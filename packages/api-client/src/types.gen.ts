@@ -420,6 +420,39 @@ export type ProjectCreate = {
 };
 
 /**
+ * ProjectJobSummary
+ *
+ * Состояние последнего задания проекта.
+ *
+ * Компактнее полного JobRead: список проектов не должен тащить служебные поля,
+ * которые в нём всё равно не показать.
+ */
+export type ProjectJobSummary = {
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    job_type: JobType;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    status: JobStatus;
+};
+
+/**
  * ProjectRead
  */
 export type ProjectRead = {
@@ -458,6 +491,9 @@ export type ProjectStatus = 'active' | 'archived';
  * ProjectSummary
  *
  * Проект вместе с производными счётчиками — то, что нужно списку и карточке.
+ *
+ * Последнее задание отдаётся здесь же: иначе, чтобы увидеть ход импорта, пришлось бы
+ * открывать каждый проект по очереди.
  */
 export type ProjectSummary = {
     /**
@@ -472,6 +508,7 @@ export type ProjectSummary = {
      * Id
      */
     id: string;
+    last_job?: ProjectJobSummary | null;
     /**
      * Name
      */

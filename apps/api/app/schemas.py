@@ -78,11 +78,32 @@ class ProjectRead(ApiModel):
     updated_at: datetime
 
 
+class ProjectJobSummary(ApiModel):
+    """Состояние последнего задания проекта.
+
+    Компактнее полного JobRead: список проектов не должен тащить служебные поля,
+    которые в нём всё равно не показать.
+    """
+
+    id: uuid.UUID
+    job_type: JobType
+    status: JobStatus
+    progress: float | None
+    stage: str | None
+    error_code: str | None
+    finished_at: datetime | None
+
+
 class ProjectSummary(ProjectRead):
-    """Проект вместе с производными счётчиками — то, что нужно списку и карточке."""
+    """Проект вместе с производными счётчиками — то, что нужно списку и карточке.
+
+    Последнее задание отдаётся здесь же: иначе, чтобы увидеть ход импорта, пришлось бы
+    открывать каждый проект по очереди.
+    """
 
     document_count: int = Field(ge=0)
     sheet_count: int = Field(ge=0)
+    last_job: ProjectJobSummary | None = None
 
 
 # --------------------------------------------------------------------------- документы

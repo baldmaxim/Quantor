@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -154,6 +155,83 @@ class TestWorkspaceBoundary:
 
         assert listed["total"] == 0
         assert direct.status_code == 404
+
+
+class TestImportStatusInList:
+    """Состояние импорта видно в списке — иначе пришлось бы открывать каждый проект."""
+
+    async def test_project_without_jobs_has_no_last_job(self, api: AsyncClient) -> None:
+        await api.post("/api/v1/projects", json={"name": "Без заданий"})
+
+        body = (await api.get("/api/v1/projects")).json()
+
+        assert body["items"][0]["last_job"] is None
+
+    async def test_last_job_is_exposed(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        from app.domain import JobType
+        from app.services import jobs as jobs_service
+
+        created = (await api.post("/api/v1/projects", json={"name": "С импортом"})).json()
+        project = await projects_service.get_project(
+            db_session, workspace_id=workspace_id, project_id=uuid.UUID(created["id"])
+        )
+        assert project is not None
+        job = await jobs_service.enqueue(
+            db_session, job_type=JobType.LEGACY_IMPORT, project_id=project.id
+        )
+        await jobs_service.start(db_session, job=job, stage="regions")
+        await jobs_service.report_progress(db_session, job=job, progress=0.64)
+        await db_session.commit()
+
+        body = (await api.get(f"/api/v1/projects/{created['id']}")).json()
+
+        assert body["last_job"]["status"] == "running"
+        assert body["last_job"]["progress"] == pytest.approx(0.64)
+        assert body["last_job"]["stage"] == "regions"
+
+    async def test_only_the_newest_job_is_returned(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        from app.domain import JobType
+        from app.services import jobs as jobs_service
+
+        created = (await api.post("/api/v1/projects", json={"name": "Два задания"})).json()
+        project = await projects_service.get_project(
+            db_session, workspace_id=workspace_id, project_id=uuid.UUID(created["id"])
+        )
+        assert project is not None
+
+        first = await jobs_service.enqueue(
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            project_id=project.id,
+            idempotency_key="first",
+        )
+        await jobs_service.start(db_session, job=first)
+        await jobs_service.fail(db_session, job=first, error_code="IMPORT_FAILED")
+        second = await jobs_service.enqueue(
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            project_id=project.id,
+            idempotency_key="second",
+        )
+        await db_session.commit()
+
+        body = (await api.get("/api/v1/projects")).json()
+
+        assert body["items"][0]["last_job"]["id"] == str(second.id)
+
+    async def test_list_of_many_projects_stays_one_query_shaped(self, api: AsyncClient) -> None:
+        """Список со счётчиками и заданиями собирается без обхода по проектам."""
+        for index in range(10):
+            await api.post("/api/v1/projects", json={"name": f"Проект {index}"})
+
+        body = (await api.get("/api/v1/projects", params={"limit": 10})).json()
+
+        assert body["total"] == 10
+        assert all("last_job" in item for item in body["items"])
 
 
 class TestProjectJobs:

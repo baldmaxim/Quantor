@@ -674,6 +674,78 @@
         "title": "ProjectCreate",
         "type": "object"
       },
+      "ProjectJobSummary": {
+        "description": "Состояние последнего задания проекта.\n\nКомпактнее полного JobRead: список проектов не должен тащить служебные поля,\nкоторые в нём всё равно не показать.",
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_type": {
+            "$ref": "#/components/schemas/JobType"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "id",
+          "job_type",
+          "status",
+          "progress",
+          "stage",
+          "error_code",
+          "finished_at"
+        ],
+        "title": "ProjectJobSummary",
+        "type": "object"
+      },
       "ProjectRead": {
         "properties": {
           "created_at": {
@@ -727,7 +799,7 @@
         "type": "string"
       },
       "ProjectSummary": {
-        "description": "Проект вместе с производными счётчиками — то, что нужно списку и карточке.",
+        "description": "Проект вместе с производными счётчиками — то, что нужно списку и карточке.\n\nПоследнее задание отдаётся здесь же: иначе, чтобы увидеть ход импорта, пришлось бы\nоткрывать каждый проект по очереди.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -743,6 +815,16 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "last_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectJobSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "title": "Name",

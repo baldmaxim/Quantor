@@ -13,9 +13,10 @@ from typing import Any
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.domain import ProjectStatus
-from app.models import Document, DocumentRevision, Project, Sheet
+from app.models import Document, DocumentRevision, Job, Project, Sheet
 
 
 class ProjectSort(StrEnum):
@@ -28,6 +29,7 @@ class ProjectWithCounts:
     project: Project
     document_count: int
     sheet_count: int
+    last_job: Job | None = None
 
 
 def _scoped(workspace_id: uuid.UUID) -> Select[tuple[Project]]:
@@ -74,6 +76,21 @@ def _document_count_subquery() -> Any:
     )
 
 
+def _latest_job() -> Any:
+    """Последнее задание каждого проекта.
+
+    DISTINCT ON вместо подзапроса на строку: иначе список из тридцати проектов делает
+    тридцать лишних обращений к базе.
+    """
+    subquery = (
+        select(Job)
+        .distinct(Job.project_id)
+        .order_by(Job.project_id, Job.created_at.desc())
+        .subquery()
+    )
+    return aliased(Job, subquery)
+
+
 def _sheet_count_subquery() -> Any:
     return (
         select(func.count(Sheet.id))
@@ -90,14 +107,19 @@ async def get_project_with_counts(
     session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
 ) -> ProjectWithCounts | None:
     """Проект вместе со счётчиками — одним запросом, чтобы карточка не делала три обращения."""
-    query = select(Project, _document_count_subquery(), _sheet_count_subquery()).where(
-        Project.workspace_id == workspace_id, Project.id == project_id
+    job = _latest_job()
+    query = (
+        select(Project, _document_count_subquery(), _sheet_count_subquery(), job)
+        .outerjoin(job, job.project_id == Project.id)
+        .where(Project.workspace_id == workspace_id, Project.id == project_id)
     )
     row = (await session.execute(query)).first()
     if row is None:
         return None
-    project, documents, sheets = row
-    return ProjectWithCounts(project=project, document_count=documents, sheet_count=sheets)
+    project, documents, sheets, last_job = row
+    return ProjectWithCounts(
+        project=project, document_count=documents, sheet_count=sheets, last_job=last_job
+    )
 
 
 async def count_projects(
@@ -124,8 +146,10 @@ async def list_projects(
     Счётчики берутся подзапросами, а не обходом связей: иначе на каждый проект уходит
     отдельный запрос, и список из тридцати проектов превращается в шестьдесят обращений к базе.
     """
+    job = _latest_job()
     query = (
-        select(Project, _document_count_subquery(), _sheet_count_subquery())
+        select(Project, _document_count_subquery(), _sheet_count_subquery(), job)
+        .outerjoin(job, job.project_id == Project.id)
         .where(Project.workspace_id == workspace_id)
         .limit(limit)
         .offset(offset)
@@ -138,6 +162,8 @@ async def list_projects(
 
     result = await session.execute(query)
     return [
-        ProjectWithCounts(project=project, document_count=documents, sheet_count=sheets)
-        for project, documents, sheets in result.all()
+        ProjectWithCounts(
+            project=project, document_count=documents, sheet_count=sheets, last_job=last_job
+        )
+        for project, documents, sheets, last_job in result.all()
     ]

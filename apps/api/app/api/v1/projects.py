@@ -13,6 +13,7 @@ from app.schemas import (
     JobRead,
     Page,
     ProjectCreate,
+    ProjectJobSummary,
     ProjectRead,
     ProjectSummary,
     ProjectUpdate,
@@ -23,6 +24,15 @@ from app.services import projects as projects_service
 from app.services.projects import ProjectSort
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+def _summary(row: projects_service.ProjectWithCounts) -> ProjectSummary:
+    return ProjectSummary(
+        **ProjectRead.model_validate(row.project).model_dump(),
+        document_count=row.document_count,
+        sheet_count=row.sheet_count,
+        last_job=ProjectJobSummary.model_validate(row.last_job) if row.last_job else None,
+    )
 
 
 @router.get("", response_model=Page[ProjectSummary], summary="Список проектов")
@@ -45,15 +55,7 @@ async def list_projects(
     total = await projects_service.count_projects(
         session, workspace_id=workspace.workspace_id, search=search
     )
-    items = [
-        ProjectSummary(
-            **ProjectRead.model_validate(row.project).model_dump(),
-            document_count=row.document_count,
-            sheet_count=row.sheet_count,
-        )
-        for row in rows
-    ]
-    return Page(items=items, total=total, limit=limit, offset=offset)
+    return Page(items=[_summary(row) for row in rows], total=total, limit=limit, offset=offset)
 
 
 @router.post(
@@ -82,11 +84,7 @@ async def read_project(
     if row is None:
         raise not_found("Проект")
 
-    return ProjectSummary(
-        **ProjectRead.model_validate(row.project).model_dump(),
-        document_count=row.document_count,
-        sheet_count=row.sheet_count,
-    )
+    return _summary(row)
 
 
 @router.patch("/{project_id}", response_model=ProjectRead, summary="Изменить проект")
