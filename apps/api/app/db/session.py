@@ -29,6 +29,8 @@ def get_engine() -> AsyncEngine:
         pool_size=5,
         max_overflow=5,
         echo=False,
+        # Зависший запрос иначе держит соединение и рабочий поток приложения бесконечно.
+        connect_args={"command_timeout": settings.database_statement_timeout_seconds},
     )
 
 

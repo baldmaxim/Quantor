@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     archive_max_file_bytes: int = Field(default=1024**3, gt=0)
     archive_max_compression_ratio: int = Field(default=200, gt=1)
 
+    # Предел времени на запрос к базе. Без него зависший запрос держит соединение
+    # и рабочий поток приложения до бесконечности.
+    database_statement_timeout_seconds: float = Field(default=15.0, gt=0)
+
     # Переопределение флагов возможностей: `takeoff.ai=true,reports=true`.
     # Включение флага не создаёт функциональность — оно лишь перестаёт её прятать.
     feature_flags: str = ""
