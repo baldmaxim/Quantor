@@ -18,7 +18,7 @@
 
 ```bash
 pnpm install && pnpm run setup   # node- и python-зависимости
-pnpm up                          # postgres + minio
+pnpm infra:up                    # postgres + minio
 pnpm dev                         # api :8000 + web :3000
 pnpm lint                        # ruff + eslint
 pnpm typecheck                   # mypy + tsc

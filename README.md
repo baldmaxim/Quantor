@@ -18,13 +18,13 @@
 ## Запуск с нуля
 
 ```bash
-git clone <адрес репозитория> quantor
+git clone https://github.com/baldmaxim/Quantor.git quantor
 cd quantor
 
 pnpm install       # зависимости Node
 pnpm run setup     # окружение Python: apps/api/.venv + зависимости
 
-pnpm up            # PostgreSQL/PostGIS и MinIO в Docker
+pnpm infra:up      # PostgreSQL/PostGIS и MinIO в Docker
 pnpm db:migrate    # миграции базы
 pnpm dev           # API на :8000 и веб на :3000
 ```
@@ -57,19 +57,19 @@ API_CORS_ORIGINS=http://192.168.1.50:3000
 
 ## Команды
 
-| Команда                    | Что делает                                           |
-| -------------------------- | ---------------------------------------------------- |
-| `pnpm run setup`           | создаёт `apps/api/.venv` и ставит зависимости Python |
-| `pnpm up` / `pnpm down`    | поднимает и останавливает PostgreSQL и MinIO         |
-| `pnpm logs`                | логи контейнеров                                     |
-| `pnpm dev`                 | API и веб одновременно                               |
-| `pnpm lint`                | `ruff` для бэкенда, `eslint` для фронтенда           |
-| `pnpm typecheck`           | `mypy` и `tsc`                                       |
-| `pnpm test`                | `pytest` и `vitest`                                  |
-| `pnpm test:e2e`            | Playwright (нужен `pnpm exec playwright install`)    |
-| `pnpm build`               | генерация клиента API и сборка веб-приложения        |
-| `pnpm db:migrate`          | накатывает миграции                                  |
-| `pnpm api-client:generate` | FastAPI → `openapi.json` → TypeScript-клиент         |
+| Команда                             | Что делает                                           |
+| ----------------------------------- | ---------------------------------------------------- |
+| `pnpm run setup`                    | создаёт `apps/api/.venv` и ставит зависимости Python |
+| `pnpm infra:up` / `pnpm infra:down` | поднимает и останавливает PostgreSQL и MinIO         |
+| `pnpm infra:logs`                   | логи контейнеров                                     |
+| `pnpm dev`                          | API и веб одновременно                               |
+| `pnpm lint`                         | `ruff` для бэкенда, `eslint` для фронтенда           |
+| `pnpm typecheck`                    | `mypy` и `tsc`                                       |
+| `pnpm test`                         | `pytest` и `vitest`                                  |
+| `pnpm test:e2e`                     | Playwright (нужен `pnpm exec playwright install`)    |
+| `pnpm build`                        | генерация клиента API и сборка веб-приложения        |
+| `pnpm db:migrate`                   | накатывает миграции                                  |
+| `pnpm api-client:generate`          | FastAPI → `openapi.json` → TypeScript-клиент         |
 
 ## Структура
 
@@ -89,8 +89,10 @@ scripts               кроссплатформенные команды раз
 | Симптом                               | Причина и что делать                                                             |
 | ------------------------------------- | -------------------------------------------------------------------------------- |
 | `pnpm run setup` не находит Python    | поставьте 3.12: `winget install Python.Python.3.12`                              |
-| `pnpm up` пишет про docker            | запустите Docker Desktop и повторите                                             |
-| `/health/ready` отвечает `degraded`   | не подняты контейнеры (`pnpm up`) или занят порт 5432/9000                       |
+| `pnpm infra:up` пишет про docker      | запустите Docker Desktop и повторите                                             |
+| `/health/ready` отвечает `degraded`   | не подняты контейнеры (`pnpm infra:up`) или заняты порты                         |
+| порт 5432 занят локальным PostgreSQL  | в `.env` поставьте `POSTGRES_PORT=5433` и повторите `pnpm infra:up`              |
+| порт 9000 занят                       | в `.env` поставьте `S3_PORT=9001` и `S3_ENDPOINT_URL=http://localhost:9001`      |
 | «API недоступен» на странице проектов | бэкенд не запущен или в `NEXT_PUBLIC_API_BASE_URL` не тот адрес                  |
 | CI падает на `api-client:check`       | контракт изменился: выполните `pnpm api-client:generate` и закоммитьте результат |
 
