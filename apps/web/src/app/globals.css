@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+/* Дизайн-токены. Цвета в компонентах задаются только через них — хардкод hex запрещён.
+   Палитра сдержанная: портал — инженерный инструмент, а не маркетинговый лендинг. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #f0f2f5;
+  --text: #14181f;
+  --muted: #5c6572;
+  --border: #d9dee5;
+  --accent: #2563a8;
+  --accent-contrast: #ffffff;
+  --success: #2f7d4f;
+  --warning: #a86b1d;
+  --danger: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #14171c;
+    --surface: #1b1f26;
+    --surface-muted: #232833;
+    --text: #e7eaef;
+    --muted: #98a1b0;
+    --border: #333a45;
+    --accent: #5c9ce0;
+    --accent-contrast: #10131a;
+    --success: #63b47f;
+    --warning: #d19a4a;
+    --danger: #e0736a;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #14171c;
+  --surface: #1b1f26;
+  --surface-muted: #232833;
+  --text: #e7eaef;
+  --muted: #98a1b0;
+  --border: #333a45;
+  --accent: #5c9ce0;
+  --accent-contrast: #10131a;
+  --success: #63b47f;
+  --warning: #d19a4a;
+  --danger: #e0736a;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+}
+
+html,
+body {
+  min-height: 100dvh;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Видимый фокус обязателен: рабочей областью пользуются с клавиатуры. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

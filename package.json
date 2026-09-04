@@ -1,0 +1,41 @@
+{
+  "name": "quantor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Quantor / QTO Portal — портал автоматизированного подсчёта строительных объёмов. Stage 1: фундамент и оболочка.",
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "up": "node scripts/compose.mjs up -d",
+    "down": "node scripts/compose.mjs down",
+    "logs": "node scripts/compose.mjs logs -f",
+    "dev": "concurrently -n api,web -c cyan,magenta \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev:api": "node scripts/py.mjs -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:web": "pnpm --filter @quantor/web dev",
+    "build": "pnpm run api-client:generate && pnpm --filter @quantor/web build",
+    "lint": "pnpm run lint:api && pnpm run lint:web && pnpm run lint:format",
+    "lint:api": "node scripts/py.mjs -m ruff check . && node scripts/py.mjs -m ruff format --check .",
+    "lint:web": "pnpm --filter @quantor/web lint",
+    "lint:format": "prettier --check --ignore-unknown .",
+    "format": "node scripts/py.mjs -m ruff format . && prettier --write --ignore-unknown .",
+    "typecheck": "pnpm run typecheck:api && pnpm run typecheck:web",
+    "typecheck:api": "node scripts/py.mjs -m mypy app",
+    "typecheck:web": "pnpm --filter @quantor/web typecheck",
+    "test": "pnpm run test:api && pnpm run test:web",
+    "test:api": "node scripts/py.mjs -m pytest",
+    "test:web": "pnpm --filter @quantor/web test",
+    "test:e2e": "pnpm --filter @quantor/web test:e2e",
+    "db:migrate": "node scripts/py.mjs -m alembic upgrade head",
+    "db:revision": "node scripts/py.mjs -m alembic revision --autogenerate -m",
+    "api-client:generate": "node scripts/gen-api-client.mjs",
+    "api-client:check": "node scripts/gen-api-client.mjs --check"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "concurrently": "10.0.5",
+    "prettier": "3.9.6"
+  }
+}

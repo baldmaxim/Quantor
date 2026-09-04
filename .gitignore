@@ -1,0 +1,47 @@
+# --- Node ---
+node_modules/
+.pnpm-store/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# --- Next.js / build ---
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Test artifacts ---
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# --- Fixtures: крупные пользовательские архивы не коммитим ---
+_prompts/stage1/fixtures/**
+!_prompts/stage1/fixtures/**/
+!_prompts/stage1/fixtures/README.md
+!_prompts/stage1/fixtures/**/.gitkeep
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

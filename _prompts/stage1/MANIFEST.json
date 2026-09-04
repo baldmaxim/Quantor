@@ -1,0 +1,101 @@
+{
+  "pack": "QTO Portal Stage 1",
+  "target": "Claude Code Opus 5 (1M)",
+  "files": [
+    {
+      "path": "README_START_HERE.md",
+      "sha256": "154d839594496040cc802b95534f426aadae6354de80adb970e7ccd135f4037d",
+      "bytes": 4690
+    },
+    {
+      "path": "prompts/00_MASTER_CONTEXT.md",
+      "sha256": "2086e502c0cc2ccfca7cb1ca5093cd2eedb3bace5e7527ab6ae130d87f444fb5",
+      "bytes": 6270
+    },
+    {
+      "path": "prompts/01_REPO_AUDIT_AND_ARCHITECTURE.md",
+      "sha256": "6153ed0dde8ef75b7811fe76e542fc7710e15e20e1b173b56ec6cbcb7cd17d22",
+      "bytes": 3585
+    },
+    {
+      "path": "prompts/02_FOUNDATION_BOOTSTRAP.md",
+      "sha256": "8afb5580d6b8704840f76d30247e2a80ee105ea5062812353f5871951205974b",
+      "bytes": 3161
+    },
+    {
+      "path": "prompts/03_DOMAIN_STORAGE_API_SHELL.md",
+      "sha256": "ea948b4c1f2987d7b280bab9caebb40985b11696143bf91d77f0519b1e2a79d2",
+      "bytes": 3547
+    },
+    {
+      "path": "prompts/04_FRONTEND_DESIGN_SYSTEM_APP_SHELL.md",
+      "sha256": "431a77e2c4bbb550cf4be7827026618130655e571cf0c1ef63edf858ff74532c",
+      "bytes": 3563
+    },
+    {
+      "path": "prompts/05_PROJECTS_AND_UPLOAD_FLOW.md",
+      "sha256": "42ed2708ecae8f83485add2d4ecc6ec25ccc20ecec524b4191cfe883330cc86b",
+      "bytes": 3185
+    },
+    {
+      "path": "prompts/06_LEGACY_RECOGNIZED_PACKAGE_IMPORT.md",
+      "sha256": "0b0b9dff58329eee99e2b2509df1d92b5c2cb5147d41b8b1303b2d717e596ade",
+      "bytes": 4057
+    },
+    {
+      "path": "prompts/07_PROJECT_WORKSPACE_VIEWER_SHELL.md",
+      "sha256": "3db2f05ca5629f826720cbff36cced62704dcb3144b85190b14ed50ca673ac61",
+      "bytes": 3996
+    },
+    {
+      "path": "prompts/08_FUTURE_AI_ORCHESTRATION_BOUNDARIES.md",
+      "sha256": "c993749d0c949b9f5632abe533e07e0afcb1e3bffa59555eab9ad0ebca775202",
+      "bytes": 2938
+    },
+    {
+      "path": "prompts/09_PERFORMANCE_SECURITY_OBSERVABILITY.md",
+      "sha256": "12e1365f27c914729029e26c72306d012305446520857d9fcf2ff12317e6b04d",
+      "bytes": 2857
+    },
+    {
+      "path": "prompts/10_STAGE1_ACCEPTANCE_AUDIT.md",
+      "sha256": "171d56adb2ecc78264695c83bbbbe8da2cf165841eda3ae616d69386d594fd7d",
+      "bytes": 2887
+    },
+    {
+      "path": "reference/ARCHITECTURE_TARGET.md",
+      "sha256": "d371efac3916a216849e4e78551972a49c2e690d7344f86ffaf07a9cc28ee3f1",
+      "bytes": 5238
+    },
+    {
+      "path": "reference/DOMAIN_CONTRACTS.md",
+      "sha256": "fc1df127ec2fb800432ec87e77250f7c1e42e02ebb25d6d3a16f44d0d2ce03ae",
+      "bytes": 2389
+    },
+    {
+      "path": "reference/EXPORT_ANALYSIS.md",
+      "sha256": "d2429a5b4d00adb6602ab54577479b2311e5460fab42681447c8a14766b11795",
+      "bytes": 4094
+    },
+    {
+      "path": "reference/KREO_WORKFLOW_NOTES_2026-09.md",
+      "sha256": "e1ab22d73c10493db231592a5148d6d8a057290341a0be435ccbd5aa3512d477",
+      "bytes": 1321
+    },
+    {
+      "path": "reference/ROUTES_AND_UI.md",
+      "sha256": "5a0fc0a75dbb915e352f9774fad34474c37c26612f8341338eada263d29ea0b4",
+      "bytes": 3459
+    },
+    {
+      "path": "reference/STAGE1_ACCEPTANCE_CHECKLIST.md",
+      "sha256": "1f4a262f7e7635a3898cd4676dcf696edd7ae65ce105b88b92074bc38c49ee36",
+      "bytes": 1347
+    },
+    {
+      "path": "reference/legacy_blocks_sample.json",
+      "sha256": "8b8d81c59fd17ccd519f72d5568043365a11a32049446b236865868ad6994b43",
+      "bytes": 1024
+    }
+  ]
+}

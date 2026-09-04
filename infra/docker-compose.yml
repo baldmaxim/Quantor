@@ -1,0 +1,66 @@
+# Локальные зависимости Quantor: метаданные (PostgreSQL/PostGIS) и объектное хранилище (MinIO).
+# Все значения имеют dev-умолчания, поэтому стек поднимается без .env.
+# Продовые креды задаются только через окружение и в репозиторий не попадают.
+
+name: quantor
+
+services:
+  postgres:
+    # PostGIS-совместимый образ: геометрия понадобится Stage 2, схему менять не придётся.
+    image: postgis/postgis:17-3.5
+    container_name: quantor-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quantor}
+      POSTGRES_USER: ${POSTGRES_USER:-quantor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quantor_dev_password}
+      # Корректная сортировка/сравнение для русских наименований проектов и файлов.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=ru-RU'
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-quantor} -d ${POSTGRES_DB:-quantor}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    container_name: quantor-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-quantor_dev}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-quantor_dev_secret}
+    ports:
+      - '${S3_PORT:-9000}:9000'
+      - '${S3_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Одноразовая инициализация: создаёт бакет и оставляет его приватным.
+  minio-init:
+    image: minio/mc:latest
+    container_name: quantor-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 '${S3_ACCESS_KEY_ID:-quantor_dev}' '${S3_SECRET_ACCESS_KEY:-quantor_dev_secret}' &&
+      mc mb --ignore-existing local/'${S3_BUCKET:-quantor-dev}' &&
+      mc anonymous set none local/'${S3_BUCKET:-quantor-dev}' &&
+      echo 'bucket ${S3_BUCKET:-quantor-dev} ready'
+      "
+    restart: 'no'
+
+volumes:
+  pgdata:
+  miniodata:

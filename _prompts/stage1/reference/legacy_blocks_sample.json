@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "coordinate_space": "normalized_page_top_left",
+  "pages": [
+    {
+      "page_index": 0,
+      "width_px": 2481,
+      "height_px": 3509,
+      "rotation": 0
+    }
+  ],
+  "blocks": [
+    {
+      "block_id": "blk_example_text",
+      "ordinal": 1,
+      "page_index": 0,
+      "page_label": 1,
+      "block_type": "text",
+      "shape_type": "rectangle",
+      "status": "recognized",
+      "export_status": "recognized",
+      "coords_norm": [
+        0.1,
+        0.1,
+        0.9,
+        0.8
+      ],
+      "polygon_points": null,
+      "crop_url": "https://example.invalid/api/crops/example"
+    },
+    {
+      "block_id": "blk_example_stamp",
+      "ordinal": null,
+      "page_index": 0,
+      "page_label": 1,
+      "block_type": "stamp",
+      "shape_type": "rectangle",
+      "status": "recognized",
+      "export_status": "recognized",
+      "coords_norm": [
+        0.7,
+        0.9,
+        0.98,
+        0.99
+      ],
+      "polygon_points": null,
+      "crop_url": null
+    }
+  ]
+}

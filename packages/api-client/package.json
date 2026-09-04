@@ -1,0 +1,17 @@
+{
+  "name": "@quantor/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript-клиент Quantor API. Генерируется из OpenAPI, руками не правится.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.gen.ts",
+    "./runtime": "./runtime.ts"
+  },
+  "scripts": {
+    "generate": "openapi-ts"
+  }
+}
