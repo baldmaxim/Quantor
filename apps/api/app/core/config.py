@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     archive_max_file_bytes: int = Field(default=1024**3, gt=0)
     archive_max_compression_ratio: int = Field(default=200, gt=1)
 
+    # Переопределение флагов возможностей: `takeoff.ai=true,reports=true`.
+    # Включение флага не создаёт функциональность — оно лишь перестаёт её прятать.
+    feature_flags: str = ""
+
     @field_validator("api_cors_origins")
     @classmethod
     def _strip_origins(cls, value: str) -> str:

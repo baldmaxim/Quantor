@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app import API_VERSION, SCHEMA_VERSION
 from app.core.config import get_settings
-from app.core.features import FEATURE_FLAGS
+from app.core.features import resolve
 
 router = APIRouter(tags=["meta"])
 
@@ -32,5 +32,5 @@ async def read_meta() -> MetaResponse:
         schema_version=SCHEMA_VERSION,
         environment=settings.environment,
         stage="stage-1",
-        features=dict(FEATURE_FLAGS),
+        features=resolve(settings.feature_flags),
     )
