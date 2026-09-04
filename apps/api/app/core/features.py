@@ -17,6 +17,7 @@ FEATURE_FLAGS: Final[MappingProxyType[str, bool]] = MappingProxyType(
     {
         # --- работает или дорабатывается в Stage 1 ---
         "projects": True,
+        "documents": True,
         "legacy_import": False,
         "viewer": False,
         # --- Stage 2 и далее ---

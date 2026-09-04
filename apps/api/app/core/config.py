@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     # Таймаут проверок готовности, чтобы /health/ready не висел на недоступной зависимости.
     readiness_timeout_seconds: float = Field(default=3.0, gt=0)
 
+    # Время жизни ссылки на файл ревизии. Просмотрщик открывает документ надолго, поэтому
+    # ссылка должна пережить сеанс работы, но не превращаться в постоянную публичную.
+    content_url_ttl_seconds: int = Field(default=3600, gt=0, le=24 * 3600)
+
+    # Ограничения приёма файлов. Эталонный архив распознавалки — 47 МБ, документы бывают
+    # в разы больше, поэтому предел с запасом и настраивается окружением.
+    max_upload_size_bytes: int = Field(default=1024 * 1024 * 1024, gt=0)
+
     @field_validator("api_cors_origins")
     @classmethod
     def _strip_origins(cls, value: str) -> str:

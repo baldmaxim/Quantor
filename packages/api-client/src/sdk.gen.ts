@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { LivenessData, LivenessResponses, ReadinessData, ReadinessResponses, ReadMetaData, ReadMetaResponses } from './types.gen';
+import type { CreateProjectData, CreateProjectErrors, CreateProjectResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, LivenessData, LivenessResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,9 +19,98 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
+ * Документ
+ */
+export const readDocument = <ThrowOnError extends boolean = false>(options: Options<ReadDocumentData, ThrowOnError>): RequestResult<ReadDocumentResponses, ReadDocumentErrors, ThrowOnError> => (options.client ?? client).get<ReadDocumentResponses, ReadDocumentErrors, ThrowOnError>({ url: '/api/v1/documents/{document_id}', ...options });
+
+/**
+ * Ревизии документа
+ */
+export const listDocumentRevisions = <ThrowOnError extends boolean = false>(options: Options<ListDocumentRevisionsData, ThrowOnError>): RequestResult<ListDocumentRevisionsResponses, ListDocumentRevisionsErrors, ThrowOnError> => (options.client ?? client).get<ListDocumentRevisionsResponses, ListDocumentRevisionsErrors, ThrowOnError>({ url: '/api/v1/documents/{document_id}/revisions', ...options });
+
+/**
+ * Состояние задания
+ */
+export const readJob = <ThrowOnError extends boolean = false>(options: Options<ReadJobData, ThrowOnError>): RequestResult<ReadJobResponses, ReadJobErrors, ThrowOnError> => (options.client ?? client).get<ReadJobResponses, ReadJobErrors, ThrowOnError>({ url: '/api/v1/jobs/{job_id}', ...options });
+
+/**
  * Версии и возможности API
  */
 export const readMeta = <ThrowOnError extends boolean = false>(options?: Options<ReadMetaData, ThrowOnError>): RequestResult<ReadMetaResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ReadMetaResponses, unknown, ThrowOnError>({ url: '/api/v1/meta', ...options });
+
+/**
+ * Список проектов
+ */
+export const listProjects = <ThrowOnError extends boolean = false>(options?: Options<ListProjectsData, ThrowOnError>): RequestResult<ListProjectsResponses, ListProjectsErrors, ThrowOnError> => (options?.client ?? client).get<ListProjectsResponses, ListProjectsErrors, ThrowOnError>({ url: '/api/v1/projects', ...options });
+
+/**
+ * Создать проект
+ */
+export const createProject = <ThrowOnError extends boolean = false>(options: Options<CreateProjectData, ThrowOnError>): RequestResult<CreateProjectResponses, CreateProjectErrors, ThrowOnError> => (options.client ?? client).post<CreateProjectResponses, CreateProjectErrors, ThrowOnError>({
+    url: '/api/v1/projects',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Проект
+ */
+export const readProject = <ThrowOnError extends boolean = false>(options: Options<ReadProjectData, ThrowOnError>): RequestResult<ReadProjectResponses, ReadProjectErrors, ThrowOnError> => (options.client ?? client).get<ReadProjectResponses, ReadProjectErrors, ThrowOnError>({ url: '/api/v1/projects/{project_id}', ...options });
+
+/**
+ * Изменить проект
+ */
+export const updateProject = <ThrowOnError extends boolean = false>(options: Options<UpdateProjectData, ThrowOnError>): RequestResult<UpdateProjectResponses, UpdateProjectErrors, ThrowOnError> => (options.client ?? client).patch<UpdateProjectResponses, UpdateProjectErrors, ThrowOnError>({
+    url: '/api/v1/projects/{project_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Документы проекта
+ */
+export const listProjectDocuments = <ThrowOnError extends boolean = false>(options: Options<ListProjectDocumentsData, ThrowOnError>): RequestResult<ListProjectDocumentsResponses, ListProjectDocumentsErrors, ThrowOnError> => (options.client ?? client).get<ListProjectDocumentsResponses, ListProjectDocumentsErrors, ThrowOnError>({ url: '/api/v1/projects/{project_id}/documents', ...options });
+
+/**
+ * Задания проекта
+ */
+export const listProjectJobs = <ThrowOnError extends boolean = false>(options: Options<ListProjectJobsData, ThrowOnError>): RequestResult<ListProjectJobsResponses, ListProjectJobsErrors, ThrowOnError> => (options.client ?? client).get<ListProjectJobsResponses, ListProjectJobsErrors, ThrowOnError>({ url: '/api/v1/projects/{project_id}/jobs', ...options });
+
+/**
+ * Ревизия документа
+ */
+export const readRevision = <ThrowOnError extends boolean = false>(options: Options<ReadRevisionData, ThrowOnError>): RequestResult<ReadRevisionResponses, ReadRevisionErrors, ThrowOnError> => (options.client ?? client).get<ReadRevisionResponses, ReadRevisionErrors, ThrowOnError>({ url: '/api/v1/revisions/{revision_id}', ...options });
+
+/**
+ * Артефакты распознавания
+ */
+export const listRevisionArtifacts = <ThrowOnError extends boolean = false>(options: Options<ListRevisionArtifactsData, ThrowOnError>): RequestResult<ListRevisionArtifactsResponses, ListRevisionArtifactsErrors, ThrowOnError> => (options.client ?? client).get<ListRevisionArtifactsResponses, ListRevisionArtifactsErrors, ThrowOnError>({ url: '/api/v1/revisions/{revision_id}/artifacts', ...options });
+
+/**
+ * Ссылка на файл ревизии
+ *
+ * Временная ссылка прямо в хранилище.
+ *
+ * Просмотрщику нужен доступ с поддержкой Range-запросов, чтобы читать только текущую
+ * страницу документа. Проксировать такой файл через процесс приложения нельзя.
+ */
+export const readRevisionContentUrl = <ThrowOnError extends boolean = false>(options: Options<ReadRevisionContentUrlData, ThrowOnError>): RequestResult<ReadRevisionContentUrlResponses, ReadRevisionContentUrlErrors, ThrowOnError> => (options.client ?? client).get<ReadRevisionContentUrlResponses, ReadRevisionContentUrlErrors, ThrowOnError>({ url: '/api/v1/revisions/{revision_id}/content-url', ...options });
+
+/**
+ * Листы ревизии
+ */
+export const listRevisionSheets = <ThrowOnError extends boolean = false>(options: Options<ListRevisionSheetsData, ThrowOnError>): RequestResult<ListRevisionSheetsResponses, ListRevisionSheetsErrors, ThrowOnError> => (options.client ?? client).get<ListRevisionSheetsResponses, ListRevisionSheetsErrors, ThrowOnError>({ url: '/api/v1/revisions/{revision_id}/sheets', ...options });
+
+/**
+ * Области на листе
+ */
+export const listSheetRegions = <ThrowOnError extends boolean = false>(options: Options<ListSheetRegionsData, ThrowOnError>): RequestResult<ListSheetRegionsResponses, ListSheetRegionsErrors, ThrowOnError> => (options.client ?? client).get<ListSheetRegionsResponses, ListSheetRegionsErrors, ThrowOnError>({ url: '/api/v1/sheets/{sheet_id}/regions', ...options });
 
 /**
  * Liveness probe

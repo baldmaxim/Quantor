@@ -41,6 +41,23 @@ jobs:
   api:
     name: Бэкенд
     runs-on: ubuntu-latest
+    # Тесты базы данных должны выполняться по-настоящему, иначе они молча пропускаются.
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_DB: quantor
+          POSTGRES_USER: quantor
+          POSTGRES_PASSWORD: quantor_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quantor -d quantor"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      POSTGRES_PASSWORD: quantor_ci_password
     defaults:
       run:
         working-directory: apps/api
@@ -55,7 +72,16 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy app
-      - run: pytest
+      - name: Тесты
+        # Тесты базы данных умеют пропускаться на машине без PostgreSQL. В CI база есть,
+        # поэтому пропуск означает поломку окружения, а не отсутствие инфраструктуры.
+        run: |
+          set -o pipefail
+          pytest -q -rs 2>&1 | tee pytest.log
+          if grep -q "PostgreSQL недоступен" pytest.log; then
+            echo "::error::Тесты базы данных пропущены — база в CI недоступна"
+            exit 1
+          fi
 
   contract:
     name: Контракт API
@@ -108,3 +134,7 @@ jobs:
       - run: pip install --editable '.[dev]'
       - name: Миграции накатываются на пустую базу
         run: alembic upgrade head
+      - name: Миграции соответствуют моделям
+        run: alembic check
+      - name: Откат миграций работает
+        run: alembic downgrade base

@@ -5,6 +5,13 @@ export type ClientOptions = {
 };
 
 /**
+ * ArtifactKind
+ *
+ * Роль файла внутри распознанного пакета.
+ */
+export type ArtifactKind = 'blocks_json' | 'results_md' | 'results_html' | 'package_zip' | 'other';
+
+/**
  * ComponentHealth
  */
 export type ComponentHealth = {
@@ -21,6 +28,189 @@ export type ComponentHealth = {
      */
     status: 'ok' | 'unavailable';
 };
+
+/**
+ * ContentUrl
+ *
+ * Ссылка на файл ревизии прямо из хранилища.
+ *
+ * API не проксирует бинарные данные: документ на 50–500 МБ не должен проходить через
+ * процесс приложения (ADR-0002).
+ */
+export type ContentUrl = {
+    /**
+     * Content Type
+     */
+    content_type: string;
+    /**
+     * Expires In
+     */
+    expires_in: number;
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Url
+     */
+    url: string;
+};
+
+/**
+ * DocumentKind
+ *
+ * Природа документа. BIM-форматы принимаются на хранение, но не разбираются.
+ */
+export type DocumentKind = 'pdf' | 'recognized_package' | 'revit' | 'navisworks' | 'ifc' | 'other';
+
+/**
+ * DocumentRead
+ */
+export type DocumentRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Discipline
+     */
+    discipline: string | null;
+    /**
+     * Display Name
+     */
+    display_name: string;
+    document_kind: DocumentKind;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * DocumentRevisionRead
+ */
+export type DocumentRevisionRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Processing Error Code
+     */
+    processing_error_code: string | null;
+    processing_status: ProcessingStatus;
+    /**
+     * Revision Label
+     */
+    revision_label: string | null;
+    /**
+     * Source Filename
+     */
+    source_filename: string;
+    /**
+     * Source Metadata
+     */
+    source_metadata: {
+        [key: string]: unknown;
+    };
+    /**
+     * Source Mime
+     */
+    source_mime: string;
+    /**
+     * Source Sha256
+     */
+    source_sha256: string;
+    /**
+     * Source Size
+     */
+    source_size: number;
+};
+
+/**
+ * HTTPValidationError
+ */
+export type HttpValidationError = {
+    /**
+     * Detail
+     */
+    detail?: Array<ValidationError>;
+};
+
+/**
+ * JobRead
+ */
+export type JobRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    job_type: JobType;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    /**
+     * Started At
+     */
+    started_at: string | null;
+    status: JobStatus;
+};
+
+/**
+ * JobStatus
+ */
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+/**
+ * JobType
+ *
+ * Типы заданий.
+ *
+ * Реален только legacy_import. Остальные объявлены в промте 08 как контракт и в Stage 1
+ * не исполняются.
+ */
+export type JobType = 'legacy_import';
 
 /**
  * LivenessResponse
@@ -61,6 +251,236 @@ export type MetaResponse = {
 };
 
 /**
+ * Page[DocumentRead]
+ */
+export type PageDocumentRead = {
+    /**
+     * Items
+     */
+    items: Array<DocumentRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * Page[DocumentRevisionRead]
+ */
+export type PageDocumentRevisionRead = {
+    /**
+     * Items
+     */
+    items: Array<DocumentRevisionRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * Page[JobRead]
+ */
+export type PageJobRead = {
+    /**
+     * Items
+     */
+    items: Array<JobRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * Page[ProjectSummary]
+ */
+export type PageProjectSummary = {
+    /**
+     * Items
+     */
+    items: Array<ProjectSummary>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * Page[RegionRead]
+ */
+export type PageRegionRead = {
+    /**
+     * Items
+     */
+    items: Array<RegionRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * Page[SheetRead]
+ */
+export type PageSheetRead = {
+    /**
+     * Items
+     */
+    items: Array<SheetRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * ProcessingStatus
+ *
+ * Состояние обработки конкретной ревизии.
+ *
+ * Единственное изменяемое поле ревизии: описывает не файл, а ход работы над ним.
+ */
+export type ProcessingStatus = 'pending' | 'unprocessed' | 'processor_unavailable' | 'importing' | 'ready' | 'failed';
+
+/**
+ * ProjectCreate
+ */
+export type ProjectCreate = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * ProjectRead
+ */
+export type ProjectRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    status: ProjectStatus;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * ProjectSort
+ */
+export type ProjectSort = 'recent' | 'name';
+
+/**
+ * ProjectStatus
+ *
+ * Жизненный цикл проекта. Ход импорта сюда не пишется — он живёт в Job и ревизиях.
+ */
+export type ProjectStatus = 'active' | 'archived';
+
+/**
+ * ProjectSummary
+ *
+ * Проект вместе с производными счётчиками — то, что нужно списку и карточке.
+ */
+export type ProjectSummary = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Document Count
+     */
+    document_count: number;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Sheet Count
+     */
+    sheet_count: number;
+    status: ProjectStatus;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * ProjectUpdate
+ */
+export type ProjectUpdate = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    status?: ProjectStatus | null;
+};
+
+/**
  * ReadinessResponse
  */
 export type ReadinessResponse = {
@@ -73,6 +493,271 @@ export type ReadinessResponse = {
      */
     status: 'ok' | 'degraded';
 };
+
+/**
+ * RecognitionArtifactRead
+ */
+export type RecognitionArtifactRead = {
+    artifact_kind: ArtifactKind;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Metadata
+     */
+    metadata: {
+        [key: string]: unknown;
+    };
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Schema Version
+     */
+    schema_version: number | null;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Source Filename
+     */
+    source_filename: string;
+};
+
+/**
+ * RegionRead
+ *
+ * Область распознавания.
+ *
+ * coords_norm — [x0, y0, x1, y1] от левого верхнего угла листа, значения в [0, 1].
+ * Перевод в экранные координаты выполняет клиент при отрисовке (ADR-0008).
+ */
+export type RegionRead = {
+    /**
+     * Block Type
+     */
+    block_type: string;
+    /**
+     * Coords Norm
+     */
+    coords_norm: Array<number>;
+    /**
+     * External Block Id
+     */
+    external_block_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Legacy Metadata
+     */
+    legacy_metadata: {
+        [key: string]: unknown;
+    };
+    /**
+     * Ordinal
+     */
+    ordinal: number | null;
+    /**
+     * Polygon Points
+     */
+    polygon_points: Array<Array<number>> | null;
+    /**
+     * Raw Content Md
+     */
+    raw_content_md: string | null;
+    /**
+     * Recognition Status
+     */
+    recognition_status: string | null;
+    shape_type: RegionShape;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string;
+};
+
+/**
+ * RegionShape
+ */
+export type RegionShape = 'rectangle' | 'polygon';
+
+/**
+ * SheetRead
+ */
+export type SheetRead = {
+    /**
+     * Height Px
+     */
+    height_px: number | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Label
+     */
+    page_label: string | null;
+    /**
+     * Region Count
+     */
+    region_count: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Rotation
+     */
+    rotation: number;
+    /**
+     * Width Px
+     */
+    width_px: number | null;
+};
+
+/**
+ * ValidationError
+ */
+export type ValidationError = {
+    /**
+     * Context
+     */
+    ctx?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Input
+     */
+    input?: unknown;
+    /**
+     * Location
+     */
+    loc: Array<string | number>;
+    /**
+     * Message
+     */
+    msg: string;
+    /**
+     * Error Type
+     */
+    type: string;
+};
+
+export type ReadDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/documents/{document_id}';
+};
+
+export type ReadDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadDocumentError = ReadDocumentErrors[keyof ReadDocumentErrors];
+
+export type ReadDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocumentRead;
+};
+
+export type ReadDocumentResponse = ReadDocumentResponses[keyof ReadDocumentResponses];
+
+export type ListDocumentRevisionsData = {
+    body?: never;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+    };
+    url: '/api/v1/documents/{document_id}/revisions';
+};
+
+export type ListDocumentRevisionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListDocumentRevisionsError = ListDocumentRevisionsErrors[keyof ListDocumentRevisionsErrors];
+
+export type ListDocumentRevisionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageDocumentRevisionRead;
+};
+
+export type ListDocumentRevisionsResponse = ListDocumentRevisionsResponses[keyof ListDocumentRevisionsResponses];
+
+export type ReadJobData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/jobs/{job_id}';
+};
+
+export type ReadJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadJobError = ReadJobErrors[keyof ReadJobErrors];
+
+export type ReadJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: JobRead;
+};
+
+export type ReadJobResponse = ReadJobResponses[keyof ReadJobResponses];
 
 export type ReadMetaData = {
     body?: never;
@@ -89,6 +774,410 @@ export type ReadMetaResponses = {
 };
 
 export type ReadMetaResponse = ReadMetaResponses[keyof ReadMetaResponses];
+
+export type ListProjectsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+        /**
+         * Search
+         */
+        search?: string | null;
+        sort?: ProjectSort;
+    };
+    url: '/api/v1/projects';
+};
+
+export type ListProjectsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListProjectsError = ListProjectsErrors[keyof ListProjectsErrors];
+
+export type ListProjectsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageProjectSummary;
+};
+
+export type ListProjectsResponse = ListProjectsResponses[keyof ListProjectsResponses];
+
+export type CreateProjectData = {
+    body: ProjectCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/projects';
+};
+
+export type CreateProjectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateProjectError = CreateProjectErrors[keyof CreateProjectErrors];
+
+export type CreateProjectResponses = {
+    /**
+     * Successful Response
+     */
+    201: ProjectRead;
+};
+
+export type CreateProjectResponse = CreateProjectResponses[keyof CreateProjectResponses];
+
+export type ReadProjectData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}';
+};
+
+export type ReadProjectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadProjectError = ReadProjectErrors[keyof ReadProjectErrors];
+
+export type ReadProjectResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectSummary;
+};
+
+export type ReadProjectResponse = ReadProjectResponses[keyof ReadProjectResponses];
+
+export type UpdateProjectData = {
+    body: ProjectUpdate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}';
+};
+
+export type UpdateProjectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateProjectError = UpdateProjectErrors[keyof UpdateProjectErrors];
+
+export type UpdateProjectResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectRead;
+};
+
+export type UpdateProjectResponse = UpdateProjectResponses[keyof UpdateProjectResponses];
+
+export type ListProjectDocumentsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+    };
+    url: '/api/v1/projects/{project_id}/documents';
+};
+
+export type ListProjectDocumentsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListProjectDocumentsError = ListProjectDocumentsErrors[keyof ListProjectDocumentsErrors];
+
+export type ListProjectDocumentsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageDocumentRead;
+};
+
+export type ListProjectDocumentsResponse = ListProjectDocumentsResponses[keyof ListProjectDocumentsResponses];
+
+export type ListProjectJobsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+    };
+    url: '/api/v1/projects/{project_id}/jobs';
+};
+
+export type ListProjectJobsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListProjectJobsError = ListProjectJobsErrors[keyof ListProjectJobsErrors];
+
+export type ListProjectJobsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageJobRead;
+};
+
+export type ListProjectJobsResponse = ListProjectJobsResponses[keyof ListProjectJobsResponses];
+
+export type ReadRevisionData = {
+    body?: never;
+    path: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    query?: never;
+    url: '/api/v1/revisions/{revision_id}';
+};
+
+export type ReadRevisionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadRevisionError = ReadRevisionErrors[keyof ReadRevisionErrors];
+
+export type ReadRevisionResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocumentRevisionRead;
+};
+
+export type ReadRevisionResponse = ReadRevisionResponses[keyof ReadRevisionResponses];
+
+export type ListRevisionArtifactsData = {
+    body?: never;
+    path: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    query?: never;
+    url: '/api/v1/revisions/{revision_id}/artifacts';
+};
+
+export type ListRevisionArtifactsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListRevisionArtifactsError = ListRevisionArtifactsErrors[keyof ListRevisionArtifactsErrors];
+
+export type ListRevisionArtifactsResponses = {
+    /**
+     * Response List Revision Artifacts
+     *
+     * Successful Response
+     */
+    200: Array<RecognitionArtifactRead>;
+};
+
+export type ListRevisionArtifactsResponse = ListRevisionArtifactsResponses[keyof ListRevisionArtifactsResponses];
+
+export type ReadRevisionContentUrlData = {
+    body?: never;
+    path: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    query?: never;
+    url: '/api/v1/revisions/{revision_id}/content-url';
+};
+
+export type ReadRevisionContentUrlErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadRevisionContentUrlError = ReadRevisionContentUrlErrors[keyof ReadRevisionContentUrlErrors];
+
+export type ReadRevisionContentUrlResponses = {
+    /**
+     * Successful Response
+     */
+    200: ContentUrl;
+};
+
+export type ReadRevisionContentUrlResponse = ReadRevisionContentUrlResponses[keyof ReadRevisionContentUrlResponses];
+
+export type ListRevisionSheetsData = {
+    body?: never;
+    path: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+    };
+    url: '/api/v1/revisions/{revision_id}/sheets';
+};
+
+export type ListRevisionSheetsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListRevisionSheetsError = ListRevisionSheetsErrors[keyof ListRevisionSheetsErrors];
+
+export type ListRevisionSheetsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageSheetRead;
+};
+
+export type ListRevisionSheetsResponse = ListRevisionSheetsResponses[keyof ListRevisionSheetsResponses];
+
+export type ListSheetRegionsData = {
+    body?: never;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+        /**
+         * Block Type
+         *
+         * Фильтр по типу области
+         */
+        block_type?: string | null;
+        /**
+         * Recognition Status
+         *
+         * Фильтр по статусу распознавания
+         */
+        recognition_status?: string | null;
+    };
+    url: '/api/v1/sheets/{sheet_id}/regions';
+};
+
+export type ListSheetRegionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSheetRegionsError = ListSheetRegionsErrors[keyof ListSheetRegionsErrors];
+
+export type ListSheetRegionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageRegionRead;
+};
+
+export type ListSheetRegionsResponse = ListSheetRegionsResponses[keyof ListSheetRegionsResponses];
 
 export type LivenessData = {
     body?: never;

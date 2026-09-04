@@ -9,9 +9,11 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from sqlalchemy.exc import DBAPIError, OperationalError
 
 from app import API_VERSION
 from app.api import health
@@ -20,6 +22,8 @@ from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
 from app.db.session import dispose_engine
+from app.errors import MESSAGES, DomainError, ErrorCode
+from app.storage.base import StorageUnavailableError
 
 DESCRIPTION = (
     "API портала автоматизированного подсчёта строительных объёмов. "
@@ -75,9 +79,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expose_headers=["X-Request-ID"],
     )
 
+    _register_error_handlers(app)
+
     app.include_router(health.router)
     app.include_router(api_v1_router)
     return app
+
+
+def _error_body(code: ErrorCode, message: str | None = None) -> dict[str, dict[str, str]]:
+    return {"detail": {"code": code.value, "message": message or MESSAGES[code]}}
+
+
+def _register_error_handlers(app: FastAPI) -> None:
+    """Наружу уходит стабильный код ошибки, подробности остаются в логах.
+
+    Без этих обработчиков нарушенный инвариант задания и упавшая база превращаются
+    в безликий 500, по которому невозможно ни объяснить пользователю причину,
+    ни отличить поломку инфраструктуры от ошибки в данных.
+    """
+    log = get_logger(__name__)
+
+    @app.exception_handler(DomainError)
+    async def _domain_error(_: Request, error: DomainError) -> JSONResponse:
+        log.warning("domain_error", code=error.code.value)
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=_error_body(error.code, error.detail),
+        )
+
+    # ConnectionError нужен отдельно: отказ в соединении с базой приходит как обычная
+    # ошибка сокета и SQLAlchemy её не оборачивает.
+    @app.exception_handler(ConnectionError)
+    @app.exception_handler(OperationalError)
+    @app.exception_handler(DBAPIError)
+    async def _database_error(_: Request, error: Exception) -> JSONResponse:
+        log.error("database_unavailable", error_type=type(error).__name__)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=_error_body(ErrorCode.DATABASE_UNAVAILABLE),
+        )
+
+    @app.exception_handler(StorageUnavailableError)
+    async def _storage_error(_: Request, error: StorageUnavailableError) -> JSONResponse:
+        log.error("storage_unavailable", error_type=type(error).__name__)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=_error_body(ErrorCode.STORAGE_UNAVAILABLE),
+        )
 
 
 app = create_app()

@@ -10,11 +10,11 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
+# Импорт пакета моделей обязателен: без него autogenerate не увидит таблицы и предложит
+# удалить всё, что есть в базе.
+import app.models  # noqa: F401
 from app.core.config import get_settings
 from app.db.base import Base
-
-# Импорт моделей нужен, чтобы autogenerate видел таблицы.
-# Доменные сущности появляются в промте 03 — тогда здесь добавится `from app.models import *`.
 
 config = context.config
 

@@ -36,6 +36,6 @@ async def test_meta_keeps_stage2_features_disabled(client: AsyncClient) -> None:
 
 
 async def test_unknown_route_returns_404(client: AsyncClient) -> None:
-    response = await client.get("/api/v1/projects")
+    response = await client.get("/api/v1/takeoff/measurements")
 
     assert response.status_code == 404
