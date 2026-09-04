@@ -29,6 +29,7 @@ from app.core.workspace import DEV_WORKSPACE_ID
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import create_app
+from app.services.job_runner import get_job_scheduler
 from app.storage import get_object_storage
 from app.storage.base import ObjectNotFoundError, ObjectStat, StoredObject
 
@@ -244,8 +245,16 @@ async def api(
     def override_storage() -> Any:
         return fake_storage
 
+    # Фоновый импорт в тестах не запускается: задания выполняются явно, чтобы проверять
+    # результат, а не гоняться за асинхронной задачей.
+    scheduled: list[uuid.UUID] = []
+
+    def override_scheduler() -> Any:
+        return scheduled.append
+
     app.dependency_overrides[get_session] = override_session
     app.dependency_overrides[get_object_storage] = override_storage
+    app.dependency_overrides[get_job_scheduler] = override_scheduler
 
     transport = ASGITransport(app=app)
     try:

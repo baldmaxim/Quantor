@@ -8,8 +8,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, UploadFile, status
 
-from app.api.v1.deps import SessionDep, StorageDep, WorkspaceDep
+from app.api.v1.deps import SchedulerDep, SessionDep, StorageDep, WorkspaceDep
 from app.core.config import get_settings
+from app.domain import JobStatus
 from app.errors import ErrorCode, http_error, not_found
 from app.schemas import UploadedFileType, UploadRead
 from app.services import documents as documents_service
@@ -41,6 +42,7 @@ async def upload_file(
     session: SessionDep,
     workspace: WorkspaceDep,
     storage: StorageDep,
+    schedule: SchedulerDep,
     file: Annotated[UploadFile, File(description="Файл проекта")],
     document_id: Annotated[
         uuid.UUID | None,
@@ -80,6 +82,11 @@ async def upload_file(
         document=document,
     )
     await session.commit()
+
+    # Импорт запускается только после того, как записи зафиксированы: иначе фоновая задача
+    # не найдёт ни задания, ни ревизии.
+    if outcome.job is not None and outcome.job.status is JobStatus.QUEUED:
+        schedule(outcome.job.id)
 
     return UploadRead.from_outcome(outcome)
 

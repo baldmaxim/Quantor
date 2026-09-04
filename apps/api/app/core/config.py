@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     # в разы больше, поэтому предел с запасом и настраивается окружением.
     max_upload_size_bytes: int = Field(default=1024 * 1024 * 1024, gt=0)
 
+    # Пределы для недоверенного архива распознавалки. Эталонный пакет — 4 файла и 52 МБ
+    # в распакованном виде, так что запас многократный.
+    archive_max_files: int = Field(default=64, gt=0)
+    archive_max_total_bytes: int = Field(default=2 * 1024**3, gt=0)
+    archive_max_file_bytes: int = Field(default=1024**3, gt=0)
+    archive_max_compression_ratio: int = Field(default=200, gt=1)
+
     @field_validator("api_cors_origins")
     @classmethod
     def _strip_origins(cls, value: str) -> str:

@@ -22,6 +22,14 @@ class ErrorCode(StrEnum):
     EMPTY_FILE = "EMPTY_FILE"
     CORRUPT_ARCHIVE = "CORRUPT_ARCHIVE"
 
+    # --- импорт распознанного пакета ---
+    ARCHIVE_UNSAFE_PATH = "ARCHIVE_UNSAFE_PATH"
+    ARCHIVE_LIMIT_EXCEEDED = "ARCHIVE_LIMIT_EXCEEDED"
+    LEGACY_PDF_MISSING = "LEGACY_PDF_MISSING"
+    LEGACY_BLOCKS_INVALID = "LEGACY_BLOCKS_INVALID"
+    LEGACY_SCHEMA_UNSUPPORTED = "LEGACY_SCHEMA_UNSUPPORTED"
+    IMPORT_FAILED = "IMPORT_FAILED"
+
     # --- инфраструктура ---
     STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
@@ -39,6 +47,12 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.UPLOAD_TOO_LARGE: "Файл слишком большой",
     ErrorCode.EMPTY_FILE: "Файл пуст",
     ErrorCode.CORRUPT_ARCHIVE: "Архив повреждён",
+    ErrorCode.ARCHIVE_UNSAFE_PATH: "В архиве есть небезопасный файл",
+    ErrorCode.ARCHIVE_LIMIT_EXCEEDED: "Архив превышает допустимые пределы",
+    ErrorCode.LEGACY_PDF_MISSING: "В пакете нет исходного PDF",
+    ErrorCode.LEGACY_BLOCKS_INVALID: "Файл распознанных областей некорректен",
+    ErrorCode.LEGACY_SCHEMA_UNSUPPORTED: "Версия схемы пакета не поддерживается",
+    ErrorCode.IMPORT_FAILED: "Импорт пакета не удался",
     ErrorCode.STORAGE_UNAVAILABLE: "Хранилище файлов недоступно",
     ErrorCode.DATABASE_UNAVAILABLE: "База данных недоступна",
     ErrorCode.CONTENT_NOT_AVAILABLE: "Файл ревизии недоступен",
@@ -54,6 +68,12 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.UPLOAD_TOO_LARGE: status.HTTP_413_CONTENT_TOO_LARGE,
     ErrorCode.EMPTY_FILE: status.HTTP_400_BAD_REQUEST,
     ErrorCode.CORRUPT_ARCHIVE: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.ARCHIVE_UNSAFE_PATH: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.ARCHIVE_LIMIT_EXCEEDED: status.HTTP_413_CONTENT_TOO_LARGE,
+    ErrorCode.LEGACY_PDF_MISSING: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.LEGACY_BLOCKS_INVALID: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.LEGACY_SCHEMA_UNSUPPORTED: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.IMPORT_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.CONTENT_NOT_AVAILABLE: status.HTTP_404_NOT_FOUND,

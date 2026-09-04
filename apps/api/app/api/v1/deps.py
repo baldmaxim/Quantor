@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.workspace import WorkspaceContext, get_workspace_context
 from app.db.session import get_session
 from app.schemas import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from app.services.job_runner import JobScheduler, get_job_scheduler
 from app.storage import get_object_storage
 from app.storage.base import ObjectStorage
 
@@ -19,6 +20,9 @@ WorkspaceDep = Annotated[WorkspaceContext, Depends(get_workspace_context)]
 # Хранилище приходит зависимостью, а не берётся из модуля: так его можно подменить
 # в тестах, не поднимая MinIO и не патча импорты.
 StorageDep = Annotated[ObjectStorage, Depends(get_object_storage)]
+
+# Запуск фонового задания — тоже зависимость: иначе тест загрузки поднимал бы реальный импорт.
+SchedulerDep = Annotated[JobScheduler, Depends(get_job_scheduler)]
 
 LimitDep = Annotated[
     int,
@@ -30,6 +34,7 @@ __all__ = [
     "DEFAULT_PAGE_SIZE",
     "LimitDep",
     "OffsetDep",
+    "SchedulerDep",
     "SessionDep",
     "StorageDep",
     "WorkspaceDep",
