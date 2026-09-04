@@ -1,0 +1,1693 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quantor — образец дизайна</title>
+    <style>
+      /* ============================================================
+         Дизайн-токены. Совпадают с apps/web/src/app/globals.css —
+         это образец для реализации, а не отдельная вселенная.
+         ============================================================ */
+      :root {
+        --bg: #f6f7f9;
+        --surface: #ffffff;
+        --surface-muted: #f0f2f5;
+        --text: #14181f;
+        --muted: #5c6572;
+        --border: #d9dee5;
+        --accent: #2563a8;
+        --accent-contrast: #ffffff;
+        --success: #2f7d4f;
+        --warning: #a86b1d;
+        --danger: #b3261e;
+
+        --region-text: #3b82f6;
+        --region-image: #8b5cf6;
+        --region-stamp: #f59e0b;
+
+        --canvas: #e8e8e4;
+        --chrome: #eceef1;
+
+        --radius: 8px;
+        --radius-sm: 5px;
+
+        --font-sans:
+          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        --font-mono: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+      }
+
+      :root[data-theme='dark'] {
+        --bg: #14171c;
+        --surface: #1b1f26;
+        --surface-muted: #232833;
+        --text: #e7eaef;
+        --muted: #98a1b0;
+        --border: #333a45;
+        --accent: #5c9ce0;
+        --accent-contrast: #10131a;
+        --success: #63b47f;
+        --warning: #d19a4a;
+        --danger: #e0736a;
+
+        --region-text: #60a5fa;
+        --region-image: #a78bfa;
+        --region-stamp: #fbbf24;
+
+        --canvas: #d8d8d4;
+        --chrome: #12151a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      code,
+      .mono {
+        font-family: var(--font-mono);
+        font-size: 0.92em;
+      }
+
+      /* ---------- каркас документа-образца ---------- */
+      .doc-bar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 12px 24px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .doc-bar__title {
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .doc-bar__title span {
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .doc-bar nav {
+        display: flex;
+        gap: 16px;
+        margin-left: auto;
+      }
+      .doc-bar nav a {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 13px;
+      }
+      .doc-bar nav a:hover {
+        color: var(--text);
+      }
+      .theme-btn {
+        border: 1px solid var(--border);
+        background: var(--surface-muted);
+        color: var(--text);
+        border-radius: var(--radius-sm);
+        padding: 5px 12px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .theme-btn:hover {
+        border-color: var(--accent);
+      }
+
+      .doc {
+        max-width: 1560px;
+        margin: 0 auto;
+        padding: 32px 24px 96px;
+      }
+      .doc section {
+        margin-bottom: 72px;
+        scroll-margin-top: 72px;
+      }
+      .doc h2 {
+        font-size: 20px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .doc h2 .num {
+        color: var(--muted);
+        font-weight: 400;
+        margin-right: 8px;
+      }
+      .doc .note {
+        color: var(--muted);
+        margin: 0 0 16px;
+        max-width: 78ch;
+        font-size: 13px;
+      }
+
+      /* рамка вокруг макета экрана */
+      .frame {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .frame__hint {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 6px 12px;
+        background: var(--surface-muted);
+        border-bottom: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      /* ============================================================
+         Оболочка портала
+         ============================================================ */
+      .shell {
+        display: grid;
+        grid-template-columns: 56px 1fr;
+        min-height: 560px;
+        background: var(--bg);
+      }
+
+      .rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 0;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+      }
+      .rail__logo {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-sm);
+        background: var(--accent);
+        color: var(--accent-contrast);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 15px;
+        margin-bottom: 12px;
+      }
+      .rail__item {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: var(--radius-sm);
+        color: var(--muted);
+        position: relative;
+      }
+      .rail__item svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.6;
+      }
+      .rail__item--active {
+        background: var(--surface-muted);
+        color: var(--accent);
+      }
+      .rail__item--active::before {
+        content: '';
+        position: absolute;
+        left: -10px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        border-radius: 2px;
+        background: var(--accent);
+      }
+      .rail__item--off {
+        opacity: 0.38;
+      }
+      .rail__spacer {
+        flex: 1;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        height: 48px;
+        padding: 0 16px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .crumbs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--muted);
+        min-width: 0;
+      }
+      .crumbs b {
+        color: var(--text);
+        font-weight: 550;
+      }
+      .crumbs .sep {
+        opacity: 0.5;
+      }
+
+      .page {
+        padding: 24px;
+      }
+
+      /* ---------- элементы ---------- */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .btn--primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-contrast);
+        font-weight: 550;
+      }
+      .btn--ghost {
+        background: transparent;
+      }
+      .btn--off {
+        opacity: 0.4;
+      }
+
+      .input {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 240px;
+      }
+      .input svg {
+        width: 14px;
+        height: 14px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.7;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 8px;
+        border-radius: 100px;
+        font-size: 11.5px;
+        font-weight: 550;
+        border: 1px solid transparent;
+        white-space: nowrap;
+      }
+      .badge::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .badge--ready {
+        color: var(--success);
+        border-color: color-mix(in srgb, var(--success) 35%, transparent);
+        background: color-mix(in srgb, var(--success) 12%, transparent);
+      }
+      .badge--work {
+        color: var(--accent);
+        border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+      }
+      .badge--wait {
+        color: var(--warning);
+        border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+        background: color-mix(in srgb, var(--warning) 12%, transparent);
+      }
+      .badge--fail {
+        color: var(--danger);
+        border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+        background: color-mix(in srgb, var(--danger) 12%, transparent);
+      }
+
+      /* ---------- список проектов ---------- */
+      .page-head {
+        display: flex;
+        align-items: flex-end;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .page-head h1 {
+        font-size: 22px;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+      .page-head .sub {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 2px;
+      }
+      .page-head .tools {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+      }
+
+      .table {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: minmax(280px, 2.4fr) 110px 110px 160px 150px;
+        gap: 16px;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .row:last-child {
+        border-bottom: none;
+      }
+      .row--head {
+        background: var(--surface-muted);
+        color: var(--muted);
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding-top: 8px;
+        padding-bottom: 8px;
+      }
+      .row--hover {
+        background: color-mix(in srgb, var(--accent) 6%, transparent);
+      }
+      .row .name {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+      }
+      .row .name b {
+        font-weight: 550;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .row .name span {
+        color: var(--muted);
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .row .num {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .row .when {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      .empty {
+        border: 1px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 32px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .empty b {
+        display: block;
+        color: var(--text);
+        font-size: 15px;
+        margin-bottom: 4px;
+      }
+
+      /* ---------- карточка проекта ---------- */
+      .cards {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap: 16px;
+        align-items: start;
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+      .card__head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 550;
+        font-size: 13.5px;
+      }
+      .card__head .count {
+        color: var(--muted);
+        font-weight: 400;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+      }
+      .card__body {
+        padding: 12px 16px;
+      }
+      .doc-row {
+        display: grid;
+        grid-template-columns: 22px 1fr auto auto;
+        gap: 12px;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .doc-row:last-child {
+        border-bottom: none;
+      }
+      .doc-row svg {
+        width: 18px;
+        height: 18px;
+        stroke: var(--muted);
+        fill: none;
+        stroke-width: 1.5;
+      }
+      .doc-row .meta {
+        min-width: 0;
+      }
+      .doc-row .meta b {
+        display: block;
+        font-weight: 500;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .doc-row .meta span {
+        color: var(--muted);
+        font-size: 12px;
+        font-family: var(--font-mono);
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 6px 16px;
+        font-size: 13px;
+      }
+      .kv dt {
+        color: var(--muted);
+      }
+      .kv dd {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+      }
+
+      .progress {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--surface-muted);
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      .progress i {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+
+      /* ============================================================
+         Рабочая область — тёмный хром вокруг нейтрального холста
+         ============================================================ */
+      .ws {
+        display: grid;
+        grid-template-rows: 40px 40px 1fr 26px;
+        height: 620px;
+        background: var(--chrome);
+        color: var(--text);
+      }
+      :root[data-theme='light'] .ws {
+        --surface: #f7f8fa;
+        --border: #cfd5dd;
+      }
+
+      .ws__tabs {
+        display: flex;
+        align-items: stretch;
+        gap: 1px;
+        background: var(--chrome);
+        border-bottom: 1px solid var(--border);
+        padding-left: 8px;
+      }
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        font-size: 12.5px;
+        color: var(--muted);
+        border-right: 1px solid var(--border);
+        max-width: 220px;
+      }
+      .tab b {
+        font-weight: 450;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tab--active {
+        background: var(--surface);
+        color: var(--text);
+        box-shadow: inset 0 -2px 0 var(--accent);
+      }
+      .tab .x {
+        opacity: 0.5;
+      }
+      .ws__tabs .job {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .ws__toolbar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 8px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .tool {
+        width: 30px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border-radius: var(--radius-sm);
+        color: var(--muted);
+      }
+      .tool svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.6;
+      }
+      .tool--active {
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+        color: var(--accent);
+      }
+      .tool--wide {
+        width: auto;
+        padding: 0 8px;
+        font-size: 12px;
+        gap: 5px;
+        display: flex;
+        align-items: center;
+        height: 28px;
+      }
+      .divider {
+        width: 1px;
+        height: 18px;
+        background: var(--border);
+        margin: 0 8px;
+      }
+      .page-field {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .page-field .box {
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 7px;
+        font-family: var(--font-mono);
+        color: var(--text);
+        background: var(--chrome);
+      }
+
+      .ws__body {
+        display: grid;
+        grid-template-columns: 248px 1fr 288px;
+        min-height: 0;
+      }
+
+      .pane {
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .pane--right {
+        border-right: none;
+        border-left: 1px solid var(--border);
+      }
+      .pane__tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+      }
+      .pane__tab {
+        flex: 1;
+        text-align: center;
+        padding: 7px 0;
+        font-size: 12px;
+        color: var(--muted);
+        border-right: 1px solid var(--border);
+      }
+      .pane__tab:last-child {
+        border-right: none;
+      }
+      .pane__tab--active {
+        color: var(--text);
+        box-shadow: inset 0 -2px 0 var(--accent);
+      }
+      .pane__tab--off {
+        opacity: 0.4;
+      }
+      .pane__scroll {
+        overflow: hidden;
+        padding: 8px 0;
+        flex: 1;
+      }
+      .pane__label {
+        padding: 8px 12px 4px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+
+      .tree-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 12px;
+        font-size: 12.5px;
+        color: var(--text);
+      }
+      .tree-item svg {
+        width: 14px;
+        height: 14px;
+        stroke: var(--muted);
+        fill: none;
+        stroke-width: 1.6;
+        flex: none;
+      }
+      .tree-item span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tree-item .n {
+        margin-left: auto;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+      }
+      .tree-item--sel {
+        background: color-mix(in srgb, var(--accent) 14%, transparent);
+        color: var(--text);
+      }
+
+      .legend {
+        padding: 8px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .legend__row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+      }
+      .legend__swatch {
+        width: 11px;
+        height: 11px;
+        border-radius: 3px;
+        border: 1.5px solid currentColor;
+        background: color-mix(in srgb, currentColor 22%, transparent);
+        flex: none;
+      }
+      .legend__row .n {
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      .legend__row svg {
+        width: 13px;
+        height: 13px;
+        stroke: var(--muted);
+        fill: none;
+        stroke-width: 1.6;
+        opacity: 0.55;
+      }
+
+      /* ---------- холст с чертежом ---------- */
+      .viewport {
+        position: relative;
+        background:
+          radial-gradient(
+              circle at 1px 1px,
+              color-mix(in srgb, var(--muted) 22%, transparent) 1px,
+              transparent 0
+            )
+            0 0 / 16px 16px,
+          var(--chrome);
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .sheet {
+        position: relative;
+        height: 92%;
+        aspect-ratio: 2481 / 3509;
+        background: var(--canvas);
+        box-shadow: 0 6px 28px rgb(0 0 0 / 0.35);
+      }
+      .sheet svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+      }
+      .region {
+        position: absolute;
+        border: 1.5px solid var(--c);
+        background: color-mix(in srgb, var(--c) 14%, transparent);
+        border-radius: 2px;
+      }
+      .region--sel {
+        border-width: 2px;
+        background: color-mix(in srgb, var(--c) 26%, transparent);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent);
+      }
+      .region__tag {
+        position: absolute;
+        top: -15px;
+        left: -1px;
+        font-family: var(--font-mono);
+        font-size: 9px;
+        line-height: 14px;
+        padding: 0 4px;
+        border-radius: 3px 3px 0 0;
+        background: var(--c);
+        color: #0b0d11;
+        white-space: nowrap;
+      }
+
+      /* ---------- инспектор ---------- */
+      .insp {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow: hidden;
+      }
+      .insp__title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 550;
+      }
+      .insp__kv {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        gap: 5px 8px;
+        font-size: 12px;
+      }
+      .insp__kv dt {
+        color: var(--muted);
+      }
+      .insp__kv dd {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        overflow-wrap: anywhere;
+      }
+      .insp__section {
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+      }
+      .insp__section h4 {
+        margin: 0 0 8px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        font-weight: 550;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .md {
+        background: var(--chrome);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        line-height: 1.55;
+        color: var(--muted);
+        max-height: 132px;
+        overflow: hidden;
+        position: relative;
+      }
+      .md b {
+        color: var(--text);
+        font-weight: 550;
+      }
+      .md::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 34px;
+        background: linear-gradient(transparent, var(--chrome));
+      }
+      .ext-link {
+        font-size: 11.5px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .ext-link .warn {
+        color: var(--warning);
+      }
+
+      .ws__status {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 12px;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+        font-size: 11.5px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+      }
+      .ws__status .right {
+        margin-left: auto;
+        display: flex;
+        gap: 16px;
+      }
+
+      /* ---------- палитра ---------- */
+      .tokens {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+        gap: 12px;
+      }
+      .token {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .token__chip {
+        height: 44px;
+      }
+      .token__name {
+        padding: 6px 8px 8px;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+      }
+      .token__name span {
+        display: block;
+        color: var(--muted);
+        font-family: var(--font-sans);
+        font-size: 11px;
+        margin-top: 1px;
+      }
+
+      .rules {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+      }
+      .rule {
+        border: 1px solid var(--border);
+        border-left: 2px solid var(--accent);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+        padding: 12px 16px;
+      }
+      .rule h4 {
+        margin: 0 0 4px;
+        font-size: 13px;
+      }
+      .rule p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-bar">
+      <div class="doc-bar__title">Quantor <span>— образец дизайна, Stage 1</span></div>
+      <nav>
+        <a href="#projects">Проекты</a>
+        <a href="#overview">Карточка проекта</a>
+        <a href="#workspace">Рабочая область</a>
+        <a href="#tokens">Токены</a>
+        <a href="#rules">Правила</a>
+      </nav>
+      <button class="theme-btn" id="theme">Светлая тема</button>
+    </div>
+
+    <div class="doc">
+      <p class="note" style="margin-bottom: 40px">
+        Статичный макет. Кода приложения не содержит, кликов не обрабатывает — служит образцом для
+        промта 04 и отправной точкой для переработки дизайна. Цвета взяты из
+        <code>apps/web/src/app/globals.css</code>: то, что здесь видно, реализуемо теми же токенами.
+        Рабочие сценарии подсмотрены у Kreo как принципы, оформление собственное.
+      </p>
+
+      <!-- ================= ПРОЕКТЫ ================= -->
+      <section id="projects">
+        <h2><span class="num">01</span>Список проектов</h2>
+        <p class="note">
+          Плотная таблица вместо крупных карточек: проектов будут десятки, и важнее видеть больше
+          строк, чем красивые обложки. Никаких выдуманных финансовых показателей — только то, что
+          система действительно знает.
+        </p>
+        <div class="frame">
+          <div class="frame__hint"><span>/projects</span><span>1440 × 900</span></div>
+          <div class="shell">
+            <div class="rail">
+              <div class="rail__logo">Q</div>
+              <div class="rail__item rail__item--active" title="Проекты">
+                <svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z" /></svg>
+              </div>
+              <div class="rail__item rail__item--off" title="Шаблоны — этап 2">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+                </svg>
+              </div>
+              <div class="rail__item rail__item--off" title="Модели — этап 2">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+                  <path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" />
+                </svg>
+              </div>
+              <div class="rail__item rail__item--off" title="Отчёты — этап 2">
+                <svg viewBox="0 0 24 24">
+                  <path d="M6 3h9l5 5v13H6z" />
+                  <path d="M9 13h6M9 17h4" />
+                </svg>
+              </div>
+              <div class="rail__spacer"></div>
+              <div class="rail__item" title="Настройки">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" />
+                </svg>
+              </div>
+            </div>
+
+            <div>
+              <div class="topbar">
+                <div class="crumbs"><b>Проекты</b></div>
+                <div style="margin-left: auto; display: flex; gap: 8px; align-items: center">
+                  <div class="input">
+                    <svg viewBox="0 0 24 24">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                    Поиск по названию
+                  </div>
+                  <div class="btn btn--ghost">По изменению ↓</div>
+                </div>
+              </div>
+
+              <div class="page">
+                <div class="page-head">
+                  <div>
+                    <h1>Проекты</h1>
+                    <div class="sub">4 проекта · 11 документов</div>
+                  </div>
+                  <div class="tools">
+                    <div class="btn btn--primary">+ Создать проект</div>
+                  </div>
+                </div>
+
+                <div class="table">
+                  <div class="row row--head">
+                    <div>Проект</div>
+                    <div>Документы</div>
+                    <div>Листы</div>
+                    <div>Состояние</div>
+                    <div>Изменён</div>
+                  </div>
+                  <div class="row row--hover">
+                    <div class="name">
+                      <b>ЖК «Северный», корпус 3 — АР</b>
+                      <span>01-03-00-01-12_ПД-00260560-АР.pdf</span>
+                    </div>
+                    <div class="num">3</div>
+                    <div class="num">77</div>
+                    <div><span class="badge badge--ready">Готов</span></div>
+                    <div class="when">сегодня, 11:42</div>
+                  </div>
+                  <div class="row">
+                    <div class="name">
+                      <b>Школа на 1200 мест — КЖ</b>
+                      <span>КЖ_разделы_1-4.pdf, узлы.pdf</span>
+                    </div>
+                    <div class="num">2</div>
+                    <div class="num">48</div>
+                    <div><span class="badge badge--work">Импорт 64 %</span></div>
+                    <div class="when">сегодня, 10:05</div>
+                  </div>
+                  <div class="row">
+                    <div class="name">
+                      <b>Реконструкция котельной — ОВ</b>
+                      <span>ОВ_П_ревизия_2.zip</span>
+                    </div>
+                    <div class="num">1</div>
+                    <div class="num">—</div>
+                    <div><span class="badge badge--wait">В очереди</span></div>
+                    <div class="when">вчера, 18:20</div>
+                  </div>
+                  <div class="row">
+                    <div class="name">
+                      <b>Склад №4 — АС</b>
+                      <span>АС_склад.zip — архив повреждён</span>
+                    </div>
+                    <div class="num">1</div>
+                    <div class="num">—</div>
+                    <div><span class="badge badge--fail">Ошибка импорта</span></div>
+                    <div class="when">2 сентября</div>
+                  </div>
+                </div>
+
+                <div style="margin-top: 16px" class="empty">
+                  <b>Пустое состояние — когда проектов нет</b>
+                  Создайте проект и загрузите распознанный пакет или PDF проектной документации.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= КАРТОЧКА ПРОЕКТА ================= -->
+      <section id="overview">
+        <h2><span class="num">02</span>Карточка проекта</h2>
+        <p class="note">
+          Отвечает на три вопроса: что загружено, что с этим происходит и можно ли уже открыть
+          рабочую область. Кнопка открытия неактивна, пока нет пригодной к отрисовке ревизии PDF.
+        </p>
+        <div class="frame">
+          <div class="frame__hint"><span>/projects/:id</span><span>1440 × 900</span></div>
+          <div class="shell" style="min-height: 420px">
+            <div class="rail">
+              <div class="rail__logo">Q</div>
+              <div class="rail__item rail__item--active">
+                <svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z" /></svg>
+              </div>
+              <div class="rail__item rail__item--off">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+                </svg>
+              </div>
+              <div class="rail__spacer"></div>
+            </div>
+            <div>
+              <div class="topbar">
+                <div class="crumbs">
+                  Проекты <span class="sep">/</span> <b>ЖК «Северный», корпус 3 — АР</b>
+                  <span class="badge badge--ready" style="margin-left: 8px">Готов</span>
+                </div>
+                <div style="margin-left: auto; display: flex; gap: 8px">
+                  <div class="btn btn--ghost">Загрузить файл</div>
+                  <div class="btn btn--primary">Открыть рабочую область</div>
+                </div>
+              </div>
+              <div class="page">
+                <div class="cards">
+                  <div class="card">
+                    <div class="card__head">Документы <span class="count">3</span></div>
+                    <div class="card__body">
+                      <div class="doc-row">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M6 3h9l5 5v13H6z" />
+                          <path d="M15 3v5h5" />
+                        </svg>
+                        <div class="meta">
+                          <b>01-03-00-01-12_ПД-00260560-АР.pdf</b>
+                          <span>77 листов · 47,6 МБ · ревизия 1</span>
+                        </div>
+                        <span class="badge badge--ready">Распознан</span>
+                        <div class="mono" style="color: var(--muted); font-size: 12px">
+                          383 обл.
+                        </div>
+                      </div>
+                      <div class="doc-row">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M6 3h9l5 5v13H6z" />
+                          <path d="M15 3v5h5" />
+                        </svg>
+                        <div class="meta">
+                          <b>Узлы_кровли_ревизия_2.pdf</b>
+                          <span>12 листов · 8,1 МБ · ревизия 2</span>
+                        </div>
+                        <span class="badge badge--wait">Не распознан</span>
+                        <div class="mono" style="color: var(--muted); font-size: 12px">—</div>
+                      </div>
+                      <div class="doc-row">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+                          <path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" />
+                        </svg>
+                        <div class="meta">
+                          <b>korpus3.nwd</b>
+                          <span>214 МБ · хранится без обработки</span>
+                        </div>
+                        <span class="badge badge--wait">Обработчик не подключён</span>
+                        <div class="mono" style="color: var(--muted); font-size: 12px">—</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="card">
+                    <div class="card__head">Импорт</div>
+                    <div class="card__body">
+                      <dl class="kv">
+                        <dt>Задание</dt>
+                        <dd>legacy_import</dd>
+                        <dt>Состояние</dt>
+                        <dd>succeeded</dd>
+                        <dt>Стадия</dt>
+                        <dd>regions</dd>
+                        <dt>Листов</dt>
+                        <dd>77</dd>
+                        <dt>Областей</dt>
+                        <dd>383</dd>
+                        <dt>Длительность</dt>
+                        <dd>1 мин 12 с</dd>
+                      </dl>
+                      <div class="progress"><i style="width: 100%"></i></div>
+                      <p class="note" style="margin: 12px 0 0; font-size: 12px">
+                        Схема пакета <code>legacy-v1</code>, координаты
+                        <code>normalized_page_top_left</code>. Внешние ссылки на вырезы сохранены
+                        как метаданные и не загружались.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= РАБОЧАЯ ОБЛАСТЬ ================= -->
+      <section id="workspace">
+        <h2><span class="num">03</span>Рабочая область</h2>
+        <p class="note">
+          Три панели вокруг чертежа, тёмный хром и нейтральный холст — глаз держится на документе, а
+          не на интерфейсе. На Stage 1 показываются только распознанные области; вкладка «Обмеры»
+          честно выключена. Индикатор масштаба говорит «Не задан», потому что определять масштаб
+          система пока не умеет.
+        </p>
+        <div class="frame">
+          <div class="frame__hint">
+            <span>/projects/:id/workspace</span><span>десктоп 1440+, ниже — предупреждение</span>
+          </div>
+          <div class="ws">
+            <!-- вкладки страниц -->
+            <div class="ws__tabs">
+              <div class="tab tab--active">
+                <b>Лист 27 · План 3 этажа</b> <span class="x">×</span>
+              </div>
+              <div class="tab"><b>Лист 12 · Фасад 1-14</b> <span class="x">×</span></div>
+              <div class="tab"><b>Лист 3 · Общие данные</b> <span class="x">×</span></div>
+              <div class="job"><span class="badge badge--ready">Заданий нет</span></div>
+            </div>
+
+            <!-- инструменты -->
+            <div class="ws__toolbar">
+              <div class="tool tool--active" title="Выбор">
+                <svg viewBox="0 0 24 24"><path d="M6 3l12 8-5 1.4L10.6 18z" /></svg>
+              </div>
+              <div class="tool" title="Панорама">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M9 11V6a1.5 1.5 0 013 0v5M12 11V5a1.5 1.5 0 013 0v6M15 11V7a1.5 1.5 0 013 0v7a6 6 0 01-6 6h-1a6 6 0 01-6-6v-3a1.5 1.5 0 013 0"
+                  />
+                </svg>
+              </div>
+              <div class="divider"></div>
+              <div class="tool" title="Предыдущий лист">
+                <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></svg>
+              </div>
+              <div class="page-field"><span class="box">27</span> / 77</div>
+              <div class="tool" title="Следующий лист">
+                <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+              </div>
+              <div class="divider"></div>
+              <div class="tool" title="Уменьшить">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M8 11h6M20 20l-3.5-3.5" />
+                </svg>
+              </div>
+              <div class="page-field"><span class="box">64 %</span></div>
+              <div class="tool" title="Увеличить">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M8 11h6M11 8v6M20 20l-3.5-3.5" />
+                </svg>
+              </div>
+              <div class="tool tool--wide" title="По ширине">По ширине</div>
+              <div class="tool tool--wide" title="Целиком">Целиком</div>
+              <div class="divider"></div>
+              <div class="tool tool--active tool--wide" title="Слой распознавания">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3l9 5-9 5-9-5z" />
+                  <path d="M3 13l9 5 9-5" />
+                </svg>
+                Распознавание
+              </div>
+              <div class="tool tool--wide" style="opacity: 0.4" title="Этап 2">Обмеры</div>
+              <div style="margin-left: auto; display: flex; align-items: center; gap: 4px">
+                <div class="tool" title="Поиск по тексту">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M20 20l-3.5-3.5" />
+                  </svg>
+                </div>
+                <div class="tool" title="Сбросить вид">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 9a8 8 0 1114 5" />
+                    <path d="M4 4v5h5" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- три панели -->
+            <div class="ws__body">
+              <!-- левая -->
+              <div class="pane">
+                <div class="pane__tabs">
+                  <div class="pane__tab">Документы</div>
+                  <div class="pane__tab pane__tab--active">Распознавание</div>
+                  <div class="pane__tab pane__tab--off" title="Этап 2">Обмеры</div>
+                </div>
+                <div class="pane__scroll">
+                  <div class="pane__label">Типы областей</div>
+                  <div class="legend">
+                    <div class="legend__row" style="color: var(--region-text)">
+                      <span class="legend__swatch"></span>
+                      <span style="color: var(--text)">Текст</span>
+                      <span class="n">230</span>
+                      <svg viewBox="0 0 24 24">
+                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+                        <circle cx="12" cy="12" r="2.5" />
+                      </svg>
+                    </div>
+                    <div class="legend__row" style="color: var(--region-image)">
+                      <span class="legend__swatch"></span>
+                      <span style="color: var(--text)">Изображение</span>
+                      <span class="n">90</span>
+                      <svg viewBox="0 0 24 24">
+                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+                        <circle cx="12" cy="12" r="2.5" />
+                      </svg>
+                    </div>
+                    <div class="legend__row" style="color: var(--region-stamp)">
+                      <span class="legend__swatch"></span>
+                      <span style="color: var(--text)">Штамп</span>
+                      <span class="n">63</span>
+                      <svg viewBox="0 0 24 24">
+                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+                        <circle cx="12" cy="12" r="2.5" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div class="pane__label" style="margin-top: 8px">Области на листе 27</div>
+                  <div class="tree-item tree-item--sel">
+                    <svg viewBox="0 0 24 24">
+                      <rect x="4" y="5" width="16" height="14" rx="1.5" />
+                    </svg>
+                    <span>#27 · изображение</span>
+                    <span class="n">blk_a91f</span>
+                  </div>
+                  <div class="tree-item">
+                    <svg viewBox="0 0 24 24">
+                      <rect x="4" y="5" width="16" height="14" rx="1.5" />
+                    </svg>
+                    <span>#28 · текст</span>
+                    <span class="n">blk_c04d</span>
+                  </div>
+                  <div class="tree-item">
+                    <svg viewBox="0 0 24 24">
+                      <rect x="4" y="5" width="16" height="14" rx="1.5" />
+                    </svg>
+                    <span>#29 · текст</span>
+                    <span class="n">blk_5be2</span>
+                  </div>
+                  <div class="tree-item">
+                    <svg viewBox="0 0 24 24"><path d="M5 12l4-6h9l1 6-5 6H8z" /></svg>
+                    <span>#30 · текст, полигон</span>
+                    <span class="n">blk_77ac</span>
+                  </div>
+                  <div class="tree-item">
+                    <svg viewBox="0 0 24 24">
+                      <rect x="4" y="5" width="16" height="14" rx="1.5" />
+                    </svg>
+                    <span>— · штамп</span>
+                    <span class="n">blk_e310</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- холст -->
+              <div class="viewport">
+                <div class="sheet">
+                  <!-- условный чертёж: только чтобы показать соотношение слоёв -->
+                  <svg viewBox="0 0 248 351" aria-hidden="true">
+                    <g stroke="#5b5f66" fill="none" stroke-width="0.6">
+                      <rect x="10" y="10" width="228" height="331" />
+                      <rect x="16" y="16" width="216" height="319" stroke-width="0.4" />
+                      <rect x="34" y="42" width="86" height="104" stroke-width="1" />
+                      <rect x="34" y="42" width="42" height="52" />
+                      <rect x="76" y="42" width="44" height="52" />
+                      <rect x="34" y="94" width="86" height="52" />
+                      <path d="M34 68h86M76 42v104" stroke-width="0.5" />
+                      <rect x="132" y="42" width="80" height="60" stroke-width="1" />
+                      <path d="M132 62h80M152 42v60M182 62v40" stroke-width="0.5" />
+                      <rect x="132" y="116" width="80" height="30" stroke-width="0.8" />
+                      <circle cx="60" cy="180" r="18" />
+                      <circle cx="60" cy="180" r="11" stroke-width="0.5" />
+                      <path d="M42 180h36M60 162v36" stroke-width="0.4" />
+                      <rect x="98" y="164" width="114" height="32" stroke-width="0.8" />
+                      <path d="M98 174h114M98 186h114" stroke-width="0.35" />
+                      <path d="M34 214h178M34 214v6M212 214v6" stroke-width="0.5" />
+                      <path d="M34 232h178M34 232v6M212 232v6" stroke-width="0.5" />
+                      <rect x="34" y="252" width="178" height="44" stroke-width="0.6" />
+                      <path
+                        d="M34 263h178M34 274h178M34 285h178M90 252v44M150 252v44"
+                        stroke-width="0.3"
+                      />
+                      <rect x="150" y="304" width="62" height="28" stroke-width="0.9" />
+                      <path d="M150 313h62M150 322h62M172 304v28" stroke-width="0.35" />
+                    </g>
+                  </svg>
+
+                  <!-- слой распознанных областей: отдельный от рендера PDF -->
+                  <div class="overlay">
+                    <div
+                      class="region region--sel"
+                      style="
+                        --c: var(--region-image);
+                        left: 10.5%;
+                        top: 10.5%;
+                        width: 37%;
+                        height: 31%;
+                      "
+                    >
+                      <span class="region__tag">#27 image · blk_a91f</span>
+                    </div>
+                    <div
+                      class="region"
+                      style="
+                        --c: var(--region-text);
+                        left: 53%;
+                        top: 10.5%;
+                        width: 33%;
+                        height: 18%;
+                      "
+                    ></div>
+                    <div
+                      class="region"
+                      style="--c: var(--region-text); left: 53%; top: 32%; width: 33%; height: 9%"
+                    ></div>
+                    <div
+                      class="region"
+                      style="--c: var(--region-image); left: 16%; top: 45%; width: 16%; height: 12%"
+                    ></div>
+                    <div
+                      class="region"
+                      style="--c: var(--region-text); left: 39%; top: 46%; width: 47%; height: 10%"
+                    ></div>
+                    <div
+                      class="region"
+                      style="--c: var(--region-text); left: 13%; top: 71%; width: 73%; height: 13%"
+                    ></div>
+                    <div
+                      class="region"
+                      style="
+                        --c: var(--region-stamp);
+                        left: 60%;
+                        top: 86%;
+                        width: 26%;
+                        height: 8.5%;
+                      "
+                    >
+                      <span class="region__tag">stamp</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- инспектор -->
+              <div class="pane pane--right">
+                <div class="pane__tabs">
+                  <div class="pane__tab pane__tab--active">Свойства области</div>
+                </div>
+                <div class="insp">
+                  <div class="insp__title">
+                    <span
+                      class="legend__swatch"
+                      style="color: var(--region-image); width: 12px; height: 12px"
+                    ></span>
+                    Изображение · #27
+                  </div>
+                  <dl class="insp__kv">
+                    <dt>block_id</dt>
+                    <dd>blk_a91f3c7e2d</dd>
+                    <dt>Лист</dt>
+                    <dd>27 из 77</dd>
+                    <dt>Форма</dt>
+                    <dd>rectangle</dd>
+                    <dt>Координаты</dt>
+                    <dd>[0.105, 0.105, 0.475, 0.415]</dd>
+                    <dt>Простр-во</dt>
+                    <dd>normalized_page_top_left</dd>
+                    <dt>Статус</dt>
+                    <dd>recognized</dd>
+                  </dl>
+
+                  <div class="insp__section">
+                    <h4>
+                      Распознанный текст
+                      <span style="font-weight: 400; text-transform: none; letter-spacing: 0"
+                        >· из results.md</span
+                      >
+                    </h4>
+                    <div class="md">
+                      <b>Summary:</b> План 3-го этажа, оси 1–14 / А–Д.<br />
+                      <b>Description:</b> Планировка жилой секции: 6 квартир, лестнично-лифтовой
+                      узел в осях 7–9. Показаны перегородки 120 мм, проёмы и маркировка
+                      помещений.<br />
+                      <b>Entities:</b> помещения 3.1–3.6, лестница Л-1, лифт Л-2, оси 1–14…
+                    </div>
+                  </div>
+
+                  <div class="insp__section">
+                    <h4>Исходные метаданные</h4>
+                    <div class="ext-link">
+                      <span class="warn">⚠</span> crop_url — внешняя ссылка, сервер её не загружает
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- статус -->
+            <div class="ws__status">
+              <span>Лист 27 / 77</span>
+              <span>Масштаб вида 64 %</span>
+              <span>Масштаб чертежа: Не задан</span>
+              <div class="right">
+                <span>областей на листе: 7</span>
+                <span>рендер: pdf.js</span>
+                <span>2481 × 3509 px</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ТОКЕНЫ ================= -->
+      <section id="tokens">
+        <h2><span class="num">04</span>Токены</h2>
+        <p class="note">
+          Единственный источник цвета. В компонентах хардкод запрещён — иначе тёмная тема
+          расползётся. Переключите тему в шапке, чтобы увидеть обе палитры.
+        </p>
+        <div class="tokens">
+          <div class="token">
+            <div class="token__chip" style="background: var(--bg)"></div>
+            <div class="token__name">--bg<span>фон страницы</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--surface)"></div>
+            <div class="token__name">--surface<span>панели, карточки</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--surface-muted)"></div>
+            <div class="token__name">--surface-muted<span>шапки таблиц</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--border)"></div>
+            <div class="token__name">--border<span>границы панелей</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--text)"></div>
+            <div class="token__name">--text<span>основной текст</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--muted)"></div>
+            <div class="token__name">--muted<span>подписи, метаданные</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--accent)"></div>
+            <div class="token__name">--accent<span>действия, выделение</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--success)"></div>
+            <div class="token__name">--success<span>готово</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--warning)"></div>
+            <div class="token__name">--warning<span>ожидание, внимание</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--danger)"></div>
+            <div class="token__name">--danger<span>ошибка</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--region-text)"></div>
+            <div class="token__name">--region-text<span>область: текст</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--region-image)"></div>
+            <div class="token__name">--region-image<span>область: изображение</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--region-stamp)"></div>
+            <div class="token__name">--region-stamp<span>область: штамп</span></div>
+          </div>
+          <div class="token">
+            <div class="token__chip" style="background: var(--canvas)"></div>
+            <div class="token__name">--canvas<span>лист чертежа</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ПРАВИЛА ================= -->
+      <section id="rules">
+        <h2><span class="num">05</span>Правила, которым подчинён макет</h2>
+        <div class="rules">
+          <div class="rule">
+            <h4>Плотность вместо воздуха</h4>
+            <p>
+              Ритм 4/8 px, строки таблиц 40 px, панели 248 и 288 px. Внутри рабочей области нет
+              крупных карточек и заголовков — экран принадлежит чертежу.
+            </p>
+          </div>
+          <div class="rule">
+            <h4>Честные состояния</h4>
+            <p>
+              Выключенное показано выключенным: «Обмеры», «Модели», «Отчёты» видны, но неактивны и
+              подписаны этапом. Выдуманных метрик и процентов на экране нет.
+            </p>
+          </div>
+          <div class="rule">
+            <h4>Слои разделены</h4>
+            <p>
+              Чертёж рисует один слой, области — другой. Цвет области кодирует тип, выделение
+              усиливает заливку и рамку, а не перерисовывает документ.
+            </p>
+          </div>
+          <div class="rule">
+            <h4>Масштаб не выдуман</h4>
+            <p>
+              В статусной строке два разных числа: масштаб вида в процентах и масштаб чертежа,
+              который сейчас «Не задан». Пока нет калибровки — так и написано.
+            </p>
+          </div>
+          <div class="rule">
+            <h4>Клавиатура и фокус</h4>
+            <p>
+              Видимая обводка фокуса, подсказки у иконок без подписи, Esc снимает выделение, пробел
+              с перетаскиванием — панорама.
+            </p>
+          </div>
+          <div class="rule">
+            <h4>Только десктоп для чертежей</h4>
+            <p>
+              Список проектов остаётся пригодным на узком экране, рабочая область на нём показывает
+              внятное сообщение вместо сломанной вёрстки.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+      const btn = document.getElementById('theme');
+      btn.addEventListener('click', () => {
+        const dark = root.getAttribute('data-theme') === 'dark';
+        root.setAttribute('data-theme', dark ? 'light' : 'dark');
+        btn.textContent = dark ? 'Тёмная тема' : 'Светлая тема';
+      });
+    </script>
+  </body>
+</html>
