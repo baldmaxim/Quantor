@@ -9,6 +9,7 @@ import {
   readJob,
   readMeta,
   readProject,
+  readRevisionContentUrl,
   type DocumentRead,
   type MetaResponse,
   type ProjectSummary,
@@ -33,6 +34,7 @@ export const queryKeys = {
   regions: (sheetId: string, blockType: string | null) =>
     ['sheet', sheetId, 'regions', blockType] as const,
   job: (jobId: string) => ['job', jobId] as const,
+  contentUrl: (revisionId: string) => ['revision', revisionId, 'content-url'] as const,
 };
 
 export interface ProjectsParams {
@@ -155,6 +157,30 @@ export const useRegions = (sheetId: string | null, blockType: string | null) =>
         }),
       ),
     staleTime: Number.POSITIVE_INFINITY,
+  });
+
+/**
+ * Временная ссылка на файл ревизии.
+ *
+ * Обновляется заранее, до истечения: просмотрщик держит документ открытым часами,
+ * и протухшая ссылка посреди работы выглядит как поломка.
+ */
+export const useContentUrl = (revisionId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.contentUrl(revisionId ?? ''),
+    enabled: revisionId !== null,
+    queryFn: async () =>
+      unwrap(
+        await readRevisionContentUrl({
+          throwOnError: true,
+          path: { revision_id: revisionId ?? '' },
+        }),
+      ),
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const expires = query.state.data?.expires_in;
+      return expires ? Math.max(expires - 300, 60) * 1000 : false;
+    },
   });
 
 export const useJob = (jobId: string | null) =>

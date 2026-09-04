@@ -127,6 +127,35 @@ test.describe('рабочая область', () => {
     await expect(takeoff).toHaveAttribute('title', /Этап 2/);
   });
 
+  test('без ревизии объясняет, что открывать нечего', async ({ page }) => {
+    await page.goto(WORKSPACE);
+
+    await expect(page.getByText('Ревизия не выбрана')).toBeVisible();
+  });
+
+  test('pdf.js не грузится вне рабочей области', async ({ page }) => {
+    // Требование этапа: тяжёлые зависимости просмотрщика не должны попадать в бандл
+    // списка проектов. Проверяем по фактически загруженным скриптам, а не по конфигу.
+    const scripts: string[] = [];
+    page.on('response', (response) => {
+      const url = response.url();
+      if (url.endsWith('.js')) scripts.push(url);
+    });
+
+    await page.goto('/projects');
+    await page.waitForLoadState('networkidle');
+
+    const sizes = await Promise.all(
+      scripts.map(async (url) => {
+        const response = await page.request.get(url);
+        const body = await response.text();
+        return body.includes('PDFDocumentProxy') || body.includes('pdfjs') ? url : null;
+      }),
+    );
+
+    expect(sizes.filter(Boolean)).toHaveLength(0);
+  });
+
   test('на узком экране показывает требование десктопа', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 800 });
     await page.goto(WORKSPACE);
