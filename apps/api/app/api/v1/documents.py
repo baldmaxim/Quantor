@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query
 
 from app.api.v1.deps import (
     DEFAULT_PAGE_SIZE,
@@ -168,11 +168,9 @@ async def read_revision_content_url(
             download_filename=revision.source_filename,
         )
     except ObjectNotFoundError as error:
-        raise http_error(ErrorCode.CONTENT_NOT_AVAILABLE, status.HTTP_404_NOT_FOUND) from error
+        raise http_error(ErrorCode.CONTENT_NOT_AVAILABLE) from error
     except StorageUnavailableError as error:
-        raise http_error(
-            ErrorCode.STORAGE_UNAVAILABLE, status.HTTP_503_SERVICE_UNAVAILABLE
-        ) from error
+        raise http_error(ErrorCode.STORAGE_UNAVAILABLE) from error
 
     return ContentUrl(
         url=url,

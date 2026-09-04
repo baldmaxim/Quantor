@@ -13,6 +13,34 @@
         "title": "ArtifactKind",
         "type": "string"
       },
+      "Body_upload_file": {
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Добавить как новую ревизию существующего документа",
+            "title": "Document Id"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Файл проекта",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_file",
+        "type": "object"
+      },
       "ComponentHealth": {
         "properties": {
           "duration_ms": {
@@ -1041,6 +1069,73 @@
         "title": "SheetRead",
         "type": "object"
       },
+      "UploadRead": {
+        "description": "Результат загрузки.\n\nis_duplicate означает, что такой файл в проекте уже был: возвращается прежняя ревизия,\nвторая копия не создаётся.",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentRead"
+          },
+          "is_duplicate": {
+            "title": "Is Duplicate",
+            "type": "boolean"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/DocumentRevisionRead"
+          }
+        },
+        "required": [
+          "document",
+          "revision",
+          "job",
+          "is_duplicate"
+        ],
+        "title": "UploadRead",
+        "type": "object"
+      },
+      "UploadedFileType": {
+        "description": "Что портал умеет делать с файлом такого расширения.",
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "document_kind": {
+            "$ref": "#/components/schemas/DocumentKind"
+          },
+          "extension": {
+            "title": "Extension",
+            "type": "string"
+          },
+          "max_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Size Bytes",
+            "type": "integer"
+          },
+          "schedules_import": {
+            "title": "Schedules Import",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "extension",
+          "document_kind",
+          "capability",
+          "schedules_import",
+          "max_size_bytes"
+        ],
+        "title": "UploadedFileType",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1622,6 +1717,108 @@
         "summary": "Задания проекта",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/upload-capabilities": {
+      "get": {
+        "description": "Список поддерживаемых расширений и того, что портал с ними сделает.\n\nИнтерфейс берёт подписи отсюда, а не хранит свою копию: иначе при подключении нового\nобработчика обещания на экране разойдутся с поведением сервера.",
+        "operationId": "read_upload_capabilities",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UploadedFileType"
+                  },
+                  "title": "Response Read Upload Capabilities",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Какие файлы принимает портал",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/uploads": {
+      "post": {
+        "description": "Принимает файл, кладёт его в хранилище и заводит документ с ревизией.\n\nРаспознавание здесь не выполняется: для ZIP-пакета создаётся задание импорта в состоянии\n«в очереди», для остальных типов ревизия сохраняется с честным статусом обработки.",
+        "operationId": "upload_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Загрузить файл в проект",
+        "tags": [
+          "uploads"
         ]
       }
     },

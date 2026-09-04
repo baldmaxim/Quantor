@@ -12,6 +12,24 @@ export type ClientOptions = {
 export type ArtifactKind = 'blocks_json' | 'results_md' | 'results_html' | 'package_zip' | 'other';
 
 /**
+ * Body_upload_file
+ */
+export type BodyUploadFile = {
+    /**
+     * Document Id
+     *
+     * Добавить как новую ревизию существующего документа
+     */
+    document_id?: string | null;
+    /**
+     * File
+     *
+     * Файл проекта
+     */
+    file: Blob | File;
+};
+
+/**
  * ComponentHealth
  */
 export type ComponentHealth = {
@@ -629,6 +647,49 @@ export type SheetRead = {
 };
 
 /**
+ * UploadRead
+ *
+ * Результат загрузки.
+ *
+ * is_duplicate означает, что такой файл в проекте уже был: возвращается прежняя ревизия,
+ * вторая копия не создаётся.
+ */
+export type UploadRead = {
+    document: DocumentRead;
+    /**
+     * Is Duplicate
+     */
+    is_duplicate: boolean;
+    job: JobRead | null;
+    revision: DocumentRevisionRead;
+};
+
+/**
+ * UploadedFileType
+ *
+ * Что портал умеет делать с файлом такого расширения.
+ */
+export type UploadedFileType = {
+    /**
+     * Capability
+     */
+    capability: string;
+    document_kind: DocumentKind;
+    /**
+     * Extension
+     */
+    extension: string;
+    /**
+     * Max Size Bytes
+     */
+    max_size_bytes: number;
+    /**
+     * Schedules Import
+     */
+    schedules_import: boolean;
+};
+
+/**
  * ValidationError
  */
 export type ValidationError = {
@@ -988,6 +1049,68 @@ export type ListProjectJobsResponses = {
 };
 
 export type ListProjectJobsResponse = ListProjectJobsResponses[keyof ListProjectJobsResponses];
+
+export type ReadUploadCapabilitiesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/upload-capabilities';
+};
+
+export type ReadUploadCapabilitiesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadUploadCapabilitiesError = ReadUploadCapabilitiesErrors[keyof ReadUploadCapabilitiesErrors];
+
+export type ReadUploadCapabilitiesResponses = {
+    /**
+     * Response Read Upload Capabilities
+     *
+     * Successful Response
+     */
+    200: Array<UploadedFileType>;
+};
+
+export type ReadUploadCapabilitiesResponse = ReadUploadCapabilitiesResponses[keyof ReadUploadCapabilitiesResponses];
+
+export type UploadFileData = {
+    body: BodyUploadFile;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/uploads';
+};
+
+export type UploadFileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadFileError = UploadFileErrors[keyof UploadFileErrors];
+
+export type UploadFileResponses = {
+    /**
+     * Successful Response
+     */
+    201: UploadRead;
+};
+
+export type UploadFileResponse = UploadFileResponses[keyof UploadFileResponses];
 
 export type ReadRevisionData = {
     body?: never;

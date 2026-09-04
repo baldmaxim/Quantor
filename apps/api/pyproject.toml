@@ -13,6 +13,7 @@ dependencies = [
     "alembic==1.19.1",
     "aioboto3==15.5.0",
     "structlog==26.1.0",
+    "python-multipart==0.0.32",
 ]
 
 [project.optional-dependencies]

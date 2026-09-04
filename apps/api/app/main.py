@@ -103,7 +103,7 @@ def _register_error_handlers(app: FastAPI) -> None:
     async def _domain_error(_: Request, error: DomainError) -> JSONResponse:
         log.warning("domain_error", code=error.code.value)
         return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=error.status_code,
             content=_error_body(error.code, error.detail),
         )
 

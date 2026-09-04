@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -21,6 +21,9 @@ from app.domain import (
     ProjectStatus,
     RegionShape,
 )
+
+if TYPE_CHECKING:
+    from app.services.uploads import UploadOutcome
 
 # Пагинация обязательна: на одном листе бывают сотни областей, во всём документе — тысячи.
 DEFAULT_PAGE_SIZE = 50
@@ -165,6 +168,41 @@ class RegionRead(ApiModel):
     recognition_status: str | None
     raw_content_md: str | None
     legacy_metadata: dict[str, Any]
+
+
+# --------------------------------------------------------------------------- загрузка
+
+
+class UploadedFileType(ApiModel):
+    """Что портал умеет делать с файлом такого расширения."""
+
+    extension: str
+    document_kind: DocumentKind
+    capability: str
+    schedules_import: bool
+    max_size_bytes: int = Field(gt=0)
+
+
+class UploadRead(BaseModel):
+    """Результат загрузки.
+
+    is_duplicate означает, что такой файл в проекте уже был: возвращается прежняя ревизия,
+    вторая копия не создаётся.
+    """
+
+    document: DocumentRead
+    revision: DocumentRevisionRead
+    job: JobRead | None
+    is_duplicate: bool
+
+    @classmethod
+    def from_outcome(cls, outcome: UploadOutcome) -> UploadRead:
+        return cls(
+            document=DocumentRead.model_validate(outcome.document),
+            revision=DocumentRevisionRead.model_validate(outcome.revision),
+            job=JobRead.model_validate(outcome.job) if outcome.job else None,
+            is_duplicate=outcome.is_duplicate,
+        )
 
 
 # --------------------------------------------------------------------------- задания
