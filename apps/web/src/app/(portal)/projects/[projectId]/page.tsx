@@ -2,8 +2,9 @@
 
 import type { DocumentRead, ProjectJobSummary } from '@quantor/api-client';
 import Link from 'next/link';
-import { use } from 'react';
+import { use, useState } from 'react';
 
+import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
 import { TopBar } from '@/components/shell/TopBar';
 import {
   Button,
@@ -15,14 +16,23 @@ import {
   StatusBadge,
 } from '@/components/ui';
 import { IconBim, IconPdf, IconZip } from '@/components/ui/icons';
-import { documentKind, formatWhen, projectStatus } from '@/lib/format';
-import { useProject, useProjectDocuments } from '@/lib/queries';
+import { errorMessage } from '@/lib/errors';
+import {
+  countOf,
+  documentKind,
+  formatBytes,
+  formatWhen,
+  projectStatus,
+  revisionStatus,
+  SHEETS_FORMS,
+} from '@/lib/format';
+import { isRenderable, useDocumentRevisions, useProject, useProjectDocuments } from '@/lib/queries';
 
 /**
  * Карточка проекта.
  *
  * Отвечает на три вопроса: что загружено, что с этим происходит и можно ли уже открыть
- * рабочую область. Кнопка открытия неактивна, пока нет пригодной к отрисовке ревизии —
+ * рабочую область. Кнопка открытия остаётся неактивной, пока нет готовой ревизии PDF —
  * обещать открытие того, чего нет, нельзя.
  */
 
@@ -32,8 +42,16 @@ interface IPageProps {
 
 const ProjectPage = ({ params }: IPageProps) => {
   const { projectId } = use(params);
+  const [uploading, setUploading] = useState(false);
+
   const project = useProject(projectId);
   const documents = useProjectDocuments(projectId);
+
+  // Открывать в рабочей области можно только распознанный PDF: пакет — это архив,
+  // а BIM-модель портал не разбирает.
+  const renderableDocument = documents.data?.items.find(isRenderable) ?? null;
+  const revisions = useDocumentRevisions(renderableDocument?.id ?? null);
+  const openable = revisions.data?.items.find((revision) => revision.processing_status === 'ready');
 
   const status = projectStatus(project.data?.last_job);
 
@@ -44,12 +62,23 @@ const ProjectPage = ({ params }: IPageProps) => {
         status={status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : null}
         actions={
           <>
-            <Button disabled title="Загрузка файлов появится на следующем шаге">
-              Загрузить файл
-            </Button>
-            <Button variant="primary" disabled title="Просмотрщик появится на следующем шаге">
-              Открыть рабочую область
-            </Button>
+            <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
+            {openable ? (
+              <Link
+                href={`/projects/${projectId}/workspace?revision=${openable.id}`}
+                className="inline-flex h-[var(--h-ctl)] items-center rounded-[var(--radius-sm)] border border-accent bg-accent px-[var(--s-5)] text-sm font-medium text-accent-contrast hover:bg-accent-hover"
+              >
+                Открыть рабочую область
+              </Link>
+            ) : (
+              <Button
+                variant="primary"
+                disabled
+                title="Нужен распознанный PDF: загрузите пакет и дождитесь импорта"
+              >
+                Открыть рабочую область
+              </Button>
+            )}
           </>
         }
       />
@@ -82,6 +111,7 @@ const ProjectPage = ({ params }: IPageProps) => {
                     compact
                     title="Документов пока нет"
                     description="Загрузите распознанный пакет или PDF — они появятся здесь."
+                    action={<Button onClick={() => setUploading(true)}>Загрузить файл</Button>}
                   />
                 </div>
               )}
@@ -114,6 +144,12 @@ const ProjectPage = ({ params }: IPageProps) => {
           </section>
         </div>
       </main>
+
+      <UploadFilesDialog
+        projectId={projectId}
+        open={uploading}
+        onClose={() => setUploading(false)}
+      />
     </>
   );
 };
@@ -128,25 +164,35 @@ const ICONS: Record<string, typeof IconPdf> = {
 
 const DocumentRow = ({ document }: { document: DocumentRead }) => {
   const Icon = ICONS[document.document_kind] ?? IconPdf;
+  const revisions = useDocumentRevisions(document.id);
+  const latest = revisions.data?.items.at(-1);
+  const status = latest ? revisionStatus(latest.processing_status) : null;
+  const pageCount = latest?.source_metadata?.['page_count'];
 
   return (
     <div className="grid grid-cols-[22px_1fr_auto] items-center gap-[var(--s-5)] border-b border-border py-[var(--s-4)] last:border-b-0">
       <Icon className="text-muted" />
+
       <div className="min-w-0">
         <p className="truncate text-sm">{document.display_name}</p>
         <p className="mono text-xs text-muted">
           {documentKind(document.document_kind)}
-          {document.discipline ? ` · ${document.discipline}` : ''} ·{' '}
-          {formatWhen(document.created_at)}
+          {latest && ` · ${formatBytes(latest.source_size)}`}
+          {typeof pageCount === 'number' && ` · ${countOf(pageCount, SHEETS_FORMS)}`}
+          {revisions.data && revisions.data.total > 1 && ` · ревизий: ${revisions.data.total}`}
         </p>
+        {latest?.processing_error_code && (
+          <p className="mt-[var(--s-2)] text-xs text-danger">
+            {errorMessage(latest.processing_error_code)}
+          </p>
+        )}
       </div>
-      <Link
-        href={`/projects/${document.project_id}`}
-        className="text-xs text-muted transition-colors hover:text-text"
-        aria-label={`Ревизии документа ${document.display_name}`}
-      >
-        Ревизии
-      </Link>
+
+      {status ? (
+        <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+      ) : (
+        <Skeleton className="h-[16px] w-[90px]" />
+      )}
     </div>
   );
 };
@@ -165,6 +211,8 @@ const JobCard = ({ job }: { job: ProjectJobSummary }) => {
       </dl>
 
       {running && <ProgressRow value={job.progress} label="Импорт пакета" />}
+
+      {job.error_code && <p className="text-sm text-danger">{errorMessage(job.error_code)}</p>}
 
       {job.status === 'failed' && (
         <p className="text-sm text-muted">

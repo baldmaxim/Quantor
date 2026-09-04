@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 
+import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
 import { ProjectsTable } from '@/components/projects/ProjectsTable';
 import { TopBar } from '@/components/shell/TopBar';
 import { Button, EmptyState, ErrorState, SearchInput, SkeletonRows, cx } from '@/components/ui';
@@ -19,6 +21,11 @@ import { useProjects, type ProjectsParams } from '@/lib/queries';
 const PAGE_SIZE = 50;
 
 const ProjectsPage = () => {
+  const router = useRouter();
+  // Открытый диалог живёт в адресе: на него можно дать ссылку, и /projects/new ведёт сюда же.
+  const searchParams = useSearchParams();
+  const creating = searchParams.get('create') === '1';
+
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<ProjectsParams['sort']>('recent');
 
@@ -52,11 +59,7 @@ const ProjectsPage = () => {
               </p>
             </div>
             <div className="ml-auto">
-              <Button
-                variant="primary"
-                disabled
-                title="Создание проекта появится на следующем шаге"
-              >
+              <Button variant="primary" onClick={() => router.push('/projects?create=1')}>
                 + Создать проект
               </Button>
             </div>
@@ -88,6 +91,13 @@ const ProjectsPage = () => {
                   ? 'Попробуйте изменить запрос — поиск идёт по названию проекта.'
                   : 'Создайте проект и загрузите распознанный пакет или PDF проектной документации.'
               }
+              action={
+                search ? undefined : (
+                  <Button variant="primary" onClick={() => router.push('/projects?create=1')}>
+                    Создать проект
+                  </Button>
+                )
+              }
             />
           )}
 
@@ -96,6 +106,8 @@ const ProjectsPage = () => {
           )}
         </div>
       </main>
+
+      <CreateProjectDialog open={creating} onClose={() => router.push('/projects')} />
     </>
   );
 };
@@ -141,4 +153,14 @@ const SortToggle = ({ value, onChange }: ISortToggleProps) => (
   </div>
 );
 
-export default ProjectsPage;
+/**
+ * useSearchParams требует границы приостановки: без неё маршрут не может быть
+ * предрендерен статически.
+ */
+const ProjectsRoute = () => (
+  <Suspense fallback={null}>
+    <ProjectsPage />
+  </Suspense>
+);
+
+export default ProjectsRoute;

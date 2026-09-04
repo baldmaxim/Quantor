@@ -57,6 +57,32 @@ test.describe('оболочка портала', () => {
     await expect(page).toHaveURL(/\/projects$/);
   });
 
+  test('создание проекта открывается по кнопке и по адресу', async ({ page }) => {
+    await page.goto('/projects');
+    await page.getByRole('button', { name: '+ Создать проект' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(/create=1/);
+    // Пока имя не введено, создавать нечего.
+    await expect(dialog.getByRole('button', { name: 'Создать проект' })).toBeDisabled();
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    await page.goto('/projects/new');
+    await expect(page.getByRole('dialog')).toBeVisible();
+  });
+
+  test('диалог объясняет, что будет с каждым типом файла', async ({ page }) => {
+    await page.goto('/projects?create=1');
+    const dialog = page.getByRole('dialog');
+
+    await expect(dialog.getByText(/ZIP-пакет распознавалки, PDF/)).toBeVisible();
+    await dialog.getByRole('textbox').first().fill('Проверочный проект');
+    await expect(dialog.getByRole('button', { name: 'Создать проект' })).toBeEnabled();
+  });
+
   test('фокус виден при обходе с клавиатуры', async ({ page }) => {
     await page.goto('/projects');
     await page.keyboard.press('Tab');

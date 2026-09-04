@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  listDocumentRevisions,
   listProjectDocuments,
   listProjects,
   listRevisionSheets,
@@ -27,6 +28,7 @@ export const queryKeys = {
   projects: (params: ProjectsParams) => ['projects', params] as const,
   project: (projectId: string) => ['project', projectId] as const,
   documents: (projectId: string) => ['project', projectId, 'documents'] as const,
+  revisions: (documentId: string) => ['document', documentId, 'revisions'] as const,
   sheets: (revisionId: string) => ['revision', revisionId, 'sheets'] as const,
   regions: (sheetId: string, blockType: string | null) =>
     ['sheet', sheetId, 'regions', blockType] as const,
@@ -106,6 +108,20 @@ export const useProjectDocuments = (projectId: string) =>
           throwOnError: true,
           path: { project_id: projectId },
           query: { limit: 200 },
+        }),
+      ),
+  });
+
+export const useDocumentRevisions = (documentId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.revisions(documentId ?? ''),
+    enabled: documentId !== null,
+    queryFn: async () =>
+      unwrap(
+        await listDocumentRevisions({
+          throwOnError: true,
+          path: { document_id: documentId ?? '' },
+          query: { limit: 50 },
         }),
       ),
   });
