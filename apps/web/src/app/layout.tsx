@@ -15,14 +15,14 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  // Значение перезаписывается предзагрузочным скриптом под активную тему.
+  themeColor: '#f1f4f7',
 };
 
 const RootLayout = ({ children }: { children: ReactNode }) => (
   <html lang="ru" suppressHydrationWarning>
-    <head>
-      <ThemeScript />
-    </head>
     <body className="antialiased">
+      <ThemeScript />
       <Providers>{children}</Providers>
     </body>
   </html>

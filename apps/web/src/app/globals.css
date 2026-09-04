@@ -1,69 +1,283 @@
 @import 'tailwindcss';
 
-/* Дизайн-токены. Цвета в компонентах задаются только через них — хардкод hex запрещён.
-   Палитра сдержанная: портал — инженерный инструмент, а не маркетинговый лендинг. */
+/* ============================================================================
+   Дизайн-токены Quantor.
+
+   Единственный источник цвета и размера. Хардкод в компонентах запрещён без
+   исключений: иначе тёмная тема расползается, а контраст перестаёт быть
+   проверяемым. Значения перенесены из design-reference.html —
+   см. docs/design/REDESIGN_NOTES.md.
+   ============================================================================ */
+
 :root {
-  --bg: #f6f7f9;
+  color-scheme: light;
+
+  /* --- поверхности --- */
+  --bg: #f1f4f7;
   --surface: #ffffff;
-  --surface-muted: #f0f2f5;
-  --text: #14181f;
-  --muted: #5c6572;
-  --border: #d9dee5;
-  --accent: #2563a8;
+  --surface-muted: #e9edf2;
+  --surface-sunken: #dfe5ec;
+  --surface-raised: #ffffff;
+
+  /* --- текст --- */
+  --text: #0f141a;
+  --muted: #55606e;
+
+  /* --- границы ---
+     Разделители и границы контролов разведены намеренно: у контрола граница
+     обязана давать контраст 3:1, у разделителя строк такое требование излишне
+     и делает таблицу полосатой. */
+  --border: #d2d9e1;
+  --border-strong: #b6c0cb;
+  --border-control: #79838f;
+
+  /* --- акцент --- */
+  --accent: #1a5fa8;
+  --accent-hover: #174f8d;
+  --accent-active: #134476;
+  --accent-soft: #e2edf9;
   --accent-contrast: #ffffff;
-  --success: #2f7d4f;
-  --warning: #a86b1d;
-  --danger: #b3261e;
+  --focus: #0f4c9c;
+
+  /* --- статусы --- */
+  --success: #1e6b41;
+  --success-soft: #e2f0e8;
+  --warning: #8a5a10;
+  --warning-soft: #f7eedc;
+  --danger: #a92318;
+  --danger-soft: #fae7e4;
+  --info: #1a5fa8;
+  --info-soft: #e2edf9;
+
+  /* --- просмотрщик --- */
+  --canvas: #fbfbf8;
+  --canvas-ink: #4a4f57;
+  --canvas-well: #c4cad1;
+
+  /* Цвета областей не зависят от темы: лист чертежа всегда светлый,
+     и «тёмные» варианты давали бы на нём 3.9:1. */
+  --region-text: #14539e;
+  --region-image: #6d28d9;
+  --region-stamp: #92400e;
+  --region-tag-text: #ffffff;
+
+  /* --- вспомогательное --- */
+  --tooltip-bg: #2b323b;
+  --tooltip-text: #ffffff;
+  --skeleton: #e4e9ef;
+  --skeleton-hi: #eff3f7;
+  --scrim: rgb(9 14 20 / 0.44);
+  --shadow-1: 0 1px 2px rgb(9 14 20 / 0.1);
+  --shadow-2: 0 6px 20px rgb(9 14 20 / 0.14);
+  --shadow-sheet: 0 2px 14px rgb(9 14 20 / 0.28);
+
+  /* --- отступы: единственная шкала --- */
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 6px;
+  --s-4: 8px;
+  --s-5: 12px;
+  --s-6: 16px;
+  --s-7: 24px;
+  --s-8: 32px;
+
+  /* --- скругления: чип, контрол, карточка, экран --- */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* --- типографика --- */
+  --fs-micro: 11px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --lh-tight: 1.25;
+  --lh: 1.45;
+
+  /* --- высоты ---
+     У рабочей области свои, меньшие: там каждый пиксель отнимается у чертежа. */
+  --h-ctl: 32px;
+  --h-ctl-ws: 26px;
+  --h-row: 36px;
+  --h-row-tree: 26px;
+  --h-row-region: 24px;
+  --h-topbar: 44px;
+  --h-ws-tabs: 34px;
+  --h-ws-toolbar: 34px;
+  --h-ws-status: 24px;
+
+  /* --- ширины --- */
+  --w-rail: 52px;
+  --w-pane-left: 264px;
+  --w-pane-right: 300px;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
 }
 
+/* Системная тёмная тема, если пользователь не выбрал светлую явно. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #14171c;
-    --surface: #1b1f26;
-    --surface-muted: #232833;
-    --text: #e7eaef;
-    --muted: #98a1b0;
-    --border: #333a45;
-    --accent: #5c9ce0;
-    --accent-contrast: #10131a;
-    --success: #63b47f;
-    --warning: #d19a4a;
-    --danger: #e0736a;
+    color-scheme: dark;
+
+    --bg: #0f1216;
+    --surface: #171b21;
+    --surface-muted: #1f242c;
+    --surface-sunken: #0a0c0f;
+    --surface-raised: #232932;
+
+    --text: #e6eaf0;
+    --muted: #9aa5b3;
+
+    --border: #2b323b;
+    --border-strong: #3d4652;
+    --border-control: #767f8c;
+
+    --accent: #5fa2e8;
+    --accent-hover: #7ab5ee;
+    --accent-active: #4b91d8;
+    --accent-soft: #152741;
+    --accent-contrast: #0a0f16;
+    --focus: #7ab5ee;
+
+    --success: #5cb887;
+    --success-soft: #152a20;
+    --warning: #d6a34a;
+    --warning-soft: #2a2114;
+    --danger: #ea7a70;
+    --danger-soft: #2d1a18;
+    --info: #5fa2e8;
+    --info-soft: #152741;
+
+    --canvas: #eceae4;
+    --canvas-well: #0a0c0f;
+
+    --tooltip-bg: #c8d2de;
+    --tooltip-text: #0f141a;
+    --skeleton: #232932;
+    --skeleton-hi: #2c333d;
+    --scrim: rgb(3 5 8 / 0.62);
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-2: 0 8px 24px rgb(0 0 0 / 0.5);
+    --shadow-sheet: 0 2px 18px rgb(0 0 0 / 0.6);
   }
 }
 
+/* Явный выбор пользователя. Значения те же, но перекрывают системную настройку
+   в обе стороны — иначе переключатель работает только в одну. */
 :root[data-theme='dark'] {
-  --bg: #14171c;
-  --surface: #1b1f26;
-  --surface-muted: #232833;
-  --text: #e7eaef;
-  --muted: #98a1b0;
-  --border: #333a45;
-  --accent: #5c9ce0;
-  --accent-contrast: #10131a;
-  --success: #63b47f;
-  --warning: #d19a4a;
-  --danger: #e0736a;
+  color-scheme: dark;
+
+  --bg: #0f1216;
+  --surface: #171b21;
+  --surface-muted: #1f242c;
+  --surface-sunken: #0a0c0f;
+  --surface-raised: #232932;
+
+  --text: #e6eaf0;
+  --muted: #9aa5b3;
+
+  --border: #2b323b;
+  --border-strong: #3d4652;
+  --border-control: #767f8c;
+
+  --accent: #5fa2e8;
+  --accent-hover: #7ab5ee;
+  --accent-active: #4b91d8;
+  --accent-soft: #152741;
+  --accent-contrast: #0a0f16;
+  --focus: #7ab5ee;
+
+  --success: #5cb887;
+  --success-soft: #152a20;
+  --warning: #d6a34a;
+  --warning-soft: #2a2114;
+  --danger: #ea7a70;
+  --danger-soft: #2d1a18;
+  --info: #5fa2e8;
+  --info-soft: #152741;
+
+  --canvas: #eceae4;
+  --canvas-well: #0a0c0f;
+
+  --tooltip-bg: #c8d2de;
+  --tooltip-text: #0f141a;
+  --skeleton: #232932;
+  --skeleton-hi: #2c333d;
+  --scrim: rgb(3 5 8 / 0.62);
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 8px 24px rgb(0 0 0 / 0.5);
+  --shadow-sheet: 0 2px 18px rgb(0 0 0 / 0.6);
 }
 
+/* Единственная точка перелома на всё приложение: на широком мониторе панели
+   могут позволить себе больше, чертежу это не мешает. */
+@media (min-width: 1800px) {
+  :root {
+    --w-pane-left: 300px;
+    --w-pane-right: 340px;
+  }
+}
+
+/* Токены → утилиты Tailwind. inline, чтобы значения оставались ссылками
+   на переменные и продолжали меняться вместе с темой. */
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
   --color-text: var(--text);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-control: var(--border-control);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-accent-soft: var(--accent-soft);
   --color-accent-contrast: var(--accent-contrast);
+  --color-focus: var(--focus);
   --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-canvas: var(--canvas);
+  --color-canvas-ink: var(--canvas-ink);
+  --color-canvas-well: var(--canvas-well);
+  --color-region-text: var(--region-text);
+  --color-region-image: var(--region-image);
+  --color-region-stamp: var(--region-stamp);
+  --color-skeleton: var(--skeleton);
+  --color-tooltip-bg: var(--tooltip-bg);
+  --color-tooltip-text: var(--tooltip-text);
 
-  --font-sans:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+  --text-micro: var(--fs-micro);
+  --text-xs: var(--fs-xs);
+  --text-sm: var(--fs-sm);
+  --text-md: var(--fs-md);
+  --text-lg: var(--fs-lg);
+  --text-xl: var(--fs-xl);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
+
+/* ============================================================================
+   Базовые стили
+   ============================================================================ */
 
 html,
 body {
@@ -71,16 +285,65 @@ body {
 }
 
 body {
+  margin: 0;
   background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  line-height: var(--lh);
+  -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Цифры в таблицах и статусной строке не должны прыгать при обновлении. */
+.tabular,
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
 }
 
 /* Видимый фокус обязателен: рабочей областью пользуются с клавиатуры. */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* Скрытый заголовок для программ чтения с экрана. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton) 25%,
+    var(--skeleton-hi) 50%,
+    var(--skeleton) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+  border-radius: var(--radius-sm);
 }
 
 @media (prefers-reduced-motion: reduce) {

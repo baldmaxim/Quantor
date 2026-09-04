@@ -16,6 +16,10 @@ export const Providers = ({ children }: { children: ReactNode }) => {
             staleTime: 30_000,
             retry: 1,
             refetchOnWindowFocus: false,
+            // Определение «офлайн» по браузеру здесь вредит: портал общается с API,
+            // который может работать на этой же машине. Без этого запрос к недоступному
+            // серверу навсегда застревает в паузе вместо честной ошибки.
+            networkMode: 'always',
           },
         },
       }),

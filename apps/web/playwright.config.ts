@@ -24,12 +24,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: { width: 1920, height: 1080 } },
     },
   ],
+  // Проверяем собранное приложение, а не dev-сервер: во-первых, это то, что увидит
+  // пользователь; во-вторых, HMR-сокет dev-сервера, привязанного к 0.0.0.0, не
+  // устанавливается из headless-браузера, и клиент Next не доходит до гидратации.
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: 'pnpm run dev',
+        command: `pnpm run build && pnpm exec next start --hostname 127.0.0.1 --port ${PORT}`,
         url: baseURL,
         reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
+        timeout: 240_000,
       },
 });
