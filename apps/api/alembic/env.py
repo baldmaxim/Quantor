@@ -25,14 +25,26 @@ config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 target_metadata = Base.metadata
 
-# Схемы и таблицы расширения PostGIS. Образ базы — postgis/postgis, и на установке, где
-# расширение включено, сравнение схемы видит чужие таблицы как «лишние» и предлагает их
-# удалить. Это не расхождение моделей, а шум: они принадлежат расширению.
+# Порядок поиска схем на время сравнения. Главная часть решения, а не мелочь.
 #
-# Отфильтровано узко и намеренно: «пропускать всё, чего нет в моделях» спрятало бы и
-# настоящее расхождение — забытую таблицу, которую как раз и надо заметить.
+# `postgis_tiger_geocoder` дописывает в search_path базы схемы topology и tiger. После
+# этого отражение без явной схемы приносит их таблицы (edges, addrfeat и ещё три десятка)
+# так, будто они лежат в public: `schema` у них None, и отфильтровать их по схеме уже
+# нельзя. Замерено на живой базе: 49 таблиц против 13 при явном schema="public".
+#
+# Поэтому search_path сужается до своих схем до начала сравнения.
+OWN_SEARCH_PATH = '"$user", public'
+
+# Схемы расширения. После сужения search_path сюда попадать нечему, но проверка остаётся
+# на случай сравнения с явным перечислением схем.
 EXTENSION_SCHEMAS = frozenset({"tiger", "tiger_data", "topology"})
+
+# А эта таблица лежит именно в public: её создаёт само расширение postgis, и search_path
+# от неё не спасает.
 EXTENSION_TABLES = frozenset({"spatial_ref_sys"})
+
+# Фильтры узкие намеренно: «пропускать всё, чего нет в моделях» убрало бы шум заодно
+# с настоящим расхождением — забытой таблицей, которую как раз и надо заметить.
 
 
 def include_name(name: str | None, type_: str, parent_names: dict[str, str | None]) -> bool:
@@ -71,6 +83,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    # До configure, а не после: отражение схемы происходит внутри него и уже пользуется
+    # действующим порядком поиска. Офлайн-режим (`--sql`) этого не проверяет — там живого
+    # отражения нет вовсе, и ошибка обнаруживается только на настоящей базе.
+    connection.exec_driver_sql(f"SET search_path TO {OWN_SEARCH_PATH}")
+
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
