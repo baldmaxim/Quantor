@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { cx } from '@/components/ui';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 /**
@@ -14,6 +13,10 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
  *
  * На телефоне действия переносятся во вторую строку: пять контролов в ряд на 360 px
  * либо не помещаются, либо ужимаются до непопадаемых.
+ *
+ * Последняя крошка — это и есть заголовок страницы, поэтому она размечена как `h1`.
+ * Дублировать её ещё раз в теле страницы незачем: одно и то же слово дважды подряд
+ * не помогает сориентироваться, а только съедает высоту экрана.
  */
 
 export interface Crumb {
@@ -25,19 +28,18 @@ interface ITopBarProps {
   crumbs: readonly Crumb[];
   actions?: ReactNode;
   status?: ReactNode;
+  /** Короткая сводка под стать разделу: сколько проектов, документов. */
+  summary?: ReactNode;
 }
 
-export const TopBar = ({ crumbs, actions, status }: ITopBarProps) => (
+export const TopBar = ({ crumbs, actions, status, summary }: ITopBarProps) => (
   <header
     // Имя перехода закрепляет шапку: контент едет, шапка стоит (см. globals.css).
     style={{ viewTransitionName: 'shell-topbar' }}
     className="safe-top sticky top-0 z-20 flex-none border-b border-border-strong bg-surface/95 backdrop-blur-sm"
   >
     <div className="flex min-h-[var(--h-topbar)] items-center gap-[var(--s-5)] px-[var(--s-5)] md:px-[var(--s-6)]">
-      <nav
-        aria-label="Хлебные крошки"
-        className="flex min-w-0 flex-1 items-center gap-[var(--s-4)]"
-      >
+      <nav aria-label="Хлебные крошки" className="flex min-w-0 items-center gap-[var(--s-4)]">
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1;
 
@@ -57,21 +59,26 @@ export const TopBar = ({ crumbs, actions, status }: ITopBarProps) => (
                 >
                   {crumb.label}
                 </Link>
-              ) : (
-                <span
-                  className={cx('truncate text-sm', last ? 'font-medium text-text' : 'text-muted')}
-                  aria-current={last ? 'page' : undefined}
-                >
+              ) : last ? (
+                <h1 className="truncate text-sm font-medium text-text" aria-current="page">
                   {crumb.label}
-                </span>
+                </h1>
+              ) : (
+                <span className="truncate text-sm text-muted">{crumb.label}</span>
               )}
             </span>
           );
         })}
-        {status}
       </nav>
 
-      <div className="flex flex-none items-center gap-[var(--s-4)]">
+      {summary && (
+        <span className="hidden flex-none text-xs whitespace-nowrap text-muted sm:inline">
+          {summary}
+        </span>
+      )}
+      {status}
+
+      <div className="ml-auto flex flex-none items-center gap-[var(--s-4)]">
         {actions && <div className="hidden items-center gap-[var(--s-4)] md:flex">{actions}</div>}
         <ThemeToggle />
       </div>

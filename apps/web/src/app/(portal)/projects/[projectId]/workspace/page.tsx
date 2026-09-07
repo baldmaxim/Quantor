@@ -394,6 +394,22 @@ const viewportSize = () => {
     : { width: 1200, height: 800 };
 };
 
+/**
+ * Ссылка из пакета, пригодная для перехода.
+ *
+ * Адрес приходит из недоверенного архива, поэтому схема проверяется явно: `javascript:`
+ * в href — это исполнение чужого кода на странице портала. Всё, кроме http(s), остаётся
+ * обычным текстом.
+ */
+const externalHref = (value: string): string | null => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+};
+
 const sheetLabel = (
   sheet: { page_index: number; page_label: string | null } | null,
   total: number,
@@ -664,6 +680,7 @@ const RecognitionPanel = ({
 
 const RegionInspector = ({ region, sheetLabel }: { region: RegionRead; sheetLabel: string }) => {
   const cropUrl = region.legacy_metadata['crop_url'];
+  const cropHref = typeof cropUrl === 'string' ? externalHref(cropUrl) : null;
 
   return (
     <>
@@ -695,9 +712,24 @@ const RegionInspector = ({ region, sheetLabel }: { region: RegionRead; sheetLabe
         <InspectorSection title="Исходные метаданные">
           <p className="flex items-start gap-[var(--s-3)] text-micro text-muted">
             <IconWarning width={13} height={13} className="mt-[2px] flex-none text-warning" />
-            {/* Сервер эту ссылку не загружает: пакет должен оставаться самодостаточным. */}
+            {/* Сервер эту ссылку не загружает: пакет должен оставаться самодостаточным.
+                Открыть её может человек — и пусть открывает в новой вкладке, не теряя
+                рабочую область. */}
             <span className="min-w-0 break-all">
-              crop_url — внешняя ссылка, сервер её не загружает: {cropUrl}
+              crop_url — внешняя ссылка, сервер её не загружает:{' '}
+              {cropHref ? (
+                <a
+                  href={cropHref}
+                  target="_blank"
+                  rel="noopener noreferrer external"
+                  title="Открыть вырезку в новой вкладке"
+                  className="text-accent underline decoration-dotted underline-offset-2 transition-colors duration-[var(--dur-fast)] hover:decoration-solid"
+                >
+                  {cropUrl}
+                </a>
+              ) : (
+                cropUrl
+              )}
             </span>
           </p>
         </InspectorSection>

@@ -47,6 +47,12 @@ interface IDrawingViewportProps {
   onError?: (code: string) => void;
 }
 
+/** Пауза после последнего изменения вида, после которой страница рисуется заново. */
+const RERENDER_DELAY_MS = 180;
+
+/** Задержка перед показом значка отрисовки: быстрые листы не должны им мигать. */
+const BADGE_DELAY_MS = 120;
+
 /** Цвета областей берутся из токенов темы — хардкод здесь означал бы разъехавшуюся тему. */
 const readRegionColors = (): Record<string, string> => {
   if (typeof window === 'undefined') return {};
@@ -87,14 +93,32 @@ export const DrawingViewport = ({
   const dragging = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const [spacePressed, setSpacePressed] = useState(false);
 
+  // Масштаб, в котором сейчас лежат пиксели холста страницы.
+  //
+  // Пока идёт жест, стопка растягивается стилями от этого значения — зум мгновенный,
+  // без единой перерисовки PDF. Когда жест затих, страница перерисовывается в новом
+  // масштабе, и коэффициент растяжения снова становится единичным.
+  const renderedScale = useRef(1);
+
+  // Обработчики родителя приходят стрелками и пересоздаются на каждый рендер. Держим их
+  // в ссылках, чтобы подписки на камеру не пересоздавались вместе с ними.
+  const viewChanged = useRef(onViewChange);
+  const failed = useRef(onError);
+
+  useEffect(() => {
+    viewChanged.current = onViewChange;
+    failed.current = onError;
+  }, [onViewChange, onError]);
+
   const paintOverlay = useCallback(() => {
     const canvas = overlayCanvas.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context || !sheet) return;
 
     const ratio = window.devicePixelRatio || 1;
-    const { scale } = cameraState.current;
-    const placed = placeRenderedPage(sheet, scale, ratio);
+    // Слой рисуется в том же масштабе, что и страница: у них общий родитель, и одно
+    // преобразование двигает обоих — разъехаться они не могут по построению.
+    const placed = placeRenderedPage(sheet, renderedScale.current, ratio);
 
     resizeOverlay(canvas, placed.width, placed.height, ratio);
     drawOverlay(
@@ -112,87 +136,97 @@ export const DrawingViewport = ({
   }, [sheet, regions, hiddenTypes, overlayVisible, selectedId]);
 
   /** Двигает и масштабирует стопку холстов. Вызывается на каждом кадре камеры. */
-  const applyCamera = useCallback(
-    (state: CameraState) => {
-      cameraState.current = state;
-      const element = stack.current;
-      if (element) {
-        element.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px)`;
-      }
-      paintOverlay();
-      onViewChange?.(state);
-    },
-    [paintOverlay, onViewChange],
-  );
+  const applyCamera = useCallback((state: CameraState) => {
+    cameraState.current = state;
+
+    const element = stack.current;
+    if (element) {
+      const zoom = state.scale / renderedScale.current;
+      element.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${zoom})`;
+    }
+
+    viewChanged.current?.(state);
+  }, []);
 
   useEffect(() => {
     applyCamera(camera.getState());
     return camera.subscribe(applyCamera);
   }, [camera, applyCamera]);
 
-  // Отрисовка страницы. Старая задача отменяется при любой смене листа или масштаба:
-  // иначе при быстром перелистывании поверх актуальной страницы дорисуется прежняя.
+  const reportFailure = useCallback((error: unknown) => {
+    if (error instanceof RenderCancelledError) return;
+    failed.current?.(error instanceof DocumentLoadError ? error.code : 'PDF_RENDER_FAILED');
+  }, []);
+
+  /** Рисует страницу в текущем масштабе камеры и снимает растяжение стопки. */
+  const renderPage = useCallback(
+    async (signal: AbortSignal) => {
+      const canvas = pageCanvas.current;
+      if (!backend || !sheet || !canvas) return;
+
+      const scale = cameraState.current.scale;
+      await backend.render({ pageIndex: sheet.pageIndex, scale, canvas, signal });
+      if (signal.aborted) return;
+
+      renderedScale.current = scale;
+      applyCamera(cameraState.current);
+      paintOverlay();
+    },
+    [backend, sheet, applyCamera, paintOverlay],
+  );
+
+  const render = useRef(renderPage);
+  useEffect(() => {
+    render.current = renderPage;
+  }, [renderPage]);
+
+  // Первая отрисовка листа. Старая задача отменяется при смене листа: иначе при быстром
+  // перелистывании поверх актуальной страницы дорисуется прежняя.
   useEffect(() => {
     if (!backend || !sheet) return;
-
-    const canvas = pageCanvas.current;
-    if (!canvas) return;
 
     const controller = new AbortController();
-    setRendering(true);
+    let finished = false;
 
-    void (async () => {
-      try {
-        await backend.render({
-          pageIndex: sheet.pageIndex,
-          scale: cameraState.current.scale,
-          canvas,
-          signal: controller.signal,
-        });
-        paintOverlay();
-      } catch (error) {
-        if (error instanceof RenderCancelledError) return;
-        if (error instanceof DocumentLoadError) onError?.(error.code);
-        else onError?.('PDF_RENDER_FAILED');
-      } finally {
+    void render
+      .current(controller.signal)
+      .catch(reportFailure)
+      .finally(() => {
+        finished = true;
         if (!controller.signal.aborted) setRendering(false);
-      }
-    })();
+      });
 
-    return () => controller.abort();
-    // Масштаб намеренно не в зависимостях: перерисовка по зуму запускается отдельно,
-    // с задержкой, иначе каждый щелчок колеса ставил бы новую задачу отрисовки.
-  }, [backend, sheet, paintOverlay, onError]);
+    // Значок «отрисовка…» появляется, только если страница рисуется дольше мгновения.
+    // Показывать его на каждом листе значило бы мигать им там, где ждать нечего.
+    const badge = window.setTimeout(() => {
+      if (!finished && !controller.signal.aborted) setRendering(true);
+    }, BADGE_DELAY_MS);
 
-  // Перерисовка страницы после того, как зум остановился.
+    return () => {
+      window.clearTimeout(badge);
+      controller.abort();
+    };
+    // Масштаб намеренно не в зависимостях: перерисовка по зуму идёт отдельно, с
+    // задержкой, иначе каждый щелчок колеса ставил бы новую задачу отрисовки.
+  }, [backend, sheet, reportFailure]);
+
+  // Перерисовка страницы после того, как жест затих.
+  //
+  // Подписка зависит только от камеры. Раньше в зависимостях стояли обработчики,
+  // пересоздаваемые на каждый рендер, а рендер случался на каждый щелчок колеса —
+  // очистка эффекта снимала таймер раньше, чем он срабатывал, и страница не
+  // перерисовывалась вообще. Зум при этом «не работал»: менялся только слой областей.
   useEffect(() => {
-    if (!backend || !sheet) return;
-
     let timer: number | undefined;
     let controller: AbortController | null = null;
 
     const unsubscribe = camera.subscribe(() => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        const canvas = pageCanvas.current;
-        if (!canvas) return;
-
         controller?.abort();
         controller = new AbortController();
-
-        void backend
-          .render({
-            pageIndex: sheet.pageIndex,
-            scale: cameraState.current.scale,
-            canvas,
-            signal: controller.signal,
-          })
-          .then(paintOverlay)
-          .catch((error: unknown) => {
-            if (error instanceof RenderCancelledError) return;
-            onError?.(error instanceof DocumentLoadError ? error.code : 'PDF_RENDER_FAILED');
-          });
-      }, 180);
+        void render.current(controller.signal).catch(reportFailure);
+      }, RERENDER_DELAY_MS);
     });
 
     return () => {
@@ -200,7 +234,7 @@ export const DrawingViewport = ({
       controller?.abort();
       unsubscribe();
     };
-  }, [backend, sheet, camera, paintOverlay, onError]);
+  }, [camera, reportFailure]);
 
   useEffect(() => {
     paintOverlay();

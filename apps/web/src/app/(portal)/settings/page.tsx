@@ -23,8 +23,6 @@ const SettingsPage = () => {
 
       <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
         <div className="mx-auto flex w-full max-w-[720px] flex-col gap-[var(--s-6)]">
-          <h1 className="text-xl font-semibold tracking-[-0.02em]">Настройки</h1>
-
           <section className="rounded-[var(--radius-md)] border border-border-strong bg-surface p-[var(--s-5)] md:p-[var(--s-6)]">
             <h2 className="mb-[var(--s-4)] text-sm font-medium">Оформление</h2>
             <div className="flex flex-col items-start gap-[var(--s-5)] sm:flex-row sm:items-center sm:gap-[var(--s-6)]">

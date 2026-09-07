@@ -52,15 +52,14 @@ const ProjectsPage = () => {
 
       <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-[var(--s-6)]">
-          {/* На телефоне кнопка уходит под заголовок и растягивается на всю ширину:
-              это главное действие экрана, и промахнуться по нему не должно быть можно. */}
-          <header className="flex flex-col gap-[var(--s-5)] sm:flex-row sm:items-end sm:gap-[var(--s-6)]">
-            <div className="min-w-0">
-              <h1 className="text-xl font-semibold tracking-[-0.02em]">Проекты</h1>
-              <p className="mt-[var(--s-1)] text-sm text-muted">
-                {isPending ? ' ' : summaryLine(data?.total ?? 0, documentTotal(data?.items))}
-              </p>
-            </div>
+          {/* Заголовок и счётчик живут в шапке — здесь остаётся только действие.
+              На телефоне кнопка во всю ширину: это главное действие экрана, и
+              промахнуться по нему не должно быть можно. Счётчик дублируется тут же,
+              потому что в узкую шапку он не помещается. */}
+          <header className="flex flex-col gap-[var(--s-4)] sm:flex-row sm:items-center">
+            <p className="text-sm text-muted sm:hidden">
+              {isPending ? ' ' : summaryLine(data?.total ?? 0, documentTotal(data?.items))}
+            </p>
             <Button
               variant="primary"
               className="w-full justify-center sm:ml-auto sm:w-auto"
