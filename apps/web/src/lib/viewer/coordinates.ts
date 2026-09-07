@@ -201,6 +201,40 @@ export const hitTest = <T extends { readonly coords_norm: readonly number[] }>(
   return best;
 };
 
+/**
+ * Прямоугольник отрисованной страницы.
+ *
+ * Единственный правильный источник размера — сам документ, а не растр распознавалки.
+ * Проверено на эталонном пакете: все 77 страниц нормализованы относительно уже
+ * повёрнутой страницы (`page.rect`), а её растр сделан с плотностью, которая ещё и
+ * не постоянна — 4,17 px/pt на одних листах и 3,16 на других. Брать размер из
+ * `width_px` значило бы промахнуться в разы, а на повёрнутых листах ещё и развернуть
+ * разметку поперёк чертежа.
+ *
+ * Поэтому поворот здесь нулевой: pdf.js уже применил `/Rotate`, и координаты областей
+ * записаны в той же, конечной системе. Механизм поворота остаётся в модуле для формата
+ * пакета v2, если тот начнёт хранить координаты до поворота.
+ *
+ * Округление повторяет формулу бэкенда (`floor` в физических пикселях): холст страницы
+ * и холст слоя обязаны совпадать пиксель в пиксель, иначе разметка «плывёт» на дробных
+ * масштабах.
+ */
+export const placeRenderedPage = (
+  page: { readonly width: number; readonly height: number },
+  scale: number,
+  devicePixelRatio = 1,
+): SheetPlacement => {
+  const ratio = devicePixelRatio > 0 ? devicePixelRatio : 1;
+
+  return {
+    x: 0,
+    y: 0,
+    width: Math.floor(page.width * scale * ratio) / ratio,
+    height: Math.floor(page.height * scale * ratio) / ratio,
+    rotation: 0,
+  };
+};
+
 /** Размер листа в пикселях при заданном масштабе и повороте. */
 export const placeSheet = (
   sheet: { readonly widthPx: number; readonly heightPx: number; readonly rotation: Rotation },

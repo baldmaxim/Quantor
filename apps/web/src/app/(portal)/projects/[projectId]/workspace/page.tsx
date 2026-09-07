@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
+import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { useDocumentBackend } from '@/components/viewer/useDocumentBackend';
 import { EmptyState, ErrorState, Field, InspectorSection, StatusBadge, cx } from '@/components/ui';
 import {
@@ -27,7 +28,6 @@ import { errorMessage } from '@/lib/errors';
 import { REGIONS_FORMS, blockType, countOf } from '@/lib/format';
 import { useContentUrl, useProject, useRegions, useSheets } from '@/lib/queries';
 import { Camera } from '@/lib/viewer/camera';
-import { normalizeRotation } from '@/lib/viewer/coordinates';
 import type { OverlayRegion } from '@/lib/viewer/overlay';
 import { useWorkspaceStore, type LeftTab } from '@/store/workspace';
 
@@ -82,6 +82,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const pageIndex = Math.min(Math.max(pageParam - 1, 0), Math.max(pages.length - 1, 0));
   const sheet = pages[pageIndex] ?? null;
 
+  const geometry = usePageGeometry(backend, sheet ? sheet.page_index : null);
+
   const regions = useRegions(sheet?.id ?? null, null);
   const overlayRegions = useMemo(() => toOverlayRegions(regions.data?.items ?? []), [regions.data]);
   const selectedRegion = regions.data?.items.find((item) => item.id === selectedRegionId) ?? null;
@@ -102,14 +104,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
     setQuery({ page: String(clamped + 1), region: null });
   };
 
-  const viewportSheet = sheet
-    ? {
-        pageIndex: sheet.page_index,
-        widthPx: sheet.width_px ?? 2481,
-        heightPx: sheet.height_px ?? 3509,
-        rotation: normalizeRotation(sheet.rotation),
-      }
-    : null;
+  // Размер листа берётся у отрисовщика, а не из полей пакета: `width_px` — это пиксели
+  // растра распознавалки, снятого с непостоянной плотностью и до применения поворота.
+  // Пока размер не известен, вписывать и рисовать разметку нечему.
+  const viewportSheet =
+    sheet && geometry
+      ? { pageIndex: sheet.page_index, width: geometry.width, height: geometry.height }
+      : null;
 
   const failure = renderError ?? errorCode ?? null;
 
@@ -212,18 +213,14 @@ const WorkspacePage = ({ params }: IPageProps) => {
               <ToolButton
                 label="По ширине"
                 wide
-                onClick={() =>
-                  viewportSheet && camera.fitWidth(sheetSize(viewportSheet), viewportSize())
-                }
+                onClick={() => viewportSheet && camera.fitWidth(viewportSheet, viewportSize())}
               >
                 По ширине
               </ToolButton>
               <ToolButton
                 label="Целиком"
                 wide
-                onClick={() =>
-                  viewportSheet && camera.fitPage(sheetSize(viewportSheet), viewportSize())
-                }
+                onClick={() => viewportSheet && camera.fitPage(viewportSheet, viewportSize())}
               >
                 Целиком
               </ToolButton>
@@ -247,9 +244,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
               <ToolButton
                 label="Сбросить вид"
-                onClick={() =>
-                  viewportSheet && camera.reset(sheetSize(viewportSheet), viewportSize())
-                }
+                onClick={() => viewportSheet && camera.reset(viewportSheet, viewportSize())}
               >
                 <IconReset width={16} height={16} />
               </ToolButton>
@@ -397,14 +392,6 @@ const viewportSize = () => {
   return element
     ? { width: element.clientWidth, height: element.clientHeight }
     : { width: 1200, height: 800 };
-};
-
-const sheetSize = (sheet: { widthPx: number; heightPx: number; rotation: number }) => {
-  const swapped = sheet.rotation === 90 || sheet.rotation === 270;
-  return {
-    width: swapped ? sheet.heightPx : sheet.widthPx,
-    height: swapped ? sheet.widthPx : sheet.heightPx,
-  };
 };
 
 const sheetLabel = (

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cx } from '@/components/ui';
 import type { Camera, CameraState } from '@/lib/viewer/camera';
-import { placeSheet, toNormalizedPoint, type Rotation } from '@/lib/viewer/coordinates';
+import { placeRenderedPage, toNormalizedPoint } from '@/lib/viewer/coordinates';
 import { drawOverlay, resizeOverlay, type OverlayRegion } from '@/lib/viewer/overlay';
 import { DocumentLoadError, RenderCancelledError, type RenderBackend } from '@/lib/viewer/backend';
 
@@ -20,11 +20,17 @@ import { DocumentLoadError, RenderCancelledError, type RenderBackend } from '@/l
  * движение мыши перерисовывало бы обе панели и список областей (ADR-0004).
  */
 
+/**
+ * Страница, готовая к отрисовке.
+ *
+ * Размер — в единицах документа при масштабе 1, то есть ровно то, что вернул отрисовщик.
+ * Поворота здесь нет намеренно: pdf.js применяет `/Rotate` сам, и координаты областей
+ * записаны в той же конечной системе (см. `placeRenderedPage`).
+ */
 export interface ViewportSheet {
   readonly pageIndex: number;
-  readonly widthPx: number;
-  readonly heightPx: number;
-  readonly rotation: Rotation;
+  readonly width: number;
+  readonly height: number;
 }
 
 interface IDrawingViewportProps {
@@ -88,12 +94,12 @@ export const DrawingViewport = ({
 
     const ratio = window.devicePixelRatio || 1;
     const { scale } = cameraState.current;
-    const placed = placeSheet(sheet, { scale, offsetX: 0, offsetY: 0 });
+    const placed = placeRenderedPage(sheet, scale, ratio);
 
     resizeOverlay(canvas, placed.width, placed.height, ratio);
     drawOverlay(
       context,
-      { ...placed, x: 0, y: 0 },
+      placed,
       {
         regions: overlayVisible ? regions : [],
         hiddenTypes,
@@ -206,9 +212,8 @@ export const DrawingViewport = ({
     if (!element || !sheet) return;
 
     const fit = () => {
-      const placed = placeSheet(sheet, { scale: 1, offsetX: 0, offsetY: 0 });
       camera.fitPage(
-        { width: placed.width, height: placed.height },
+        { width: sheet.width, height: sheet.height },
         { width: element.clientWidth, height: element.clientHeight },
       );
     };
@@ -225,16 +230,13 @@ export const DrawingViewport = ({
       if (!element || !sheet) return null;
 
       const bounds = element.getBoundingClientRect();
-      const placed = placeSheet(sheet, {
-        scale: cameraState.current.scale,
-        offsetX: 0,
-        offsetY: 0,
-      });
-
-      return toNormalizedPoint(
-        { x: clientX - bounds.left, y: clientY - bounds.top },
-        { ...placed, x: 0, y: 0 },
+      const placed = placeRenderedPage(
+        sheet,
+        cameraState.current.scale,
+        window.devicePixelRatio || 1,
       );
+
+      return toNormalizedPoint({ x: clientX - bounds.left, y: clientY - bounds.top }, placed);
     },
     [sheet],
   );

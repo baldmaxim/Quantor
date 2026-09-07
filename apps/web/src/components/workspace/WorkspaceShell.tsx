@@ -72,7 +72,10 @@ export const WorkspaceShell = ({
         {tabs}
       </div>
 
-      <div className="flex min-w-0 items-center gap-[var(--s-2)] border-b border-border-strong bg-surface px-[var(--s-4)]">
+      {/* Инструментов больше, чем помещается на узком ноутбуке. Раньше они сжимались
+          и налезали друг на друга; теперь ряд прокручивается по горизонтали, а сами
+          кнопки сохраняют размер. */}
+      <div className="scroll-area flex min-w-0 items-center gap-[var(--s-2)] overflow-y-hidden border-b border-border-strong bg-surface px-[var(--s-4)]">
         {toolbar}
       </div>
 

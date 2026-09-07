@@ -62,39 +62,78 @@ export const Button = ({
 
 interface ISearchInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label: string;
+  /** Показывает крестик очистки, когда в поле что-то введено. */
+  onClear?: () => void;
 }
 
-export const SearchInput = ({ label, className, ...rest }: ISearchInputProps) => (
-  <label className={cx('relative inline-flex items-center', className)}>
-    <span className="visually-hidden">{label}</span>
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="pointer-events-none absolute left-[var(--s-4)] h-[14px] w-[14px] text-muted"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    >
-      <circle cx="11" cy="11" r="7" />
-      <path d="M20 20l-3.5-3.5" />
-    </svg>
-    <input
-      type="search"
-      placeholder={label}
-      className={cx(
-        'h-[var(--h-ctl)] w-full rounded-[var(--radius-sm)] border border-border-control bg-surface',
-        'pr-[var(--s-5)] pl-[calc(var(--s-6)+var(--s-5))] text-sm text-text',
-        'placeholder:text-muted',
-        // Граница подсвечивается акцентом при наведении и фокусе: поле должно
-        // отзываться раньше, чем в него начали печатать.
-        'transition-[border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-        'hover:border-border-strong focus:border-accent focus:outline-none',
-        'focus:shadow-[0_0_0_3px_var(--accent-soft)]',
+export const SearchInput = ({ label, className, onClear, ...rest }: ISearchInputProps) => {
+  const filled = String(rest.value ?? '').length > 0;
+
+  return (
+    <label className={cx('group relative inline-flex items-center', className)}>
+      <span className="visually-hidden">{label}</span>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className={cx(
+          'pointer-events-none absolute left-[var(--s-4)] h-[14px] w-[14px]',
+          'transition-colors duration-[var(--dur-fast)]',
+          filled ? 'text-text' : 'text-muted',
+        )}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-3.5-3.5" />
+      </svg>
+      <input
+        type="search"
+        placeholder={label}
+        className={cx(
+          // Утопленный фон, как у сегментного переключателя рядом: поле ввода и группа
+          // кнопок должны читаться как один набор, а не как два разных элемента.
+          'h-[var(--h-ctl)] w-full rounded-[var(--radius-sm)] border border-border-control bg-surface-sunken',
+          'pl-[calc(var(--s-6)+var(--s-5))] text-sm text-text',
+          filled ? 'pr-[calc(var(--s-6)+var(--s-4))]' : 'pr-[var(--s-5)]',
+          'placeholder:text-muted',
+          // Крестик очистки — своя кнопка: встроенный у type="search" есть не во всех
+          // браузерах и не красится темой.
+          '[&::-webkit-search-cancel-button]:hidden',
+          // Граница подсвечивается акцентом при наведении и фокусе: поле должно
+          // отзываться раньше, чем в него начали печатать.
+          'transition-[border-color,box-shadow,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
+          'hover:border-border-strong focus:border-accent focus:bg-surface focus:outline-none',
+          'focus:shadow-[0_0_0_3px_var(--accent-soft)]',
+        )}
+        {...rest}
+      />
+      {filled && onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Очистить: ${label}`}
+          className={cx(
+            'press absolute right-[var(--s-3)] grid h-[22px] w-[22px] place-items-center',
+            'rounded-[var(--radius-xs)] text-muted hover:bg-surface-muted hover:text-text',
+          )}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-[12px] w-[12px]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
       )}
-      {...rest}
-    />
-  </label>
-);
+    </label>
+  );
+};
 
 /* ------------------------------------------------------------------------ бейджи */
 

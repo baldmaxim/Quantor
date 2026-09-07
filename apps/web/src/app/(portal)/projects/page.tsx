@@ -42,6 +42,7 @@ const ProjectsPage = () => {
               label="Поиск по названию"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+              onClear={() => setSearch('')}
               className="min-w-0 flex-1 md:w-[240px] md:flex-none"
             />
             <SortToggle value={sort} onChange={setSort} />
@@ -133,7 +134,9 @@ const SortToggle = ({ value, onChange }: ISortToggleProps) => (
   <div
     role="group"
     aria-label="Сортировка"
-    className="flex h-[var(--h-ctl)] items-center overflow-hidden rounded-[var(--radius-sm)] border border-border-control"
+    // Утопленная дорожка с приподнятым выбранным сегментом. Сплошная заливка акцентом
+    // читалась как нажатая кнопка действия, хотя это переключатель вида.
+    className="flex h-[var(--h-ctl)] flex-none items-center gap-[2px] rounded-[var(--radius-sm)] border border-border-control bg-surface-sunken p-[3px]"
   >
     {(
       [
@@ -147,8 +150,10 @@ const SortToggle = ({ value, onChange }: ISortToggleProps) => (
         onClick={() => onChange(key)}
         aria-pressed={value === key}
         className={cx(
-          'h-full px-[var(--s-5)] text-sm transition-colors',
-          value === key ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-muted',
+          'press h-full rounded-[calc(var(--radius-sm)-2px)] px-[var(--s-5)] text-sm whitespace-nowrap',
+          value === key
+            ? 'bg-surface font-medium text-accent shadow-[var(--shadow-1)]'
+            : 'text-muted hover:text-text',
         )}
       >
         {label}

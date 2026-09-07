@@ -115,28 +115,34 @@ export const SideNav = () => {
     <nav
       aria-label="Разделы портала"
       style={{ viewTransitionName: 'shell-sidenav' }}
-      className="safe-top hidden w-[var(--w-rail)] flex-none flex-col items-center gap-[var(--s-4)] border-r border-border-strong bg-surface py-[var(--s-5)] md:flex"
+      className="safe-top hidden w-[var(--w-rail)] flex-none flex-col items-center border-r border-border-strong bg-surface md:flex"
     >
-      <Link
-        href="/projects"
-        aria-label="Quantor — к списку проектов"
-        className="press mb-[var(--s-5)] grid h-[32px] w-[32px] place-items-center rounded-[var(--radius-sm)] bg-accent text-lg font-bold text-accent-contrast shadow-[var(--shadow-1)]"
-      >
-        Q
-      </Link>
+      {/* Знак стоит в полосе высотой с шапку и по её центру: прижатый к самому краю
+          окна, он выглядел обрезанным и не совпадал по линии с хлебными крошками. */}
+      <div className="flex h-[var(--h-topbar)] flex-none items-center">
+        <Link
+          href="/projects"
+          aria-label="Quantor — к списку проектов"
+          className="press grid h-[32px] w-[32px] place-items-center rounded-[var(--radius-sm)] bg-accent text-lg font-bold text-accent-contrast shadow-[var(--shadow-1)]"
+        >
+          Q
+        </Link>
+      </div>
 
-      {PRIMARY.map((item) => (
-        <RailButton
-          key={item.href}
-          item={item}
-          active={isActive(item.href)}
-          enabled={isEnabled(item)}
-        />
-      ))}
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-[var(--s-4)] pt-[var(--s-4)] pb-[var(--s-5)]">
+        {PRIMARY.map((item) => (
+          <RailButton
+            key={item.href}
+            item={item}
+            active={isActive(item.href)}
+            enabled={isEnabled(item)}
+          />
+        ))}
 
-      <div className="flex-1" />
+        <div className="flex-1" />
 
-      <RailButton item={SETTINGS} active={isActive(SETTINGS.href)} enabled />
+        <RailButton item={SETTINGS} active={isActive(SETTINGS.href)} enabled />
+      </div>
     </nav>
   );
 };

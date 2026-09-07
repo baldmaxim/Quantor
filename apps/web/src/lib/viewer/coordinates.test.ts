@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   hitTest,
   normalizeRotation,
+  placeRenderedPage,
   placeSheet,
   rectContains,
   toNormalizedPoint,
@@ -159,5 +160,50 @@ describe('попадание в область', () => {
   it('перевёрнутый прямоугольник всё равно ловит точку', () => {
     // Экспорт иногда меняет углы местами; отбрасывать такую область нельзя.
     expect(rectContains([0.9, 0.9, 0.1, 0.1], { x: 0.5, y: 0.5 })).toBe(true);
+  });
+});
+
+describe('прямоугольник отрисованной страницы', () => {
+  // Числа взяты с эталонного пакета, лист 73: страница A1 с /Rotate 90, поэтому
+  // pdf.js рисует её как 2384×1684, а растр распознавалки — 9934×7017 (те же
+  // пропорции, плотность 4,17 px/pt). На листе 35 плотность уже 3,16 — постоянной
+  // её считать нельзя, и именно поэтому размер берётся у документа, а не у растра.
+  const RENDERED = { width: 2384, height: 1684 };
+
+  it('размер совпадает с тем, что рисует бэкенд', () => {
+    // Бэкенд считает так же: floor в физических пикселях, затем деление на плотность.
+    // Разойдись эти две формулы — разметка поехала бы на дробных масштабах.
+    const scale = 0.2913;
+    const ratio = 2;
+    const placed = placeRenderedPage(RENDERED, scale, ratio);
+
+    expect(placed.width).toBe(Math.floor(RENDERED.width * scale * ratio) / ratio);
+    expect(placed.height).toBe(Math.floor(RENDERED.height * scale * ratio) / ratio);
+  });
+
+  it('масштаб 1 даёт размер страницы, а не растра', () => {
+    const placed = placeRenderedPage(RENDERED, 1);
+
+    expect(placed.width).toBe(2384);
+    expect(placed.height).toBe(1684);
+    // Регрессия: раньше сюда попадали пиксели растра, и слой оказывался в 4,17 раза
+    // крупнее страницы — области висели заведомо мимо чертежа.
+    expect(placed.width).not.toBe(7017);
+  });
+
+  it('штамп остаётся в правом нижнем углу', () => {
+    // Координаты пакета записаны относительно уже повёрнутой страницы, поэтому
+    // поворачивать их ещё раз нельзя: штамп уехал бы в левый нижний угол.
+    const placed = placeRenderedPage(RENDERED, 1);
+    const stamp = toScreenRect([0.77, 0.89, 1, 1], placed);
+
+    expect(stamp.x).toBeGreaterThan(placed.width / 2);
+    expect(stamp.y).toBeGreaterThan(placed.height / 2);
+    expect(stamp.x + stamp.width).toBeCloseTo(placed.width, 5);
+    expect(stamp.y + stamp.height).toBeCloseTo(placed.height, 5);
+  });
+
+  it('нулевая плотность не ломает раскладку', () => {
+    expect(placeRenderedPage(RENDERED, 1, 0).width).toBe(2384);
   });
 });
