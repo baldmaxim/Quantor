@@ -97,7 +97,7 @@ const ProjectsPage = () => {
               title="Не удалось загрузить проекты"
               description={
                 error instanceof Error
-                  ? 'Проверьте, что бэкенд запущен и доступен по адресу из настроек.'
+                  ? 'Проверьте /health/ready на бэкенде: там видно, что именно недоступно — база, её схема или хранилище файлов.'
                   : undefined
               }
               onRetry={() => void refetch()}

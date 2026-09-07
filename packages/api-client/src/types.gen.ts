@@ -34,6 +34,10 @@ export type BodyUploadFile = {
  */
 export type ComponentHealth = {
     /**
+     * Detail
+     */
+    detail?: string | null;
+    /**
      * Duration Ms
      */
     duration_ms: number;
@@ -44,7 +48,7 @@ export type ComponentHealth = {
     /**
      * Status
      */
-    status: 'ok' | 'unavailable';
+    status: 'ok' | 'unavailable' | 'outdated';
 };
 
 /**
@@ -563,6 +567,10 @@ export type ReadinessResponse = {
      * Components
      */
     components: Array<ComponentHealth>;
+    /**
+     * Schema Revision
+     */
+    schema_revision: string;
     /**
      * Status
      */

@@ -106,6 +106,34 @@ scripts               кроссплатформенные команды раз
 - [Аудит репозитория](docs/architecture/repo-audit-2026-09-04.md)
 - [Что сделано на Stage 1](docs/stage1/README.md)
 
+## Если портал не показывает данные
+
+`GET /health/ready` отвечает, что именно сломалось:
+
+```json
+{
+  "status": "degraded",
+  "schema_revision": "0002_project_source",
+  "components": [
+    { "name": "database", "status": "ok" },
+    {
+      "name": "database_schema",
+      "status": "outdated",
+      "detail": "база на ревизии 0001_domain_stage1, коду нужна 0002_project_source. Выполните `pnpm db:migrate`"
+    },
+    { "name": "object_storage", "status": "ok" }
+  ]
+}
+```
+
+`outdated` у `database_schema` — самая частая поломка после `git pull`: код обновился,
+миграции не накатаны. База при этом жива и отвечает, поэтому снаружи это выглядит как
+отказ сервиса. Лечится одной командой:
+
+```bash
+pnpm db:migrate
+```
+
 ## Проекты из TenderHUB
 
 Портал умеет заводить проект по тендеру TenderHUB: на странице «Проекты» появляется

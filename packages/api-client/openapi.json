@@ -43,6 +43,17 @@
       },
       "ComponentHealth": {
         "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
           "duration_ms": {
             "minimum": 0.0,
             "title": "Duration Ms",
@@ -55,7 +66,8 @@
           "status": {
             "enum": [
               "ok",
-              "unavailable"
+              "unavailable",
+              "outdated"
             ],
             "title": "Status",
             "type": "string"
@@ -935,6 +947,10 @@
             "title": "Components",
             "type": "array"
           },
+          "schema_revision": {
+            "title": "Schema Revision",
+            "type": "string"
+          },
           "status": {
             "enum": [
               "ok",
@@ -946,7 +962,8 @@
         },
         "required": [
           "status",
-          "components"
+          "components",
+          "schema_revision"
         ],
         "title": "ReadinessResponse",
         "type": "object"
