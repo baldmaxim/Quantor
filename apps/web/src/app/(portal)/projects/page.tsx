@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, ViewTransition } from 'react';
 
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
 import { ProjectsTable } from '@/components/projects/ProjectsTable';
@@ -42,27 +42,31 @@ const ProjectsPage = () => {
               label="Поиск по названию"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="w-[240px]"
+              className="min-w-0 flex-1 md:w-[240px] md:flex-none"
             />
             <SortToggle value={sort} onChange={setSort} />
           </>
         }
       />
 
-      <main className="min-w-0 flex-1 px-[var(--s-7)] py-[var(--s-7)]">
+      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-[var(--s-6)]">
-          <header className="flex items-end gap-[var(--s-6)]">
-            <div>
+          {/* На телефоне кнопка уходит под заголовок и растягивается на всю ширину:
+              это главное действие экрана, и промахнуться по нему не должно быть можно. */}
+          <header className="flex flex-col gap-[var(--s-5)] sm:flex-row sm:items-end sm:gap-[var(--s-6)]">
+            <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-[-0.02em]">Проекты</h1>
               <p className="mt-[var(--s-1)] text-sm text-muted">
                 {isPending ? ' ' : summaryLine(data?.total ?? 0, documentTotal(data?.items))}
               </p>
             </div>
-            <div className="ml-auto">
-              <Button variant="primary" onClick={() => router.push('/projects?create=1')}>
-                + Создать проект
-              </Button>
-            </div>
+            <Button
+              variant="primary"
+              className="w-full justify-center sm:ml-auto sm:w-auto"
+              onClick={() => router.push('/projects?create=1')}
+            >
+              + Создать проект
+            </Button>
           </header>
 
           {isPending && (
@@ -159,7 +163,16 @@ const SortToggle = ({ value, onChange }: ISortToggleProps) => (
  */
 const ProjectsRoute = () => (
   <Suspense fallback={null}>
-    <ProjectsPage />
+    {/* Направление перехода задают ссылки: вглубь — влево, назад — вправо.
+        default: 'none' оставляет без движения переходы без типа — возврат
+        кнопкой браузера и обновление данных. */}
+    <ViewTransition
+      enter={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      default="none"
+    >
+      <ProjectsPage />
+    </ViewTransition>
   </Suspense>
 );
 

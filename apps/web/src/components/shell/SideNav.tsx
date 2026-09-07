@@ -68,7 +68,7 @@ const RailButton = ({ item, active, enabled }: IRailButtonProps) => {
   const { Icon } = item;
   const title = enabled ? item.label : `${item.label} — ${item.stage ?? 'позже'}`;
   const shared = cx(
-    'relative grid h-[36px] w-[36px] place-items-center rounded-[var(--radius-sm)] transition-colors',
+    'press relative grid h-[36px] w-[36px] place-items-center rounded-[var(--radius-sm)]',
     active ? 'bg-surface-muted text-accent' : 'text-muted',
     enabled && !active && 'hover:bg-surface-muted hover:text-text',
     !enabled && 'opacity-40',
@@ -93,6 +93,9 @@ const RailButton = ({ item, active, enabled }: IRailButtonProps) => {
       {active && (
         <span
           aria-hidden="true"
+          // Метка активного раздела переезжает вместе с выбором: общее имя перехода
+          // заставляет браузер анимировать её как один и тот же объект.
+          style={{ viewTransitionName: 'nav-marker' }}
           className="absolute top-[8px] bottom-[8px] -left-[8px] w-[2px] rounded-full bg-accent"
         />
       )}
@@ -111,12 +114,13 @@ export const SideNav = () => {
   return (
     <nav
       aria-label="Разделы портала"
-      className="flex w-[var(--w-rail)] flex-none flex-col items-center gap-[var(--s-4)] border-r border-border-strong bg-surface py-[var(--s-5)]"
+      style={{ viewTransitionName: 'shell-sidenav' }}
+      className="safe-top hidden w-[var(--w-rail)] flex-none flex-col items-center gap-[var(--s-4)] border-r border-border-strong bg-surface py-[var(--s-5)] md:flex"
     >
       <Link
         href="/projects"
         aria-label="Quantor — к списку проектов"
-        className="mb-[var(--s-5)] grid h-[32px] w-[32px] place-items-center rounded-[var(--radius-sm)] bg-accent text-lg font-bold text-accent-contrast"
+        className="press mb-[var(--s-5)] grid h-[32px] w-[32px] place-items-center rounded-[var(--radius-sm)] bg-accent text-lg font-bold text-accent-contrast shadow-[var(--shadow-1)]"
       >
         Q
       </Link>

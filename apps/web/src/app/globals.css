@@ -113,6 +113,21 @@
   --w-rail: 52px;
   --w-pane-left: 264px;
   --w-pane-right: 300px;
+  /* Нижняя навигация на телефоне: рейка туда не помещается, а до низа экрана
+     дотягивается большой палец. */
+  --h-bottom-nav: 56px;
+
+  /* --- движение ---
+     Длительности короткие намеренно: это рабочий инструмент, в котором действие
+     повторяют сотни раз за день, и каждая лишняя сотня миллисекунд накапливается.
+     На входе ease-out (быстро появилось, мягко встало), на выходе ease-in. */
+  --dur-instant: 90ms;
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
@@ -346,6 +361,207 @@ body {
   border-radius: var(--radius-sm);
 }
 
+/* ============================================================================
+   Движение
+
+   Переходы между маршрутами — нативный View Transitions API через React.
+   Появление и исчезновение элементов — @starting-style и allow-discrete,
+   тоже средствами браузера. Библиотека нужна ровно в одном месте, где CSS
+   бессилен: перестроение списка при фильтрации и сортировке.
+
+   Анимируются только transform и opacity: width/height/top заставляют браузер
+   пересчитывать раскладку на каждом кадре, и на телефоне это видно.
+   ============================================================================ */
+
+/* Направленные переходы между страницами. Влево — вглубь, вправо — назад:
+   в анимации это устоявшийся язык, и нарушать его — дезориентировать. */
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-slide-from-right {
+  from {
+    transform: translateX(28px);
+  }
+}
+
+@keyframes vt-slide-to-left {
+  to {
+    transform: translateX(-28px);
+  }
+}
+
+@keyframes vt-slide-from-left {
+  from {
+    transform: translateX(-28px);
+  }
+}
+
+@keyframes vt-slide-to-right {
+  to {
+    transform: translateX(28px);
+  }
+}
+
+::view-transition-old(.nav-forward) {
+  animation:
+    var(--dur-fast) var(--ease-in) both vt-fade-out,
+    var(--dur-base) var(--ease-in-out) both vt-slide-to-left;
+}
+
+::view-transition-new(.nav-forward) {
+  animation:
+    var(--dur-base) var(--ease-out) both vt-fade-in,
+    var(--dur-base) var(--ease-in-out) both vt-slide-from-right;
+}
+
+::view-transition-old(.nav-back) {
+  animation:
+    var(--dur-fast) var(--ease-in) both vt-fade-out,
+    var(--dur-base) var(--ease-in-out) both vt-slide-to-right;
+}
+
+::view-transition-new(.nav-back) {
+  animation:
+    var(--dur-base) var(--ease-out) both vt-fade-in,
+    var(--dur-base) var(--ease-in-out) both vt-slide-from-left;
+}
+
+/* Пока едет контент, оболочка стоит. Это единственная неподвижная точка отсчёта:
+   если вместе с содержимым уезжает и шапка с навигацией, кажется, что дёрнулось
+   всё окно, и непонятно, что именно сменилось. */
+::view-transition-group(shell-topbar),
+::view-transition-group(shell-sidenav),
+::view-transition-group(shell-bottomnav) {
+  animation: none;
+  z-index: 100;
+}
+
+::view-transition-old(shell-topbar),
+::view-transition-old(shell-sidenav),
+::view-transition-old(shell-bottomnav) {
+  display: none;
+}
+
+::view-transition-new(shell-topbar),
+::view-transition-new(shell-sidenav),
+::view-transition-new(shell-bottomnav) {
+  animation: none;
+}
+
+/* Слой перехода накрывает страницу и съедает клики. Пока идёт анимация,
+   портал должен оставаться живым — нажатие не должно пропадать. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* Появление и исчезновение модального окна.
+   allow-discrete нужен, чтобы display мог участвовать в переходе: без него
+   окно исчезает мгновенно, и закрытие выглядит как обрыв. */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+.animate-dialog {
+  animation: dialog-in var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.animate-scrim {
+  animation: scrim-in var(--dur-fast) var(--ease-out) both;
+}
+
+/* Появление содержимого после загрузки: короткое, без сдвига раскладки. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.animate-rise {
+  animation: rise-in var(--dur-base) var(--ease-out) both;
+}
+
+/* Нажатие на контрол. Отдача под пальцем важнее, чем на мыши: на телефоне
+   без неё непонятно, засчиталось ли касание. */
+.press {
+  transition:
+    background-color var(--dur-instant) var(--ease-out),
+    border-color var(--dur-instant) var(--ease-out),
+    color var(--dur-instant) var(--ease-out),
+    transform var(--dur-instant) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ============================================================================
+   Адаптивность
+   ============================================================================ */
+
+/* Отступы под вырез и домашнюю полоску. Без них шапка уезжает под «чёлку»,
+   а нижняя навигация — под жест «домой». */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+@media (max-width: 767px) {
+  /* Шрифт меньше 16px заставляет Safari и Chrome зумить форму при фокусе,
+     после чего страница остаётся увеличенной. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Тап-цели: 44px — минимум Apple, 48px рекомендация Material. */
+  button,
+  a[role='button'],
+  [role='tab'] {
+    min-height: 44px;
+  }
+}
+
+/* Инерционный скролл внутри панелей, без «протягивания» страницы за ними. */
+.scroll-area {
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Длинные имена файлов и block_id не должны раздвигать раскладку на 360px. */
+.wrap-anywhere {
+  overflow-wrap: anywhere;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -353,5 +569,13 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Переходы между страницами тоже отключаем: они самые заметные. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

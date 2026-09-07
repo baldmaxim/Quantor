@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Quantor">
+  <!-- Исходник иконки. Все растровые размеры генерируются из него скриптом
+       scripts/generate-icons.mjs — PNG руками не правим.
+       Фон непрозрачный: прозрачный PNG на iOS превращается в чёрный квадрат. -->
+  <rect width="512" height="512" rx="112" fill="#1a5fa8" />
+  <path
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="34"
+    stroke-linecap="square"
+    d="M256 124a132 132 0 1 0 0 264 132 132 0 0 0 0-264Z"
+  />
+  <path stroke="#ffffff" stroke-width="34" stroke-linecap="square" d="M300 300 385 385" />
+</svg>

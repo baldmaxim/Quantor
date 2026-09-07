@@ -26,10 +26,12 @@ interface IButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    'bg-accent text-accent-contrast border-accent hover:bg-accent-hover active:bg-accent-active font-medium',
-  default: 'bg-surface text-text border-border-control hover:bg-surface-muted',
-  ghost: 'bg-transparent text-text border-transparent hover:bg-surface-muted',
-  danger: 'bg-transparent text-danger border-border-control hover:bg-danger-soft',
+    'bg-accent text-accent-contrast border-accent font-medium shadow-[var(--shadow-1)] hover:bg-accent-hover hover:border-accent-hover active:bg-accent-active active:shadow-none',
+  default:
+    'bg-surface text-text border-border-control hover:bg-surface-muted hover:border-border-strong active:bg-surface-sunken',
+  ghost: 'bg-transparent text-muted border-transparent hover:bg-surface-muted hover:text-text',
+  danger:
+    'bg-transparent text-danger border-border-control hover:bg-danger-soft hover:border-danger',
 };
 
 export const Button = ({
@@ -43,8 +45,8 @@ export const Button = ({
   <button
     type="button"
     className={cx(
-      'inline-flex items-center justify-center gap-[var(--s-3)] rounded-[var(--radius-sm)] border px-[var(--s-5)] whitespace-nowrap',
-      'text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+      'press inline-flex items-center justify-center gap-[var(--s-3)] rounded-[var(--radius-sm)] border px-[var(--s-5)] whitespace-nowrap',
+      'text-sm select-none disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none',
       compact ? 'h-[var(--h-ctl-ws)] px-[var(--s-4)] text-xs' : 'h-[var(--h-ctl)]',
       BUTTON_VARIANTS[variant],
       className,
@@ -83,6 +85,11 @@ export const SearchInput = ({ label, className, ...rest }: ISearchInputProps) =>
         'h-[var(--h-ctl)] w-full rounded-[var(--radius-sm)] border border-border-control bg-surface',
         'pr-[var(--s-5)] pl-[calc(var(--s-6)+var(--s-5))] text-sm text-text',
         'placeholder:text-muted',
+        // Граница подсвечивается акцентом при наведении и фокусе: поле должно
+        // отзываться раньше, чем в него начали печатать.
+        'transition-[border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
+        'hover:border-border-strong focus:border-accent focus:outline-none',
+        'focus:shadow-[0_0_0_3px_var(--accent-soft)]',
       )}
       {...rest}
     />
@@ -113,6 +120,8 @@ export const StatusBadge = ({ tone = 'neutral', dot = true, children }: IStatusB
     className={cx(
       'inline-flex items-center gap-[var(--s-3)] rounded-full border px-[var(--s-4)] py-[1px]',
       'text-micro font-medium whitespace-nowrap',
+      // Состояние задания меняется на глазах: без перехода бейдж «моргает».
+      'transition-colors duration-[var(--dur-base)] ease-[var(--ease-out)]',
       BADGE_TONES[tone],
     )}
   >
@@ -148,7 +157,12 @@ export const ProgressRow = ({ value, label }: IProgressRowProps) => {
         className="h-[4px] overflow-hidden rounded-full bg-surface-sunken"
       >
         <div
-          className="h-full bg-accent transition-[width] duration-200 ease-out"
+          className={cx(
+            'h-full origin-left bg-accent',
+            'transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-out)]',
+            // Долю не знаем — показываем движение, а не выдуманный процент.
+            percent === null && 'animate-pulse',
+          )}
           style={{ width: percent === null ? '35%' : `${percent}%` }}
         />
       </div>
@@ -168,7 +182,7 @@ interface IEmptyStateProps {
 export const EmptyState = ({ title, description, action, compact = false }: IEmptyStateProps) => (
   <div
     className={cx(
-      'flex flex-col items-center gap-[var(--s-4)] rounded-[var(--radius-md)] border border-dashed border-border-strong text-center',
+      'animate-rise flex flex-col items-center gap-[var(--s-4)] rounded-[var(--radius-md)] border border-dashed border-border-strong text-center',
       compact ? 'px-[var(--s-6)] py-[var(--s-7)]' : 'px-[var(--s-8)] py-[calc(var(--s-8)*1.5)]',
     )}
   >
@@ -188,7 +202,7 @@ interface IErrorStateProps {
 export const ErrorState = ({ title, code, description, onRetry }: IErrorStateProps) => (
   <div
     role="alert"
-    className="flex flex-col items-start gap-[var(--s-4)] rounded-[var(--radius-md)] border border-danger-soft bg-danger-soft px-[var(--s-6)] py-[var(--s-5)]"
+    className="animate-rise flex flex-col items-start gap-[var(--s-4)] rounded-[var(--radius-md)] border border-danger-soft bg-danger-soft px-[var(--s-6)] py-[var(--s-5)]"
   >
     <div className="flex items-center gap-[var(--s-4)]">
       <span className="text-md font-medium text-danger">{title}</span>

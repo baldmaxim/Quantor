@@ -55,7 +55,10 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-[var(--s-6)]"
+      // На телефоне окно прижато к низу и во всю ширину: до кнопок внизу дотягивается
+      // большой палец, а центрированная карточка с полями по краям там только сужает
+      // поля ввода.
+      className="animate-scrim fixed inset-0 z-50 grid items-end justify-items-center bg-[var(--scrim)] sm:place-items-center sm:p-[var(--s-6)]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose();
       }}
@@ -64,7 +67,7 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[86dvh] w-full max-w-[620px] flex-col gap-[var(--s-6)] overflow-auto rounded-[var(--radius-lg)] border border-border-strong bg-surface-raised p-[var(--s-7)] shadow-[var(--shadow-2)]"
+        className="animate-dialog safe-bottom flex max-h-[88dvh] w-full max-w-[620px] flex-col gap-[var(--s-6)] overflow-auto rounded-t-[var(--radius-lg)] border border-border-strong bg-surface-raised p-[var(--s-6)] shadow-[var(--shadow-2)] sm:rounded-b-[var(--radius-lg)] sm:p-[var(--s-7)]"
       >
         <h2 id={titleId} className="text-lg font-semibold">
           Загрузить файлы

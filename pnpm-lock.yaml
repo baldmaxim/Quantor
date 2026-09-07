@@ -20,6 +20,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@formkit/auto-animate':
+        specifier: 0.10.0
+        version: 0.10.0
       '@quantor/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -81,6 +84,9 @@ importers:
       jsdom:
         specifier: 30.0.1
         version: 30.0.1
+      sharp:
+        specifier: 0.35.4
+        version: 0.35.4(@types/node@26.4.1)
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3
@@ -291,6 +297,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@formkit/auto-animate@0.10.0':
+    resolution: {integrity: sha512-KGomRttjUfORuPUaR/ZGQw+6xfMrTM+sxnILv7JAd9AmabU9rg9i6gF/iC0Ih+QpKCubJpCA/1DX9UHKE8cX+A==}
 
   '@hey-api/codegen-core@0.9.1':
     resolution: {integrity: sha512-s97jL1dgTMuiMHv2BZ1X4Tgd99Mf9GOvGdNqNcGwIMmnR+PgYNoraj4Zvp134MKsNCap/m7k0r0vKKnl56pj4w==}
@@ -3254,6 +3263,8 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
+  '@formkit/auto-animate@0.10.0': {}
+
   '@hey-api/codegen-core@0.9.1':
     dependencies:
       '@hey-api/types': 0.1.4
@@ -3320,8 +3331,7 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.4':
     optionalDependencies:
@@ -5532,7 +5542,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.4
       '@img/sharp-win32-x64': 0.35.4
       '@types/node': 26.4.1
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:

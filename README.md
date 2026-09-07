@@ -57,19 +57,20 @@ API_CORS_ORIGINS=http://192.168.1.50:3000
 
 ## Команды
 
-| Команда                             | Что делает                                           |
-| ----------------------------------- | ---------------------------------------------------- |
-| `pnpm run setup`                    | создаёт `apps/api/.venv` и ставит зависимости Python |
-| `pnpm infra:up` / `pnpm infra:down` | поднимает и останавливает PostgreSQL и MinIO         |
-| `pnpm infra:logs`                   | логи контейнеров                                     |
-| `pnpm dev`                          | API и веб одновременно                               |
-| `pnpm lint`                         | `ruff` для бэкенда, `eslint` для фронтенда           |
-| `pnpm typecheck`                    | `mypy` и `tsc`                                       |
-| `pnpm test`                         | `pytest` и `vitest`                                  |
-| `pnpm test:e2e`                     | Playwright (нужен `pnpm exec playwright install`)    |
-| `pnpm build`                        | генерация клиента API и сборка веб-приложения        |
-| `pnpm db:migrate`                   | накатывает миграции                                  |
-| `pnpm api-client:generate`          | FastAPI → `openapi.json` → TypeScript-клиент         |
+| Команда                             | Что делает                                                                                                 |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `pnpm run setup`                    | создаёт `apps/api/.venv` и ставит зависимости Python                                                       |
+| `pnpm infra:up` / `pnpm infra:down` | поднимает и останавливает PostgreSQL и MinIO                                                               |
+| `pnpm infra:logs`                   | логи контейнеров                                                                                           |
+| `pnpm dev`                          | API и веб одновременно                                                                                     |
+| `pnpm lint`                         | `ruff` для бэкенда, `eslint` для фронтенда                                                                 |
+| `pnpm typecheck`                    | `mypy` и `tsc`                                                                                             |
+| `pnpm test`                         | `pytest` и `vitest`                                                                                        |
+| `pnpm test:e2e`                     | Playwright: десктоп 1440/1920 и телефон 430/390/360 (нужен `pnpm exec playwright install chromium webkit`) |
+| `pnpm icons:generate`               | иконки и `apple-touch-icon` из `apps/web/public/quantor-favicon.svg`                                       |
+| `pnpm build`                        | генерация клиента API и сборка веб-приложения                                                              |
+| `pnpm db:migrate`                   | накатывает миграции                                                                                        |
+| `pnpm api-client:generate`          | FastAPI → `openapi.json` → TypeScript-клиент                                                               |
 
 ## Структура
 

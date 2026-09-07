@@ -28,6 +28,7 @@
     "test:api": "node scripts/py.mjs -m pytest",
     "test:web": "pnpm --filter @quantor/web test",
     "test:e2e": "pnpm --filter @quantor/web test:e2e",
+    "icons:generate": "pnpm --filter @quantor/web icons:generate",
     "db:migrate": "node scripts/py.mjs -m alembic upgrade head",
     "db:revision": "node scripts/py.mjs -m alembic revision --autogenerate -m",
     "api-client:generate": "node scripts/gen-api-client.mjs",

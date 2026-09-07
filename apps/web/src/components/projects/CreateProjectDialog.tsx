@@ -82,7 +82,10 @@ export const CreateProjectDialog = ({ open, onClose }: ICreateProjectDialogProps
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-[var(--s-6)]"
+      // На телефоне окно прижато к низу и во всю ширину: до кнопок внизу дотягивается
+      // большой палец, а центрированная карточка с полями по краям там только сужает
+      // поля ввода.
+      className="animate-scrim fixed inset-0 z-50 grid items-end justify-items-center bg-[var(--scrim)] sm:place-items-center sm:p-[var(--s-6)]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose();
       }}
@@ -91,7 +94,7 @@ export const CreateProjectDialog = ({ open, onClose }: ICreateProjectDialogProps
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${nameId}-title`}
-        className="flex max-h-[86dvh] w-full max-w-[620px] flex-col gap-[var(--s-6)] overflow-auto rounded-[var(--radius-lg)] border border-border-strong bg-surface-raised p-[var(--s-7)] shadow-[var(--shadow-2)]"
+        className="animate-dialog safe-bottom flex max-h-[88dvh] w-full max-w-[620px] flex-col gap-[var(--s-6)] overflow-auto rounded-t-[var(--radius-lg)] border border-border-strong bg-surface-raised p-[var(--s-6)] shadow-[var(--shadow-2)] sm:rounded-b-[var(--radius-lg)] sm:p-[var(--s-7)]"
       >
         <h2 id={`${nameId}-title`} className="text-lg font-semibold">
           Новый проект
@@ -154,7 +157,7 @@ export const CreateProjectDialog = ({ open, onClose }: ICreateProjectDialogProps
           <ErrorState title="Проект не создан" code={failure.code} description={failure.text} />
         )}
 
-        <div className="flex items-center gap-[var(--s-4)]">
+        <div className="flex flex-wrap items-center gap-[var(--s-4)]">
           {queue.running && (
             <Button variant="danger" onClick={queue.cancel}>
               Отменить загрузку

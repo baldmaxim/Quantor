@@ -1,0 +1,24 @@
+{
+  "name": "Quantor — подсчёт строительных объёмов",
+  "short_name": "Quantor",
+  "description": "Портал работы с проектной документацией: проекты, распознанные пакеты и просмотр чертежей.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1a5fa8",
+  "theme_color": "#f1f4f7",
+  "icons": [
+    { "src": "/quantor-favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" },
+    {
+      "src": "/icon-512-maskable.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ]
+}

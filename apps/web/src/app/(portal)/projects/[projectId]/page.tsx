@@ -2,7 +2,7 @@
 
 import type { DocumentRead, ProjectJobSummary } from '@quantor/api-client';
 import Link from 'next/link';
-import { use, useState } from 'react';
+import { use, useState, ViewTransition } from 'react';
 
 import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
 import { TopBar } from '@/components/shell/TopBar';
@@ -83,7 +83,7 @@ const ProjectPage = ({ params }: IPageProps) => {
         }
       />
 
-      <main className="min-w-0 flex-1 px-[var(--s-7)] py-[var(--s-7)]">
+      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
         <div className="mx-auto grid w-full max-w-[1400px] items-start gap-[var(--s-6)] lg:grid-cols-[1.6fr_1fr]">
           <section className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
             <h2 className="flex items-center gap-[var(--s-5)] border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
@@ -223,4 +223,14 @@ const JobCard = ({ job }: { job: ProjectJobSummary }) => {
   );
 };
 
-export default ProjectPage;
+const ProjectRoute = ({ params }: IPageProps) => (
+  <ViewTransition
+    enter={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+    exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+    default="none"
+  >
+    <ProjectPage params={params} />
+  </ViewTransition>
+);
+
+export default ProjectRoute;

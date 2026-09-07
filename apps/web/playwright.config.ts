@@ -3,7 +3,11 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.WEB_PORT ?? 3000);
 const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`;
 
-// Рабочая область портала рассчитана на десктоп, поэтому e2e гоняем на типовых разрешениях 1440p/1080p.
+// Рабочая область портала рассчитана на десктоп, но список проектов, карточка и
+// настройки обязаны работать на телефоне. Поэтому прогонов два: десктопные
+// разрешения для оболочки целиком и телефонные — для того, что там доступно.
+// Ширины взяты по правилам каталога: 430 (iPhone 15 Pro Max), 390 (iPhone 12),
+// 360 (бюджетный Android) — на 360 ломается всё, что вообще может сломаться.
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -17,11 +21,31 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-1440',
+      testMatch: /smoke\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },
     {
       name: 'desktop-1920',
+      testMatch: /smoke\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1920, height: 1080 } },
+    },
+    {
+      name: 'mobile-430',
+      testMatch: /mobile\.spec\.ts/,
+      use: { ...devices['iPhone 15 Pro Max'] },
+    },
+    {
+      name: 'mobile-390',
+      testMatch: /mobile\.spec\.ts/,
+      use: { ...devices['iPhone 12'] },
+    },
+    {
+      name: 'mobile-360',
+      testMatch: /mobile\.spec\.ts/,
+      use: {
+        ...devices['Pixel 7'],
+        viewport: { width: 360, height: 800 },
+      },
     },
   ],
   // Проверяем собранное приложение, а не dev-сервер: во-первых, это то, что увидит

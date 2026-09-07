@@ -1,18 +1,22 @@
 import type { ReactNode } from 'react';
 
+import { BottomNav } from '@/components/shell/BottomNav';
 import { SideNav } from '@/components/shell/SideNav';
 
 /**
- * Оболочка портала: рейка слева, содержимое справа.
+ * Оболочка портала.
  *
- * Общая для всех маршрутов, включая рабочую область: рейка нужна и там, иначе из
- * чертежа некуда вернуться. Высота фиксирована по окну — рабочая область должна
- * занимать её целиком, а не растягивать страницу.
+ * На десктопе разделы слева рейкой, на телефоне — внизу: вертикальная рейка на узком
+ * экране съедала бы шестую часть ширины, а до её верха не дотянуться большим пальцем.
+ *
+ * Высота фиксирована по окну — рабочая область должна занимать её целиком, а не
+ * растягивать страницу.
  */
 const PortalLayout = ({ children }: { children: ReactNode }) => (
-  <div className="flex h-dvh">
+  <div className="flex h-dvh flex-col md:flex-row">
     <SideNav />
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">{children}</div>
+    <div className="scroll-area flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+    <BottomNav />
   </div>
 );
 
