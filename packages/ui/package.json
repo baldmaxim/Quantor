@@ -1,0 +1,26 @@
+{
+  "name": "@quantor/ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Общие примитивы интерфейса и дизайн-токены. Второй потребитель появился — появился и пакет (ADR-0001).",
+  "type": "module",
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./icons": "./src/icons.tsx",
+    "./theme": "./src/theme.ts",
+    "./base.css": "./src/base.css"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "typescript": "6.0.3"
+  }
+}
