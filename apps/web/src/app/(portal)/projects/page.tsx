@@ -41,6 +41,9 @@ const ProjectsPage = () => {
     <>
       <TopBar
         crumbs={[{ label: 'Проекты' }]}
+        // Счётчик показывается только при полученных данных: «0 проектов» на экране
+        // ошибки утверждало бы, что проектов нет, хотя их просто не удалось прочитать.
+        summary={data ? summaryLine(data.total, documentTotal(data.items)) : null}
         actions={
           <>
             <SearchInput
@@ -151,9 +154,9 @@ const SortToggle = ({ value, onChange }: ISortToggleProps) => (
   <div
     role="group"
     aria-label="Сортировка"
-    // Утопленная дорожка с приподнятым выбранным сегментом. Сплошная заливка акцентом
-    // читалась как нажатая кнопка действия, хотя это переключатель вида.
-    className="flex h-[var(--h-ctl)] flex-none items-center gap-[2px] rounded-[var(--radius-sm)] border border-border-control bg-surface-sunken p-[3px]"
+    // Без рамки и дорожки: выбранный сегмент виден акцентом (6,4:1 к фону), и обводить
+    // группу контуром незачем — на тёмной теме он читался как белый прямоугольник.
+    className="flex h-[var(--h-ctl)] flex-none items-center gap-[2px] rounded-[var(--radius-sm)] p-[2px]"
   >
     {(
       [
@@ -169,8 +172,8 @@ const SortToggle = ({ value, onChange }: ISortToggleProps) => (
         className={cx(
           'press h-full rounded-[calc(var(--radius-sm)-2px)] px-[var(--s-5)] text-sm whitespace-nowrap',
           value === key
-            ? 'bg-surface-raised font-medium text-accent shadow-[var(--shadow-1)]'
-            : 'text-muted hover:text-text',
+            ? 'bg-accent-soft font-medium text-accent'
+            : 'text-muted hover:bg-surface-muted hover:text-text',
         )}
       >
         {label}

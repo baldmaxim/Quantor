@@ -19,6 +19,43 @@ test.describe('оболочка портала', () => {
     await expect(page.getByRole('heading', { name: 'Проекты', level: 1 })).toBeVisible();
   });
 
+  test('счётчик проектов виден в шапке', async ({ page }) => {
+    // Счётчик живёт в шапке, а не в теле страницы: заголовок раздела там уже есть,
+    // и дублировать его ради подписи незачем. Регрессия: свойство однажды потерялось
+    // при правке, и на десктопе счётчик просто исчез.
+    await page.route('**/api/v1/projects*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              id: '11111111-1111-4111-8111-111111111111',
+              name: 'Проверочный проект',
+              status: 'active',
+              source: 'manual',
+              external_ref: null,
+              created_at: '2026-09-01T10:00:00Z',
+              updated_at: '2026-09-04T08:42:00Z',
+              document_count: 2,
+              sheet_count: 77,
+              last_job: null,
+            },
+          ],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        }),
+      }),
+    );
+
+    await page.goto('/projects');
+
+    const header = page.getByRole('banner');
+    await expect(header).toContainText('1 проект');
+    await expect(header).toContainText('2 документа');
+  });
+
   test('нет горизонтального скролла', async ({ page }) => {
     await page.goto('/projects');
 

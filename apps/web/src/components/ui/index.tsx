@@ -91,10 +91,11 @@ export const SearchInput = ({ label, className, onClear, ...rest }: ISearchInput
         type="search"
         placeholder={label}
         className={cx(
-          // Заливка светлее шапки, а не темнее: тёмный колодец на тёмном фоне виден
-          // только за счёт рамки, и рамку приходится делать яркой. Светлое поле
-          // читается само, и рамке остаётся быть тихой.
-          'h-[var(--h-ctl)] w-full rounded-[var(--radius-sm)] border border-border-control bg-surface-muted',
+          // Тихая рамка вместо контрольной: на тёмной теме --border-control (3,3:1)
+          // читался как белый прямоугольник вокруг поля. Поле опознаётся заливкой,
+          // иконкой и подсказкой, а при фокусе получает акцентную рамку с кольцом —
+          // индикатор фокуса остаётся контрастным (6,4:1), и это главное.
+          'h-[var(--h-ctl)] w-full rounded-[var(--radius-sm)] border border-border bg-surface-muted',
           'pl-[calc(var(--s-6)+var(--s-5))] text-sm text-text',
           filled ? 'pr-[calc(var(--s-6)+var(--s-4))]' : 'pr-[var(--s-5)]',
           'placeholder:text-muted',
