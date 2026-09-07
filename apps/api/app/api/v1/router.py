@@ -22,6 +22,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.api.v1 import auth, documents, integrations, jobs, meta, projects, uploads
+from app.api.v1.admin import admin_router
 from app.auth.resolver import require_authenticated
 
 api_v1_router = APIRouter(prefix="/api/v1")
@@ -39,3 +40,6 @@ protected_router.include_router(jobs.router)
 protected_router.include_router(integrations.router)
 
 api_v1_router.include_router(protected_router)
+
+# Контур управления платформой. Отдельной группой, со своим требованием прав на входе.
+api_v1_router.include_router(admin_router)

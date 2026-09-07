@@ -26,6 +26,16 @@ class ErrorCode(StrEnum):
     MEMBERSHIP_EXISTS = "MEMBERSHIP_EXISTS"
     LAST_ADMIN_REMOVAL = "LAST_ADMIN_REMOVAL"
 
+    # --- контур управления ---
+    SETTING_UNKNOWN = "SETTING_UNKNOWN"
+    SETTING_VALUE_INVALID = "SETTING_VALUE_INVALID"
+    SETTING_SCOPE_INVALID = "SETTING_SCOPE_INVALID"
+    FLAG_UNKNOWN = "FLAG_UNKNOWN"
+    FLAG_NOT_EDITABLE = "FLAG_NOT_EDITABLE"
+    FLAG_SCOPE_INVALID = "FLAG_SCOPE_INVALID"
+    TENDERHUB_BINDING_CONFLICT = "TENDERHUB_BINDING_CONFLICT"
+    TENDERHUB_BINDING_IMMUTABLE = "TENDERHUB_BINDING_IMMUTABLE"
+
     # --- провайдер личности ---
     AUTH_NOT_CONFIGURED = "AUTH_NOT_CONFIGURED"
     OIDC_STATE_INVALID = "OIDC_STATE_INVALID"
@@ -77,6 +87,14 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.WORKSPACE_NOT_FOUND: "Рабочее пространство не найдено",
     ErrorCode.MEMBERSHIP_EXISTS: "Участник уже добавлен в пространство",
     ErrorCode.LAST_ADMIN_REMOVAL: "Нельзя убрать последнего администратора пространства",
+    ErrorCode.SETTING_UNKNOWN: "Такой настройки нет",
+    ErrorCode.SETTING_VALUE_INVALID: "Значение настройки не подходит",
+    ErrorCode.SETTING_SCOPE_INVALID: "Настройка не переопределяется на этом уровне",
+    ErrorCode.FLAG_UNKNOWN: "Такого флага возможностей нет",
+    ErrorCode.FLAG_NOT_EDITABLE: "Флаг закрыт до готовности возможности",
+    ErrorCode.FLAG_SCOPE_INVALID: "Флаг не переопределяется на уровне пространства",
+    ErrorCode.TENDERHUB_BINDING_CONFLICT: "Этот тендер уже привязан к другому проекту",
+    ErrorCode.TENDERHUB_BINDING_IMMUTABLE: "Связь с тендером меняется только администратором",
     ErrorCode.AUTH_NOT_CONFIGURED: "Вход в портал не настроен",
     ErrorCode.OIDC_STATE_INVALID: "Ответ провайдера входа не принят",
     ErrorCode.OIDC_DISCOVERY_FAILED: "Провайдер входа недоступен",
@@ -122,6 +140,16 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.LAST_ADMIN_REMOVAL: status.HTTP_409_CONFLICT,
     # Провайдер личности — такая же внешняя система, как TenderHUB, и отвечает так же:
     # не настроен — 503, не отвечает — 502, прислал негодный ответ — 400.
+    ErrorCode.SETTING_UNKNOWN: status.HTTP_404_NOT_FOUND,
+    ErrorCode.SETTING_VALUE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.SETTING_SCOPE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.FLAG_UNKNOWN: status.HTTP_404_NOT_FOUND,
+    # 409, а не 403: право у администратора есть, но возможность ещё не готова —
+    # это конфликт с состоянием продукта, а не отказ в доступе.
+    ErrorCode.FLAG_NOT_EDITABLE: status.HTTP_409_CONFLICT,
+    ErrorCode.FLAG_SCOPE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDERHUB_BINDING_CONFLICT: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDERHUB_BINDING_IMMUTABLE: status.HTTP_409_CONFLICT,
     ErrorCode.AUTH_NOT_CONFIGURED: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.OIDC_STATE_INVALID: status.HTTP_400_BAD_REQUEST,
     ErrorCode.OIDC_DISCOVERY_FAILED: status.HTTP_502_BAD_GATEWAY,

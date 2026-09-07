@@ -59,6 +59,70 @@ PLATFORM_ROLES: frozenset[Role] = frozenset({Role.PLATFORM_ADMIN, Role.SERVICE})
 WORKSPACE_ROLES: frozenset[Role] = frozenset(Role) - PLATFORM_ROLES
 
 
+class OverrideScope(StrEnum):
+    """Уровень, на котором переопределяется настройка или флаг.
+
+    `PROJECT` объявлен, но ни одной настройке пока не разрешён: контракт готов к
+    расширению, а выдавать несуществующий уровень за работающий нельзя. Тест следит,
+    чтобы уровень не появился в определениях раньше, чем в коде, который его читает.
+    """
+
+    SYSTEM = "system"
+    WORKSPACE = "workspace"
+    PROJECT = "project"
+
+
+class ValueSource(StrEnum):
+    """Откуда взялось действующее значение настройки или флага.
+
+    Показывается администратору вместе со значением: «включено» без ответа на вопрос
+    «кем и где» — это половина сведений, по которой ничего не починить.
+    """
+
+    DEFAULT = "default"
+    SYSTEM = "system"
+    WORKSPACE = "workspace"
+    DEPLOYMENT = "deployment"
+
+
+class AuditResult(StrEnum):
+    """Чем закончилось действие.
+
+    Отказ записывается наравне с успехом: попытка сделать то, на что нет прав, —
+    это ровно то событие, ради которого журнал и заводят.
+    """
+
+    SUCCESS = "success"
+    FAILURE = "failure"
+    DENIED = "denied"
+
+
+class AuditAction(StrEnum):
+    """Словарь действий журнала.
+
+    В базе — обычная строка, а не CHECK: набор пополняется каждый этап, и миграция
+    на каждое новое действие была бы трением без выигрыша. Соответствие значений этому
+    перечислению проверяется тестом.
+    """
+
+    LOGIN_SUCCEEDED = "login_succeeded"
+    LOGIN_FAILED = "login_failed"
+    LOGOUT = "logout"
+    SESSION_REVOKED = "session_revoked"
+
+    SETTING_OVERRIDE_SET = "setting_override_set"
+    SETTING_OVERRIDE_DELETED = "setting_override_deleted"
+
+    FEATURE_FLAG_OVERRIDE_SET = "feature_flag_override_set"
+    FEATURE_FLAG_OVERRIDE_DELETED = "feature_flag_override_deleted"
+
+    TENDERHUB_CONNECTION_TESTED = "tenderhub_connection_tested"
+    TENDERHUB_PROJECT_REBOUND = "tenderhub_project_rebound"
+    TENDERHUB_PROJECT_UNLINKED = "tenderhub_project_unlinked"
+
+    PERMISSION_DENIED = "permission_denied"
+
+
 class ProjectStatus(StrEnum):
     """Жизненный цикл проекта. Ход импорта сюда не пишется — он живёт в Job и ревизиях."""
 

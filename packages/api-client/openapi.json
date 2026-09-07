@@ -13,6 +13,150 @@
         "title": "ArtifactKind",
         "type": "string"
       },
+      "AuditEventRead": {
+        "description": "Запись журнала. Только чтение: операций изменения у журнала нет вовсе.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Label"
+          },
+          "actor_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Role"
+          },
+          "after_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Summary"
+          },
+          "before_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Summary"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "resource_type": {
+            "title": "Resource Type",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AuditResult"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "actor_label",
+          "actor_role",
+          "workspace_id",
+          "action",
+          "resource_type",
+          "resource_id",
+          "result",
+          "error_code",
+          "before_summary",
+          "after_summary",
+          "request_id"
+        ],
+        "title": "AuditEventRead",
+        "type": "object"
+      },
+      "AuditResult": {
+        "description": "Чем закончилось действие.\n\nОтказ записывается наравне с успехом: попытка сделать то, на что нет прав, —\nэто ровно то событие, ради которого журнал и заводят.",
+        "enum": [
+          "success",
+          "failure",
+          "denied"
+        ],
+        "title": "AuditResult",
+        "type": "string"
+      },
       "Body_upload_file": {
         "properties": {
           "document_id": {
@@ -257,6 +401,98 @@
         "title": "DocumentRevisionRead",
         "type": "object"
       },
+      "FlagOverrideWrite": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/OverrideScope"
+          }
+        },
+        "required": [
+          "scope",
+          "enabled"
+        ],
+        "title": "FlagOverrideWrite",
+        "type": "object"
+      },
+      "FlagStateRead": {
+        "description": "Флаг вместе с тем, откуда взялось его значение и можно ли его трогать.",
+        "properties": {
+          "admin_editable": {
+            "title": "Admin Editable",
+            "type": "boolean"
+          },
+          "default": {
+            "title": "Default",
+            "type": "boolean"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "effective": {
+            "title": "Effective",
+            "type": "boolean"
+          },
+          "follows_configuration": {
+            "title": "Follows Configuration",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ValueSource"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "workspace_scoped": {
+            "title": "Workspace Scoped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "description",
+          "stage",
+          "effective",
+          "default",
+          "source",
+          "reason",
+          "admin_editable",
+          "workspace_scoped",
+          "follows_configuration"
+        ],
+        "title": "FlagStateRead",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -436,6 +672,14 @@
             "title": "Api Version",
             "type": "string"
           },
+          "auth_mode": {
+            "enum": [
+              "dev",
+              "oidc"
+            ],
+            "title": "Auth Mode",
+            "type": "string"
+          },
           "environment": {
             "title": "Environment",
             "type": "string"
@@ -461,9 +705,54 @@
           "schema_version",
           "environment",
           "stage",
-          "features"
+          "features",
+          "auth_mode"
         ],
         "title": "MetaResponse",
+        "type": "object"
+      },
+      "OverrideScope": {
+        "description": "Уровень, на котором переопределяется настройка или флаг.\n\n`PROJECT` объявлен, но ни одной настройке пока не разрешён: контракт готов к\nрасширению, а выдавать несуществующий уровень за работающий нельзя. Тест следит,\nчтобы уровень не появился в определениях раньше, чем в коде, который его читает.",
+        "enum": [
+          "system",
+          "workspace",
+          "project"
+        ],
+        "title": "OverrideScope",
+        "type": "string"
+      },
+      "Page_AuditEventRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEventRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[AuditEventRead]",
         "type": "object"
       },
       "Page_DocumentRead_": {
@@ -1315,6 +1604,193 @@
         "title": "SessionWorkspace",
         "type": "object"
       },
+      "SettingOverrideWrite": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/OverrideScope"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "scope",
+          "value"
+        ],
+        "title": "SettingOverrideWrite",
+        "type": "object"
+      },
+      "SettingStateRead": {
+        "description": "Настройка вместе с действующим значением и его происхождением.\n\nОпределение и значение в одном ответе намеренно: страница настроек строится из\nметаданных реестра, а не из зашитой в интерфейс копии списка.",
+        "properties": {
+          "allowed_scopes": {
+            "items": {
+              "$ref": "#/components/schemas/OverrideScope"
+            },
+            "title": "Allowed Scopes",
+            "type": "array"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "default_value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Default Value"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "is_secret": {
+            "title": "Is Secret",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ValueSource"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value"
+          },
+          "value_type": {
+            "title": "Value Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "description",
+          "category",
+          "value_type",
+          "value",
+          "default_value",
+          "source",
+          "allowed_scopes",
+          "editable",
+          "restart_required",
+          "is_secret"
+        ],
+        "title": "SettingStateRead",
+        "type": "object"
+      },
       "SheetRead": {
         "properties": {
           "height_px": {
@@ -1385,6 +1861,109 @@
           "region_count"
         ],
         "title": "SheetRead",
+        "type": "object"
+      },
+      "TenderBindingPreviewRead": {
+        "description": "Предпросмотр перепривязки: что было, что станет и что мешает.",
+        "properties": {
+          "conflicting_project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflicting Project Id"
+          },
+          "conflicting_project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflicting Project Name"
+          },
+          "current_external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current External Id"
+          },
+          "current_external_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current External Ref"
+          },
+          "is_noop": {
+            "title": "Is Noop",
+            "type": "boolean"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "target_client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Client Name"
+          },
+          "target_external_id": {
+            "title": "Target External Id",
+            "type": "string"
+          },
+          "target_external_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target External Ref"
+          },
+          "target_title": {
+            "title": "Target Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "current_external_id",
+          "current_external_ref",
+          "target_external_id",
+          "target_external_ref",
+          "target_title",
+          "target_client_name",
+          "conflicting_project_id",
+          "conflicting_project_name",
+          "is_noop"
+        ],
+        "title": "TenderBindingPreviewRead",
         "type": "object"
       },
       "TenderBriefRead": {
@@ -1491,6 +2070,87 @@
         "title": "TenderBriefRead",
         "type": "object"
       },
+      "TenderHubProbeRead": {
+        "description": "Результат явной проверки связи. Выполняется по кнопке, а не при открытии страницы.",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "duration_ms": {
+            "minimum": 0.0,
+            "title": "Duration Ms",
+            "type": "number"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "tender_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tender Count"
+          }
+        },
+        "required": [
+          "ok",
+          "checked_at",
+          "duration_ms"
+        ],
+        "title": "TenderHubProbeRead",
+        "type": "object"
+      },
+      "TenderHubStatusRead": {
+        "description": "Состояние интеграции. Ключ не показывается ни в каком виде — только факт наличия.",
+        "properties": {
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "credential_state": {
+            "enum": [
+              "configured",
+              "missing"
+            ],
+            "title": "Credential State",
+            "type": "string"
+          },
+          "linked_project_count": {
+            "title": "Linked Project Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "configured",
+          "credential_state",
+          "base_url",
+          "linked_project_count"
+        ],
+        "title": "TenderHubStatusRead",
+        "type": "object"
+      },
       "TenderImport": {
         "description": "Запрос на создание проекта по тендеру.",
         "properties": {
@@ -1517,6 +2177,26 @@
           "tender_id"
         ],
         "title": "TenderImport",
+        "type": "object"
+      },
+      "TenderRebindRequest": {
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "tender_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Tender Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tender_id"
+        ],
+        "title": "TenderRebindRequest",
         "type": "object"
       },
       "UploadRead": {
@@ -1625,6 +2305,17 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "ValueSource": {
+        "description": "Откуда взялось действующее значение настройки или флага.\n\nПоказывается администратору вместе со значением: «включено» без ответа на вопрос\n«кем и где» — это половина сведений, по которой ничего не починить.",
+        "enum": [
+          "default",
+          "system",
+          "workspace",
+          "deployment"
+        ],
+        "title": "ValueSource",
+        "type": "string"
       }
     }
   },
@@ -1635,6 +2326,628 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/audit": {
+      "get": {
+        "description": "Страница журнала.\n\nПагинация обязательна: журнал растёт всё время работы установки, и выборка «всё»\nздесь означает выборку, которая однажды не вернётся.\n\nАдминистратор платформы видит всю установку; остальные — только своё пространство.",
+        "operationId": "list_audit_events",
+        "parameters": [
+          {
+            "description": "Сколько записей вернуть",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Сколько записей вернуть",
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Сколько записей пропустить",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Сколько записей пропустить",
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Фильтр по действию",
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по действию",
+              "title": "Action"
+            }
+          },
+          {
+            "description": "Фильтр по типу объекта",
+            "in": "query",
+            "name": "resource_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по типу объекта",
+              "title": "Resource Type"
+            }
+          },
+          {
+            "description": "Фильтр по результату",
+            "in": "query",
+            "name": "result",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AuditResult"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по результату",
+              "title": "Result"
+            }
+          },
+          {
+            "description": "Фильтр по актору",
+            "in": "query",
+            "name": "actor_user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по актору",
+              "title": "Actor User Id"
+            }
+          },
+          {
+            "description": "Не раньше",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Не раньше",
+              "title": "Since"
+            }
+          },
+          {
+            "description": "Не позже",
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Не позже",
+              "title": "Until"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AuditEventRead_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Журнал административных действий",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/feature-flags": {
+      "get": {
+        "operationId": "list_feature_flags",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FlagStateRead"
+                  },
+                  "title": "Response List Feature Flags",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Флаги возможностей",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/feature-flags/{key}": {
+      "delete": {
+        "operationId": "delete_feature_flag_override",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "С какого уровня снять",
+            "in": "query",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/OverrideScope",
+              "description": "С какого уровня снять"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagStateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Снять переопределение флага",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "set_feature_flag_override",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlagOverrideWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagStateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Переопределить флаг",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/integrations/tenderhub": {
+      "get": {
+        "description": "Настроена ли интеграция и сколько проектов с ней связано.\n\nКлюч доступа не показывается ни целиком, ни частями: наружу уходит только факт\nего наличия (ADR-0011).",
+        "operationId": "read_tenderhub_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderHubStatusRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Состояние интеграции",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/integrations/tenderhub/projects/{project_id}/rebind": {
+      "post": {
+        "description": "Перенос связи. Документы, ревизии и задания остаются на месте.",
+        "operationId": "rebind_tenderhub_project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenderRebindRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Перепривязать проект к другому тендеру",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/integrations/tenderhub/projects/{project_id}/rebind/preview": {
+      "post": {
+        "description": "Что именно изменится и что этому мешает. Ничего не меняет.",
+        "operationId": "preview_tenderhub_rebind",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenderRebindRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderBindingPreviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Предпросмотр перепривязки",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/integrations/tenderhub/projects/{project_id}/unlink": {
+      "post": {
+        "description": "Разрыв связи. Проект и вся его работа остаются в портале.",
+        "operationId": "unlink_tenderhub_project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отвязать проект от тендера",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/integrations/tenderhub/test-connection": {
+      "post": {
+        "description": "Явное действие, а не проба при открытии страницы.\n\nСтраница состояния не должна ходить во внешнюю систему сама: тогда её открытие\nзависит от чужой доступности, а администратор приходит туда как раз тогда, когда\nчто-то сломалось.",
+        "operationId": "test_tenderhub_connection",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderHubProbeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Проверить связь с TenderHUB",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/settings": {
+      "get": {
+        "operationId": "list_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SettingStateRead"
+                  },
+                  "title": "Response List Settings",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Настройки с действующими значениями",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/settings/{key}": {
+      "delete": {
+        "operationId": "delete_setting_override",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "С какого уровня снять",
+            "in": "query",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/OverrideScope",
+              "description": "С какого уровня снять"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingStateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Снять переопределение",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "set_setting_override",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingOverrideWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingStateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Переопределить настройку",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/auth/callback": {
       "get": {
         "description": "Меняет код на токены, заводит сеанс и возвращает браузер в портал.",
@@ -2035,6 +3348,7 @@
     },
     "/api/v1/meta": {
       "get": {
+        "description": "Версии контракта и набор возможностей для текущего контекста.\n\nМаршрут публичный: странице входа нужно узнать состояние API до того, как появится\nсеанс. Без сеанса отдаются код и системные переопределения, с сеансом добавляются\nпереопределения пространства.\n\nОтказ базы понижает набор до кодовых умолчаний, а не роняет запрос: на неразмеченной\nустановке портал обязан показать границу этапа, а не пятисотку.",
         "operationId": "read_meta",
         "responses": {
           "200": {

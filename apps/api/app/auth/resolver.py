@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, Request, params
+from fastapi import Depends, HTTPException, Request, params
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import csrf, oidc, sessions
@@ -168,6 +168,21 @@ def _requested_workspace(request: Request) -> uuid.UUID | None:
         raise DomainError(
             ErrorCode.VALIDATION_FAILED, f"{WORKSPACE_HEADER}: ожидается UUID"
         ) from error
+
+
+async def optional_context(
+    request: Request, settings: Settings, session: AsyncSession
+) -> AuthContext | None:
+    """Контекст, если он есть, и None, если нет.
+
+    Для публичных маршрутов, которым сеанс полезен, но не обязателен. Отказ здесь —
+    это ответ «не вошёл», а не ошибка: `/api/v1/meta` обязан работать до входа, иначе
+    страница входа не сможет узнать даже версию API.
+    """
+    try:
+        return await get_auth_context(request, settings, session)
+    except (DomainError, HTTPException):
+        return None
 
 
 AuthDep = Annotated[AuthContext, Depends(get_auth_context)]

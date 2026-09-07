@@ -14,14 +14,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain import (
     ArtifactKind,
+    AuditResult,
     DocumentKind,
     JobStatus,
     JobType,
+    OverrideScope,
     ProcessingStatus,
     ProjectSource,
     ProjectStatus,
     RegionShape,
     Role,
+    ValueSource,
 )
 
 if TYPE_CHECKING:
@@ -30,6 +33,10 @@ if TYPE_CHECKING:
 # Пагинация обязательна: на одном листе бывают сотни областей, во всём документе — тысячи.
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 500
+
+# Значение настройки в контракте: перечисление возможных форм, а не произвольный JSON.
+# Свободный тип здесь означал бы, что клиент не знает, что ему придёт.
+SettingValueJson = bool | int | str | list[str]
 
 
 class Page[ItemT](BaseModel):
@@ -91,6 +98,124 @@ class LogoutResponse(BaseModel):
     """Результат выхода. Повторный выход не ошибка — сеанса уже нет."""
 
     ok: bool = True
+
+
+# ------------------------------------------------------------------ контур управления
+
+
+class SettingStateRead(BaseModel):
+    """Настройка вместе с действующим значением и его происхождением.
+
+    Определение и значение в одном ответе намеренно: страница настроек строится из
+    метаданных реестра, а не из зашитой в интерфейс копии списка.
+    """
+
+    key: str
+    title: str
+    description: str
+    category: str
+    value_type: str
+    value: SettingValueJson
+    default_value: SettingValueJson
+    source: ValueSource
+    """default | system | workspace | deployment — где значение задано на самом деле."""
+    allowed_scopes: list[OverrideScope]
+    editable: bool
+    """False — значение задано окружением и из портала не меняется."""
+    restart_required: bool
+    is_secret: bool
+    minimum: int | None = None
+    maximum: int | None = None
+    choices: list[str] = Field(default_factory=list)
+    updated_by: str | None = None
+    updated_at: str | None = None
+
+
+class SettingOverrideWrite(BaseModel):
+    scope: OverrideScope
+    value: SettingValueJson
+
+
+class FlagStateRead(BaseModel):
+    """Флаг вместе с тем, откуда взялось его значение и можно ли его трогать."""
+
+    key: str
+    title: str
+    description: str
+    stage: str
+    effective: bool
+    default: bool
+    source: ValueSource
+    reason: str
+    admin_editable: bool
+    """False — возможность не готова. Право есть, включать нечего."""
+    workspace_scoped: bool
+    follows_configuration: bool
+
+
+class FlagOverrideWrite(BaseModel):
+    scope: OverrideScope
+    enabled: bool
+    reason: Annotated[str | None, Field(default=None, max_length=500)] = None
+
+
+class AuditEventRead(ApiModel):
+    """Запись журнала. Только чтение: операций изменения у журнала нет вовсе."""
+
+    id: uuid.UUID
+    created_at: datetime
+    actor_label: str | None
+    actor_role: str | None
+    workspace_id: uuid.UUID | None
+    action: str
+    resource_type: str
+    resource_id: str | None
+    result: AuditResult
+    error_code: str | None
+    before_summary: dict[str, Any] | None
+    after_summary: dict[str, Any] | None
+    request_id: str | None
+
+
+class TenderHubStatusRead(BaseModel):
+    """Состояние интеграции. Ключ не показывается ни в каком виде — только факт наличия."""
+
+    configured: bool
+    credential_state: Literal["configured", "missing"]
+    base_url: str
+    """Адрес внешней системы. Не секрет: он есть в документации вендора."""
+    linked_project_count: int
+
+
+class TenderHubProbeRead(BaseModel):
+    """Результат явной проверки связи. Выполняется по кнопке, а не при открытии страницы."""
+
+    ok: bool
+    checked_at: datetime
+    duration_ms: float = Field(ge=0)
+    error_code: str | None = None
+    tender_count: int | None = None
+
+
+class TenderBindingPreviewRead(BaseModel):
+    """Предпросмотр перепривязки: что было, что станет и что мешает."""
+
+    project_id: uuid.UUID
+    current_external_id: str | None
+    current_external_ref: str | None
+    target_external_id: str
+    target_external_ref: str | None
+    target_title: str
+    target_client_name: str | None
+    conflicting_project_id: uuid.UUID | None
+    conflicting_project_name: str | None
+    is_noop: bool
+
+
+class TenderRebindRequest(BaseModel):
+    tender_id: Annotated[str, Field(min_length=1, max_length=128)]
+    confirm: bool = False
+    """Подтверждение обязательно: перепривязка не должна происходить с одного нажатия."""
 
 
 # --------------------------------------------------------------------------- проекты

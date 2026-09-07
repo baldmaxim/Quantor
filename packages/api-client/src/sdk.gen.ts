@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginLoginData, BeginLoginErrors, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
+import type { BeginLoginData, BeginLoginErrors, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,118 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Журнал административных действий
+ *
+ * Страница журнала.
+ *
+ * Пагинация обязательна: журнал растёт всё время работы установки, и выборка «всё»
+ * здесь означает выборку, которая однажды не вернётся.
+ *
+ * Администратор платформы видит всю установку; остальные — только своё пространство.
+ */
+export const listAuditEvents = <ThrowOnError extends boolean = false>(options?: Options<ListAuditEventsData, ThrowOnError>): RequestResult<ListAuditEventsResponses, ListAuditEventsErrors, ThrowOnError> => (options?.client ?? client).get<ListAuditEventsResponses, ListAuditEventsErrors, ThrowOnError>({ url: '/api/v1/admin/audit', ...options });
+
+/**
+ * Флаги возможностей
+ */
+export const listFeatureFlags = <ThrowOnError extends boolean = false>(options?: Options<ListFeatureFlagsData, ThrowOnError>): RequestResult<ListFeatureFlagsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListFeatureFlagsResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/feature-flags', ...options });
+
+/**
+ * Снять переопределение флага
+ */
+export const deleteFeatureFlagOverride = <ThrowOnError extends boolean = false>(options: Options<DeleteFeatureFlagOverrideData, ThrowOnError>): RequestResult<DeleteFeatureFlagOverrideResponses, DeleteFeatureFlagOverrideErrors, ThrowOnError> => (options.client ?? client).delete<DeleteFeatureFlagOverrideResponses, DeleteFeatureFlagOverrideErrors, ThrowOnError>({ url: '/api/v1/admin/feature-flags/{key}', ...options });
+
+/**
+ * Переопределить флаг
+ */
+export const setFeatureFlagOverride = <ThrowOnError extends boolean = false>(options: Options<SetFeatureFlagOverrideData, ThrowOnError>): RequestResult<SetFeatureFlagOverrideResponses, SetFeatureFlagOverrideErrors, ThrowOnError> => (options.client ?? client).put<SetFeatureFlagOverrideResponses, SetFeatureFlagOverrideErrors, ThrowOnError>({
+    url: '/api/v1/admin/feature-flags/{key}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Состояние интеграции
+ *
+ * Настроена ли интеграция и сколько проектов с ней связано.
+ *
+ * Ключ доступа не показывается ни целиком, ни частями: наружу уходит только факт
+ * его наличия (ADR-0011).
+ */
+export const readTenderhubStatus = <ThrowOnError extends boolean = false>(options?: Options<ReadTenderhubStatusData, ThrowOnError>): RequestResult<ReadTenderhubStatusResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ReadTenderhubStatusResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/integrations/tenderhub', ...options });
+
+/**
+ * Перепривязать проект к другому тендеру
+ *
+ * Перенос связи. Документы, ревизии и задания остаются на месте.
+ */
+export const rebindTenderhubProject = <ThrowOnError extends boolean = false>(options: Options<RebindTenderhubProjectData, ThrowOnError>): RequestResult<RebindTenderhubProjectResponses, RebindTenderhubProjectErrors, ThrowOnError> => (options.client ?? client).post<RebindTenderhubProjectResponses, RebindTenderhubProjectErrors, ThrowOnError>({
+    url: '/api/v1/admin/integrations/tenderhub/projects/{project_id}/rebind',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Предпросмотр перепривязки
+ *
+ * Что именно изменится и что этому мешает. Ничего не меняет.
+ */
+export const previewTenderhubRebind = <ThrowOnError extends boolean = false>(options: Options<PreviewTenderhubRebindData, ThrowOnError>): RequestResult<PreviewTenderhubRebindResponses, PreviewTenderhubRebindErrors, ThrowOnError> => (options.client ?? client).post<PreviewTenderhubRebindResponses, PreviewTenderhubRebindErrors, ThrowOnError>({
+    url: '/api/v1/admin/integrations/tenderhub/projects/{project_id}/rebind/preview',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Отвязать проект от тендера
+ *
+ * Разрыв связи. Проект и вся его работа остаются в портале.
+ */
+export const unlinkTenderhubProject = <ThrowOnError extends boolean = false>(options: Options<UnlinkTenderhubProjectData, ThrowOnError>): RequestResult<UnlinkTenderhubProjectResponses, UnlinkTenderhubProjectErrors, ThrowOnError> => (options.client ?? client).post<UnlinkTenderhubProjectResponses, UnlinkTenderhubProjectErrors, ThrowOnError>({ url: '/api/v1/admin/integrations/tenderhub/projects/{project_id}/unlink', ...options });
+
+/**
+ * Проверить связь с TenderHUB
+ *
+ * Явное действие, а не проба при открытии страницы.
+ *
+ * Страница состояния не должна ходить во внешнюю систему сама: тогда её открытие
+ * зависит от чужой доступности, а администратор приходит туда как раз тогда, когда
+ * что-то сломалось.
+ */
+export const testTenderhubConnection = <ThrowOnError extends boolean = false>(options?: Options<TestTenderhubConnectionData, ThrowOnError>): RequestResult<TestTenderhubConnectionResponses, unknown, ThrowOnError> => (options?.client ?? client).post<TestTenderhubConnectionResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/integrations/tenderhub/test-connection', ...options });
+
+/**
+ * Настройки с действующими значениями
+ */
+export const listSettings = <ThrowOnError extends boolean = false>(options?: Options<ListSettingsData, ThrowOnError>): RequestResult<ListSettingsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListSettingsResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/settings', ...options });
+
+/**
+ * Снять переопределение
+ */
+export const deleteSettingOverride = <ThrowOnError extends boolean = false>(options: Options<DeleteSettingOverrideData, ThrowOnError>): RequestResult<DeleteSettingOverrideResponses, DeleteSettingOverrideErrors, ThrowOnError> => (options.client ?? client).delete<DeleteSettingOverrideResponses, DeleteSettingOverrideErrors, ThrowOnError>({ url: '/api/v1/admin/settings/{key}', ...options });
+
+/**
+ * Переопределить настройку
+ */
+export const setSettingOverride = <ThrowOnError extends boolean = false>(options: Options<SetSettingOverrideData, ThrowOnError>): RequestResult<SetSettingOverrideResponses, SetSettingOverrideErrors, ThrowOnError> => (options.client ?? client).put<SetSettingOverrideResponses, SetSettingOverrideErrors, ThrowOnError>({
+    url: '/api/v1/admin/settings/{key}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Завершить вход
@@ -88,6 +200,15 @@ export const readJob = <ThrowOnError extends boolean = false>(options: Options<R
 
 /**
  * Версии и возможности API
+ *
+ * Версии контракта и набор возможностей для текущего контекста.
+ *
+ * Маршрут публичный: странице входа нужно узнать состояние API до того, как появится
+ * сеанс. Без сеанса отдаются код и системные переопределения, с сеансом добавляются
+ * переопределения пространства.
+ *
+ * Отказ базы понижает набор до кодовых умолчаний, а не роняет запрос: на неразмеченной
+ * установке портал обязан показать границу этапа, а не пятисотку.
  */
 export const readMeta = <ThrowOnError extends boolean = false>(options?: Options<ReadMetaData, ThrowOnError>): RequestResult<ReadMetaResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ReadMetaResponses, unknown, ThrowOnError>({ url: '/api/v1/meta', ...options });
 

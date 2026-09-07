@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,6 +54,15 @@ class Project(TimestampMixin, Base):
     # Идентификатор в системе-источнике и человекочитаемая ссылка на него (номер тендера).
     external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     external_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    # Местное имя проекта. Отдельно от `name` потому, что у проекта из внешней системы
+    # `name` — это её название, а не наше: переименование в портале не должно молча
+    # затирать каноническое (ADR-0011, промт 06). Пусто — показывается каноническое.
+    local_alias: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # Когда связь с тендером была установлена в последний раз. Нужно разбору перепривязок:
+    # без отметки времени история связи восстанавливается только по журналу.
+    external_bound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     workspace: Mapped[Workspace] = relationship(back_populates="projects")
 

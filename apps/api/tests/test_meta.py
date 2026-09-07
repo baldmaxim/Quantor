@@ -25,7 +25,7 @@ async def test_meta_reports_contract_versions(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert payload["api_version"] == API_VERSION
     assert payload["schema_version"] == SCHEMA_VERSION
-    assert payload["stage"] == "stage-1"
+    assert payload["stage"] == "stage-1.5"
 
 
 async def test_meta_keeps_stage2_features_disabled(client: AsyncClient) -> None:

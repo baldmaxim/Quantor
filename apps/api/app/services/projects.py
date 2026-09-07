@@ -118,7 +118,14 @@ async def update_project(
     status: ProjectStatus | None = None,
 ) -> Project:
     if name is not None:
-        project.name = name.strip()
+        # У проекта из внешней системы `name` — её название, а не наше. Переименование
+        # в портале пишется в местное имя: иначе каноническое затирается молча и
+        # восстановить его нечем (ADR-0011). Перепривязка связи — отдельная
+        # привилегированная операция, и обычным редактированием она недоступна.
+        if project.source is ProjectSource.TENDERHUB:
+            project.local_alias = name.strip() or None
+        else:
+            project.name = name.strip()
     if status is not None:
         project.status = status
     await session.flush()

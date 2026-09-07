@@ -12,6 +12,77 @@ export type ClientOptions = {
 export type ArtifactKind = 'blocks_json' | 'results_md' | 'results_html' | 'package_zip' | 'other';
 
 /**
+ * AuditEventRead
+ *
+ * Запись журнала. Только чтение: операций изменения у журнала нет вовсе.
+ */
+export type AuditEventRead = {
+    /**
+     * Action
+     */
+    action: string;
+    /**
+     * Actor Label
+     */
+    actor_label: string | null;
+    /**
+     * Actor Role
+     */
+    actor_role: string | null;
+    /**
+     * After Summary
+     */
+    after_summary: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Before Summary
+     */
+    before_summary: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Request Id
+     */
+    request_id: string | null;
+    /**
+     * Resource Id
+     */
+    resource_id: string | null;
+    /**
+     * Resource Type
+     */
+    resource_type: string;
+    result: AuditResult;
+    /**
+     * Workspace Id
+     */
+    workspace_id: string | null;
+};
+
+/**
+ * AuditResult
+ *
+ * Чем закончилось действие.
+ *
+ * Отказ записывается наравне с успехом: попытка сделать то, на что нет прав, —
+ * это ровно то событие, ради которого журнал и заводят.
+ */
+export type AuditResult = 'success' | 'failure' | 'denied';
+
+/**
  * Body_upload_file
  */
 export type BodyUploadFile = {
@@ -166,6 +237,70 @@ export type DocumentRevisionRead = {
 };
 
 /**
+ * FlagOverrideWrite
+ */
+export type FlagOverrideWrite = {
+    /**
+     * Enabled
+     */
+    enabled: boolean;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    scope: OverrideScope;
+};
+
+/**
+ * FlagStateRead
+ *
+ * Флаг вместе с тем, откуда взялось его значение и можно ли его трогать.
+ */
+export type FlagStateRead = {
+    /**
+     * Admin Editable
+     */
+    admin_editable: boolean;
+    /**
+     * Default
+     */
+    default: boolean;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Effective
+     */
+    effective: boolean;
+    /**
+     * Follows Configuration
+     */
+    follows_configuration: boolean;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    source: ValueSource;
+    /**
+     * Stage
+     */
+    stage: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Workspace Scoped
+     */
+    workspace_scoped: boolean;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -265,6 +400,10 @@ export type MetaResponse = {
      */
     api_version: string;
     /**
+     * Auth Mode
+     */
+    auth_mode: 'dev' | 'oidc';
+    /**
      * Environment
      */
     environment: string;
@@ -282,6 +421,39 @@ export type MetaResponse = {
      * Stage
      */
     stage: string;
+};
+
+/**
+ * OverrideScope
+ *
+ * Уровень, на котором переопределяется настройка или флаг.
+ *
+ * `PROJECT` объявлен, но ни одной настройке пока не разрешён: контракт готов к
+ * расширению, а выдавать несуществующий уровень за работающий нельзя. Тест следит,
+ * чтобы уровень не появился в определениях раньше, чем в коде, который его читает.
+ */
+export type OverrideScope = 'system' | 'workspace' | 'project';
+
+/**
+ * Page[AuditEventRead]
+ */
+export type PageAuditEventRead = {
+    /**
+     * Items
+     */
+    items: Array<AuditEventRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
 };
 
 /**
@@ -781,6 +953,93 @@ export type SessionWorkspace = {
 };
 
 /**
+ * SettingOverrideWrite
+ */
+export type SettingOverrideWrite = {
+    scope: OverrideScope;
+    /**
+     * Value
+     */
+    value: boolean | number | string | Array<string>;
+};
+
+/**
+ * SettingStateRead
+ *
+ * Настройка вместе с действующим значением и его происхождением.
+ *
+ * Определение и значение в одном ответе намеренно: страница настроек строится из
+ * метаданных реестра, а не из зашитой в интерфейс копии списка.
+ */
+export type SettingStateRead = {
+    /**
+     * Allowed Scopes
+     */
+    allowed_scopes: Array<OverrideScope>;
+    /**
+     * Category
+     */
+    category: string;
+    /**
+     * Choices
+     */
+    choices?: Array<string>;
+    /**
+     * Default Value
+     */
+    default_value: boolean | number | string | Array<string>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Editable
+     */
+    editable: boolean;
+    /**
+     * Is Secret
+     */
+    is_secret: boolean;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Maximum
+     */
+    maximum?: number | null;
+    /**
+     * Minimum
+     */
+    minimum?: number | null;
+    /**
+     * Restart Required
+     */
+    restart_required: boolean;
+    source: ValueSource;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Updated At
+     */
+    updated_at?: string | null;
+    /**
+     * Updated By
+     */
+    updated_by?: string | null;
+    /**
+     * Value
+     */
+    value: boolean | number | string | Array<string>;
+    /**
+     * Value Type
+     */
+    value_type: string;
+};
+
+/**
  * SheetRead
  */
 export type SheetRead = {
@@ -816,6 +1075,54 @@ export type SheetRead = {
      * Width Px
      */
     width_px: number | null;
+};
+
+/**
+ * TenderBindingPreviewRead
+ *
+ * Предпросмотр перепривязки: что было, что станет и что мешает.
+ */
+export type TenderBindingPreviewRead = {
+    /**
+     * Conflicting Project Id
+     */
+    conflicting_project_id: string | null;
+    /**
+     * Conflicting Project Name
+     */
+    conflicting_project_name: string | null;
+    /**
+     * Current External Id
+     */
+    current_external_id: string | null;
+    /**
+     * Current External Ref
+     */
+    current_external_ref: string | null;
+    /**
+     * Is Noop
+     */
+    is_noop: boolean;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Target Client Name
+     */
+    target_client_name: string | null;
+    /**
+     * Target External Id
+     */
+    target_external_id: string;
+    /**
+     * Target External Ref
+     */
+    target_external_ref: string | null;
+    /**
+     * Target Title
+     */
+    target_title: string;
 };
 
 /**
@@ -866,6 +1173,58 @@ export type TenderBriefRead = {
 };
 
 /**
+ * TenderHubProbeRead
+ *
+ * Результат явной проверки связи. Выполняется по кнопке, а не при открытии страницы.
+ */
+export type TenderHubProbeRead = {
+    /**
+     * Checked At
+     */
+    checked_at: string;
+    /**
+     * Duration Ms
+     */
+    duration_ms: number;
+    /**
+     * Error Code
+     */
+    error_code?: string | null;
+    /**
+     * Ok
+     */
+    ok: boolean;
+    /**
+     * Tender Count
+     */
+    tender_count?: number | null;
+};
+
+/**
+ * TenderHubStatusRead
+ *
+ * Состояние интеграции. Ключ не показывается ни в каком виде — только факт наличия.
+ */
+export type TenderHubStatusRead = {
+    /**
+     * Base Url
+     */
+    base_url: string;
+    /**
+     * Configured
+     */
+    configured: boolean;
+    /**
+     * Credential State
+     */
+    credential_state: 'configured' | 'missing';
+    /**
+     * Linked Project Count
+     */
+    linked_project_count: number;
+};
+
+/**
  * TenderImport
  *
  * Запрос на создание проекта по тендеру.
@@ -875,6 +1234,20 @@ export type TenderImport = {
      * Name
      */
     name?: string | null;
+    /**
+     * Tender Id
+     */
+    tender_id: string;
+};
+
+/**
+ * TenderRebindRequest
+ */
+export type TenderRebindRequest = {
+    /**
+     * Confirm
+     */
+    confirm?: boolean;
     /**
      * Tender Id
      */
@@ -951,6 +1324,378 @@ export type ValidationError = {
      */
     type: string;
 };
+
+/**
+ * ValueSource
+ *
+ * Откуда взялось действующее значение настройки или флага.
+ *
+ * Показывается администратору вместе со значением: «включено» без ответа на вопрос
+ * «кем и где» — это половина сведений, по которой ничего не починить.
+ */
+export type ValueSource = 'default' | 'system' | 'workspace' | 'deployment';
+
+export type ListAuditEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+        /**
+         * Action
+         *
+         * Фильтр по действию
+         */
+        action?: string | null;
+        /**
+         * Resource Type
+         *
+         * Фильтр по типу объекта
+         */
+        resource_type?: string | null;
+        /**
+         * Result
+         *
+         * Фильтр по результату
+         */
+        result?: AuditResult | null;
+        /**
+         * Actor User Id
+         *
+         * Фильтр по актору
+         */
+        actor_user_id?: string | null;
+        /**
+         * Since
+         *
+         * Не раньше
+         */
+        since?: string | null;
+        /**
+         * Until
+         *
+         * Не позже
+         */
+        until?: string | null;
+    };
+    url: '/api/v1/admin/audit';
+};
+
+export type ListAuditEventsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListAuditEventsError = ListAuditEventsErrors[keyof ListAuditEventsErrors];
+
+export type ListAuditEventsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageAuditEventRead;
+};
+
+export type ListAuditEventsResponse = ListAuditEventsResponses[keyof ListAuditEventsResponses];
+
+export type ListFeatureFlagsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/feature-flags';
+};
+
+export type ListFeatureFlagsResponses = {
+    /**
+     * Response List Feature Flags
+     *
+     * Successful Response
+     */
+    200: Array<FlagStateRead>;
+};
+
+export type ListFeatureFlagsResponse = ListFeatureFlagsResponses[keyof ListFeatureFlagsResponses];
+
+export type DeleteFeatureFlagOverrideData = {
+    body?: never;
+    path: {
+        /**
+         * Key
+         */
+        key: string;
+    };
+    query: {
+        /**
+         * С какого уровня снять
+         */
+        scope: OverrideScope;
+    };
+    url: '/api/v1/admin/feature-flags/{key}';
+};
+
+export type DeleteFeatureFlagOverrideErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteFeatureFlagOverrideError = DeleteFeatureFlagOverrideErrors[keyof DeleteFeatureFlagOverrideErrors];
+
+export type DeleteFeatureFlagOverrideResponses = {
+    /**
+     * Successful Response
+     */
+    200: FlagStateRead;
+};
+
+export type DeleteFeatureFlagOverrideResponse = DeleteFeatureFlagOverrideResponses[keyof DeleteFeatureFlagOverrideResponses];
+
+export type SetFeatureFlagOverrideData = {
+    body: FlagOverrideWrite;
+    path: {
+        /**
+         * Key
+         */
+        key: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/feature-flags/{key}';
+};
+
+export type SetFeatureFlagOverrideErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetFeatureFlagOverrideError = SetFeatureFlagOverrideErrors[keyof SetFeatureFlagOverrideErrors];
+
+export type SetFeatureFlagOverrideResponses = {
+    /**
+     * Successful Response
+     */
+    200: FlagStateRead;
+};
+
+export type SetFeatureFlagOverrideResponse = SetFeatureFlagOverrideResponses[keyof SetFeatureFlagOverrideResponses];
+
+export type ReadTenderhubStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/integrations/tenderhub';
+};
+
+export type ReadTenderhubStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderHubStatusRead;
+};
+
+export type ReadTenderhubStatusResponse = ReadTenderhubStatusResponses[keyof ReadTenderhubStatusResponses];
+
+export type RebindTenderhubProjectData = {
+    body: TenderRebindRequest;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/integrations/tenderhub/projects/{project_id}/rebind';
+};
+
+export type RebindTenderhubProjectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RebindTenderhubProjectError = RebindTenderhubProjectErrors[keyof RebindTenderhubProjectErrors];
+
+export type RebindTenderhubProjectResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectRead;
+};
+
+export type RebindTenderhubProjectResponse = RebindTenderhubProjectResponses[keyof RebindTenderhubProjectResponses];
+
+export type PreviewTenderhubRebindData = {
+    body: TenderRebindRequest;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/integrations/tenderhub/projects/{project_id}/rebind/preview';
+};
+
+export type PreviewTenderhubRebindErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PreviewTenderhubRebindError = PreviewTenderhubRebindErrors[keyof PreviewTenderhubRebindErrors];
+
+export type PreviewTenderhubRebindResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderBindingPreviewRead;
+};
+
+export type PreviewTenderhubRebindResponse = PreviewTenderhubRebindResponses[keyof PreviewTenderhubRebindResponses];
+
+export type UnlinkTenderhubProjectData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/integrations/tenderhub/projects/{project_id}/unlink';
+};
+
+export type UnlinkTenderhubProjectErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UnlinkTenderhubProjectError = UnlinkTenderhubProjectErrors[keyof UnlinkTenderhubProjectErrors];
+
+export type UnlinkTenderhubProjectResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectRead;
+};
+
+export type UnlinkTenderhubProjectResponse = UnlinkTenderhubProjectResponses[keyof UnlinkTenderhubProjectResponses];
+
+export type TestTenderhubConnectionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/integrations/tenderhub/test-connection';
+};
+
+export type TestTenderhubConnectionResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderHubProbeRead;
+};
+
+export type TestTenderhubConnectionResponse = TestTenderhubConnectionResponses[keyof TestTenderhubConnectionResponses];
+
+export type ListSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/settings';
+};
+
+export type ListSettingsResponses = {
+    /**
+     * Response List Settings
+     *
+     * Successful Response
+     */
+    200: Array<SettingStateRead>;
+};
+
+export type ListSettingsResponse = ListSettingsResponses[keyof ListSettingsResponses];
+
+export type DeleteSettingOverrideData = {
+    body?: never;
+    path: {
+        /**
+         * Key
+         */
+        key: string;
+    };
+    query: {
+        /**
+         * С какого уровня снять
+         */
+        scope: OverrideScope;
+    };
+    url: '/api/v1/admin/settings/{key}';
+};
+
+export type DeleteSettingOverrideErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteSettingOverrideError = DeleteSettingOverrideErrors[keyof DeleteSettingOverrideErrors];
+
+export type DeleteSettingOverrideResponses = {
+    /**
+     * Successful Response
+     */
+    200: SettingStateRead;
+};
+
+export type DeleteSettingOverrideResponse = DeleteSettingOverrideResponses[keyof DeleteSettingOverrideResponses];
+
+export type SetSettingOverrideData = {
+    body: SettingOverrideWrite;
+    path: {
+        /**
+         * Key
+         */
+        key: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/settings/{key}';
+};
+
+export type SetSettingOverrideErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetSettingOverrideError = SetSettingOverrideErrors[keyof SetSettingOverrideErrors];
+
+export type SetSettingOverrideResponses = {
+    /**
+     * Successful Response
+     */
+    200: SettingStateRead;
+};
+
+export type SetSettingOverrideResponse = SetSettingOverrideResponses[keyof SetSettingOverrideResponses];
 
 export type CompleteLoginData = {
     body?: never;

@@ -11,7 +11,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.core.logging import get_logger
-from app.core.request_context import set_request_id
+from app.core.request_context import set_client, set_request_id
 
 REQUEST_ID_HEADER = "X-Request-ID"
 
@@ -26,6 +26,12 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         request_id = request.headers.get(REQUEST_ID_HEADER) or uuid.uuid4().hex
         set_request_id(request_id)
+        # Не в лог: адрес и клиент нужны журналу административных действий, а писать их
+        # в каждую строку access-лога значит собирать сведения о людях без повода.
+        set_client(
+            request.client.host if request.client else None,
+            request.headers.get("User-Agent"),
+        )
 
         started = time.perf_counter()
         response = await call_next(request)
