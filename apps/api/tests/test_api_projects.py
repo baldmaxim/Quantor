@@ -9,6 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import DocumentKind, ProjectStatus
+from app.models import Workspace
 from app.services import documents as documents_service
 from app.services import projects as projects_service
 
@@ -143,10 +144,10 @@ class TestReadAndUpdate:
 
 class TestWorkspaceBoundary:
     async def test_project_of_another_workspace_is_not_visible(
-        self, api: AsyncClient, db_session: AsyncSession
+        self, api: AsyncClient, db_session: AsyncSession, second_workspace: Workspace
     ) -> None:
         foreign = await projects_service.create_project(
-            db_session, workspace_id=uuid.uuid4(), name="Чужой проект"
+            db_session, workspace_id=second_workspace.id, name="Чужой проект"
         )
         await db_session.commit()
 

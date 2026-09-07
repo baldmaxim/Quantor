@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import COORDINATE_SPACE_NORMALIZED_TOP_LEFT, DocumentKind, ProcessingStatus
-from app.models import Document, DocumentRevision, Project, Region, Sheet
+from app.models import Document, DocumentRevision, Project, Region, Sheet, Workspace
 from app.services import documents as documents_service
 from app.services import projects as projects_service
 from app.storage.keys import revision_key
@@ -283,9 +283,9 @@ class TestSheetsAndRegions:
 
 class TestCrossProjectAccess:
     async def test_sheet_of_foreign_workspace_is_hidden(
-        self, api: AsyncClient, db_session: AsyncSession
+        self, api: AsyncClient, db_session: AsyncSession, second_workspace: Workspace
     ) -> None:
-        data = await _build(db_session, uuid.uuid4())
+        data = await _build(db_session, second_workspace.id)
 
         for path in (
             f"/api/v1/documents/{data.document.id}",
