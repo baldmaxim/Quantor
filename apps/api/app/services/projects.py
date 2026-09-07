@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -15,7 +16,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.domain import ProjectStatus
+from app.domain import ProjectSource, ProjectStatus
 from app.models import Document, DocumentRevision, Job, Project, Sheet
 
 
@@ -36,12 +37,70 @@ def _scoped(workspace_id: uuid.UUID) -> Select[tuple[Project]]:
     return select(Project).where(Project.workspace_id == workspace_id)
 
 
-async def create_project(session: AsyncSession, *, workspace_id: uuid.UUID, name: str) -> Project:
-    project = Project(workspace_id=workspace_id, name=name.strip(), status=ProjectStatus.ACTIVE)
+async def create_project(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    name: str,
+    source: ProjectSource = ProjectSource.MANUAL,
+    external_id: str | None = None,
+    external_ref: str | None = None,
+) -> Project:
+    project = Project(
+        workspace_id=workspace_id,
+        name=name.strip(),
+        status=ProjectStatus.ACTIVE,
+        source=source,
+        external_id=external_id,
+        external_ref=external_ref,
+    )
     session.add(project)
     await session.flush()
     await session.refresh(project)
     return project
+
+
+async def find_by_external_id(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    source: ProjectSource,
+    external_id: str,
+) -> Project | None:
+    """Проект, уже созданный по записи внешней системы.
+
+    Нужен и до создания, и списку тендеров: строку, которая уже стала проектом, надо
+    показывать ссылкой на него, а не кнопкой «создать» ещё раз.
+    """
+    result = await session.execute(
+        _scoped(workspace_id).where(Project.source == source, Project.external_id == external_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def map_external_ids(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    source: ProjectSource,
+    external_ids: Sequence[str],
+) -> dict[str, uuid.UUID]:
+    """Соответствие «чужой идентификатор → проект» одним запросом.
+
+    Список тендеров приходит целиком, и спрашивать базу по строке значило бы сделать
+    тысячу запросов там, где хватает одного.
+    """
+    if not external_ids:
+        return {}
+
+    result = await session.execute(
+        select(Project.external_id, Project.id).where(
+            Project.workspace_id == workspace_id,
+            Project.source == source,
+            Project.external_id.in_(list(external_ids)),
+        )
+    )
+    return {external: project_id for external, project_id in result.all() if external}
 
 
 async def get_project(

@@ -38,6 +38,15 @@ class ErrorCode(StrEnum):
     # --- задания ---
     JOB_TRANSITION_INVALID = "JOB_TRANSITION_INVALID"
 
+    # --- TenderHUB ---
+    TENDERHUB_DISABLED = "TENDERHUB_DISABLED"
+    TENDERHUB_AUTH_FAILED = "TENDERHUB_AUTH_FAILED"
+    TENDERHUB_FORBIDDEN = "TENDERHUB_FORBIDDEN"
+    TENDERHUB_RATE_LIMITED = "TENDERHUB_RATE_LIMITED"
+    TENDERHUB_UNAVAILABLE = "TENDERHUB_UNAVAILABLE"
+    TENDERHUB_TENDER_NOT_FOUND = "TENDERHUB_TENDER_NOT_FOUND"
+    TENDERHUB_ALREADY_LINKED = "TENDERHUB_ALREADY_LINKED"
+
 
 MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.NOT_FOUND: "Объект не найден",
@@ -57,6 +66,13 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.DATABASE_UNAVAILABLE: "База данных недоступна",
     ErrorCode.CONTENT_NOT_AVAILABLE: "Файл ревизии недоступен",
     ErrorCode.JOB_TRANSITION_INVALID: "Недопустимый переход состояния задания",
+    ErrorCode.TENDERHUB_DISABLED: "Интеграция с TenderHUB не настроена",
+    ErrorCode.TENDERHUB_AUTH_FAILED: "TenderHUB не принял ключ доступа",
+    ErrorCode.TENDERHUB_FORBIDDEN: "Ключу TenderHUB не выдан доступ к этим данным",
+    ErrorCode.TENDERHUB_RATE_LIMITED: "TenderHUB ограничил частоту запросов",
+    ErrorCode.TENDERHUB_UNAVAILABLE: "TenderHUB недоступен",
+    ErrorCode.TENDERHUB_TENDER_NOT_FOUND: "Тендер не найден в TenderHUB",
+    ErrorCode.TENDERHUB_ALREADY_LINKED: "Проект по этому тендеру уже создан",
 }
 
 # HTTP-статус зависит от кода: клиенту важно отличать свою ошибку от отказа инфраструктуры.
@@ -78,6 +94,15 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.CONTENT_NOT_AVAILABLE: status.HTTP_404_NOT_FOUND,
     ErrorCode.JOB_TRANSITION_INVALID: status.HTTP_409_CONFLICT,
+    # Отказы внешней системы — 502: клиент не виноват, но и повторять запрос бессмысленно,
+    # пока не поправят ключ или доступ на той стороне.
+    ErrorCode.TENDERHUB_DISABLED: status.HTTP_503_SERVICE_UNAVAILABLE,
+    ErrorCode.TENDERHUB_AUTH_FAILED: status.HTTP_502_BAD_GATEWAY,
+    ErrorCode.TENDERHUB_FORBIDDEN: status.HTTP_502_BAD_GATEWAY,
+    ErrorCode.TENDERHUB_RATE_LIMITED: status.HTTP_429_TOO_MANY_REQUESTS,
+    ErrorCode.TENDERHUB_UNAVAILABLE: status.HTTP_502_BAD_GATEWAY,
+    ErrorCode.TENDERHUB_TENDER_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.TENDERHUB_ALREADY_LINKED: status.HTTP_409_CONFLICT,
 }
 
 

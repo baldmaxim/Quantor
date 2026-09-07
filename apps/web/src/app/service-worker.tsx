@@ -16,6 +16,7 @@ import { Button } from '@/components/ui';
 
 export const ServiceWorkerBridge = () => {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') return;
@@ -53,11 +54,19 @@ export const ServiceWorkerBridge = () => {
     };
   }, []);
 
-  if (!waiting) return null;
+  if (!waiting || dismissed) return null;
 
   return (
-    <div className="animate-rise safe-bottom fixed inset-x-[var(--s-5)] bottom-[var(--s-6)] z-40 mx-auto flex max-w-[420px] items-center gap-[var(--s-5)] rounded-[var(--radius-md)] border border-border-strong bg-surface-raised px-[var(--s-5)] py-[var(--s-4)] shadow-[var(--shadow-2)]">
+    <div
+      role="status"
+      // Над нижней навигацией, а не поверх неё: на телефоне разделы прибиты к низу
+      // экрана, и тост, лежащий на них, забирает себе нажатия по «Проектам».
+      className="animate-rise safe-bottom fixed inset-x-[var(--s-5)] bottom-[calc(var(--h-bottom-nav)+var(--s-5))] z-40 mx-auto flex max-w-[420px] flex-wrap items-center gap-[var(--s-4)] rounded-[var(--radius-md)] border border-border-strong bg-surface-raised px-[var(--s-5)] py-[var(--s-4)] shadow-[var(--shadow-2)] md:bottom-[var(--s-6)]"
+    >
       <p className="min-w-0 flex-1 text-sm">Доступна новая версия портала</p>
+      {/* Отложить можно: обновление перезагружает страницу, а пользователь мог
+          в этот момент заполнять форму. */}
+      <Button onClick={() => setDismissed(true)}>Позже</Button>
       <Button
         variant="primary"
         onClick={() => {

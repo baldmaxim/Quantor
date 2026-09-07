@@ -753,6 +753,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "external_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Ref"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -761,6 +772,9 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ProjectSource"
           },
           "status": {
             "$ref": "#/components/schemas/ProjectStatus"
@@ -775,6 +789,8 @@
           "id",
           "name",
           "status",
+          "source",
+          "external_ref",
           "created_at",
           "updated_at"
         ],
@@ -787,6 +803,15 @@
           "name"
         ],
         "title": "ProjectSort",
+        "type": "string"
+      },
+      "ProjectSource": {
+        "description": "Откуда взялся проект.\n\nНужен, чтобы отличить заведённый руками проект от подтянутого из внешней системы:\nу второго есть чужой идентификатор, и повторно создавать его нельзя.",
+        "enum": [
+          "manual",
+          "tenderhub"
+        ],
+        "title": "ProjectSource",
         "type": "string"
       },
       "ProjectStatus": {
@@ -810,6 +835,17 @@
             "minimum": 0.0,
             "title": "Document Count",
             "type": "integer"
+          },
+          "external_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Ref"
           },
           "id": {
             "format": "uuid",
@@ -835,6 +871,9 @@
             "title": "Sheet Count",
             "type": "integer"
           },
+          "source": {
+            "$ref": "#/components/schemas/ProjectSource"
+          },
           "status": {
             "$ref": "#/components/schemas/ProjectStatus"
           },
@@ -848,6 +887,8 @@
           "id",
           "name",
           "status",
+          "source",
+          "external_ref",
           "created_at",
           "updated_at",
           "document_count",
@@ -1151,6 +1192,138 @@
         "title": "SheetRead",
         "type": "object"
       },
+      "TenderBriefRead": {
+        "description": "Тендер TenderHUB в том виде, в каком его показывает портал.\n\nСметные строки и суммы сюда не входят: портал на Stage 1 не ведёт расчёт, и\nпоказывать чужие деньги как свой результат нельзя (границы этапа в CLAUDE.md).",
+        "properties": {
+          "client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Name"
+          },
+          "construction_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Construction Scope"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "imported_project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imported Project Id"
+          },
+          "submission_deadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Deadline"
+          },
+          "tender_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tender Number"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "id",
+          "tender_number",
+          "title",
+          "client_name",
+          "version",
+          "construction_scope",
+          "submission_deadline",
+          "updated_at",
+          "imported_project_id"
+        ],
+        "title": "TenderBriefRead",
+        "type": "object"
+      },
+      "TenderImport": {
+        "description": "Запрос на создание проекта по тендеру.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "tender_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Tender Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tender_id"
+        ],
+        "title": "TenderImport",
+        "type": "object"
+      },
       "UploadRead": {
         "description": "Результат загрузки.\n\nis_duplicate означает, что такой файл в проекте уже был: возвращается прежняя ревизия,\nвторая копия не создаётся.",
         "properties": {
@@ -1377,6 +1550,100 @@
         "summary": "Ревизии документа",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/v1/integrations/tenderhub/projects": {
+      "post": {
+        "operationId": "import_tender",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenderImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать проект по тендеру",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/tenderhub/tenders": {
+      "get": {
+        "operationId": "list_tenders",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TenderBriefRead"
+                  },
+                  "title": "Response List Tenders",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Тендеры, доступные ключу",
+        "tags": [
+          "integrations"
         ]
       }
     },

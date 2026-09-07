@@ -26,6 +26,19 @@ const MESSAGES: Record<string, string> = {
   VALIDATION_FAILED: 'Данные запроса не приняты.',
   JOB_TRANSITION_INVALID: 'Задание уже завершено — перезапустить его нельзя.',
   NETWORK_ERROR: 'Не удалось связаться с сервером. Проверьте, что бэкенд запущен.',
+
+  // TenderHUB. Формулировки разные намеренно: в одном случае чинят ключ, в другом ждут,
+  // в третьем идут к администратору — общее «сервис недоступен» не помогает никому.
+  TENDERHUB_DISABLED: 'Интеграция с TenderHUB не настроена: на сервере нет ключа доступа.',
+  TENDERHUB_AUTH_FAILED:
+    'TenderHUB не принял ключ. Нужно выпустить новый в «Настройки → Доступ к API».',
+  TENDERHUB_FORBIDDEN:
+    'Ключу TenderHUB не выдан доступ к этим данным. Нужен перевыпуск с областью tenders:read.',
+  TENDERHUB_RATE_LIMITED: 'TenderHUB ограничил частоту запросов. Подождите минуту и повторите.',
+  TENDERHUB_UNAVAILABLE: 'TenderHUB не отвечает. Попробуйте позже.',
+  TENDERHUB_TENDER_NOT_FOUND:
+    'Тендер не найден в TenderHUB — возможно, он удалён или скрыт от ключа.',
+  TENDERHUB_ALREADY_LINKED: 'Проект по этому тендеру уже создан.',
 };
 
 export const errorMessage = (code: string, fallback?: string): string =>

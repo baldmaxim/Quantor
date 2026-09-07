@@ -16,6 +16,17 @@ class ProjectStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class ProjectSource(StrEnum):
+    """Откуда взялся проект.
+
+    Нужен, чтобы отличить заведённый руками проект от подтянутого из внешней системы:
+    у второго есть чужой идентификатор, и повторно создавать его нельзя.
+    """
+
+    MANUAL = "manual"
+    TENDERHUB = "tenderhub"
+
+
 class DocumentKind(StrEnum):
     """Природа документа. BIM-форматы принимаются на хранение, но не разбираются."""
 

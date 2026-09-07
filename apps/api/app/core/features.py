@@ -21,6 +21,7 @@ STAGE1_FEATURES: Final[tuple[str, ...]] = (
     "uploads",
     "legacy_import",
     "viewer",
+    "integrations.tenderhub",
 )
 
 # --- Stage 2 и далее: объявлены, но не реализованы ---
@@ -39,8 +40,10 @@ DEFAULTS: Final[MappingProxyType[str, bool]] = MappingProxyType(
         "documents": True,
         "uploads": True,
         "legacy_import": True,
-        # Просмотрщик появится в промте 07.
         "viewer": False,
+        # Интеграция включается наличием ключа в окружении, а не флагом: включённая
+        # возможность без ключа — обещание, которого портал не выполнит.
+        "integrations.tenderhub": False,
         **dict.fromkeys(STAGE2_FEATURES, False),
     }
 )
@@ -61,6 +64,11 @@ def parse_overrides(raw: str) -> dict[str, bool]:
     return overrides
 
 
-def resolve(raw_overrides: str = "") -> dict[str, bool]:
-    """Итоговый набор флагов."""
-    return {**DEFAULTS, **parse_overrides(raw_overrides)}
+def resolve(raw_overrides: str = "", *, tenderhub_configured: bool = False) -> dict[str, bool]:
+    """Итоговый набор флагов.
+
+    Интеграция объявляется включённой только при настроенном ключе: интерфейс не должен
+    предлагать источник, из которого сервер всё равно ничего не прочитает.
+    """
+    resolved = {**DEFAULTS, "integrations.tenderhub": tenderhub_configured}
+    return {**resolved, **parse_overrides(raw_overrides)}

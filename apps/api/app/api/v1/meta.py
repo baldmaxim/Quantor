@@ -32,5 +32,5 @@ async def read_meta() -> MetaResponse:
         schema_version=SCHEMA_VERSION,
         environment=settings.environment,
         stage="stage-1",
-        features=resolve(settings.feature_flags),
+        features=resolve(settings.feature_flags, tenderhub_configured=settings.tenderhub_enabled),
     )

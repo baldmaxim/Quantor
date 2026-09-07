@@ -18,6 +18,7 @@ from app.domain import (
     JobStatus,
     JobType,
     ProcessingStatus,
+    ProjectSource,
     ProjectStatus,
     RegionShape,
 )
@@ -74,6 +75,10 @@ class ProjectRead(ApiModel):
     id: uuid.UUID
     name: str
     status: ProjectStatus
+    source: ProjectSource
+    """Откуда взялся проект: заведён руками или подтянут из внешней системы."""
+    external_ref: str | None
+    """Человекочитаемая ссылка на источник — номер тендера. Идентификатор наружу не нужен."""
     created_at: datetime
     updated_at: datetime
 
@@ -241,3 +246,30 @@ class JobRead(ApiModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+
+
+class TenderBriefRead(BaseModel):
+    """Тендер TenderHUB в том виде, в каком его показывает портал.
+
+    Сметные строки и суммы сюда не входят: портал на Stage 1 не ведёт расчёт, и
+    показывать чужие деньги как свой результат нельзя (границы этапа в CLAUDE.md).
+    """
+
+    id: str
+    tender_number: str | None
+    title: str
+    client_name: str | None
+    version: int | None
+    construction_scope: str | None
+    submission_deadline: str | None
+    updated_at: str | None
+    imported_project_id: uuid.UUID | None
+    """Проект портала, уже созданный по этому тендеру. None — тендер ещё не подключён."""
+
+
+class TenderImport(BaseModel):
+    """Запрос на создание проекта по тендеру."""
+
+    tender_id: Annotated[str, Field(min_length=1, max_length=128)]
+    name: Annotated[str | None, Field(default=None, max_length=200)] = None
+    """Имя проекта. Пусто — берётся из тендера."""

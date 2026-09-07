@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # apps/api/app/core/config.py -> apps/api/app/core -> app -> api -> apps -> корень репозитория
@@ -68,6 +68,20 @@ class Settings(BaseSettings):
     # и рабочий поток приложения до бесконечности.
     database_statement_timeout_seconds: float = Field(default=15.0, gt=0)
 
+    # --- TenderHUB ---
+    #
+    # Ключ читается из окружения и нигде больше не появляется: ни в логе, ни в ответе API,
+    # ни в сгенерированном клиенте. Наружу уходит только признак «интеграция настроена».
+    #
+    # Имя переменной — то, под которым ключ уже лежит в .env; вендорская документация
+    # называет её TENDERHUB_API_KEY, поэтому принимаем оба варианта.
+    tenderhub_api_url: str = "https://tender.su10.ru"
+    tenderhub_api_token: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("TENDERHUB_API_TOKEN", "TENDERHUB_API_KEY"),
+    )
+    tenderhub_timeout_seconds: float = Field(default=20.0, gt=0)
+
     # Переопределение флагов возможностей: `takeoff.ai=true,reports=true`.
     # Включение флага не создаёт функциональность — оно лишь перестаёт её прятать.
     feature_flags: str = ""
@@ -80,6 +94,12 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.api_cors_origins.split(",") if origin.strip()]
+
+    @property
+    def tenderhub_enabled(self) -> bool:
+        """Интеграция включена ровно тогда, когда задан ключ. Отдельного флага нет намеренно:
+        включённая возможность без ключа — это обещание, которое портал не выполнит."""
+        return bool(self.tenderhub_api_token.get_secret_value().strip())
 
     @property
     def is_local(self) -> bool:

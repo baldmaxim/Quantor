@@ -6,6 +6,7 @@ import {
   listProjects,
   listRevisionSheets,
   listSheetRegions,
+  listTenders,
   readJob,
   readMeta,
   readProject,
@@ -13,6 +14,7 @@ import {
   type DocumentRead,
   type MetaResponse,
   type ProjectSummary,
+  type TenderBriefRead,
 } from '@quantor/api-client';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
@@ -35,6 +37,7 @@ export const queryKeys = {
     ['sheet', sheetId, 'regions', blockType] as const,
   job: (jobId: string) => ['job', jobId] as const,
   contentUrl: (revisionId: string) => ['revision', revisionId, 'content-url'] as const,
+  tenders: (search: string) => ['tenderhub', 'tenders', search] as const,
 };
 
 export interface ProjectsParams {
@@ -202,3 +205,21 @@ const isRunning = (project: ProjectSummary | undefined): boolean => {
 
 /** Документ, пригодный к открытию в рабочей области. */
 export const isRenderable = (document: DocumentRead): boolean => document.document_kind === 'pdf';
+
+/**
+ * Тендеры TenderHUB, доступные ключу сервера.
+ *
+ * Запрос идёт в портал, а не напрямую во внешнюю систему: ключ живёт на сервере и в
+ * браузер не попадает. Список приходит целиком — на той стороне страниц нет, — поэтому
+ * держим его недолго: тендеры заводят и правят в течение дня.
+ */
+export const useTenders = (search: string, enabled: boolean): UseQueryResult<TenderBriefRead[]> =>
+  useQuery({
+    queryKey: queryKeys.tenders(search),
+    queryFn: async () =>
+      unwrap(await listTenders({ throwOnError: true, query: { search: search || undefined } })),
+    enabled,
+    staleTime: 60_000,
+    // Список тяжёлый и внешний: повторять его при каждом открытии окна незачем.
+    refetchOnWindowFocus: false,
+  });

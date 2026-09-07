@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateProjectData, CreateProjectErrors, CreateProjectResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, LivenessData, LivenessResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
+import type { CreateProjectData, CreateProjectErrors, CreateProjectResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -27,6 +27,23 @@ export const readDocument = <ThrowOnError extends boolean = false>(options: Opti
  * Ревизии документа
  */
 export const listDocumentRevisions = <ThrowOnError extends boolean = false>(options: Options<ListDocumentRevisionsData, ThrowOnError>): RequestResult<ListDocumentRevisionsResponses, ListDocumentRevisionsErrors, ThrowOnError> => (options.client ?? client).get<ListDocumentRevisionsResponses, ListDocumentRevisionsErrors, ThrowOnError>({ url: '/api/v1/documents/{document_id}/revisions', ...options });
+
+/**
+ * Создать проект по тендеру
+ */
+export const importTender = <ThrowOnError extends boolean = false>(options: Options<ImportTenderData, ThrowOnError>): RequestResult<ImportTenderResponses, ImportTenderErrors, ThrowOnError> => (options.client ?? client).post<ImportTenderResponses, ImportTenderErrors, ThrowOnError>({
+    url: '/api/v1/integrations/tenderhub/projects',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Тендеры, доступные ключу
+ */
+export const listTenders = <ThrowOnError extends boolean = false>(options?: Options<ListTendersData, ThrowOnError>): RequestResult<ListTendersResponses, ListTendersErrors, ThrowOnError> => (options?.client ?? client).get<ListTendersResponses, ListTendersErrors, ThrowOnError>({ url: '/api/v1/integrations/tenderhub/tenders', ...options });
 
 /**
  * Состояние задания

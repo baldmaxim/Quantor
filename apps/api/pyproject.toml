@@ -14,13 +14,13 @@ dependencies = [
     "aioboto3==15.5.0",
     "structlog==26.1.0",
     "python-multipart==0.0.32",
+    "httpx==0.28.1",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
-    "httpx==0.28.1",
     "ruff==0.16.6",
     "mypy==2.3.1",
     "types-aioboto3[s3]==15.5.0",

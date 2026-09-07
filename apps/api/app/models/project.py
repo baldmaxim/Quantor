@@ -5,12 +5,12 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Index, String
+from sqlalchemy import Index, String, UniqueConstraint
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.domain import ProjectStatus
+from app.domain import ProjectSource, ProjectStatus
 from app.models.mixins import TimestampMixin, str_enum, uuid_pk
 
 if TYPE_CHECKING:
@@ -35,6 +35,17 @@ class Project(TimestampMixin, Base):
         default=ProjectStatus.ACTIVE,
     )
 
+    # Происхождение проекта. Для заведённых руками — manual и пустые внешние поля.
+    source: Mapped[ProjectSource] = mapped_column(
+        str_enum(ProjectSource, name="source"),
+        nullable=False,
+        default=ProjectSource.MANUAL,
+        server_default=ProjectSource.MANUAL.value,
+    )
+    # Идентификатор в системе-источнике и человекочитаемая ссылка на него (номер тендера).
+    external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    external_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
     documents: Mapped[list[Document]] = relationship(
         back_populates="project", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -45,4 +56,10 @@ class Project(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_projects_workspace_id_updated_at", "workspace_id", "updated_at"),
         Index("ix_projects_workspace_id_name", "workspace_id", "name"),
+        # Один тендер — один проект в рабочем пространстве. Без этого повторное нажатие
+        # «Создать» на той же строке списка плодит дубликаты, и какой из них настоящий,
+        # потом не разобрать.
+        UniqueConstraint(
+            "workspace_id", "source", "external_id", name="uq_projects_workspace_source_external"
+        ),
     )

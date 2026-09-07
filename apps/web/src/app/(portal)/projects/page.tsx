@@ -4,11 +4,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, ViewTransition } from 'react';
 
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
+import { TenderHubDialog } from '@/components/projects/TenderHubDialog';
 import { ProjectsTable } from '@/components/projects/ProjectsTable';
 import { TopBar } from '@/components/shell/TopBar';
 import { Button, EmptyState, ErrorState, SearchInput, SkeletonRows, cx } from '@/components/ui';
 import { DOCUMENTS_FORMS, PROJECTS_FORMS, countOf } from '@/lib/format';
-import { useProjects, type ProjectsParams } from '@/lib/queries';
+import { useFeatures, useProjects, type ProjectsParams } from '@/lib/queries';
 
 /**
  * Список проектов — точка входа в портал.
@@ -25,6 +26,10 @@ const ProjectsPage = () => {
   // Открытый диалог живёт в адресе: на него можно дать ссылку, и /projects/new ведёт сюда же.
   const searchParams = useSearchParams();
   const creating = searchParams.get('create') === '1';
+  // Источник тоже в адресе: на окно выбора тендера можно дать ссылку.
+  const picking = searchParams.get('tenderhub') === '1';
+
+  const features = useFeatures();
 
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<ProjectsParams['sort']>('recent');
@@ -60,13 +65,25 @@ const ProjectsPage = () => {
             <p className="text-sm text-muted sm:hidden">
               {isPending ? ' ' : summaryLine(data?.total ?? 0, documentTotal(data?.items))}
             </p>
-            <Button
-              variant="primary"
-              className="w-full justify-center sm:ml-auto sm:w-auto"
-              onClick={() => router.push('/projects?create=1')}
-            >
-              + Создать проект
-            </Button>
+            <div className="flex flex-col gap-[var(--s-4)] sm:ml-auto sm:flex-row">
+              {/* Кнопка появляется, только когда на сервере есть ключ: предлагать
+                  источник, из которого ничего не прочитать, — пустое обещание. */}
+              {features['integrations.tenderhub'] === true && (
+                <Button
+                  className="w-full justify-center sm:w-auto"
+                  onClick={() => router.push('/projects?tenderhub=1')}
+                >
+                  Из TenderHUB
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                className="w-full justify-center sm:w-auto"
+                onClick={() => router.push('/projects?create=1')}
+              >
+                + Создать проект
+              </Button>
+            </div>
           </header>
 
           {isPending && (
@@ -112,6 +129,7 @@ const ProjectsPage = () => {
       </main>
 
       <CreateProjectDialog open={creating} onClose={() => router.push('/projects')} />
+      <TenderHubDialog open={picking} onClose={() => router.push('/projects')} />
     </>
   );
 };

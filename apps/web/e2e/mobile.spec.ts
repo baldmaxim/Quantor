@@ -24,6 +24,23 @@ test.describe('телефон', () => {
     }
   });
 
+  test('предложение обновиться не перекрывает навигацию', async ({ page }) => {
+    // Тост об обновлении — фиксированный и поверх всего. Стоя на нижней панели, он
+    // забирал себе нажатия по разделам: панель видна, но нажать нельзя.
+    await page.goto('/projects');
+
+    const bottom = page.getByRole('navigation', { name: 'Разделы портала' });
+    const bar = await bottom.boundingBox();
+    expect(bar).not.toBeNull();
+
+    const toast = page.getByRole('status').filter({ hasText: 'Доступна новая версия' });
+    if ((await toast.count()) === 0) return;
+
+    const box = await toast.first().boundingBox();
+    expect(box).not.toBeNull();
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(bar?.y ?? 0);
+  });
+
   test('разделы доступны снизу, а не в боковой рейке', async ({ page }) => {
     await page.goto('/projects');
 

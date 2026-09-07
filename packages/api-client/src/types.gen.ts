@@ -461,6 +461,10 @@ export type ProjectRead = {
      */
     created_at: string;
     /**
+     * External Ref
+     */
+    external_ref: string | null;
+    /**
      * Id
      */
     id: string;
@@ -468,6 +472,7 @@ export type ProjectRead = {
      * Name
      */
     name: string;
+    source: ProjectSource;
     status: ProjectStatus;
     /**
      * Updated At
@@ -479,6 +484,16 @@ export type ProjectRead = {
  * ProjectSort
  */
 export type ProjectSort = 'recent' | 'name';
+
+/**
+ * ProjectSource
+ *
+ * Откуда взялся проект.
+ *
+ * Нужен, чтобы отличить заведённый руками проект от подтянутого из внешней системы:
+ * у второго есть чужой идентификатор, и повторно создавать его нельзя.
+ */
+export type ProjectSource = 'manual' | 'tenderhub';
 
 /**
  * ProjectStatus
@@ -505,6 +520,10 @@ export type ProjectSummary = {
      */
     document_count: number;
     /**
+     * External Ref
+     */
+    external_ref: string | null;
+    /**
      * Id
      */
     id: string;
@@ -517,6 +536,7 @@ export type ProjectSummary = {
      * Sheet Count
      */
     sheet_count: number;
+    source: ProjectSource;
     status: ProjectStatus;
     /**
      * Updated At
@@ -684,6 +704,69 @@ export type SheetRead = {
 };
 
 /**
+ * TenderBriefRead
+ *
+ * Тендер TenderHUB в том виде, в каком его показывает портал.
+ *
+ * Сметные строки и суммы сюда не входят: портал на Stage 1 не ведёт расчёт, и
+ * показывать чужие деньги как свой результат нельзя (границы этапа в CLAUDE.md).
+ */
+export type TenderBriefRead = {
+    /**
+     * Client Name
+     */
+    client_name: string | null;
+    /**
+     * Construction Scope
+     */
+    construction_scope: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Imported Project Id
+     */
+    imported_project_id: string | null;
+    /**
+     * Submission Deadline
+     */
+    submission_deadline: string | null;
+    /**
+     * Tender Number
+     */
+    tender_number: string | null;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Updated At
+     */
+    updated_at: string | null;
+    /**
+     * Version
+     */
+    version: number | null;
+};
+
+/**
+ * TenderImport
+ *
+ * Запрос на создание проекта по тендеру.
+ */
+export type TenderImport = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Tender Id
+     */
+    tender_id: string;
+};
+
+/**
  * UploadRead
  *
  * Результат загрузки.
@@ -826,6 +909,63 @@ export type ListDocumentRevisionsResponses = {
 };
 
 export type ListDocumentRevisionsResponse = ListDocumentRevisionsResponses[keyof ListDocumentRevisionsResponses];
+
+export type ImportTenderData = {
+    body: TenderImport;
+    path?: never;
+    query?: never;
+    url: '/api/v1/integrations/tenderhub/projects';
+};
+
+export type ImportTenderErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ImportTenderError = ImportTenderErrors[keyof ImportTenderErrors];
+
+export type ImportTenderResponses = {
+    /**
+     * Successful Response
+     */
+    201: ProjectRead;
+};
+
+export type ImportTenderResponse = ImportTenderResponses[keyof ImportTenderResponses];
+
+export type ListTendersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Search
+         */
+        search?: string | null;
+    };
+    url: '/api/v1/integrations/tenderhub/tenders';
+};
+
+export type ListTendersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTendersError = ListTendersErrors[keyof ListTendersErrors];
+
+export type ListTendersResponses = {
+    /**
+     * Response List Tenders
+     *
+     * Successful Response
+     */
+    200: Array<TenderBriefRead>;
+};
+
+export type ListTendersResponse = ListTendersResponses[keyof ListTendersResponses];
 
 export type ReadJobData = {
     body?: never;

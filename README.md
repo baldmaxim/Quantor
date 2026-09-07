@@ -105,3 +105,35 @@ scripts               кроссплатформенные команды раз
 - [Архитектурные решения](docs/adr/README.md)
 - [Аудит репозитория](docs/architecture/repo-audit-2026-09-04.md)
 - [Что сделано на Stage 1](docs/stage1/README.md)
+
+## Проекты из TenderHUB
+
+Портал умеет заводить проект по тендеру TenderHUB: на странице «Проекты» появляется
+кнопка «Из TenderHUB». Из тендера берутся номер, название и заказчик — позиции ВОР и
+строки смет не переносятся, расчёт остаётся в TenderHUB ([ADR-0011](docs/adr/0011-integraciya-s-tenderhub.md)).
+
+Чтобы включить:
+
+1. Выпустите ключ в TenderHUB: «Настройки → Доступ к API», область `tenders:read`.
+   Секрет `thk_…` показывается один раз.
+2. Положите его в `.env` в корне репозитория:
+
+   ```dotenv
+   TENDERHUB_API_URL=https://tender.su10.ru
+   TENDERHUB_API_TOKEN=thk_...
+   ```
+
+3. Перезапустите `pnpm dev`.
+
+Ключ читает только сервер: в браузер он не попадает и в ответах API не появляется.
+Пока ключа нет, возможность `integrations.tenderhub` в `/api/v1/meta` выключена и
+кнопки в интерфейсе не будет — портал не предлагает того, чего не сможет сделать.
+
+Проверить связь, не открывая портал:
+
+```bash
+curl -s --compressed "$TENDERHUB_API_URL/api/v1/tenders/brief?is_archived=false"      -H "X-API-Key: $TENDERHUB_API_TOKEN"
+```
+
+Заголовок именно `X-API-Key`. `Authorization: Bearer` — путь сессии человека: исправный
+ключ, посланный так, получит `401`, и перевыпуск ключа не поможет.
