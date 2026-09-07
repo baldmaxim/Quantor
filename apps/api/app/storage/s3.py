@@ -168,7 +168,10 @@ class S3ObjectStorage:
         try:
             async with self._client() as client:
                 response = await client.get_object(Bucket=self.bucket, Key=key)
-                async with response["Body"] as body:
+                # Не `async with Body as body`: __aenter__ у StreamingBody возвращает
+                # сырой ClientResponse, у которого read() не принимает размер куска.
+                body = response["Body"]
+                async with body:
                     while True:
                         chunk = await body.read(chunk_size)
                         if not chunk:

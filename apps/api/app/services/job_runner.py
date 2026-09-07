@@ -114,6 +114,8 @@ async def execute_legacy_import(
     )
     await session.flush()
 
+    job_id = job.id
+    revision_uuid = revision.id
     try:
         result = await importer.import_package(
             session,
@@ -123,15 +125,16 @@ async def execute_legacy_import(
             settings=settings,
         )
     except DomainError as error:
+        code, detail = error.code, error.detail
         await session.rollback()
-        return await _mark_failed(session, job.id, revision.id, error.code, error.detail)
+        return await _mark_failed(session, job_id, revision_uuid, code, detail)
     except Exception as error:
-        log.exception("legacy_import_crashed", job_id=str(job.id))
+        log.exception("legacy_import_crashed", job_id=str(job_id))
         await session.rollback()
         return await _mark_failed(
             session,
-            job.id,
-            revision.id,
+            job_id,
+            revision_uuid,
             ErrorCode.IMPORT_FAILED,
             type(error).__name__,
         )

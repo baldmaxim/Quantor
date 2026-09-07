@@ -85,7 +85,9 @@ def _latest_job() -> Any:
     subquery = (
         select(Job)
         .distinct(Job.project_id)
-        .order_by(Job.project_id, Job.created_at.desc())
+        # id как тай-брейкер: два задания, созданные в одной транзакции, могут
+        # получить одинаковый created_at с точностью до микросекунд.
+        .order_by(Job.project_id, Job.created_at.desc(), Job.id.desc())
         .subquery()
     )
     return aliased(Job, subquery)

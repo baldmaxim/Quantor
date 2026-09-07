@@ -51,6 +51,10 @@ async def enqueue(
         status=JobStatus.QUEUED,
         idempotency_key=idempotency_key,
         payload=dict(payload or {}),
+        # Явное время: server now() внутри одной транзакции одинаков, и два задания
+        # получают один created_at — DISTINCT ON тогда выбирает произвольно.
+        created_at=_now(),
+        updated_at=_now(),
     )
     session.add(job)
     await session.flush()
