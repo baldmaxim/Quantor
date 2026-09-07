@@ -38,6 +38,27 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  admin:
+    name: Контур управления
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: Установка зависимостей
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
   api:
     name: Бэкенд
     runs-on: ubuntu-latest

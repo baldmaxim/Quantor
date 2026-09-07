@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+@import '@quantor/ui/base.css';
+
+/* Tailwind не сканирует node_modules: без этой строки классы примитивов пакета
+   не попадут в сборку и стили просто не применятся. */
+@source '../../../../packages/ui/src';
+
+/* ============================================================================
+   Специфичное для контура управления.
+
+   Админка десктопная по природе: таблицы прав, настроек и журнала не сжимаются
+   до телефона без потери смысла. На узком экране они прокручиваются вбок внутри
+   своего контейнера, а страница по горизонтали не едет.
+   ============================================================================ */
+
+.table-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.admin-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border-strong);
+  padding: var(--s-4) var(--s-5);
+  text-align: left;
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.admin-table td {
+  border-bottom: 1px solid var(--border);
+  padding: var(--s-4) var(--s-5);
+  vertical-align: top;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: 0;
+}
