@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
 
+import { AccountMenu } from '@/components/shell/AccountMenu';
 import { cx } from '@/components/ui';
 import {
   IconModels,
@@ -142,6 +143,7 @@ export const SideNav = () => {
         <div className="flex-1" />
 
         <RailButton item={SETTINGS} active={isActive(SETTINGS.href)} enabled />
+        <AccountMenu />
       </div>
     </nav>
   );

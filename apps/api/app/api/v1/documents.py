@@ -13,7 +13,9 @@ from app.api.v1.deps import (
     SessionDep,
     StorageDep,
     WorkspaceDep,
+    require,
 )
+from app.auth.permissions import Permission
 from app.core.config import get_settings
 from app.errors import ErrorCode, http_error, not_found
 from app.schemas import (
@@ -31,7 +33,12 @@ from app.storage.base import ObjectNotFoundError, StorageUnavailableError
 router = APIRouter(tags=["documents"])
 
 
-@router.get("/documents/{document_id}", response_model=DocumentRead, summary="Документ")
+@router.get(
+    "/documents/{document_id}",
+    response_model=DocumentRead,
+    summary="Документ",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
 async def read_document(
     document_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
 ) -> DocumentRead:
@@ -47,6 +54,7 @@ async def read_document(
     "/documents/{document_id}/revisions",
     response_model=Page[DocumentRevisionRead],
     summary="Ревизии документа",
+    dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def list_document_revisions(
     document_id: uuid.UUID,
@@ -74,7 +82,10 @@ async def list_document_revisions(
 
 
 @router.get(
-    "/revisions/{revision_id}", response_model=DocumentRevisionRead, summary="Ревизия документа"
+    "/revisions/{revision_id}",
+    response_model=DocumentRevisionRead,
+    summary="Ревизия документа",
+    dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def read_revision(
     revision_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
@@ -91,6 +102,7 @@ async def read_revision(
     "/revisions/{revision_id}/artifacts",
     response_model=list[RecognitionArtifactRead],
     summary="Артефакты распознавания",
+    dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def list_revision_artifacts(
     revision_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
@@ -106,7 +118,10 @@ async def list_revision_artifacts(
 
 
 @router.get(
-    "/revisions/{revision_id}/sheets", response_model=Page[SheetRead], summary="Листы ревизии"
+    "/revisions/{revision_id}/sheets",
+    response_model=Page[SheetRead],
+    summary="Листы ревизии",
+    dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def list_revision_sheets(
     revision_id: uuid.UUID,
@@ -145,6 +160,7 @@ async def list_revision_sheets(
     "/revisions/{revision_id}/content-url",
     response_model=ContentUrl,
     summary="Ссылка на файл ревизии",
+    dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def read_revision_content_url(
     revision_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep, storage: StorageDep
@@ -181,7 +197,10 @@ async def read_revision_content_url(
 
 
 @router.get(
-    "/sheets/{sheet_id}/regions", response_model=Page[RegionRead], summary="Области на листе"
+    "/sheets/{sheet_id}/regions",
+    response_model=Page[RegionRead],
+    summary="Области на листе",
+    dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def list_sheet_regions(
     sheet_id: uuid.UUID,

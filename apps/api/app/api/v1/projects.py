@@ -6,7 +6,15 @@ import uuid
 
 from fastapi import APIRouter, status
 
-from app.api.v1.deps import DEFAULT_PAGE_SIZE, LimitDep, OffsetDep, SessionDep, WorkspaceDep
+from app.api.v1.deps import (
+    DEFAULT_PAGE_SIZE,
+    LimitDep,
+    OffsetDep,
+    SessionDep,
+    WorkspaceDep,
+    require,
+)
+from app.auth.permissions import Permission
 from app.errors import not_found
 from app.schemas import (
     DocumentRead,
@@ -35,7 +43,12 @@ def _summary(row: projects_service.ProjectWithCounts) -> ProjectSummary:
     )
 
 
-@router.get("", response_model=Page[ProjectSummary], summary="Список проектов")
+@router.get(
+    "",
+    response_model=Page[ProjectSummary],
+    summary="Список проектов",
+    dependencies=[require(Permission.PROJECT_READ)],
+)
 async def list_projects(
     session: SessionDep,
     workspace: WorkspaceDep,
@@ -63,6 +76,7 @@ async def list_projects(
     response_model=ProjectRead,
     status_code=status.HTTP_201_CREATED,
     summary="Создать проект",
+    dependencies=[require(Permission.PROJECT_CREATE)],
 )
 async def create_project(
     payload: ProjectCreate, session: SessionDep, workspace: WorkspaceDep
@@ -74,7 +88,12 @@ async def create_project(
     return ProjectRead.model_validate(project)
 
 
-@router.get("/{project_id}", response_model=ProjectSummary, summary="Проект")
+@router.get(
+    "/{project_id}",
+    response_model=ProjectSummary,
+    summary="Проект",
+    dependencies=[require(Permission.PROJECT_READ)],
+)
 async def read_project(
     project_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
 ) -> ProjectSummary:
@@ -87,7 +106,12 @@ async def read_project(
     return _summary(row)
 
 
-@router.patch("/{project_id}", response_model=ProjectRead, summary="Изменить проект")
+@router.patch(
+    "/{project_id}",
+    response_model=ProjectRead,
+    summary="Изменить проект",
+    dependencies=[require(Permission.PROJECT_UPDATE)],
+)
 async def update_project(
     project_id: uuid.UUID,
     payload: ProjectUpdate,
@@ -108,7 +132,10 @@ async def update_project(
 
 
 @router.get(
-    "/{project_id}/documents", response_model=Page[DocumentRead], summary="Документы проекта"
+    "/{project_id}/documents",
+    response_model=Page[DocumentRead],
+    summary="Документы проекта",
+    dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def list_project_documents(
     project_id: uuid.UUID,
@@ -135,7 +162,12 @@ async def list_project_documents(
     )
 
 
-@router.get("/{project_id}/jobs", response_model=Page[JobRead], summary="Задания проекта")
+@router.get(
+    "/{project_id}/jobs",
+    response_model=Page[JobRead],
+    summary="Задания проекта",
+    dependencies=[require(Permission.JOBS_READ)],
+)
 async def list_project_jobs(
     project_id: uuid.UUID,
     session: SessionDep,

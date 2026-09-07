@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -24,11 +24,17 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
-from app.core.config import get_settings
+from app.auth.context import AuthContext, CredentialKind, Principal
+from app.auth.dev import DEV_USER_ID
+from app.auth.permissions import permissions_for
+from app.auth.resolver import get_auth_context
+from app.core.config import Settings, get_settings
 from app.core.workspace import DEV_WORKSPACE_ID
 from app.db.base import Base
 from app.db.session import get_session
+from app.domain import Role, UserKind
 from app.main import create_app
+from app.models import UserIdentity, Workspace
 from app.services.job_runner import get_job_scheduler
 from app.storage import get_object_storage
 from app.storage.base import ObjectNotFoundError, ObjectStat, StoredObject
@@ -97,6 +103,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     """Сессия теста. После теста таблицы очищаются, чтобы тесты не влияли друг на друга."""
     factory = async_sessionmaker(db_engine, expire_on_commit=False, autoflush=False)
     async with factory() as session:
+        await _seed_identity(session)
         try:
             yield session
         finally:
@@ -107,9 +114,52 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
         await connection.execute(text(f"truncate table {tables} restart identity cascade"))
 
 
+async def _seed_identity(session: AsyncSession) -> None:
+    """Пространство по умолчанию и dev-личность.
+
+    Сеется в каждом тесте, а не один раз: `truncate` после теста уносит и это тоже.
+    Без строки пространства не вставится ни один проект — с миграции 0003 на
+    `projects.workspace_id` стоит внешний ключ, а тестовая база собирается из метаданных,
+    минуя миграции, и посева оттуда не получает.
+    """
+    session.add(
+        Workspace(id=DEV_WORKSPACE_ID, slug="default", name="Рабочее пространство по умолчанию")
+    )
+    session.add(
+        UserIdentity(
+            id=DEV_USER_ID,
+            issuer="dev",
+            subject="dev",
+            email="dev@localhost",
+            display_name="Разработчик",
+            platform_role=Role.PLATFORM_ADMIN,
+        )
+    )
+    await session.commit()
+
+
 @pytest.fixture
-def workspace_id() -> uuid.UUID:
+async def workspace_id(db_session: AsyncSession) -> uuid.UUID:
+    """Пространство по умолчанию. Строка уже создана посевом сессии."""
     return DEV_WORKSPACE_ID
+
+
+@pytest.fixture
+async def second_workspace(db_session: AsyncSession) -> Workspace:
+    """Чужое пространство. Нужно проверкам границы: без второго арендатора её не видно."""
+    workspace = Workspace(slug="second", name="Соседнее пространство")
+    db_session.add(workspace)
+    await db_session.commit()
+    return workspace
+
+
+@pytest.fixture
+async def other_user(db_session: AsyncSession) -> UserIdentity:
+    """Обычный пользователь без прав платформы."""
+    user = UserIdentity(issuer="idp.test", subject="user-2", email="user2@example.com")
+    db_session.add(user)
+    await db_session.commit()
+    return user
 
 
 class FakeObjectStorage:
@@ -232,12 +282,58 @@ async def client() -> AsyncIterator[AsyncClient]:
         yield async_client
 
 
-@pytest.fixture
-async def api(
-    db_session: AsyncSession, fake_storage: FakeObjectStorage
-) -> AsyncIterator[AsyncClient]:
-    """Клиент API с настоящей базой и хранилищем в памяти."""
-    app = create_app()
+def make_context(
+    role: Role = Role.PLATFORM_ADMIN,
+    *,
+    workspace_id: uuid.UUID = DEV_WORKSPACE_ID,
+    user_id: uuid.UUID = DEV_USER_ID,
+    platform_admin: bool | None = None,
+) -> AuthContext:
+    """Контекст доступа для проверок.
+
+    Собирается тем же способом, что и в бою: права выводятся из роли, а не перечисляются
+    руками. Иначе тест проверял бы выдуманный набор, а не действующий.
+    """
+    is_platform = role is Role.PLATFORM_ADMIN if platform_admin is None else platform_admin
+    principal = Principal(
+        user_id=user_id,
+        issuer="idp.test",
+        subject=str(user_id),
+        email="user@example.com",
+        display_name="Проверяющий",
+        kind=UserKind.HUMAN,
+        platform_role=Role.PLATFORM_ADMIN if is_platform else None,
+    )
+    return AuthContext(
+        principal=principal,
+        workspace_id=workspace_id,
+        role=role,
+        permissions=permissions_for(role),
+        credential=CredentialKind.SESSION,
+        is_dev_mode=False,
+    )
+
+
+def oidc_settings() -> Settings:
+    """Настройки с включённым провайдером: только так виден отказ без учётных данных.
+
+    В dev-режиме контекст выдаётся всем, и проверка «без сеанса — 401» показывала бы 200.
+    """
+    return Settings(  # type: ignore[call-arg]
+        auth_mode="oidc",
+        oidc_issuer="https://idp.test",
+        oidc_client_id="quantor",
+    )
+
+
+def _build_api(
+    db_session: AsyncSession,
+    fake_storage: FakeObjectStorage,
+    *,
+    context: AuthContext | None,
+    settings: Settings | None = None,
+) -> tuple[Any, AsyncClient]:
+    app = create_app(settings) if settings is not None else create_app()
 
     async def override_session() -> AsyncIterator[AsyncSession]:
         yield db_session
@@ -255,10 +351,52 @@ async def api(
     app.dependency_overrides[get_session] = override_session
     app.dependency_overrides[get_object_storage] = override_storage
     app.dependency_overrides[get_job_scheduler] = override_scheduler
+    if settings is not None:
+        app.dependency_overrides[get_settings] = lambda: settings
+    if context is not None:
+        # Подменяется ровно одна зависимость: всё остальное — `require`, `WorkspaceDep`,
+        # запрет по умолчанию — построено на ней и подхватывает подмену само.
+        app.dependency_overrides[get_auth_context] = lambda: context
 
-    transport = ASGITransport(app=app)
+    return app, AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver")
+
+
+@pytest.fixture
+async def api(
+    db_session: AsyncSession, fake_storage: FakeObjectStorage
+) -> AsyncIterator[AsyncClient]:
+    """Клиент API с настоящей базой и хранилищем в памяти.
+
+    Контекст — администратор платформы в пространстве по умолчанию: проверки этого клиента
+    занимаются предметной логикой, а не правами, и не должны переписываться из-за них.
+    """
+    app, client = _build_api(db_session, fake_storage, context=make_context())
     try:
-        async with AsyncClient(transport=transport, base_url="http://testserver") as async_client:
+        async with client as async_client:
             yield async_client
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def build_api(
+    db_session: AsyncSession, fake_storage: FakeObjectStorage
+) -> Iterator[Callable[..., AsyncClient]]:
+    """Фабрика клиентов для проверок доступа.
+
+    Без контекста клиент проходит настоящий путь опознания при включённом провайдере —
+    так и проверяется отказ без учётных данных.
+    """
+    apps: list[Any] = []
+
+    def _make(context: AuthContext | None = None, *, with_provider: bool = False) -> AsyncClient:
+        settings = oidc_settings() if (with_provider or context is None) else None
+        app, client = _build_api(db_session, fake_storage, context=context, settings=settings)
+        apps.append(app)
+        return client
+
+    try:
+        yield _make
+    finally:
+        for app in apps:
+            app.dependency_overrides.clear()

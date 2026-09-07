@@ -245,6 +245,18 @@ export type LivenessResponse = {
 };
 
 /**
+ * LogoutResponse
+ *
+ * Результат выхода. Повторный выход не ошибка — сеанса уже нет.
+ */
+export type LogoutResponse = {
+    /**
+     * Ok
+     */
+    ok?: boolean;
+};
+
+/**
  * MetaResponse
  */
 export type MetaResponse = {
@@ -674,6 +686,101 @@ export type RegionRead = {
 export type RegionShape = 'rectangle' | 'polygon';
 
 /**
+ * Role
+ *
+ * Роль — именованный набор разрешений, а не проверяемая сущность.
+ *
+ * Бизнес-код спрашивает разрешение (`Permission`), а не имя роли: состав набора меняется
+ * в одном месте, а не по всем обработчикам. Соответствие описано в `app/auth/permissions.py`.
+ *
+ * `PLATFORM_ADMIN` и `SERVICE` относятся к платформе и живут на самой личности; остальные
+ * выдаются членством в конкретном рабочем пространстве.
+ */
+export type Role = 'platform_admin' | 'workspace_admin' | 'engineer' | 'reviewer' | 'viewer' | 'service';
+
+/**
+ * SessionResponse
+ *
+ * Состояние сеанса.
+ *
+ * Отдаётся и портале, и админке: обе решают по нему, что показывать. Права перечислены
+ * явно — интерфейс не должен знать состав ролей и повторять его у себя.
+ */
+export type SessionResponse = {
+    /**
+     * Auth Mode
+     */
+    auth_mode: 'dev' | 'oidc';
+    /**
+     * Authenticated
+     */
+    authenticated: boolean;
+    /**
+     * Csrf Token
+     */
+    csrf_token?: string | null;
+    /**
+     * Permissions
+     */
+    permissions?: Array<string>;
+    role?: Role | null;
+    user?: SessionUser | null;
+    /**
+     * Workspace Id
+     */
+    workspace_id?: string | null;
+    /**
+     * Workspaces
+     */
+    workspaces?: Array<SessionWorkspace>;
+};
+
+/**
+ * SessionUser
+ *
+ * Личность текущего сеанса. Ни токенов, ни секретов — только то, что рисует интерфейс.
+ */
+export type SessionUser = {
+    /**
+     * Display Name
+     */
+    display_name: string | null;
+    /**
+     * Email
+     */
+    email: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Is Platform Admin
+     */
+    is_platform_admin: boolean;
+};
+
+/**
+ * SessionWorkspace
+ *
+ * Пространство, доступное пользователю, и его роль в нём.
+ */
+export type SessionWorkspace = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    role: Role;
+    /**
+     * Slug
+     */
+    slug: string;
+};
+
+/**
  * SheetRead
  */
 export type SheetRead = {
@@ -844,6 +951,90 @@ export type ValidationError = {
      */
     type: string;
 };
+
+export type CompleteLoginData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Code
+         *
+         * Код авторизации провайдера
+         */
+        code: string;
+        /**
+         * State
+         *
+         * Значение состояния
+         */
+        state: string;
+    };
+    url: '/api/v1/auth/callback';
+};
+
+export type CompleteLoginErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CompleteLoginError = CompleteLoginErrors[keyof CompleteLoginErrors];
+
+export type BeginLoginData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Next
+         *
+         * Путь внутри портала
+         */
+        next?: string | null;
+    };
+    url: '/api/v1/auth/login';
+};
+
+export type BeginLoginErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BeginLoginError = BeginLoginErrors[keyof BeginLoginErrors];
+
+export type LogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/logout';
+};
+
+export type LogoutResponses = {
+    /**
+     * Successful Response
+     */
+    200: LogoutResponse;
+};
+
+export type LogoutResponse2 = LogoutResponses[keyof LogoutResponses];
+
+export type ReadSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/session';
+};
+
+export type ReadSessionResponses = {
+    /**
+     * Successful Response
+     */
+    200: SessionResponse;
+};
+
+export type ReadSessionResponse = ReadSessionResponses[keyof ReadSessionResponses];
 
 export type ReadDocumentData = {
     body?: never;

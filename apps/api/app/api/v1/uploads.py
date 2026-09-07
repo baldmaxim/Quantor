@@ -8,7 +8,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, UploadFile, status
 
-from app.api.v1.deps import SchedulerDep, SessionDep, StorageDep, WorkspaceDep
+from app.api.v1.deps import SchedulerDep, SessionDep, StorageDep, WorkspaceDep, require
+from app.auth.permissions import Permission
 from app.core.config import get_settings
 from app.domain import JobStatus
 from app.errors import ErrorCode, http_error, not_found
@@ -36,6 +37,7 @@ async def _stream(upload: UploadFile) -> AsyncIterator[bytes]:
     response_model=UploadRead,
     status_code=status.HTTP_201_CREATED,
     summary="Загрузить файл в проект",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
 )
 async def upload_file(
     project_id: uuid.UUID,
@@ -95,6 +97,7 @@ async def upload_file(
     "/upload-capabilities",
     response_model=list[UploadedFileType],
     summary="Какие файлы принимает портал",
+    dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def read_upload_capabilities(
     project_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep

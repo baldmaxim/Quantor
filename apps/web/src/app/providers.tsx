@@ -3,11 +3,20 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
+import { installCsrfInterceptor } from '@/lib/csrf';
+
 /**
  * Серверное состояние живёт только в TanStack Query. QueryClient создаётся внутри компонента,
  * иначе при SSR он окажется общим для всех пользователей.
  */
 export const Providers = ({ children }: { children: ReactNode }) => {
+  // Ставится до первого запроса и ровно один раз: инициализатор useState выполняется
+  // при первом отрисовывании, эффект — уже после того, как запросы могли уйти.
+  useState(() => {
+    installCsrfInterceptor();
+    return null;
+  });
+
   const [queryClient] = useState(
     () =>
       new QueryClient({

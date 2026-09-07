@@ -418,6 +418,18 @@
         "title": "LivenessResponse",
         "type": "object"
       },
+      "LogoutResponse": {
+        "description": "Результат выхода. Повторный выход не ошибка — сеанса уже нет.",
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "LogoutResponse",
+        "type": "object"
+      },
       "MetaResponse": {
         "properties": {
           "api_version": {
@@ -1137,6 +1149,172 @@
         "title": "RegionShape",
         "type": "string"
       },
+      "Role": {
+        "description": "Роль — именованный набор разрешений, а не проверяемая сущность.\n\nБизнес-код спрашивает разрешение (`Permission`), а не имя роли: состав набора меняется\nв одном месте, а не по всем обработчикам. Соответствие описано в `app/auth/permissions.py`.\n\n`PLATFORM_ADMIN` и `SERVICE` относятся к платформе и живут на самой личности; остальные\nвыдаются членством в конкретном рабочем пространстве.",
+        "enum": [
+          "platform_admin",
+          "workspace_admin",
+          "engineer",
+          "reviewer",
+          "viewer",
+          "service"
+        ],
+        "title": "Role",
+        "type": "string"
+      },
+      "SessionResponse": {
+        "description": "Состояние сеанса.\n\nОтдаётся и портале, и админке: обе решают по нему, что показывать. Права перечислены\nявно — интерфейс не должен знать состав ролей и повторять его у себя.",
+        "properties": {
+          "auth_mode": {
+            "enum": [
+              "dev",
+              "oidc"
+            ],
+            "title": "Auth Mode",
+            "type": "string"
+          },
+          "authenticated": {
+            "title": "Authenticated",
+            "type": "boolean"
+          },
+          "csrf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csrf Token"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUser"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/SessionWorkspace"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "authenticated",
+          "auth_mode"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
+      "SessionUser": {
+        "description": "Личность текущего сеанса. Ни токенов, ни секретов — только то, что рисует интерфейс.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_platform_admin": {
+            "title": "Is Platform Admin",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "is_platform_admin"
+        ],
+        "title": "SessionUser",
+        "type": "object"
+      },
+      "SessionWorkspace": {
+        "description": "Пространство, доступное пользователю, и его роль в нём.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "role"
+        ],
+        "title": "SessionWorkspace",
+        "type": "object"
+      },
       "SheetRead": {
         "properties": {
           "height_px": {
@@ -1457,6 +1635,154 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/callback": {
+      "get": {
+        "description": "Меняет код на токены, заводит сеанс и возвращает браузер в портал.",
+        "operationId": "complete_login",
+        "parameters": [
+          {
+            "description": "Код авторизации провайдера",
+            "in": "query",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "description": "Код авторизации провайдера",
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Значение состояния",
+            "in": "query",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "description": "Значение состояния",
+              "title": "State",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "307": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Завершить вход",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "get": {
+        "description": "Переадресует на страницу входа провайдера.\n\nВ dev-режиме провайдера нет: браузер сразу возвращается в портал, где его уже ждёт\nфиксированная личность.",
+        "operationId": "begin_login",
+        "parameters": [
+          {
+            "description": "Путь внутри портала",
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Путь внутри портала",
+              "title": "Next"
+            }
+          }
+        ],
+        "responses": {
+          "307": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Начать вход",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Гасит сеанс и снимает cookie.\n\nСтрока в базе отзывается по-настоящему: cookie можно и не удалять — предъявленный\nпосле выхода токен всё равно не сработает.",
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Выйти",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "description": "Кто вошёл, куда ему можно и что ему разрешено.\n\nПубличный маршрут: «не вошёл» — это ответ, а не ошибка.",
+        "operationId": "read_session",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Текущий сеанс",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/documents/{document_id}": {
       "get": {
         "operationId": "read_document",

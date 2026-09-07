@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
 
+import { AccountMenu } from '@/components/shell/AccountMenu';
 import { cx } from '@/components/ui';
 import { IconProjects, IconSettings } from '@/components/ui/icons';
 import { useFeatures } from '@/lib/queries';
@@ -68,6 +69,12 @@ export const BottomNav = () => {
           </Link>
         );
       })}
+
+      {/* Выход должен быть достижим и с телефона: иначе сеанс на чужом
+          устройстве нечем закрыть. */}
+      <div className="flex min-h-[var(--h-bottom-nav)] flex-1 items-center justify-center">
+        <AccountMenu compact />
+      </div>
     </nav>
   );
 };

@@ -15,6 +15,23 @@ class ErrorCode(StrEnum):
     NOT_FOUND = "NOT_FOUND"
     VALIDATION_FAILED = "VALIDATION_FAILED"
 
+    # --- вход и права ---
+    UNAUTHENTICATED = "UNAUTHENTICATED"
+    SESSION_EXPIRED = "SESSION_EXPIRED"
+    CREDENTIAL_INVALID = "CREDENTIAL_INVALID"
+    PERMISSION_DENIED = "PERMISSION_DENIED"
+    CSRF_FAILED = "CSRF_FAILED"
+    WORKSPACE_FORBIDDEN = "WORKSPACE_FORBIDDEN"
+    WORKSPACE_NOT_FOUND = "WORKSPACE_NOT_FOUND"
+    MEMBERSHIP_EXISTS = "MEMBERSHIP_EXISTS"
+    LAST_ADMIN_REMOVAL = "LAST_ADMIN_REMOVAL"
+
+    # --- провайдер личности ---
+    AUTH_NOT_CONFIGURED = "AUTH_NOT_CONFIGURED"
+    OIDC_STATE_INVALID = "OIDC_STATE_INVALID"
+    OIDC_DISCOVERY_FAILED = "OIDC_DISCOVERY_FAILED"
+    OIDC_EXCHANGE_FAILED = "OIDC_EXCHANGE_FAILED"
+
     # --- приём файлов ---
     UNSUPPORTED_FILE_TYPE = "UNSUPPORTED_FILE_TYPE"
     MIME_MISMATCH = "MIME_MISMATCH"
@@ -51,6 +68,19 @@ class ErrorCode(StrEnum):
 MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.NOT_FOUND: "Объект не найден",
     ErrorCode.VALIDATION_FAILED: "Некорректные данные запроса",
+    ErrorCode.UNAUTHENTICATED: "Требуется вход в портал",
+    ErrorCode.SESSION_EXPIRED: "Сеанс истёк, войдите снова",
+    ErrorCode.CREDENTIAL_INVALID: "Учётные данные недействительны",
+    ErrorCode.PERMISSION_DENIED: "Недостаточно прав для этого действия",
+    ErrorCode.CSRF_FAILED: "Запрос не подтверждён",
+    ErrorCode.WORKSPACE_FORBIDDEN: "Нет доступа к этому рабочему пространству",
+    ErrorCode.WORKSPACE_NOT_FOUND: "Рабочее пространство не найдено",
+    ErrorCode.MEMBERSHIP_EXISTS: "Участник уже добавлен в пространство",
+    ErrorCode.LAST_ADMIN_REMOVAL: "Нельзя убрать последнего администратора пространства",
+    ErrorCode.AUTH_NOT_CONFIGURED: "Вход в портал не настроен",
+    ErrorCode.OIDC_STATE_INVALID: "Ответ провайдера входа не принят",
+    ErrorCode.OIDC_DISCOVERY_FAILED: "Провайдер входа недоступен",
+    ErrorCode.OIDC_EXCHANGE_FAILED: "Провайдер входа не подтвердил вход",
     ErrorCode.UNSUPPORTED_FILE_TYPE: "Такой тип файла не поддерживается",
     ErrorCode.MIME_MISMATCH: "Содержимое файла не соответствует расширению",
     ErrorCode.UPLOAD_TOO_LARGE: "Файл слишком большой",
@@ -79,6 +109,23 @@ MESSAGES: dict[ErrorCode, str] = {
 STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.VALIDATION_FAILED: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    # 401 — «не знаю, кто ты», 403 — «знаю, но нельзя». Чужое рабочее пространство отвечает
+    # не отсюда, а обычным 404: 403 подтвердил бы, что объект существует (ADR-0012).
+    ErrorCode.UNAUTHENTICATED: status.HTTP_401_UNAUTHORIZED,
+    ErrorCode.SESSION_EXPIRED: status.HTTP_401_UNAUTHORIZED,
+    ErrorCode.CREDENTIAL_INVALID: status.HTTP_401_UNAUTHORIZED,
+    ErrorCode.PERMISSION_DENIED: status.HTTP_403_FORBIDDEN,
+    ErrorCode.CSRF_FAILED: status.HTTP_403_FORBIDDEN,
+    ErrorCode.WORKSPACE_FORBIDDEN: status.HTTP_403_FORBIDDEN,
+    ErrorCode.WORKSPACE_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.MEMBERSHIP_EXISTS: status.HTTP_409_CONFLICT,
+    ErrorCode.LAST_ADMIN_REMOVAL: status.HTTP_409_CONFLICT,
+    # Провайдер личности — такая же внешняя система, как TenderHUB, и отвечает так же:
+    # не настроен — 503, не отвечает — 502, прислал негодный ответ — 400.
+    ErrorCode.AUTH_NOT_CONFIGURED: status.HTTP_503_SERVICE_UNAVAILABLE,
+    ErrorCode.OIDC_STATE_INVALID: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.OIDC_DISCOVERY_FAILED: status.HTTP_502_BAD_GATEWAY,
+    ErrorCode.OIDC_EXCHANGE_FAILED: status.HTTP_502_BAD_GATEWAY,
     ErrorCode.UNSUPPORTED_FILE_TYPE: status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
     ErrorCode.MIME_MISMATCH: status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
     ErrorCode.UPLOAD_TOO_LARGE: status.HTTP_413_CONTENT_TOO_LARGE,
@@ -135,9 +182,18 @@ def not_found(what: str) -> HTTPException:
 
 
 def http_error(
-    code: ErrorCode, status_code: int | None = None, message: str | None = None
+    code: ErrorCode,
+    status_code: int | None = None,
+    message: str | None = None,
+    headers: dict[str, str] | None = None,
 ) -> HTTPException:
+    """Ошибка с безопасным кодом.
+
+    headers нужен отказам аутентификации: 401 без `WWW-Authenticate` формально неполон,
+    и клиенты, различающие способы входа, по нему ориентируются.
+    """
     return HTTPException(
         status_code=status_code or STATUS_CODES[code],
         detail={"code": code.value, "message": message or MESSAGES[code]},
+        headers=headers,
     )

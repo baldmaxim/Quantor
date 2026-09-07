@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # apps/api/app/core/config.py -> apps/api/app/core -> app -> api -> apps -> корень репозитория
@@ -82,6 +82,40 @@ class Settings(BaseSettings):
     )
     tenderhub_timeout_seconds: float = Field(default=20.0, gt=0)
 
+    # --- вход в портал ---
+    #
+    # `dev` — фиксированная личность без провайдера: так работают `pnpm dev` и тесты.
+    # `oidc` — настоящий провайдер. Валидатор ниже не даёт запустить `dev` вне локальной
+    # среды: тихий откат к режиму без проверки — это ровно тот способ, которым портал
+    # открывают наружу, не заметив.
+    auth_mode: Literal["dev", "oidc"] = "dev"
+
+    auth_cookie_name: str = "quantor_session"
+    auth_csrf_cookie_name: str = "quantor_csrf"
+    # Домен cookie задаётся только в бою: `admin.example.ru` и `api.example.ru` должны
+    # получить общий cookie, локально же домен указывать нельзя — браузер отвергнет.
+    auth_cookie_domain: str = ""
+    auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    auth_session_ttl_seconds: int = Field(default=12 * 3600, gt=0)
+
+    # Кому выдать права администратора платформы при первом входе. Список почт или
+    # субъектов через запятую. Зашивать первого администратора в миграцию нельзя:
+    # его идентификатор зависит от провайдера, которого на момент миграции ещё нет.
+    auth_bootstrap_platform_admins: str = ""
+
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: SecretStr = SecretStr("")
+    # Ожидаемый получатель токена. Пусто — проверяется совпадение с client_id.
+    oidc_audience: str = ""
+    oidc_scopes: str = "openid profile email"
+    oidc_jwks_ttl_seconds: int = Field(default=3600, gt=0)
+    oidc_timeout_seconds: float = Field(default=10.0, gt=0)
+
+    # Куда вернуть браузер после входа. Отдельно от CORS: список источников разрешает
+    # запросы, а сюда уходит переадресация, и подставлять её из запроса нельзя.
+    portal_base_url: str = "http://localhost:3000"
+
     # Переопределение флагов возможностей: `takeoff.ai=true,reports=true`.
     # Включение флага не создаёт функциональность — оно лишь перестаёт её прятать.
     feature_flags: str = ""
@@ -101,9 +135,46 @@ class Settings(BaseSettings):
         включённая возможность без ключа — это обещание, которое портал не выполнит."""
         return bool(self.tenderhub_api_token.get_secret_value().strip())
 
+    @model_validator(mode="after")
+    def _check_auth_is_usable(self) -> Settings:
+        """Негодная настройка входа роняет запуск, а не первый запрос.
+
+        Оба случая одинаково опасны: dev-режим вне локальной среды открывает портал всем,
+        а режим OIDC без адреса провайдера обещает вход, которого не будет.
+        """
+        if self.auth_mode == "dev" and not self.is_local:
+            raise ValueError(
+                f"AUTH_MODE=dev недопустим при ENVIRONMENT={self.environment}: "
+                "настройте провайдера входа (AUTH_MODE=oidc, OIDC_ISSUER)"
+            )
+        if self.auth_mode == "oidc" and not (
+            self.oidc_issuer.strip() and self.oidc_client_id.strip()
+        ):
+            raise ValueError("AUTH_MODE=oidc требует OIDC_ISSUER и OIDC_CLIENT_ID")
+        return self
+
     @property
     def is_local(self) -> bool:
         return self.environment in ("local", "test")
+
+    @property
+    def auth_cookie_secure(self) -> bool:
+        """Вне локальной среды cookie уходит только по HTTPS."""
+        return not self.is_local
+
+    @property
+    def oidc_expected_audience(self) -> str:
+        return self.oidc_audience.strip() or self.oidc_client_id.strip()
+
+    @property
+    def oidc_scope_list(self) -> list[str]:
+        return [scope for scope in self.oidc_scopes.split() if scope]
+
+    @property
+    def bootstrap_platform_admins(self) -> frozenset[str]:
+        """Опознаватели первых администраторов, приведённые к нижнему регистру."""
+        raw = self.auth_bootstrap_platform_admins.split(",")
+        return frozenset(item.strip().lower() for item in raw if item.strip())
 
     @property
     def database_url(self) -> str:

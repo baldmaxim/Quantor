@@ -22,16 +22,20 @@ def uuid_pk() -> Mapped[uuid.UUID]:
     return mapped_column(pg.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
 
-def str_enum[E: StrEnum](enum_cls: type[E], *, name: str) -> SaEnum:
+def str_enum[E: StrEnum](enum_cls: type[E], *, name: str, length: int = 32) -> SaEnum:
     """Перечисление как VARCHAR с CHECK.
 
     values_callable обязателен: без него SQLAlchemy пишет в базу имена членов (ACTIVE),
     а не значения (active), и данные расходятся с тем, что отдаёт API.
+
+    Длина по умолчанию рассчитана на доменные состояния. Словари вроде действий аудита
+    длиннее, поэтому её можно поднять — но не занижать: обрезанное значение не пройдёт CHECK
+    и уронит вставку в самый неудобный момент.
     """
     return SaEnum(
         enum_cls,
         native_enum=False,
-        length=32,
+        length=length,
         name=name,
         values_callable=lambda members: [member.value for member in members],
     )

@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from app.api.v1.deps import SessionDep, TenderHubDep, WorkspaceDep
+from app.api.v1.deps import SessionDep, TenderHubDep, WorkspaceDep, require
+from app.auth.permissions import Permission
 from app.domain import ProjectSource
 from app.errors import DomainError, ErrorCode
 from app.integrations.tenderhub import TenderBrief
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/integrations/tenderhub", tags=["integrations"])
     "/tenders",
     response_model=list[TenderBriefRead],
     summary="Тендеры, доступные ключу",
+    dependencies=[require(Permission.INTEGRATION_READ)],
 )
 async def list_tenders(
     session: SessionDep,
@@ -65,6 +67,7 @@ async def list_tenders(
     response_model=ProjectRead,
     status_code=status.HTTP_201_CREATED,
     summary="Создать проект по тендеру",
+    dependencies=[require(Permission.PROJECT_CREATE)],
 )
 async def import_tender(
     payload: TenderImport,

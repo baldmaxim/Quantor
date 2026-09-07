@@ -50,7 +50,8 @@ export interface ProjectsParams {
 /** Задание в работе опрашивается регулярно; завершённое — нет. */
 const JOB_POLL_INTERVAL = 2000;
 
-const unwrap = <T>(response: { data?: T }): T => {
+/** Достаёт данные из ответа клиента. Экспортируется: тем же способом читает сеанс. */
+export const unwrap = <T>(response: { data?: T }): T => {
   if (response.data === undefined) {
     throw new Error('Пустой ответ API');
   }

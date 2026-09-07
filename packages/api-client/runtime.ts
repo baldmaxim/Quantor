@@ -13,4 +13,8 @@ export const resolveApiBaseUrl = (): string =>
 export const createClientConfig: CreateClientConfig = (config) => ({
   ...config,
   baseUrl: resolveApiBaseUrl(),
+  // Cookie сеанса обязана уходить вместе с запросом. API живёт на другом origin
+  // (:8000 против :3000), а fetch по умолчанию чужие cookie не отправляет — без этой
+  // строки аутентификация «не работает», не выдавая при этом ни одной ошибки.
+  credentials: 'include',
 });

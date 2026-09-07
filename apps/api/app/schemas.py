@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -21,6 +21,7 @@ from app.domain import (
     ProjectSource,
     ProjectStatus,
     RegionShape,
+    Role,
 )
 
 if TYPE_CHECKING:
@@ -44,6 +45,52 @@ class ApiModel(BaseModel):
     """База для схем, читаемых прямо из моделей SQLAlchemy."""
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ------------------------------------------------------------------------ вход и права
+
+
+class SessionUser(BaseModel):
+    """Личность текущего сеанса. Ни токенов, ни секретов — только то, что рисует интерфейс."""
+
+    id: uuid.UUID
+    email: str | None
+    display_name: str | None
+    is_platform_admin: bool
+
+
+class SessionWorkspace(BaseModel):
+    """Пространство, доступное пользователю, и его роль в нём."""
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    role: Role
+
+
+class SessionResponse(BaseModel):
+    """Состояние сеанса.
+
+    Отдаётся и портале, и админке: обе решают по нему, что показывать. Права перечислены
+    явно — интерфейс не должен знать состав ролей и повторять его у себя.
+    """
+
+    authenticated: bool
+    auth_mode: Literal["dev", "oidc"]
+    user: SessionUser | None = None
+    workspace_id: uuid.UUID | None = None
+    role: Role | None = None
+    permissions: list[str] = Field(default_factory=list)
+    workspaces: list[SessionWorkspace] = Field(default_factory=list)
+    """Пространства пользователя. Переключатель показывается только если их больше одного."""
+    csrf_token: str | None = None
+    """Значение для заголовка X-CSRF-Token. В dev-режиме отсутствует: проверки нет."""
+
+
+class LogoutResponse(BaseModel):
+    """Результат выхода. Повторный выход не ошибка — сеанса уже нет."""
+
+    ok: bool = True
 
 
 # --------------------------------------------------------------------------- проекты

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Index, String, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,6 +15,7 @@ from app.models.mixins import TimestampMixin, str_enum, uuid_pk
 
 if TYPE_CHECKING:
     from app.models.document import Document
+    from app.models.identity import Workspace
     from app.models.job import Job
 
 
@@ -23,10 +24,17 @@ class Project(TimestampMixin, Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
 
-    # Граница организации/рабочего пространства. Аутентификации на Stage 1 нет, поэтому
-    # здесь всегда идентификатор dev-пространства. Колонка заведена сразу, чтобы добавление
-    # арендаторов позже не переписывало каждый запрос.
-    workspace_id: Mapped[uuid.UUID] = mapped_column(pg.UUID(as_uuid=True), nullable=False)
+    # Граница арендатора. На Stage 1 это был свободный UUID: рабочих пространств как
+    # сущности не существовало. Внешний ключ появился вместе с ними (ADR-0012) и не даёт
+    # завести проект в пространстве, которого нет.
+    #
+    # RESTRICT, а не CASCADE: удаление арендатора не должно молча уносить его проекты
+    # вместе с документами и распознанными областями.
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        pg.UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[ProjectStatus] = mapped_column(
@@ -45,6 +53,8 @@ class Project(TimestampMixin, Base):
     # Идентификатор в системе-источнике и человекочитаемая ссылка на него (номер тендера).
     external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     external_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    workspace: Mapped[Workspace] = relationship(back_populates="projects")
 
     documents: Mapped[list[Document]] = relationship(
         back_populates="project", cascade="all, delete-orphan", passive_deletes=True

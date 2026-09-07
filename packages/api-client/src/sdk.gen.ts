@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateProjectData, CreateProjectErrors, CreateProjectResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
+import type { BeginLoginData, BeginLoginErrors, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,42 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Завершить вход
+ *
+ * Меняет код на токены, заводит сеанс и возвращает браузер в портал.
+ */
+export const completeLogin = <ThrowOnError extends boolean = false>(options: Options<CompleteLoginData, ThrowOnError>): RequestResult<unknown, CompleteLoginErrors, ThrowOnError> => (options.client ?? client).get<unknown, CompleteLoginErrors, ThrowOnError>({ url: '/api/v1/auth/callback', ...options });
+
+/**
+ * Начать вход
+ *
+ * Переадресует на страницу входа провайдера.
+ *
+ * В dev-режиме провайдера нет: браузер сразу возвращается в портал, где его уже ждёт
+ * фиксированная личность.
+ */
+export const beginLogin = <ThrowOnError extends boolean = false>(options?: Options<BeginLoginData, ThrowOnError>): RequestResult<unknown, BeginLoginErrors, ThrowOnError> => (options?.client ?? client).get<unknown, BeginLoginErrors, ThrowOnError>({ url: '/api/v1/auth/login', ...options });
+
+/**
+ * Выйти
+ *
+ * Гасит сеанс и снимает cookie.
+ *
+ * Строка в базе отзывается по-настоящему: cookie можно и не удалять — предъявленный
+ * после выхода токен всё равно не сработает.
+ */
+export const logout = <ThrowOnError extends boolean = false>(options?: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, unknown, ThrowOnError> => (options?.client ?? client).post<LogoutResponses, unknown, ThrowOnError>({ url: '/api/v1/auth/logout', ...options });
+
+/**
+ * Текущий сеанс
+ *
+ * Кто вошёл, куда ему можно и что ему разрешено.
+ *
+ * Публичный маршрут: «не вошёл» — это ответ, а не ошибка.
+ */
+export const readSession = <ThrowOnError extends boolean = false>(options?: Options<ReadSessionData, ThrowOnError>): RequestResult<ReadSessionResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ReadSessionResponses, unknown, ThrowOnError>({ url: '/api/v1/auth/session', ...options });
 
 /**
  * Документ

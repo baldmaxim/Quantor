@@ -8,8 +8,9 @@ from typing import Annotated
 from fastapi import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.context import AuthContext
+from app.auth.resolver import get_auth_context, require
 from app.core.config import Settings, get_settings
-from app.core.workspace import WorkspaceContext, get_workspace_context
 from app.db.session import get_session
 from app.integrations.tenderhub import TenderHubClient
 from app.schemas import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
@@ -18,7 +19,13 @@ from app.storage import get_object_storage
 from app.storage.base import ObjectStorage
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-WorkspaceDep = Annotated[WorkspaceContext, Depends(get_workspace_context)]
+
+# Контекст запроса. Имя `WorkspaceDep` сохранено намеренно: обработчики читают
+# `workspace.workspace_id`, и появление настоящей аутентификации не должно было
+# превращаться в правку каждого маршрута. Теперь за этим именем стоит проверенная
+# личность и её права, а не константа.
+AuthDep = Annotated[AuthContext, Depends(get_auth_context)]
+WorkspaceDep = AuthDep
 
 # Хранилище приходит зависимостью, а не берётся из модуля: так его можно подменить
 # в тестах, не поднимая MinIO и не патча импорты.
@@ -51,6 +58,7 @@ OffsetDep = Annotated[int, Query(ge=0, description="Сколько записе�
 
 __all__ = [
     "DEFAULT_PAGE_SIZE",
+    "AuthDep",
     "LimitDep",
     "OffsetDep",
     "SchedulerDep",
@@ -59,4 +67,5 @@ __all__ = [
     "StorageDep",
     "TenderHubDep",
     "WorkspaceDep",
+    "require",
 ]
