@@ -184,7 +184,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               </ToolButton>
               <ToolButton
                 label="Панорама"
-                hint="пробел с перетаскиванием"
+                hint="пробел или средняя кнопка с перетаскиванием; Shift и Alt с колесом"
                 active={tool === 'pan'}
                 onClick={() => setTool('pan')}
               >

@@ -46,6 +46,16 @@ if (!('ResizeObserver' in globalThis)) {
   } as unknown as typeof ResizeObserver;
 }
 
+/**
+ * Захват указателя в jsdom не реализован, а просмотрщик берёт его на время
+ * перетаскивания — без этого жест теряется, стоит курсору выйти за холст.
+ */
+if (!Element.prototype.setPointerCapture) {
+  Element.prototype.setPointerCapture = () => undefined;
+  Element.prototype.releasePointerCapture = () => undefined;
+  Element.prototype.hasPointerCapture = () => false;
+}
+
 afterEach(() => {
   cleanup();
 });

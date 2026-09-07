@@ -155,6 +155,38 @@ describe('холст рабочей области', () => {
     expect(backend.renders.length).toBe(initial);
   });
 
+  it('колесо с Shift двигает лист по горизонтали, не меняя масштаб', async () => {
+    const { camera } = setup();
+    await flushFrame();
+    const before = camera.getState();
+
+    await act(async () => {
+      fireEvent.wheel(screen.getByTestId('viewport'), { deltaY: 120, shiftKey: true });
+    });
+
+    const after = camera.getState();
+    expect(after.scale).toBe(before.scale);
+    expect(after.offsetX).toBeLessThan(before.offsetX);
+    expect(after.offsetY).toBe(before.offsetY);
+  });
+
+  it('средняя кнопка панорамирует любым инструментом', async () => {
+    // В AutoCAD и Revit лист двигают нажатым колесом. Инструмент при этом не меняют.
+    const { camera } = setup({ tool: 'pointer' });
+    const viewport = screen.getByTestId('viewport');
+    await flushFrame();
+    const before = camera.getState();
+
+    await act(async () => {
+      fireEvent.pointerDown(viewport, { button: 1, pointerId: 2, clientX: 100, clientY: 100 });
+      fireEvent.pointerMove(viewport, { pointerId: 2, clientX: 130, clientY: 150 });
+    });
+
+    const after = camera.getState();
+    expect(after.offsetX - before.offsetX).toBeCloseTo(30, 5);
+    expect(after.offsetY - before.offsetY).toBeCloseTo(50, 5);
+  });
+
   it('панорамирование не трогает масштаб', async () => {
     const { camera } = setup({ tool: 'pan' });
     const viewport = screen.getByTestId('viewport');

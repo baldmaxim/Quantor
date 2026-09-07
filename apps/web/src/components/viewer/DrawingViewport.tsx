@@ -50,6 +50,9 @@ interface IDrawingViewportProps {
 /** Пауза после последнего изменения вида, после которой страница рисуется заново. */
 const RERENDER_DELAY_MS = 180;
 
+/** Шаг зума на щелчок колеса. Множитель, а не слагаемое: на мелком масштабе шаг иначе огромен. */
+const ZOOM_WHEEL_STEP = 1.12;
+
 /** Задержка перед показом значка отрисовки: быстрые листы не должны им мигать. */
 const BADGE_DELAY_MS = 120;
 
@@ -322,9 +325,13 @@ export const DrawingViewport = ({
   const panning = tool === 'pan' || spacePressed;
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+    // Средняя кнопка панорамирует всегда, каким бы инструментом ни работали: в AutoCAD
+    // и Revit это тот же жест, и переучивать инженера незачем.
+    const wheelDrag = event.button === 1;
+    if (event.button !== 0 && !wheelDrag) return;
+    if (wheelDrag) event.preventDefault();
 
-    if (panning) {
+    if (panning || wheelDrag) {
       dragging.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
@@ -362,10 +369,20 @@ export const DrawingViewport = ({
     const element = host.current;
     if (!element) return;
 
+    // С модификатором колесо двигает лист, без него — меняет масштаб. Разложение по
+    // модификаторам, а не смена режима: после зума лист нужно подвинуть сразу, не
+    // переключая инструмент и не отпуская колесо.
+    if (event.shiftKey || event.altKey) {
+      const step = event.deltaY + event.deltaX;
+      // Shift — по горизонтали, Alt — по вертикали: так же ведут себя редакторы чертежей.
+      camera.panBy(event.shiftKey ? -step : 0, event.shiftKey ? 0 : -step);
+      return;
+    }
+
     const bounds = element.getBoundingClientRect();
     camera.zoomAt(
       { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-      event.deltaY < 0 ? 1.12 : 1 / 1.12,
+      event.deltaY < 0 ? ZOOM_WHEEL_STEP : 1 / ZOOM_WHEEL_STEP,
     );
   };
 
