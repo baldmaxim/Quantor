@@ -91,9 +91,10 @@ export const SearchInput = ({ label, className, onClear, ...rest }: ISearchInput
         type="search"
         placeholder={label}
         className={cx(
-          // Утопленный фон, как у сегментного переключателя рядом: поле ввода и группа
-          // кнопок должны читаться как один набор, а не как два разных элемента.
-          'h-[var(--h-ctl)] w-full rounded-[var(--radius-sm)] border border-border-control bg-surface-sunken',
+          // Заливка светлее шапки, а не темнее: тёмный колодец на тёмном фоне виден
+          // только за счёт рамки, и рамку приходится делать яркой. Светлое поле
+          // читается само, и рамке остаётся быть тихой.
+          'h-[var(--h-ctl)] w-full rounded-[var(--radius-sm)] border border-border-control bg-surface-muted',
           'pl-[calc(var(--s-6)+var(--s-5))] text-sm text-text',
           filled ? 'pr-[calc(var(--s-6)+var(--s-4))]' : 'pr-[var(--s-5)]',
           'placeholder:text-muted',
@@ -103,7 +104,7 @@ export const SearchInput = ({ label, className, onClear, ...rest }: ISearchInput
           // Граница подсвечивается акцентом при наведении и фокусе: поле должно
           // отзываться раньше, чем в него начали печатать.
           'transition-[border-color,box-shadow,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-          'hover:border-border-strong focus:border-accent focus:bg-surface focus:outline-none',
+          'hover:border-border-strong focus:border-accent focus:bg-surface-raised focus:outline-none',
           'focus:shadow-[0_0_0_3px_var(--accent-soft)]',
         )}
         {...rest}

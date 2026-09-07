@@ -169,7 +169,7 @@ const SortToggle = ({ value, onChange }: ISortToggleProps) => (
         className={cx(
           'press h-full rounded-[calc(var(--radius-sm)-2px)] px-[var(--s-5)] text-sm whitespace-nowrap',
           value === key
-            ? 'bg-surface font-medium text-accent shadow-[var(--shadow-1)]'
+            ? 'bg-surface-raised font-medium text-accent shadow-[var(--shadow-1)]'
             : 'text-muted hover:text-text',
         )}
       >
