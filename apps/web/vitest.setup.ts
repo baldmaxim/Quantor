@@ -33,6 +33,19 @@ if (!Element.prototype.animate) {
   })) as unknown as typeof Element.prototype.animate;
 }
 
+/**
+ * ResizeObserver в jsdom тоже нет, а просмотрщик подписывается на изменение размера
+ * области, чтобы вписать лист. Заглушка ничего не наблюдает: размеры в jsdom всё равно
+ * нулевые, а проверяются здесь жесты, а не раскладка.
+ */
+if (!('ResizeObserver' in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  } as unknown as typeof ResizeObserver;
+}
+
 afterEach(() => {
   cleanup();
 });

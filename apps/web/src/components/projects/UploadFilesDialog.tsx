@@ -81,10 +81,10 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
         />
 
         {queue.items.length > 0 && (
-          <ul className="flex flex-col gap-[var(--s-4)]">
+          <ul className="flex flex-col gap-[var(--s-5)] rounded-[var(--radius-md)] border border-border px-[var(--s-6)] py-[var(--s-5)]">
             {queue.items.map((item) => (
-              <li key={item.id} className="flex flex-col gap-[var(--s-2)]">
-                <div className="flex items-baseline gap-[var(--s-4)] text-xs">
+              <li key={item.id} className="flex flex-col gap-[var(--s-3)]">
+                <div className="flex items-baseline gap-[var(--s-5)] text-xs">
                   <span className="min-w-0 flex-1 truncate">{item.name}</span>
                   <span className="mono text-muted">{formatBytes(item.size)}</span>
                   <StatusBadge
@@ -116,7 +116,7 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
           </ul>
         )}
 
-        <div className="flex items-center gap-[var(--s-4)]">
+        <div className="flex flex-wrap items-center gap-[var(--s-4)]">
           {busy && (
             <Button variant="danger" onClick={queue.cancel}>
               Отменить

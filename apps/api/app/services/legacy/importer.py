@@ -134,6 +134,14 @@ async def import_package(
 
     existing = await session.get(DocumentRevision, revision_id)
     if existing is not None:
+        # Пакет уже разобран. Статус всё равно доводим до READY: исполнитель задания
+        # ставит ревизии IMPORTING перед запуском, и без этой строки повторный импорт
+        # оставлял пакет навсегда «в обработке» при успешно завершённом задании.
+        await documents_service.set_processing_status(
+            session, revision=package_revision, status=ProcessingStatus.READY
+        )
+        await session.flush()
+
         return ImportResult(
             document_id=existing.document_id,
             revision_id=existing.id,

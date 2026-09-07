@@ -107,10 +107,22 @@ const WorkspacePage = ({ params }: IPageProps) => {
   // Размер листа берётся у отрисовщика, а не из полей пакета: `width_px` — это пиксели
   // растра распознавалки, снятого с непостоянной плотностью и до применения поворота.
   // Пока размер не известен, вписывать и рисовать разметку нечему.
-  const viewportSheet =
-    sheet && geometry
-      ? { pageIndex: sheet.page_index, width: geometry.width, height: geometry.height }
-      : null;
+  //
+  // Объект обязан быть стабильным по значению: холст перезапускает отрисовку при смене
+  // листа, а лист меняется по ссылке. Новый объект на каждый рендер обрывал отрисовку
+  // и начинал заново — а рендер случается на каждый щелчок колеса, потому что меняется
+  // показанный процент масштаба. Страница в итоге не дорисовывалась никогда.
+  const pageWidth = geometry?.width ?? null;
+  const pageHeight = geometry?.height ?? null;
+  const sheetPageIndex = sheet?.page_index ?? null;
+
+  const viewportSheet = useMemo(
+    () =>
+      sheetPageIndex !== null && pageWidth !== null && pageHeight !== null
+        ? { pageIndex: sheetPageIndex, width: pageWidth, height: pageHeight }
+        : null,
+    [sheetPageIndex, pageWidth, pageHeight],
+  );
 
   const failure = renderError ?? errorCode ?? null;
 

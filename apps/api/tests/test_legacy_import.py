@@ -263,6 +263,12 @@ class TestIdempotency:
         assert len(sheets) == 2
         assert len(regions) == 2
 
+        # Повторный импорт не должен оставлять пакет «в обработке»: исполнитель ставит
+        # ревизии IMPORTING перед запуском, и ранний выход обязан довести её до конца.
+        # Иначе на карточке проекта задание успешно, а пакет вечно в очереди.
+        await db_session.refresh(package_revision)
+        assert package_revision.processing_status is ProcessingStatus.READY
+
 
 class TestFailures:
     async def test_invalid_blocks_leave_no_half_built_project(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { cx } from '@/components/ui';
 import type { Camera, CameraState } from '@/lib/viewer/camera';
@@ -110,15 +110,30 @@ export const DrawingViewport = ({
     failed.current = onError;
   }, [onViewChange, onError]);
 
+  // Лист приходит объектом и пересоздаётся вместе с рендером родителя. Всё, что
+  // перезапускает отрисовку, зависит от значений, а не от ссылки: иначе холст обрывал
+  // собственную задачу на каждый рендер и не дорисовывал страницу никогда.
+  const pageIndex = sheet?.pageIndex ?? null;
+  const pageWidth = sheet?.width ?? null;
+  const pageHeight = sheet?.height ?? null;
+
+  const page = useMemo(
+    () =>
+      pageIndex !== null && pageWidth !== null && pageHeight !== null
+        ? { pageIndex, width: pageWidth, height: pageHeight }
+        : null,
+    [pageIndex, pageWidth, pageHeight],
+  );
+
   const paintOverlay = useCallback(() => {
     const canvas = overlayCanvas.current;
     const context = canvas?.getContext('2d');
-    if (!canvas || !context || !sheet) return;
+    if (!canvas || !context || !page) return;
 
     const ratio = window.devicePixelRatio || 1;
     // Слой рисуется в том же масштабе, что и страница: у них общий родитель, и одно
     // преобразование двигает обоих — разъехаться они не могут по построению.
-    const placed = placeRenderedPage(sheet, renderedScale.current, ratio);
+    const placed = placeRenderedPage(page, renderedScale.current, ratio);
 
     resizeOverlay(canvas, placed.width, placed.height, ratio);
     drawOverlay(
@@ -133,7 +148,7 @@ export const DrawingViewport = ({
       { colors: readRegionColors(), fallbackColor: 'currentColor' },
       ratio,
     );
-  }, [sheet, regions, hiddenTypes, overlayVisible, selectedId]);
+  }, [page, regions, hiddenTypes, overlayVisible, selectedId]);
 
   /** Двигает и масштабирует стопку холстов. Вызывается на каждом кадре камеры. */
   const applyCamera = useCallback((state: CameraState) => {
@@ -162,17 +177,17 @@ export const DrawingViewport = ({
   const renderPage = useCallback(
     async (signal: AbortSignal) => {
       const canvas = pageCanvas.current;
-      if (!backend || !sheet || !canvas) return;
+      if (!backend || !page || !canvas) return;
 
       const scale = cameraState.current.scale;
-      await backend.render({ pageIndex: sheet.pageIndex, scale, canvas, signal });
+      await backend.render({ pageIndex: page.pageIndex, scale, canvas, signal });
       if (signal.aborted) return;
 
       renderedScale.current = scale;
       applyCamera(cameraState.current);
       paintOverlay();
     },
-    [backend, sheet, applyCamera, paintOverlay],
+    [backend, page, applyCamera, paintOverlay],
   );
 
   const render = useRef(renderPage);
@@ -183,7 +198,7 @@ export const DrawingViewport = ({
   // Первая отрисовка листа. Старая задача отменяется при смене листа: иначе при быстром
   // перелистывании поверх актуальной страницы дорисуется прежняя.
   useEffect(() => {
-    if (!backend || !sheet) return;
+    if (!backend || !page) return;
 
     const controller = new AbortController();
     let finished = false;
@@ -208,7 +223,7 @@ export const DrawingViewport = ({
     };
     // Масштаб намеренно не в зависимостях: перерисовка по зуму идёт отдельно, с
     // задержкой, иначе каждый щелчок колеса ставил бы новую задачу отрисовки.
-  }, [backend, sheet, reportFailure]);
+  }, [backend, page, reportFailure]);
 
   // Перерисовка страницы после того, как жест затих.
   //
@@ -243,11 +258,11 @@ export const DrawingViewport = ({
   // Вписываем лист при его смене и при изменении размера области.
   useEffect(() => {
     const element = host.current;
-    if (!element || !sheet) return;
+    if (!element || !page) return;
 
     const fit = () => {
       camera.fitPage(
-        { width: sheet.width, height: sheet.height },
+        { width: page.width, height: page.height },
         { width: element.clientWidth, height: element.clientHeight },
       );
     };
@@ -256,23 +271,23 @@ export const DrawingViewport = ({
     const observer = new ResizeObserver(fit);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [sheet, camera]);
+  }, [page, camera]);
 
   const pointFromEvent = useCallback(
     (clientX: number, clientY: number) => {
       const element = stack.current;
-      if (!element || !sheet) return null;
+      if (!element || !page) return null;
 
       const bounds = element.getBoundingClientRect();
       const placed = placeRenderedPage(
-        sheet,
+        page,
         cameraState.current.scale,
         window.devicePixelRatio || 1,
       );
 
       return toNormalizedPoint({ x: clientX - bounds.left, y: clientY - bounds.top }, placed);
     },
-    [sheet],
+    [page],
   );
 
   const findRegion = useCallback(

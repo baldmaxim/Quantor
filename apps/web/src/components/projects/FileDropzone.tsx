@@ -57,7 +57,7 @@ export const FileDropzone = ({ files, onAdd, onRemove, disabled = false }: IFile
   };
 
   return (
-    <div className="flex flex-col gap-[var(--s-4)]">
+    <div className="flex flex-col gap-[var(--s-5)]">
       <div
         onDragOver={(event) => {
           event.preventDefault();
@@ -127,7 +127,7 @@ const PickedRow = ({ picked, disabled, onRemove }: IPickedRowProps) => {
   const capability = CAPABILITY[extension];
 
   return (
-    <li className="grid grid-cols-[20px_1fr_auto_auto] items-center gap-[var(--s-4)] border-b border-border px-[var(--s-5)] py-[var(--s-4)] last:border-b-0">
+    <li className="grid grid-cols-[20px_1fr_auto_auto] items-center gap-[var(--s-5)] border-b border-border px-[var(--s-6)] py-[var(--s-5)] last:border-b-0">
       <Icon width={16} height={16} className="text-muted" />
 
       <span className="flex min-w-0 flex-col">
@@ -150,7 +150,7 @@ const PickedRow = ({ picked, disabled, onRemove }: IPickedRowProps) => {
         onClick={onRemove}
         disabled={disabled}
         aria-label={`Убрать ${picked.file.name}`}
-        className="grid h-[22px] w-[22px] place-items-center rounded-[var(--radius-xs)] text-muted hover:bg-surface-muted hover:text-text disabled:opacity-40"
+        className="press grid h-[26px] w-[26px] place-items-center rounded-[var(--radius-sm)] text-base leading-none text-muted hover:bg-surface-muted hover:text-text disabled:opacity-40"
       >
         ×
       </button>
