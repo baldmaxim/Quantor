@@ -10,6 +10,17 @@ from httpx import AsyncClient
 
 from app.api import health
 from app.db.schema_version import SchemaOutdatedError, expected_revision
+from app.services.workers import WorkerHealth
+
+
+def _workers(alive: int, total: int | None = None) -> Callable[..., Awaitable[WorkerHealth]]:
+    """Подменённый пульс исполнителей: проба не должна ходить в базу из тестов оболочки."""
+
+    async def load(_: object) -> WorkerHealth:
+        count = total if total is not None else alive
+        return WorkerHealth(total=count, alive=alive, stale=count - alive, last_heartbeat_at=None)
+
+    return load
 
 
 async def test_liveness_does_not_touch_dependencies(client: AsyncClient) -> None:
@@ -40,6 +51,7 @@ async def test_readiness_ok_when_dependencies_answer(
     monkeypatch.setattr(health, "ping_database", ok)
     monkeypatch.setattr(health, "check_schema_current", ok)
     monkeypatch.setattr(health, "get_object_storage", lambda: _FakeStorage(ok))
+    monkeypatch.setattr(health, "load_worker_health", _workers(alive=1))
 
     response = await client.get("/health/ready")
     payload = response.json()
@@ -50,6 +62,7 @@ async def test_readiness_ok_when_dependencies_answer(
         "database",
         "database_schema",
         "object_storage",
+        "job_worker",
     }
     assert payload["schema_revision"] == expected_revision()
 
@@ -66,6 +79,7 @@ async def test_readiness_degraded_when_storage_is_down(
     monkeypatch.setattr(health, "ping_database", ok)
     monkeypatch.setattr(health, "check_schema_current", ok)
     monkeypatch.setattr(health, "get_object_storage", lambda: _FakeStorage(fail))
+    monkeypatch.setattr(health, "load_worker_health", _workers(alive=1))
 
     response = await client.get("/health/ready")
     payload = response.json()
@@ -77,6 +91,7 @@ async def test_readiness_degraded_when_storage_is_down(
         "database": "ok",
         "database_schema": "ok",
         "object_storage": "unavailable",
+        "job_worker": "ok",
     }
     # Наружу не должно уходить ничего, кроме безопасного статуса.
     assert "bucket" not in response.text
@@ -191,3 +206,59 @@ class _FakeStorage:
 
     async def check_available(self) -> None:
         await self._check()
+
+
+async def test_dead_worker_does_not_make_the_api_unready(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Портал остаётся рабочим, когда лежит только исполнитель заданий.
+
+    Это главное свойство разделения. Без исполнителя не начнутся новые импорты, но
+    проекты, документы и чертежи по-прежнему открываются. Ответить здесь 503 значит
+    увести трафик с полностью исправного API и превратить частичную поломку в полную.
+    """
+
+    async def ok() -> None:
+        return None
+
+    monkeypatch.setattr(health, "ping_database", ok)
+    monkeypatch.setattr(health, "check_schema_current", ok)
+    monkeypatch.setattr(health, "get_object_storage", lambda: _FakeStorage(ok))
+    # Исполнители зарегистрированы, но молчат.
+    monkeypatch.setattr(health, "load_worker_health", _workers(alive=0, total=2))
+
+    response = await client.get("/health/ready")
+    payload = response.json()
+
+    assert response.status_code == 200, "мёртвый воркер не повод уводить трафик с API"
+    assert payload["status"] == "degraded"
+
+    worker = next(c for c in payload["components"] if c["name"] == "job_worker")
+    assert worker["status"] == "unavailable"
+    assert worker["required"] is False
+
+
+async def test_never_started_worker_is_not_reported_as_broken(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """«Не запускали» и «умер» — разные состояния.
+
+    На свежей установке воркера просто ещё не поднимали, и пугать администратора
+    красным здесь не за что: чинить нечего, надо запустить.
+    """
+
+    async def ok() -> None:
+        return None
+
+    monkeypatch.setattr(health, "ping_database", ok)
+    monkeypatch.setattr(health, "check_schema_current", ok)
+    monkeypatch.setattr(health, "get_object_storage", lambda: _FakeStorage(ok))
+    monkeypatch.setattr(health, "load_worker_health", _workers(alive=0, total=0))
+
+    response = await client.get("/health/ready")
+    worker = next(c for c in response.json()["components"] if c["name"] == "job_worker")
+
+    assert response.status_code == 200
+    assert worker["status"] == "degraded"
+    assert worker["detail"] is not None
+    assert "dev:worker" in worker["detail"], "подсказка должна называть команду запуска"

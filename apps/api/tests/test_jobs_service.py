@@ -15,14 +15,39 @@ from app.models import Job, Project
 from app.services import jobs as jobs_service
 from app.services import projects as projects_service
 
-TERMINAL = (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED)
+# Окончательные состояния: выхода нет и не появится. Отказ сюда больше не входит —
+# у него есть ровно один выход, и только через повтор (см. ниже).
+FINAL = (JobStatus.SUCCEEDED, JobStatus.CANCELLED)
 
 
 class TestTransitionTable:
-    @pytest.mark.parametrize("status", TERMINAL)
-    def test_terminal_states_have_no_exit(self, status: JobStatus) -> None:
+    @pytest.mark.parametrize("status", FINAL)
+    def test_final_states_have_no_exit(self, status: JobStatus) -> None:
+        """Успех и отмена окончательны: переделать их нельзя, можно только начать заново."""
         assert jobs_service.ALLOWED_TRANSITIONS[status] == frozenset()
         assert status.is_terminal
+
+    def test_failure_leads_back_to_the_queue_and_nowhere_else(self) -> None:
+        """У отказа один выход — обратно в очередь, и только повтором.
+
+        Это появилось вместе с отдельным исполнителем. Прямой переход `failed → running`
+        означал бы, что задание «продолжили» — а его надо начать сначала, с новой попытки.
+        """
+        assert jobs_service.ALLOWED_TRANSITIONS[JobStatus.FAILED] == frozenset({JobStatus.QUEUED})
+        assert JobStatus.FAILED.is_terminal
+
+    def test_running_returns_to_the_queue_when_abandoned(self) -> None:
+        """Брошенное задание возвращается в очередь, иначе оно висит «выполняется» вечно."""
+        assert JobStatus.QUEUED in jobs_service.ALLOWED_TRANSITIONS[JobStatus.RUNNING]
+
+    def test_only_circumstantial_failures_are_retryable(self) -> None:
+        """Битый архив останется битым: предлагать для него повтор — обещать невозможное."""
+        retryable = jobs_service.RETRYABLE_ERROR_CODES
+        assert "STORAGE_UNAVAILABLE" in retryable
+        assert "JOB_LEASE_LOST" in retryable
+        assert "ARCHIVE_UNSAFE_PATH" not in retryable
+        assert "LEGACY_BLOCKS_INVALID" not in retryable
+        assert "CORRUPT_ARCHIVE" not in retryable
 
     def test_queued_cannot_jump_to_succeeded(self) -> None:
         # Успех без запуска означал бы, что работа не выполнялась.

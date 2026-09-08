@@ -218,6 +218,61 @@ class TenderRebindRequest(BaseModel):
     """Подтверждение обязательно: перепривязка не должна происходить с одного нажатия."""
 
 
+class WorkerRead(BaseModel):
+    """Исполнитель заданий. Показывается в эксплуатации, а не пользователю."""
+
+    id: str
+    host: str
+    pid: int
+    version: str
+    started_at: datetime
+    heartbeat_at: datetime
+    current_job_id: uuid.UUID | None
+    is_alive: bool
+    """Пульс свежее порога. Считается сервером: у клиента свои часы."""
+
+
+class AdminJobRead(ApiModel):
+    """Задание в эксплуатационном виде.
+
+    Отдельно от `JobRead`: пользователю не нужны попытки и исполнитель, а администратору
+    без них не разобрать, почему задание висит. Полезная нагрузка сюда не попадает —
+    в ней лежат идентификаторы и пути, а не то, что стоит показывать целиком.
+    """
+
+    id: uuid.UUID
+    project_id: uuid.UUID | None
+    job_type: JobType
+    status: JobStatus
+    progress: float | None
+    stage: str | None
+    error_code: str | None
+    error_message: str | None
+    attempt: int
+    max_attempts: int
+    worker_id: str | None
+    lease_expires_at: datetime | None
+    heartbeat_at: datetime | None
+    available_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    is_retryable: bool
+    """Считается сервером по коду отказа: битый архив повтором не чинится."""
+
+
+class JobStatsRead(BaseModel):
+    """Счётчики очереди для панели обзора."""
+
+    queued: int
+    running: int
+    failed_recently: int
+    """Отказы за сутки. Ноль здесь — это ноль, а не «не измеряли»."""
+    workers_alive: int
+    workers_total: int
+
+
 # --------------------------------------------------------------------------- проекты
 
 

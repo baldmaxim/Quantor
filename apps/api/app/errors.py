@@ -64,6 +64,10 @@ class ErrorCode(StrEnum):
 
     # --- задания ---
     JOB_TRANSITION_INVALID = "JOB_TRANSITION_INVALID"
+    JOB_LEASE_LOST = "JOB_LEASE_LOST"
+    JOB_TIMEOUT = "JOB_TIMEOUT"
+    JOB_NOT_RETRYABLE = "JOB_NOT_RETRYABLE"
+    WORKER_UNAVAILABLE = "WORKER_UNAVAILABLE"
 
     # --- TenderHUB ---
     TENDERHUB_DISABLED = "TENDERHUB_DISABLED"
@@ -114,6 +118,10 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.DATABASE_UNAVAILABLE: "База данных недоступна",
     ErrorCode.CONTENT_NOT_AVAILABLE: "Файл ревизии недоступен",
     ErrorCode.JOB_TRANSITION_INVALID: "Недопустимый переход состояния задания",
+    ErrorCode.JOB_LEASE_LOST: "Исполнитель перестал отвечать, задание брошено",
+    ErrorCode.JOB_TIMEOUT: "Задание не уложилось в отведённое время",
+    ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
+    ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
     ErrorCode.TENDERHUB_DISABLED: "Интеграция с TenderHUB не настроена",
     ErrorCode.TENDERHUB_AUTH_FAILED: "TenderHUB не принял ключ доступа",
     ErrorCode.TENDERHUB_FORBIDDEN: "Ключу TenderHUB не выдан доступ к этим данным",
@@ -169,6 +177,13 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.CONTENT_NOT_AVAILABLE: status.HTTP_404_NOT_FOUND,
     ErrorCode.JOB_TRANSITION_INVALID: status.HTTP_409_CONFLICT,
+    # Брошенное задание и исчерпанный срок — это состояние задания, а не ошибка
+    # запроса: наружу они уходят в поле задания, а не HTTP-кодом. Статус нужен
+    # только на случай, когда их всё же поднимают исключением.
+    ErrorCode.JOB_LEASE_LOST: status.HTTP_409_CONFLICT,
+    ErrorCode.JOB_TIMEOUT: status.HTTP_409_CONFLICT,
+    ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
+    ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     # Отказы внешней системы — 502: клиент не виноват, но и повторять запрос бессмысленно,
     # пока не поправят ключ или доступ на той стороне.
     ErrorCode.TENDERHUB_DISABLED: status.HTTP_503_SERVICE_UNAVAILABLE,

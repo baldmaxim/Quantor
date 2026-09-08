@@ -5,6 +5,88 @@ export type ClientOptions = {
 };
 
 /**
+ * AdminJobRead
+ *
+ * Задание в эксплуатационном виде.
+ *
+ * Отдельно от `JobRead`: пользователю не нужны попытки и исполнитель, а администратору
+ * без них не разобрать, почему задание висит. Полезная нагрузка сюда не попадает —
+ * в ней лежат идентификаторы и пути, а не то, что стоит показывать целиком.
+ */
+export type AdminJobRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Available At
+     */
+    available_at: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Heartbeat At
+     */
+    heartbeat_at: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Is Retryable
+     */
+    is_retryable: boolean;
+    job_type: JobType;
+    /**
+     * Lease Expires At
+     */
+    lease_expires_at: string | null;
+    /**
+     * Max Attempts
+     */
+    max_attempts: number;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    /**
+     * Started At
+     */
+    started_at: string | null;
+    status: JobStatus;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Worker Id
+     */
+    worker_id: string | null;
+};
+
+/**
  * ArtifactKind
  *
  * Роль файла внутри распознанного пакета.
@@ -117,9 +199,13 @@ export type ComponentHealth = {
      */
     name: string;
     /**
+     * Required
+     */
+    required?: boolean;
+    /**
      * Status
      */
-    status: 'ok' | 'unavailable' | 'outdated';
+    status: 'ok' | 'degraded' | 'unavailable' | 'outdated';
 };
 
 /**
@@ -355,6 +441,34 @@ export type JobRead = {
 };
 
 /**
+ * JobStatsRead
+ *
+ * Счётчики очереди для панели обзора.
+ */
+export type JobStatsRead = {
+    /**
+     * Failed Recently
+     */
+    failed_recently: number;
+    /**
+     * Queued
+     */
+    queued: number;
+    /**
+     * Running
+     */
+    running: number;
+    /**
+     * Workers Alive
+     */
+    workers_alive: number;
+    /**
+     * Workers Total
+     */
+    workers_total: number;
+};
+
+/**
  * JobStatus
  */
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -433,6 +547,28 @@ export type MetaResponse = {
  * чтобы уровень не появился в определениях раньше, чем в коде, который его читает.
  */
 export type OverrideScope = 'system' | 'workspace' | 'project';
+
+/**
+ * Page[AdminJobRead]
+ */
+export type PageAdminJobRead = {
+    /**
+     * Items
+     */
+    items: Array<AdminJobRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
 
 /**
  * Page[AuditEventRead]
@@ -1335,6 +1471,46 @@ export type ValidationError = {
  */
 export type ValueSource = 'default' | 'system' | 'workspace' | 'deployment';
 
+/**
+ * WorkerRead
+ *
+ * Исполнитель заданий. Показывается в эксплуатации, а не пользователю.
+ */
+export type WorkerRead = {
+    /**
+     * Current Job Id
+     */
+    current_job_id: string | null;
+    /**
+     * Heartbeat At
+     */
+    heartbeat_at: string;
+    /**
+     * Host
+     */
+    host: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Is Alive
+     */
+    is_alive: boolean;
+    /**
+     * Pid
+     */
+    pid: number;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Version
+     */
+    version: string;
+};
+
 export type ListAuditEventsData = {
     body?: never;
     path?: never;
@@ -1613,6 +1789,186 @@ export type TestTenderhubConnectionResponses = {
 };
 
 export type TestTenderhubConnectionResponse = TestTenderhubConnectionResponses[keyof TestTenderhubConnectionResponses];
+
+export type ListAdminJobsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+        /**
+         * Status
+         *
+         * Фильтр по состоянию
+         */
+        status?: JobStatus | null;
+        /**
+         * Job Type
+         *
+         * Фильтр по типу
+         */
+        job_type?: JobType | null;
+        /**
+         * Project Id
+         *
+         * Фильтр по проекту
+         */
+        project_id?: string | null;
+    };
+    url: '/api/v1/admin/jobs';
+};
+
+export type ListAdminJobsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListAdminJobsError = ListAdminJobsErrors[keyof ListAdminJobsErrors];
+
+export type ListAdminJobsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageAdminJobRead;
+};
+
+export type ListAdminJobsResponse = ListAdminJobsResponses[keyof ListAdminJobsResponses];
+
+export type ReadJobStatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/jobs/stats';
+};
+
+export type ReadJobStatsResponses = {
+    /**
+     * Successful Response
+     */
+    200: JobStatsRead;
+};
+
+export type ReadJobStatsResponse = ReadJobStatsResponses[keyof ReadJobStatsResponses];
+
+export type ListJobWorkersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/jobs/workers';
+};
+
+export type ListJobWorkersResponses = {
+    /**
+     * Response List Job Workers
+     *
+     * Successful Response
+     */
+    200: Array<WorkerRead>;
+};
+
+export type ListJobWorkersResponse = ListJobWorkersResponses[keyof ListJobWorkersResponses];
+
+export type ReadAdminJobData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/jobs/{job_id}';
+};
+
+export type ReadAdminJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadAdminJobError = ReadAdminJobErrors[keyof ReadAdminJobErrors];
+
+export type ReadAdminJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminJobRead;
+};
+
+export type ReadAdminJobResponse = ReadAdminJobResponses[keyof ReadAdminJobResponses];
+
+export type CancelAdminJobData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/jobs/{job_id}/cancel';
+};
+
+export type CancelAdminJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CancelAdminJobError = CancelAdminJobErrors[keyof CancelAdminJobErrors];
+
+export type CancelAdminJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminJobRead;
+};
+
+export type CancelAdminJobResponse = CancelAdminJobResponses[keyof CancelAdminJobResponses];
+
+export type RetryAdminJobData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/jobs/{job_id}/retry';
+};
+
+export type RetryAdminJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RetryAdminJobError = RetryAdminJobErrors[keyof RetryAdminJobErrors];
+
+export type RetryAdminJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminJobRead;
+};
+
+export type RetryAdminJobResponse = RetryAdminJobResponses[keyof RetryAdminJobResponses];
 
 export type ListSettingsData = {
     body?: never;

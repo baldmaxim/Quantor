@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginLoginData, BeginLoginErrors, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
+import type { BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -107,6 +107,60 @@ export const unlinkTenderhubProject = <ThrowOnError extends boolean = false>(opt
  * что-то сломалось.
  */
 export const testTenderhubConnection = <ThrowOnError extends boolean = false>(options?: Options<TestTenderhubConnectionData, ThrowOnError>): RequestResult<TestTenderhubConnectionResponses, unknown, ThrowOnError> => (options?.client ?? client).post<TestTenderhubConnectionResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/integrations/tenderhub/test-connection', ...options });
+
+/**
+ * Задания
+ *
+ * Страница списка заданий.
+ *
+ * Пагинация обязательна: задания копятся всё время работы установки.
+ */
+export const listAdminJobs = <ThrowOnError extends boolean = false>(options?: Options<ListAdminJobsData, ThrowOnError>): RequestResult<ListAdminJobsResponses, ListAdminJobsErrors, ThrowOnError> => (options?.client ?? client).get<ListAdminJobsResponses, ListAdminJobsErrors, ThrowOnError>({ url: '/api/v1/admin/jobs', ...options });
+
+/**
+ * Счётчики очереди
+ *
+ * Сколько заданий ждёт, работает и отказало за сутки.
+ *
+ * Здесь ноль — это настоящий ноль, а не «не измеряли»: счётчики считаются запросом.
+ */
+export const readJobStats = <ThrowOnError extends boolean = false>(options?: Options<ReadJobStatsData, ThrowOnError>): RequestResult<ReadJobStatsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ReadJobStatsResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/jobs/stats', ...options });
+
+/**
+ * Исполнители заданий
+ *
+ * Кто сейчас берёт задания и чем занят.
+ */
+export const listJobWorkers = <ThrowOnError extends boolean = false>(options?: Options<ListJobWorkersData, ThrowOnError>): RequestResult<ListJobWorkersResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListJobWorkersResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/jobs/workers', ...options });
+
+/**
+ * Задание
+ */
+export const readAdminJob = <ThrowOnError extends boolean = false>(options: Options<ReadAdminJobData, ThrowOnError>): RequestResult<ReadAdminJobResponses, ReadAdminJobErrors, ThrowOnError> => (options.client ?? client).get<ReadAdminJobResponses, ReadAdminJobErrors, ThrowOnError>({ url: '/api/v1/admin/jobs/{job_id}', ...options });
+
+/**
+ * Отменить задание
+ *
+ * Отменяет задание, которое ещё не начали.
+ *
+ * Только ожидающее. Прерывать выполняющийся импорт на середине нечем: он оставит
+ * полуразобранный пакет, и разбираться с этим дороже, чем дождаться. Совместная
+ * отмена появится тогда, когда для неё будет настоящий механизм, а не раньше.
+ */
+export const cancelAdminJob = <ThrowOnError extends boolean = false>(options: Options<CancelAdminJobData, ThrowOnError>): RequestResult<CancelAdminJobResponses, CancelAdminJobErrors, ThrowOnError> => (options.client ?? client).post<CancelAdminJobResponses, CancelAdminJobErrors, ThrowOnError>({ url: '/api/v1/admin/jobs/{job_id}/cancel', ...options });
+
+/**
+ * Повторить задание
+ *
+ * Возвращает отказавшее задание в очередь.
+ *
+ * Не создаёт второе, а возвращает то же: ключ идемпотентности уникален, и вставка
+ * дубликата превратилась бы в непонятную ошибку вместо повтора.
+ *
+ * Повторить можно только то, что имеет смысл повторять. Битый архив останется битым,
+ * и кнопка для него отключена — обещать починку тем, что её не даёт, хуже, чем отказать.
+ */
+export const retryAdminJob = <ThrowOnError extends boolean = false>(options: Options<RetryAdminJobData, ThrowOnError>): RequestResult<RetryAdminJobResponses, RetryAdminJobErrors, ThrowOnError> => (options.client ?? client).post<RetryAdminJobResponses, RetryAdminJobErrors, ThrowOnError>({ url: '/api/v1/admin/jobs/{job_id}/retry', ...options });
 
 /**
  * Настройки с действующими значениями
@@ -321,5 +375,16 @@ export const liveness = <ThrowOnError extends boolean = false>(options?: Options
 
 /**
  * Readiness probe
+ *
+ * Готовность API отвечать на запросы.
+ *
+ * Ключевое различие — между обязательными компонентами и необязательными. Без базы,
+ * схемы и хранилища API не может ответить почти ни на что: это 503, и балансировщик
+ * обязан увести с него трафик.
+ *
+ * Исполнитель заданий — другое дело. Когда он лежит, портал по-прежнему показывает
+ * проекты, документы и чертежи; не работает только запуск новых импортов. Отдавать
+ * 503 в этом случае значит увести трафик с полностью исправного API и превратить
+ * частичную поломку в полную (ADR-0015).
  */
 export const readiness = <ThrowOnError extends boolean = false>(options?: Options<ReadinessData, ThrowOnError>): RequestResult<ReadinessResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ReadinessResponses, unknown, ThrowOnError>({ url: '/health/ready', ...options });

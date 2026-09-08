@@ -120,6 +120,9 @@ class AuditAction(StrEnum):
     TENDERHUB_PROJECT_REBOUND = "tenderhub_project_rebound"
     TENDERHUB_PROJECT_UNLINKED = "tenderhub_project_unlinked"
 
+    JOB_RETRIED = "job_retried"
+    JOB_CANCELLED = "job_cancelled"
+
     PERMISSION_DENIED = "permission_denied"
 
 

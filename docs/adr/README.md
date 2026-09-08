@@ -22,3 +22,4 @@ ADR не переписываются задним числом. Если реш
 | [0011](0011-integraciya-s-tenderhub.md)               | Интеграция с TenderHUB                        | принято |
 | [0012](0012-granica-autentifikacii-i-avtorizacii.md)  | Граница аутентификации и авторизации          | принято |
 | [0013](0013-granica-razvyortyvaniya-admin-console.md) | Граница развёртывания админ-контура           | принято |
+| [0014](0014-otdelnyj-ispolnitel-zadanij.md)           | Отдельный исполнитель заданий                 | принято |

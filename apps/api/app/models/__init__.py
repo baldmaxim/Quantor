@@ -8,6 +8,7 @@ from app.models.identity import AuthSession, UserIdentity, Workspace, WorkspaceM
 from app.models.job import Job
 from app.models.project import Project
 from app.models.sheet import Region, Sheet
+from app.models.worker import Worker
 
 __all__ = [
     "AuditEvent",
@@ -22,6 +23,7 @@ __all__ = [
     "SettingOverride",
     "Sheet",
     "UserIdentity",
+    "Worker",
     "Workspace",
     "WorkspaceMembership",
 ]

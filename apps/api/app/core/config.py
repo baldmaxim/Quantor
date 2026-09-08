@@ -82,6 +82,23 @@ class Settings(BaseSettings):
     )
     tenderhub_timeout_seconds: float = Field(default=20.0, gt=0)
 
+    # --- исполнение заданий ---
+    #
+    # `worker` — задания забирает отдельный процесс (`python -m app.worker`).
+    # `inline` — прежнее поведение Stage 1: фоновая задача внутри процесса API. Оставлен
+    # для запуска без воркера и для тестов, которые выполняют задание явно.
+    job_executor: Literal["worker", "inline"] = "worker"
+
+    worker_poll_interval_seconds: float = Field(default=1.0, gt=0)
+    # Срок владения заданием. Пульс шлётся втрое чаще: одна пропущенная отметка не должна
+    # приводить к тому, что задание отберут у живого исполнителя.
+    worker_lease_seconds: int = Field(default=60, gt=0)
+    worker_concurrency: int = Field(default=1, gt=0)
+    worker_retry_base_seconds: int = Field(default=15, gt=0)
+    worker_retry_max_seconds: int = Field(default=900, gt=0)
+    # Через сколько молчания исполнитель считается мёртвым. Втрое больше аренды.
+    worker_stale_after_seconds: int = Field(default=180, gt=0)
+
     # --- вход в портал ---
     #
     # `dev` — фиксированная личность без провайдера: так работают `pnpm dev` и тесты.
@@ -161,6 +178,11 @@ class Settings(BaseSettings):
     @property
     def is_local(self) -> bool:
         return self.environment in ("local", "test")
+
+    @property
+    def worker_heartbeat_interval_seconds(self) -> float:
+        """Как часто продлевать аренду. Втрое чаще её срока — с запасом на одну потерю."""
+        return max(self.worker_lease_seconds / 3, 1.0)
 
     @property
     def auth_cookie_secure(self) -> bool:

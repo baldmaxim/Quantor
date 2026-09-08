@@ -10,21 +10,55 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode
 from app.models import Job, Project
 
-# Разрешённые переходы. Из завершённого состояния выхода нет: перезапуск — это новое задание.
+# Разрешённые переходы.
+#
+# Два возврата в очередь появились вместе с отдельным исполнителем, и оба узкие:
+#
+# - `running → queued` — только через `release_expired()`: исполнитель умер, аренда
+#   истекла, и задание надо отдать другому. Иначе оно висело бы «выполняется» вечно;
+# - `failed → queued` — только через `retry()`: администратор повторяет отказ, который
+#   действительно можно повторить.
+#
+# Успех и отмена остаются окончательными: у них выхода нет и не будет.
 ALLOWED_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
     JobStatus.QUEUED: frozenset({JobStatus.RUNNING, JobStatus.CANCELLED, JobStatus.FAILED}),
-    JobStatus.RUNNING: frozenset({JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED}),
+    JobStatus.RUNNING: frozenset(
+        {JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.QUEUED}
+    ),
     JobStatus.SUCCEEDED: frozenset(),
-    JobStatus.FAILED: frozenset(),
+    JobStatus.FAILED: frozenset({JobStatus.QUEUED}),
     JobStatus.CANCELLED: frozenset(),
 }
+
+# Отказы, которые имеет смысл повторить: они про обстоятельства, а не про сам вход.
+# Битый архив останется битым сколько его ни повторяй, и предлагать кнопку «повторить»
+# для него значит обещать невозможное.
+RETRYABLE_ERROR_CODES: frozenset[str] = frozenset(
+    {
+        ErrorCode.STORAGE_UNAVAILABLE.value,
+        ErrorCode.DATABASE_UNAVAILABLE.value,
+        ErrorCode.TENDERHUB_UNAVAILABLE.value,
+        ErrorCode.TENDERHUB_RATE_LIMITED.value,
+        ErrorCode.JOB_LEASE_LOST.value,
+        ErrorCode.JOB_TIMEOUT.value,
+    }
+)
+
+
+def is_retryable(job: Job) -> bool:
+    """Можно ли повторить это задание.
+
+    Исчерпанные попытки не мешают повтору вручную: администратор видит причину и решает
+    сам — на то он и администратор. Мешает только природа ошибки.
+    """
+    return job.status is JobStatus.FAILED and (job.error_code or "") in RETRYABLE_ERROR_CODES
 
 
 def _now() -> datetime:
@@ -174,5 +208,184 @@ async def cancel(session: AsyncSession, *, job: Job) -> Job:
     _ensure_transition(job, JobStatus.CANCELLED)
     job.status = JobStatus.CANCELLED
     job.finished_at = _now()
+    await session.flush()
+    return job
+
+
+# --------------------------------------------------------------- захват и аренда
+#
+# Всё ниже работает на часах базы (`now()`), а не приложения. `created_at` задания ставит
+# процесс API — осознанно, см. ограничения этапа, — но аренду так мерить нельзя: два
+# процесса с разошедшимися часами начнут отбирать задания друг у друга.
+
+
+CLAIM_SQL = text(
+    """
+    update jobs set
+        status = 'running',
+        worker_id = :worker_id,
+        attempt = attempt + 1,
+        started_at = coalesce(started_at, now()),
+        heartbeat_at = now(),
+        lease_expires_at = now() + make_interval(secs => :lease_seconds),
+        progress = 0.0,
+        stage = null,
+        updated_at = now()
+    where id = (
+        select id from jobs
+         where status = 'queued'
+           and job_type = any(:job_types)
+           and available_at <= now()
+         order by available_at, created_at
+         limit 1
+         for update skip locked
+    )
+    returning id
+    """
+)
+
+
+async def claim(
+    session: AsyncSession,
+    *,
+    worker_id: str,
+    job_types: list[str],
+    lease_seconds: int,
+) -> Job | None:
+    """Забирает одно задание из очереди или возвращает None, если брать нечего.
+
+    `for update skip locked` — то, ради чего здесь сырой SQL: два исполнителя, пришедшие
+    одновременно, не встают в очередь друг за другом и не берут одно и то же. Второй
+    просто пропускает занятую строку и смотрит следующую.
+
+    Порядок `available_at, created_at`, а не только `created_at`: иначе отсрочка повтора
+    игнорируется и упавшее задание берут снова немедленно.
+    """
+    claimed = await session.scalar(
+        CLAIM_SQL,
+        {"worker_id": worker_id, "job_types": job_types, "lease_seconds": lease_seconds},
+    )
+    if claimed is None:
+        return None
+    return await session.get(Job, claimed)
+
+
+HEARTBEAT_SQL = text(
+    """
+    update jobs set
+        heartbeat_at = now(),
+        lease_expires_at = now() + make_interval(secs => :lease_seconds),
+        progress = coalesce(:progress, progress),
+        stage = coalesce(:stage, stage),
+        updated_at = now()
+    where id = :job_id and worker_id = :worker_id and status = 'running'
+    returning id
+    """
+)
+
+
+async def heartbeat(
+    session: AsyncSession,
+    *,
+    job_id: uuid.UUID,
+    worker_id: str,
+    lease_seconds: int,
+    progress: float | None = None,
+    stage: str | None = None,
+) -> bool:
+    """Продлевает аренду. False означает, что задание больше не наше.
+
+    Ответ важен: аренду мог отобрать сборщик брошенных, решив, что исполнитель умер.
+    Продолжать работу в этом случае нельзя — её уже делает кто-то другой.
+    """
+    # `returning id` вместо rowcount: у результата в типах SQLAlchemy его нет, а
+    # подавлять проверку типов правилами проекта запрещено. Заодно нагляднее.
+    updated = await session.scalar(
+        HEARTBEAT_SQL,
+        {
+            "job_id": job_id,
+            "worker_id": worker_id,
+            "lease_seconds": lease_seconds,
+            "progress": progress,
+            "stage": stage,
+        },
+    )
+    return updated is not None
+
+
+RELEASE_EXPIRED_SQL = text(
+    """
+    update jobs set
+        status = case
+            when attempt < max_attempts then 'queued'
+            else 'failed'
+        end,
+        worker_id = null,
+        lease_expires_at = null,
+        available_at = case
+            when attempt < max_attempts
+            then now() + make_interval(
+                secs => least(:base_seconds * power(2, attempt), :max_seconds)
+            )
+            else available_at
+        end,
+        error_code = case when attempt < max_attempts then error_code else :lost_code end,
+        error_message = case
+            when attempt < max_attempts then error_message
+            else 'исполнитель перестал отвечать'
+        end,
+        finished_at = case when attempt < max_attempts then null else now() end,
+        updated_at = now()
+    where status = 'running'
+      and lease_expires_at is not null
+      and lease_expires_at < now()
+    returning id
+    """
+)
+
+
+async def release_expired(session: AsyncSession, *, base_seconds: int, max_seconds: int) -> int:
+    """Возвращает в очередь задания, чья аренда истекла.
+
+    Отсрочка растёт вдвое с каждой попыткой: если причина отказа не в самом задании,
+    а в недоступной зависимости, немедленный повтор её не починит, а нагрузку добавит.
+
+    Исчерпав попытки, задание становится отказом с отдельным кодом. Молча висеть
+    «выполняется» оно не должно: по этому состоянию судят о работоспособности установки.
+    """
+    result = await session.execute(
+        RELEASE_EXPIRED_SQL,
+        {
+            "base_seconds": base_seconds,
+            "max_seconds": max_seconds,
+            "lost_code": ErrorCode.JOB_LEASE_LOST.value,
+        },
+    )
+    return len(result.fetchall())
+
+
+async def retry(session: AsyncSession, *, job: Job) -> Job:
+    """Повторяет отказавшее задание.
+
+    Не создаёт второе, а возвращает то же самое в очередь: ключ идемпотентности уникален,
+    а импорт пакета и так идемпотентен — второе задание с тем же ключом просто не
+    вставится, и повтор превратился бы в непонятную ошибку.
+    """
+    if not is_retryable(job):
+        raise DomainError(
+            ErrorCode.JOB_NOT_RETRYABLE,
+            f"Отказ {job.error_code or 'без кода'} повтором не чинится",
+        )
+
+    _ensure_transition(job, JobStatus.QUEUED)
+    job.status = JobStatus.QUEUED
+    job.max_attempts = job.attempt + 1
+    job.worker_id = None
+    job.lease_expires_at = None
+    job.error_code = None
+    job.error_message = None
+    job.finished_at = None
+    job.progress = None
+    job.stage = None
     await session.flush()
     return job

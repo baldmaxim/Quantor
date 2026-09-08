@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1.admin import audit, feature_flags, integrations, settings
+from app.api.v1.admin import audit, feature_flags, integrations, jobs, settings
 from app.api.v1.deps import require
 from app.auth.permissions import Permission
 
@@ -24,4 +24,5 @@ admin_router = APIRouter(
 admin_router.include_router(settings.router)
 admin_router.include_router(feature_flags.router)
 admin_router.include_router(integrations.router)
+admin_router.include_router(jobs.router)
 admin_router.include_router(audit.router)

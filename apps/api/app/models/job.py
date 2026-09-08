@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, String
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -52,6 +52,30 @@ class Job(TimestampMixin, Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # --- исполнение отдельным процессом ---
+    #
+    # Все отметки времени ниже ставит база (`now()`), а не приложение. Это не придирка:
+    # `created_at` задания ставит процесс API (осознанно, см. ограничения этапа), и если
+    # аренду мерить теми же часами, то два процесса с разошедшимися часами начнут отбирать
+    # задания друг у друга.
+
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Снимок на момент постановки: изменение умолчания не должно задним числом
+    # оживлять давно отказавшие задания.
+    max_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+
+    worker_id: Mapped[str | None] = mapped_column(String(64))
+    # Срок владения. Истёк — задание считается брошенным и возвращается в очередь.
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Не раньше этого времени задание можно брать. На этом стоит отсрочка повтора.
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
     # Идентификаторы входных и выходных артефактов задания: без них происхождение
     # результата не восстановить.
     payload: Mapped[dict[str, Any]] = mapped_column(
@@ -64,6 +88,21 @@ class Job(TimestampMixin, Base):
         CheckConstraint(
             "progress is null or (progress >= 0 and progress <= 1)", name="progress_range"
         ),
+        CheckConstraint("attempt >= 0 and attempt <= max_attempts + 1", name="attempt_range"),
         Index("ix_jobs_project_id_created_at", "project_id", "created_at"),
         Index("ix_jobs_status_created_at", "status", "created_at"),
+        # Частичные индексы под два горячих запроса воркера: «что взять» и «что брошено».
+        # Без условия они покрывали бы и завершённые задания, которых со временем
+        # становится большинство.
+        Index(
+            "ix_jobs_claim",
+            "available_at",
+            "created_at",
+            postgresql_where=text("status = 'queued'"),
+        ),
+        Index(
+            "ix_jobs_lease",
+            "lease_expires_at",
+            postgresql_where=text("status = 'running'"),
+        ),
     )
