@@ -69,18 +69,42 @@ async def enqueue(
     session: AsyncSession,
     *,
     job_type: JobType,
+    workspace_id: uuid.UUID | None,
     project_id: uuid.UUID | None = None,
     idempotency_key: str | None = None,
     payload: dict[str, object] | None = None,
 ) -> Job:
-    """Ставит задание в очередь. При повторе с тем же ключом возвращает существующее."""
+    """Ставит задание в очередь. При повторе с тем же ключом возвращает существующее.
+
+    `workspace_id` — именованный аргумент **без умолчания**. Умолчание `None` означало бы,
+    что общесистемное задание создаётся забывчивостью: пропустил параметр — получил задание,
+    невидимое пространству. Для намеренного случая есть `enqueue_system`.
+    """
+    if project_id is not None:
+        project = await session.get(Project, project_id)
+        if project is None or project.workspace_id != workspace_id:
+            # База поймала бы это составным ключом, но сообщением драйвера, а не по делу.
+            raise DomainError(
+                ErrorCode.VALIDATION_FAILED,
+                "Проект не принадлежит указанному рабочему пространству",
+            )
+
     if idempotency_key:
         existing = await find_by_idempotency_key(session, idempotency_key=idempotency_key)
         if existing is not None:
+            if existing.workspace_id != workspace_id:
+                # Ключ уникален на всю установку. Сегодня он содержит project_id и потому
+                # не сталкивается, но это соглашение вызывающего, а не инвариант схемы:
+                # без этой проверки чужое задание вернулось бы как своё.
+                raise DomainError(
+                    ErrorCode.VALIDATION_FAILED,
+                    "Ключ идемпотентности занят заданием другого рабочего пространства",
+                )
             return existing
 
     job = Job(
         project_id=project_id,
+        workspace_id=workspace_id,
         job_type=job_type,
         status=JobStatus.QUEUED,
         idempotency_key=idempotency_key,
@@ -96,6 +120,28 @@ async def enqueue(
     return job
 
 
+async def enqueue_system(
+    session: AsyncSession,
+    *,
+    job_type: JobType,
+    idempotency_key: str | None = None,
+    payload: dict[str, object] | None = None,
+) -> Job:
+    """Задание вне арендаторов: обслуживание установки.
+
+    Ни одному рабочему пространству оно не видно; читается только административным контуром
+    через `get_system_job`. Вызовов пока нет — обёртка заводится вместе с механизмом, чтобы
+    общесистемное задание нельзя было создать, просто забыв аргумент.
+    """
+    return await enqueue(
+        session,
+        job_type=job_type,
+        workspace_id=None,
+        idempotency_key=idempotency_key,
+        payload=payload,
+    )
+
+
 async def find_by_idempotency_key(session: AsyncSession, *, idempotency_key: str) -> Job | None:
     result = await session.execute(select(Job).where(Job.idempotency_key == idempotency_key))
     return result.scalar_one_or_none()
@@ -106,27 +152,43 @@ async def get_job(
 ) -> Job | None:
     """Задание видно только внутри своего рабочего пространства.
 
-    Задания без проекта (общесистемные) на Stage 1 не создаются, но контракт учитывает
-    и такой случай: у них project_id пуст, и они доступны в dev-режиме.
+    Общесистемные задания (`workspace_id is null`) отсюда не видны никогда и никому:
+    сравнение с NULL в SQL не истинно, и отдельной ветки для них здесь нет — именно её
+    отсутствие и есть гарантия. Прежде такая ветка была, и задание без проекта попадало
+    в любое пространство.
     """
-    query = (
-        select(Job)
-        .outerjoin(Project, Job.project_id == Project.id)
-        .where(
-            Job.id == job_id,
-            (Job.project_id.is_(None)) | (Project.workspace_id == workspace_id),
-        )
-    )
+    query = select(Job).where(Job.id == job_id, Job.workspace_id == workspace_id)
+    result = await session.execute(query)
+    return result.scalar_one_or_none()
+
+
+async def get_system_job(session: AsyncSession, *, job_id: uuid.UUID) -> Job | None:
+    """Общесистемное задание: обслуживание установки, вне арендаторов.
+
+    Отдельная функция, а не флаг `include_system=True` у `get_job`: такой флаг рано или
+    поздно оказывается прокинут из параметра запроса.
+    """
+    query = select(Job).where(Job.id == job_id, Job.workspace_id.is_(None))
     result = await session.execute(query)
     return result.scalar_one_or_none()
 
 
 async def list_jobs(
-    session: AsyncSession, *, project_id: uuid.UUID, limit: int, offset: int
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    limit: int,
+    offset: int,
 ) -> list[Job]:
+    """Задания проекта. Пространство спрашивается отдельно — защита в глубину.
+
+    Вызывающий уже проверил принадлежность проекта, но именно этот предикат делает выборку
+    безопасной в отрыве от вызывающего.
+    """
     query = (
         select(Job)
-        .where(Job.project_id == project_id)
+        .where(Job.workspace_id == workspace_id, Job.project_id == project_id)
         .order_by(Job.created_at.desc())
         .limit(limit)
         .offset(offset)
@@ -135,9 +197,13 @@ async def list_jobs(
     return list(result.scalars().all())
 
 
-async def count_jobs(session: AsyncSession, *, project_id: uuid.UUID) -> int:
+async def count_jobs(
+    session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
+) -> int:
     result = await session.execute(
-        select(func.count()).select_from(Job).where(Job.project_id == project_id)
+        select(func.count())
+        .select_from(Job)
+        .where(Job.workspace_id == workspace_id, Job.project_id == project_id)
     )
     return int(result.scalar_one())
 

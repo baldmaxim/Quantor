@@ -115,6 +115,9 @@
             ],
             "title": "Project Id"
           },
+          "scope": {
+            "$ref": "#/components/schemas/JobScope"
+          },
           "stage": {
             "anyOf": [
               {
@@ -156,11 +159,25 @@
               }
             ],
             "title": "Worker Id"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
           }
         },
         "required": [
           "id",
           "project_id",
+          "workspace_id",
+          "scope",
           "job_type",
           "status",
           "progress",
@@ -917,6 +934,16 @@
         ],
         "title": "JobRead",
         "type": "object"
+      },
+      "JobScope": {
+        "description": "Кому принадлежит задание.\n\nЭто словарь контракта, а не колонка: область выводится из пары `workspace_id`/`project_id`\nу `Job`. Отдельная колонка была бы производной от той же пары и однажды разошлась бы с ней.\n\n`system` — обслуживание установки. Такое задание не видно ни одному рабочему пространству\nи доступно только через административный контур.",
+        "enum": [
+          "system",
+          "workspace",
+          "project"
+        ],
+        "title": "JobScope",
+        "type": "string"
       },
       "JobStatsRead": {
         "description": "Счётчики очереди для панели обзора.",
@@ -3476,7 +3503,7 @@
     },
     "/api/v1/admin/jobs": {
       "get": {
-        "description": "Страница списка заданий.\n\nПагинация обязательна: задания копятся всё время работы установки.",
+        "description": "Страница списка заданий.\n\nПагинация обязательна: задания копятся всё время работы установки.\n\nУмолчание для администратора платформы — все области, включая общесистемную: это\nэксплуатационный список, и прятать в нём обслуживание установки значило бы прятать\nеё поломки.",
         "operationId": "list_admin_jobs",
         "parameters": [
           {
@@ -3559,6 +3586,24 @@
               ],
               "description": "Фильтр по проекту",
               "title": "Project Id"
+            }
+          },
+          {
+            "description": "Фильтр по области видимости",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/JobScope"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по области видимости",
+              "title": "Scope"
             }
           }
         ],

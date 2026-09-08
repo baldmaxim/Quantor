@@ -6,12 +6,16 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import JobStatus, JobType
+from app.domain import JobScope, JobStatus, JobType
 from app.errors import DomainError
-from app.models import Job, Project
+from app.models import Job, Project, Workspace
 from app.services import jobs as jobs_service
 from app.services import projects as projects_service
 
@@ -70,7 +74,10 @@ class TestJobLifecycle:
         project = await _project(db_session, workspace_id)
 
         job = await jobs_service.enqueue(
-            db_session, job_type=JobType.LEGACY_IMPORT, project_id=project.id
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
         )
         assert job.status is JobStatus.QUEUED
         assert job.started_at is None
@@ -99,7 +106,10 @@ class TestJobLifecycle:
     ) -> None:
         project = await _project(db_session, workspace_id)
         job = await jobs_service.enqueue(
-            db_session, job_type=JobType.LEGACY_IMPORT, project_id=project.id
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
         )
         await jobs_service.start(db_session, job=job)
         await jobs_service.fail(db_session, job=job, error_code="ARCHIVE_LIMIT_EXCEEDED")
@@ -112,7 +122,10 @@ class TestJobLifecycle:
     ) -> None:
         project = await _project(db_session, workspace_id)
         job = await jobs_service.enqueue(
-            db_session, job_type=JobType.LEGACY_IMPORT, project_id=project.id
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
         )
 
         with pytest.raises(DomainError):
@@ -123,7 +136,10 @@ class TestJobLifecycle:
     ) -> None:
         project = await _project(db_session, workspace_id)
         job = await jobs_service.enqueue(
-            db_session, job_type=JobType.LEGACY_IMPORT, project_id=project.id
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
         )
         await jobs_service.start(db_session, job=job)
 
@@ -137,7 +153,10 @@ class TestJobLifecycle:
     ) -> None:
         project = await _project(db_session, workspace_id)
         job = await jobs_service.enqueue(
-            db_session, job_type=JobType.LEGACY_IMPORT, project_id=project.id
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
         )
         await jobs_service.start(db_session, job=job)
 
@@ -158,18 +177,25 @@ class TestIdempotency:
         first = await jobs_service.enqueue(
             db_session,
             job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
             project_id=project.id,
             idempotency_key="package-sha256-abc",
         )
         second = await jobs_service.enqueue(
             db_session,
             job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
             project_id=project.id,
             idempotency_key="package-sha256-abc",
         )
 
         assert first.id == second.id
-        assert await jobs_service.count_jobs(db_session, project_id=project.id) == 1
+        assert (
+            await jobs_service.count_jobs(
+                db_session, workspace_id=workspace_id, project_id=project.id
+            )
+            == 1
+        )
 
     async def test_different_keys_create_separate_jobs(
         self, db_session: AsyncSession, workspace_id: object
@@ -179,33 +205,178 @@ class TestIdempotency:
         await jobs_service.enqueue(
             db_session,
             job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
             project_id=project.id,
             idempotency_key="first",
         )
         await jobs_service.enqueue(
             db_session,
             job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
             project_id=project.id,
             idempotency_key="second",
         )
 
-        assert await jobs_service.count_jobs(db_session, project_id=project.id) == 2
+        assert (
+            await jobs_service.count_jobs(
+                db_session, workspace_id=workspace_id, project_id=project.id
+            )
+            == 2
+        )
 
 
 class TestJobIsolation:
     async def test_job_of_another_workspace_is_invisible(
         self, db_session: AsyncSession, workspace_id: object
     ) -> None:
-        import uuid
-
         project = await _project(db_session, workspace_id)
         job = await jobs_service.enqueue(
-            db_session, job_type=JobType.LEGACY_IMPORT, project_id=project.id
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
         )
 
         found = await jobs_service.get_job(db_session, workspace_id=uuid.uuid4(), job_id=job.id)
 
         assert found is None
+
+    async def test_system_job_is_invisible_to_every_workspace(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID, second_workspace: Workspace
+    ) -> None:
+        """Общесистемное задание не принадлежит никому — значит, не видно никому.
+
+        До явной области видимости пустой `project_id` означал обратное: такое задание
+        попадало в любое рабочее пространство.
+        """
+        job = await jobs_service.enqueue_system(db_session, job_type=JobType.LEGACY_IMPORT)
+
+        assert job.scope is JobScope.SYSTEM
+        assert (
+            await jobs_service.get_job(db_session, workspace_id=workspace_id, job_id=job.id) is None
+        )
+        assert (
+            await jobs_service.get_job(db_session, workspace_id=second_workspace.id, job_id=job.id)
+            is None
+        )
+
+    async def test_system_job_is_reachable_only_through_its_own_path(
+        self, db_session: AsyncSession
+    ) -> None:
+        job = await jobs_service.enqueue_system(db_session, job_type=JobType.LEGACY_IMPORT)
+
+        found = await jobs_service.get_system_job(db_session, job_id=job.id)
+
+        assert found is not None
+        assert found.id == job.id
+
+    async def test_system_path_does_not_return_a_workspace_job(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        """Симметрия: путь администратора не превращается в универсальную отмычку."""
+        project = await _project(db_session, workspace_id)
+        job = await jobs_service.enqueue(
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
+        )
+
+        assert await jobs_service.get_system_job(db_session, job_id=job.id) is None
+
+    async def test_workspace_job_without_project_belongs_to_its_workspace(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID, second_workspace: Workspace
+    ) -> None:
+        """Задание пространства без проекта видно своим и не видно чужим."""
+        job = await jobs_service.enqueue(
+            db_session, job_type=JobType.LEGACY_IMPORT, workspace_id=workspace_id
+        )
+
+        assert job.scope is JobScope.WORKSPACE
+        found = await jobs_service.get_job(db_session, workspace_id=workspace_id, job_id=job.id)
+        assert found is not None
+        assert (
+            await jobs_service.get_job(db_session, workspace_id=second_workspace.id, job_id=job.id)
+            is None
+        )
+
+
+class TestScopeInvariants:
+    async def test_enqueue_rejects_a_project_from_another_workspace(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID, second_workspace: Workspace
+    ) -> None:
+        project = await _project(db_session, workspace_id)
+
+        with pytest.raises(DomainError):
+            await jobs_service.enqueue(
+                db_session,
+                job_type=JobType.LEGACY_IMPORT,
+                workspace_id=second_workspace.id,
+                project_id=project.id,
+            )
+
+    async def test_idempotency_key_does_not_cross_the_boundary(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID, second_workspace: Workspace
+    ) -> None:
+        """Ключ уникален на всю установку — но чужое задание по нему не отдаётся."""
+        project = await _project(db_session, workspace_id)
+        await jobs_service.enqueue(
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
+            idempotency_key="shared-key",
+        )
+
+        with pytest.raises(DomainError):
+            await jobs_service.enqueue(
+                db_session,
+                job_type=JobType.LEGACY_IMPORT,
+                workspace_id=second_workspace.id,
+                idempotency_key="shared-key",
+            )
+
+    async def test_database_rejects_a_project_job_without_a_workspace(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        """Проверяет, что CHECK доехал до схемы, а не остался в модели."""
+        project = await _project(db_session, workspace_id)
+        await db_session.flush()
+
+        with pytest.raises(IntegrityError):
+            await db_session.execute(
+                text(
+                    "insert into jobs (id, project_id, workspace_id, job_type, status,"
+                    " attempt, max_attempts, payload, created_at, updated_at)"
+                    " values (:id, :project_id, null, 'legacy_import', 'queued',"
+                    " 0, 1, '{}', now(), now())"
+                ),
+                {"id": uuid.uuid4(), "project_id": project.id},
+            )
+        await db_session.rollback()
+
+    async def test_database_rejects_a_job_whose_workspace_differs_from_its_project(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID, second_workspace: Workspace
+    ) -> None:
+        """Составной внешний ключ держит инвариант и при записи мимо сервиса."""
+        project = await _project(db_session, workspace_id)
+        await db_session.flush()
+
+        with pytest.raises(IntegrityError):
+            await db_session.execute(
+                text(
+                    "insert into jobs (id, project_id, workspace_id, job_type, status,"
+                    " attempt, max_attempts, payload, created_at, updated_at)"
+                    " values (:id, :project_id, :workspace_id, 'legacy_import', 'queued',"
+                    " 0, 1, '{}', now(), now())"
+                ),
+                {
+                    "id": uuid.uuid4(),
+                    "project_id": project.id,
+                    "workspace_id": second_workspace.id,
+                },
+            )
+        await db_session.rollback()
 
 
 def test_job_model_defaults() -> None:

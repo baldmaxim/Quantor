@@ -67,6 +67,7 @@ export type AdminJobRead = {
      * Project Id
      */
     project_id: string | null;
+    scope: JobScope;
     /**
      * Stage
      */
@@ -84,6 +85,10 @@ export type AdminJobRead = {
      * Worker Id
      */
     worker_id: string | null;
+    /**
+     * Workspace Id
+     */
+    workspace_id: string | null;
 };
 
 /**
@@ -509,6 +514,19 @@ export type JobRead = {
     started_at: string | null;
     status: JobStatus;
 };
+
+/**
+ * JobScope
+ *
+ * Кому принадлежит задание.
+ *
+ * Это словарь контракта, а не колонка: область выводится из пары `workspace_id`/`project_id`
+ * у `Job`. Отдельная колонка была бы производной от той же пары и однажды разошлась бы с ней.
+ *
+ * `system` — обслуживание установки. Такое задание не видно ни одному рабочему пространству
+ * и доступно только через административный контур.
+ */
+export type JobScope = 'system' | 'workspace' | 'project';
 
 /**
  * JobStatsRead
@@ -2045,6 +2063,12 @@ export type ListAdminJobsData = {
          * Фильтр по проекту
          */
         project_id?: string | null;
+        /**
+         * Scope
+         *
+         * Фильтр по области видимости
+         */
+        scope?: JobScope | null;
     };
     url: '/api/v1/admin/jobs';
 };

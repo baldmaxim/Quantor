@@ -17,6 +17,7 @@ from app.domain import (
     ArtifactKind,
     AuditResult,
     DocumentKind,
+    JobScope,
     JobStatus,
     JobType,
     OverrideScope,
@@ -244,6 +245,10 @@ class AdminJobRead(ApiModel):
 
     id: uuid.UUID
     project_id: uuid.UUID | None
+    workspace_id: uuid.UUID | None
+    """Пусто — задание общесистемное: оно вне арендаторов и не видно ни одному из них."""
+    scope: JobScope
+    """Область видимости. Выводится из пары идентификаторов, отдельной колонки в базе нет."""
     job_type: JobType
     status: JobStatus
     progress: float | None

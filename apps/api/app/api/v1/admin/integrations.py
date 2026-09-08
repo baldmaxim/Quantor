@@ -48,13 +48,16 @@ async def read_tenderhub_status(
     Ключ доступа не показывается ни целиком, ни частями: наружу уходит только факт
     его наличия (ADR-0011).
     """
+    # Администратор платформы без контекста арендатора видит счётчик по всей установке.
+    # Сравнение с пустым `workspace_id` дало бы ноль — то есть тихо соврало бы «связей нет»
+    # там, где их просто не с чем сопоставить.
+    scoped = (
+        [Project.workspace_id == context.workspace_id] if context.workspace_id is not None else []
+    )
     linked = await session.scalar(
         select(func.count())
         .select_from(Project)
-        .where(
-            Project.workspace_id == context.workspace_id,
-            Project.source == ProjectSource.TENDERHUB,
-        )
+        .where(*scoped, Project.source == ProjectSource.TENDERHUB)
     )
     return TenderHubStatusRead(
         configured=settings.tenderhub_enabled,
@@ -115,7 +118,7 @@ async def _project_or_404(
     session: AsyncSession, context: AuthContext, project_id: uuid.UUID
 ) -> Project:
     project = await projects_service.get_project(
-        session, workspace_id=context.workspace_id, project_id=project_id
+        session, workspace_id=context.tenant, project_id=project_id
     )
     if project is None:
         raise not_found("Проект")
@@ -140,7 +143,7 @@ async def preview_tenderhub_rebind(
     plan = await tenderhub_binding.preview(
         session,
         client,
-        workspace_id=context.workspace_id,
+        workspace_id=context.tenant,
         project=project,
         tender_id=payload.tender_id,
     )

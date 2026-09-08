@@ -16,14 +16,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, and_, func, select
 
 from app.api.v1.deps import DEFAULT_PAGE_SIZE, AuthDep, LimitDep, OffsetDep, SessionDep, require
 from app.auth.permissions import Permission
 from app.core.config import get_settings
-from app.domain import AuditAction, JobStatus, JobType
+from app.domain import AuditAction, JobScope, JobStatus, JobType
 from app.errors import not_found
-from app.models import Job, Project
+from app.models import Job
 from app.schemas import AdminJobRead, JobStatsRead, Page, WorkerRead
 from app.services import audit as audit_service
 from app.services import jobs as jobs_service
@@ -40,6 +40,8 @@ def _to_read(job: Job) -> AdminJobRead:
     return AdminJobRead(
         id=job.id,
         project_id=job.project_id,
+        workspace_id=job.workspace_id,
+        scope=job.scope,
         job_type=job.job_type,
         status=job.status,
         progress=job.progress,
@@ -60,9 +62,25 @@ def _to_read(job: Job) -> AdminJobRead:
     )
 
 
-def _scope(context: AuthDep) -> uuid.UUID | None:
-    """Администратор платформы видит всю установку, остальные — своё пространство."""
-    return None if context.principal.is_platform_admin else context.workspace_id
+def _visible_to(context: AuthDep) -> ColumnElement[bool] | None:
+    """Ограничение видимости. `None` — администратор платформы, видит всю установку.
+
+    Прежде здесь пропускались и задания с пустым `project_id`, то есть общесистемные:
+    администратор пространства видел обслуживание всей установки. Теперь граница проходит
+    по самому заданию, и сравнение с NULL общесистемные не пропускает.
+    """
+    if context.principal.is_platform_admin:
+        return None
+    return Job.workspace_id == context.workspace_id
+
+
+def _scope_condition(scope: JobScope) -> ColumnElement[bool]:
+    """Фильтр по области видимости. Область выводится из пары колонок, а не хранится."""
+    if scope is JobScope.SYSTEM:
+        return Job.workspace_id.is_(None)
+    if scope is JobScope.WORKSPACE:
+        return and_(Job.workspace_id.is_not(None), Job.project_id.is_(None))
+    return Job.project_id.is_not(None)
 
 
 @router.get(
@@ -79,15 +97,22 @@ async def list_admin_jobs(
     status: Annotated[JobStatus | None, Query(description="Фильтр по состоянию")] = None,
     job_type: Annotated[JobType | None, Query(description="Фильтр по типу")] = None,
     project_id: Annotated[uuid.UUID | None, Query(description="Фильтр по проекту")] = None,
+    scope: Annotated[JobScope | None, Query(description="Фильтр по области видимости")] = None,
 ) -> Page[AdminJobRead]:
     """Страница списка заданий.
 
     Пагинация обязательна: задания копятся всё время работы установки.
+
+    Умолчание для администратора платформы — все области, включая общесистемную: это
+    эксплуатационный список, и прятать в нём обслуживание установки значило бы прятать
+    её поломки.
     """
     conditions: list[ColumnElement[bool]] = []
-    scope = _scope(context)
+    visible = _visible_to(context)
+    if visible is not None:
+        conditions.append(visible)
     if scope is not None:
-        conditions.append(Project.workspace_id == scope)
+        conditions.append(_scope_condition(scope))
     if status is not None:
         conditions.append(Job.status == status)
     if job_type is not None:
@@ -95,13 +120,9 @@ async def list_admin_jobs(
     if project_id is not None:
         conditions.append(Job.project_id == project_id)
 
-    base = select(Job).outerjoin(Project, Job.project_id == Project.id).where(*conditions)
-    total = await session.scalar(
-        select(func.count())
-        .select_from(Job)
-        .outerjoin(Project, Job.project_id == Project.id)
-        .where(*conditions)
-    )
+    # Соединение с `projects` больше не нужно: принадлежность лежит на самом задании.
+    base = select(Job).where(*conditions)
+    total = await session.scalar(select(func.count()).select_from(Job).where(*conditions))
     rows = (
         (await session.execute(base.order_by(Job.created_at.desc()).limit(limit).offset(offset)))
         .scalars()
@@ -128,18 +149,11 @@ async def read_job_stats(session: SessionDep, context: AuthDep) -> JobStatsRead:
     Здесь ноль — это настоящий ноль, а не «не измеряли»: счётчики считаются запросом.
     """
     settings = get_settings()
-    scope = _scope(context)
-    conditions: list[ColumnElement[bool]] = (
-        [Project.workspace_id == scope] if scope is not None else []
-    )
+    visible = _visible_to(context)
+    conditions: list[ColumnElement[bool]] = [visible] if visible is not None else []
 
     async def count(*extra: ColumnElement[bool]) -> int:
-        query = (
-            select(func.count())
-            .select_from(Job)
-            .outerjoin(Project, Job.project_id == Project.id)
-            .where(*conditions, *extra)
-        )
+        query = select(func.count()).select_from(Job).where(*conditions, *extra)
         return int(await session.scalar(query) or 0)
 
     since = datetime.now(UTC) - RECENT_FAILURES_WINDOW
@@ -184,10 +198,11 @@ async def list_job_workers(session: SessionDep) -> list[WorkerRead]:
 
 
 async def _job_or_404(session: SessionDep, context: AuthDep, job_id: uuid.UUID) -> Job:
-    scope = _scope(context)
-    query = select(Job).outerjoin(Project, Job.project_id == Project.id).where(Job.id == job_id)
-    if scope is not None:
-        query = query.where((Job.project_id.is_(None)) | (Project.workspace_id == scope))
+    query = select(Job).where(Job.id == job_id)
+    visible = _visible_to(context)
+    if visible is not None:
+        # Общесистемные задания сюда не попадают: сравнение с NULL не истинно.
+        query = query.where(visible)
     job = (await session.execute(query)).scalar_one_or_none()
     if job is None:
         raise not_found("Задание")

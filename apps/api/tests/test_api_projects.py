@@ -180,7 +180,10 @@ class TestImportStatusInList:
         )
         assert project is not None
         job = await jobs_service.enqueue(
-            db_session, job_type=JobType.LEGACY_IMPORT, project_id=project.id
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
         )
         await jobs_service.start(db_session, job=job, stage="regions")
         await jobs_service.report_progress(db_session, job=job, progress=0.64)
@@ -207,6 +210,7 @@ class TestImportStatusInList:
         first = await jobs_service.enqueue(
             db_session,
             job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
             project_id=project.id,
             idempotency_key="first",
         )
@@ -215,6 +219,7 @@ class TestImportStatusInList:
         second = await jobs_service.enqueue(
             db_session,
             job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
             project_id=project.id,
             idempotency_key="second",
         )

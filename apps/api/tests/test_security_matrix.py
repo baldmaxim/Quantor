@@ -23,9 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.permissions import Permission, permissions_for
 from app.core.config import get_settings
-from app.domain import Role
+from app.domain import JobType, Role
 from app.main import create_app
 from app.models import Workspace
+from app.services import jobs as jobs_service
 from app.services import projects as projects_service
 from tests.conftest import make_context, oidc_settings
 
@@ -141,16 +142,59 @@ async def test_6_guessed_identifiers_do_not_cross_the_boundary(
     )
     await db_session.commit()
 
+    foreign_job = await jobs_service.enqueue(
+        db_session,
+        job_type=JobType.LEGACY_IMPORT,
+        workspace_id=second_workspace.id,
+        project_id=foreign.id,
+    )
+    await db_session.commit()
+
     async with build_api(make_context(Role.ENGINEER, workspace_id=workspace_id)) as client:
         for path in (
             f"/api/v1/projects/{foreign.id}",
             f"/api/v1/projects/{foreign.id}/documents",
             f"/api/v1/projects/{foreign.id}/jobs",
+            f"/api/v1/jobs/{foreign_job.id}",
         ):
             response = await client.get(path)
             assert response.status_code == 404, path
             # 403 подтвердил бы существование объекта и превратил бы перебор в разведку.
             assert response.json()["detail"]["code"] == "NOT_FOUND"
+
+
+# 9 -----------------------------------------------------------------------------
+
+
+async def test_9_system_jobs_are_outside_every_workspace(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    workspace_id: uuid.UUID,
+) -> None:
+    """Общесистемное задание не принадлежит арендатору и не показывается ему.
+
+    Прежде пустой `project_id` означал обратное: такое задание было видно из любого
+    рабочего пространства. Административный контур, наоборот, обязан показывать его
+    явно — иначе поломка самой установки останется незамеченной.
+    """
+    job = await jobs_service.enqueue_system(db_session, job_type=JobType.LEGACY_IMPORT)
+    await db_session.commit()
+
+    async with build_api(make_context(Role.ENGINEER, workspace_id=workspace_id)) as client:
+        denied = await client.get(f"/api/v1/jobs/{job.id}")
+
+    assert denied.status_code == 404
+    assert denied.json()["detail"]["code"] == "NOT_FOUND"
+
+    async with build_api(
+        make_context(Role.PLATFORM_ADMIN, workspace_id=workspace_id, platform_admin=True)
+    ) as client:
+        seen = await client.get(f"/api/v1/admin/jobs/{job.id}")
+
+    assert seen.status_code == 200
+    body = seen.json()
+    assert body["scope"] == "system"
+    assert body["workspace_id"] is None
 
 
 # 7 -----------------------------------------------------------------------------

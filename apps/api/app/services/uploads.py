@@ -240,6 +240,7 @@ async def receive_upload(
         job = await jobs_service.enqueue(
             session,
             job_type=JobType.LEGACY_IMPORT,
+            workspace_id=project.workspace_id,
             project_id=project.id,
             idempotency_key=_import_key(project.id, stored.sha256),
             payload={"revision_id": str(revision.id)},

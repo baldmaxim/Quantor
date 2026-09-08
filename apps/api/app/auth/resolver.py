@@ -122,11 +122,16 @@ def _principal(user: UserIdentity) -> Principal:
 
 async def _resolve_workspace(
     request: Request, session: AsyncSession, principal: Principal
-) -> tuple[uuid.UUID, Role]:
+) -> tuple[uuid.UUID | None, Role]:
     """Выбирает пространство запроса и роль в нём.
 
     Заголовок — явное переключение. Без него берётся первое членство: порядок устойчив,
     иначе пользователь с двумя пространствами видел бы разные проекты через раз.
+
+    Пусто возвращается только администратору платформы без членств: у него есть системные
+    операции, которым арендатор не нужен, и запирать его за отсутствие членства значило бы
+    закрыть администрирование установки ровно в тот момент, когда оно нужнее всего —
+    при её первичной настройке.
     """
     requested = _requested_workspace(request)
     memberships = await identity_service.list_memberships(session, principal.user_id)
@@ -151,6 +156,12 @@ async def _resolve_workspace(
     if memberships:
         first = memberships[0]
         return first.workspace_id, first.role
+
+    if principal.is_platform_admin:
+        # Ни одного членства и ни одного заголовка. Подставить сюда «первое попавшееся»
+        # пространство нельзя: это выдало бы права в чужих данных молча. Контекст остаётся
+        # пустым, и операция внутри пространства сама откажет — понятной ошибкой.
+        return None, Role.PLATFORM_ADMIN
 
     raise DomainError(
         ErrorCode.WORKSPACE_FORBIDDEN,

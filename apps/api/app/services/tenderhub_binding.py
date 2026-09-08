@@ -107,7 +107,7 @@ async def rebind(
     context.require(Permission.INTEGRATION_MANAGE)
 
     plan = await preview(
-        session, client, workspace_id=context.workspace_id, project=project, tender_id=tender_id
+        session, client, workspace_id=context.tenant, project=project, tender_id=tender_id
     )
     if plan.conflicting_project_id is not None:
         # Отказ записывается наравне с успехом: попытка перепривязать занятый тендер —

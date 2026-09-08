@@ -77,7 +77,12 @@ async def _seed(session: AsyncSession, workspace_id: uuid.UUID, projects: int) -
                 coords_norm=[0.1, 0.1, 0.9, 0.9],
             )
         )
-        await jobs_service.enqueue(session, job_type=JobType.LEGACY_IMPORT, project_id=project.id)
+        await jobs_service.enqueue(
+            session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=project.workspace_id,
+            project_id=project.id,
+        )
     await session.commit()
 
 

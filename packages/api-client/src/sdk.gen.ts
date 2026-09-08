@@ -124,6 +124,10 @@ export const testTenderhubConnection = <ThrowOnError extends boolean = false>(op
  * Страница списка заданий.
  *
  * Пагинация обязательна: задания копятся всё время работы установки.
+ *
+ * Умолчание для администратора платформы — все области, включая общесистемную: это
+ * эксплуатационный список, и прятать в нём обслуживание установки значило бы прятать
+ * её поломки.
  */
 export const listAdminJobs = <ThrowOnError extends boolean = false>(options?: Options<ListAdminJobsData, ThrowOnError>): RequestResult<ListAdminJobsResponses, ListAdminJobsErrors, ThrowOnError> => (options?.client ?? client).get<ListAdminJobsResponses, ListAdminJobsErrors, ThrowOnError>({ url: '/api/v1/admin/jobs', ...options });
 

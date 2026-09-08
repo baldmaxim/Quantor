@@ -28,7 +28,12 @@ TYPES = [JobType.LEGACY_IMPORT.value]
 
 async def _queued(session: AsyncSession, workspace_id: uuid.UUID, name: str = "Проект") -> Job:
     project = await projects_service.create_project(session, workspace_id=workspace_id, name=name)
-    job = await jobs_service.enqueue(session, job_type=JobType.LEGACY_IMPORT, project_id=project.id)
+    job = await jobs_service.enqueue(
+        session,
+        job_type=JobType.LEGACY_IMPORT,
+        workspace_id=workspace_id,
+        project_id=project.id,
+    )
     await session.commit()
     return job
 
@@ -341,3 +346,52 @@ async def test_stopped_worker_is_not_counted_as_dead(db_session: AsyncSession) -
     await db_session.commit()
 
     assert (await workers_service.health(db_session, stale_after_seconds=180)).is_present is False
+
+
+async def test_claim_takes_jobs_of_every_scope(
+    db_session: AsyncSession, workspace_id: uuid.UUID
+) -> None:
+    """Очередь одна на установку: воркер намеренно слеп к арендаторам.
+
+    Область видимости — это граница чтения через API, а не признак исполнимости.
+    Если бы захват фильтровал по пространству, общесистемное задание никто бы не взял.
+    """
+    project = await projects_service.create_project(
+        db_session, workspace_id=workspace_id, name="Проект для областей"
+    )
+    system = await jobs_service.enqueue_system(db_session, job_type=JobType.LEGACY_IMPORT)
+    workspace_job = await jobs_service.enqueue(
+        db_session, job_type=JobType.LEGACY_IMPORT, workspace_id=workspace_id
+    )
+    project_job = await jobs_service.enqueue(
+        db_session,
+        job_type=JobType.LEGACY_IMPORT,
+        workspace_id=workspace_id,
+        project_id=project.id,
+    )
+    await db_session.commit()
+
+    claimed = set()
+    for _ in range(3):
+        job = await jobs_service.claim(
+            db_session, worker_id="w-scope", job_types=TYPES, lease_seconds=LEASE
+        )
+        assert job is not None
+        claimed.add(job.id)
+        await db_session.commit()
+
+    assert claimed == {system.id, workspace_job.id, project_job.id}
+
+
+async def test_claim_keeps_the_workspace_of_the_job(
+    db_session: AsyncSession, workspace_id: uuid.UUID
+) -> None:
+    """Захват меняет состояние и владельца, но не границу арендатора."""
+    job = await _queued(db_session, workspace_id)
+
+    claimed = await jobs_service.claim(
+        db_session, worker_id="w-1", job_types=TYPES, lease_seconds=LEASE
+    )
+
+    assert claimed is not None
+    assert claimed.workspace_id == job.workspace_id

@@ -206,5 +206,20 @@ class JobStatus(StrEnum):
         return self in (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED)
 
 
+class JobScope(StrEnum):
+    """Кому принадлежит задание.
+
+    Это словарь контракта, а не колонка: область выводится из пары `workspace_id`/`project_id`
+    у `Job`. Отдельная колонка была бы производной от той же пары и однажды разошлась бы с ней.
+
+    `system` — обслуживание установки. Такое задание не видно ни одному рабочему пространству
+    и доступно только через административный контур.
+    """
+
+    SYSTEM = "system"
+    WORKSPACE = "workspace"
+    PROJECT = "project"
+
+
 # Пространство координат распознанного пакета. Канон описан в ADR-0008.
 COORDINATE_SPACE_NORMALIZED_TOP_LEFT = "normalized_page_top_left"

@@ -59,12 +59,32 @@ class AuthContext:
     """
 
     principal: Principal
-    workspace_id: uuid.UUID
+    workspace_id: uuid.UUID | None
+    """Пространство запроса. Пусто — контекста арендатора нет вовсе.
+
+    Так выглядит администратор платформы, не состоящий ни в одном пространстве: системные
+    операции ему доступны, а операции внутри пространства требуют явного заголовка. Выбрать
+    за него «первое попавшееся» нельзя — это тихо дало бы права в чужих данных.
+    """
     role: Role
     permissions: frozenset[Permission]
     credential: CredentialKind
     is_dev_mode: bool
     session_id: uuid.UUID | None = None
+
+    @property
+    def tenant(self) -> uuid.UUID:
+        """Пространство для операции, которая без него бессмысленна.
+
+        Отдельное свойство, а не проверка на каждом маршруте: забытая проверка выглядела бы
+        как работающий код, а здесь пропуск ловится типом.
+        """
+        if self.workspace_id is None:
+            raise DomainError(
+                ErrorCode.WORKSPACE_FORBIDDEN,
+                "Операция выполняется в рабочем пространстве: укажите X-Workspace-Id",
+            )
+        return self.workspace_id
 
     def has(self, permission: Permission) -> bool:
         return permission in self.permissions

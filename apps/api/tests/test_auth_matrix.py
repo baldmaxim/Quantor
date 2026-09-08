@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.permissions import Permission, permissions_for
 from app.auth.resolver import WORKSPACE_HEADER
 from app.domain import COORDINATE_SPACE_NORMALIZED_TOP_LEFT, DocumentKind, ProcessingStatus, Role
+from app.errors import DomainError, ErrorCode
 from app.models import Region, Sheet, Workspace
 from app.services import documents as documents_service
 from app.services import projects as projects_service
@@ -292,3 +293,60 @@ async def test_no_role_below_platform_admin_may_switch_workspace(
     context = make_context(role, workspace_id=workspace_id)
     assert not context.principal.is_platform_admin
     assert Permission.SYSTEM_ADMIN not in context.permissions
+
+
+class TestPlatformAdminWithoutMembership:
+    """Администратор платформы, не состоящий ни в одном пространстве.
+
+    Так выглядит первичная настройка установки: администратор уже назначен переменной
+    окружения, а членств у него ещё нет. Прежде резолвер отказывал такому запросу до
+    проверки прав, и администрирование установки оказывалось закрыто ровно тогда, когда
+    оно нужнее всего.
+    """
+
+    def test_context_without_a_tenant_is_representable(self) -> None:
+        context = make_context(Role.PLATFORM_ADMIN, workspace_id=None)
+
+        assert context.workspace_id is None
+        assert Permission.SYSTEM_ADMIN in context.permissions
+
+    def test_operation_inside_a_workspace_refuses_explicitly(self) -> None:
+        """Отказ — понятной ошибкой, а не подстановкой первого попавшегося пространства."""
+        context = make_context(Role.PLATFORM_ADMIN, workspace_id=None)
+
+        with pytest.raises(DomainError) as error:
+            _ = context.tenant
+
+        assert error.value.code is ErrorCode.WORKSPACE_FORBIDDEN
+
+    async def test_system_endpoints_work_without_a_tenant(
+        self, build_api: Callable[..., AsyncClient]
+    ) -> None:
+        """Системные операции доступны: арендатор им не нужен."""
+        async with build_api(make_context(Role.PLATFORM_ADMIN, workspace_id=None)) as client:
+            jobs = await client.get("/api/v1/admin/jobs")
+            workers = await client.get("/api/v1/admin/jobs/workers")
+
+        assert jobs.status_code == 200
+        assert workers.status_code == 200
+
+    async def test_workspace_endpoints_refuse_without_a_tenant(
+        self, build_api: Callable[..., AsyncClient]
+    ) -> None:
+        """Операция внутри пространства требует явного выбора, а не догадки."""
+        async with build_api(make_context(Role.PLATFORM_ADMIN, workspace_id=None)) as client:
+            response = await client.get("/api/v1/projects")
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "WORKSPACE_FORBIDDEN"
+
+    async def test_a_plain_user_without_membership_is_still_refused(
+        self, db_session: AsyncSession, build_api: Callable[..., AsyncClient]
+    ) -> None:
+        """Послабление касается только администратора платформы."""
+        context = make_context(Role.VIEWER, workspace_id=None, platform_admin=False)
+
+        async with build_api(context) as client:
+            response = await client.get("/api/v1/projects")
+
+        assert response.status_code in (403, 404)

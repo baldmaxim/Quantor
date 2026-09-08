@@ -76,6 +76,10 @@ class Project(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_projects_workspace_id_updated_at", "workspace_id", "updated_at"),
         Index("ix_projects_workspace_id_name", "workspace_id", "name"),
+        # Цель составного внешнего ключа из `jobs`. По данным избыточно — `id` и так первичный
+        # ключ, — но PostgreSQL требует объявленной уникальности ровно на том наборе колонок,
+        # на который ссылается ключ.
+        UniqueConstraint("id", "workspace_id", name="uq_projects_id_workspace"),
         # Один тендер — один проект в рабочем пространстве. Без этого повторное нажатие
         # «Создать» на той же строке списка плодит дубликаты, и какой из них настоящий,
         # потом не разобрать.

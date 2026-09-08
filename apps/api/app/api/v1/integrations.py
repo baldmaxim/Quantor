@@ -41,7 +41,7 @@ async def list_tenders(
     # Какие тендеры уже стали проектами — одним запросом, а не по строке на каждый.
     linked = await projects_service.map_external_ids(
         session,
-        workspace_id=workspace.workspace_id,
+        workspace_id=workspace.tenant,
         source=ProjectSource.TENDERHUB,
         external_ids=[tender.id for tender in tenders],
     )
@@ -77,7 +77,7 @@ async def import_tender(
 ) -> ProjectRead:
     existing = await projects_service.find_by_external_id(
         session,
-        workspace_id=workspace.workspace_id,
+        workspace_id=workspace.tenant,
         source=ProjectSource.TENDERHUB,
         external_id=payload.tender_id,
     )
@@ -88,7 +88,7 @@ async def import_tender(
 
     project = await projects_service.create_project(
         session,
-        workspace_id=workspace.workspace_id,
+        workspace_id=workspace.tenant,
         name=payload.name or project_name(tender),
         source=ProjectSource.TENDERHUB,
         external_id=payload.tender_id,

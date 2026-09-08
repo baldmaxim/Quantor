@@ -57,7 +57,7 @@ async def upload_file(
     «в очереди», для остальных типов ревизия сохраняется с честным статусом обработки.
     """
     project = await projects_service.get_project(
-        session, workspace_id=workspace.workspace_id, project_id=project_id
+        session, workspace_id=workspace.tenant, project_id=project_id
     )
     if project is None:
         raise not_found("Проект")
@@ -65,7 +65,7 @@ async def upload_file(
     document = None
     if document_id is not None:
         document = await documents_service.get_document(
-            session, workspace_id=workspace.workspace_id, document_id=document_id
+            session, workspace_id=workspace.tenant, document_id=document_id
         )
         if document is None or document.project_id != project.id:
             raise not_found("Документ")
@@ -108,7 +108,7 @@ async def read_upload_capabilities(
     обработчика обещания на экране разойдутся с поведением сервера.
     """
     project = await projects_service.get_project(
-        session, workspace_id=workspace.workspace_id, project_id=project_id
+        session, workspace_id=workspace.tenant, project_id=project_id
     )
     if project is None:
         raise not_found("Проект")

@@ -286,7 +286,7 @@ async def client() -> AsyncIterator[AsyncClient]:
 def make_context(
     role: Role = Role.PLATFORM_ADMIN,
     *,
-    workspace_id: uuid.UUID = DEV_WORKSPACE_ID,
+    workspace_id: uuid.UUID | None = DEV_WORKSPACE_ID,
     user_id: uuid.UUID = DEV_USER_ID,
     platform_admin: bool | None = None,
 ) -> AuthContext:
@@ -294,6 +294,8 @@ def make_context(
 
     Собирается тем же способом, что и в бою: права выводятся из роли, а не перечисляются
     руками. Иначе тест проверял бы выдуманный набор, а не действующий.
+
+    `workspace_id=None` — администратор платформы без членства: контекста арендатора нет.
     """
     is_platform = role is Role.PLATFORM_ADMIN if platform_admin is None else platform_admin
     principal = Principal(

@@ -226,7 +226,9 @@ async def set_override(
             f"«{definition.title}» не настроена: добавьте ключ доступа в окружение",
         )
 
-    workspace_id = context.workspace_id if scope is OverrideScope.WORKSPACE else None
+    # `tenant`, а не `workspace_id`: без контекста арендатора переопределение области
+    # «пространство» получило бы пустой workspace_id и молча стало бы системным.
+    workspace_id = context.tenant if scope is OverrideScope.WORKSPACE else None
     existing = await _find(session, key=key, scope=scope, workspace_id=workspace_id)
     before = {"enabled": existing.enabled, "reason": existing.reason} if existing else None
 
@@ -276,7 +278,9 @@ async def delete_override(
     definition = _definition_or_404(key)
     _check(context, definition, scope)
 
-    workspace_id = context.workspace_id if scope is OverrideScope.WORKSPACE else None
+    # `tenant`, а не `workspace_id`: без контекста арендатора переопределение области
+    # «пространство» получило бы пустой workspace_id и молча стало бы системным.
+    workspace_id = context.tenant if scope is OverrideScope.WORKSPACE else None
     existing = await _find(session, key=key, scope=scope, workspace_id=workspace_id)
     if existing is not None:
         await session.delete(existing)

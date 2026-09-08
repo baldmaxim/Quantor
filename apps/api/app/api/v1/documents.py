@@ -43,7 +43,7 @@ async def read_document(
     document_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
 ) -> DocumentRead:
     document = await documents_service.get_document(
-        session, workspace_id=workspace.workspace_id, document_id=document_id
+        session, workspace_id=workspace.tenant, document_id=document_id
     )
     if document is None:
         raise not_found("Документ")
@@ -64,7 +64,7 @@ async def list_document_revisions(
     offset: OffsetDep = 0,
 ) -> Page[DocumentRevisionRead]:
     document = await documents_service.get_document(
-        session, workspace_id=workspace.workspace_id, document_id=document_id
+        session, workspace_id=workspace.tenant, document_id=document_id
     )
     if document is None:
         raise not_found("Документ")
@@ -91,7 +91,7 @@ async def read_revision(
     revision_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
 ) -> DocumentRevisionRead:
     revision = await documents_service.get_revision(
-        session, workspace_id=workspace.workspace_id, revision_id=revision_id
+        session, workspace_id=workspace.tenant, revision_id=revision_id
     )
     if revision is None:
         raise not_found("Ревизия")
@@ -108,7 +108,7 @@ async def list_revision_artifacts(
     revision_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
 ) -> list[RecognitionArtifactRead]:
     revision = await documents_service.get_revision(
-        session, workspace_id=workspace.workspace_id, revision_id=revision_id
+        session, workspace_id=workspace.tenant, revision_id=revision_id
     )
     if revision is None:
         raise not_found("Ревизия")
@@ -131,7 +131,7 @@ async def list_revision_sheets(
     offset: OffsetDep = 0,
 ) -> Page[SheetRead]:
     revision = await documents_service.get_revision(
-        session, workspace_id=workspace.workspace_id, revision_id=revision_id
+        session, workspace_id=workspace.tenant, revision_id=revision_id
     )
     if revision is None:
         raise not_found("Ревизия")
@@ -171,7 +171,7 @@ async def read_revision_content_url(
     страницу документа. Проксировать такой файл через процесс приложения нельзя.
     """
     revision = await documents_service.get_revision(
-        session, workspace_id=workspace.workspace_id, revision_id=revision_id
+        session, workspace_id=workspace.tenant, revision_id=revision_id
     )
     if revision is None:
         raise not_found("Ревизия")
@@ -214,7 +214,7 @@ async def list_sheet_regions(
     ),
 ) -> Page[RegionRead]:
     sheet = await documents_service.get_sheet(
-        session, workspace_id=workspace.workspace_id, sheet_id=sheet_id
+        session, workspace_id=workspace.tenant, sheet_id=sheet_id
     )
     if sheet is None:
         raise not_found("Лист")

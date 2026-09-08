@@ -59,14 +59,14 @@ async def list_projects(
 ) -> Page[ProjectSummary]:
     rows = await projects_service.list_projects(
         session,
-        workspace_id=workspace.workspace_id,
+        workspace_id=workspace.tenant,
         limit=limit,
         offset=offset,
         search=search,
         sort=sort,
     )
     total = await projects_service.count_projects(
-        session, workspace_id=workspace.workspace_id, search=search
+        session, workspace_id=workspace.tenant, search=search
     )
     return Page(items=[_summary(row) for row in rows], total=total, limit=limit, offset=offset)
 
@@ -82,7 +82,7 @@ async def create_project(
     payload: ProjectCreate, session: SessionDep, workspace: WorkspaceDep
 ) -> ProjectRead:
     project = await projects_service.create_project(
-        session, workspace_id=workspace.workspace_id, name=payload.name
+        session, workspace_id=workspace.tenant, name=payload.name
     )
     await session.commit()
     return ProjectRead.model_validate(project)
@@ -98,7 +98,7 @@ async def read_project(
     project_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
 ) -> ProjectSummary:
     row = await projects_service.get_project_with_counts(
-        session, workspace_id=workspace.workspace_id, project_id=project_id
+        session, workspace_id=workspace.tenant, project_id=project_id
     )
     if row is None:
         raise not_found("Проект")
@@ -119,7 +119,7 @@ async def update_project(
     workspace: WorkspaceDep,
 ) -> ProjectRead:
     project = await projects_service.get_project(
-        session, workspace_id=workspace.workspace_id, project_id=project_id
+        session, workspace_id=workspace.tenant, project_id=project_id
     )
     if project is None:
         raise not_found("Проект")
@@ -145,7 +145,7 @@ async def list_project_documents(
     offset: OffsetDep = 0,
 ) -> Page[DocumentRead]:
     project = await projects_service.get_project(
-        session, workspace_id=workspace.workspace_id, project_id=project_id
+        session, workspace_id=workspace.tenant, project_id=project_id
     )
     if project is None:
         raise not_found("Проект")
@@ -176,13 +176,21 @@ async def list_project_jobs(
     offset: OffsetDep = 0,
 ) -> Page[JobRead]:
     project = await projects_service.get_project(
-        session, workspace_id=workspace.workspace_id, project_id=project_id
+        session, workspace_id=workspace.tenant, project_id=project_id
     )
     if project is None:
         raise not_found("Проект")
 
-    rows = await jobs_service.list_jobs(session, project_id=project.id, limit=limit, offset=offset)
-    total = await jobs_service.count_jobs(session, project_id=project.id)
+    rows = await jobs_service.list_jobs(
+        session,
+        workspace_id=workspace.tenant,
+        project_id=project.id,
+        limit=limit,
+        offset=offset,
+    )
+    total = await jobs_service.count_jobs(
+        session, workspace_id=workspace.tenant, project_id=project.id
+    )
     return Page(
         items=[JobRead.model_validate(row) for row in rows],
         total=total,

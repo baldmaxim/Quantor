@@ -6,12 +6,21 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    String,
+    text,
+)
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.domain import JobStatus, JobType
+from app.domain import JobScope, JobStatus, JobType
 from app.models.mixins import TimestampMixin, str_enum, uuid_pk
 
 if TYPE_CHECKING:
@@ -28,9 +37,15 @@ class Job(TimestampMixin, Base):
     __tablename__ = "jobs"
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    project_id: Mapped[uuid.UUID | None] = mapped_column(
-        pg.UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE")
-    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
+
+    # Граница арендатора принадлежит самому заданию, а не выводится джойном через проект.
+    # Выведенная означала, что задание без проекта не принадлежит никому — то есть доступно
+    # всем: ровно эта дыра и закрывается здесь.
+    #
+    # NULL — не «неизвестно», а «общесистемное»: обслуживание установки, невидимое ни одному
+    # пространству. Отсюда и отсутствие NOT NULL: инвариант держит CHECK ниже, а не nullability.
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
 
     job_type: Mapped[JobType] = mapped_column(str_enum(JobType, name="job_type"), nullable=False)
     status: Mapped[JobStatus] = mapped_column(
@@ -84,12 +99,46 @@ class Job(TimestampMixin, Base):
 
     project: Mapped[Project | None] = relationship(back_populates="jobs")
 
+    @property
+    def scope(self) -> JobScope:
+        """Область видимости задания. Выводится, а не хранится."""
+        if self.workspace_id is None:
+            return JobScope.SYSTEM
+        return JobScope.PROJECT if self.project_id is not None else JobScope.WORKSPACE
+
     __table_args__ = (
         CheckConstraint(
             "progress is null or (progress >= 0 and progress <= 1)", name="progress_range"
         ),
         CheckConstraint("attempt >= 0 and attempt <= max_attempts + 1", name="attempt_range"),
+        # Три допустимых состояния пары и одно недопустимое:
+        #
+        #   workspace_id | project_id | смысл
+        #   NOT NULL     | NULL       | задание пространства
+        #   NOT NULL     | NOT NULL   | задание проекта
+        #   NULL         | NULL       | общесистемное
+        #   NULL         | NOT NULL   | непредставимо — его и запрещает этот CHECK
+        CheckConstraint("project_id is null or workspace_id is not null", name="workspace_scope"),
+        # Композитный ключ вместо одноколоночного: он и есть гарантия того, что арендатор
+        # задания совпадает с арендатором его проекта. Проверка в сервисе даёт понятную ошибку,
+        # но не удержит запись мимо API — миграцию или ручной SQL.
+        #
+        # Режим MATCH SIMPLE (умолчание PostgreSQL) не проверяет ключ, когда project_id пуст,
+        # — ровно то, что нужно заданиям пространства и общесистемным. Промежуток между этим
+        # ключом и CHECK выше закрыт: как только project_id задан, workspace_id обязан быть.
+        ForeignKeyConstraint(
+            ["project_id", "workspace_id"],
+            ["projects.id", "projects.workspace_id"],
+            ondelete="CASCADE",
+            # Страховка на будущее: если проект начнёт переезжать между пространствами,
+            # его задания переедут вместе с ним, а не станут молча чужими.
+            onupdate="CASCADE",
+        ),
+        ForeignKeyConstraint(["workspace_id"], ["workspaces.id"], ondelete="RESTRICT"),
         Index("ix_jobs_project_id_created_at", "project_id", "created_at"),
+        # Покрывает и список заданий пространства, и `where workspace_id is null` для
+        # общесистемных: btree индексирует NULL, отдельный частичный индекс не нужен.
+        Index("ix_jobs_workspace_id_created_at", "workspace_id", "created_at"),
         Index("ix_jobs_status_created_at", "status", "created_at"),
         # Частичные индексы под два горячих запроса воркера: «что взять» и «что брошено».
         # Без условия они покрывали бы и завершённые задания, которых со временем

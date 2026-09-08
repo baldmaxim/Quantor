@@ -1,0 +1,43 @@
+{
+  "package": "Quantor Stage 2A Measurement Core",
+  "target": "Claude Code Opus 5 (1M)",
+  "created_date": "2026-09-08",
+  "prompt_order": [
+    "prompts/00_",
+    "prompts/01_",
+    "prompts/02_",
+    "prompts/03_",
+    "prompts/04_",
+    "prompts/05_",
+    "prompts/06_",
+    "prompts/07_",
+    "prompts/08_",
+    "prompts/09_",
+    "prompts/10_",
+    "prompts/11_",
+    "prompts/12_",
+    "prompts/13_",
+    "prompts/14_",
+    "prompts/15_",
+    "prompts/16_"
+  ],
+  "scope": [
+    "canonical_pdf_geometry",
+    "coordinate_transforms",
+    "manual_scale",
+    "manual_measurement",
+    "count_length_area",
+    "benchmark",
+    "live_acceptance"
+  ],
+  "explicitly_excluded": [
+    "ai_auto_count",
+    "ai_auto_measure",
+    "cv_vlm_inference",
+    "unsloth_training",
+    "bim_parsing",
+    "projectgraph",
+    "vor_production",
+    "costing"
+  ]
+}

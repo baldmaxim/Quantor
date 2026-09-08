@@ -34,10 +34,17 @@ test-results/
 .playwright/
 
 # --- Fixtures: крупные пользовательские архивы не коммитим ---
+# Правило заведено на каждый этап отдельно, а не шаблоном `_prompts/*/fixtures/**`:
+# так добавление этапа требует осознанного решения, а не молча наследует запрет.
 _prompts/stage1/fixtures/**
 !_prompts/stage1/fixtures/**/
 !_prompts/stage1/fixtures/README.md
 !_prompts/stage1/fixtures/**/.gitkeep
+
+_prompts/stage2a_measurement_core/fixtures/**
+!_prompts/stage2a_measurement_core/fixtures/**/
+!_prompts/stage2a_measurement_core/fixtures/README.md
+!_prompts/stage2a_measurement_core/fixtures/**/.gitkeep
 
 # --- OS / IDE ---
 .DS_Store

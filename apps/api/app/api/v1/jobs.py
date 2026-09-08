@@ -22,7 +22,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
     dependencies=[require(Permission.JOBS_READ)],
 )
 async def read_job(job_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep) -> JobRead:
-    job = await jobs_service.get_job(session, workspace_id=workspace.workspace_id, job_id=job_id)
+    job = await jobs_service.get_job(session, workspace_id=workspace.tenant, job_id=job_id)
     if job is None:
         raise not_found("Задание")
     return JobRead.model_validate(job)
