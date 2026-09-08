@@ -36,6 +36,34 @@ class FakeBackend implements RenderBackend {
   destroy(): void {}
 }
 
+/**
+ * Отрисовщик, который не заканчивает работу сам.
+ *
+ * Нужен, чтобы поймать наложение задач: настоящий pdf.js рисует не мгновенно, а
+ * `FakeBackend` возвращается в том же тике и потому наложиться физически не может.
+ */
+class SlowBackend implements RenderBackend {
+  readonly name = 'slow';
+  readonly pageCount = 77;
+  /** Наибольшее число одновременно живых, то есть неотменённых, задач. */
+  maxLive = 0;
+  private readonly inFlight: AbortSignal[] = [];
+
+  async geometry() {
+    return { width: SHEET.width, height: SHEET.height, rotation: 0 as const };
+  }
+
+  async render({ signal }: RenderRequest): Promise<void> {
+    this.inFlight.push(signal);
+    const live = this.inFlight.filter((item) => !item.aborted).length;
+    this.maxLive = Math.max(this.maxLive, live);
+    // Задача не завершается: её обязан оборвать сам холст, а не время.
+    await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve()));
+  }
+
+  destroy(): void {}
+}
+
 const scaleOf = (element: HTMLElement): number => {
   const match = /scale\(([\d.]+)\)/.exec(element.style.transform);
   return match?.[1] ? Number(match[1]) : 1;
@@ -153,6 +181,24 @@ describe('холст рабочей области', () => {
     }
 
     expect(backend.renders.length).toBe(initial);
+  });
+
+  it('две отрисовки не идут по одному холсту разом', async () => {
+    // Регрессия, найденная живым открытием чертежа: первая вписка листа и перерисовка
+    // после зума шли параллельно, каждая со своим AbortController, и обе звали render()
+    // на одном холсте. pdf.js 6 отвечает на это отказом, и лист не открывался вовсе —
+    // с экрана это выглядело как PDF_RENDER_FAILED на ровном месте.
+    const backend = new SlowBackend();
+    setup({ backend });
+    await flushFrame();
+
+    fireEvent.wheel(screen.getByTestId('viewport'), { deltaY: -100 });
+    // Перерисовка по зуму отложена на RERENDER_DELAY_MS; ждём заведомо дольше.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 260));
+    });
+
+    expect(backend.maxLive).toBe(1);
   });
 
   it('колесо с Shift двигает лист по горизонтали, не меняя масштаб', async () => {
