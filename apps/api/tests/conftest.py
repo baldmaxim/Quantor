@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import SecretStr
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -323,6 +324,25 @@ def oidc_settings() -> Settings:
         auth_mode="oidc",
         oidc_issuer="https://idp.test",
         oidc_client_id="quantor",
+    )
+
+
+def clean_settings(**overrides: object) -> Settings:
+    """Настройки без влияния окружения разработчика.
+
+    `Settings()` читает `.env`, и проверка контура управления начинает зависеть от того,
+    что у конкретного человека лежит в файле. Один такой случай уже был: заданный
+    `TENDERHUB_API_TOKEN` ломал проверку «интеграцию нельзя включить без ключа», причём
+    только на машине, где ключ настроен, — то есть у того, кто с интеграцией и работает.
+
+    Здесь обнуляется всё, чем управляет контур: ключ интеграции, переопределения флагов
+    и настроек. Проверка порядка старшинства обязана видеть ровно то, что положила сама.
+    """
+    return Settings(  # type: ignore[call-arg]
+        tenderhub_api_token=SecretStr(""),
+        feature_flags="",
+        settings_overrides="",
+        **overrides,
     )
 
 

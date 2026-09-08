@@ -12,7 +12,6 @@ from collections.abc import Callable
 
 import pytest
 from httpx import AsyncClient
-from pydantic import SecretStr
 from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +26,7 @@ from app.models import AuditEvent, Workspace
 from app.services import audit as audit_service
 from app.services import feature_flags as flags_service
 from app.services import portal_settings
-from tests.conftest import make_context
+from tests.conftest import clean_settings, make_context
 
 TTL_KEY = "documents.content_url_ttl_seconds"
 SIZE_KEY = "uploads.max_upload_size_bytes"
@@ -91,7 +90,7 @@ def test_deployment_ceiling_caps_the_value() -> None:
 async def test_precedence_is_exactly_default_system_workspace_deployment(
     db_session: AsyncSession, workspace_id: uuid.UUID
 ) -> None:
-    settings = Settings()
+    settings = clean_settings()
     context = make_context(Role.PLATFORM_ADMIN, workspace_id=workspace_id)
 
     # 1. умолчание кода
@@ -127,7 +126,7 @@ async def test_precedence_is_exactly_default_system_workspace_deployment(
     assert resolved[TTL_KEY].source == ValueSource.WORKSPACE.value
 
     # 4. окружение старше всего: это аварийный рычаг
-    emergency = Settings(settings_overrides=f"{TTL_KEY}=300")  # type: ignore[call-arg]
+    emergency = clean_settings(settings_overrides=f"{TTL_KEY}=300")
     resolved = await portal_settings.effective(
         db_session, workspace_id=workspace_id, settings=emergency
     )
@@ -138,7 +137,7 @@ async def test_precedence_is_exactly_default_system_workspace_deployment(
 async def test_deleting_an_override_returns_the_inherited_value(
     db_session: AsyncSession, workspace_id: uuid.UUID
 ) -> None:
-    settings = Settings()
+    settings = clean_settings()
     context = make_context(Role.PLATFORM_ADMIN, workspace_id=workspace_id)
 
     await portal_settings.set_override(
@@ -164,7 +163,7 @@ async def test_deleting_an_override_returns_the_inherited_value(
 async def test_workspace_override_does_not_leak_between_tenants(
     db_session: AsyncSession, workspace_id: uuid.UUID, second_workspace: Workspace
 ) -> None:
-    settings = Settings()
+    settings = clean_settings()
     context = make_context(Role.PLATFORM_ADMIN, workspace_id=workspace_id)
     await portal_settings.set_override(
         db_session,
@@ -185,7 +184,7 @@ async def test_workspace_admin_cannot_change_the_whole_installation(
     db_session: AsyncSession, workspace_id: uuid.UUID
 ) -> None:
     """Системный уровень — привилегия платформы, а не арендатора."""
-    settings = Settings()
+    settings = clean_settings()
     context = make_context(Role.WORKSPACE_ADMIN, workspace_id=workspace_id)
     assert Permission.SETTINGS_MANAGE in context.permissions
 
@@ -252,7 +251,7 @@ async def test_enabling_an_unready_feature_is_refused(
             scope=OverrideScope.SYSTEM,
             enabled=True,
             reason="хочу показать заказчику",
-            settings=Settings(),
+            settings=clean_settings(),
         )
     assert error.value.code.value == "FLAG_NOT_EDITABLE"
 
@@ -272,8 +271,7 @@ async def test_integration_flag_cannot_be_enabled_without_a_key(
             scope=OverrideScope.SYSTEM,
             enabled=True,
             reason=None,
-            # Пустой ключ явно: иначе Settings() подхватит TENDERHUB_* из .env разработчика.
-            settings=Settings(tenderhub_api_token=SecretStr("")),
+            settings=clean_settings(),
         )
     assert error.value.code.value == "FLAG_NOT_EDITABLE"
 
@@ -281,7 +279,7 @@ async def test_integration_flag_cannot_be_enabled_without_a_key(
 async def test_flag_override_is_scoped_to_its_workspace(
     db_session: AsyncSession, workspace_id: uuid.UUID, second_workspace: Workspace
 ) -> None:
-    settings = Settings()
+    settings = clean_settings()
     context = make_context(Role.PLATFORM_ADMIN, workspace_id=workspace_id)
     await flags_service.set_override(
         db_session,
@@ -314,7 +312,7 @@ async def test_meta_reflects_the_current_context(
         scope=OverrideScope.SYSTEM,
         enabled=False,
         reason="временно",
-        settings=Settings(),
+        settings=clean_settings(),
     )
 
     response = await api.get("/api/v1/meta")
@@ -333,7 +331,7 @@ async def test_changes_leave_a_trace(db_session: AsyncSession, workspace_id: uui
         key=TTL_KEY,
         scope=OverrideScope.SYSTEM,
         value=1200,
-        settings=Settings(),
+        settings=clean_settings(),
     )
 
     events = (await db_session.execute(select(AuditEvent))).scalars().all()
