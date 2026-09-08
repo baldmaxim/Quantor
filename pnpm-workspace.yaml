@@ -1,5 +1,6 @@
 packages:
   - 'apps/web'
+  - 'apps/admin'
   - 'packages/*'
 
 # unrs-resolver — нативный резолвер импортов для ESLint, требует сборки при установке.
