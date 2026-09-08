@@ -1,15 +1,23 @@
 'use client';
 
 import {
+  cancelAdminJob,
+  checkModelProvider,
   deleteFeatureFlagOverride,
   deleteSettingOverride,
+  listAdminJobs,
   listAuditEvents,
   listFeatureFlags,
+  listJobWorkers,
+  listModelProviders,
   listSettings,
+  readDiagnostics,
+  readJobStats,
   readMeta,
   readSession,
   readTenderhubStatus,
   setFeatureFlagOverride,
+  retryAdminJob,
   setSettingOverride,
   testTenderhubConnection,
 } from '@quantor/api-client';
@@ -167,5 +175,92 @@ export const useTestTenderHub = () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tenderhub });
       void queryClient.invalidateQueries({ queryKey: ['audit'] });
     },
+  });
+};
+
+/* --------------------------------------------------- задания, состояние, модели */
+
+export const jobKeys = {
+  list: (page: { limit: number; offset: number; status?: string }) => ['jobs', page] as const,
+  stats: ['jobs', 'stats'] as const,
+  workers: ['jobs', 'workers'] as const,
+  diagnostics: ['diagnostics'] as const,
+  modelProviders: ['model-providers'] as const,
+} as const;
+
+export const useAdminJobs = (page: { limit: number; offset: number; status?: string }) =>
+  useQuery({
+    queryKey: jobKeys.list(page),
+    queryFn: async () =>
+      unwrap(
+        await listAdminJobs({
+          query: {
+            limit: page.limit,
+            offset: page.offset,
+            ...(page.status ? { status: page.status as never } : {}),
+          },
+          throwOnError: true,
+        }),
+      ),
+  });
+
+export const useJobStats = () =>
+  useQuery({
+    queryKey: jobKeys.stats,
+    queryFn: async () => unwrap(await readJobStats({ throwOnError: true })),
+  });
+
+export const useJobWorkers = () =>
+  useQuery({
+    queryKey: jobKeys.workers,
+    queryFn: async () => unwrap(await listJobWorkers({ throwOnError: true })),
+  });
+
+export const useDiagnostics = () =>
+  useQuery({
+    queryKey: jobKeys.diagnostics,
+    queryFn: async () => unwrap(await readDiagnostics({ throwOnError: true })),
+    // Обновление по кнопке. Автоматический опрос добавляет нагрузку ровно тогда,
+    // когда система нездорова, — а сюда приходят именно в этот момент.
+    refetchInterval: false,
+  });
+
+export const useModelProviders = () =>
+  useQuery({
+    queryKey: jobKeys.modelProviders,
+    queryFn: async () => unwrap(await listModelProviders({ throwOnError: true })),
+  });
+
+export const useRetryJob = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId: string) =>
+      unwrap(await retryAdminJob({ path: { job_id: jobId }, throwOnError: true })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      void queryClient.invalidateQueries({ queryKey: ['audit'] });
+    },
+  });
+};
+
+export const useCancelJob = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId: string) =>
+      unwrap(await cancelAdminJob({ path: { job_id: jobId }, throwOnError: true })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      void queryClient.invalidateQueries({ queryKey: ['audit'] });
+    },
+  });
+};
+
+export const useCheckModelProvider = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // Явное действие: открытие страницы к моделям не обращается.
+    mutationFn: async (providerId: string) =>
+      unwrap(await checkModelProvider({ path: { provider_id: providerId }, throwOnError: true })),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: jobKeys.modelProviders }),
   });
 };

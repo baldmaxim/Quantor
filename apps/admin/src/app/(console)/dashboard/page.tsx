@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Section } from '@/components/common/Section';
 import { Tile } from '@/components/common/Tile';
 import { env } from '@/lib/env';
-import { useFeatureFlags, useMeta, useTenderHubStatus } from '@/lib/queries';
+import { useFeatureFlags, useJobStats, useMeta, useTenderHubStatus } from '@/lib/queries';
 import { NOT_MEASURED, statusView, type ProbeStatus } from '@/lib/status';
 
 /**
@@ -28,6 +28,7 @@ const Page = () => {
   const meta = useMeta();
   const flags = useFeatureFlags();
   const tenderhub = useTenderHubStatus();
+  const stats = useJobStats();
 
   // Готовность публична и отвечает без прав: это проба для балансировщика.
   const health = useQuery({
@@ -131,16 +132,23 @@ const Page = () => {
             hint="Флаг показывает только то, что действительно работает"
           />
           <Tile
-            label="Воркер заданий"
-            value={NOT_MEASURED}
-            badge="не измеряется"
-            hint="Пульс исполнителя появится вместе с выносом заданий в отдельный процесс"
+            label="Исполнители заданий"
+            value={
+              stats.data
+                ? `${stats.data.workers_alive} из ${stats.data.workers_total}`
+                : NOT_MEASURED
+            }
+            tone={stats.data && stats.data.workers_alive > 0 ? 'success' : 'danger'}
+            badge={
+              stats.data && stats.data.workers_alive === 0 ? 'новые задания не начнутся' : undefined
+            }
+            hint="Считается по пульсу в базе, а не стуком к процессу по сети"
           />
           <Tile
-            label="Отказавшие задания"
-            value={NOT_MEASURED}
-            badge="не измеряется"
-            hint="Ноль здесь читался бы как «всё хорошо», а это пока неизвестно"
+            label="Отказы заданий за сутки"
+            value={stats.data ? String(stats.data.failed_recently) : NOT_MEASURED}
+            tone={stats.data && stats.data.failed_recently > 0 ? 'danger' : 'neutral'}
+            hint="Ноль здесь настоящий: счётчик считается запросом, а не подставляется"
           />
         </div>
       )}

@@ -1,7 +1,7 @@
 node_modules
 .next
-# генерируется Next.js при сборке
-apps/web/next-env.d.ts
+# генерируется Next.js при сборке — в каждом приложении свой
+**/next-env.d.ts
 dist
 coverage
 playwright-report

@@ -60,13 +60,16 @@ test('незавершённую возможность включить нел�
   ).toBeDisabled();
 });
 
-test('панель не выдаёт неизмеренное за ноль', async ({ page }) => {
+test('панель показывает числа сервера, а не выдуманные', async ({ page }) => {
   await page.goto('/dashboard');
 
-  const worker = page.locator('div', { hasText: 'Воркер заданий' }).last();
-  await expect(worker).toContainText('не измеряется');
-  // Ноль здесь читался бы как «всё хорошо».
-  await expect(worker).not.toContainText(/\b0\b/);
+  // Пульс исполнителей стал измеримым вместе с выносом заданий в отдельный процесс,
+  // и панель обязана показывать ровно то, что ответил сервер, — ни больше ни меньше.
+  const workers = page.locator('div', { hasText: 'Исполнители заданий' }).last();
+  await expect(workers).toContainText('1 из 1');
+
+  const failures = page.locator('div', { hasText: 'Отказы заданий за сутки' }).last();
+  await expect(failures).toContainText('2');
 });
 
 test('панель не опрашивает сервер сама', async ({ page }) => {
@@ -105,4 +108,47 @@ test('секрет интеграции не показывается', async ({
   const text = await page.locator('body').innerText();
   expect(text).not.toContain('thk_');
   await expect(page.getByText('Значение не показывается и не логируется')).toBeVisible();
+});
+
+test('битый архив нельзя повторить', async ({ page }) => {
+  await page.goto('/jobs');
+
+  const row = page.locator('.admin-table tbody tr').filter({ hasText: 'ARCHIVE_UNSAFE_PATH' });
+  await expect(row.getByRole('button', { name: 'Повторить' })).toBeDisabled();
+  // Отмена доступна только тому, что ещё не начали.
+  await expect(row.getByRole('button', { name: 'Отменить' })).toBeDisabled();
+});
+
+test('состояние показывает, что исполнителя не запускали, и как это починить', async ({ page }) => {
+  await page.goto('/health');
+
+  await expect(page.getByText('исполнитель ни разу не запускался')).toBeVisible();
+  await expect(page.getByText('pnpm dev:worker')).toBeVisible();
+  // Ненастроенное не выдаётся за исправное.
+  await expect(page.getByText('не настроено').first()).toBeVisible();
+});
+
+test('страница состояния не опрашивает сервер сама', async ({ page }) => {
+  await page.goto('/health');
+  await page.waitForLoadState('networkidle');
+
+  let requests = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('/diagnostics')) requests += 1;
+  });
+
+  await page.waitForTimeout(6000);
+  expect(requests, 'обновление только по кнопке').toBe(0);
+
+  await page.getByRole('button', { name: 'Проверить снова' }).click();
+  await expect.poll(() => requests).toBe(1);
+});
+
+test('реестр моделей честно сообщает, что поставщиков нет', async ({ page }) => {
+  await page.goto('/model-providers');
+
+  await expect(page.getByText('Поставщики не описаны')).toBeVisible();
+  await expect(page.getByText('MODEL_PROVIDERS')).toBeVisible();
+  // Ни одного обращения к моделям при открытии — и никакой выдуманной таблицы.
+  await expect(page.locator('.admin-table')).toHaveCount(0);
 });

@@ -135,6 +135,89 @@ const READINESS = {
 
 const AUDIT = { items: [], total: 0, limit: 50, offset: 0 };
 
+const JOB_STATS = {
+  queued: 0,
+  running: 1,
+  failed_recently: 2,
+  workers_alive: 1,
+  workers_total: 1,
+};
+
+const WORKERS = [
+  {
+    id: 'host:42:abc123',
+    host: 'host',
+    pid: 42,
+    version: 'v1',
+    started_at: '2026-09-08T10:00:00Z',
+    heartbeat_at: '2026-09-08T10:05:00Z',
+    current_job_id: null,
+    is_alive: true,
+  },
+];
+
+const JOBS = {
+  items: [
+    {
+      id: '33333333-3333-4333-8333-333333333333',
+      project_id: null,
+      job_type: 'legacy_import',
+      status: 'failed',
+      progress: null,
+      stage: null,
+      error_code: 'ARCHIVE_UNSAFE_PATH',
+      error_message: 'в архиве есть небезопасный файл',
+      attempt: 1,
+      max_attempts: 1,
+      worker_id: 'host:42:abc123',
+      lease_expires_at: null,
+      heartbeat_at: null,
+      available_at: '2026-09-08T10:00:00Z',
+      started_at: '2026-09-08T10:00:00Z',
+      finished_at: '2026-09-08T10:01:00Z',
+      created_at: '2026-09-08T10:00:00Z',
+      updated_at: '2026-09-08T10:01:00Z',
+      // Битый архив: повтор ничего не изменит, и кнопка должна быть заблокирована.
+      is_retryable: false,
+    },
+  ],
+  total: 1,
+  limit: 25,
+  offset: 0,
+};
+
+const DIAGNOSTICS = {
+  status: 'degraded',
+  generated_at: '2026-09-08T10:05:00Z',
+  components: [
+    {
+      name: 'database',
+      title: 'PostgreSQL',
+      status: 'healthy',
+      source: 'live',
+      checked_at: '2026-09-08T10:05:00Z',
+      duration_ms: 1.2,
+      detail: null,
+      remediation: null,
+      facts: { revision: '0006_job_worker_lease' },
+    },
+    {
+      name: 'job_worker',
+      title: 'Исполнитель заданий',
+      status: 'not_configured',
+      source: 'reported',
+      checked_at: '2026-09-08T10:05:00Z',
+      duration_ms: null,
+      detail: 'исполнитель ни разу не запускался',
+      remediation: 'Запустите `pnpm dev:worker`',
+      facts: {},
+    },
+  ],
+};
+
+// Пусто намеренно: страница обязана честно сказать, что поставщики не описаны.
+const MODEL_PROVIDERS: unknown[] = [];
+
 const sessionFor = (cookie: string): unknown => {
   if (cookie.includes('quantor_session=admin')) return PLATFORM_ADMIN;
   if (cookie.includes('quantor_session=engineer')) return ENGINEER;
@@ -201,6 +284,11 @@ const handle = (request: IncomingMessage, response: ServerResponse): void => {
     if (url.includes('/feature-flags')) return json(request, response, FLAGS);
     if (url.includes('/integrations/tenderhub')) return json(request, response, TENDERHUB);
     if (url.includes('/audit')) return json(request, response, AUDIT);
+    if (url.includes('/jobs/stats')) return json(request, response, JOB_STATS);
+    if (url.includes('/jobs/workers')) return json(request, response, WORKERS);
+    if (url.includes('/jobs')) return json(request, response, JOBS);
+    if (url.includes('/diagnostics')) return json(request, response, DIAGNOSTICS);
+    if (url.includes('/model-providers')) return json(request, response, MODEL_PROVIDERS);
   }
 
   json(request, response, { detail: { code: 'NOT_FOUND', message: 'нет такого маршрута' } }, 404);
