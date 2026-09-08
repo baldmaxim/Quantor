@@ -88,19 +88,18 @@ export class PdfJsRenderBackend implements RenderBackend {
     canvas.style.width = `${Math.floor(viewport.width / ratio)}px`;
     canvas.style.height = `${Math.floor(viewport.height / ratio)}px`;
 
-    const context = canvas.getContext('2d', { alpha: false });
-    if (!context) {
-      throw new DocumentLoadError('PDF_RENDER_FAILED', 'Браузер не дал холст для отрисовки');
-    }
-
-    const task = page.render({ canvas, canvasContext: context, viewport });
+    // pdf.js 6: только `canvas`. Вместе с `canvasContext` контекст не берёт
+    // переданный холст, а в паре с гонкой это ещё и валит отрисовку.
+    const task = page.render({ canvas, viewport });
     const onAbort = () => task.cancel();
     signal.addEventListener('abort', onAbort, { once: true });
 
     try {
       await task.promise;
     } catch (error) {
-      if (signal.aborted || isCancelled(error)) throw new RenderCancelledError();
+      if (signal.aborted || isCancelled(error) || isCanvasBusy(error)) {
+        throw new RenderCancelledError();
+      }
       throw new DocumentLoadError('PDF_RENDER_FAILED', 'Страница не отрисовалась');
     } finally {
       signal.removeEventListener('abort', onAbort);
@@ -161,6 +160,9 @@ const isCancelled = (error: unknown): boolean =>
   typeof error === 'object' &&
   error !== null &&
   (error as { name?: string }).name === 'RenderingCancelledException';
+
+const isCanvasBusy = (error: unknown): boolean =>
+  error instanceof Error && error.message.includes('same canvas during multiple render');
 
 /**
  * Приводит отказ pdf.js к коду интерфейса.

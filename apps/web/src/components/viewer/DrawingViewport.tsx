@@ -103,6 +103,11 @@ export const DrawingViewport = ({
   // масштабе, и коэффициент растяжения снова становится единичным.
   const renderedScale = useRef(1);
 
+  // Одна активная отрисовка: первая вписка листа и перерисовка после зума иначе
+  // бегут параллельно с разными AbortController и оба зовут pdf.js render() на одном
+  // canvas — в pdf.js 6 это падает в PDF_RENDER_FAILED.
+  const renderController = useRef<AbortController | null>(null);
+
   // Обработчики родителя приходят стрелками и пересоздаются на каждый рендер. Держим их
   // в ссылках, чтобы подписки на камеру не пересоздавались вместе с ними.
   const viewChanged = useRef(onViewChange);
@@ -198,35 +203,51 @@ export const DrawingViewport = ({
     render.current = renderPage;
   }, [renderPage]);
 
+  /** Запускает отрисовку, отменяя прежнюю незавершённую на этом холсте. */
+  const startRender = useCallback(
+    (options?: { readonly showBadge?: boolean }) => {
+      renderController.current?.abort();
+      const controller = new AbortController();
+      renderController.current = controller;
+
+      let finished = false;
+      const badge =
+        options?.showBadge === false
+          ? undefined
+          : window.setTimeout(() => {
+              if (!finished && !controller.signal.aborted) setRendering(true);
+            }, BADGE_DELAY_MS);
+
+      void render
+        .current(controller.signal)
+        .catch(reportFailure)
+        .finally(() => {
+          finished = true;
+          if (badge !== undefined) window.clearTimeout(badge);
+          if (!controller.signal.aborted && renderController.current === controller) {
+            setRendering(false);
+          }
+        });
+
+      return () => {
+        if (badge !== undefined) window.clearTimeout(badge);
+        if (renderController.current === controller) {
+          controller.abort();
+          renderController.current = null;
+        }
+      };
+    },
+    [reportFailure],
+  );
+
   // Первая отрисовка листа. Старая задача отменяется при смене листа: иначе при быстром
   // перелистывании поверх актуальной страницы дорисуется прежняя.
   useEffect(() => {
     if (!backend || !page) return;
-
-    const controller = new AbortController();
-    let finished = false;
-
-    void render
-      .current(controller.signal)
-      .catch(reportFailure)
-      .finally(() => {
-        finished = true;
-        if (!controller.signal.aborted) setRendering(false);
-      });
-
-    // Значок «отрисовка…» появляется, только если страница рисуется дольше мгновения.
-    // Показывать его на каждом листе значило бы мигать им там, где ждать нечего.
-    const badge = window.setTimeout(() => {
-      if (!finished && !controller.signal.aborted) setRendering(true);
-    }, BADGE_DELAY_MS);
-
-    return () => {
-      window.clearTimeout(badge);
-      controller.abort();
-    };
+    return startRender();
     // Масштаб намеренно не в зависимостях: перерисовка по зуму идёт отдельно, с
     // задержкой, иначе каждый щелчок колеса ставил бы новую задачу отрисовки.
-  }, [backend, page, reportFailure]);
+  }, [backend, page, startRender]);
 
   // Перерисовка страницы после того, как жест затих.
   //
@@ -236,23 +257,19 @@ export const DrawingViewport = ({
   // перерисовывалась вообще. Зум при этом «не работал»: менялся только слой областей.
   useEffect(() => {
     let timer: number | undefined;
-    let controller: AbortController | null = null;
 
     const unsubscribe = camera.subscribe(() => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        controller?.abort();
-        controller = new AbortController();
-        void render.current(controller.signal).catch(reportFailure);
+        startRender({ showBadge: false });
       }, RERENDER_DELAY_MS);
     });
 
     return () => {
       window.clearTimeout(timer);
-      controller?.abort();
       unsubscribe();
     };
-  }, [camera, reportFailure]);
+  }, [camera, startRender]);
 
   useEffect(() => {
     paintOverlay();
