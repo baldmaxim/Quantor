@@ -55,7 +55,7 @@ async def test_failure_response_does_not_leak_connection_details() -> None:
 
 async def test_domain_error_becomes_conflict_with_its_code() -> None:
     client = await _client_with_failing_session(
-        DomainError(ErrorCode.JOB_TRANSITION_INVALID, "Переход running → running недопустим")
+        DomainError(ErrorCode.JOB_TRANSITION_INVALID, "Переход running -> running недопустим")
     )
     async with client:
         response = await client.get("/api/v1/projects")

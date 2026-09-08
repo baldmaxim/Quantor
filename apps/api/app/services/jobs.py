@@ -146,11 +146,25 @@ def _ensure_transition(job: Job, target: JobStatus) -> None:
     if target not in ALLOWED_TRANSITIONS[job.status]:
         raise DomainError(
             ErrorCode.JOB_TRANSITION_INVALID,
-            f"Переход {job.status.value} → {target.value} недопустим",
+            # ASCII-стрелка: сообщение может попасть в лог Windows (cp1251),
+            # где «→» роняет весь процесс исполнителя при job_crashed.
+            f"Переход {job.status.value} -> {target.value} недопустим",
         )
 
 
 async def start(session: AsyncSession, *, job: Job, stage: str | None = None) -> Job:
+    """Отмечает начало работы.
+
+    Идемпотентно для уже `running`: `claim()` переводит в running до тела задания,
+    а `execute_*` всё ещё вызывает `start` со стадией — повторный переход запрещён
+    автоматом состояний, но стадию выставить нужно.
+    """
+    if job.status is JobStatus.RUNNING:
+        if stage is not None:
+            job.stage = stage
+        await session.flush()
+        return job
+
     _ensure_transition(job, JobStatus.RUNNING)
     job.status = JobStatus.RUNNING
     job.started_at = _now()

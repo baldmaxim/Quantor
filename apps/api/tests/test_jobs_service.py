@@ -79,6 +79,11 @@ class TestJobLifecycle:
         assert job.status is JobStatus.RUNNING
         assert job.started_at is not None
 
+        # claim() уже перевёл в running — повторный start только выставляет стадию.
+        await jobs_service.start(db_session, job=job, stage="regions")
+        assert job.status is JobStatus.RUNNING
+        assert job.stage == "regions"
+
         await jobs_service.report_progress(db_session, job=job, progress=0.5, stage="regions")
         assert job.progress == pytest.approx(0.5)
         assert job.stage == "regions"
