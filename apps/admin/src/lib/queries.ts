@@ -35,7 +35,7 @@ export const queryKeys = {
   settings: ['settings'] as const,
   flags: ['feature-flags'] as const,
   tenderhub: ['integrations', 'tenderhub'] as const,
-  audit: (page: { limit: number; offset: number }) => ['audit', page] as const,
+  audit: (page: AuditQuery) => ['audit', page] as const,
 } as const;
 
 const unwrap = <T>(response: { data?: T }): T => {
@@ -76,11 +76,24 @@ export const useTenderHubStatus = () =>
     queryFn: async () => unwrap(await readTenderhubStatus({ throwOnError: true })),
   });
 
-export const useAuditEvents = (page: { limit: number; offset: number }) =>
+export interface AuditQuery {
+  limit: number;
+  offset: number;
+  action?: string;
+  resource_type?: string;
+  result?: 'success' | 'failure' | 'denied';
+  since?: string;
+  until?: string;
+}
+
+export const useAuditEvents = (page: AuditQuery) =>
   useQuery({
     queryKey: queryKeys.audit(page),
     // Пагинация обязательна: журнал растёт всё время работы установки.
-    queryFn: async () => unwrap(await listAuditEvents({ query: page, throwOnError: true })),
+    // Фильтры уходят на сервер, а не применяются к загруженной странице: иначе
+    // «показать отказы» показывало бы отказы только из первых пятидесяти записей.
+    queryFn: async () =>
+      unwrap(await listAuditEvents({ query: page as never, throwOnError: true })),
   });
 
 /* ------------------------------------------------------------------ изменения */

@@ -3,8 +3,9 @@
 import { Button, EmptyState, ErrorState, SkeletonRows, StatusBadge } from '@quantor/ui';
 import { useState } from 'react';
 
+import { AuditFilters } from '@/components/common/AuditFilters';
 import { Section } from '@/components/common/Section';
-import { useAuditEvents } from '@/lib/queries';
+import { useAuditEvents, type AuditQuery } from '@/lib/queries';
 
 /**
  * Журнал административных действий.
@@ -42,8 +43,10 @@ const Summary = ({ label, value }: { label: string; value: unknown }) => {
 };
 
 const Page = () => {
-  const [offset, setOffset] = useState(0);
-  const events = useAuditEvents({ limit: PAGE_SIZE, offset });
+  const [query, setQuery] = useState<AuditQuery>({ limit: PAGE_SIZE, offset: 0 });
+  const events = useAuditEvents(query);
+  const offset = query.offset;
+  const setOffset = (next: number) => setQuery((current) => ({ ...current, offset: next }));
 
   if (events.isPending) return <SkeletonRows rows={8} />;
   if (events.isError) {
@@ -64,10 +67,16 @@ const Page = () => {
       title="Журнал"
       description="Кто и что менял. Записи не редактируются и не удаляются — ни отсюда, ни через API."
     >
+      <AuditFilters value={query} onChange={setQuery} />
+
       {items.length === 0 ? (
         <EmptyState
-          title="Записей пока нет"
-          description="Журнал заполняется административными действиями: изменением настроек, флагов и связей."
+          title="Записей нет"
+          description={
+            query.action || query.result || query.since || query.until
+              ? 'По этим условиям ничего не нашлось. Попробуйте снять часть фильтров.'
+              : 'Журнал заполняется административными действиями: изменением настроек, флагов и связей.'
+          }
         />
       ) : (
         <>
