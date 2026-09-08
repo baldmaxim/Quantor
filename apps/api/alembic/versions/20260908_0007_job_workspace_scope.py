@@ -114,5 +114,6 @@ def downgrade() -> None:
         ondelete="CASCADE",
     )
     op.drop_constraint("uq_projects_id_workspace", "projects", type_="unique")
-    op.drop_constraint("ck_jobs_workspace_scope", "jobs", type_="check")
+    # op.f — имя уже финальное; без него naming convention снова допишет ck_jobs_…
+    op.drop_constraint(op.f("ck_jobs_workspace_scope"), "jobs", type_="check")
     op.drop_column("jobs", "workspace_id")

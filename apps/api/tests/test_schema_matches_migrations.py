@@ -183,8 +183,8 @@ async def test_migration_backfills_the_workspace_of_existing_jobs(
     async with migrated_engine.begin() as connection:
         workspace_id = await connection.scalar(
             text(
-                "insert into workspaces (id, slug, name, is_active, created_at, updated_at)"
-                " values (gen_random_uuid(), 'backfill', 'Backfill', true, now(), now())"
+                "insert into workspaces (id, slug, name, status, created_at, updated_at)"
+                " values (gen_random_uuid(), 'backfill', 'Backfill', 'active', now(), now())"
                 " returning id"
             )
         )
