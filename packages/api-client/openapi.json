@@ -366,6 +366,79 @@
         "title": "Body_upload_file",
         "type": "object"
       },
+      "ComponentDiagnosticsRead": {
+        "description": "Состояние одного компонента установки.\n\n`source` показывается рядом со статусом намеренно: «в порядке» без ответа на вопрос\n«когда и откуда это известно» — половина сведений.",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "facts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Facts",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "remediation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remediation"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ProbeSource"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProbeStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "status",
+          "source",
+          "checked_at"
+        ],
+        "title": "ComponentDiagnosticsRead",
+        "type": "object"
+      },
       "ComponentHealth": {
         "properties": {
           "detail": {
@@ -440,6 +513,43 @@
           "content_type"
         ],
         "title": "ContentUrl",
+        "type": "object"
+      },
+      "DataPolicy": {
+        "description": "Куда позволено уходить данным.\n\nДля проектной документации это бывает жёстким требованием заказчика, а не\nпожеланием: чертёж объекта нельзя отправлять наружу ни при каких условиях.",
+        "enum": [
+          "local_only",
+          "remote_allowed",
+          "restricted_data"
+        ],
+        "title": "DataPolicy",
+        "type": "string"
+      },
+      "DiagnosticsReport": {
+        "description": "Сводка по установке. Итог считается по обязательным компонентам.",
+        "properties": {
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/ComponentDiagnosticsRead"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProbeStatus"
+          }
+        },
+        "required": [
+          "status",
+          "generated_at",
+          "components"
+        ],
+        "title": "DiagnosticsReport",
         "type": "object"
       },
       "DocumentKind": {
@@ -932,6 +1042,178 @@
         "title": "MetaResponse",
         "type": "object"
       },
+      "ModelProviderProbeRead": {
+        "description": "Результат явной проверки связи. Задержка появляется только здесь и только по кнопке.",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "latency_ms": {
+            "minimum": 0.0,
+            "title": "Latency Ms",
+            "type": "number"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "healthy",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider_id",
+          "status",
+          "checked_at",
+          "latency_ms"
+        ],
+        "title": "ModelProviderProbeRead",
+        "type": "object"
+      },
+      "ModelProviderRead": {
+        "description": "Поставщик моделей в административном виде.\n\nПоля под значение ключа здесь нет. Наружу уходит имя переменной окружения и признак\n«задана» — маскировать нечего там, где нечего показывать (промт 07).",
+        "properties": {
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "credential_configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Configured"
+          },
+          "credential_env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Env"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "endpoint_label": {
+            "title": "Endpoint Label",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_usable": {
+            "title": "Is Usable",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "max_concurrency": {
+            "title": "Max Concurrency",
+            "type": "integer"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelSpecRead"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/DataPolicy"
+          },
+          "runs_locally": {
+            "title": "Runs Locally",
+            "type": "boolean"
+          },
+          "timeout_seconds": {
+            "title": "Timeout Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "policy",
+          "endpoint_label",
+          "base_url",
+          "timeout_seconds",
+          "max_concurrency",
+          "enabled",
+          "is_usable",
+          "runs_locally",
+          "credential_env",
+          "credential_configured",
+          "models"
+        ],
+        "title": "ModelProviderRead",
+        "type": "object"
+      },
+      "ModelSpecRead": {
+        "description": "Одна модель у поставщика.",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "context_tokens": {
+            "title": "Context Tokens",
+            "type": "integer"
+          },
+          "max_output_tokens": {
+            "title": "Max Output Tokens",
+            "type": "integer"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "capabilities",
+          "context_tokens",
+          "max_output_tokens"
+        ],
+        "title": "ModelSpecRead",
+        "type": "object"
+      },
       "OverrideScope": {
         "description": "Уровень, на котором переопределяется настройка или флаг.\n\n`PROJECT` объявлен, но ни одной настройке пока не разрешён: контракт готов к\nрасширению, а выдавать несуществующий уровень за работающий нельзя. Тест следит,\nчтобы уровень не появился в определениях раньше, чем в коде, который его читает.",
         "enum": [
@@ -1214,6 +1496,28 @@
         "title": "Page[SheetRead]",
         "type": "object"
       },
+      "ProbeSource": {
+        "description": "Откуда взялось состояние. Показывается рядом с ним — иначе непонятно, насколько свежее.",
+        "enum": [
+          "live",
+          "reported",
+          "config",
+          "unknown"
+        ],
+        "title": "ProbeSource",
+        "type": "string"
+      },
+      "ProbeStatus": {
+        "enum": [
+          "healthy",
+          "degraded",
+          "unavailable",
+          "not_configured",
+          "unknown"
+        ],
+        "title": "ProbeStatus",
+        "type": "string"
+      },
       "ProcessingStatus": {
         "description": "Состояние обработки конкретной ревизии.\n\nЕдинственное изменяемое поле ревизии: описывает не файл, а ход работы над ним.",
         "enum": [
@@ -1493,6 +1797,19 @@
         },
         "title": "ProjectUpdate",
         "type": "object"
+      },
+      "ProviderKind": {
+        "description": "Как разговаривать с поставщиком.\n\nРазличие протокольное, а не маркетинговое: vLLM, SGLang и LM Studio отвечают\nOpenAI-совместимым API, и адаптер у них будет общий.",
+        "enum": [
+          "openai_compatible",
+          "anthropic_compatible",
+          "lm_studio",
+          "vllm",
+          "sglang",
+          "custom"
+        ],
+        "title": "ProviderKind",
+        "type": "string"
       },
       "ReadinessResponse": {
         "properties": {
@@ -2812,6 +3129,28 @@
         ]
       }
     },
+    "/api/v1/admin/diagnostics": {
+      "get": {
+        "description": "Что работает, что нет и что с этим делать.\n\nНи одна проба не может уронить ответ: отказ превращается в состояние компонента.\nОбщий предел времени гарантирует, что страница ответит даже при мёртвой зависимости.",
+        "operationId": "read_diagnostics",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticsReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Состояние установки",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/feature-flags": {
       "get": {
         "operationId": "list_feature_flags",
@@ -3425,6 +3764,75 @@
           }
         },
         "summary": "Повторить задание",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/model-providers": {
+      "get": {
+        "description": "Что настроено развёртыванием.\n\nНи одного сетевого обращения: открытие страницы не должно зависеть от доступности\nмоделей — на неё приходят как раз тогда, когда они недоступны.",
+        "operationId": "list_model_providers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelProviderRead"
+                  },
+                  "title": "Response List Model Providers",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Поставщики моделей",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/model-providers/{provider_id}/health-check": {
+      "post": {
+        "description": "Явная проверка доступности адреса.\n\nПроверяется связь, а не модель: запрос к модели стоит денег и времени, а на этом\nэтапе портал к моделям не обращается вовсе (ADR-0006).\n\nОтказ одного поставщика ничего не ломает: он превращается в состояние в ответе,\nа не в исключение.",
+        "operationId": "check_model_provider",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProviderProbeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Проверить связь с поставщиком",
         "tags": [
           "admin"
         ]

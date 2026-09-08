@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
+import type { BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -29,6 +29,16 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  * Администратор платформы видит всю установку; остальные — только своё пространство.
  */
 export const listAuditEvents = <ThrowOnError extends boolean = false>(options?: Options<ListAuditEventsData, ThrowOnError>): RequestResult<ListAuditEventsResponses, ListAuditEventsErrors, ThrowOnError> => (options?.client ?? client).get<ListAuditEventsResponses, ListAuditEventsErrors, ThrowOnError>({ url: '/api/v1/admin/audit', ...options });
+
+/**
+ * Состояние установки
+ *
+ * Что работает, что нет и что с этим делать.
+ *
+ * Ни одна проба не может уронить ответ: отказ превращается в состояние компонента.
+ * Общий предел времени гарантирует, что страница ответит даже при мёртвой зависимости.
+ */
+export const readDiagnostics = <ThrowOnError extends boolean = false>(options?: Options<ReadDiagnosticsData, ThrowOnError>): RequestResult<ReadDiagnosticsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ReadDiagnosticsResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/diagnostics', ...options });
 
 /**
  * Флаги возможностей
@@ -161,6 +171,29 @@ export const cancelAdminJob = <ThrowOnError extends boolean = false>(options: Op
  * и кнопка для него отключена — обещать починку тем, что её не даёт, хуже, чем отказать.
  */
 export const retryAdminJob = <ThrowOnError extends boolean = false>(options: Options<RetryAdminJobData, ThrowOnError>): RequestResult<RetryAdminJobResponses, RetryAdminJobErrors, ThrowOnError> => (options.client ?? client).post<RetryAdminJobResponses, RetryAdminJobErrors, ThrowOnError>({ url: '/api/v1/admin/jobs/{job_id}/retry', ...options });
+
+/**
+ * Поставщики моделей
+ *
+ * Что настроено развёртыванием.
+ *
+ * Ни одного сетевого обращения: открытие страницы не должно зависеть от доступности
+ * моделей — на неё приходят как раз тогда, когда они недоступны.
+ */
+export const listModelProviders = <ThrowOnError extends boolean = false>(options?: Options<ListModelProvidersData, ThrowOnError>): RequestResult<ListModelProvidersResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListModelProvidersResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/model-providers', ...options });
+
+/**
+ * Проверить связь с поставщиком
+ *
+ * Явная проверка доступности адреса.
+ *
+ * Проверяется связь, а не модель: запрос к модели стоит денег и времени, а на этом
+ * этапе портал к моделям не обращается вовсе (ADR-0006).
+ *
+ * Отказ одного поставщика ничего не ломает: он превращается в состояние в ответе,
+ * а не в исключение.
+ */
+export const checkModelProvider = <ThrowOnError extends boolean = false>(options: Options<CheckModelProviderData, ThrowOnError>): RequestResult<CheckModelProviderResponses, CheckModelProviderErrors, ThrowOnError> => (options.client ?? client).post<CheckModelProviderResponses, CheckModelProviderErrors, ThrowOnError>({ url: '/api/v1/admin/model-providers/{provider_id}/health-check', ...options });
 
 /**
  * Настройки с действующими значениями

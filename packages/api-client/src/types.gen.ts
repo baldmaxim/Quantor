@@ -183,6 +183,49 @@ export type BodyUploadFile = {
 };
 
 /**
+ * ComponentDiagnosticsRead
+ *
+ * Состояние одного компонента установки.
+ *
+ * `source` показывается рядом со статусом намеренно: «в порядке» без ответа на вопрос
+ * «когда и откуда это известно» — половина сведений.
+ */
+export type ComponentDiagnosticsRead = {
+    /**
+     * Checked At
+     */
+    checked_at: string;
+    /**
+     * Detail
+     */
+    detail?: string | null;
+    /**
+     * Duration Ms
+     */
+    duration_ms?: number | null;
+    /**
+     * Facts
+     */
+    facts?: {
+        [key: string]: string;
+    };
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Remediation
+     */
+    remediation?: string | null;
+    source: ProbeSource;
+    status: ProbeStatus;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * ComponentHealth
  */
 export type ComponentHealth = {
@@ -233,6 +276,33 @@ export type ContentUrl = {
      * Url
      */
     url: string;
+};
+
+/**
+ * DataPolicy
+ *
+ * Куда позволено уходить данным.
+ *
+ * Для проектной документации это бывает жёстким требованием заказчика, а не
+ * пожеланием: чертёж объекта нельзя отправлять наружу ни при каких условиях.
+ */
+export type DataPolicy = 'local_only' | 'remote_allowed' | 'restricted_data';
+
+/**
+ * DiagnosticsReport
+ *
+ * Сводка по установке. Итог считается по обязательным компонентам.
+ */
+export type DiagnosticsReport = {
+    /**
+     * Components
+     */
+    components: Array<ComponentDiagnosticsRead>;
+    /**
+     * Generated At
+     */
+    generated_at: string;
+    status: ProbeStatus;
 };
 
 /**
@@ -538,6 +608,119 @@ export type MetaResponse = {
 };
 
 /**
+ * ModelProviderProbeRead
+ *
+ * Результат явной проверки связи. Задержка появляется только здесь и только по кнопке.
+ */
+export type ModelProviderProbeRead = {
+    /**
+     * Checked At
+     */
+    checked_at: string;
+    /**
+     * Detail
+     */
+    detail?: string | null;
+    /**
+     * Latency Ms
+     */
+    latency_ms: number;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Status
+     */
+    status: 'healthy' | 'unavailable';
+};
+
+/**
+ * ModelProviderRead
+ *
+ * Поставщик моделей в административном виде.
+ *
+ * Поля под значение ключа здесь нет. Наружу уходит имя переменной окружения и признак
+ * «задана» — маскировать нечего там, где нечего показывать (промт 07).
+ */
+export type ModelProviderRead = {
+    /**
+     * Base Url
+     */
+    base_url: string;
+    /**
+     * Credential Configured
+     */
+    credential_configured: boolean | null;
+    /**
+     * Credential Env
+     */
+    credential_env: string | null;
+    /**
+     * Enabled
+     */
+    enabled: boolean;
+    /**
+     * Endpoint Label
+     */
+    endpoint_label: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Is Usable
+     */
+    is_usable: boolean;
+    kind: ProviderKind;
+    /**
+     * Max Concurrency
+     */
+    max_concurrency: number;
+    /**
+     * Models
+     */
+    models: Array<ModelSpecRead>;
+    /**
+     * Name
+     */
+    name: string;
+    policy: DataPolicy;
+    /**
+     * Runs Locally
+     */
+    runs_locally: boolean;
+    /**
+     * Timeout Seconds
+     */
+    timeout_seconds: number;
+};
+
+/**
+ * ModelSpecRead
+ *
+ * Одна модель у поставщика.
+ */
+export type ModelSpecRead = {
+    /**
+     * Capabilities
+     */
+    capabilities: Array<string>;
+    /**
+     * Context Tokens
+     */
+    context_tokens: number;
+    /**
+     * Max Output Tokens
+     */
+    max_output_tokens: number;
+    /**
+     * Model Id
+     */
+    model_id: string;
+};
+
+/**
  * OverrideScope
  *
  * Уровень, на котором переопределяется настройка или флаг.
@@ -725,6 +908,18 @@ export type PageSheetRead = {
 };
 
 /**
+ * ProbeSource
+ *
+ * Откуда взялось состояние. Показывается рядом с ним — иначе непонятно, насколько свежее.
+ */
+export type ProbeSource = 'live' | 'reported' | 'config' | 'unknown';
+
+/**
+ * ProbeStatus
+ */
+export type ProbeStatus = 'healthy' | 'degraded' | 'unavailable' | 'not_configured' | 'unknown';
+
+/**
  * ProcessingStatus
  *
  * Состояние обработки конкретной ревизии.
@@ -878,6 +1073,16 @@ export type ProjectUpdate = {
     name?: string | null;
     status?: ProjectStatus | null;
 };
+
+/**
+ * ProviderKind
+ *
+ * Как разговаривать с поставщиком.
+ *
+ * Различие протокольное, а не маркетинговое: vLLM, SGLang и LM Studio отвечают
+ * OpenAI-совместимым API, и адаптер у них будет общий.
+ */
+export type ProviderKind = 'openai_compatible' | 'anthropic_compatible' | 'lm_studio' | 'vllm' | 'sglang' | 'custom';
 
 /**
  * ReadinessResponse
@@ -1585,6 +1790,22 @@ export type ListAuditEventsResponses = {
 
 export type ListAuditEventsResponse = ListAuditEventsResponses[keyof ListAuditEventsResponses];
 
+export type ReadDiagnosticsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/diagnostics';
+};
+
+export type ReadDiagnosticsResponses = {
+    /**
+     * Successful Response
+     */
+    200: DiagnosticsReport;
+};
+
+export type ReadDiagnosticsResponse = ReadDiagnosticsResponses[keyof ReadDiagnosticsResponses];
+
 export type ListFeatureFlagsData = {
     body?: never;
     path?: never;
@@ -1969,6 +2190,54 @@ export type RetryAdminJobResponses = {
 };
 
 export type RetryAdminJobResponse = RetryAdminJobResponses[keyof RetryAdminJobResponses];
+
+export type ListModelProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/model-providers';
+};
+
+export type ListModelProvidersResponses = {
+    /**
+     * Response List Model Providers
+     *
+     * Successful Response
+     */
+    200: Array<ModelProviderRead>;
+};
+
+export type ListModelProvidersResponse = ListModelProvidersResponses[keyof ListModelProvidersResponses];
+
+export type CheckModelProviderData = {
+    body?: never;
+    path: {
+        /**
+         * Provider Id
+         */
+        provider_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/model-providers/{provider_id}/health-check';
+};
+
+export type CheckModelProviderErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CheckModelProviderError = CheckModelProviderErrors[keyof CheckModelProviderErrors];
+
+export type CheckModelProviderResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelProviderProbeRead;
+};
+
+export type CheckModelProviderResponse = CheckModelProviderResponses[keyof CheckModelProviderResponses];
 
 export type ListSettingsData = {
     body?: never;

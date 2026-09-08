@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.contracts.models import DataPolicy, ProviderKind
 from app.domain import (
     ArtifactKind,
     AuditResult,
@@ -26,6 +27,7 @@ from app.domain import (
     Role,
     ValueSource,
 )
+from app.services.diagnostics import ProbeSource, ProbeStatus
 
 if TYPE_CHECKING:
     from app.services.uploads import UploadOutcome
@@ -271,6 +273,77 @@ class JobStatsRead(BaseModel):
     """Отказы за сутки. Ноль здесь — это ноль, а не «не измеряли»."""
     workers_alive: int
     workers_total: int
+
+
+class ModelSpecRead(BaseModel):
+    """Одна модель у поставщика."""
+
+    model_id: str
+    capabilities: list[str]
+    context_tokens: int
+    max_output_tokens: int
+
+
+class ModelProviderRead(BaseModel):
+    """Поставщик моделей в административном виде.
+
+    Поля под значение ключа здесь нет. Наружу уходит имя переменной окружения и признак
+    «задана» — маскировать нечего там, где нечего показывать (промт 07).
+    """
+
+    id: str
+    name: str
+    kind: ProviderKind
+    policy: DataPolicy
+    """local_only | remote_allowed | restricted_data — куда позволено уходить данным."""
+    endpoint_label: str
+    base_url: str
+    timeout_seconds: float
+    max_concurrency: int
+    enabled: bool
+    is_usable: bool
+    """Включён и готов: поставщику с ключом без ключа делать нечего."""
+    runs_locally: bool
+    credential_env: str | None
+    credential_configured: bool | None
+    models: list[ModelSpecRead]
+
+
+class ModelProviderProbeRead(BaseModel):
+    """Результат явной проверки связи. Задержка появляется только здесь и только по кнопке."""
+
+    provider_id: str
+    status: Literal["healthy", "unavailable"]
+    checked_at: datetime
+    latency_ms: float = Field(ge=0)
+    detail: str | None = None
+
+
+class ComponentDiagnosticsRead(BaseModel):
+    """Состояние одного компонента установки.
+
+    `source` показывается рядом со статусом намеренно: «в порядке» без ответа на вопрос
+    «когда и откуда это известно» — половина сведений.
+    """
+
+    name: str
+    title: str
+    status: ProbeStatus
+    source: ProbeSource
+    checked_at: datetime
+    duration_ms: float | None = None
+    detail: str | None = None
+    remediation: str | None = None
+    """Что сделать. Команда или действие — но никогда не учётные данные."""
+    facts: dict[str, str] = Field(default_factory=dict)
+
+
+class DiagnosticsReport(BaseModel):
+    """Сводка по установке. Итог считается по обязательным компонентам."""
+
+    status: ProbeStatus
+    generated_at: datetime
+    components: list[ComponentDiagnosticsRead]
 
 
 # --------------------------------------------------------------------------- проекты

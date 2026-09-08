@@ -69,6 +69,9 @@ class ErrorCode(StrEnum):
     JOB_NOT_RETRYABLE = "JOB_NOT_RETRYABLE"
     WORKER_UNAVAILABLE = "WORKER_UNAVAILABLE"
 
+    # --- поставщики моделей ---
+    MODEL_PROVIDER_NOT_CONFIGURED = "MODEL_PROVIDER_NOT_CONFIGURED"
+
     # --- TenderHUB ---
     TENDERHUB_DISABLED = "TENDERHUB_DISABLED"
     TENDERHUB_AUTH_FAILED = "TENDERHUB_AUTH_FAILED"
@@ -122,6 +125,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.JOB_TIMEOUT: "Задание не уложилось в отведённое время",
     ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
     ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
+    ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: "Поставщик моделей не настроен",
     ErrorCode.TENDERHUB_DISABLED: "Интеграция с TenderHUB не настроена",
     ErrorCode.TENDERHUB_AUTH_FAILED: "TenderHUB не принял ключ доступа",
     ErrorCode.TENDERHUB_FORBIDDEN: "Ключу TenderHUB не выдан доступ к этим данным",
@@ -184,6 +188,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.JOB_TIMEOUT: status.HTTP_409_CONFLICT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
+    ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: status.HTTP_409_CONFLICT,
     # Отказы внешней системы — 502: клиент не виноват, но и повторять запрос бессмысленно,
     # пока не поправят ключ или доступ на той стороне.
     ErrorCode.TENDERHUB_DISABLED: status.HTTP_503_SERVICE_UNAVAILABLE,
