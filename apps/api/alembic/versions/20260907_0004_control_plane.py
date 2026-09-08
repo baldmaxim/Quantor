@@ -35,23 +35,24 @@ AUDIT_RESULTS = ("success", "failure", "denied")
 
 SCOPE_MATCHES_WORKSPACE = "(scope = 'system') = (workspace_id is null)"
 
-APPEND_ONLY_UP = """
+# asyncpg не принимает несколько команд в одном prepared statement — каждое DDL отдельно.
+APPEND_ONLY_FUNCTION = """
 create or replace function audit_events_append_only() returns trigger
 language plpgsql as $$
 begin
     raise exception 'audit_events is append-only';
 end
-$$;
+$$
+"""
 
+APPEND_ONLY_TRIGGER = """
 create trigger trg_audit_events_append_only
 before update or delete on audit_events
-for each row execute function audit_events_append_only();
+for each row execute function audit_events_append_only()
 """
 
-APPEND_ONLY_DOWN = """
-drop trigger if exists trg_audit_events_append_only on audit_events;
-drop function if exists audit_events_append_only();
-"""
+APPEND_ONLY_DROP_TRIGGER = "drop trigger if exists trg_audit_events_append_only on audit_events"
+APPEND_ONLY_DROP_FUNCTION = "drop function if exists audit_events_append_only()"
 
 
 def upgrade() -> None:
@@ -116,11 +117,13 @@ def upgrade() -> None:
     op.create_index('ix_audit_events_resource_type_resource_id', 'audit_events', ['resource_type', 'resource_id'], unique=False)
     op.create_index('ix_audit_events_workspace_id_created_at', 'audit_events', ['workspace_id', 'created_at'], unique=False)
 
-    op.execute(APPEND_ONLY_UP)
+    op.execute(APPEND_ONLY_FUNCTION)
+    op.execute(APPEND_ONLY_TRIGGER)
 
 
 def downgrade() -> None:
-    op.execute(APPEND_ONLY_DOWN)
+    op.execute(APPEND_ONLY_DROP_TRIGGER)
+    op.execute(APPEND_ONLY_DROP_FUNCTION)
 
     op.drop_index('ix_audit_events_workspace_id_created_at', table_name='audit_events')
     op.drop_index('ix_audit_events_resource_type_resource_id', table_name='audit_events')

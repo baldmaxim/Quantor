@@ -107,6 +107,10 @@ async def run_migrations_online() -> None:
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
+        # SET search_path выше открывает транзакцию соединения; begin_transaction()
+        # Alembic в этом случае коммитит только savepoint. Без commit на соединении
+        # весь upgrade (включая alembic_version) откатывается при выходе из connect().
+        await connection.commit()
     await connectable.dispose()
 
 

@@ -12,6 +12,7 @@ from collections.abc import Callable
 
 import pytest
 from httpx import AsyncClient
+from pydantic import SecretStr
 from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -271,7 +272,8 @@ async def test_integration_flag_cannot_be_enabled_without_a_key(
             scope=OverrideScope.SYSTEM,
             enabled=True,
             reason=None,
-            settings=Settings(),
+            # Пустой ключ явно: иначе Settings() подхватит TENDERHUB_* из .env разработчика.
+            settings=Settings(tenderhub_api_token=SecretStr("")),
         )
     assert error.value.code.value == "FLAG_NOT_EDITABLE"
 
@@ -379,16 +381,17 @@ async def test_audit_rows_cannot_be_rewritten(
         resource_id=TTL_KEY,
     )
     await db_session.commit()
+    event_id = event.id
 
     with pytest.raises(DBAPIError):
         await db_session.execute(
             text("update audit_events set action = 'подделка' where id = :id"),
-            {"id": event.id},
+            {"id": event_id},
         )
     await db_session.rollback()
 
     with pytest.raises(DBAPIError):
-        await db_session.execute(text("delete from audit_events where id = :id"), {"id": event.id})
+        await db_session.execute(text("delete from audit_events where id = :id"), {"id": event_id})
     await db_session.rollback()
 
 

@@ -82,17 +82,22 @@ class AuditEvent(CreatedAtMixin, Base):
 #
 # `truncate` строковые триггеры не вызывает, поэтому очистка таблиц между тестами
 # продолжает работать.
-_APPEND_ONLY_SQL = """
+#
+# asyncpg не принимает несколько команд в одном prepared statement — function и trigger
+# выполняем отдельными вызовами.
+_APPEND_ONLY_FUNCTION = """
 create or replace function audit_events_append_only() returns trigger
 language plpgsql as $$
 begin
     raise exception 'audit_events is append-only';
 end
-$$;
+$$
+"""
 
+_APPEND_ONLY_TRIGGER = """
 create trigger trg_audit_events_append_only
 before update or delete on audit_events
-for each row execute function audit_events_append_only();
+for each row execute function audit_events_append_only()
 """
 
 
@@ -104,7 +109,8 @@ def _install_append_only(target: Table, connection: Connection, **kwargs: object
     """
     if connection.dialect.name != "postgresql":
         return
-    connection.exec_driver_sql(_APPEND_ONLY_SQL)
+    connection.exec_driver_sql(_APPEND_ONLY_FUNCTION)
+    connection.exec_driver_sql(_APPEND_ONLY_TRIGGER)
 
 
 event.listen(AuditEvent.__table__, "after_create", _install_append_only)

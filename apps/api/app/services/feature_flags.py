@@ -166,9 +166,10 @@ async def evaluate_all(
         return await StaticFlagProvider(settings).evaluate_all(context)
     try:
         return await DatabaseFlagProvider(session, settings).evaluate_all(context)
-    except (SQLAlchemyError, ConnectionError, OSError) as error:
+    except (SQLAlchemyError, ConnectionError, OSError, RuntimeError) as error:
         # Именно так и задумано: набор возможностей — не то, ради чего стоит отдавать
         # пятисотку. На неразмеченной базе портал обязан показать границу этапа из кода.
+        # RuntimeError — в т.ч. «Event loop is closed» у кэшированного async-движка в тестах.
         log.warning("feature_flags_fallback", error_type=type(error).__name__)
         return await StaticFlagProvider(settings).evaluate_all(context)
 
