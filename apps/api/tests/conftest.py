@@ -338,12 +338,13 @@ def clean_settings(**overrides: object) -> Settings:
     Здесь обнуляется всё, чем управляет контур: ключ интеграции, переопределения флагов
     и настроек. Проверка порядка старшинства обязана видеть ровно то, что положила сама.
     """
-    return Settings(  # type: ignore[call-arg]
-        tenderhub_api_token=SecretStr(""),
-        feature_flags="",
-        settings_overrides="",
-        **overrides,
-    )
+    values: dict[str, object] = {
+        "tenderhub_api_token": SecretStr(""),
+        "feature_flags": "",
+        "settings_overrides": "",
+    }
+    values.update(overrides)
+    return Settings(**values)  # type: ignore[call-arg]
 
 
 def _build_api(

@@ -267,7 +267,9 @@ async def claim(
     )
     if claimed is None:
         return None
-    return await session.get(Job, claimed)
+    # UPDATE шёл сырым SQL: если задание уже в identity map (типичный случай тестов
+    # и иногда одного запроса API), session.get вернёт устаревший статус без перечитывания.
+    return await session.get(Job, claimed, populate_existing=True)
 
 
 HEARTBEAT_SQL = text(
