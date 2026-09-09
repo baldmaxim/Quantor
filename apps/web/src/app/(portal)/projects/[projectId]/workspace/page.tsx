@@ -7,6 +7,9 @@ import { Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { usePageGeometry } from '@/components/viewer/usePageGeometry';
+import { ScaleDialog } from '@/components/workspace/ScaleDialog';
+import type { NormalizedPoint } from '@/lib/viewer/coordinates';
+import { ScaleDraft, type ScaleDraftPhase } from '@/lib/viewer/scale-draft';
 import { useDocumentBackend } from '@/components/viewer/useDocumentBackend';
 import { EmptyState, ErrorState, Field, InspectorSection, StatusBadge, cx } from '@/components/ui';
 import {
@@ -26,7 +29,14 @@ import { ToolButton, ToolDivider, ToolField } from '@/components/workspace/Toolb
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { errorMessage } from '@/lib/errors';
 import { REGIONS_FORMS, blockType, countOf } from '@/lib/format';
-import { useContentUrl, useProject, useRegions, useSheets } from '@/lib/queries';
+import {
+  useContentUrl,
+  useCreateCalibration,
+  useProject,
+  useRegions,
+  useScaleCalibrations,
+  useSheets,
+} from '@/lib/queries';
 import { Camera } from '@/lib/viewer/camera';
 import type { OverlayRegion } from '@/lib/viewer/overlay';
 import { useWorkspaceStore, type LeftTab } from '@/store/workspace';
@@ -89,6 +99,68 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const selectedRegion = regions.data?.items.find((item) => item.id === selectedRegionId) ?? null;
 
   const counts = useMemo(() => countByType(regions.data?.items ?? []), [regions.data]);
+
+  // --- масштаб чертежа ---
+  //
+  // Черновик — императивный контроллер вне состояния React: точка под курсором меняется
+  // на каждом движении мыши, и перерисовывать ей всю рабочую область нельзя.
+  const sheetId = sheet?.id ?? null;
+  const scaleDraft = useMemo(() => new ScaleDraft(), []);
+  useEffect(() => () => scaleDraft.dispose(), [scaleDraft]);
+
+  const [scaleError, setScaleError] = useState<string | null>(null);
+  // В состояние React попадает только фаза и готовые точки — то есть два события на всю
+  // калибровку, а не поток координат.
+  const [draftPhase, setDraftPhase] = useState<ScaleDraftPhase>('idle');
+  const [draftPoints, setDraftPoints] = useState<{
+    a: NormalizedPoint;
+    b: NormalizedPoint;
+  } | null>(null);
+
+  useEffect(() => {
+    const seen = { phase: scaleDraft.getState().phase };
+    return scaleDraft.subscribe((state) => {
+      if (state.phase === seen.phase) return;
+      seen.phase = state.phase;
+      setDraftPhase(state.phase);
+      setDraftPoints(state.a && state.b ? { a: state.a, b: state.b } : null);
+      // Черновик сброшен — прежняя ошибка больше ни к чему не относится.
+      if (state.phase === 'idle') setScaleError(null);
+    });
+  }, [scaleDraft]);
+
+  const draftA = draftPoints?.a ?? null;
+  const draftB = draftPoints?.b ?? null;
+
+  const calibrations = useScaleCalibrations(sheetId);
+  const defaultCalibration = calibrations.data?.find((item) => item.is_default) ?? null;
+  const createCalibration = useCreateCalibration();
+
+  // Предпросмотр считается по геометрии из отрисовщика: она совпадает с канонической
+  // серверной (ADR-0016), а сохранённый коэффициент всё равно приходит от сервера.
+  const geometryValue = useMemo(
+    () => (geometry ? { displayWidthPt: geometry.width, displayHeightPt: geometry.height } : null),
+    [geometry],
+  );
+
+  // Esc отменяет черновик, не обращаясь к серверу.
+  useEffect(() => {
+    if (tool !== 'scale') return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      scaleDraft.cancel();
+      setScaleError(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [tool, scaleDraft]);
+
+  // Смена листа обнуляет черновик: точки нормализованы к своему листу и на чужом
+  // означали бы совсем другое место. Отмена императивная — состояние обновит подписка.
+  useEffect(() => {
+    scaleDraft.cancel();
+  }, [sheetId, scaleDraft]);
 
   const setQuery = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -248,6 +320,20 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 <IconLayers width={16} height={16} />
                 Распознавание
               </ToolButton>
+              <ToolButton
+                label="Масштаб"
+                hint="два щелчка по известному размеру; Esc — отмена"
+                wide
+                active={tool === 'scale'}
+                disabled={!sheetId}
+                onClick={() => {
+                  scaleDraft.cancel();
+                  setScaleError(null);
+                  setTool(tool === 'scale' ? 'pointer' : 'scale');
+                }}
+              >
+                Масштаб
+              </ToolButton>
               <ToolButton label="Обмеры" hint="Этап 2" wide disabled>
                 Обмеры
               </ToolButton>
@@ -347,9 +433,44 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 onSelect={(id) => setQuery({ region: id })}
                 camera={camera}
                 tool={tool}
+                scaleDraft={scaleDraft}
                 onViewChange={(state) => setZoomPercent(Math.round(state.scale * 100))}
                 onError={setRenderError}
               />
+              {draftPhase === 'complete' && draftA && draftB && sheetId && (
+                <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">
+                  <ScaleDialog
+                    pointA={draftA}
+                    pointB={draftB}
+                    geometry={geometryValue}
+                    pending={createCalibration.isPending}
+                    error={scaleError}
+                    onCancel={() => {
+                      scaleDraft.cancel();
+                      setScaleError(null);
+                    }}
+                    onConfirm={(value, unit) => {
+                      setScaleError(null);
+                      createCalibration.mutate(
+                        {
+                          sheetId,
+                          pointA: [draftA.x, draftA.y],
+                          pointB: [draftB.x, draftB.y],
+                          knownDistance: value,
+                          unit,
+                        },
+                        {
+                          onSuccess: () => {
+                            scaleDraft.cancel();
+                            setTool('pointer');
+                          },
+                          onError: (error) => setScaleError(describeScaleError(error)),
+                        },
+                      );
+                    }}
+                  />
+                </div>
+              )}
             </ViewportArea>
           }
           rightTitle="Свойства области"
@@ -376,8 +497,18 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 Лист {pages.length > 0 ? pageIndex + 1 : '—'} / {pages.length || '—'}
               </span>
               <span className="tabular">Масштаб вида {zoomPercent} %</span>
-              {/* Определять масштаб чертежа портал не умеет и пишет об этом прямо. */}
-              <span>Масштаб чертежа: Не задан</span>
+              {/* Масштаб задаётся вручную и только вручную: надпись «М 1:100» на чертеже
+                  портал читать не имеет права (ADR-0018). */}
+              <span>
+                Масштаб чертежа:{' '}
+                {defaultCalibration ? (
+                  <span className="tabular">
+                    {Number(defaultCalibration.mm_per_pt).toFixed(3)} мм/pt
+                  </span>
+                ) : (
+                  'Не задан'
+                )}
+              </span>
               <span className="ml-auto flex gap-[var(--s-6)]">
                 <span className="tabular">
                   {countOf(regions.data?.total ?? 0, REGIONS_FORMS)} на листе
@@ -426,6 +557,32 @@ const sheetLabel = (
   sheet: { page_index: number; page_label: string | null } | null,
   total: number,
 ): string => (sheet ? `${sheet.page_label ?? sheet.page_index + 1} из ${total}` : '—');
+
+/**
+ * Понятное сообщение по коду доменной ошибки.
+ *
+ * Портал показывает причину, а не «что-то пошло не так»: у калибровки причин отказа
+ * ровно несколько, и каждая означает разное действие пользователя.
+ */
+const describeScaleError = (error: unknown): string => {
+  const code =
+    typeof error === 'object' && error !== null && 'detail' in error
+      ? ((error as { detail?: { code?: string } }).detail?.code ?? '')
+      : '';
+
+  switch (code) {
+    case 'SCALE_SEGMENT_TOO_SHORT':
+      return 'Отрезок слишком короткий — поставьте точки дальше друг от друга.';
+    case 'SCALE_GEOMETRY_REQUIRED':
+      return 'Геометрия страницы ещё не извлечена: масштаб пока не к чему привязать.';
+    case 'PERMISSION_DENIED':
+      return 'Недостаточно прав, чтобы задать масштаб.';
+    case 'NOT_FOUND':
+      return 'Лист не найден.';
+    default:
+      return 'Не удалось сохранить масштаб. Попробуйте ещё раз.';
+  }
+};
 
 const toOverlayRegions = (regions: readonly RegionRead[]): OverlayRegion[] =>
   regions

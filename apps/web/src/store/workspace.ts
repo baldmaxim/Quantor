@@ -15,7 +15,7 @@ import { create } from 'zustand';
  */
 
 export type LeftTab = 'documents' | 'recognition' | 'takeoff';
-export type Tool = 'pointer' | 'pan';
+export type Tool = 'pointer' | 'pan' | 'scale';
 
 const MIN_LEFT = 200;
 const MAX_LEFT = 420;

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DrawingViewport, type ViewportSheet } from './DrawingViewport';
 import { Camera } from '@/lib/viewer/camera';
+import { ScaleDraft } from '@/lib/viewer/scale-draft';
 import type { RenderBackend, RenderRequest } from '@/lib/viewer/backend';
 
 /**
@@ -247,5 +248,105 @@ describe('холст рабочей области', () => {
     expect(after.scale).toBe(before.scale);
     expect(after.offsetX - before.offsetX).toBeCloseTo(60, 5);
     expect(after.offsetY - before.offsetY).toBeCloseTo(40, 5);
+  });
+});
+
+describe('инструмент масштаба на холсте', () => {
+  it('щелчки ставят две точки, не обращаясь к серверу', async () => {
+    // Черновик живёт в памяти до подтверждения: сеть трогается один раз, кнопкой.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const draft = new ScaleDraft();
+    setup({ tool: 'scale', scaleDraft: draft });
+    await flushFrame();
+
+    // В jsdom контейнер нулевого размера, поэтому лист вписан в очень мелкий масштаб:
+    // координаты берутся из фактической ширины холста, а не из вымышленных пикселей.
+    const viewport = screen.getByTestId('viewport');
+    const width = stackOf().querySelectorAll('canvas')[0]?.clientWidth || 1;
+    fireEvent.pointerDown(viewport, { button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerDown(viewport, { button: 0, clientX: width, clientY: 0 });
+
+    expect(draft.getState().phase).toBe('complete');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('движение указателя не обращается к серверу и не перерисовывает страницу', async () => {
+    // Самая дорогая ошибка этого экрана: перерисовка PDF на каждое движение мыши.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const draft = new ScaleDraft();
+    const { backend } = setup({ tool: 'scale', scaleDraft: draft });
+    await flushFrame();
+    const rendersBefore = backend.renders.length;
+
+    const viewport = screen.getByTestId('viewport');
+    fireEvent.pointerDown(viewport, { button: 0, clientX: 10, clientY: 10 });
+    for (let step = 0; step < 20; step += 1) {
+      fireEvent.pointerMove(viewport, { clientX: 20 + step * 5, clientY: 30 });
+    }
+    await flushFrame();
+
+    expect(backend.renders.length).toBe(rendersBefore);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(draft.getState().hover).not.toBeNull();
+    fetchSpy.mockRestore();
+  });
+
+  it('точки хранятся нормализованными и переживают зум', async () => {
+    // Нормализованная точка не зависит от масштаба вида: иначе калибровка «поехала» бы
+    // от одного поворота колеса между двумя щелчками.
+    const draft = new ScaleDraft();
+    setup({ tool: 'scale', scaleDraft: draft });
+    await flushFrame();
+
+    const viewport = screen.getByTestId('viewport');
+    fireEvent.pointerDown(viewport, { button: 0, clientX: 100, clientY: 50 });
+    const first = draft.getState().a;
+
+    fireEvent.wheel(viewport, { deltaY: -100, clientX: 100, clientY: 50 });
+    await flushFrame();
+
+    expect(draft.getState().a).toEqual(first);
+  });
+
+  it('слой черновика скрыт, пока инструмент не выбран', async () => {
+    const draft = new ScaleDraft();
+    const { view } = setup({ tool: 'pointer', scaleDraft: draft });
+    await flushFrame();
+
+    expect(screen.getByTestId('scale-layer').className).toContain('hidden');
+
+    view.rerender(
+      <DrawingViewport
+        backend={new FakeBackend()}
+        sheet={SHEET}
+        regions={[]}
+        hiddenTypes={new Set()}
+        overlayVisible
+        selectedId={null}
+        onSelect={vi.fn()}
+        camera={new Camera()}
+        tool="scale"
+        scaleDraft={draft}
+      />,
+    );
+
+    expect(screen.getByTestId('scale-layer').className).not.toContain('hidden');
+  });
+
+  it('выбор области инструментом масштаба не срабатывает', async () => {
+    // Иначе щелчок по штампу выбирал бы область вместо постановки точки.
+    const draft = new ScaleDraft();
+    const onSelect = vi.fn();
+    setup({ tool: 'scale', scaleDraft: draft, onSelect });
+    await flushFrame();
+
+    fireEvent.pointerDown(screen.getByTestId('viewport'), {
+      button: 0,
+      clientX: 30,
+      clientY: 30,
+    });
+
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

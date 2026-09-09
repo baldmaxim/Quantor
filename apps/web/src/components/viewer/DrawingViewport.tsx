@@ -7,6 +7,11 @@ import type { Camera, CameraState } from '@/lib/viewer/camera';
 import { placeRenderedPage, toNormalizedPoint } from '@/lib/viewer/coordinates';
 import { drawOverlay, resizeOverlay, type OverlayRegion } from '@/lib/viewer/overlay';
 import { DocumentLoadError, RenderCancelledError, type RenderBackend } from '@/lib/viewer/backend';
+import type { ScaleDraft } from '@/lib/viewer/scale-draft';
+import { drawScaleDraft } from '@/lib/viewer/scale-overlay';
+
+/** Инструменты, которые понимает холст. Остальные живут выше и сюда не доходят. */
+export type ViewportTool = 'pointer' | 'pan' | 'scale';
 
 /**
  * Холст рабочей области: страница документа и слой распознанных областей.
@@ -42,7 +47,12 @@ interface IDrawingViewportProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   camera: Camera;
-  tool: 'pointer' | 'pan';
+  tool: ViewportTool;
+  /**
+   * Черновик калибровки. Приходит снаружи, потому что подтверждать его будет рабочая
+   * область: холст только рисует и ставит точки.
+   */
+  scaleDraft?: ScaleDraft | null;
   onViewChange?: (state: CameraState) => void;
   onError?: (code: string) => void;
 }
@@ -78,6 +88,7 @@ export const DrawingViewport = ({
   onSelect,
   camera,
   tool,
+  scaleDraft = null,
   onViewChange,
   onError,
 }: IDrawingViewportProps) => {
@@ -85,6 +96,9 @@ export const DrawingViewport = ({
   const stack = useRef<HTMLDivElement>(null);
   const pageCanvas = useRef<HTMLCanvasElement>(null);
   const overlayCanvas = useRef<HTMLCanvasElement>(null);
+  // Третий холст: черновик калибровки не смешивается со слоем распознанных областей.
+  // `Region` — свидетельство, черновик — намерение (ADR-0015).
+  const scaleCanvas = useRef<HTMLCanvasElement>(null);
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -339,6 +353,35 @@ export const DrawingViewport = ({
     [regions, hiddenTypes, overlayVisible, pointFromEvent],
   );
 
+  const paintScale = useCallback(() => {
+    const canvas = scaleCanvas.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context || !page || !scaleDraft) return;
+
+    const ratio = window.devicePixelRatio || 1;
+    const placed = placeRenderedPage(page, renderedScale.current, ratio);
+    resizeOverlay(canvas, placed.width, placed.height, ratio);
+
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    drawScaleDraft(
+      context,
+      placed,
+      scaleDraft.getState(),
+      { color: color || 'currentColor' },
+      ratio,
+    );
+  }, [page, scaleDraft]);
+
+  // Слой перерисовывается по подписке на черновик, а не через состояние React: точка под
+  // курсором меняется на каждом движении мыши, и перерисовывать ей дерево компонентов
+  // значило бы ронять частоту кадров вместе со всеми панелями.
+  useEffect(() => {
+    if (!scaleDraft) return;
+    paintScale();
+    return scaleDraft.subscribe(paintScale);
+  }, [scaleDraft, paintScale]);
+
+  const measuring = tool === 'scale' && scaleDraft !== null;
   const panning = tool === 'pan' || spacePressed;
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -354,6 +397,16 @@ export const DrawingViewport = ({
       return;
     }
 
+    if (measuring) {
+      const point = pointFromEvent(event.clientX, event.clientY);
+      // Точка за пределами листа — промах мимо чертежа, а не намерение: ставить её
+      // значило бы получить калибровку по краю поля.
+      if (point && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1) {
+        scaleDraft?.pick(point);
+      }
+      return;
+    }
+
     onSelect(findRegion(event.clientX, event.clientY)?.id ?? null);
   };
 
@@ -362,6 +415,12 @@ export const DrawingViewport = ({
     if (drag && drag.pointerId === event.pointerId) {
       camera.panBy(event.clientX - drag.x, event.clientY - drag.y);
       dragging.current = { ...drag, x: event.clientX, y: event.clientY };
+      return;
+    }
+
+    if (measuring) {
+      // Ни одного обращения к серверу: черновик живёт в памяти до подтверждения.
+      scaleDraft?.hover(pointFromEvent(event.clientX, event.clientY));
       return;
     }
 
@@ -442,7 +501,13 @@ export const DrawingViewport = ({
       data-testid="viewport"
       className={cx(
         'relative h-full w-full overflow-hidden bg-canvas-well',
-        panning ? 'cursor-grab' : hoveredId ? 'cursor-pointer' : 'cursor-default',
+        panning
+          ? 'cursor-grab'
+          : measuring
+            ? 'cursor-crosshair'
+            : hoveredId
+              ? 'cursor-pointer'
+              : 'cursor-default',
       )}
     >
       <div ref={stack} className="absolute top-0 left-0 origin-top-left will-change-transform">
@@ -453,6 +518,11 @@ export const DrawingViewport = ({
             'pointer-events-none absolute top-0 left-0',
             !overlayVisible && 'opacity-0',
           )}
+        />
+        <canvas
+          ref={scaleCanvas}
+          data-testid="scale-layer"
+          className={cx('pointer-events-none absolute top-0 left-0', !measuring && 'hidden')}
         />
       </div>
 

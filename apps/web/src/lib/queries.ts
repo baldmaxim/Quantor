@@ -1,12 +1,15 @@
 'use client';
 
 import {
+  createSheetCalibration,
   listDocumentRevisions,
   listProjectDocuments,
   listProjects,
   listRevisionSheets,
+  listSheetCalibrations,
   listSheetRegions,
   listTenders,
+  makeCalibrationDefault,
   readJob,
   readMeta,
   readProject,
@@ -14,9 +17,10 @@ import {
   type DocumentRead,
   type MetaResponse,
   type ProjectSummary,
+  type ScaleCalibrationRead,
   type TenderBriefRead,
 } from '@quantor/api-client';
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
 /**
  * Обращения к API.
@@ -38,6 +42,7 @@ export const queryKeys = {
   job: (jobId: string) => ['job', jobId] as const,
   contentUrl: (revisionId: string) => ['revision', revisionId, 'content-url'] as const,
   tenders: (search: string) => ['tenderhub', 'tenders', search] as const,
+  calibrations: (sheetId: string) => ['sheet', sheetId, 'scale-calibrations'] as const,
 };
 
 export interface ProjectsParams {
@@ -224,3 +229,83 @@ export const useTenders = (search: string, enabled: boolean): UseQueryResult<Ten
     // Список тяжёлый и внешний: повторять его при каждом открытии окна незачем.
     refetchOnWindowFocus: false,
   });
+
+// --------------------------------------------------------------------- масштаб чертежа
+
+/**
+ * Калибровки масштаба листа.
+ *
+ * Их может быть несколько: план 1:100 и узел 1:20 на одном листе — обычное дело
+ * (ADR-0018). Действующая помечена `is_default`.
+ */
+export const useScaleCalibrations = (sheetId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.calibrations(sheetId ?? ''),
+    queryFn: async () =>
+      unwrap(
+        await listSheetCalibrations({ throwOnError: true, path: { sheet_id: sheetId ?? '' } }),
+      ),
+    enabled: Boolean(sheetId),
+  });
+
+/** Действующая калибровка листа или `null`, если масштаб не задан. */
+export const useDefaultCalibration = (sheetId: string | null): ScaleCalibrationRead | null => {
+  const { data } = useScaleCalibrations(sheetId);
+  return data?.find((item) => item.is_default) ?? null;
+};
+
+export interface CreateCalibrationInput {
+  readonly sheetId: string;
+  readonly pointA: readonly [number, number];
+  readonly pointB: readonly [number, number];
+  readonly knownDistance: string;
+  readonly unit: 'mm' | 'cm' | 'm';
+}
+
+/**
+ * Создаёт калибровку по двум точкам и известному размеру.
+ *
+ * Коэффициент не передаётся: его считает сервер из точек и канонической геометрии
+ * страницы. Значение, присланное клиентом, не было бы защитимо перед заказчиком.
+ */
+export const useCreateCalibration = () => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateCalibrationInput) =>
+      unwrap(
+        await createSheetCalibration({
+          throwOnError: true,
+          path: { sheet_id: input.sheetId },
+          body: {
+            point_a: [String(input.pointA[0]), String(input.pointA[1])],
+            point_b: [String(input.pointB[0]), String(input.pointB[1])],
+            known_distance: input.knownDistance,
+            unit: input.unit,
+            make_default: true,
+          },
+        }),
+      ),
+    onSuccess: (_result, input) => {
+      void client.invalidateQueries({ queryKey: queryKeys.calibrations(input.sheetId) });
+    },
+  });
+};
+
+/** Делает калибровку действующей. Уже посчитанные величины при этом не меняются. */
+export const useMakeCalibrationDefault = (sheetId: string) => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (calibrationId: string) =>
+      unwrap(
+        await makeCalibrationDefault({
+          throwOnError: true,
+          path: { calibration_id: calibrationId },
+        }),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.calibrations(sheetId) });
+    },
+  });
+};
