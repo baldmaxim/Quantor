@@ -482,6 +482,13 @@ export type FlagStateRead = {
 export type GeometryStatus = 'not_applicable' | 'pending' | 'extracting' | 'ready' | 'failed';
 
 /**
+ * GeometryType
+ *
+ * Что именно измеряют.
+ */
+export type GeometryType = 'count' | 'line' | 'polyline' | 'polygon';
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -622,6 +629,119 @@ export type LogoutResponse = {
      * Ok
      */
     ok?: boolean;
+};
+
+/**
+ * MeasurementBatchCreate
+ *
+ * Пакетная постановка точек.
+ *
+ * Нужна счёту: пользователь ставит метки подряд, и ждать ответа сервера на каждый щелчок
+ * он не должен. Предел размера жёсткий — пакет без предела становится способом положить
+ * сервер одним запросом.
+ */
+export type MeasurementBatchCreate = {
+    /**
+     * Items
+     */
+    items: Array<Array<Array<number>>>;
+    /**
+     * Scale Calibration Id
+     */
+    scale_calibration_id?: string | null;
+    /**
+     * Takeoff Item Id
+     */
+    takeoff_item_id: string;
+};
+
+/**
+ * MeasurementCreate
+ */
+export type MeasurementCreate = {
+    /**
+     * Points
+     */
+    points: Array<Array<number>>;
+    /**
+     * Scale Calibration Id
+     */
+    scale_calibration_id?: string | null;
+    /**
+     * Takeoff Item Id
+     */
+    takeoff_item_id: string;
+};
+
+/**
+ * MeasurementRead
+ *
+ * Геометрия обмера на листе.
+ */
+export type MeasurementRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    geometry_type: GeometryType;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Points
+     */
+    points: Array<Array<number>>;
+    /**
+     * Scale Calibration Id
+     */
+    scale_calibration_id: string | null;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string;
+    source: MeasurementSource;
+    /**
+     * Takeoff Item Id
+     */
+    takeoff_item_id: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * MeasurementSource
+ *
+ * Кто создал геометрию. Влияет на порядок проверки, а не на саму величину.
+ */
+export type MeasurementSource = 'manual' | 'ai' | 'imported';
+
+/**
+ * MeasurementUpdate
+ *
+ * Правка геометрии с проверкой версии.
+ *
+ * Версия обязательна: без неё старый клиент молча перетёр бы чужую правку.
+ */
+export type MeasurementUpdate = {
+    /**
+     * Points
+     */
+    points: Array<Array<number>>;
+    /**
+     * Version
+     */
+    version: number;
 };
 
 /**
@@ -1197,6 +1317,16 @@ export type ProjectUpdate = {
 export type ProviderKind = 'openai_compatible' | 'anthropic_compatible' | 'lm_studio' | 'vllm' | 'sglang' | 'custom';
 
 /**
+ * QuantityUnit
+ *
+ * Единица показа величины.
+ *
+ * Выводится из типа геометрии и проверяется базой: хранить её отдельно и позволить
+ * разойтись с типом — значит однажды показать площадь в метрах (ADR-0019).
+ */
+export type QuantityUnit = 'pcs' | 'm' | 'm2';
+
+/**
  * ReadinessResponse
  */
 export type ReadinessResponse = {
@@ -1680,6 +1810,102 @@ export type SheetRead = {
      * Width Px
      */
     width_px: number | null;
+};
+
+/**
+ * TakeoffItemCreate
+ */
+export type TakeoffItemCreate = {
+    /**
+     * Code
+     */
+    code?: string | null;
+    /**
+     * Color Key
+     */
+    color_key?: string | null;
+    geometry_type: GeometryType;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * TakeoffItemRead
+ *
+ * Строка списка обмеров (ADR-0019).
+ */
+export type TakeoffItemRead = {
+    /**
+     * Archived At
+     */
+    archived_at: string | null;
+    /**
+     * Code
+     */
+    code: string | null;
+    /**
+     * Color Key
+     */
+    color_key: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    display_unit: QuantityUnit;
+    geometry_type: GeometryType;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Ordinal
+     */
+    ordinal: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * TakeoffItemUpdate
+ *
+ * Изменяемые поля строки.
+ *
+ * Типа геометрии здесь нет: сменить его у строки с измерениями значило бы объявить
+ * посчитанные точки площадями.
+ */
+export type TakeoffItemUpdate = {
+    /**
+     * Code
+     */
+    code?: string | null;
+    /**
+     * Color Key
+     */
+    color_key?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Ordinal
+     */
+    ordinal?: number | null;
 };
 
 /**
@@ -2843,6 +3069,66 @@ export type ReadJobResponses = {
 
 export type ReadJobResponse = ReadJobResponses[keyof ReadJobResponses];
 
+export type DeleteMeasurementData = {
+    body?: never;
+    path: {
+        /**
+         * Measurement Id
+         */
+        measurement_id: string;
+    };
+    query?: never;
+    url: '/api/v1/measurements/{measurement_id}';
+};
+
+export type DeleteMeasurementErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteMeasurementError = DeleteMeasurementErrors[keyof DeleteMeasurementErrors];
+
+export type DeleteMeasurementResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteMeasurementResponse = DeleteMeasurementResponses[keyof DeleteMeasurementResponses];
+
+export type UpdateMeasurementData = {
+    body: MeasurementUpdate;
+    path: {
+        /**
+         * Measurement Id
+         */
+        measurement_id: string;
+    };
+    query?: never;
+    url: '/api/v1/measurements/{measurement_id}';
+};
+
+export type UpdateMeasurementErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateMeasurementError = UpdateMeasurementErrors[keyof UpdateMeasurementErrors];
+
+export type UpdateMeasurementResponses = {
+    /**
+     * Successful Response
+     */
+    200: MeasurementRead;
+};
+
+export type UpdateMeasurementResponse = UpdateMeasurementResponses[keyof UpdateMeasurementResponses];
+
 export type ReadMetaData = {
     body?: never;
     path?: never;
@@ -3072,6 +3358,75 @@ export type ListProjectJobsResponses = {
 };
 
 export type ListProjectJobsResponse = ListProjectJobsResponses[keyof ListProjectJobsResponses];
+
+export type ListTakeoffItemsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Include Archived
+         *
+         * Показать архивные строки
+         */
+        include_archived?: boolean;
+    };
+    url: '/api/v1/projects/{project_id}/takeoff-items';
+};
+
+export type ListTakeoffItemsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTakeoffItemsError = ListTakeoffItemsErrors[keyof ListTakeoffItemsErrors];
+
+export type ListTakeoffItemsResponses = {
+    /**
+     * Response List Takeoff Items
+     *
+     * Successful Response
+     */
+    200: Array<TakeoffItemRead>;
+};
+
+export type ListTakeoffItemsResponse = ListTakeoffItemsResponses[keyof ListTakeoffItemsResponses];
+
+export type CreateTakeoffItemData = {
+    body: TakeoffItemCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/takeoff-items';
+};
+
+export type CreateTakeoffItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateTakeoffItemError = CreateTakeoffItemErrors[keyof CreateTakeoffItemErrors];
+
+export type CreateTakeoffItemResponses = {
+    /**
+     * Successful Response
+     */
+    201: TakeoffItemRead;
+};
+
+export type CreateTakeoffItemResponse = CreateTakeoffItemResponses[keyof CreateTakeoffItemResponses];
 
 export type ReadUploadCapabilitiesData = {
     body?: never;
@@ -3390,6 +3745,107 @@ export type ReadSheetGeometryResponses = {
 
 export type ReadSheetGeometryResponse = ReadSheetGeometryResponses[keyof ReadSheetGeometryResponses];
 
+export type ListSheetMeasurementsData = {
+    body?: never;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: {
+        /**
+         * Takeoff Item Id
+         *
+         * Фильтр по строке
+         */
+        takeoff_item_id?: string | null;
+    };
+    url: '/api/v1/sheets/{sheet_id}/measurements';
+};
+
+export type ListSheetMeasurementsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSheetMeasurementsError = ListSheetMeasurementsErrors[keyof ListSheetMeasurementsErrors];
+
+export type ListSheetMeasurementsResponses = {
+    /**
+     * Response List Sheet Measurements
+     *
+     * Successful Response
+     */
+    200: Array<MeasurementRead>;
+};
+
+export type ListSheetMeasurementsResponse = ListSheetMeasurementsResponses[keyof ListSheetMeasurementsResponses];
+
+export type CreateMeasurementData = {
+    body: MeasurementCreate;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/sheets/{sheet_id}/measurements';
+};
+
+export type CreateMeasurementErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateMeasurementError = CreateMeasurementErrors[keyof CreateMeasurementErrors];
+
+export type CreateMeasurementResponses = {
+    /**
+     * Successful Response
+     */
+    201: MeasurementRead;
+};
+
+export type CreateMeasurementResponse = CreateMeasurementResponses[keyof CreateMeasurementResponses];
+
+export type CreateMeasurementsBatchData = {
+    body: MeasurementBatchCreate;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/sheets/{sheet_id}/measurements/batch';
+};
+
+export type CreateMeasurementsBatchErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateMeasurementsBatchError = CreateMeasurementsBatchErrors[keyof CreateMeasurementsBatchErrors];
+
+export type CreateMeasurementsBatchResponses = {
+    /**
+     * Response Create Measurements Batch
+     *
+     * Successful Response
+     */
+    201: Array<MeasurementRead>;
+};
+
+export type CreateMeasurementsBatchResponse = CreateMeasurementsBatchResponses[keyof CreateMeasurementsBatchResponses];
+
 export type ListSheetRegionsData = {
     body?: never;
     path: {
@@ -3506,6 +3962,66 @@ export type CreateSheetCalibrationResponses = {
 };
 
 export type CreateSheetCalibrationResponse = CreateSheetCalibrationResponses[keyof CreateSheetCalibrationResponses];
+
+export type UpdateTakeoffItemData = {
+    body: TakeoffItemUpdate;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/v1/takeoff-items/{item_id}';
+};
+
+export type UpdateTakeoffItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateTakeoffItemError = UpdateTakeoffItemErrors[keyof UpdateTakeoffItemErrors];
+
+export type UpdateTakeoffItemResponses = {
+    /**
+     * Successful Response
+     */
+    200: TakeoffItemRead;
+};
+
+export type UpdateTakeoffItemResponse = UpdateTakeoffItemResponses[keyof UpdateTakeoffItemResponses];
+
+export type ArchiveTakeoffItemData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/v1/takeoff-items/{item_id}/archive';
+};
+
+export type ArchiveTakeoffItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ArchiveTakeoffItemError = ArchiveTakeoffItemErrors[keyof ArchiveTakeoffItemErrors];
+
+export type ArchiveTakeoffItemResponses = {
+    /**
+     * Successful Response
+     */
+    200: TakeoffItemRead;
+};
+
+export type ArchiveTakeoffItemResponse = ArchiveTakeoffItemResponses[keyof ArchiveTakeoffItemResponses];
 
 export type LivenessData = {
     body?: never;

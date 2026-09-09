@@ -120,6 +120,17 @@ class AuditAction(StrEnum):
     TENDERHUB_PROJECT_REBOUND = "tenderhub_project_rebound"
     TENDERHUB_PROJECT_UNLINKED = "tenderhub_project_unlinked"
 
+    TAKEOFF_ITEM_CREATED = "takeoff_item_created"
+    TAKEOFF_ITEM_UPDATED = "takeoff_item_updated"
+    TAKEOFF_ITEM_ARCHIVED = "takeoff_item_archived"
+    MEASUREMENT_CREATED = "measurement_created"
+    MEASUREMENT_UPDATED = "measurement_updated"
+    MEASUREMENT_DELETED = "measurement_deleted"
+    MEASUREMENT_BATCH_CREATED = "measurement_batch_created"
+    SCALE_CALIBRATION_CREATED = "scale_calibration_created"
+    SCALE_CALIBRATION_DEFAULT_SET = "scale_calibration_default_set"
+    SCALE_CALIBRATION_VERIFIED = "scale_calibration_verified"
+
     JOB_RETRIED = "job_retried"
     JOB_CANCELLED = "job_cancelled"
 

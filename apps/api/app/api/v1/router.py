@@ -21,7 +21,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.api.v1 import auth, documents, integrations, jobs, meta, projects, scale, uploads
+from app.api.v1 import (
+    auth,
+    documents,
+    integrations,
+    jobs,
+    meta,
+    projects,
+    scale,
+    takeoff,
+    uploads,
+)
 from app.api.v1.admin import admin_router
 from app.auth.resolver import require_authenticated
 
@@ -37,6 +47,7 @@ protected_router.include_router(projects.router)
 protected_router.include_router(uploads.router)
 protected_router.include_router(documents.router)
 protected_router.include_router(scale.router)
+protected_router.include_router(takeoff.router)
 protected_router.include_router(jobs.router)
 protected_router.include_router(integrations.router)
 

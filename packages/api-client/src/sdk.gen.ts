@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateSheetCalibrationData, CreateSheetCalibrationErrors, CreateSheetCalibrationResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetCalibrationsData, ListSheetCalibrationsErrors, ListSheetCalibrationsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, MakeCalibrationDefaultData, MakeCalibrationDefaultErrors, MakeCalibrationDefaultResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadCalibrationData, ReadCalibrationErrors, ReadCalibrationResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadSheetGeometryData, ReadSheetGeometryErrors, ReadSheetGeometryResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, SetCalibrationVerificationData, SetCalibrationVerificationErrors, SetCalibrationVerificationResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
+import type { ArchiveTakeoffItemData, ArchiveTakeoffItemErrors, ArchiveTakeoffItemResponses, BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompleteLoginData, CompleteLoginErrors, CreateMeasurementData, CreateMeasurementErrors, CreateMeasurementResponses, CreateMeasurementsBatchData, CreateMeasurementsBatchErrors, CreateMeasurementsBatchResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateSheetCalibrationData, CreateSheetCalibrationErrors, CreateSheetCalibrationResponses, CreateTakeoffItemData, CreateTakeoffItemErrors, CreateTakeoffItemResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteMeasurementData, DeleteMeasurementErrors, DeleteMeasurementResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetCalibrationsData, ListSheetCalibrationsErrors, ListSheetCalibrationsResponses, ListSheetMeasurementsData, ListSheetMeasurementsErrors, ListSheetMeasurementsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTakeoffItemsData, ListTakeoffItemsErrors, ListTakeoffItemsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, MakeCalibrationDefaultData, MakeCalibrationDefaultErrors, MakeCalibrationDefaultResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadCalibrationData, ReadCalibrationErrors, ReadCalibrationResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadSheetGeometryData, ReadSheetGeometryErrors, ReadSheetGeometryResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, SetCalibrationVerificationData, SetCalibrationVerificationErrors, SetCalibrationVerificationResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateMeasurementData, UpdateMeasurementErrors, UpdateMeasurementResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UpdateTakeoffItemData, UpdateTakeoffItemErrors, UpdateTakeoffItemResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -290,6 +290,30 @@ export const listTenders = <ThrowOnError extends boolean = false>(options?: Opti
 export const readJob = <ThrowOnError extends boolean = false>(options: Options<ReadJobData, ThrowOnError>): RequestResult<ReadJobResponses, ReadJobErrors, ThrowOnError> => (options.client ?? client).get<ReadJobResponses, ReadJobErrors, ThrowOnError>({ url: '/api/v1/jobs/{job_id}', ...options });
 
 /**
+ * Удалить измерение
+ *
+ * Мягкое удаление: запись остаётся объяснением вчерашнего числа.
+ */
+export const deleteMeasurement = <ThrowOnError extends boolean = false>(options: Options<DeleteMeasurementData, ThrowOnError>): RequestResult<DeleteMeasurementResponses, DeleteMeasurementErrors, ThrowOnError> => (options.client ?? client).delete<DeleteMeasurementResponses, DeleteMeasurementErrors, ThrowOnError>({ url: '/api/v1/measurements/{measurement_id}', ...options });
+
+/**
+ * Изменить геометрию измерения
+ *
+ * Правит геометрию с проверкой версии.
+ *
+ * Версия обязательна: без неё клиент, открывший лист десять минут назад, молча перетёр бы
+ * чужую правку. Расхождение — 409 с понятным кодом, а не тихая перезапись.
+ */
+export const updateMeasurement = <ThrowOnError extends boolean = false>(options: Options<UpdateMeasurementData, ThrowOnError>): RequestResult<UpdateMeasurementResponses, UpdateMeasurementErrors, ThrowOnError> => (options.client ?? client).patch<UpdateMeasurementResponses, UpdateMeasurementErrors, ThrowOnError>({
+    url: '/api/v1/measurements/{measurement_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Версии и возможности API
  *
  * Версии контракта и набор возможностей для текущего контекста.
@@ -346,6 +370,25 @@ export const listProjectDocuments = <ThrowOnError extends boolean = false>(optio
  * Задания проекта
  */
 export const listProjectJobs = <ThrowOnError extends boolean = false>(options: Options<ListProjectJobsData, ThrowOnError>): RequestResult<ListProjectJobsResponses, ListProjectJobsErrors, ThrowOnError> => (options.client ?? client).get<ListProjectJobsResponses, ListProjectJobsErrors, ThrowOnError>({ url: '/api/v1/projects/{project_id}/jobs', ...options });
+
+/**
+ * Строки обмера проекта
+ *
+ * Список строк проекта. Не страница: строк у проекта десятки, а не тысячи.
+ */
+export const listTakeoffItems = <ThrowOnError extends boolean = false>(options: Options<ListTakeoffItemsData, ThrowOnError>): RequestResult<ListTakeoffItemsResponses, ListTakeoffItemsErrors, ThrowOnError> => (options.client ?? client).get<ListTakeoffItemsResponses, ListTakeoffItemsErrors, ThrowOnError>({ url: '/api/v1/projects/{project_id}/takeoff-items', ...options });
+
+/**
+ * Создать строку обмера
+ */
+export const createTakeoffItem = <ThrowOnError extends boolean = false>(options: Options<CreateTakeoffItemData, ThrowOnError>): RequestResult<CreateTakeoffItemResponses, CreateTakeoffItemErrors, ThrowOnError> => (options.client ?? client).post<CreateTakeoffItemResponses, CreateTakeoffItemErrors, ThrowOnError>({
+    url: '/api/v1/projects/{project_id}/takeoff-items',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Какие файлы принимает портал
@@ -443,6 +486,45 @@ export const setCalibrationVerification = <ThrowOnError extends boolean = false>
 export const readSheetGeometry = <ThrowOnError extends boolean = false>(options: Options<ReadSheetGeometryData, ThrowOnError>): RequestResult<ReadSheetGeometryResponses, ReadSheetGeometryErrors, ThrowOnError> => (options.client ?? client).get<ReadSheetGeometryResponses, ReadSheetGeometryErrors, ThrowOnError>({ url: '/api/v1/sheets/{sheet_id}/geometry', ...options });
 
 /**
+ * Измерения листа
+ *
+ * Активные измерения одного листа.
+ *
+ * Именно листа, а не документа: просмотрщик показывает открытую страницу, и тянуть
+ * измерения всех 77 листов ради одного — это тот же N+1, только наоборот.
+ */
+export const listSheetMeasurements = <ThrowOnError extends boolean = false>(options: Options<ListSheetMeasurementsData, ThrowOnError>): RequestResult<ListSheetMeasurementsResponses, ListSheetMeasurementsErrors, ThrowOnError> => (options.client ?? client).get<ListSheetMeasurementsResponses, ListSheetMeasurementsErrors, ThrowOnError>({ url: '/api/v1/sheets/{sheet_id}/measurements', ...options });
+
+/**
+ * Создать измерение
+ */
+export const createMeasurement = <ThrowOnError extends boolean = false>(options: Options<CreateMeasurementData, ThrowOnError>): RequestResult<CreateMeasurementResponses, CreateMeasurementErrors, ThrowOnError> => (options.client ?? client).post<CreateMeasurementResponses, CreateMeasurementErrors, ThrowOnError>({
+    url: '/api/v1/sheets/{sheet_id}/measurements',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Создать несколько измерений
+ *
+ * Пакетная постановка. Нужна счёту: метки ставят подряд, а не по одной с ожиданием.
+ *
+ * Пакет атомарен: одна негодная геометрия отменяет весь. Частичный результат заставил бы
+ * клиента выяснять, какие из двадцати меток сохранились, — а он их уже нарисовал.
+ */
+export const createMeasurementsBatch = <ThrowOnError extends boolean = false>(options: Options<CreateMeasurementsBatchData, ThrowOnError>): RequestResult<CreateMeasurementsBatchResponses, CreateMeasurementsBatchErrors, ThrowOnError> => (options.client ?? client).post<CreateMeasurementsBatchResponses, CreateMeasurementsBatchErrors, ThrowOnError>({
+    url: '/api/v1/sheets/{sheet_id}/measurements/batch',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Области на листе
  */
 export const listSheetRegions = <ThrowOnError extends boolean = false>(options: Options<ListSheetRegionsData, ThrowOnError>): RequestResult<ListSheetRegionsResponses, ListSheetRegionsErrors, ThrowOnError> => (options.client ?? client).get<ListSheetRegionsResponses, ListSheetRegionsErrors, ThrowOnError>({ url: '/api/v1/sheets/{sheet_id}/regions', ...options });
@@ -472,6 +554,33 @@ export const createSheetCalibration = <ThrowOnError extends boolean = false>(opt
         ...options.headers
     }
 });
+
+/**
+ * Изменить строку обмера
+ *
+ * Меняет описание строки.
+ *
+ * Типа геометрии в запросе нет: сменить его у строки с измерениями значило бы объявить
+ * посчитанные точки площадями.
+ */
+export const updateTakeoffItem = <ThrowOnError extends boolean = false>(options: Options<UpdateTakeoffItemData, ThrowOnError>): RequestResult<UpdateTakeoffItemResponses, UpdateTakeoffItemErrors, ThrowOnError> => (options.client ?? client).patch<UpdateTakeoffItemResponses, UpdateTakeoffItemErrors, ThrowOnError>({
+    url: '/api/v1/takeoff-items/{item_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Архивировать строку обмера
+ *
+ * Архивирует строку.
+ *
+ * Удаления нет: строка, по которой посчитаны объёмы, — это документ, и удалить её значит
+ * потерять объяснение чисел, которые могли уйти заказчику.
+ */
+export const archiveTakeoffItem = <ThrowOnError extends boolean = false>(options: Options<ArchiveTakeoffItemData, ThrowOnError>): RequestResult<ArchiveTakeoffItemResponses, ArchiveTakeoffItemErrors, ThrowOnError> => (options.client ?? client).post<ArchiveTakeoffItemResponses, ArchiveTakeoffItemErrors, ThrowOnError>({ url: '/api/v1/takeoff-items/{item_id}/archive', ...options });
 
 /**
  * Liveness probe

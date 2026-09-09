@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import UTC, datetime
 
@@ -378,3 +379,88 @@ async def count_for_item(
         query = query.where(Sheet.revision_id == revision_id)
 
     return int(await session.scalar(query) or 0)
+
+
+# Предел пакета. Счёт ставит метки десятками, но не тысячами за один запрос: пакет без
+# предела — это способ положить сервер, а не удобство.
+MAX_BATCH_SIZE = 200
+
+
+async def update_item(
+    session: AsyncSession,
+    *,
+    item: TakeoffItem,
+    name: str | None = None,
+    code: str | None = None,
+    color_key: str | None = None,
+    ordinal: int | None = None,
+    actor: uuid.UUID | None = None,
+) -> TakeoffItem:
+    """Меняет описательные поля строки.
+
+    Тип геометрии не меняется никогда: сменить его у строки с измерениями значило бы
+    объявить посчитанные точки площадями. Нужен другой тип — заводится другая строка.
+    """
+    if name is not None:
+        cleaned = name.strip()
+        if not cleaned:
+            raise DomainError(ErrorCode.VALIDATION_FAILED, "Название строки не может быть пустым")
+        item.name = cleaned
+    if code is not None:
+        item.code = code or None
+    if color_key is not None:
+        item.color_key = color_key
+    if ordinal is not None:
+        item.ordinal = ordinal
+
+    item.updated_by = actor
+    await session.flush()
+    return item
+
+
+async def create_measurements_batch(
+    session: AsyncSession,
+    *,
+    item: TakeoffItem,
+    sheet: Sheet,
+    batch: list[list[list[float]]],
+    calibration: ScaleCalibration | None = None,
+    created_by: uuid.UUID | None = None,
+) -> list[Measurement]:
+    """Создаёт несколько измерений одной транзакцией.
+
+    Пакет **атомарен**: одна негодная геометрия отменяет весь пакет. Частичный результат
+    заставил бы клиента разбираться, какие из двадцати меток сохранились, — а он в этот
+    момент уже нарисовал все двадцать.
+    """
+    if not batch:
+        raise DomainError(ErrorCode.VALIDATION_FAILED, "Пустой пакет")
+    if len(batch) > MAX_BATCH_SIZE:
+        raise DomainError(
+            ErrorCode.VALIDATION_FAILED,
+            f"В пакете {len(batch)} измерений, предел {MAX_BATCH_SIZE}",
+        )
+
+    created: list[Measurement] = []
+    for points in batch:
+        created.append(
+            await create_measurement(
+                session,
+                item=item,
+                sheet=sheet,
+                points=points,
+                calibration=calibration,
+                created_by=created_by,
+            )
+        )
+    return created
+
+
+def geometry_digest(points: list[list[float]]) -> str:
+    """Короткий отпечаток геометрии для журнала.
+
+    В журнал не кладётся массив из тысяч координат: он раздул бы записи и ничего бы не
+    объяснил. Отпечатка и числа точек хватает, чтобы понять, менялась ли геометрия.
+    """
+    payload = ";".join(f"{x!r},{y!r}" for x, y in points)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]

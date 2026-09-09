@@ -19,14 +19,17 @@ from app.domain import (
     AuditResult,
     DocumentKind,
     GeometryStatus,
+    GeometryType,
     JobScope,
     JobStatus,
     JobType,
     LengthUnit,
+    MeasurementSource,
     OverrideScope,
     ProcessingStatus,
     ProjectSource,
     ProjectStatus,
+    QuantityUnit,
     RegionShape,
     Role,
     ScaleScopeKind,
@@ -523,6 +526,98 @@ class PageGeometryRead(ApiModel):
     geometry_fingerprint: str
     """Отпечаток содержимого: одним сравнением отвечает, та ли это геометрия."""
     extracted_at: datetime
+
+
+# --------------------------------------------------------------------------- обмеры
+
+
+class TakeoffItemRead(ApiModel):
+    """Строка списка обмеров (ADR-0019)."""
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    name: str
+    code: str | None
+    geometry_type: GeometryType
+    display_unit: QuantityUnit
+    """Выводится из типа геометрии, а не задаётся: иначе площадь однажды покажется в метрах."""
+    color_key: str
+    ordinal: int
+    archived_at: datetime | None
+    """Заполнено — строка в архиве и новых измерений не принимает."""
+    created_by: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TakeoffItemCreate(BaseModel):
+    name: Annotated[str, Field(min_length=1, max_length=200)]
+    geometry_type: GeometryType
+    code: Annotated[str | None, Field(default=None, max_length=64)] = None
+    color_key: Annotated[str | None, Field(default=None, max_length=32)] = None
+    """Ключ палитры темы. Единица показа сюда не входит — она следует из типа."""
+
+
+class TakeoffItemUpdate(BaseModel):
+    """Изменяемые поля строки.
+
+    Типа геометрии здесь нет: сменить его у строки с измерениями значило бы объявить
+    посчитанные точки площадями.
+    """
+
+    name: Annotated[str | None, Field(default=None, min_length=1, max_length=200)] = None
+    code: Annotated[str | None, Field(default=None, max_length=64)] = None
+    color_key: Annotated[str | None, Field(default=None, max_length=32)] = None
+    ordinal: int | None = None
+
+
+class MeasurementRead(ApiModel):
+    """Геометрия обмера на листе."""
+
+    id: uuid.UUID
+    takeoff_item_id: uuid.UUID
+    sheet_id: uuid.UUID
+    geometry_type: GeometryType
+    points: list[list[float]]
+    """Нормализованные точки листа: [[x, y], …] от левого верхнего угла, значения в [0, 1]."""
+    source: MeasurementSource
+    scale_calibration_id: uuid.UUID | None
+    """Та калибровка, по которой посчитано, а не действующая сейчас (ADR-0018)."""
+    version: int
+    """Растёт на каждое изменение. Передаётся обратно при правке — иначе 409."""
+    created_by: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MeasurementCreate(BaseModel):
+    takeoff_item_id: uuid.UUID
+    points: Annotated[list[list[float]], Field(min_length=1)]
+    scale_calibration_id: uuid.UUID | None = None
+    """Пусто — берётся действующая калибровка листа, если она есть."""
+
+
+class MeasurementBatchCreate(BaseModel):
+    """Пакетная постановка точек.
+
+    Нужна счёту: пользователь ставит метки подряд, и ждать ответа сервера на каждый щелчок
+    он не должен. Предел размера жёсткий — пакет без предела становится способом положить
+    сервер одним запросом.
+    """
+
+    takeoff_item_id: uuid.UUID
+    items: Annotated[list[Annotated[list[list[float]], Field(min_length=1)]], Field(min_length=1)]
+    scale_calibration_id: uuid.UUID | None = None
+
+
+class MeasurementUpdate(BaseModel):
+    """Правка геометрии с проверкой версии.
+
+    Версия обязательна: без неё старый клиент молча перетёр бы чужую правку.
+    """
+
+    points: Annotated[list[list[float]], Field(min_length=1)]
+    version: Annotated[int, Field(ge=1)]
 
 
 class ScaleCalibrationRead(ApiModel):

@@ -835,6 +835,17 @@
         "title": "GeometryStatus",
         "type": "string"
       },
+      "GeometryType": {
+        "description": "Что именно измеряют.",
+        "enum": [
+          "count",
+          "line",
+          "polyline",
+          "polygon"
+        ],
+        "title": "GeometryType",
+        "type": "string"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1061,6 +1072,213 @@
           }
         },
         "title": "LogoutResponse",
+        "type": "object"
+      },
+      "MeasurementBatchCreate": {
+        "description": "Пакетная постановка точек.\n\nНужна счёту: пользователь ставит метки подряд, и ждать ответа сервера на каждый щелчок\nон не должен. Предел размера жёсткий — пакет без предела становится способом положить\nсервер одним запросом.",
+        "properties": {
+          "items": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "scale_calibration_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Calibration Id"
+          },
+          "takeoff_item_id": {
+            "format": "uuid",
+            "title": "Takeoff Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "takeoff_item_id",
+          "items"
+        ],
+        "title": "MeasurementBatchCreate",
+        "type": "object"
+      },
+      "MeasurementCreate": {
+        "properties": {
+          "points": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "minItems": 1,
+            "title": "Points",
+            "type": "array"
+          },
+          "scale_calibration_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Calibration Id"
+          },
+          "takeoff_item_id": {
+            "format": "uuid",
+            "title": "Takeoff Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "takeoff_item_id",
+          "points"
+        ],
+        "title": "MeasurementCreate",
+        "type": "object"
+      },
+      "MeasurementRead": {
+        "description": "Геометрия обмера на листе.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "geometry_type": {
+            "$ref": "#/components/schemas/GeometryType"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "scale_calibration_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Calibration Id"
+          },
+          "sheet_id": {
+            "format": "uuid",
+            "title": "Sheet Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/MeasurementSource"
+          },
+          "takeoff_item_id": {
+            "format": "uuid",
+            "title": "Takeoff Item Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "takeoff_item_id",
+          "sheet_id",
+          "geometry_type",
+          "points",
+          "source",
+          "scale_calibration_id",
+          "version",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MeasurementRead",
+        "type": "object"
+      },
+      "MeasurementSource": {
+        "description": "Кто создал геометрию. Влияет на порядок проверки, а не на саму величину.",
+        "enum": [
+          "manual",
+          "ai",
+          "imported"
+        ],
+        "title": "MeasurementSource",
+        "type": "string"
+      },
+      "MeasurementUpdate": {
+        "description": "Правка геометрии с проверкой версии.\n\nВерсия обязательна: без неё старый клиент молча перетёр бы чужую правку.",
+        "properties": {
+          "points": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "minItems": 1,
+            "title": "Points",
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "points",
+          "version"
+        ],
+        "title": "MeasurementUpdate",
         "type": "object"
       },
       "MetaResponse": {
@@ -1956,6 +2174,16 @@
         "title": "ProviderKind",
         "type": "string"
       },
+      "QuantityUnit": {
+        "description": "Единица показа величины.\n\nВыводится из типа геометрии и проверяется базой: хранить её отдельно и позволить\nразойтись с типом — значит однажды показать площадь в метрах (ADR-0019).",
+        "enum": [
+          "pcs",
+          "m",
+          "m2"
+        ],
+        "title": "QuantityUnit",
+        "type": "string"
+      },
       "ReadinessResponse": {
         "properties": {
           "components": {
@@ -2843,6 +3071,198 @@
           "region_count"
         ],
         "title": "SheetRead",
+        "type": "object"
+      },
+      "TakeoffItemCreate": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "color_key": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color Key"
+          },
+          "geometry_type": {
+            "$ref": "#/components/schemas/GeometryType"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "geometry_type"
+        ],
+        "title": "TakeoffItemCreate",
+        "type": "object"
+      },
+      "TakeoffItemRead": {
+        "description": "Строка списка обмеров (ADR-0019).",
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "color_key": {
+            "title": "Color Key",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "display_unit": {
+            "$ref": "#/components/schemas/QuantityUnit"
+          },
+          "geometry_type": {
+            "$ref": "#/components/schemas/GeometryType"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ordinal": {
+            "title": "Ordinal",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "code",
+          "geometry_type",
+          "display_unit",
+          "color_key",
+          "ordinal",
+          "archived_at",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TakeoffItemRead",
+        "type": "object"
+      },
+      "TakeoffItemUpdate": {
+        "description": "Изменяемые поля строки.\n\nТипа геометрии здесь нет: сменить его у строки с измерениями значило бы объявить\nпосчитанные точки площадями.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "color_key": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color Key"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "ordinal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordinal"
+          }
+        },
+        "title": "TakeoffItemUpdate",
         "type": "object"
       },
       "TenderBindingPreviewRead": {
@@ -4801,6 +5221,95 @@
         ]
       }
     },
+    "/api/v1/measurements/{measurement_id}": {
+      "delete": {
+        "description": "Мягкое удаление: запись остаётся объяснением вчерашнего числа.",
+        "operationId": "delete_measurement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "measurement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Measurement Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить измерение",
+        "tags": [
+          "takeoff"
+        ]
+      },
+      "patch": {
+        "description": "Правит геометрию с проверкой версии.\n\nВерсия обязательна: без неё клиент, открывший лист десять минут назад, молча перетёр бы\nчужую правку. Расхождение — 409 с понятным кодом, а не тихая перезапись.",
+        "operationId": "update_measurement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "measurement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Measurement Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeasurementUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Изменить геометрию измерения",
+        "tags": [
+          "takeoff"
+        ]
+      }
+    },
     "/api/v1/meta": {
       "get": {
         "description": "Версии контракта и набор возможностей для текущего контекста.\n\nМаршрут публичный: странице входа нужно узнать состояние API до того, как появится\nсеанс. Без сеанса отдаются код и системные переопределения, с сеансом добавляются\nпереопределения пространства.\n\nОтказ базы понижает набор до кодовых умолчаний, а не роняет запрос: на неразмеченной\nустановке портал обязан показать границу этапа, а не пятисотку.",
@@ -5178,6 +5687,117 @@
         "summary": "Задания проекта",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/takeoff-items": {
+      "get": {
+        "description": "Список строк проекта. Не страница: строк у проекта десятки, а не тысячи.",
+        "operationId": "list_takeoff_items",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Показать архивные строки",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Показать архивные строки",
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TakeoffItemRead"
+                  },
+                  "title": "Response List Takeoff Items",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Строки обмера проекта",
+        "tags": [
+          "takeoff"
+        ]
+      },
+      "post": {
+        "operationId": "create_takeoff_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TakeoffItemCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeoffItemRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать строку обмера",
+        "tags": [
+          "takeoff"
         ]
       }
     },
@@ -5672,6 +6292,182 @@
         ]
       }
     },
+    "/api/v1/sheets/{sheet_id}/measurements": {
+      "get": {
+        "description": "Активные измерения одного листа.\n\nИменно листа, а не документа: просмотрщик показывает открытую страницу, и тянуть\nизмерения всех 77 листов ради одного — это тот же N+1, только наоборот.",
+        "operationId": "list_sheet_measurements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sheet Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Фильтр по строке",
+            "in": "query",
+            "name": "takeoff_item_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по строке",
+              "title": "Takeoff Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MeasurementRead"
+                  },
+                  "title": "Response List Sheet Measurements",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Измерения листа",
+        "tags": [
+          "takeoff"
+        ]
+      },
+      "post": {
+        "operationId": "create_measurement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sheet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeasurementCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать измерение",
+        "tags": [
+          "takeoff"
+        ]
+      }
+    },
+    "/api/v1/sheets/{sheet_id}/measurements/batch": {
+      "post": {
+        "description": "Пакетная постановка. Нужна счёту: метки ставят подряд, а не по одной с ожиданием.\n\nПакет атомарен: одна негодная геометрия отменяет весь. Частичный результат заставил бы\nклиента выяснять, какие из двадцати меток сохранились, — а он их уже нарисовал.",
+        "operationId": "create_measurements_batch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sheet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeasurementBatchCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MeasurementRead"
+                  },
+                  "title": "Response Create Measurements Batch",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать несколько измерений",
+        "tags": [
+          "takeoff"
+        ]
+      }
+    },
     "/api/v1/sheets/{sheet_id}/regions": {
       "get": {
         "operationId": "list_sheet_regions",
@@ -5875,6 +6671,104 @@
         "summary": "Задать масштаб по известному размеру",
         "tags": [
           "scale"
+        ]
+      }
+    },
+    "/api/v1/takeoff-items/{item_id}": {
+      "patch": {
+        "description": "Меняет описание строки.\n\nТипа геометрии в запросе нет: сменить его у строки с измерениями значило бы объявить\nпосчитанные точки площадями.",
+        "operationId": "update_takeoff_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TakeoffItemUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeoffItemRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Изменить строку обмера",
+        "tags": [
+          "takeoff"
+        ]
+      }
+    },
+    "/api/v1/takeoff-items/{item_id}/archive": {
+      "post": {
+        "description": "Архивирует строку.\n\nУдаления нет: строка, по которой посчитаны объёмы, — это документ, и удалить её значит\nпотерять объяснение чисел, которые могли уйти заказчику.",
+        "operationId": "archive_takeoff_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeoffItemRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Архивировать строку обмера",
+        "tags": [
+          "takeoff"
         ]
       }
     },
