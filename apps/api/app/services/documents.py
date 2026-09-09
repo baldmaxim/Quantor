@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import DocumentKind, ProcessingStatus
+from app.domain import DocumentKind, GeometryStatus, ProcessingStatus
 from app.models import Document, DocumentRevision, Project, RecognitionArtifact, Region, Sheet
 
 
@@ -94,6 +94,7 @@ async def create_revision(
     processing_status: ProcessingStatus,
     revision_label: str | None = None,
     source_metadata: dict[str, object] | None = None,
+    geometry_status: GeometryStatus = GeometryStatus.NOT_APPLICABLE,
 ) -> DocumentRevision:
     """Создаёт неизменяемую ревизию.
 
@@ -110,6 +111,7 @@ async def create_revision(
         source_sha256=source_sha256,
         storage_key=storage_key,
         processing_status=processing_status,
+        geometry_status=geometry_status,
         source_metadata=dict(source_metadata or {}),
     )
     session.add(revision)

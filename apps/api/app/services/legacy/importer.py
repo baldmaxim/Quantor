@@ -40,6 +40,7 @@ from app.domain import (
     COORDINATE_SPACE_NORMALIZED_TOP_LEFT,
     ArtifactKind,
     DocumentKind,
+    GeometryStatus,
     ProcessingStatus,
     RegionShape,
 )
@@ -275,6 +276,10 @@ async def _persist(
         source_sha256=stored_pdf.sha256,
         storage_key=pdf_key,
         processing_status=ProcessingStatus.READY,
+        # Пакет разобран, но каноническая геометрия страниц ещё не извлечена: листы сейчас
+        # знают только размер растра распознавалки. Извлечение — отдельное задание, чтобы
+        # быстрый импорт не превращался в долгий разбор PDF (ADR-0016).
+        geometry_status=GeometryStatus.PENDING,
         source_metadata={
             "package_format": "recognized-package/legacy-v1",
             "schema_version": blocks.schema_version,

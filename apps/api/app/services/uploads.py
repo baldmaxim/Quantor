@@ -20,7 +20,7 @@ from typing import Final
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import DocumentKind, JobType, ProcessingStatus
+from app.domain import DocumentKind, GeometryStatus, JobType, ProcessingStatus
 from app.errors import DomainError, ErrorCode, InvariantError
 from app.models import Document, DocumentRevision, Job, Project
 from app.services import documents as documents_service
@@ -50,6 +50,8 @@ class FileKind:
     schedules_import: bool
     # Текст для интерфейса: честно говорит, что произойдёт с файлом.
     capability: str
+    # Начальное состояние геометрии. У не-PDF извлекать нечего, и это не отказ (ADR-0016).
+    geometry_status: GeometryStatus = GeometryStatus.NOT_APPLICABLE
 
 
 # Пакет распознавалки — единственный тип, который портал сейчас умеет разбирать.
@@ -66,6 +68,9 @@ RAW_PDF = FileKind(
     content_type="application/pdf",
     schedules_import=False,
     capability="Сохранить, распознавание будет на следующем этапе",
+    # Геометрия применима и ждёт извлечения. `unprocessed` рядом — про распознавание:
+    # это два независимых процесса над одним файлом (ADR-0016).
+    geometry_status=GeometryStatus.PENDING,
 )
 
 
@@ -232,6 +237,7 @@ async def receive_upload(
         source_sha256=stored.sha256,
         storage_key=key,
         processing_status=kind.processing_status,
+        geometry_status=kind.geometry_status,
     )
 
     job: Job | None = None

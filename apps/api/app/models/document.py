@@ -10,7 +10,7 @@ from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.domain import DocumentKind, ProcessingStatus
+from app.domain import DocumentKind, GeometryStatus, ProcessingStatus
 from app.models.mixins import CreatedAtMixin, TimestampMixin, str_enum, uuid_pk
 
 if TYPE_CHECKING:
@@ -51,8 +51,9 @@ class DocumentRevision(CreatedAtMixin, Base):
     """Загруженная версия документа.
 
     Неизменяема: имя, размер, MIME, хэш и ключ объекта после создания не переписываются
-    (ADR-0003). Меняться может только processing_status — он описывает ход обработки,
-    а не сам файл.
+    (ADR-0003). Меняются только состояния обработки — `processing_status` и
+    `geometry_status`. Они описывают ход работы над файлом, а не сам файл, и относятся
+    к двум независимым процессам: импорту распознанного пакета и извлечению геометрии.
     """
 
     __tablename__ = "document_revisions"
@@ -78,6 +79,21 @@ class DocumentRevision(CreatedAtMixin, Base):
         default=ProcessingStatus.PENDING,
     )
     processing_error_code: Mapped[str | None] = mapped_column(String(64))
+
+    # Состояние извлечения канонической геометрии страниц (ADR-0016). Отдельно от
+    # processing_status: тот описывает импорт распознанного пакета и у обычного PDF навсегда
+    # остаётся `unprocessed`. Одно поле на два независимых процесса означало бы, что успех
+    # одного стирает отказ другого.
+    #
+    # Состояние принадлежит ревизии, а не странице: при расхождении числа страниц доверять
+    # нельзя ни одной, поэтому частично извлечённой геометрии не бывает.
+    geometry_status: Mapped[GeometryStatus] = mapped_column(
+        str_enum(GeometryStatus, name="geometry_status"),
+        nullable=False,
+        default=GeometryStatus.NOT_APPLICABLE,
+        server_default=GeometryStatus.NOT_APPLICABLE.value,
+    )
+    geometry_error_code: Mapped[str | None] = mapped_column(String(64))
 
     # Схема и происхождение исходника: версия пакета, пространство координат, число страниц.
     source_metadata: Mapped[dict[str, Any]] = mapped_column(

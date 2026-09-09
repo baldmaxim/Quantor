@@ -6,6 +6,7 @@ from app.models.control_plane import FeatureFlagOverride, SettingOverride
 from app.models.document import Document, DocumentRevision
 from app.models.identity import AuthSession, UserIdentity, Workspace, WorkspaceMembership
 from app.models.job import Job
+from app.models.page_geometry import PageGeometry
 from app.models.project import Project
 from app.models.sheet import Region, Sheet
 from app.models.worker import Worker
@@ -17,6 +18,7 @@ __all__ = [
     "DocumentRevision",
     "FeatureFlagOverride",
     "Job",
+    "PageGeometry",
     "Project",
     "RecognitionArtifact",
     "Region",

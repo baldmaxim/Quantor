@@ -15,6 +15,7 @@ from app.models.mixins import CreatedAtMixin, str_enum, uuid_pk
 
 if TYPE_CHECKING:
     from app.models.document import DocumentRevision
+    from app.models.page_geometry import PageGeometry
 
 
 class Sheet(CreatedAtMixin, Base):
@@ -41,6 +42,11 @@ class Sheet(CreatedAtMixin, Base):
 
     revision: Mapped[DocumentRevision] = relationship(back_populates="sheets")
     regions: Mapped[list[Region]] = relationship(
+        back_populates="sheet", cascade="all, delete-orphan", passive_deletes=True
+    )
+    # Каноническая геометрия страницы (ADR-0016). Пусто — не извлечена; частично
+    # извлечённой не бывает. Именно она, а не width_px, участвует в расчёте величин.
+    geometry: Mapped[PageGeometry | None] = relationship(
         back_populates="sheet", cascade="all, delete-orphan", passive_deletes=True
     )
 
