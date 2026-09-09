@@ -524,6 +524,11 @@ async def run_api(*, iterations: int, measurements: int) -> dict[str, object]:
                     calibration=fixture.calibration,
                 )
                 await session.rollback()
+                # rollback гасит атрибуты экземпляров — без refresh следующий проход
+                # упрётся в MissingGreenlet на item.geometry_type.
+                await session.refresh(item)
+                await session.refresh(fixture.sheet)
+                await session.refresh(fixture.calibration)
 
             metrics["create_batch_200"] = _timing_payload(
                 await _timed(create_batch, iterations=max(3, iterations // 10))

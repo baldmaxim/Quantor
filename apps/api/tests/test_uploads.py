@@ -159,7 +159,10 @@ class TestUploadEndpoint:
         assert "ПД" not in key
         assert fake_storage.metadata[key]["original-filename"] == RUSSIAN_PDF_NAME
 
-    async def test_raw_pdf_is_stored_unprocessed_without_job(self, api: AsyncClient) -> None:
+    async def test_raw_pdf_schedules_geometry_but_stays_unprocessed(
+        self, api: AsyncClient
+    ) -> None:
+        """Распознавание и геометрия независимы: PDF ждёт AI, но геометрию уже извлекаем."""
         project_id = await self._project(api)
 
         body = (
@@ -170,7 +173,8 @@ class TestUploadEndpoint:
         ).json()
 
         assert body["revision"]["processing_status"] == "unprocessed"
-        assert body["job"] is None
+        assert body["job"] is not None
+        assert body["job"]["job_type"] == "pdf_geometry_extract"
 
     async def test_bim_model_is_stored_with_honest_status(self, api: AsyncClient) -> None:
         project_id = await self._project(api)

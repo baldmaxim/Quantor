@@ -299,10 +299,12 @@ class TestExtraction:
         assert result.sheets_created == 0
         assert result.sheets_enriched == 2
 
-        sheets = await documents_service.list_sheets(db_session, revision_id=revision.id)
+        sheets = await documents_service.list_sheets(
+            db_session, revision_id=revision.id, limit=100, offset=0
+        )
         assert len(sheets) == 2
         # Растровые метаданные распознавалки не тронуты: это другое свидетельство.
-        assert [sheet.width_px for sheet in sheets] == [2480, 2480]
+        assert [row.sheet.width_px for row in sheets] == [2480, 2480]
 
     async def test_geometry_is_stored_for_every_page(
         self,

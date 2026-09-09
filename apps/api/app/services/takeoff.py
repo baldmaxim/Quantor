@@ -445,6 +445,12 @@ async def create_measurements_batch(
             f"В пакете {len(batch)} измерений, предел {MAX_MEASUREMENT_BATCH}",
         )
 
+    # Сначала проверить весь пакет. Иначе flush первой годной метки оставит частичный
+    # результат, если следующая точка негодная, — а обработчик DomainError не всегда
+    # откатывает сессию до ответа клиенту.
+    for points in batch:
+        validate_points(item.geometry_type, points)
+
     created: list[Measurement] = []
     for points in batch:
         created.append(
