@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Замер слоя измерений</title>
+    <style>
+      body {
+        margin: 0;
+        background: #101317;
+      }
+      canvas {
+        display: block;
+        width: 1600px;
+        height: 1000px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="overlay"></canvas>
+    <script type="module">
+      import { runOverlayBenchmark } from '/benchmarks/overlay-bench.ts';
+
+      // Замер не запускается сам: тысячи фигур блокируют поток, и событие load не наступило
+      // бы до конца прогона — переход на страницу выглядел бы зависшим.
+      const canvas = document.querySelector('#overlay');
+      window.__runBench = (sizes, frames) => runOverlayBenchmark(canvas, sizes, frames);
+      window.__benchReady = true;
+    </script>
+  </body>
+</html>

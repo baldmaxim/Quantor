@@ -1,0 +1,884 @@
+{
+  "schema": "quantor.benchmark.v1",
+  "generatedAt": "2026-09-09T09:49:50.949Z",
+  "environment": {
+    "python": "3.12.8",
+    "implementation": "CPython",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 85 Stepping 4, GenuineIntel",
+    "git_commit": "01f6eaf5d80fdfd6798b4ce6334760cc6b575e54",
+    "timer_resolution_ns": 100
+  },
+  "dataset": {
+    "id": "measurement_synthetic",
+    "version": "v1",
+    "manifest_version": 1,
+    "sha256": "37ea7ba9b2e8fbaaff462cdc4337e5943012c02c35beccbfe3065f2b352337fb",
+    "path": "benchmarks/datasets/measurement_v1.json",
+    "cases": 16,
+    "note": "Синтетические случаи со снятыми аналитически ожиданиями. Ни одно число не получено запуском реализации: тест, сверяющийся с собственным выводом, доказывает воспроизводимость, но не правильность. Страницы подобраны так, чтобы ответы были круглыми."
+  },
+  "web": {
+    "environment": {
+      "node": "v24.14.1",
+      "platform": "win32 x64"
+    }
+  },
+  "sections": {
+    "math": {
+      "status": "ok",
+      "cases": [
+        {
+          "case_id": "count.single_mark",
+          "geometry_type": "count",
+          "vertices": 1,
+          "page": "square_10m",
+          "calibration": null,
+          "expected": {
+            "state": "ready",
+            "value": "1",
+            "unit": "pcs"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "1",
+            "unit": "pcs",
+            "canonical_value": "1",
+            "canonical_unit": "pcs",
+            "rule_key": "count.v1",
+            "input_fingerprint": "d11e800a5c1c495480f0e1489da86b88915320cd341af61ebe4d429888281745"
+          },
+          "absolute_error": "0",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": false,
+            "consistent": true,
+            "note": "калибровка не используется"
+          },
+          "timing": {
+            "median_ns": 27600,
+            "min_ns": 22800,
+            "p95_ns": 37300,
+            "iterations": 200,
+            "per_second": 36231.884057971016,
+            "geometry_median_ns": null
+          },
+          "source_note": "Штука есть штука: счёт не зависит ни от масштаба, ни от геометрии страницы."
+        },
+        {
+          "case_id": "line.full_width",
+          "geometry_type": "line",
+          "vertices": 2,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "10",
+            "unit": "m"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "10.0000000000000",
+            "unit": "m",
+            "canonical_value": "10000.0000000000000",
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "484e6692f9f609cc879f5764a480b2ea9f26b15193cdca11e1cb6b766723db76"
+          },
+          "absolute_error": "0E-13",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 52500,
+            "min_ns": 47700,
+            "p95_ns": 71300,
+            "iterations": 200,
+            "per_second": 19047.619047619046,
+            "geometry_median_ns": 22450
+          },
+          "source_note": "Вся ширина листа. Известна из определения калибровки, а не из расчёта."
+        },
+        {
+          "case_id": "line.diagonal_3_4_5",
+          "geometry_type": "line",
+          "vertices": 2,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "5",
+            "unit": "m"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "5.0000000000000",
+            "unit": "m",
+            "canonical_value": "5000.0000000000000",
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "9b4f303f2af866959156b00d06d1fe8291d8a9575591c02678841f6eaa98f6ed"
+          },
+          "absolute_error": "0E-13",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 74850,
+            "min_ns": 50900,
+            "p95_ns": 95900,
+            "iterations": 200,
+            "per_second": 13360.05344021376,
+            "geometry_median_ns": 15400
+          },
+          "source_note": "Катеты 300 и 400 pt: египетский треугольник, гипотенуза ровно 500 pt. Точное значение в binary64, допуск не нужен."
+        },
+        {
+          "case_id": "polyline.three_segments",
+          "geometry_type": "polyline",
+          "vertices": 4,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "10",
+            "unit": "m"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "10.0000000000000",
+            "unit": "m",
+            "canonical_value": "10000.0000000000000",
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "3704d895751eddd52178a3f24a999695ff8e29f1c67403ba5cfdae232c11ee71"
+          },
+          "absolute_error": "0E-13",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 66000,
+            "min_ns": 58700,
+            "p95_ns": 99700,
+            "iterations": 200,
+            "per_second": 15151.515151515152,
+            "geometry_median_ns": 25000
+          },
+          "source_note": "Звенья 300 + 400 + 300 pt. Порядок суммирования — часть контракта (ADR-0017), поэтому ожидание тоже слева направо."
+        },
+        {
+          "case_id": "polyline.thousand_vertices",
+          "geometry_type": "polyline",
+          "vertices": 1001,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "10",
+            "unit": "m"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "10.0000000000000",
+            "unit": "m",
+            "canonical_value": "10000.0000000000000",
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "d0e1fcf7e4934edb8585f4f69a68421a9d9e9cfe3efc093825250ac88c05709b"
+          },
+          "absolute_error": "0E-13",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "1E-9",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 8230050,
+            "min_ns": 6952400,
+            "p95_ns": 11653000,
+            "iterations": 200,
+            "per_second": 121.50594467834338,
+            "geometry_median_ns": 5652800
+          },
+          "source_note": "Тысяча звеньев по 1 pt вдоль всей ширины: сумма равна ширине листа, 10 м. Единственный случай с ненулевым допуском — деление доли страницы на 1000 частей не даёт двоичного нуля в остатке. Допуск 1 нм показывает, что накопления ошибки нет."
+        },
+        {
+          "case_id": "line.tiny_one_point",
+          "geometry_type": "line",
+          "vertices": 2,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "0.01",
+            "unit": "m"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "0.0100000000000",
+            "unit": "m",
+            "canonical_value": "10.0000000000000",
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "0903782094526b91b60622f8523917939094df0daabbb36e92ccd3c9cdb62a80"
+          },
+          "absolute_error": "0E-13",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 85800,
+            "min_ns": 73800,
+            "p95_ns": 181800,
+            "iterations": 200,
+            "per_second": 11655.011655011655,
+            "geometry_median_ns": 21600
+          },
+          "source_note": "Одна точка PDF — 10 мм. Нижняя граница разумного измерения: короче уже неотличимо от дрожания курсора."
+        },
+        {
+          "case_id": "polygon.full_sheet",
+          "geometry_type": "polygon",
+          "vertices": 4,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "100",
+            "unit": "m2"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "100.0000000000000000000",
+            "unit": "m2",
+            "canonical_value": "100000000.0000000000000000000",
+            "canonical_unit": "mm2",
+            "rule_key": "area.v1",
+            "input_fingerprint": "8de74ad198c7af8daf6a374663d58021fdcf3207d0162bd4f80c6d465399c7eb"
+          },
+          "absolute_error": "0E-19",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 81500,
+            "min_ns": 61600,
+            "p95_ns": 169700,
+            "iterations": 200,
+            "per_second": 12269.938650306749,
+            "geometry_median_ns": 21800
+          },
+          "source_note": "Весь лист 10 × 10 метров."
+        },
+        {
+          "case_id": "polygon.half_sheet_triangle",
+          "geometry_type": "polygon",
+          "vertices": 3,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "50",
+            "unit": "m2"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "50.00000000000000000000",
+            "unit": "m2",
+            "canonical_value": "50000000.00000000000000000000",
+            "canonical_unit": "mm2",
+            "rule_key": "area.v1",
+            "input_fingerprint": "1bf256905428da7b1e2fe859452ce9291d768568af648f61ac9e8c9f3275c081"
+          },
+          "absolute_error": "0E-20",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 88550,
+            "min_ns": 52100,
+            "p95_ns": 169100,
+            "iterations": 200,
+            "per_second": 11293.054771315641,
+            "geometry_median_ns": 18000
+          },
+          "source_note": "Половина листа: треугольник на двух сторонах квадрата."
+        },
+        {
+          "case_id": "polygon.quarter_rect",
+          "geometry_type": "polygon",
+          "vertices": 4,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "25",
+            "unit": "m2"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "25.00000000000000000000",
+            "unit": "m2",
+            "canonical_value": "25000000.00000000000000000000",
+            "canonical_unit": "mm2",
+            "rule_key": "area.v1",
+            "input_fingerprint": "5666e0687fc8fab66a69428570c47bae8e7545e2202bbb05c0fffe54946831e4"
+          },
+          "absolute_error": "0E-20",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 102150,
+            "min_ns": 63400,
+            "p95_ns": 119400,
+            "iterations": 200,
+            "per_second": 9789.525208027411,
+            "geometry_median_ns": 31250
+          },
+          "source_note": "Квадрат 5 × 5 метров по центру. Доли 0,25 и 0,75 представимы в двоичной дроби точно."
+        },
+        {
+          "case_id": "line.landscape_half_width",
+          "geometry_type": "line",
+          "vertices": 2,
+          "page": "landscape_20x10m",
+          "calibration": "landscape_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "10",
+            "unit": "m"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "10.0000000000000",
+            "unit": "m",
+            "canonical_value": "10000.0000000000000",
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "ba0497c4940e2343214c8da34a10859ccac66856ec79e71698dfaca8d73ad87f"
+          },
+          "absolute_error": "0E-13",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 58450,
+            "min_ns": 51800,
+            "p95_ns": 141100,
+            "iterations": 200,
+            "per_second": 17108.63986313088,
+            "geometry_median_ns": 16250
+          },
+          "source_note": "Половина ширины страницы 2000 pt — 1000 pt, то есть 10 метров."
+        },
+        {
+          "case_id": "line.landscape_half_height",
+          "geometry_type": "line",
+          "vertices": 2,
+          "page": "landscape_20x10m",
+          "calibration": "landscape_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "5",
+            "unit": "m"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "5.0000000000000",
+            "unit": "m",
+            "canonical_value": "5000.0000000000000",
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "98e3fb7253f7905d9fe6510880a69c450862589a4fbb6624bde6696c4f5e006f"
+          },
+          "absolute_error": "0E-13",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 54300,
+            "min_ns": 50000,
+            "p95_ns": 86600,
+            "iterations": 200,
+            "per_second": 18416.206261510128,
+            "geometry_median_ns": 15900
+          },
+          "source_note": "Ловушка прямоугольной страницы: та же доля 0,5, что и в предыдущем случае, но по другой оси — и 5 метров вместо 10. Расчёт в нормализованном пространстве дал бы здесь одинаковые числа и был бы неверен (ADR-0018)."
+        },
+        {
+          "case_id": "polygon.landscape_full_sheet",
+          "geometry_type": "polygon",
+          "vertices": 4,
+          "page": "landscape_20x10m",
+          "calibration": "landscape_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "200",
+            "unit": "m2"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "200.0000000000000000000",
+            "unit": "m2",
+            "canonical_value": "200000000.0000000000000000000",
+            "canonical_unit": "mm2",
+            "rule_key": "area.v1",
+            "input_fingerprint": "0327c15c32de93a210a4dfe4e54c1678915a7e3ad7757cf4df1582231a9e1f3a"
+          },
+          "absolute_error": "0E-19",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 62900,
+            "min_ns": 61300,
+            "p95_ns": 97300,
+            "iterations": 200,
+            "per_second": 15898.25119236884,
+            "geometry_median_ns": 24500
+          },
+          "source_note": "Лист 20 × 10 метров."
+        },
+        {
+          "case_id": "line.rotated_page_full_width",
+          "geometry_type": "line",
+          "vertices": 2,
+          "page": "rotated_10x20m",
+          "calibration": "rotated_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "10",
+            "unit": "m"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "10.0000000000000",
+            "unit": "m",
+            "canonical_value": "10000.0000000000000",
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "276f170e36fce5bcf70b3f6218e3fd05bf38dbd34d935bb1016eda5e10acb765"
+          },
+          "absolute_error": "0E-13",
+          "relative_error": 0,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 53500,
+            "min_ns": 49700,
+            "p95_ns": 84100,
+            "iterations": 200,
+            "per_second": 18691.58878504673,
+            "geometry_median_ns": 19500
+          },
+          "source_note": "Страница с /Rotate 90. Если бы поворот применился второй раз, ширина взялась бы от MediaBox (2000 pt) и вышло бы 20 метров вместо 10. Случай существует именно ради этой разницы."
+        },
+        {
+          "case_id": "polygon.bowtie_self_intersecting",
+          "geometry_type": "polygon",
+          "vertices": 4,
+          "page": "square_10m",
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "ready",
+            "value": "0",
+            "unit": "m2"
+          },
+          "actual": {
+            "state": "ready",
+            "value": "0E-25",
+            "unit": "m2",
+            "canonical_value": "0E-25",
+            "canonical_unit": "mm2",
+            "rule_key": "area.v1",
+            "input_fingerprint": "c4a00209bd4f7b7dc38d15b1fd6981d655232bfb66e278e03921978409c181ef"
+          },
+          "absolute_error": "0E-25",
+          "relative_error": null,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 82700,
+            "min_ns": 74700,
+            "p95_ns": 99800,
+            "iterations": 200,
+            "per_second": 12091.898428053204,
+            "geometry_median_ns": 27150
+          },
+          "source_note": "Самопересекающийся «бантик». Формула шнурков даёт разность долей, здесь равных, — ноль. Это зафиксированное поведение, а не одобренное: политика для самопересечений не выбрана, потому что правильный ответ зависит от того, что рисовал человек. Случай в датасете, чтобы смена поведения была заметной."
+        },
+        {
+          "case_id": "line.no_calibration",
+          "geometry_type": "line",
+          "vertices": 2,
+          "page": "square_10m",
+          "calibration": null,
+          "expected": {
+            "state": "unavailable_no_scale",
+            "value": null,
+            "unit": "m"
+          },
+          "actual": {
+            "state": "unavailable_no_scale",
+            "value": null,
+            "unit": "m",
+            "canonical_value": null,
+            "canonical_unit": "mm",
+            "rule_key": "length.v1",
+            "input_fingerprint": "f20d977f6a06d7d2ba342f3232ade0e16e10667a59fda0fc5326543ec1b7b9ea"
+          },
+          "absolute_error": null,
+          "relative_error": null,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": false,
+            "consistent": true,
+            "note": "калибровка не используется"
+          },
+          "timing": {
+            "median_ns": 45200,
+            "min_ns": 28600,
+            "p95_ns": 73200,
+            "iterations": 200,
+            "per_second": 22123.893805309734,
+            "geometry_median_ns": 23600
+          },
+          "source_note": "Без масштаба длина недоступна, а не равна нулю. Ноль — это утверждение о величине, и ложное."
+        },
+        {
+          "case_id": "polygon.no_page_geometry",
+          "geometry_type": "polygon",
+          "vertices": 4,
+          "page": null,
+          "calibration": "square_10mm_per_pt",
+          "expected": {
+            "state": "unavailable_no_geometry",
+            "value": null,
+            "unit": "m2"
+          },
+          "actual": {
+            "state": "unavailable_no_geometry",
+            "value": null,
+            "unit": "m2",
+            "canonical_value": null,
+            "canonical_unit": "mm2",
+            "rule_key": "area.v1",
+            "input_fingerprint": "e6cfc7d14d4f6ed3ca0add2ecc6be8068f3cdc24b1af09495677b1ee5495bb32"
+          },
+          "absolute_error": null,
+          "relative_error": null,
+          "tolerance": {
+            "absolute": "0",
+            "relative": "0"
+          },
+          "passed": true,
+          "mismatches": [],
+          "repeatable": true,
+          "repeats": 25,
+          "evidence": {
+            "checked": true,
+            "consistent": true,
+            "note": "коэффициент следует из известного размера"
+          },
+          "timing": {
+            "median_ns": 50800,
+            "min_ns": 43600,
+            "p95_ns": 62200,
+            "iterations": 200,
+            "per_second": 19685.03937007874,
+            "geometry_median_ns": null
+          },
+          "source_note": "Коэффициент есть, а страницы нет: переводить нормализованные доли не во что. Случай возможен, пока извлечение геометрии — отдельное задание."
+        }
+      ],
+      "summary": {
+        "total": 16,
+        "passed": 16,
+        "failed": [],
+        "unrepeatable": []
+      }
+    },
+    "api": {
+      "status": "skipped",
+      "reason": "PostgreSQL недоступен — стенд не поднят.",
+      "commands": [
+        "pnpm infra:up",
+        "pnpm db:migrate",
+        "pnpm benchmark:measurement"
+      ]
+    },
+    "overlay": {
+      "status": "ok",
+      "canvas": {
+        "cssWidth": 1600,
+        "cssHeight": 1000
+      },
+      "devicePixelRatio": 1,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+      "draw": [
+        {
+          "primitives": 1000,
+          "vertices": 3500,
+          "frames": 60,
+          "medianMs": 64.7000000178814,
+          "minMs": 52.09999996423721,
+          "p95Ms": 87,
+          "drawn": 1000
+        },
+        {
+          "primitives": 5000,
+          "vertices": 17500,
+          "frames": 60,
+          "medianMs": 313.7000000178814,
+          "minMs": 267.9000000357628,
+          "p95Ms": 361.80000001192093,
+          "drawn": 5000
+        },
+        {
+          "primitives": 10000,
+          "vertices": 35000,
+          "frames": 60,
+          "medianMs": 612,
+          "minMs": 519.5,
+          "p95Ms": 698.5,
+          "drawn": 10000
+        }
+      ],
+      "hitTest": [
+        {
+          "primitives": 1000,
+          "vertices": 3500,
+          "frames": 60,
+          "medianMs": 0.40000003576278687,
+          "minMs": 0.2999999523162842,
+          "p95Ms": 1.5,
+          "drawn": 0
+        },
+        {
+          "primitives": 5000,
+          "vertices": 17500,
+          "frames": 60,
+          "medianMs": 2.699999988079071,
+          "minMs": 1.600000023841858,
+          "p95Ms": 4.600000023841858,
+          "drawn": 0
+        },
+        {
+          "primitives": 10000,
+          "vertices": 35000,
+          "frames": 60,
+          "medianMs": 4.400000035762787,
+          "minMs": 3.300000011920929,
+          "p95Ms": 6.899999976158142,
+          "drawn": 0
+        }
+      ],
+      "overhead": {
+        "primitives": 0,
+        "vertices": 0,
+        "frames": 60,
+        "medianMs": 0.800000011920929,
+        "minMs": 0.3999999761581421,
+        "p95Ms": 1.600000023841858,
+        "drawn": 0
+      },
+      "heapBefore": {
+        "usedBytes": 10000000,
+        "totalBytes": 10000000
+      },
+      "heapAfter": {
+        "usedBytes": 10000000,
+        "totalBytes": 10000000
+      }
+    },
+    "bundle": {
+      "status": "ok",
+      "note": "Каждый модуль собран отдельно и минифицирован. Общие зависимости попадают в каждую сборку, поэтому сумма — верхняя оценка, а не точный вес слоя.",
+      "modules": [
+        {
+          "entry": "src/lib/viewer/measurement-overlay.ts",
+          "minifiedBytes": 3826,
+          "gzippedBytes": 1525,
+          "sha256": "4a7f78f6ff9de7f9"
+        },
+        {
+          "entry": "src/lib/viewer/tool-machine.ts",
+          "minifiedBytes": 2800,
+          "gzippedBytes": 968,
+          "sha256": "47cd891d4d9d2f99"
+        },
+        {
+          "entry": "src/lib/viewer/tool-controller.ts",
+          "minifiedBytes": 3821,
+          "gzippedBytes": 1303,
+          "sha256": "1408c98ce118c67d"
+        },
+        {
+          "entry": "src/lib/viewer/measurement.ts",
+          "minifiedBytes": 2052,
+          "gzippedBytes": 990,
+          "sha256": "22076cd495903f0f"
+        }
+      ]
+    }
+  }
+}

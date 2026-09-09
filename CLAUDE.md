@@ -27,6 +27,7 @@ pnpm test                        # pytest + vitest
 pnpm build                       # генерация клиента + сборка web
 pnpm db:migrate                  # alembic upgrade head
 pnpm api-client:generate         # FastAPI -> openapi.json -> TS
+pnpm benchmark:measurement       # замер точности и стоимости измерительного ядра
 ```
 
 ## Границы этапа

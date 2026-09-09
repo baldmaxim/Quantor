@@ -12,3 +12,6 @@ packages/api-client/src
 packages/api-client/openapi.json
 pnpm-lock.yaml
 _prompts
+# создаётся командой pnpm benchmark:measurement — правится только генератором
+docs/stage2a/benchmark-report.md
+docs/stage2a/benchmark-results.json

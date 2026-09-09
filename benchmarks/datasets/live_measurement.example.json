@@ -1,0 +1,54 @@
+{
+  "manifest_version": 1,
+  "dataset_id": "measurement_live",
+  "dataset_version": "example",
+  "created": "2026-09-09",
+  "note": "Образец живого датасета. Настоящие чертежи весят десятки и сотни мегабайт и в репозиторий не коммитятся без решения владельца, поэтому здесь только форма. Свой файл положите куда угодно и укажите путь в QUANTOR_BENCH_LIVE_DATASET.",
+  "pages": {
+    "example_sheet": {
+      "sheet_ref": {
+        "pdf_path": "_prompts/stage1/fixtures/legacy/example.pdf",
+        "page_index": 0,
+        "source_sha256": null
+      },
+      "note": "Путь относительно корня репозитория либо абсолютный. Размеры страницы не пишутся руками: их извлекает тот же провайдер геометрии, что и рабочий конвейер, — иначе benchmark проверял бы не то, что работает в проде. Если указан source_sha256, файл сверяется: чертёж, подменённый под тем же именем, обязан быть замечен."
+    }
+  },
+  "calibrations": {
+    "example_scale": {
+      "page": "example_sheet",
+      "point_a": ["0.1000", "0.5000"],
+      "point_b": ["0.4000", "0.5000"],
+      "input_value": "6000.0000",
+      "input_unit": "mm",
+      "known_distance_mm": "6000.0000",
+      "page_distance_pt": null,
+      "mm_per_pt": null,
+      "source": "manual",
+      "verification_state": "unverified",
+      "note": "Для живого случая page_distance_pt и mm_per_pt оставляются пустыми: их считает сервер по извлечённой геометрии. Коэффициент, вписанный руками, означал бы, что benchmark проверяет арифметику датасета, а не калибровку."
+    }
+  },
+  "cases": [
+    {
+      "case_id": "live.example_wall_length",
+      "page": "example_sheet",
+      "calibration": "example_scale",
+      "geometry_type": "line",
+      "points": [
+        ["0.2000", "0.3000"],
+        ["0.5000", "0.3000"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "6",
+        "unit": "m",
+        "canonical_value": "6000",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0.02", "relative": "0.002" },
+      "source_note": "Ожидание берётся из размерной надписи на чертеже, а не из вывода программы. Допуск здесь ненулевой намеренно: точки ставит человек мышью, и попадание в линию размера ограничено разрешением экрана, а не арифметикой. Величину допуска обосновывает тот, кто добавляет случай."
+    }
+  ]
+}

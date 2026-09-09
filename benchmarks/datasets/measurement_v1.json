@@ -1,0 +1,400 @@
+{
+  "manifest_version": 1,
+  "dataset_id": "measurement_synthetic",
+  "dataset_version": "v1",
+  "created": "2026-09-09",
+  "note": "Синтетические случаи со снятыми аналитически ожиданиями. Ни одно число не получено запуском реализации: тест, сверяющийся с собственным выводом, доказывает воспроизводимость, но не правильность. Страницы подобраны так, чтобы ответы были круглыми.",
+  "pages": {
+    "square_10m": {
+      "display_width_pt": "1000.0000",
+      "display_height_pt": "1000.0000",
+      "pdf_rotation": 0,
+      "geometry_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+      "note": "Квадрат 1000×1000 pt при 10 мм/pt — лист ровно 10×10 метров."
+    },
+    "landscape_20x10m": {
+      "display_width_pt": "2000.0000",
+      "display_height_pt": "1000.0000",
+      "pdf_rotation": 0,
+      "geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+      "note": "Прямоугольник 2000×1000 pt: доля по X и та же доля по Y — разные расстояния."
+    },
+    "rotated_10x20m": {
+      "display_width_pt": "1000.0000",
+      "display_height_pt": "2000.0000",
+      "pdf_rotation": 90,
+      "geometry_fingerprint": "3333333333333333333333333333333333333333333333333333333333333333",
+      "note": "MediaBox 2000×1000 с /Rotate 90. Стороны уже переставлены в display-размерах: поворот применён один раз и повторно не применяется (ADR-0016)."
+    }
+  },
+  "calibrations": {
+    "square_10mm_per_pt": {
+      "page": "square_10m",
+      "point_a": ["0", "0"],
+      "point_b": ["1", "0"],
+      "input_value": "10000.0000",
+      "input_unit": "mm",
+      "known_distance_mm": "10000.0000",
+      "page_distance_pt": "1000.000000",
+      "mm_per_pt": "10.000000000000",
+      "source": "manual",
+      "verification_state": "verified",
+      "note": "Известный размер — вся ширина листа, 10 метров."
+    },
+    "landscape_10mm_per_pt": {
+      "page": "landscape_20x10m",
+      "point_a": ["0", "0"],
+      "point_b": ["1", "0"],
+      "input_value": "20000.0000",
+      "input_unit": "mm",
+      "known_distance_mm": "20000.0000",
+      "page_distance_pt": "2000.000000",
+      "mm_per_pt": "10.000000000000",
+      "source": "manual",
+      "verification_state": "verified",
+      "note": "Ширина 2000 pt при известных 20 метрах даёт тот же коэффициент, что и на квадратной странице."
+    },
+    "rotated_10mm_per_pt": {
+      "page": "rotated_10x20m",
+      "point_a": ["0", "0"],
+      "point_b": ["1", "0"],
+      "input_value": "10000.0000",
+      "input_unit": "mm",
+      "known_distance_mm": "10000.0000",
+      "page_distance_pt": "1000.000000",
+      "mm_per_pt": "10.000000000000",
+      "source": "manual",
+      "verification_state": "unverified",
+      "note": "Ширина повёрнутой страницы — 1000 pt: это display-ширина, а не сторона MediaBox."
+    }
+  },
+  "cases": [
+    {
+      "case_id": "count.single_mark",
+      "page": "square_10m",
+      "calibration": null,
+      "geometry_type": "count",
+      "points": [["0.5", "0.5"]],
+      "expected": {
+        "state": "ready",
+        "value": "1",
+        "unit": "pcs",
+        "canonical_value": "1",
+        "canonical_unit": "pcs",
+        "rule_key": "count.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Штука есть штука: счёт не зависит ни от масштаба, ни от геометрии страницы."
+    },
+    {
+      "case_id": "line.full_width",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "line",
+      "points": [
+        ["0", "0.5"],
+        ["1", "0.5"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "10",
+        "unit": "m",
+        "canonical_value": "10000",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Вся ширина листа. Известна из определения калибровки, а не из расчёта."
+    },
+    {
+      "case_id": "line.diagonal_3_4_5",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "line",
+      "points": [
+        ["0.1", "0.1"],
+        ["0.4", "0.5"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "5",
+        "unit": "m",
+        "canonical_value": "5000",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Катеты 300 и 400 pt: египетский треугольник, гипотенуза ровно 500 pt. Точное значение в binary64, допуск не нужен."
+    },
+    {
+      "case_id": "polyline.three_segments",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "polyline",
+      "points": [
+        ["0", "0"],
+        ["0.3", "0"],
+        ["0.3", "0.4"],
+        ["0.6", "0.4"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "10",
+        "unit": "m",
+        "canonical_value": "10000",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Звенья 300 + 400 + 300 pt. Порядок суммирования — часть контракта (ADR-0017), поэтому ожидание тоже слева направо."
+    },
+    {
+      "case_id": "polyline.thousand_vertices",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "polyline",
+      "generator": { "kind": "horizontal_scan", "vertices": 1001, "y": "0.5" },
+      "expected": {
+        "state": "ready",
+        "value": "10",
+        "unit": "m",
+        "canonical_value": "10000",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0.000000001", "relative": "0" },
+      "source_note": "Тысяча звеньев по 1 pt вдоль всей ширины: сумма равна ширине листа, 10 м. Единственный случай с ненулевым допуском — деление доли страницы на 1000 частей не даёт двоичного нуля в остатке. Допуск 1 нм показывает, что накопления ошибки нет."
+    },
+    {
+      "case_id": "line.tiny_one_point",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "line",
+      "points": [
+        ["0", "0"],
+        ["0.001", "0"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "0.01",
+        "unit": "m",
+        "canonical_value": "10",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Одна точка PDF — 10 мм. Нижняя граница разумного измерения: короче уже неотличимо от дрожания курсора."
+    },
+    {
+      "case_id": "polygon.full_sheet",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "polygon",
+      "points": [
+        ["0", "0"],
+        ["1", "0"],
+        ["1", "1"],
+        ["0", "1"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "100",
+        "unit": "m2",
+        "canonical_value": "100000000",
+        "canonical_unit": "mm2",
+        "rule_key": "area.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Весь лист 10 × 10 метров."
+    },
+    {
+      "case_id": "polygon.half_sheet_triangle",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "polygon",
+      "points": [
+        ["0", "0"],
+        ["1", "0"],
+        ["0", "1"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "50",
+        "unit": "m2",
+        "canonical_value": "50000000",
+        "canonical_unit": "mm2",
+        "rule_key": "area.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Половина листа: треугольник на двух сторонах квадрата."
+    },
+    {
+      "case_id": "polygon.quarter_rect",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "polygon",
+      "points": [
+        ["0.25", "0.25"],
+        ["0.75", "0.25"],
+        ["0.75", "0.75"],
+        ["0.25", "0.75"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "25",
+        "unit": "m2",
+        "canonical_value": "25000000",
+        "canonical_unit": "mm2",
+        "rule_key": "area.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Квадрат 5 × 5 метров по центру. Доли 0,25 и 0,75 представимы в двоичной дроби точно."
+    },
+    {
+      "case_id": "line.landscape_half_width",
+      "page": "landscape_20x10m",
+      "calibration": "landscape_10mm_per_pt",
+      "geometry_type": "line",
+      "points": [
+        ["0.25", "0.5"],
+        ["0.75", "0.5"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "10",
+        "unit": "m",
+        "canonical_value": "10000",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Половина ширины страницы 2000 pt — 1000 pt, то есть 10 метров."
+    },
+    {
+      "case_id": "line.landscape_half_height",
+      "page": "landscape_20x10m",
+      "calibration": "landscape_10mm_per_pt",
+      "geometry_type": "line",
+      "points": [
+        ["0.5", "0.25"],
+        ["0.5", "0.75"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "5",
+        "unit": "m",
+        "canonical_value": "5000",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Ловушка прямоугольной страницы: та же доля 0,5, что и в предыдущем случае, но по другой оси — и 5 метров вместо 10. Расчёт в нормализованном пространстве дал бы здесь одинаковые числа и был бы неверен (ADR-0018)."
+    },
+    {
+      "case_id": "polygon.landscape_full_sheet",
+      "page": "landscape_20x10m",
+      "calibration": "landscape_10mm_per_pt",
+      "geometry_type": "polygon",
+      "points": [
+        ["0", "0"],
+        ["1", "0"],
+        ["1", "1"],
+        ["0", "1"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "200",
+        "unit": "m2",
+        "canonical_value": "200000000",
+        "canonical_unit": "mm2",
+        "rule_key": "area.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Лист 20 × 10 метров."
+    },
+    {
+      "case_id": "line.rotated_page_full_width",
+      "page": "rotated_10x20m",
+      "calibration": "rotated_10mm_per_pt",
+      "geometry_type": "line",
+      "points": [
+        ["0", "0.5"],
+        ["1", "0.5"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "10",
+        "unit": "m",
+        "canonical_value": "10000",
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Страница с /Rotate 90. Если бы поворот применился второй раз, ширина взялась бы от MediaBox (2000 pt) и вышло бы 20 метров вместо 10. Случай существует именно ради этой разницы."
+    },
+    {
+      "case_id": "polygon.bowtie_self_intersecting",
+      "page": "square_10m",
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "polygon",
+      "points": [
+        ["0", "0"],
+        ["1", "0"],
+        ["0", "1"],
+        ["1", "1"]
+      ],
+      "expected": {
+        "state": "ready",
+        "value": "0",
+        "unit": "m2",
+        "canonical_value": "0",
+        "canonical_unit": "mm2",
+        "rule_key": "area.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Самопересекающийся «бантик». Формула шнурков даёт разность долей, здесь равных, — ноль. Это зафиксированное поведение, а не одобренное: политика для самопересечений не выбрана, потому что правильный ответ зависит от того, что рисовал человек. Случай в датасете, чтобы смена поведения была заметной."
+    },
+    {
+      "case_id": "line.no_calibration",
+      "page": "square_10m",
+      "calibration": null,
+      "geometry_type": "line",
+      "points": [
+        ["0", "0.5"],
+        ["1", "0.5"]
+      ],
+      "expected": {
+        "state": "unavailable_no_scale",
+        "value": null,
+        "unit": "m",
+        "canonical_value": null,
+        "canonical_unit": "mm",
+        "rule_key": "length.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Без масштаба длина недоступна, а не равна нулю. Ноль — это утверждение о величине, и ложное."
+    },
+    {
+      "case_id": "polygon.no_page_geometry",
+      "page": null,
+      "calibration": "square_10mm_per_pt",
+      "geometry_type": "polygon",
+      "points": [
+        ["0", "0"],
+        ["1", "0"],
+        ["1", "1"],
+        ["0", "1"]
+      ],
+      "expected": {
+        "state": "unavailable_no_geometry",
+        "value": null,
+        "unit": "m2",
+        "canonical_value": null,
+        "canonical_unit": "mm2",
+        "rule_key": "area.v1"
+      },
+      "tolerance": { "absolute": "0", "relative": "0" },
+      "source_note": "Коэффициент есть, а страницы нет: переводить нормализованные доли не во что. Случай возможен, пока извлечение геометрии — отдельное задание."
+    }
+  ]
+}

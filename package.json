@@ -10,6 +10,7 @@
   "scripts": {
     "api-client:check": "node scripts/gen-api-client.mjs --check",
     "api-client:generate": "node scripts/gen-api-client.mjs",
+    "benchmark:measurement": "node scripts/benchmark.mjs",
     "build": "pnpm run api-client:generate && pnpm --filter @quantor/web build && pnpm --filter @quantor/admin build",
     "db:migrate": "node scripts/py.mjs -m alembic upgrade head",
     "db:revision": "node scripts/py.mjs -m alembic revision --autogenerate -m",
@@ -33,7 +34,7 @@
     "test:e2e": "pnpm --filter @quantor/web test:e2e && pnpm --filter @quantor/admin test:e2e",
     "test:web": "pnpm --filter @quantor/web test && pnpm --filter @quantor/admin test",
     "typecheck": "pnpm run typecheck:api && pnpm run typecheck:web",
-    "typecheck:api": "node scripts/py.mjs -m mypy app",
+    "typecheck:api": "node scripts/py.mjs -m mypy app benchmarks",
     "typecheck:web": "pnpm --filter @quantor/web typecheck && pnpm --filter @quantor/admin typecheck"
   },
   "devDependencies": {
