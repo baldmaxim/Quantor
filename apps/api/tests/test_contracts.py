@@ -64,9 +64,29 @@ class TestStageBoundaries:
             f"{package} не должен появляться в зависимостях Stage 1"
         )
 
-    def test_only_one_real_job_type(self) -> None:
-        """Реальный тип задания ровно один: остальные шаги пока только контракт."""
-        assert [job_type.value for job_type in JobType] == ["legacy_import"]
+    def test_real_job_types_are_named_explicitly(self) -> None:
+        """Исполняемые типы заданий перечислены явно.
+
+        Список сверяется целиком, а не по длине: новый тип должен попадать сюда осознанным
+        решением. На Stage 2A к импорту пакета добавилось извлечение геометрии страниц —
+        оно читает размеры страницы и ничего не распознаёт.
+        """
+        assert [job_type.value for job_type in JobType] == [
+            "legacy_import",
+            "pdf_geometry_extract",
+        ]
+
+    def test_no_job_type_invokes_a_model(self) -> None:
+        """Настоящая граница этапа: ни одно исполняемое задание не обращается к модели.
+
+        Проверяется соответствием этапам конвейера, а не числом типов: список заданий
+        будет расти, а этот запрет — нет.
+        """
+        model_stages = {
+            stage.value for stage in PipelineStage if STAGE_CONTRACTS[stage].uses_models
+        }
+        assert model_stages, "этапы с моделями должны существовать как контракт"
+        assert model_stages.isdisjoint({job_type.value for job_type in JobType})
 
     def test_future_stages_are_contracts_only(self) -> None:
         assert set(STAGE_CONTRACTS) == set(PipelineStage)

@@ -647,6 +647,20 @@
             "title": "Document Id",
             "type": "string"
           },
+          "geometry_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geometry Error Code"
+          },
+          "geometry_status": {
+            "$ref": "#/components/schemas/GeometryStatus"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -709,6 +723,8 @@
           "source_sha256",
           "processing_status",
           "processing_error_code",
+          "geometry_status",
+          "geometry_error_code",
           "source_metadata",
           "created_at"
         ],
@@ -806,6 +822,18 @@
         ],
         "title": "FlagStateRead",
         "type": "object"
+      },
+      "GeometryStatus": {
+        "description": "Состояние извлечения канонической геометрии страниц ревизии.\n\nОтносится ко всей ревизии, а не к отдельной странице: если число страниц в PDF не\nсовпало с числом листов, доверять нельзя ни одной. Частично извлечённой геометрии не\nбывает (ADR-0016).\n\nОтдельно от `ProcessingStatus`: тот описывает импорт распознанного пакета и у обычного\nPDF навсегда остаётся `unprocessed`. Одно поле на два независимых процесса означало бы,\nчто успех одного стирает отказ другого.",
+        "enum": [
+          "not_applicable",
+          "pending",
+          "extracting",
+          "ready",
+          "failed"
+        ],
+        "title": "GeometryStatus",
+        "type": "string"
       },
       "HTTPValidationError": {
         "properties": {
@@ -991,9 +1019,10 @@
         "type": "string"
       },
       "JobType": {
-        "description": "Типы заданий.\n\nРеален только legacy_import. Остальные объявлены в промте 08 как контракт и в Stage 1\nне исполняются.",
+        "description": "Типы заданий.\n\nРеальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и\nне исполняются.",
         "enum": [
-          "legacy_import"
+          "legacy_import",
+          "pdf_geometry_extract"
         ],
         "title": "JobType",
         "type": "string"
@@ -1250,6 +1279,85 @@
         ],
         "title": "OverrideScope",
         "type": "string"
+      },
+      "PageGeometryRead": {
+        "description": "Каноническая геометрия страницы (ADR-0016).\n\nПространство `pdf_display_points_top_left`: точка PDF, начало в левом верхнем углу,\nповорот **уже учтён** в отображаемых размерах. Поэтому перевод из нормализованных\nкоординат — умножение, без повторного поворота.\n\nРазмеры и рамки передаются строками: `JSON.parse` превращает число в float64, и\nканоническая десятичная запись, на которой построен отпечаток, теряется.",
+        "properties": {
+          "coordinate_space": {
+            "title": "Coordinate Space",
+            "type": "string"
+          },
+          "crop_box": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Crop Box",
+            "type": "array"
+          },
+          "display_height_pt": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Display Height Pt",
+            "type": "string"
+          },
+          "display_width_pt": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Display Width Pt",
+            "type": "string"
+          },
+          "extracted_at": {
+            "format": "date-time",
+            "title": "Extracted At",
+            "type": "string"
+          },
+          "geometry_fingerprint": {
+            "title": "Geometry Fingerprint",
+            "type": "string"
+          },
+          "media_box": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Media Box",
+            "type": "array"
+          },
+          "parser_name": {
+            "title": "Parser Name",
+            "type": "string"
+          },
+          "parser_version": {
+            "title": "Parser Version",
+            "type": "string"
+          },
+          "pdf_rotation": {
+            "title": "Pdf Rotation",
+            "type": "integer"
+          },
+          "sheet_id": {
+            "format": "uuid",
+            "title": "Sheet Id",
+            "type": "string"
+          },
+          "source_sha256": {
+            "title": "Source Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sheet_id",
+          "coordinate_space",
+          "display_width_pt",
+          "display_height_pt",
+          "pdf_rotation",
+          "media_box",
+          "crop_box",
+          "parser_name",
+          "parser_version",
+          "source_sha256",
+          "geometry_fingerprint",
+          "extracted_at"
+        ],
+        "title": "PageGeometryRead",
+        "type": "object"
       },
       "Page_AdminJobRead_": {
         "properties": {
@@ -5089,6 +5197,50 @@
           }
         },
         "summary": "Листы ревизии",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/sheets/{sheet_id}/geometry": {
+      "get": {
+        "description": "Размер страницы в точках PDF — единственное основание для физических величин.\n\nОтдельный ресурс, а не поле листа: список на 77 листов не должен тащить геометрию\nкаждого, а причина её отсутствия у геометрии своя (ADR-0016).",
+        "operationId": "read_sheet_geometry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sheet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageGeometryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Каноническая геометрия листа",
         "tags": [
           "documents"
         ]

@@ -23,6 +23,7 @@ from app.schemas import (
     DocumentRead,
     DocumentRevisionRead,
     Page,
+    PageGeometryRead,
     RecognitionArtifactRead,
     RegionRead,
     SheetRead,
@@ -239,3 +240,36 @@ async def list_sheet_regions(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get(
+    "/sheets/{sheet_id}/geometry",
+    response_model=PageGeometryRead,
+    summary="Каноническая геометрия листа",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_sheet_geometry(
+    sheet_id: uuid.UUID,
+    session: SessionDep,
+    workspace: WorkspaceDep,
+) -> PageGeometryRead:
+    """Размер страницы в точках PDF — единственное основание для физических величин.
+
+    Отдельный ресурс, а не поле листа: список на 77 листов не должен тащить геометрию
+    каждого, а причина её отсутствия у геометрии своя (ADR-0016).
+    """
+    sheet = await documents_service.get_sheet(
+        session, workspace_id=workspace.tenant, sheet_id=sheet_id
+    )
+    if sheet is None:
+        raise not_found("Лист")
+
+    geometry = await documents_service.get_page_geometry(
+        session, workspace_id=workspace.tenant, sheet_id=sheet.id
+    )
+    if geometry is None:
+        # Лист есть, геометрии нет. Это не «не найдено»: состояние извлечения видно
+        # в ревизии, и клиенту нужно различать «ещё не извлекли» и «не удалось».
+        raise http_error(ErrorCode.GEOMETRY_NOT_READY)
+
+    return PageGeometryRead.model_validate(geometry)

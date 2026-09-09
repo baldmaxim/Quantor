@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.domain import JobType
 from app.models import Job
-from app.services.job_runner import execute_legacy_import
+from app.services.job_runner import execute_legacy_import, execute_pdf_geometry_extract
 from app.storage.base import ObjectStorage
 
 JobHandler = Callable[[AsyncSession, Job, ObjectStorage, Settings], Awaitable[Job]]
@@ -29,8 +29,15 @@ async def _legacy_import(
     return await execute_legacy_import(session, job, storage=storage, settings=settings)
 
 
+async def _pdf_geometry_extract(
+    session: AsyncSession, job: Job, storage: ObjectStorage, settings: Settings
+) -> Job:
+    return await execute_pdf_geometry_extract(session, job, storage=storage, settings=settings)
+
+
 HANDLERS: dict[JobType, JobHandler] = {
     JobType.LEGACY_IMPORT: _legacy_import,
+    JobType.PDF_GEOMETRY_EXTRACT: _pdf_geometry_extract,
 }
 
 

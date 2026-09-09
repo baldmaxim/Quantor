@@ -47,6 +47,7 @@ from app.domain import (
 from app.errors import DomainError, ErrorCode
 from app.models import Document, DocumentRevision, Project, RecognitionArtifact, Region, Sheet
 from app.services import documents as documents_service
+from app.services import geometry
 from app.services.legacy import archive as archive_reader
 from app.services.legacy import markdown, package
 from app.services.legacy.archive import ArchiveLimits, ArchiveMember
@@ -339,6 +340,11 @@ async def _persist(
     await documents_service.set_processing_status(
         session, revision=package_revision, status=ProcessingStatus.READY
     )
+
+    # Листы уже созданы, но знают только размер растра распознавалки. Каноническая
+    # геометрия извлекается отдельным заданием: разбор PDF на 77 страниц не должен
+    # превращать полуторасекундный импорт в минуту ожидания (ADR-0016).
+    await geometry.schedule_extract(session, project=project, revision=revision)
     await session.flush()
 
     return ImportResult(

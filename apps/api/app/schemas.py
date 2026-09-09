@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -17,6 +18,7 @@ from app.domain import (
     ArtifactKind,
     AuditResult,
     DocumentKind,
+    GeometryStatus,
     JobScope,
     JobStatus,
     JobType,
@@ -439,6 +441,13 @@ class DocumentRevisionRead(ApiModel):
     source_sha256: str
     processing_status: ProcessingStatus
     processing_error_code: str | None
+    geometry_status: GeometryStatus
+    """Состояние извлечения канонической геометрии страниц.
+
+    Отвечает на вопрос «почему у листа нет геометрии» без обращения к журналу заданий:
+    не извлекали, извлекаем, готово или не удалось — это разные экраны (ADR-0016).
+    """
+    geometry_error_code: str | None
     source_metadata: dict[str, Any]
     created_at: datetime
 
@@ -479,6 +488,37 @@ class SheetRead(ApiModel):
     height_px: int | None
     rotation: int
     region_count: int = Field(ge=0)
+
+
+class PageGeometryRead(ApiModel):
+    """Каноническая геометрия страницы (ADR-0016).
+
+    Пространство `pdf_display_points_top_left`: точка PDF, начало в левом верхнем углу,
+    поворот **уже учтён** в отображаемых размерах. Поэтому перевод из нормализованных
+    координат — умножение, без повторного поворота.
+
+    Размеры и рамки передаются строками: `JSON.parse` превращает число в float64, и
+    каноническая десятичная запись, на которой построен отпечаток, теряется.
+    """
+
+    sheet_id: uuid.UUID
+    coordinate_space: str
+    display_width_pt: Decimal
+    display_height_pt: Decimal
+    pdf_rotation: int
+    media_box: list[str]
+    """Рамки в исходном пространстве PDF: начало внизу слева, поворот не применён.
+
+    Диагностика и происхождение, а не короткий путь к измерению: отображаемая страница —
+    это crop_box, пересечённый с media_box и повёрнутый.
+    """
+    crop_box: list[str]
+    parser_name: str
+    parser_version: str
+    source_sha256: str
+    geometry_fingerprint: str
+    """Отпечаток содержимого: одним сравнением отвечает, та ли это геометрия."""
+    extracted_at: datetime
 
 
 class RegionRead(ApiModel):

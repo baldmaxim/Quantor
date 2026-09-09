@@ -24,6 +24,7 @@ from app.domain import DocumentKind, GeometryStatus, JobType, ProcessingStatus
 from app.errors import DomainError, ErrorCode, InvariantError
 from app.models import Document, DocumentRevision, Job, Project
 from app.services import documents as documents_service
+from app.services import geometry
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectStorage
 from app.storage.keys import display_filename, extension_of, revision_key
@@ -251,6 +252,10 @@ async def receive_upload(
             idempotency_key=_import_key(project.id, stored.sha256),
             payload={"revision_id": str(revision.id)},
         )
+    elif kind.geometry_status is GeometryStatus.PENDING:
+        # Обычный PDF: листов у него нет, и до извлечения геометрии измерять нечего.
+        # Это не распознавание, а чтение размеров страницы (ADR-0016).
+        job = await geometry.schedule_extract(session, project=project, revision=revision)
 
     return UploadOutcome(document=target, revision=revision, job=job, is_duplicate=False)
 

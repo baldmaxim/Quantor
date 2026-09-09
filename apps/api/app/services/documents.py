@@ -13,7 +13,15 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import DocumentKind, GeometryStatus, ProcessingStatus
-from app.models import Document, DocumentRevision, Project, RecognitionArtifact, Region, Sheet
+from app.models import (
+    Document,
+    DocumentRevision,
+    PageGeometry,
+    Project,
+    RecognitionArtifact,
+    Region,
+    Sheet,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,3 +286,23 @@ async def count_regions(
         query = query.where(Region.recognition_status == recognition_status)
     result = await session.execute(query)
     return int(result.scalar_one())
+
+
+async def get_page_geometry(
+    session: AsyncSession, *, workspace_id: uuid.UUID, sheet_id: uuid.UUID
+) -> PageGeometry | None:
+    """Каноническая геометрия листа внутри своего пространства.
+
+    Тот же путь владения, что и у листа: чужое не находится, а не запрещается — 404
+    вместо 403, иначе ответ подтверждал бы существование объекта.
+    """
+    query = (
+        select(PageGeometry)
+        .join(Sheet, PageGeometry.sheet_id == Sheet.id)
+        .join(DocumentRevision, Sheet.revision_id == DocumentRevision.id)
+        .join(Document, DocumentRevision.document_id == Document.id)
+        .join(Project, Document.project_id == Project.id)
+        .where(PageGeometry.sheet_id == sheet_id, Project.workspace_id == workspace_id)
+    )
+    result = await session.execute(query)
+    return result.scalar_one_or_none()

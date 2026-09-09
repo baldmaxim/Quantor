@@ -361,6 +361,11 @@ export type DocumentRevisionRead = {
      */
     document_id: string;
     /**
+     * Geometry Error Code
+     */
+    geometry_error_code: string | null;
+    geometry_status: GeometryStatus;
+    /**
      * Id
      */
     id: string;
@@ -460,6 +465,21 @@ export type FlagStateRead = {
      */
     workspace_scoped: boolean;
 };
+
+/**
+ * GeometryStatus
+ *
+ * Состояние извлечения канонической геометрии страниц ревизии.
+ *
+ * Относится ко всей ревизии, а не к отдельной странице: если число страниц в PDF не
+ * совпало с числом листов, доверять нельзя ни одной. Частично извлечённой геометрии не
+ * бывает (ADR-0016).
+ *
+ * Отдельно от `ProcessingStatus`: тот описывает импорт распознанного пакета и у обычного
+ * PDF навсегда остаётся `unprocessed`. Одно поле на два независимых процесса означало бы,
+ * что успех одного стирает отказ другого.
+ */
+export type GeometryStatus = 'not_applicable' | 'pending' | 'extracting' | 'ready' | 'failed';
 
 /**
  * HTTPValidationError
@@ -566,10 +586,10 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  *
  * Типы заданий.
  *
- * Реален только legacy_import. Остальные объявлены в промте 08 как контракт и в Stage 1
+ * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract';
 
 /**
  * LivenessResponse
@@ -748,6 +768,69 @@ export type ModelSpecRead = {
  * чтобы уровень не появился в определениях раньше, чем в коде, который его читает.
  */
 export type OverrideScope = 'system' | 'workspace' | 'project';
+
+/**
+ * PageGeometryRead
+ *
+ * Каноническая геометрия страницы (ADR-0016).
+ *
+ * Пространство `pdf_display_points_top_left`: точка PDF, начало в левом верхнем углу,
+ * поворот **уже учтён** в отображаемых размерах. Поэтому перевод из нормализованных
+ * координат — умножение, без повторного поворота.
+ *
+ * Размеры и рамки передаются строками: `JSON.parse` превращает число в float64, и
+ * каноническая десятичная запись, на которой построен отпечаток, теряется.
+ */
+export type PageGeometryRead = {
+    /**
+     * Coordinate Space
+     */
+    coordinate_space: string;
+    /**
+     * Crop Box
+     */
+    crop_box: Array<string>;
+    /**
+     * Display Height Pt
+     */
+    display_height_pt: string;
+    /**
+     * Display Width Pt
+     */
+    display_width_pt: string;
+    /**
+     * Extracted At
+     */
+    extracted_at: string;
+    /**
+     * Geometry Fingerprint
+     */
+    geometry_fingerprint: string;
+    /**
+     * Media Box
+     */
+    media_box: Array<string>;
+    /**
+     * Parser Name
+     */
+    parser_name: string;
+    /**
+     * Parser Version
+     */
+    parser_version: string;
+    /**
+     * Pdf Rotation
+     */
+    pdf_rotation: number;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string;
+    /**
+     * Source Sha256
+     */
+    source_sha256: string;
+};
 
 /**
  * Page[AdminJobRead]
@@ -3016,6 +3099,36 @@ export type ListRevisionSheetsResponses = {
 };
 
 export type ListRevisionSheetsResponse = ListRevisionSheetsResponses[keyof ListRevisionSheetsResponses];
+
+export type ReadSheetGeometryData = {
+    body?: never;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/sheets/{sheet_id}/geometry';
+};
+
+export type ReadSheetGeometryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadSheetGeometryError = ReadSheetGeometryErrors[keyof ReadSheetGeometryErrors];
+
+export type ReadSheetGeometryResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageGeometryRead;
+};
+
+export type ReadSheetGeometryResponse = ReadSheetGeometryResponses[keyof ReadSheetGeometryResponses];
 
 export type ListSheetRegionsData = {
     body?: never;

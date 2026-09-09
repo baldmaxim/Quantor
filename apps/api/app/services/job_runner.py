@@ -32,10 +32,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.db.session import get_session_factory
-from app.domain import JobStatus, ProcessingStatus
+from app.domain import GeometryStatus, JobStatus, ProcessingStatus
 from app.errors import DomainError, ErrorCode
 from app.models import DocumentRevision, Job, Project
 from app.services import documents as documents_service
+from app.services import geometry
 from app.services import jobs as jobs_service
 from app.services.legacy import importer
 from app.storage import get_object_storage
@@ -207,4 +208,108 @@ async def _mark_failed(
         )
 
     log.warning("legacy_import_failed", job_id=str(job_id), code=code.value)
+    return await jobs_service.fail(session, job=job, error_code=code.value, error_message=message)
+
+
+async def execute_pdf_geometry_extract(
+    session: AsyncSession, job: Job, *, storage: ObjectStorage, settings: Settings
+) -> Job:
+    """Тело задания извлечения канонической геометрии страниц (ADR-0016).
+
+    Настройки в теле не нужны, но остаются в сигнатуре: реестр обработчиков один на все
+    типы, и расхождение сигнатур пришлось бы разруливать ветвлением в исполнителе.
+    """
+    revision_id = job.payload.get("revision_id")
+    if not isinstance(revision_id, str):
+        return await jobs_service.fail(
+            session,
+            job=job,
+            error_code=ErrorCode.GEOMETRY_EXTRACT_FAILED.value,
+            error_message="в задании нет ссылки на ревизию",
+        )
+
+    revision = await session.get(DocumentRevision, uuid.UUID(revision_id))
+    if revision is None:
+        return await jobs_service.fail(
+            session,
+            job=job,
+            error_code=ErrorCode.GEOMETRY_EXTRACT_FAILED.value,
+            error_message="ревизия не найдена",
+        )
+
+    await jobs_service.start(session, job=job, stage="geometry")
+    revision.geometry_status = GeometryStatus.EXTRACTING
+    revision.geometry_error_code = None
+    await session.flush()
+
+    job_id = job.id
+    revision_uuid = revision.id
+    provider = geometry.PypdfGeometryProvider()
+
+    try:
+        result = await geometry.extract_for_revision(
+            session, storage, revision=revision, provider=provider
+        )
+    except DomainError as error:
+        code, detail = error.code, error.detail
+        await session.rollback()
+        return await _mark_geometry_failed(session, job_id, revision_uuid, code, detail)
+    except Exception as error:
+        # Содержимое PDF в журнал не попадает: там чужая проектная документация.
+        # Имени класса исключения достаточно, чтобы понять, куда смотреть.
+        log.exception("pdf_geometry_extract_crashed", job_id=str(job_id))
+        await session.rollback()
+        return await _mark_geometry_failed(
+            session,
+            job_id,
+            revision_uuid,
+            ErrorCode.GEOMETRY_EXTRACT_FAILED,
+            type(error).__name__,
+        )
+
+    log.info(
+        "pdf_geometry_extract_finished",
+        job_id=str(job.id),
+        pages=result.page_count,
+        sheets_created=result.sheets_created,
+        sheets_enriched=result.sheets_enriched,
+        parser=f"{result.parser_name} {result.parser_version}",
+    )
+    return await jobs_service.succeed(
+        session,
+        job=job,
+        payload={
+            "revision_id": str(result.revision_id),
+            "page_count": result.page_count,
+            "sheets_created": result.sheets_created,
+            "sheets_enriched": result.sheets_enriched,
+            "parser_name": result.parser_name,
+            "parser_version": result.parser_version,
+        },
+    )
+
+
+async def _mark_geometry_failed(
+    session: AsyncSession,
+    job_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    code: ErrorCode,
+    message: str,
+) -> Job:
+    """Записывает отказ извлечения после отката.
+
+    Ревизия остаётся `failed` без единой строки геометрии: частично доверенной геометрии
+    не бывает, и «половина листов меряется» — это хуже, чем «не меряется ничего».
+    """
+    job = await session.get(Job, job_id)
+    if job is None:  # pragma: no cover — задание не может исчезнуть
+        raise RuntimeError(f"задание {job_id} исчезло во время извлечения геометрии")
+
+    revision = await session.get(DocumentRevision, revision_id)
+    if revision is not None:
+        revision.geometry_status = GeometryStatus.FAILED
+        revision.geometry_error_code = code.value
+        await session.flush()
+
+    log.warning("pdf_geometry_extract_failed", job_id=str(job_id), code=code.value)
     return await jobs_service.fail(session, job=job, error_code=code.value, error_message=message)

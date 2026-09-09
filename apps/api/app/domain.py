@@ -187,11 +187,14 @@ class RegionShape(StrEnum):
 class JobType(StrEnum):
     """Типы заданий.
 
-    Реален только legacy_import. Остальные объявлены в промте 08 как контракт и в Stage 1
+    Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
     не исполняются.
     """
 
     LEGACY_IMPORT = "legacy_import"
+    # Каноническая геометрия страниц PDF (ADR-0016). Ставится и после обычной загрузки PDF,
+    # и после импорта пакета: это не распознавание, а чтение размеров страницы.
+    PDF_GEOMETRY_EXTRACT = "pdf_geometry_extract"
 
 
 class JobStatus(StrEnum):
