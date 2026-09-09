@@ -156,12 +156,16 @@ test.describe('рабочая область', () => {
     await expect(page.getByLabel('Панель документов и распознавания')).toBeVisible();
   });
 
-  test('вкладка обмеров выключена и подписана этапом', async ({ page }) => {
+  test('вкладка обмеров открывает список строк', async ({ page }) => {
+    // Была выключена и подписана «Этап 2» до Stage 2A. Теперь ручной обмер существует,
+    // и тест переписан осознанно, а не подогнан: он проверяет новое поведение.
     await page.goto(WORKSPACE);
 
     const takeoff = page.getByRole('tab', { name: 'Обмеры' });
-    await expect(takeoff).toBeDisabled();
-    await expect(takeoff).toHaveAttribute('title', /Этап 2/);
+    await expect(takeoff).toBeEnabled();
+
+    await takeoff.click();
+    await expect(page.getByText('Строк обмера нет')).toBeVisible();
   });
 
   test('без ревизии объясняет, что открывать нечего', async ({ page }) => {

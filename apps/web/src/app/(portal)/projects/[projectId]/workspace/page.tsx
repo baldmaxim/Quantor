@@ -7,9 +7,14 @@ import { Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { usePageGeometry } from '@/components/viewer/usePageGeometry';
+import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
+import { TakeoffPanel, type TakeoffGeometry } from '@/components/workspace/TakeoffPanel';
 import type { NormalizedPoint } from '@/lib/viewer/coordinates';
+import type { OverlayMeasurement } from '@/lib/viewer/measurement-overlay';
 import { ScaleDraft, type ScaleDraftPhase } from '@/lib/viewer/scale-draft';
+import { ToolController } from '@/lib/viewer/tool-controller';
+import type { ToolMode } from '@/lib/viewer/tool-machine';
 import { useDocumentBackend } from '@/components/viewer/useDocumentBackend';
 import { EmptyState, ErrorState, Field, InspectorSection, StatusBadge, cx } from '@/components/ui';
 import {
@@ -34,8 +39,15 @@ import {
   useCreateCalibration,
   useProject,
   useRegions,
+  useArchiveTakeoffItem,
+  useCreateMeasurement,
+  useCreateTakeoffItem,
+  useDeleteMeasurement,
+  useMeasurements,
   useScaleCalibrations,
   useSheets,
+  useTakeoffItems,
+  useUpdateMeasurement,
 } from '@/lib/queries';
 import { Camera } from '@/lib/viewer/camera';
 import type { OverlayRegion } from '@/lib/viewer/overlay';
@@ -55,7 +67,7 @@ interface IPageProps {
 const LEFT_TABS: readonly { id: LeftTab; label: string; enabled: boolean; hint?: string }[] = [
   { id: 'documents', label: 'Листы', enabled: true },
   { id: 'recognition', label: 'Распознавание', enabled: true },
-  { id: 'takeoff', label: 'Обмеры', enabled: false, hint: 'Этап 2' },
+  { id: 'takeoff', label: 'Обмеры', enabled: true },
 ];
 
 const WorkspacePage = ({ params }: IPageProps) => {
@@ -132,6 +144,55 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const draftA = draftPoints?.a ?? null;
   const draftB = draftPoints?.b ?? null;
 
+  // --- обмеры ---
+  //
+  // Контроллер инструментов — императивный, как камера и черновик масштаба: вершины
+  // черновика меняются на каждом движении мыши (ADR-0004).
+  const tools = useMemo(() => new ToolController('select'), []);
+  useEffect(() => () => tools.dispose(), [tools]);
+
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [selectedMeasurementId, setSelectedMeasurementId] = useState<string | null>(null);
+  const [takeoffError, setTakeoffError] = useState<string | null>(null);
+  const [toolMode, setToolMode] = useState<ToolMode>('select');
+
+  const takeoffItems = useTakeoffItems(projectId);
+  const measurements = useMeasurements(sheetId);
+  const createItem = useCreateTakeoffItem(projectId);
+  const archiveItem = useArchiveTakeoffItem(projectId);
+  const createMeasurement = useCreateMeasurement(sheetId ?? '');
+  const updateMeasurement = useUpdateMeasurement(sheetId ?? '');
+  const removeMeasurement = useDeleteMeasurement(sheetId ?? '');
+
+  // Мемоизация не косметика: без неё новый массив на каждый рендер пересчитывал бы
+  // слой измерений и счётчики строк.
+  const items = useMemo(() => takeoffItems.data ?? [], [takeoffItems.data]);
+  const activeItem = items.find((row) => row.id === activeItemId) ?? null;
+
+  const overlayMeasurements = useMemo<OverlayMeasurement[]>(
+    () =>
+      (measurements.data ?? []).map((row) => ({
+        id: row.id,
+        geometryType: row.geometry_type,
+        points: row.points.map(([x, y]) => ({ x: x ?? 0, y: y ?? 0 })),
+        colorKey: items.find((item) => item.id === row.takeoff_item_id)?.color_key ?? 'accent',
+      })),
+    [measurements.data, items],
+  );
+
+  // Сколько измерений у каждой строки на этом листе. Область явная — лист, а не проект:
+  // сложить две ревизии значило бы посчитать одни и те же двери дважды (ADR-0019).
+  const measurementCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const row of measurements.data ?? []) {
+      counts[row.takeoff_item_id] = (counts[row.takeoff_item_id] ?? 0) + 1;
+    }
+    return counts;
+  }, [measurements.data]);
+
+  const selectedMeasurement =
+    (measurements.data ?? []).find((row) => row.id === selectedMeasurementId) ?? null;
+
   const calibrations = useScaleCalibrations(sheetId);
   const defaultCalibration = calibrations.data?.find((item) => item.is_default) ?? null;
   const createCalibration = useCreateCalibration();
@@ -142,6 +203,72 @@ const WorkspacePage = ({ params }: IPageProps) => {
     () => (geometry ? { displayWidthPt: geometry.width, displayHeightPt: geometry.height } : null),
     [geometry],
   );
+
+  // Сохранение завершённой фигуры и правки вершины. Обработчики переустанавливаются на
+  // каждый рендер, а контроллер переживает их все.
+  useEffect(() => {
+    tools.setHandlers({
+      onCompleted: (shape) => {
+        if (!sheetId || !activeItemId) return;
+        setTakeoffError(null);
+        createMeasurement.mutate(
+          {
+            takeoffItemId: activeItemId,
+            points: shape.points.map((point) => [point.x, point.y] as const),
+          },
+          { onError: (error) => setTakeoffError(describeTakeoffError(error)) },
+        );
+      },
+      onVertexDragged: (drag) => {
+        const source = (measurements.data ?? []).find((row) => row.id === drag.measurementId);
+        if (!source) return;
+        setTakeoffError(null);
+        updateMeasurement.mutate(
+          {
+            measurementId: drag.measurementId,
+            points: drag.points.map((point) => [point.x, point.y] as const),
+            version: source.version,
+          },
+          { onError: (error) => setTakeoffError(describeTakeoffError(error)) },
+        );
+      },
+    });
+  }, [tools, sheetId, activeItemId, createMeasurement, updateMeasurement, measurements.data]);
+
+  // Выбор измерения живёт в состоянии React, потому что его показывает инспектор.
+  // Это одно событие на щелчок, а не поток координат.
+  useEffect(
+    () =>
+      tools.subscribe((state) => {
+        setSelectedMeasurementId(state.selectedId);
+      }),
+    [tools],
+  );
+
+  // Клавиатура рисования: Enter завершает, Backspace убирает вершину, Esc отменяет.
+  useEffect(() => {
+    const isTyping = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTyping(event.target)) return;
+      if (event.key === 'Enter') tools.send({ type: 'finish' });
+      if (event.key === 'Backspace') tools.send({ type: 'backspace' });
+      if (event.key === 'Escape') tools.send({ type: 'cancel' });
+      if (event.code === 'Space') tools.send({ type: 'setPanOverride', pressed: true });
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') tools.send({ type: 'setPanOverride', pressed: false });
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp);
+    };
+  }, [tools]);
 
   // Esc отменяет черновик, не обращаясь к серверу.
   useEffect(() => {
@@ -334,9 +461,34 @@ const WorkspacePage = ({ params }: IPageProps) => {
               >
                 Масштаб
               </ToolButton>
-              <ToolButton label="Обмеры" hint="Этап 2" wide disabled>
-                Обмеры
-              </ToolButton>
+              <ToolDivider />
+
+              {(
+                [
+                  ['count', 'Счёт', 'метки по одной'],
+                  ['line', 'Линия', 'два щелчка'],
+                  ['polyline', 'Ломаная', 'Enter — завершить'],
+                  ['polygon', 'Площадь', 'Enter — завершить'],
+                ] as const
+              ).map(([mode, label, hint]) => (
+                <ToolButton
+                  key={mode}
+                  label={label}
+                  hint={hint}
+                  wide
+                  active={toolMode === mode}
+                  // Инструмент включается только под подходящую строку: рисовать площадь
+                  // в строке «Двери» нечем — там считают штуки (ADR-0019).
+                  disabled={!activeItem || activeItem.geometry_type !== mode}
+                  onClick={() => {
+                    const next: ToolMode = toolMode === mode ? 'select' : mode;
+                    setToolMode(next);
+                    tools.send({ type: 'setMode', mode: next });
+                  }}
+                >
+                  {label}
+                </ToolButton>
+              ))}
 
               <span className="flex-1" />
 
@@ -406,10 +558,33 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 )}
 
                 {leftTab === 'takeoff' && (
-                  <p className="p-[var(--s-4)] text-xs text-muted">
-                    Обмеры появятся на этапе 2. Сейчас портал показывает то, что распознала
-                    распознавалка, и ничего не вычисляет.
-                  </p>
+                  <TakeoffPanel
+                    items={items}
+                    activeItemId={activeItemId}
+                    counts={measurementCounts}
+                    canEdit
+                    pending={createItem.isPending}
+                    onSelect={(id) => {
+                      setActiveItemId(id);
+                      // Смена строки сбрасывает инструмент: тип новой может не совпасть.
+                      setToolMode('select');
+                      tools.send({ type: 'setMode', mode: 'select' });
+                    }}
+                    onCreate={(name, geometryType: TakeoffGeometry) => {
+                      setTakeoffError(null);
+                      createItem.mutate(
+                        { name, geometryType },
+                        {
+                          onSuccess: (created) => setActiveItemId(created.id),
+                          onError: (error) => setTakeoffError(describeTakeoffError(error)),
+                        },
+                      );
+                    }}
+                    onArchive={(id) => {
+                      archiveItem.mutate(id);
+                      if (id === activeItemId) setActiveItemId(null);
+                    }}
+                  />
                 )}
               </div>
             </>
@@ -434,6 +609,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 camera={camera}
                 tool={tool}
                 scaleDraft={scaleDraft}
+                measurements={overlayMeasurements}
+                tools={leftTab === 'takeoff' ? tools : null}
                 onViewChange={(state) => setZoomPercent(Math.round(state.scale * 100))}
                 onError={setRenderError}
               />
@@ -473,10 +650,25 @@ const WorkspacePage = ({ params }: IPageProps) => {
               )}
             </ViewportArea>
           }
-          rightTitle="Свойства области"
+          rightTitle={leftTab === 'takeoff' ? 'Свойства измерения' : 'Свойства области'}
           right={
             <div className="flex min-h-0 flex-1 flex-col gap-[var(--s-5)] overflow-auto overscroll-contain p-[var(--s-4)]">
-              {selectedRegion ? (
+              {leftTab === 'takeoff' ? (
+                <MeasurementInspector
+                  measurement={selectedMeasurement}
+                  item={
+                    items.find((row) => row.id === selectedMeasurement?.takeoff_item_id) ?? null
+                  }
+                  calibration={
+                    (calibrations.data ?? []).find(
+                      (row) => row.id === selectedMeasurement?.scale_calibration_id,
+                    ) ?? null
+                  }
+                  sheetLabel={sheet?.page_label ?? null}
+                  canEdit
+                  onDelete={(id) => removeMeasurement.mutate(id)}
+                />
+              ) : selectedRegion ? (
                 <RegionInspector
                   region={selectedRegion}
                   sheetLabel={sheetLabel(sheet, pages.length)}
@@ -509,6 +701,11 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   'Не задан'
                 )}
               </span>
+              {takeoffError && (
+                <span role="alert" className="text-danger">
+                  {takeoffError}
+                </span>
+              )}
               <span className="ml-auto flex gap-[var(--s-6)]">
                 <span className="tabular">
                   {countOf(regions.data?.total ?? 0, REGIONS_FORMS)} на листе
@@ -581,6 +778,27 @@ const describeScaleError = (error: unknown): string => {
       return 'Лист не найден.';
     default:
       return 'Не удалось сохранить масштаб. Попробуйте ещё раз.';
+  }
+};
+
+/** Понятное сообщение по коду доменной ошибки обмера. */
+const describeTakeoffError = (error: unknown): string => {
+  const code =
+    typeof error === 'object' && error !== null && 'detail' in error
+      ? ((error as { detail?: { code?: string } }).detail?.code ?? '')
+      : '';
+
+  switch (code) {
+    case 'MEASUREMENT_VERSION_CONFLICT':
+      return 'Измерение изменил кто-то другой. Обновите лист и повторите правку.';
+    case 'VALIDATION_FAILED':
+      return 'Геометрия не подходит выбранной строке обмера.';
+    case 'PERMISSION_DENIED':
+      return 'Недостаточно прав для обмера.';
+    case 'NOT_FOUND':
+      return 'Строка обмера или лист не найдены.';
+    default:
+      return 'Не удалось сохранить обмер. Попробуйте ещё раз.';
   }
 };
 

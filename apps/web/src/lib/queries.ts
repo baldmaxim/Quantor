@@ -1,7 +1,14 @@
 'use client';
 
 import {
+  archiveTakeoffItem,
+  createMeasurement,
+  createMeasurementsBatch,
   createSheetCalibration,
+  createTakeoffItem,
+  deleteMeasurement,
+  listSheetMeasurements,
+  listTakeoffItems,
   listDocumentRevisions,
   listProjectDocuments,
   listProjects,
@@ -11,13 +18,16 @@ import {
   listTenders,
   makeCalibrationDefault,
   readJob,
+  updateMeasurement,
   readMeta,
   readProject,
   readRevisionContentUrl,
   type DocumentRead,
   type MetaResponse,
   type ProjectSummary,
+  type MeasurementRead,
   type ScaleCalibrationRead,
+  type TakeoffItemRead,
   type TenderBriefRead,
 } from '@quantor/api-client';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
@@ -43,6 +53,8 @@ export const queryKeys = {
   contentUrl: (revisionId: string) => ['revision', revisionId, 'content-url'] as const,
   tenders: (search: string) => ['tenderhub', 'tenders', search] as const,
   calibrations: (sheetId: string) => ['sheet', sheetId, 'scale-calibrations'] as const,
+  takeoffItems: (projectId: string) => ['project', projectId, 'takeoff-items'] as const,
+  measurements: (sheetId: string) => ['sheet', sheetId, 'measurements'] as const,
 };
 
 export interface ProjectsParams {
@@ -309,3 +321,152 @@ export const useMakeCalibrationDefault = (sheetId: string) => {
     },
   });
 };
+
+// ------------------------------------------------------------------------- обмеры
+
+/** Строки обмера проекта. Архивные по умолчанию не показываются. */
+export const useTakeoffItems = (projectId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.takeoffItems(projectId ?? ''),
+    queryFn: async () =>
+      unwrap(await listTakeoffItems({ throwOnError: true, path: { project_id: projectId ?? '' } })),
+    enabled: Boolean(projectId),
+  });
+
+/** Активные измерения открытого листа. Именно листа: документ на 77 страниц не тянем. */
+export const useMeasurements = (sheetId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.measurements(sheetId ?? ''),
+    queryFn: async () =>
+      unwrap(
+        await listSheetMeasurements({ throwOnError: true, path: { sheet_id: sheetId ?? '' } }),
+      ),
+    enabled: Boolean(sheetId),
+  });
+
+export const useCreateTakeoffItem = (projectId: string) => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { name: string; geometryType: TakeoffItemRead['geometry_type'] }) =>
+      unwrap(
+        await createTakeoffItem({
+          throwOnError: true,
+          path: { project_id: projectId },
+          body: { name: input.name, geometry_type: input.geometryType },
+        }),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.takeoffItems(projectId) });
+    },
+  });
+};
+
+export const useArchiveTakeoffItem = (projectId: string) => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (itemId: string) =>
+      unwrap(await archiveTakeoffItem({ throwOnError: true, path: { item_id: itemId } })),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.takeoffItems(projectId) });
+    },
+  });
+};
+
+export const useCreateMeasurement = (sheetId: string) => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      takeoffItemId: string;
+      points: readonly (readonly [number, number])[];
+    }) =>
+      unwrap(
+        await createMeasurement({
+          throwOnError: true,
+          path: { sheet_id: sheetId },
+          body: {
+            takeoff_item_id: input.takeoffItemId,
+            points: input.points.map(([x, y]) => [x, y]),
+          },
+        }),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
+    },
+  });
+};
+
+/**
+ * Пакетная постановка меток счёта.
+ *
+ * Счёт должен ощущаться мгновенно: метки ставят подряд, и ждать ответа сервера на каждый
+ * щелчок пользователь не должен. Пакет атомарен — либо все, либо ни одной.
+ */
+export const useCreateMeasurementsBatch = (sheetId: string) => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      takeoffItemId: string;
+      items: readonly (readonly (readonly [number, number])[])[];
+    }) =>
+      unwrap(
+        await createMeasurementsBatch({
+          throwOnError: true,
+          path: { sheet_id: sheetId },
+          body: {
+            takeoff_item_id: input.takeoffItemId,
+            items: input.items.map((shape) => shape.map(([x, y]) => [x, y])),
+          },
+        }),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
+    },
+  });
+};
+
+/**
+ * Правка геометрии.
+ *
+ * Версия обязательна: без неё клиент, открывший лист десять минут назад, молча перетёр бы
+ * чужую правку. Расхождение возвращается как 409 и показывается пользователю.
+ */
+export const useUpdateMeasurement = (sheetId: string) => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      measurementId: string;
+      points: readonly (readonly [number, number])[];
+      version: number;
+    }) =>
+      unwrap(
+        await updateMeasurement({
+          throwOnError: true,
+          path: { measurement_id: input.measurementId },
+          body: { points: input.points.map(([x, y]) => [x, y]), version: input.version },
+        }),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
+    },
+  });
+};
+
+export const useDeleteMeasurement = (sheetId: string) => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (measurementId: string) => {
+      await deleteMeasurement({ throwOnError: true, path: { measurement_id: measurementId } });
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
+    },
+  });
+};
+
+export type { MeasurementRead, TakeoffItemRead };
