@@ -167,7 +167,8 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
                 }}
                 aria-label="Название строки"
                 placeholder="Например, Двери"
-                className="h-[var(--h-ctl)] rounded-[var(--radius-sm)] border border-line bg-canvas px-[var(--s-3)] text-body"
+                // `canvas` здесь был бы цветом бумаги чертежа — светлым и в тёмной теме.
+                className="h-[var(--h-ctl)] rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-3)] text-body text-text placeholder:text-muted"
               />
               <div className="grid grid-cols-2 gap-[var(--s-2)]">
                 {GEOMETRY_CHOICES.map((choice) => (

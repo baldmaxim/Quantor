@@ -102,7 +102,10 @@ export const ScaleDialog: FC<IScaleDialogProps> = ({
           aria-label="Известный размер"
           placeholder="6000"
           // 16px минимум: меньше — и Safari зумит форму при фокусе.
-          className="h-[var(--h-ctl)] min-w-0 flex-1 rounded-[var(--radius-sm)] border border-line bg-canvas px-[var(--s-3)] text-body tabular"
+          //
+          // Фон — `surface`, а не `canvas`. `canvas` это цвет бумаги чертежа: он остаётся
+          // светлым и в тёмной теме, поэтому светлый текст на нём становится невидимым.
+          className="h-[var(--h-ctl)] min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-3)] text-body text-text tabular placeholder:text-muted"
         />
         <div className="flex rounded-[var(--radius-sm)] border border-line">
           {UNITS.map((item) => (
