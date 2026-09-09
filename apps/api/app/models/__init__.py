@@ -10,6 +10,7 @@ from app.models.page_geometry import PageGeometry
 from app.models.project import Project
 from app.models.scale import ScaleCalibration
 from app.models.sheet import Region, Sheet
+from app.models.takeoff import Measurement, TakeoffItem
 from app.models.worker import Worker
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "DocumentRevision",
     "FeatureFlagOverride",
     "Job",
+    "Measurement",
     "PageGeometry",
     "Project",
     "RecognitionArtifact",
@@ -26,6 +28,7 @@ __all__ = [
     "ScaleCalibration",
     "SettingOverride",
     "Sheet",
+    "TakeoffItem",
     "UserIdentity",
     "Worker",
     "Workspace",

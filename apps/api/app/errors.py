@@ -69,6 +69,9 @@ class ErrorCode(StrEnum):
     SCALE_GEOMETRY_REQUIRED = "SCALE_GEOMETRY_REQUIRED"
     SCALE_SEGMENT_TOO_SHORT = "SCALE_SEGMENT_TOO_SHORT"
 
+    # --- ручной обмер (ADR-0019) ---
+    MEASUREMENT_VERSION_CONFLICT = "MEASUREMENT_VERSION_CONFLICT"
+
     # --- инфраструктура ---
     STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
@@ -137,6 +140,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.GEOMETRY_EXTRACT_FAILED: "Извлечь геометрию страниц не удалось",
     ErrorCode.SCALE_GEOMETRY_REQUIRED: "Масштаб нельзя задать до извлечения геометрии страницы",
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: "Отрезок калибровки слишком короткий",
+    ErrorCode.MEASUREMENT_VERSION_CONFLICT: "Измерение изменено другим пользователем",
     ErrorCode.STORAGE_UNAVAILABLE: "Хранилище файлов недоступно",
     ErrorCode.DATABASE_UNAVAILABLE: "База данных недоступна",
     ErrorCode.CONTENT_NOT_AVAILABLE: "Файл ревизии недоступен",
@@ -205,6 +209,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.GEOMETRY_EXTRACT_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.SCALE_GEOMETRY_REQUIRED: status.HTTP_409_CONFLICT,
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.MEASUREMENT_VERSION_CONFLICT: status.HTTP_409_CONFLICT,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.CONTENT_NOT_AVAILABLE: status.HTTP_404_NOT_FOUND,

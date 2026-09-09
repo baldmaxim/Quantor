@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from app.models.document import DocumentRevision
     from app.models.page_geometry import PageGeometry
     from app.models.scale import ScaleCalibration
+    from app.models.takeoff import Measurement
 
 
 class Sheet(CreatedAtMixin, Base):
@@ -57,6 +58,9 @@ class Sheet(CreatedAtMixin, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="ScaleCalibration.created_at",
+    )
+    measurements: Mapped[list[Measurement]] = relationship(
+        back_populates="sheet", cascade="all, delete-orphan", passive_deletes=True
     )
 
     __table_args__ = (

@@ -214,6 +214,42 @@ class ScaleSource(StrEnum):
     IMPORTED = "imported"
 
 
+class QuantityUnit(StrEnum):
+    """Единица показа величины.
+
+    Выводится из типа геометрии и проверяется базой: хранить её отдельно и позволить
+    разойтись с типом — значит однажды показать площадь в метрах (ADR-0019).
+    """
+
+    PCS = "pcs"
+    M = "m"
+    M2 = "m2"
+
+
+# Единственное соответствие типа геометрии и единицы. Второго списка нет намеренно:
+# два перечня одного и того же расходятся при первой же правке.
+UNIT_BY_GEOMETRY: dict[GeometryType, QuantityUnit] = {
+    GeometryType.COUNT: QuantityUnit.PCS,
+    GeometryType.LINE: QuantityUnit.M,
+    GeometryType.POLYLINE: QuantityUnit.M,
+    GeometryType.POLYGON: QuantityUnit.M2,
+}
+
+# Сколько точек имеет смысл у каждого типа. Многоугольник из двух точек не имеет площади.
+MIN_POINTS_BY_GEOMETRY: dict[GeometryType, int] = {
+    GeometryType.COUNT: 1,
+    GeometryType.LINE: 2,
+    GeometryType.POLYLINE: 2,
+    GeometryType.POLYGON: 3,
+}
+
+# Типы с фиксированным числом точек: у них верхняя граница совпадает с нижней.
+EXACT_POINTS_BY_GEOMETRY: dict[GeometryType, int] = {
+    GeometryType.COUNT: 1,
+    GeometryType.LINE: 2,
+}
+
+
 class ScaleScopeKind(StrEnum):
     """На что распространяется калибровка.
 

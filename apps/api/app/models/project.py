@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from app.models.document import Document
     from app.models.identity import Workspace
     from app.models.job import Job
+    from app.models.takeoff import TakeoffItem
 
 
 class Project(TimestampMixin, Base):
@@ -71,6 +72,14 @@ class Project(TimestampMixin, Base):
     )
     jobs: Mapped[list[Job]] = relationship(
         back_populates="project", cascade="all, delete-orphan", passive_deletes=True
+    )
+    # Строки обмера живут на уровне проекта: одна строка «Двери» на весь проект,
+    # а измерения по ней — на разных листах (ADR-0019).
+    takeoff_items: Mapped[list[TakeoffItem]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="TakeoffItem.ordinal",
     )
 
     __table_args__ = (
