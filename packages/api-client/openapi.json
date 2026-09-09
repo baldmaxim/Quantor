@@ -1162,6 +1162,110 @@
         "title": "MeasurementCreate",
         "type": "object"
       },
+      "MeasurementQuantityRead": {
+        "description": "Величина одного измерения вместе с происхождением.\n\nЧисла передаются строками, как и коэффициент калибровки: `JSON.parse` превратил бы их\nв float64 и потерял точную десятичную запись, по которой величину проверяют.\n\nПоказ и канон лежат рядом намеренно. Метры — это отображение, и обратный пересчёт из\nокруглённых метров уже не даст исходного (ADR-0017).",
+        "properties": {
+          "canonical_unit": {
+            "title": "Canonical Unit",
+            "type": "string"
+          },
+          "canonical_value": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Value"
+          },
+          "input_fingerprint": {
+            "title": "Input Fingerprint",
+            "type": "string"
+          },
+          "measurement_id": {
+            "format": "uuid",
+            "title": "Measurement Id",
+            "type": "string"
+          },
+          "page_geometry_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Geometry Fingerprint"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_version": {
+            "title": "Rule Version",
+            "type": "string"
+          },
+          "scale_calibration_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Calibration Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/QuantityState"
+          },
+          "takeoff_item_id": {
+            "format": "uuid",
+            "title": "Takeoff Item Id",
+            "type": "string"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/QuantityUnit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "verification_state": {
+            "$ref": "#/components/schemas/VerificationState"
+          }
+        },
+        "required": [
+          "measurement_id",
+          "takeoff_item_id",
+          "state",
+          "value",
+          "unit",
+          "canonical_value",
+          "canonical_unit",
+          "rule_key",
+          "rule_version",
+          "page_geometry_fingerprint",
+          "scale_calibration_id",
+          "input_fingerprint",
+          "verification_state"
+        ],
+        "title": "MeasurementQuantityRead",
+        "type": "object"
+      },
       "MeasurementRead": {
         "description": "Геометрия обмера на листе.",
         "properties": {
@@ -2184,6 +2288,16 @@
         "title": "ProviderKind",
         "type": "string"
       },
+      "QuantityState": {
+        "description": "Состояние величины.\n\n`unavailable` — не ошибка и не ноль: геометрия есть, а основания для перевода в метры\nнет. Показать вместо этого ноль значило бы соврать в смете: строка с нулём выглядит\nпосчитанной, строка с прочерком видна сразу.",
+        "enum": [
+          "ready",
+          "unavailable_no_scale",
+          "unavailable_no_geometry"
+        ],
+        "title": "QuantityState",
+        "type": "string"
+      },
       "QuantityUnit": {
         "description": "Единица показа величины.\n\nВыводится из типа геометрии и проверяется базой: хранить её отдельно и позволить\nразойтись с типом — значит однажды показать площадь в метрах (ADR-0019).",
         "enum": [
@@ -3011,6 +3125,55 @@
         "title": "SettingStateRead",
         "type": "object"
       },
+      "SheetQuantitiesRead": {
+        "description": "Величины открытого листа.\n\nОбласть указана явно — лист и его ревизия. Итог по документу складывал бы измерения\nразных ревизий и посчитал бы одни и те же двери дважды (ADR-0019).",
+        "properties": {
+          "measurements": {
+            "items": {
+              "$ref": "#/components/schemas/MeasurementQuantityRead"
+            },
+            "title": "Measurements",
+            "type": "array"
+          },
+          "page_geometry_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Geometry Fingerprint"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "sheet_id": {
+            "format": "uuid",
+            "title": "Sheet Id",
+            "type": "string"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/TakeoffItemQuantityRead"
+            },
+            "title": "Totals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sheet_id",
+          "revision_id",
+          "page_geometry_fingerprint",
+          "measurements",
+          "totals"
+        ],
+        "title": "SheetQuantitiesRead",
+        "type": "object"
+      },
       "SheetRead": {
         "properties": {
           "height_px": {
@@ -3124,6 +3287,57 @@
           "geometry_type"
         ],
         "title": "TakeoffItemCreate",
+        "type": "object"
+      },
+      "TakeoffItemQuantityRead": {
+        "description": "Итог по строке обмера в пределах одного листа.",
+        "properties": {
+          "canonical_unit": {
+            "title": "Canonical Unit",
+            "type": "string"
+          },
+          "canonical_value": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Canonical Value",
+            "type": "string"
+          },
+          "measurement_count": {
+            "title": "Measurement Count",
+            "type": "integer"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "takeoff_item_id": {
+            "format": "uuid",
+            "title": "Takeoff Item Id",
+            "type": "string"
+          },
+          "unavailable_count": {
+            "title": "Unavailable Count",
+            "type": "integer"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/QuantityUnit"
+          },
+          "value": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "takeoff_item_id",
+          "unit",
+          "canonical_unit",
+          "value",
+          "canonical_value",
+          "rule_key",
+          "measurement_count",
+          "unavailable_count"
+        ],
+        "title": "TakeoffItemQuantityRead",
         "type": "object"
       },
       "TakeoffItemRead": {
@@ -6473,6 +6687,50 @@
           }
         },
         "summary": "Создать несколько измерений",
+        "tags": [
+          "takeoff"
+        ]
+      }
+    },
+    "/api/v1/sheets/{sheet_id}/quantities": {
+      "get": {
+        "description": "Величины всех измерений открытого листа и итоги по строкам обмера.\n\nОдин запрос на лист, а не на измерение: просмотрщик показывает страницу целиком, и\nсотня обращений ради сотни меток была бы тем же N+1, только со стороны клиента.\n\nОбласть — лист и его ревизия, и это указано в ответе. Итог по документу складывал бы\nизмерения разных ревизий и посчитал бы одни и те же двери дважды (ADR-0019).\n\nВеличина без масштаба возвращается состоянием `unavailable_no_scale`, а не нулём: ноль\n— это утверждение о величине, и ложное.",
+        "operationId": "read_sheet_quantities",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sheet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetQuantitiesRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Величины листа",
         "tags": [
           "takeoff"
         ]

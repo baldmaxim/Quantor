@@ -3,7 +3,7 @@
 import { useState, type FC } from 'react';
 
 import { Button, EmptyState, cx } from '@/components/ui';
-import type { TakeoffItemRead } from '@quantor/api-client';
+import type { TakeoffItemQuantityRead, TakeoffItemRead } from '@quantor/api-client';
 
 /** Типы, которые пользователь выбирает при создании строки. */
 const GEOMETRY_CHOICES = [
@@ -18,10 +18,42 @@ export type TakeoffGeometry = (typeof GEOMETRY_CHOICES)[number]['value'];
 /** Как показывается единица строки. Отдельно от API: там она хранится как `pcs`/`m`/`m2`. */
 export const UNIT_LABELS: Record<string, string> = { pcs: 'шт', m: 'м', m2: 'м²' };
 
+/**
+ * Итог по строке на открытом листе.
+ *
+ * Раньше здесь показывалось число измерений с единицей строки — «3 м» означало три линии,
+ * а читалось как три метра. Теперь показывается величина, а число измерений ушло в
+ * подпись: это разные величины, и путать их в смете нельзя.
+ *
+ * Недоступные измерения считаются отдельно, а не нулями: итог, в котором половина строк
+ * «стоила ноль», невозможно ни заметить, ни объяснить.
+ */
+const ItemTotal: FC<{
+  total: TakeoffItemQuantityRead | null;
+  measurements: number;
+  unit: string;
+}> = ({ total, measurements, unit }) => {
+  if (measurements === 0) return <span className="tabular text-micro text-muted">—</span>;
+  if (!total) return <span className="tabular text-micro text-muted">…</span>;
+
+  const value = Number(total.value).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+
+  return (
+    <span className="tabular text-micro text-muted" title={`Измерений: ${measurements}`}>
+      {total.measurement_count === 0 ? '—' : `${value} ${unit}`}
+      {total.unavailable_count > 0 && (
+        <span className="text-danger"> +{total.unavailable_count} без масштаба</span>
+      )}
+    </span>
+  );
+};
+
 interface ITakeoffPanelProps {
   readonly items: readonly TakeoffItemRead[];
   readonly activeItemId: string | null;
   readonly counts: Readonly<Record<string, number>>;
+  /** Итоги по строкам на открытом листе. Считает сервер. */
+  readonly totals: Readonly<Record<string, TakeoffItemQuantityRead>>;
   readonly canEdit: boolean;
   readonly pending: boolean;
   readonly onSelect: (itemId: string) => void;
@@ -40,6 +72,7 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
   items,
   activeItemId,
   counts,
+  totals,
   canEdit,
   pending,
   onSelect,
@@ -88,9 +121,11 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
                       data-color-key={item.color_key}
                     />
                     <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                    <span className="tabular text-micro text-muted">
-                      {counts[item.id] ?? 0} {UNIT_LABELS[item.display_unit] ?? ''}
-                    </span>
+                    <ItemTotal
+                      total={totals[item.id] ?? null}
+                      measurements={counts[item.id] ?? 0}
+                      unit={UNIT_LABELS[item.display_unit] ?? ''}
+                    />
                     {canEdit && (
                       <span
                         role="button"

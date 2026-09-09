@@ -3,12 +3,19 @@
 import type { FC, ReactNode } from 'react';
 
 import { UNIT_LABELS } from '@/components/workspace/TakeoffPanel';
-import type { MeasurementRead, ScaleCalibrationRead, TakeoffItemRead } from '@quantor/api-client';
+import type {
+  MeasurementQuantityRead,
+  MeasurementRead,
+  ScaleCalibrationRead,
+  TakeoffItemRead,
+} from '@quantor/api-client';
 
 interface IMeasurementInspectorProps {
   readonly measurement: MeasurementRead | null;
   readonly item: TakeoffItemRead | null;
   readonly calibration: ScaleCalibrationRead | null;
+  /** Величина, посчитанная сервером. `null` — ответ ещё не пришёл. */
+  readonly quantity: MeasurementQuantityRead | null;
   readonly sheetLabel: string | null;
   readonly canEdit: boolean;
   readonly onDelete: (measurementId: string) => void;
@@ -28,17 +35,43 @@ const TYPE_LABELS: Record<string, string> = {
   polygon: 'Площадь',
 };
 
+/** Показ величины. Недоступная остаётся прочерком: ноль был бы ложным утверждением. */
+const QuantityValue: FC<{ quantity: MeasurementQuantityRead | null; unit: string }> = ({
+  quantity,
+  unit,
+}) => {
+  if (!quantity) return <span className="text-muted">…</span>;
+  if (quantity.state !== 'ready' || quantity.value === null) {
+    return (
+      <span className="text-danger">
+        {quantity.state === 'unavailable_no_scale' ? 'нет масштаба' : 'нет геометрии'}
+      </span>
+    );
+  }
+
+  // Число приходит строкой, чтобы не потерять точную десятичную запись по дороге через
+  // JSON. Для показа округляем, для проверки рядом лежит каноническое значение в мм.
+  return (
+    <span className="tabular">
+      {Number(quantity.value).toLocaleString('ru-RU', { maximumFractionDigits: 3 })} {unit}
+    </span>
+  );
+};
+
 /**
  * Свойства выбранного измерения.
  *
- * Величина показывается только та, что посчитал сервер. Правило подсчёта с версией
- * появляется в промте 12, поэтому пока здесь честный прочерк, а не выдуманное число:
- * «примерно столько» в смете хуже, чем «пока неизвестно».
+ * Величину считает сервер по правилу с версией. Клиентское число нельзя ни проверить, ни
+ * воспроизвести, а величина без основания в смете не величина.
+ *
+ * Правило и отпечаток показаны рядом намеренно: это и есть основание, по которому величину
+ * можно объяснить заказчику через полгода.
  */
 export const MeasurementInspector: FC<IMeasurementInspectorProps> = ({
   measurement,
   item,
   calibration,
+  quantity,
   sheetLabel,
   canEdit,
   onDelete,
@@ -63,9 +96,13 @@ export const MeasurementInspector: FC<IMeasurementInspectorProps> = ({
           {measurement.source === 'manual' ? 'Вручную' : measurement.source}
         </Field>
         <Field label="Величина">
-          {/* Величину считает сервер по правилу с версией. До промта 12 её нет. */}
-          <span className="tabular">— {UNIT_LABELS[item.display_unit] ?? ''}</span>
+          <QuantityValue quantity={quantity} unit={UNIT_LABELS[item.display_unit] ?? ''} />
         </Field>
+        {quantity && (
+          <Field label="Правило">
+            <span className="tabular text-muted">{quantity.rule_key}</span>
+          </Field>
+        )}
         <Field label="Масштаб">
           {scaled && calibration ? (
             <span className="tabular">{Number(calibration.mm_per_pt).toFixed(3)} мм/pt</span>
@@ -83,6 +120,13 @@ export const MeasurementInspector: FC<IMeasurementInspectorProps> = ({
         <Field label="Вершин">
           <span className="tabular">{measurement.points.length}</span>
         </Field>
+        {quantity && (
+          <Field label="Отпечаток входа">
+            {/* Полный отпечаток не помещается и не читается; хвост различает записи,
+                а целиком он есть в ответе API. */}
+            <span className="tabular text-muted">{quantity.input_fingerprint.slice(0, 12)}…</span>
+          </Field>
+        )}
       </dl>
 
       {!scaled && needsScale && (

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import Select, func, select
@@ -34,6 +35,8 @@ from app.models import (
     Sheet,
     TakeoffItem,
 )
+from app.services import quantity as quantity_service
+from app.services import scale as scale_service
 
 # Предел числа вершин. Не про производительность: многоугольник из ста тысяч точек —
 # это отказ, а не тяжёлая фигура. Без предела он же становится способом положить сервер
@@ -465,3 +468,69 @@ def geometry_digest(points: list[list[float]]) -> str:
     """
     payload = ";".join(f"{x!r},{y!r}" for x, y in points)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+# ----------------------------------------------------------------------------- величины
+
+
+@dataclass(frozen=True, slots=True)
+class SheetQuantities:
+    """Величины открытого листа вместе с итогами по строкам.
+
+    Область — лист, и это часть смысла, а не оптимизация. Итог по документу складывал бы
+    измерения разных ревизий и посчитал бы одни и те же двери дважды (ADR-0019).
+    """
+
+    sheet_id: uuid.UUID
+    revision_id: uuid.UUID
+    page_geometry_fingerprint: str | None
+    results: list[quantity_service.QuantityResult]
+    totals: list[quantity_service.QuantityTotal]
+
+
+async def quantities_for_sheet(
+    session: AsyncSession, *, workspace_id: uuid.UUID, sheet: Sheet
+) -> SheetQuantities:
+    """Считает величины всех измерений листа.
+
+    Три запроса независимо от числа измерений: измерения, геометрия страницы, калибровки
+    листа. Загружать калибровку на каждое измерение было бы тем самым N+1, который на
+    листе с сотней меток превращается в сто лишних обращений.
+
+    Сам расчёт остаётся чистой функцией: сюда она получает уже готовые объекты и не знает
+    ни про сессию, ни про порядок запросов.
+    """
+    measurements = await list_for_sheet(session, workspace_id=workspace_id, sheet_id=sheet.id)
+    geometry = await scale_service.find_sheet_geometry(session, sheet_id=sheet.id)
+    calibrations = await scale_service.list_for_sheet(
+        session, workspace_id=workspace_id, sheet_id=sheet.id
+    )
+    by_id: dict[uuid.UUID | None, ScaleCalibration] = {
+        calibration.id: calibration for calibration in calibrations
+    }
+
+    results = [
+        quantity_service.compute(
+            measurement,
+            geometry=geometry,
+            # Та калибровка, по которой измерение посчитано, а не действующая сейчас.
+            # Подстановка действующей означала бы, что вчерашняя величина сегодня другая
+            # и никто этого не заметил (ADR-0018).
+            calibration=by_id.get(measurement.scale_calibration_id),
+        )
+        for measurement in measurements
+    ]
+
+    grouped: dict[str, list[quantity_service.QuantityResult]] = {}
+    for result in results:
+        grouped.setdefault(result.takeoff_item_id, []).append(result)
+
+    totals = [quantity_service.total(item_id, rows) for item_id, rows in sorted(grouped.items())]
+
+    return SheetQuantities(
+        sheet_id=sheet.id,
+        revision_id=sheet.revision_id,
+        page_geometry_fingerprint=(geometry.geometry_fingerprint if geometry is not None else None),
+        results=results,
+        totals=totals,
+    )

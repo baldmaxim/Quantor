@@ -680,6 +680,63 @@ export type MeasurementCreate = {
 };
 
 /**
+ * MeasurementQuantityRead
+ *
+ * Величина одного измерения вместе с происхождением.
+ *
+ * Числа передаются строками, как и коэффициент калибровки: `JSON.parse` превратил бы их
+ * в float64 и потерял точную десятичную запись, по которой величину проверяют.
+ *
+ * Показ и канон лежат рядом намеренно. Метры — это отображение, и обратный пересчёт из
+ * округлённых метров уже не даст исходного (ADR-0017).
+ */
+export type MeasurementQuantityRead = {
+    /**
+     * Canonical Unit
+     */
+    canonical_unit: string;
+    /**
+     * Canonical Value
+     */
+    canonical_value: string | null;
+    /**
+     * Input Fingerprint
+     */
+    input_fingerprint: string;
+    /**
+     * Measurement Id
+     */
+    measurement_id: string;
+    /**
+     * Page Geometry Fingerprint
+     */
+    page_geometry_fingerprint: string | null;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    /**
+     * Rule Version
+     */
+    rule_version: string;
+    /**
+     * Scale Calibration Id
+     */
+    scale_calibration_id: string | null;
+    state: QuantityState;
+    /**
+     * Takeoff Item Id
+     */
+    takeoff_item_id: string;
+    unit: QuantityUnit;
+    /**
+     * Value
+     */
+    value: string | null;
+    verification_state: VerificationState;
+};
+
+/**
  * MeasurementRead
  *
  * Геометрия обмера на листе.
@@ -1326,6 +1383,17 @@ export type ProjectUpdate = {
 export type ProviderKind = 'openai_compatible' | 'anthropic_compatible' | 'lm_studio' | 'vllm' | 'sglang' | 'custom';
 
 /**
+ * QuantityState
+ *
+ * Состояние величины.
+ *
+ * `unavailable` — не ошибка и не ноль: геометрия есть, а основания для перевода в метры
+ * нет. Показать вместо этого ноль значило бы соврать в смете: строка с нулём выглядит
+ * посчитанной, строка с прочерком видна сразу.
+ */
+export type QuantityState = 'ready' | 'unavailable_no_scale' | 'unavailable_no_geometry';
+
+/**
  * QuantityUnit
  *
  * Единица показа величины.
@@ -1784,6 +1852,37 @@ export type SettingStateRead = {
 };
 
 /**
+ * SheetQuantitiesRead
+ *
+ * Величины открытого листа.
+ *
+ * Область указана явно — лист и его ревизия. Итог по документу складывал бы измерения
+ * разных ревизий и посчитал бы одни и те же двери дважды (ADR-0019).
+ */
+export type SheetQuantitiesRead = {
+    /**
+     * Measurements
+     */
+    measurements: Array<MeasurementQuantityRead>;
+    /**
+     * Page Geometry Fingerprint
+     */
+    page_geometry_fingerprint: string | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string;
+    /**
+     * Totals
+     */
+    totals: Array<TakeoffItemQuantityRead>;
+};
+
+/**
  * SheetRead
  */
 export type SheetRead = {
@@ -1838,6 +1937,43 @@ export type TakeoffItemCreate = {
      * Name
      */
     name: string;
+};
+
+/**
+ * TakeoffItemQuantityRead
+ *
+ * Итог по строке обмера в пределах одного листа.
+ */
+export type TakeoffItemQuantityRead = {
+    /**
+     * Canonical Unit
+     */
+    canonical_unit: string;
+    /**
+     * Canonical Value
+     */
+    canonical_value: string;
+    /**
+     * Measurement Count
+     */
+    measurement_count: number;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    /**
+     * Takeoff Item Id
+     */
+    takeoff_item_id: string;
+    /**
+     * Unavailable Count
+     */
+    unavailable_count: number;
+    unit: QuantityUnit;
+    /**
+     * Value
+     */
+    value: string;
 };
 
 /**
@@ -3854,6 +3990,36 @@ export type CreateMeasurementsBatchResponses = {
 };
 
 export type CreateMeasurementsBatchResponse = CreateMeasurementsBatchResponses[keyof CreateMeasurementsBatchResponses];
+
+export type ReadSheetQuantitiesData = {
+    body?: never;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/sheets/{sheet_id}/quantities';
+};
+
+export type ReadSheetQuantitiesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadSheetQuantitiesError = ReadSheetQuantitiesErrors[keyof ReadSheetQuantitiesErrors];
+
+export type ReadSheetQuantitiesResponses = {
+    /**
+     * Successful Response
+     */
+    200: SheetQuantitiesRead;
+};
+
+export type ReadSheetQuantitiesResponse = ReadSheetQuantitiesResponses[keyof ReadSheetQuantitiesResponses];
 
 export type ListSheetRegionsData = {
     body?: never;

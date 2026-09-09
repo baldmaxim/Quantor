@@ -23,9 +23,12 @@ from app.models import ScaleCalibration, Sheet, TakeoffItem
 from app.schemas import (
     MeasurementBatchCreate,
     MeasurementCreate,
+    MeasurementQuantityRead,
     MeasurementRead,
     MeasurementUpdate,
+    SheetQuantitiesRead,
     TakeoffItemCreate,
+    TakeoffItemQuantityRead,
     TakeoffItemRead,
     TakeoffItemUpdate,
 )
@@ -433,3 +436,48 @@ async def delete_measurement(
         before={"takeoff_item_id": str(measurement.takeoff_item_id)},
     )
     await session.commit()
+
+
+# ------------------------------------------------------------------------- величины
+
+
+@router.get(
+    "/sheets/{sheet_id}/quantities",
+    response_model=SheetQuantitiesRead,
+    summary="Величины листа",
+    dependencies=[require(Permission.TAKEOFF_READ)],
+)
+async def read_sheet_quantities(
+    sheet_id: uuid.UUID,
+    session: SessionDep,
+    workspace: WorkspaceDep,
+) -> SheetQuantitiesRead:
+    """Величины всех измерений открытого листа и итоги по строкам обмера.
+
+    Один запрос на лист, а не на измерение: просмотрщик показывает страницу целиком, и
+    сотня обращений ради сотни меток была бы тем же N+1, только со стороны клиента.
+
+    Область — лист и его ревизия, и это указано в ответе. Итог по документу складывал бы
+    измерения разных ревизий и посчитал бы одни и те же двери дважды (ADR-0019).
+
+    Величина без масштаба возвращается состоянием `unavailable_no_scale`, а не нулём: ноль
+    — это утверждение о величине, и ложное.
+    """
+    sheet = await _sheet_or_404(session, workspace, sheet_id)
+    computed = await takeoff_service.quantities_for_sheet(
+        session, workspace_id=workspace.tenant, sheet=sheet
+    )
+
+    return SheetQuantitiesRead(
+        sheet_id=computed.sheet_id,
+        revision_id=computed.revision_id,
+        page_geometry_fingerprint=computed.page_geometry_fingerprint,
+        measurements=[
+            MeasurementQuantityRead.model_validate(result, from_attributes=True)
+            for result in computed.results
+        ],
+        totals=[
+            TakeoffItemQuantityRead.model_validate(total, from_attributes=True)
+            for total in computed.totals
+        ],
+    )

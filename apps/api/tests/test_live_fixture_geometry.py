@@ -57,7 +57,7 @@ def _fixture_archive() -> pathlib.Path | None:
 
 
 @pytest.fixture(scope="module")
-def pages() -> Iterator[list[RawPageGeometry]]:
+def pages(tmp_path_factory: pytest.TempPathFactory) -> Iterator[list[RawPageGeometry]]:
     archive = _fixture_archive()
     if archive is None:
         pytest.skip(
@@ -71,16 +71,18 @@ def pages() -> Iterator[list[RawPageGeometry]]:
         payload = bundle.read(names[0])
 
     # Провайдер читает файл, а не поток: так же он вызывается и в рабочем конвейере.
-    scratch = pathlib.Path(os.environ.get("TEMP", ".")) / "quantor-live-fixture.pdf"
+    #
+    # Каталог выдаёт pytest, а не общий TEMP с постоянным именем: два одновременных прогона
+    # на одной машине затирали бы файл друг друга, и падение выглядело бы как «иногда не
+    # читается PDF».
+    scratch = tmp_path_factory.mktemp("live-fixture") / "source.pdf"
     scratch.write_bytes(payload)
-    try:
-        started = time.perf_counter()
-        extracted = PypdfGeometryProvider().read(scratch)
-        elapsed = time.perf_counter() - started
-        print(f"\nстраниц: {len(extracted)}, извлечение: {elapsed:.2f} с")
-        yield extracted
-    finally:
-        scratch.unlink(missing_ok=True)
+
+    started = time.perf_counter()
+    extracted = PypdfGeometryProvider().read(scratch)
+    elapsed = time.perf_counter() - started
+    print(f"\nстраниц: {len(extracted)}, извлечение: {elapsed:.2f} с")
+    yield extracted
 
 
 class TestLiveFixtureGeometry:

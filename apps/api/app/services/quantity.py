@@ -28,10 +28,9 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import StrEnum
 from typing import Final
 
-from app.domain import GeometryType, QuantityUnit
+from app.domain import GeometryType, QuantityState, QuantityUnit
 from app.errors import DomainError, ErrorCode
 from app.models import Measurement, PageGeometry, ScaleCalibration
 from app.services.geometry.transform import (
@@ -60,18 +59,6 @@ MM_PER_M: Final = Decimal("1000")
 MM2_PER_M2: Final = Decimal("1000000")
 
 
-class QuantityState(StrEnum):
-    """Состояние величины.
-
-    `unavailable` — не ошибка и не ноль: геометрия есть, а основания для перевода в метры
-    нет. Показать вместо этого ноль значило бы соврать в смете.
-    """
-
-    READY = "ready"
-    UNAVAILABLE_NO_SCALE = "unavailable_no_scale"
-    UNAVAILABLE_NO_GEOMETRY = "unavailable_no_geometry"
-
-
 @dataclass(frozen=True, slots=True)
 class QuantityResult:
     """Величина вместе со всем, что нужно, чтобы её воспроизвести.
@@ -82,6 +69,9 @@ class QuantityResult:
     """
 
     measurement_id: str
+    # Строка обмера — часть цепочки происхождения: величина без ответа на вопрос
+    # «чего именно» не проверяема так же, как величина без основания.
+    takeoff_item_id: str
     state: QuantityState
 
     # Показ: метры и квадратные метры.
@@ -157,6 +147,7 @@ def compute(
     def unavailable(state: QuantityState) -> QuantityResult:
         return QuantityResult(
             measurement_id=str(measurement.id),
+            takeoff_item_id=str(measurement.takeoff_item_id),
             state=state,
             value=None,
             unit=unit,
@@ -178,6 +169,7 @@ def compute(
     if measurement.geometry_type is GeometryType.COUNT:
         return QuantityResult(
             measurement_id=str(measurement.id),
+            takeoff_item_id=str(measurement.takeoff_item_id),
             state=QuantityState.READY,
             value=Decimal(1),
             unit=QuantityUnit.PCS,
@@ -216,6 +208,7 @@ def compute(
 
     return QuantityResult(
         measurement_id=str(measurement.id),
+        takeoff_item_id=str(measurement.takeoff_item_id),
         state=QuantityState.READY,
         value=display,
         unit=unit,

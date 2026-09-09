@@ -1,6 +1,10 @@
 'use client';
 
-import type { RegionRead } from '@quantor/api-client';
+import type {
+  MeasurementQuantityRead,
+  RegionRead,
+  TakeoffItemQuantityRead,
+} from '@quantor/api-client';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
@@ -45,6 +49,7 @@ import {
   useDeleteMeasurement,
   useMeasurements,
   useScaleCalibrations,
+  useSheetQuantities,
   useSheets,
   useTakeoffItems,
   useUpdateMeasurement,
@@ -192,6 +197,22 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
   const selectedMeasurement =
     (measurements.data ?? []).find((row) => row.id === selectedMeasurementId) ?? null;
+
+  // Величины считает сервер: число, посчитанное в браузере, невозможно ни проверить,
+  // ни воспроизвести (ADR-0008).
+  const quantities = useSheetQuantities(sheetId);
+
+  const quantityByMeasurement = useMemo(() => {
+    const map: Record<string, MeasurementQuantityRead> = {};
+    for (const row of quantities.data?.measurements ?? []) map[row.measurement_id] = row;
+    return map;
+  }, [quantities.data]);
+
+  const totalByItem = useMemo(() => {
+    const map: Record<string, TakeoffItemQuantityRead> = {};
+    for (const row of quantities.data?.totals ?? []) map[row.takeoff_item_id] = row;
+    return map;
+  }, [quantities.data]);
 
   const calibrations = useScaleCalibrations(sheetId);
   const defaultCalibration = calibrations.data?.find((item) => item.is_default) ?? null;
@@ -562,6 +583,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                     items={items}
                     activeItemId={activeItemId}
                     counts={measurementCounts}
+                    totals={totalByItem}
                     canEdit
                     pending={createItem.isPending}
                     onSelect={(id) => {
@@ -663,6 +685,11 @@ const WorkspacePage = ({ params }: IPageProps) => {
                     (calibrations.data ?? []).find(
                       (row) => row.id === selectedMeasurement?.scale_calibration_id,
                     ) ?? null
+                  }
+                  quantity={
+                    selectedMeasurement
+                      ? (quantityByMeasurement[selectedMeasurement.id] ?? null)
+                      : null
                   }
                   sheetLabel={sheet?.page_label ?? null}
                   canEdit

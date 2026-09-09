@@ -32,6 +32,7 @@ from app.domain import (
     ProcessingStatus,
     ProjectSource,
     ProjectStatus,
+    QuantityState,
     QuantityUnit,
     RegionShape,
     Role,
@@ -643,6 +644,67 @@ class MeasurementUpdate(BaseModel):
 
     points: MeasurementPoints
     version: Annotated[int, Field(ge=1)]
+
+
+class MeasurementQuantityRead(ApiModel):
+    """Величина одного измерения вместе с происхождением.
+
+    Числа передаются строками, как и коэффициент калибровки: `JSON.parse` превратил бы их
+    в float64 и потерял точную десятичную запись, по которой величину проверяют.
+
+    Показ и канон лежат рядом намеренно. Метры — это отображение, и обратный пересчёт из
+    округлённых метров уже не даст исходного (ADR-0017).
+    """
+
+    measurement_id: uuid.UUID
+    takeoff_item_id: uuid.UUID
+    state: QuantityState
+    """`ready` — величина есть. `unavailable_*` — не ноль, а отсутствие основания."""
+
+    value: Decimal | None
+    unit: QuantityUnit
+    canonical_value: Decimal | None
+    canonical_unit: str
+
+    # --- происхождение: без него величину нечем объяснить (ADR-0008) ---
+    rule_key: str
+    """Правило с версией: `count.v1`, `length.v1`, `area.v1`."""
+    rule_version: str
+    page_geometry_fingerprint: str | None
+    scale_calibration_id: uuid.UUID | None
+    """Та калибровка, по которой посчитано, а не действующая сейчас."""
+    input_fingerprint: str
+    """Отпечаток входа. Изменилась геометрия или коэффициент — отпечаток другой."""
+    verification_state: VerificationState
+
+
+class TakeoffItemQuantityRead(ApiModel):
+    """Итог по строке обмера в пределах одного листа."""
+
+    takeoff_item_id: uuid.UUID
+    unit: QuantityUnit
+    canonical_unit: str
+    value: Decimal
+    canonical_value: Decimal
+    rule_key: str
+    measurement_count: int
+    """Сколько измерений вошло в итог."""
+    unavailable_count: int
+    """Сколько не вошло: у них нет масштаба или геометрии. Нулями они не считаются."""
+
+
+class SheetQuantitiesRead(ApiModel):
+    """Величины открытого листа.
+
+    Область указана явно — лист и его ревизия. Итог по документу складывал бы измерения
+    разных ревизий и посчитал бы одни и те же двери дважды (ADR-0019).
+    """
+
+    sheet_id: uuid.UUID
+    revision_id: uuid.UUID
+    page_geometry_fingerprint: str | None
+    measurements: list[MeasurementQuantityRead]
+    totals: list[TakeoffItemQuantityRead]
 
 
 class ScaleCalibrationRead(ApiModel):

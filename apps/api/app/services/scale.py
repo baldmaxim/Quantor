@@ -86,10 +86,20 @@ def compute_factor(
     return distance, factor
 
 
+async def find_sheet_geometry(session: AsyncSession, *, sheet_id: uuid.UUID) -> PageGeometry | None:
+    """Геометрия листа или её отсутствие.
+
+    Отдельно от `sheet_geometry`, потому что отсутствие геометрии — это разное для разных
+    вызывающих: калибровать без неё нельзя и это отказ, а показать величину — можно,
+    состоянием «недоступна».
+    """
+    found = await session.execute(select(PageGeometry).where(PageGeometry.sheet_id == sheet_id))
+    return found.scalar_one_or_none()
+
+
 async def sheet_geometry(session: AsyncSession, *, sheet_id: uuid.UUID) -> PageGeometry:
     """Каноническая геометрия листа. Без неё калибровать не от чего."""
-    found = await session.execute(select(PageGeometry).where(PageGeometry.sheet_id == sheet_id))
-    geometry = found.scalar_one_or_none()
+    geometry = await find_sheet_geometry(session, sheet_id=sheet_id)
     if geometry is None:
         raise DomainError(
             ErrorCode.SCALE_GEOMETRY_REQUIRED,

@@ -8,6 +8,7 @@ import {
   createTakeoffItem,
   deleteMeasurement,
   listSheetMeasurements,
+  readSheetQuantities,
   listTakeoffItems,
   listDocumentRevisions,
   listProjectDocuments,
@@ -55,6 +56,7 @@ export const queryKeys = {
   calibrations: (sheetId: string) => ['sheet', sheetId, 'scale-calibrations'] as const,
   takeoffItems: (projectId: string) => ['project', projectId, 'takeoff-items'] as const,
   measurements: (sheetId: string) => ['sheet', sheetId, 'measurements'] as const,
+  quantities: (sheetId: string) => ['sheet', sheetId, 'quantities'] as const,
 };
 
 export interface ProjectsParams {
@@ -300,6 +302,7 @@ export const useCreateCalibration = () => {
       ),
     onSuccess: (_result, input) => {
       void client.invalidateQueries({ queryKey: queryKeys.calibrations(input.sheetId) });
+      void client.invalidateQueries({ queryKey: queryKeys.quantities(input.sheetId) });
     },
   });
 };
@@ -318,6 +321,7 @@ export const useMakeCalibrationDefault = (sheetId: string) => {
       ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.calibrations(sheetId) });
+      void client.invalidateQueries({ queryKey: queryKeys.quantities(sheetId) });
     },
   });
 };
@@ -341,6 +345,24 @@ export const useMeasurements = (sheetId: string | null) =>
       unwrap(
         await listSheetMeasurements({ throwOnError: true, path: { sheet_id: sheetId ?? '' } }),
       ),
+    enabled: Boolean(sheetId),
+  });
+
+/**
+ * Величины открытого листа: по измерению и итог по строке обмера.
+ *
+ * Считает сервер, а не клиент. Число, посчитанное в браузере, невозможно предъявить: его
+ * нельзя ни проверить, ни воспроизвести — а величина без основания в смете не величина
+ * (ADR-0008).
+ *
+ * Один запрос на лист: сотня обращений ради сотни меток была бы тем же N+1, только со
+ * стороны клиента.
+ */
+export const useSheetQuantities = (sheetId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.quantities(sheetId ?? ''),
+    queryFn: async () =>
+      unwrap(await readSheetQuantities({ throwOnError: true, path: { sheet_id: sheetId ?? '' } })),
     enabled: Boolean(sheetId),
   });
 
@@ -394,6 +416,7 @@ export const useCreateMeasurement = (sheetId: string) => {
       ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
+      void client.invalidateQueries({ queryKey: queryKeys.quantities(sheetId) });
     },
   });
 };
@@ -424,6 +447,7 @@ export const useCreateMeasurementsBatch = (sheetId: string) => {
       ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
+      void client.invalidateQueries({ queryKey: queryKeys.quantities(sheetId) });
     },
   });
 };
@@ -452,6 +476,7 @@ export const useUpdateMeasurement = (sheetId: string) => {
       ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
+      void client.invalidateQueries({ queryKey: queryKeys.quantities(sheetId) });
     },
   });
 };
@@ -465,6 +490,7 @@ export const useDeleteMeasurement = (sheetId: string) => {
     },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
+      void client.invalidateQueries({ queryKey: queryKeys.quantities(sheetId) });
     },
   });
 };
