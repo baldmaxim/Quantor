@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawingViewport, type ViewportSheet } from './DrawingViewport';
 import { Camera } from '@/lib/viewer/camera';
 import { ScaleDraft } from '@/lib/viewer/scale-draft';
+import { ToolController } from '@/lib/viewer/tool-controller';
 import type { RenderBackend, RenderRequest } from '@/lib/viewer/backend';
 
 /**
@@ -348,5 +349,132 @@ describe('инструмент масштаба на холсте', () => {
     });
 
     expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe('слой измерений', () => {
+  const wallMeasurement = {
+    id: 'm1',
+    geometryType: 'line' as const,
+    points: [
+      { x: 0.1, y: 0.5 },
+      { x: 0.9, y: 0.5 },
+    ],
+    colorKey: 'accent',
+  };
+
+  it('рисование не перерисовывает страницу и не ходит в сеть', async () => {
+    // Самая дорогая ошибка этого экрана: перерисовка PDF на каждое движение мыши.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const tools = new ToolController('polygon');
+    const { backend } = setup({ tools });
+    await flushFrame();
+    const rendersBefore = backend.renders.length;
+
+    const viewport = screen.getByTestId('viewport');
+    fireEvent.pointerDown(viewport, { button: 0, clientX: 0, clientY: 0 });
+    for (let step = 0; step < 20; step += 1) {
+      fireEvent.pointerMove(viewport, { clientX: step, clientY: step });
+    }
+    await flushFrame();
+
+    expect(backend.renders.length).toBe(rendersBefore);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('выбор измерения не перерисовывает страницу', async () => {
+    const tools = new ToolController('select');
+    const { backend } = setup({ tools, measurements: [wallMeasurement] });
+    await flushFrame();
+    const rendersBefore = backend.renders.length;
+
+    tools.send({ type: 'selectMeasurement', measurementId: 'm1' });
+    await flushFrame();
+
+    expect(backend.renders.length).toBe(rendersBefore);
+  });
+
+  it('перетаскивание вершины не перерисовывает страницу и не ходит в сеть', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const tools = new ToolController('select');
+    const { backend } = setup({ tools, measurements: [wallMeasurement] });
+    await flushFrame();
+    const rendersBefore = backend.renders.length;
+
+    tools.send({
+      type: 'startVertexDrag',
+      measurementId: 'm1',
+      vertexIndex: 0,
+      points: wallMeasurement.points,
+    });
+    for (let step = 0; step < 15; step += 1) {
+      tools.send({ type: 'moveVertex', point: { x: 0.2 + step * 0.01, y: 0.5 } });
+    }
+    await flushFrame();
+
+    expect(backend.renders.length).toBe(rendersBefore);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('геометрия уходит наружу один раз, по отпусканию', async () => {
+    const dragged = vi.fn();
+    const tools = new ToolController('select');
+    tools.setHandlers({ onVertexDragged: dragged });
+    setup({ tools, measurements: [wallMeasurement] });
+    await flushFrame();
+
+    tools.send({
+      type: 'startVertexDrag',
+      measurementId: 'm1',
+      vertexIndex: 0,
+      points: wallMeasurement.points,
+    });
+    tools.send({ type: 'moveVertex', point: { x: 0.3, y: 0.5 } });
+    tools.send({ type: 'moveVertex', point: { x: 0.4, y: 0.5 } });
+
+    expect(dragged).not.toHaveBeenCalled();
+
+    tools.send({ type: 'finishVertexDrag' });
+
+    expect(dragged).toHaveBeenCalledTimes(1);
+    expect(dragged.mock.calls[0]?.[0].points[0]).toEqual({ x: 0.4, y: 0.5 });
+  });
+
+  it('завершённая фигура отдаётся один раз', async () => {
+    const completed = vi.fn();
+    const tools = new ToolController('count');
+    tools.setHandlers({ onCompleted: completed });
+    setup({ tools });
+    await flushFrame();
+
+    const viewport = screen.getByTestId('viewport');
+    fireEvent.pointerDown(viewport, { button: 0, clientX: 0, clientY: 0 });
+
+    expect(completed).toHaveBeenCalledTimes(1);
+    expect(completed.mock.calls[0]?.[0].mode).toBe('count');
+  });
+
+  it('слой скрыт, пока инструменты не подключены', async () => {
+    setup({});
+    await flushFrame();
+
+    expect(screen.getByTestId('measurement-layer').className).toContain('hidden');
+  });
+
+  it('тысяча измерений отрисовывается без ошибки', async () => {
+    // Не замер производительности — тот делает промт 14. Здесь только проверка, что слой
+    // вообще работает на объёме, а не падает на сотой фигуре.
+    const many = Array.from({ length: 1000 }, (_, index) => ({
+      id: `m${index}`,
+      geometryType: 'count' as const,
+      points: [{ x: (index % 100) / 100, y: Math.floor(index / 100) / 10 }],
+      colorKey: 'accent',
+    }));
+
+    const tools = new ToolController('select');
+    expect(() => setup({ tools, measurements: many })).not.toThrow();
+    await flushFrame();
   });
 });

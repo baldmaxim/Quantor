@@ -1,0 +1,323 @@
+/**
+ * Слой измерений: сохранённые фигуры, черновик и ручки вершин.
+ *
+ * Отдельный холст поверх слоя распознанных областей (ADR-0015). Painter областей не
+ * расширяется признаком «а это измерение»: `Region` — свидетельство распознавалки,
+ * `Measurement` — намерение пользователя, и общая функция ломалась бы для обоих сразу.
+ *
+ * Canvas2D. WebGL — только после замера, и замер этот делает промт 14, а не предположение.
+ */
+
+import type { NormalizedPoint, ScreenPoint, SheetPlacement } from '@/lib/viewer/coordinates';
+import { toScreenPoint } from '@/lib/viewer/coordinates';
+
+/** Геометрия, как её рисует слой. Ровно то, что нужно отрисовке, и ничего больше. */
+export interface OverlayMeasurement {
+  readonly id: string;
+  readonly geometryType: 'count' | 'line' | 'polyline' | 'polygon';
+  readonly points: readonly NormalizedPoint[];
+  /** Ключ палитры темы: цвет строки обмера. */
+  readonly colorKey: string;
+}
+
+export interface MeasurementOverlayState {
+  readonly measurements: readonly OverlayMeasurement[];
+  readonly selectedId: string | null;
+  readonly hoveredId: string | null;
+  /** Вершины незавершённой фигуры. */
+  readonly draft: readonly NormalizedPoint[];
+  /** Тип рисуемой сейчас фигуры: от него зависит, замыкать ли черновик. */
+  readonly draftType: OverlayMeasurement['geometryType'] | null;
+  readonly draftHover: NormalizedPoint | null;
+  /** Геометрия перетаскиваемого измерения: рисуется вместо сохранённой. */
+  readonly dragOverride: {
+    readonly id: string;
+    readonly points: readonly NormalizedPoint[];
+  } | null;
+}
+
+export interface MeasurementOverlayStyle {
+  /** Цвета по ключу палитры. Приходят из токенов темы, а не зашиты здесь. */
+  readonly colors: Readonly<Record<string, string>>;
+  readonly fallbackColor: string;
+}
+
+const LINE_WIDTH = 2;
+const SELECTED_LINE_WIDTH = 3;
+const COUNT_RADIUS = 5;
+const VERTEX_RADIUS = 4;
+const FILL_ALPHA = 0.16;
+const SELECTED_FILL_ALPHA = 0.26;
+const DRAFT_DASH = [6, 4];
+
+/** Радиус попадания по вершине в пикселях экрана. Меньше — в вершину не попасть мышью. */
+export const VERTEX_HIT_RADIUS = 8;
+
+const colorOf = (measurement: OverlayMeasurement, style: MeasurementOverlayStyle): string =>
+  style.colors[measurement.colorKey] ?? style.fallbackColor;
+
+/**
+ * Рисует слой и возвращает число нарисованных фигур.
+ *
+ * Возврат нужен тесту: «слой отрисовался» и «слой отрисовал то, что нужно» — разные
+ * утверждения, и второе проверяется числом, а не скриншотом.
+ */
+export const drawMeasurements = (
+  context: CanvasRenderingContext2D,
+  placement: SheetPlacement,
+  state: MeasurementOverlayState,
+  style: MeasurementOverlayStyle,
+  devicePixelRatio = 1,
+): number => {
+  const canvas = context.canvas;
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.scale(devicePixelRatio, devicePixelRatio);
+
+  let drawn = 0;
+  for (const measurement of state.measurements) {
+    const override =
+      state.dragOverride?.id === measurement.id ? state.dragOverride.points : measurement.points;
+    drawShape(context, placement, measurement, override, state, style);
+    drawn += 1;
+  }
+
+  if (state.draft.length > 0 && state.draftType !== null) {
+    drawDraft(context, placement, state, style);
+  }
+
+  return drawn;
+};
+
+const drawShape = (
+  context: CanvasRenderingContext2D,
+  placement: SheetPlacement,
+  measurement: OverlayMeasurement,
+  points: readonly NormalizedPoint[],
+  state: MeasurementOverlayState,
+  style: MeasurementOverlayStyle,
+): void => {
+  const selected = state.selectedId === measurement.id;
+  const hovered = state.hoveredId === measurement.id;
+  const color = colorOf(measurement, style);
+  const screen = points.map((point) => toScreenPoint(point, placement));
+
+  context.save();
+  context.strokeStyle = color;
+  context.fillStyle = color;
+  context.lineWidth = selected ? SELECTED_LINE_WIDTH : LINE_WIDTH;
+
+  if (measurement.geometryType === 'count') {
+    const marker = screen[0];
+    if (marker) {
+      context.globalAlpha = selected || hovered ? 1 : 0.85;
+      context.beginPath();
+      context.arc(marker.x, marker.y, COUNT_RADIUS, 0, Math.PI * 2);
+      context.fill();
+    }
+  } else {
+    const closed = measurement.geometryType === 'polygon';
+    tracePath(context, screen, closed);
+
+    if (closed) {
+      context.globalAlpha = selected ? SELECTED_FILL_ALPHA : FILL_ALPHA;
+      context.fill();
+      context.globalAlpha = 1;
+    }
+    context.stroke();
+  }
+
+  // Ручки вершин только у выбранного: у всех сразу они превратили бы чертёж в россыпь точек.
+  if (selected && measurement.geometryType !== 'count') {
+    context.globalAlpha = 1;
+    for (const point of screen) {
+      context.beginPath();
+      context.arc(point.x, point.y, VERTEX_RADIUS, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+
+  context.restore();
+};
+
+const drawDraft = (
+  context: CanvasRenderingContext2D,
+  placement: SheetPlacement,
+  state: MeasurementOverlayState,
+  style: MeasurementOverlayStyle,
+): void => {
+  const screen = state.draft.map((point) => toScreenPoint(point, placement));
+  const hover = state.draftHover ? toScreenPoint(state.draftHover, placement) : null;
+  const path = hover ? [...screen, hover] : screen;
+
+  context.save();
+  context.strokeStyle = style.fallbackColor;
+  context.fillStyle = style.fallbackColor;
+  context.lineWidth = LINE_WIDTH;
+  // Пунктир: черновик ещё не результат и выглядеть как результат не должен.
+  context.setLineDash(DRAFT_DASH);
+
+  // Многоугольник замыкается только визуально: в данные дублирующая точка не попадает.
+  tracePath(context, path, state.draftType === 'polygon' && path.length > 2);
+  context.stroke();
+  context.setLineDash([]);
+
+  for (const point of screen) {
+    context.beginPath();
+    context.arc(point.x, point.y, VERTEX_RADIUS, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  context.restore();
+};
+
+const tracePath = (
+  context: CanvasRenderingContext2D,
+  points: readonly ScreenPoint[],
+  closed: boolean,
+): void => {
+  context.beginPath();
+  points.forEach((point, index) => {
+    if (index === 0) context.moveTo(point.x, point.y);
+    else context.lineTo(point.x, point.y);
+  });
+  if (closed) context.closePath();
+};
+
+/**
+ * Ищет измерение под курсором.
+ *
+ * Из перекрывающихся побеждает наименьшее по охвату: крупная фигура обычно окружает
+ * мелкие, и выбирать нужно то, во что пользователь целился. То же правило, что у областей
+ * (`coordinates.hitTest`), — иначе выбор вёл бы себя на двух слоях по-разному.
+ *
+ * Перебор линейный. На листе десятки измерений, и это дёшево; когда их станут тысячи,
+ * сюда встанет пространственный индекс, а сигнатура не изменится (промт 14).
+ */
+export const hitTestMeasurements = (
+  measurements: readonly OverlayMeasurement[],
+  point: NormalizedPoint,
+  placement: SheetPlacement,
+  tolerancePx = 6,
+): OverlayMeasurement | null => {
+  const target = toScreenPoint(point, placement);
+  let best: OverlayMeasurement | null = null;
+  let bestExtent = Number.POSITIVE_INFINITY;
+
+  for (const measurement of measurements) {
+    const screen = measurement.points.map((item) => toScreenPoint(item, placement));
+    if (!hits(measurement, screen, target, tolerancePx)) continue;
+
+    const extent = boundingExtent(screen);
+    if (extent < bestExtent) {
+      best = measurement;
+      bestExtent = extent;
+    }
+  }
+
+  return best;
+};
+
+/** Ищет вершину выбранного измерения под курсором. Возвращает индекс или `null`. */
+export const hitTestVertex = (
+  points: readonly NormalizedPoint[],
+  point: NormalizedPoint,
+  placement: SheetPlacement,
+  radiusPx = VERTEX_HIT_RADIUS,
+): number | null => {
+  const target = toScreenPoint(point, placement);
+
+  for (const [index, item] of points.entries()) {
+    const screen = toScreenPoint(item, placement);
+    if (Math.hypot(screen.x - target.x, screen.y - target.y) <= radiusPx) {
+      return index;
+    }
+  }
+
+  return null;
+};
+
+const hits = (
+  measurement: OverlayMeasurement,
+  screen: readonly ScreenPoint[],
+  target: ScreenPoint,
+  tolerance: number,
+): boolean => {
+  if (measurement.geometryType === 'count') {
+    const marker = screen[0];
+    return marker
+      ? Math.hypot(marker.x - target.x, marker.y - target.y) <= COUNT_RADIUS + tolerance
+      : false;
+  }
+
+  if (measurement.geometryType === 'polygon' && insidePolygon(screen, target)) {
+    return true;
+  }
+
+  const closed = measurement.geometryType === 'polygon';
+  for (let index = 1; index < screen.length; index += 1) {
+    const from = screen[index - 1];
+    const to = screen[index];
+    if (from && to && distanceToSegment(target, from, to) <= tolerance) return true;
+  }
+
+  if (closed && screen.length > 2) {
+    const first = screen[0];
+    const last = screen[screen.length - 1];
+    if (first && last && distanceToSegment(target, last, first) <= tolerance) return true;
+  }
+
+  return false;
+};
+
+const boundingExtent = (points: readonly ScreenPoint[]): number => {
+  if (points.length === 0) return Number.POSITIVE_INFINITY;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+
+  // Площадь охватывающего прямоугольника, но не меньше единицы: у отрезка она нулевая,
+  // и без пола отрезок всегда побеждал бы многоугольник.
+  return Math.max((maxX - minX) * (maxY - minY), 1);
+};
+
+const distanceToSegment = (point: ScreenPoint, from: ScreenPoint, to: ScreenPoint): number => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const lengthSquared = dx * dx + dy * dy;
+
+  if (lengthSquared === 0) {
+    return Math.hypot(point.x - from.x, point.y - from.y);
+  }
+
+  const t = Math.max(
+    0,
+    Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared),
+  );
+  return Math.hypot(point.x - (from.x + t * dx), point.y - (from.y + t * dy));
+};
+
+const insidePolygon = (points: readonly ScreenPoint[], target: ScreenPoint): boolean => {
+  let inside = false;
+  for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
+    const current = points[index];
+    const other = points[previous];
+    if (!current || !other) continue;
+
+    const crosses = current.y > target.y !== other.y > target.y;
+    if (!crosses) continue;
+
+    const x = ((other.x - current.x) * (target.y - current.y)) / (other.y - current.y) + current.x;
+    if (target.x < x) inside = !inside;
+  }
+  return inside;
+};

@@ -9,6 +9,14 @@ import { drawOverlay, resizeOverlay, type OverlayRegion } from '@/lib/viewer/ove
 import { DocumentLoadError, RenderCancelledError, type RenderBackend } from '@/lib/viewer/backend';
 import type { ScaleDraft } from '@/lib/viewer/scale-draft';
 import { drawScaleDraft } from '@/lib/viewer/scale-overlay';
+import {
+  drawMeasurements,
+  hitTestMeasurements,
+  hitTestVertex,
+  type OverlayMeasurement,
+} from '@/lib/viewer/measurement-overlay';
+import type { ToolController } from '@/lib/viewer/tool-controller';
+import { DRAWING_MODES } from '@/lib/viewer/tool-machine';
 
 /** Инструменты, которые понимает холст. Остальные живут выше и сюда не доходят. */
 export type ViewportTool = 'pointer' | 'pan' | 'scale';
@@ -53,6 +61,12 @@ interface IDrawingViewportProps {
    * область: холст только рисует и ставит точки.
    */
   scaleDraft?: ScaleDraft | null;
+  /** Сохранённые измерения текущего листа. */
+  measurements?: readonly OverlayMeasurement[];
+  /** Контроллер инструментов обмера. Приходит снаружи: холст рисует и шлёт события. */
+  tools?: ToolController | null;
+  /** Цвета строк обмера по ключу палитры. */
+  measurementColors?: Readonly<Record<string, string>>;
   onViewChange?: (state: CameraState) => void;
   onError?: (code: string) => void;
 }
@@ -89,6 +103,9 @@ export const DrawingViewport = ({
   camera,
   tool,
   scaleDraft = null,
+  measurements = [],
+  tools = null,
+  measurementColors = {},
   onViewChange,
   onError,
 }: IDrawingViewportProps) => {
@@ -99,6 +116,9 @@ export const DrawingViewport = ({
   // Третий холст: черновик калибровки не смешивается со слоем распознанных областей.
   // `Region` — свидетельство, черновик — намерение (ADR-0015).
   const scaleCanvas = useRef<HTMLCanvasElement>(null);
+  // Четвёртый холст: измерения не смешиваются ни со слоем областей, ни с черновиком
+  // масштаба. Каждый слой — своя ответственность (ADR-0015).
+  const measurementCanvas = useRef<HTMLCanvasElement>(null);
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -381,6 +401,55 @@ export const DrawingViewport = ({
     return scaleDraft.subscribe(paintScale);
   }, [scaleDraft, paintScale]);
 
+  const paintMeasurements = useCallback(() => {
+    const canvas = measurementCanvas.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context || !page || !tools) return;
+
+    const ratio = window.devicePixelRatio || 1;
+    const placed = placeRenderedPage(page, renderedScale.current, ratio);
+    resizeOverlay(canvas, placed.width, placed.height, ratio);
+
+    const toolState = tools.getState();
+    const fallback =
+      getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() ||
+      'currentColor';
+
+    drawMeasurements(
+      context,
+      placed,
+      {
+        measurements,
+        selectedId: toolState.selectedId,
+        hoveredId: null,
+        draft: toolState.points,
+        draftType: DRAWING_MODES.includes(toolState.mode)
+          ? (toolState.mode as OverlayMeasurement['geometryType'])
+          : null,
+        draftHover: toolState.hover,
+        dragOverride: toolState.drag
+          ? { id: toolState.drag.measurementId, points: toolState.drag.points }
+          : null,
+      },
+      { colors: measurementColors, fallbackColor: fallback },
+      ratio,
+    );
+  }, [page, tools, measurements, measurementColors]);
+
+  // Слой перерисовывается по подписке на контроллер, а не через состояние React: черновик
+  // меняется на каждом движении мыши, и перерисовывать им дерево значило бы ронять кадры.
+  useEffect(() => {
+    if (!tools) return;
+    paintMeasurements();
+    return tools.subscribe(paintMeasurements);
+  }, [tools, paintMeasurements]);
+
+  // Список измерений приходит из запроса и меняется редко, но перерисовать слой нужно.
+  useEffect(() => {
+    paintMeasurements();
+  }, [paintMeasurements]);
+
+  const drawing = tools !== null && DRAWING_MODES.includes(tools.getState().mode);
   const measuring = tool === 'scale' && scaleDraft !== null;
   const panning = tool === 'pan' || spacePressed;
 
@@ -395,6 +464,50 @@ export const DrawingViewport = ({
       dragging.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
+    }
+
+    if (tools) {
+      const point = pointFromEvent(event.clientX, event.clientY);
+      const state = tools.getState();
+
+      if (point) {
+        const placed = placeRenderedPage(
+          page ?? { width: 1, height: 1 },
+          cameraState.current.scale,
+          window.devicePixelRatio || 1,
+        );
+
+        // Сначала вершина выбранного измерения: попасть в неё труднее, чем в саму фигуру,
+        // и приоритет должен быть у более точного намерения.
+        if (state.selectedId) {
+          const selected = measurements.find((item) => item.id === state.selectedId);
+          const vertex = selected ? hitTestVertex(selected.points, point, placed) : null;
+          if (selected && vertex !== null) {
+            tools.send({
+              type: 'startVertexDrag',
+              measurementId: selected.id,
+              vertexIndex: vertex,
+              points: selected.points,
+            });
+            event.currentTarget.setPointerCapture(event.pointerId);
+            return;
+          }
+        }
+
+        if (drawing) {
+          tools.send({ type: 'pointerDown', point });
+          return;
+        }
+
+        const found = hitTestMeasurements(measurements, point, placed);
+        if (found) {
+          tools.send({ type: 'selectMeasurement', measurementId: found.id });
+          return;
+        }
+        if (state.selectedId) {
+          tools.send({ type: 'selectMeasurement', measurementId: null });
+        }
+      }
     }
 
     if (measuring) {
@@ -418,6 +531,20 @@ export const DrawingViewport = ({
       return;
     }
 
+    if (tools) {
+      const state = tools.getState();
+      if (state.drag !== null) {
+        const point = pointFromEvent(event.clientX, event.clientY);
+        // Ни одного запроса: геометрия уйдёт на сервер один раз, по отпусканию.
+        if (point) tools.send({ type: 'moveVertex', point });
+        return;
+      }
+      if (drawing) {
+        tools.send({ type: 'pointerMove', point: pointFromEvent(event.clientX, event.clientY) });
+        return;
+      }
+    }
+
     if (measuring) {
       // Ни одного обращения к серверу: черновик живёт в памяти до подтверждения.
       scaleDraft?.hover(pointFromEvent(event.clientX, event.clientY));
@@ -435,6 +562,12 @@ export const DrawingViewport = ({
   };
 
   const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (tools?.getState().drag !== null && tools) {
+      tools.send({ type: 'finishVertexDrag' });
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
     if (dragging.current?.pointerId === event.pointerId) {
       dragging.current = null;
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -523,6 +656,11 @@ export const DrawingViewport = ({
           ref={scaleCanvas}
           data-testid="scale-layer"
           className={cx('pointer-events-none absolute top-0 left-0', !measuring && 'hidden')}
+        />
+        <canvas
+          ref={measurementCanvas}
+          data-testid="measurement-layer"
+          className={cx('pointer-events-none absolute top-0 left-0', !tools && 'hidden')}
         />
       </div>
 
