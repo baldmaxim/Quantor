@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import (
+    MAX_MEASUREMENT_POINTS,
     UNIT_BY_GEOMETRY,
     DocumentKind,
     GeometryStatus,
@@ -147,7 +148,7 @@ class TestPointValidation:
 
     def test_too_many_vertices_are_refused(self) -> None:
         """Многоугольник из ста тысяч точек — способ положить сервер одним запросом."""
-        points = [[0.5, 0.5]] * (takeoff_service.MAX_POINTS + 1)
+        points = [[0.5, 0.5]] * (MAX_MEASUREMENT_POINTS + 1)
 
         with pytest.raises(DomainError):
             takeoff_service.validate_points(GeometryType.POLYGON, points)

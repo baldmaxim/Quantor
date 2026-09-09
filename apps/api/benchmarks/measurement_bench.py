@@ -43,6 +43,7 @@ from sqlalchemy.pool import NullPool
 from app.core.config import get_settings
 from app.db.base import Base
 from app.domain import (
+    MAX_MEASUREMENT_BATCH,
     DocumentKind,
     GeometryStatus,
     GeometryType,
@@ -494,7 +495,7 @@ async def run_api(*, iterations: int, measurements: int) -> dict[str, object]:
             )
 
             # Наполняем лист, чтобы список измерялся не на пустом месте.
-            batch = [points for _ in range(takeoff_service.MAX_BATCH_SIZE)]
+            batch = [points for _ in range(MAX_MEASUREMENT_BATCH)]
 
             async def stored() -> int:
                 return await takeoff_service.count_for_item(

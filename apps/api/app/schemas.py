@@ -15,6 +15,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.contracts.models import DataPolicy, ProviderKind
 from app.domain import (
+    COORDINATES_PER_POINT,
+    MAX_MEASUREMENT_BATCH,
+    MAX_MEASUREMENT_POINTS,
     ArtifactKind,
     AuditResult,
     DocumentKind,
@@ -49,6 +52,28 @@ MAX_PAGE_SIZE = 500
 # Значение настройки в контракте: перечисление возможных форм, а не произвольный JSON.
 # Свободный тип здесь означал бы, что клиент не знает, что ему придёт.
 SettingValueJson = bool | int | str | list[str]
+
+# --- границы геометрии обмера ---
+#
+# Пределы стоят на контракте, а не только в сервисе. Разница в том, где запрос умирает:
+# многоугольник в сто тысяч вершин, отвергнутый сервисом, уже разобран и оплачен памятью,
+# а отвергнутый схемой — нет.
+#
+# Диапазон координат [0, 1] здесь намеренно **не** проверяется: он остаётся доменным
+# правилом сервиса, и без этого проверка атомарности пакета стала бы бессодержательной —
+# негодная точка отсеивалась бы до того, как дошла до транзакции.
+Coordinate = Annotated[float, Field(allow_inf_nan=False)]
+"""Одна координата. NaN и бесконечность отвергаются до сервиса: JSON их пропускает."""
+
+MeasurementPoint = Annotated[
+    list[Coordinate], Field(min_length=COORDINATES_PER_POINT, max_length=COORDINATES_PER_POINT)
+]
+"""Пара координат. Без верхней границы одна «точка» из миллиона чисел обошла бы предел
+на число точек."""
+
+MeasurementPoints = Annotated[
+    list[MeasurementPoint], Field(min_length=1, max_length=MAX_MEASUREMENT_POINTS)
+]
 
 
 class Page[ItemT](BaseModel):
@@ -592,7 +617,7 @@ class MeasurementRead(ApiModel):
 
 class MeasurementCreate(BaseModel):
     takeoff_item_id: uuid.UUID
-    points: Annotated[list[list[float]], Field(min_length=1)]
+    points: MeasurementPoints
     scale_calibration_id: uuid.UUID | None = None
     """Пусто — берётся действующая калибровка листа, если она есть."""
 
@@ -606,7 +631,7 @@ class MeasurementBatchCreate(BaseModel):
     """
 
     takeoff_item_id: uuid.UUID
-    items: Annotated[list[Annotated[list[list[float]], Field(min_length=1)]], Field(min_length=1)]
+    items: Annotated[list[MeasurementPoints], Field(min_length=1, max_length=MAX_MEASUREMENT_BATCH)]
     scale_calibration_id: uuid.UUID | None = None
 
 
@@ -616,7 +641,7 @@ class MeasurementUpdate(BaseModel):
     Версия обязательна: без неё старый клиент молча перетёр бы чужую правку.
     """
 
-    points: Annotated[list[list[float]], Field(min_length=1)]
+    points: MeasurementPoints
     version: Annotated[int, Field(ge=1)]
 
 

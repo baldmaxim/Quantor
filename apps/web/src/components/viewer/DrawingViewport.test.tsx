@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { act } from 'react';
+import { Profiler, act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DrawingViewport, type ViewportSheet } from './DrawingViewport';
@@ -461,6 +461,43 @@ describe('слой измерений', () => {
     await flushFrame();
 
     expect(screen.getByTestId('measurement-layer').className).toContain('hidden');
+  });
+
+  it('рисование не порождает ни одного коммита React', async () => {
+    // Отсутствие перерисовки PDF уже проверено выше. Здесь другое утверждение: дерево
+    // React вообще не коммитится, пока идёт жест. Одно не следует из другого — состояние
+    // могло бы меняться и приводить к коммиту, не задевая холст страницы (ADR-0004).
+    const commits: string[] = [];
+    const camera = new Camera();
+    const tools = new ToolController('polygon');
+
+    render(
+      <Profiler id="viewport" onRender={(_id, phase) => commits.push(phase)}>
+        <DrawingViewport
+          backend={new FakeBackend()}
+          sheet={SHEET}
+          regions={[]}
+          hiddenTypes={new Set()}
+          overlayVisible
+          selectedId={null}
+          onSelect={vi.fn()}
+          camera={camera}
+          tool="pointer"
+          tools={tools}
+        />
+      </Profiler>,
+    );
+    await flushFrame();
+    const before = commits.length;
+
+    const viewport = screen.getByTestId('viewport');
+    fireEvent.pointerDown(viewport, { button: 0, clientX: 10, clientY: 10 });
+    for (let step = 0; step < 40; step += 1) {
+      fireEvent.pointerMove(viewport, { clientX: 10 + step, clientY: 10 + step });
+    }
+    await flushFrame();
+
+    expect(commits.length - before).toBe(0);
   });
 
   it('тысяча измерений отрисовывается без ошибки', async () => {

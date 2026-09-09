@@ -1083,11 +1083,15 @@
                 "items": {
                   "type": "number"
                 },
+                "maxItems": 2,
+                "minItems": 2,
                 "type": "array"
               },
+              "maxItems": 10000,
               "minItems": 1,
               "type": "array"
             },
+            "maxItems": 200,
             "minItems": 1,
             "title": "Items",
             "type": "array"
@@ -1124,8 +1128,11 @@
               "items": {
                 "type": "number"
               },
+              "maxItems": 2,
+              "minItems": 2,
               "type": "array"
             },
+            "maxItems": 10000,
             "minItems": 1,
             "title": "Points",
             "type": "array"
@@ -1262,8 +1269,11 @@
               "items": {
                 "type": "number"
               },
+              "maxItems": 2,
+              "minItems": 2,
               "type": "array"
             },
+            "maxItems": 10000,
             "minItems": 1,
             "title": "Points",
             "type": "array"

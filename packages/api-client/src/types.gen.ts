@@ -644,7 +644,10 @@ export type MeasurementBatchCreate = {
     /**
      * Items
      */
-    items: Array<Array<Array<number>>>;
+    items: Array<Array<[
+        number,
+        number
+    ]>>;
     /**
      * Scale Calibration Id
      */
@@ -662,7 +665,10 @@ export type MeasurementCreate = {
     /**
      * Points
      */
-    points: Array<Array<number>>;
+    points: Array<[
+        number,
+        number
+    ]>;
     /**
      * Scale Calibration Id
      */
@@ -737,7 +743,10 @@ export type MeasurementUpdate = {
     /**
      * Points
      */
-    points: Array<Array<number>>;
+    points: Array<[
+        number,
+        number
+    ]>;
     /**
      * Version
      */

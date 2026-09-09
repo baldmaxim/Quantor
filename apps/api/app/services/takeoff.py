@@ -15,7 +15,10 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import (
+    COORDINATES_PER_POINT,
     EXACT_POINTS_BY_GEOMETRY,
+    MAX_MEASUREMENT_BATCH,
+    MAX_MEASUREMENT_POINTS,
     MIN_POINTS_BY_GEOMETRY,
     UNIT_BY_GEOMETRY,
     GeometryType,
@@ -35,7 +38,6 @@ from app.models import (
 # Предел числа вершин. Не про производительность: многоугольник из ста тысяч точек —
 # это отказ, а не тяжёлая фигура. Без предела он же становится способом положить сервер
 # одним запросом.
-MAX_POINTS = 10_000
 
 # Цвет строки по умолчанию. Ключ палитры темы, а не значение: хардкод hex здесь
 # разъехался бы с тёмной темой.
@@ -61,15 +63,15 @@ def validate_points(geometry_type: GeometryType, points: list[list[float]]) -> l
             ErrorCode.VALIDATION_FAILED,
             f"Для «{geometry_type.value}» нужно минимум {minimum} точек, передано {len(points)}",
         )
-    if len(points) > MAX_POINTS:
+    if len(points) > MAX_MEASUREMENT_POINTS:
         raise DomainError(
             ErrorCode.VALIDATION_FAILED,
-            f"Слишком много вершин: {len(points)}, предел {MAX_POINTS}",
+            f"Слишком много вершин: {len(points)}, предел {MAX_MEASUREMENT_POINTS}",
         )
 
     canonical: list[list[float]] = []
     for index, point in enumerate(points):
-        if len(point) != 2:
+        if len(point) != COORDINATES_PER_POINT:
             raise DomainError(
                 ErrorCode.VALIDATION_FAILED, f"Точка {index + 1}: ожидается пара координат"
             )
@@ -383,7 +385,6 @@ async def count_for_item(
 
 # Предел пакета. Счёт ставит метки десятками, но не тысячами за один запрос: пакет без
 # предела — это способ положить сервер, а не удобство.
-MAX_BATCH_SIZE = 200
 
 
 async def update_item(
@@ -435,10 +436,10 @@ async def create_measurements_batch(
     """
     if not batch:
         raise DomainError(ErrorCode.VALIDATION_FAILED, "Пустой пакет")
-    if len(batch) > MAX_BATCH_SIZE:
+    if len(batch) > MAX_MEASUREMENT_BATCH:
         raise DomainError(
             ErrorCode.VALIDATION_FAILED,
-            f"В пакете {len(batch)} измерений, предел {MAX_BATCH_SIZE}",
+            f"В пакете {len(batch)} измерений, предел {MAX_MEASUREMENT_BATCH}",
         )
 
     created: list[Measurement] = []

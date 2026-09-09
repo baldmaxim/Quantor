@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.auth.context import AuthContext
 from app.domain import (
+    MAX_MEASUREMENT_BATCH,
     DocumentKind,
     GeometryStatus,
     GeometryType,
@@ -294,7 +295,7 @@ class TestMeasurementsApi:
         )
         await db_session.commit()
 
-        oversized = [[[0.5, 0.5]]] * (takeoff_service.MAX_BATCH_SIZE + 1)
+        oversized = [[[0.5, 0.5]]] * (MAX_MEASUREMENT_BATCH + 1)
         async with build_api(_engineer(workspace_id)) as client:
             response = await client.post(
                 f"/api/v1/sheets/{sheet.id}/measurements/batch",

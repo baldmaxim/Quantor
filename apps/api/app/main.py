@@ -20,7 +20,7 @@ from app.api import health
 from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
-from app.core.middleware import RequestContextMiddleware
+from app.core.middleware import JsonBodyLimitMiddleware, RequestContextMiddleware
 from app.db.session import dispose_engine
 from app.errors import MESSAGES, DomainError, ErrorCode
 from app.storage.base import StorageUnavailableError
@@ -69,7 +69,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         generate_unique_id_function=operation_id,
     )
 
+    # Порядок важен: предел тела стоит снаружи, чтобы переросший запрос не доходил
+    # до разбора. Middleware выполняются в порядке, обратном добавлению.
     app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(JsonBodyLimitMiddleware, max_bytes=settings.max_json_body_bytes)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
