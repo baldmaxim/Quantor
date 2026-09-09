@@ -159,9 +159,7 @@ class TestUploadEndpoint:
         assert "ПД" not in key
         assert fake_storage.metadata[key]["original-filename"] == RUSSIAN_PDF_NAME
 
-    async def test_raw_pdf_schedules_geometry_but_stays_unprocessed(
-        self, api: AsyncClient
-    ) -> None:
+    async def test_raw_pdf_schedules_geometry_but_stays_unprocessed(self, api: AsyncClient) -> None:
         """Распознавание и геометрия независимы: PDF ждёт AI, но геометрию уже извлекаем."""
         project_id = await self._project(api)
 
