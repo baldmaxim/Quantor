@@ -22,13 +22,17 @@ from app.domain import (
     JobScope,
     JobStatus,
     JobType,
+    LengthUnit,
     OverrideScope,
     ProcessingStatus,
     ProjectSource,
     ProjectStatus,
     RegionShape,
     Role,
+    ScaleScopeKind,
+    ScaleSource,
     ValueSource,
+    VerificationState,
 )
 from app.services.diagnostics import ProbeSource, ProbeStatus
 
@@ -519,6 +523,66 @@ class PageGeometryRead(ApiModel):
     geometry_fingerprint: str
     """Отпечаток содержимого: одним сравнением отвечает, та ли это геометрия."""
     extracted_at: datetime
+
+
+class ScaleCalibrationRead(ApiModel):
+    """Калибровка масштаба листа (ADR-0018).
+
+    Числа передаются строками: `JSON.parse` превратил бы их в float64 и потерял точную
+    десятичную запись, по которой калибровку проверяют.
+    """
+
+    id: uuid.UUID
+    sheet_id: uuid.UUID
+    scope_kind: ScaleScopeKind
+    mm_per_pt: Decimal
+    """Сколько миллиметров мира в одной точке PDF. Единственное, что нужно для расчёта."""
+
+    # --- доказательство: без него коэффициент нечем проверить ---
+    point_a_x: Decimal
+    point_a_y: Decimal
+    point_b_x: Decimal
+    point_b_y: Decimal
+    input_value: Decimal
+    """Что именно набрал человек — до приведения к миллиметрам."""
+    input_unit: LengthUnit
+    known_distance_mm: Decimal
+    page_distance_pt: Decimal
+    page_geometry_fingerprint: str
+
+    source: ScaleSource
+    verification_state: VerificationState
+    is_default: bool
+    """Действующая калибровка листа: предлагается новым измерениям."""
+    supersedes_id: uuid.UUID | None
+    created_by: uuid.UUID | None
+    verified_by: uuid.UUID | None
+    verified_at: datetime | None
+    created_at: datetime
+
+
+class ScaleCalibrationCreate(BaseModel):
+    """Запрос на ручную калибровку.
+
+    Коэффициент сюда не передаётся и не принимается: его считает сервер из точек и
+    канонической геометрии страницы. Иначе величину можно было бы задать запросом.
+    """
+
+    point_a: Annotated[list[Decimal], Field(min_length=2, max_length=2)]
+    """Первая точка в нормализованных координатах листа: [x, y] в диапазоне [0, 1]."""
+    point_b: Annotated[list[Decimal], Field(min_length=2, max_length=2)]
+    known_distance: Annotated[Decimal, Field(gt=0)]
+    """Известный размер, как он подписан на чертеже."""
+    unit: LengthUnit = LengthUnit.MM
+    make_default: bool = True
+    supersedes_id: uuid.UUID | None = None
+    """Какую калибровку эта заменяет. Ссылка, а не удаление: цепочка версий остаётся."""
+
+
+class ScaleVerificationWrite(BaseModel):
+    """Подтверждение калибровки или снятие подтверждения."""
+
+    state: VerificationState
 
 
 class RegionRead(ApiModel):

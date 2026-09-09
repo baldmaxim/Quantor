@@ -21,9 +21,8 @@ from app.contracts.models import (
     select,
 )
 from app.contracts.pipeline import STAGE_CONTRACTS, PipelineStage
-from app.contracts.quantities import GeometryType, MeasurementSource, ScaleSource
 from app.core.features import DEFAULTS, STAGE2_FEATURES, parse_overrides, resolve
-from app.domain import JobType
+from app.domain import GeometryType, JobType, MeasurementSource, ScaleSource
 
 PYPROJECT = Path(__file__).resolve().parents[1] / "pyproject.toml"
 
@@ -202,6 +201,22 @@ class TestQuantityContracts:
     def test_scale_sources_include_manual(self) -> None:
         """Масштаб можно задать руками — автоматическое определение появится позже."""
         assert ScaleSource.MANUAL in set(ScaleSource)
+
+    def test_old_scale_contract_is_superseded(self) -> None:
+        """`units_per_normalized` отменён ADR-0018.
+
+        Один коэффициент на нормализованную координату математически неверен на
+        прямоугольной странице: 0,1 по X и 0,1 по Y — разные расстояния. Его место заняла
+        настоящая модель с коэффициентом на точку PDF.
+        """
+        from app.contracts import quantities
+        from app.models import ScaleCalibration
+
+        assert not hasattr(quantities, "ScaleCalibration"), (
+            "заготовка контракта должна была уступить место рабочей модели"
+        )
+        assert not hasattr(ScaleCalibration, "units_per_normalized")
+        assert hasattr(ScaleCalibration, "mm_per_pt")
 
     def test_geometry_types_cover_takeoff_needs(self) -> None:
         assert set(GeometryType) == {

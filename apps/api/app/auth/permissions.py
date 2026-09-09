@@ -55,6 +55,13 @@ class Permission(StrEnum):
 
     AUDIT_READ = "audit.read"
 
+    # Ручной обмер (ADR-0018). `verify` отделён от `edit` намеренно: подтверждение — это
+    # ответственность за число перед заказчиком, и она не обязана совпадать с правом
+    # это число внести.
+    TAKEOFF_READ = "takeoff.read"
+    TAKEOFF_EDIT = "takeoff.edit"
+    TAKEOFF_VERIFY = "takeoff.verify"
+
 
 # Читатель: видит проекты и документы своего пространства, не меняет ничего.
 _VIEWER: Final[frozenset[Permission]] = frozenset(
@@ -63,6 +70,9 @@ _VIEWER: Final[frozenset[Permission]] = frozenset(
         Permission.PROJECT_READ,
         Permission.DOCUMENT_READ,
         Permission.FEATURE_FLAGS_READ,
+        # Читатель видит обмеры и масштаб: величина без основания непроверяема, а
+        # основание — это и есть калибровка с измерениями.
+        Permission.TAKEOFF_READ,
     }
 )
 
@@ -73,6 +83,9 @@ _REVIEWER: Final[frozenset[Permission]] = _VIEWER | {
     Permission.INTEGRATION_READ,
     Permission.SETTINGS_READ,
     Permission.MODELS_READ,
+    # Подтверждать обмер, но не вносить его: разделение автора и проверяющего —
+    # смысл роли, а не формальность.
+    Permission.TAKEOFF_VERIFY,
 }
 
 # Инженер: рабочие действия с проектами. Удаления здесь намеренно нет — удалённый проект
@@ -81,6 +94,7 @@ _ENGINEER: Final[frozenset[Permission]] = _REVIEWER | {
     Permission.PROJECT_CREATE,
     Permission.PROJECT_UPDATE,
     Permission.DOCUMENT_UPLOAD,
+    Permission.TAKEOFF_EDIT,
 }
 
 # Администратор пространства: управляет своим пространством целиком, но не платформой.

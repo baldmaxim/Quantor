@@ -1027,6 +1027,16 @@
         "title": "JobType",
         "type": "string"
       },
+      "LengthUnit": {
+        "description": "Единица, в которой человек вводит известный размер.\n\nВнутренний канон — миллиметр: именно в нём проставлены размеры на строительных\nчертежах. Введённое значение сохраняется вместе с единицей — как доказательство\nтого, что именно набрал человек.",
+        "enum": [
+          "mm",
+          "cm",
+          "m"
+        ],
+        "title": "LengthUnit",
+        "type": "string"
+      },
       "LivenessResponse": {
         "properties": {
           "status": {
@@ -2158,6 +2168,271 @@
         "title": "Role",
         "type": "string"
       },
+      "ScaleCalibrationCreate": {
+        "description": "Запрос на ручную калибровку.\n\nКоэффициент сюда не передаётся и не принимается: его считает сервер из точек и\nканонической геометрии страницы. Иначе величину можно было бы задать запросом.",
+        "properties": {
+          "known_distance": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Known Distance"
+          },
+          "make_default": {
+            "default": true,
+            "title": "Make Default",
+            "type": "boolean"
+          },
+          "point_a": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Point A",
+            "type": "array"
+          },
+          "point_b": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Point B",
+            "type": "array"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/LengthUnit",
+            "default": "mm"
+          }
+        },
+        "required": [
+          "point_a",
+          "point_b",
+          "known_distance"
+        ],
+        "title": "ScaleCalibrationCreate",
+        "type": "object"
+      },
+      "ScaleCalibrationRead": {
+        "description": "Калибровка масштаба листа (ADR-0018).\n\nЧисла передаются строками: `JSON.parse` превратил бы их в float64 и потерял точную\nдесятичную запись, по которой калибровку проверяют.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input_unit": {
+            "$ref": "#/components/schemas/LengthUnit"
+          },
+          "input_value": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Input Value",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "known_distance_mm": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Known Distance Mm",
+            "type": "string"
+          },
+          "mm_per_pt": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Mm Per Pt",
+            "type": "string"
+          },
+          "page_distance_pt": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Page Distance Pt",
+            "type": "string"
+          },
+          "page_geometry_fingerprint": {
+            "title": "Page Geometry Fingerprint",
+            "type": "string"
+          },
+          "point_a_x": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Point A X",
+            "type": "string"
+          },
+          "point_a_y": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Point A Y",
+            "type": "string"
+          },
+          "point_b_x": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Point B X",
+            "type": "string"
+          },
+          "point_b_y": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Point B Y",
+            "type": "string"
+          },
+          "scope_kind": {
+            "$ref": "#/components/schemas/ScaleScopeKind"
+          },
+          "sheet_id": {
+            "format": "uuid",
+            "title": "Sheet Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ScaleSource"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "verification_state": {
+            "$ref": "#/components/schemas/VerificationState"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          },
+          "verified_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified By"
+          }
+        },
+        "required": [
+          "id",
+          "sheet_id",
+          "scope_kind",
+          "mm_per_pt",
+          "point_a_x",
+          "point_a_y",
+          "point_b_x",
+          "point_b_y",
+          "input_value",
+          "input_unit",
+          "known_distance_mm",
+          "page_distance_pt",
+          "page_geometry_fingerprint",
+          "source",
+          "verification_state",
+          "is_default",
+          "supersedes_id",
+          "created_by",
+          "verified_by",
+          "verified_at",
+          "created_at"
+        ],
+        "title": "ScaleCalibrationRead",
+        "type": "object"
+      },
+      "ScaleScopeKind": {
+        "description": "На что распространяется калибровка.\n\nЛист с планом 1:100 и узлом 1:20 — обычное дело, поэтому `region` объявлен сразу.\nНа Stage 2A создаётся только `sheet`, но схема локальный масштаб не запрещает:\nмодель, исходящая из одного масштаба на лист, не пережила бы первый же такой чертёж.",
+        "enum": [
+          "sheet",
+          "region"
+        ],
+        "title": "ScaleScopeKind",
+        "type": "string"
+      },
+      "ScaleSource": {
+        "description": "Откуда взялся масштаб чертежа.\n\nНа Stage 2A публичный API создаёт только `manual`. Остальные объявлены как контракт,\nно записать их через эндпоинт нельзя: иначе ручную калибровку можно было бы выдать\nза автоматически подтверждённую (ADR-0018).",
+        "enum": [
+          "manual",
+          "detected_dimension",
+          "imported"
+        ],
+        "title": "ScaleSource",
+        "type": "string"
+      },
+      "ScaleVerificationWrite": {
+        "description": "Подтверждение калибровки или снятие подтверждения.",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/VerificationState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "ScaleVerificationWrite",
+        "type": "object"
+      },
       "SessionResponse": {
         "description": "Состояние сеанса.\n\nОтдаётся и портале, и админке: обе решают по нему, что показывать. Права перечислены\nявно — интерфейс не должен знать состав ролей и повторять его у себя.",
         "properties": {
@@ -3022,6 +3297,16 @@
           "deployment"
         ],
         "title": "ValueSource",
+        "type": "string"
+      },
+      "VerificationState": {
+        "description": "Состояние проверки человеком.",
+        "enum": [
+          "unverified",
+          "verified",
+          "disputed"
+        ],
+        "title": "VerificationState",
         "type": "string"
       },
       "WorkerRead": {
@@ -5202,6 +5487,147 @@
         ]
       }
     },
+    "/api/v1/scale-calibrations/{calibration_id}": {
+      "get": {
+        "operationId": "read_calibration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calibration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calibration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScaleCalibrationRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Калибровка",
+        "tags": [
+          "scale"
+        ]
+      }
+    },
+    "/api/v1/scale-calibrations/{calibration_id}/default": {
+      "post": {
+        "description": "Назначает калибровку действующей для листа.\n\nУже посчитанные измерения не меняются: каждое хранит явную ссылку на свою калибровку.\nПерепривязка — отдельное действие, а не побочный эффект этого нажатия (ADR-0018).",
+        "operationId": "make_calibration_default",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calibration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calibration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScaleCalibrationRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сделать масштаб действующим",
+        "tags": [
+          "scale"
+        ]
+      }
+    },
+    "/api/v1/scale-calibrations/{calibration_id}/verification": {
+      "post": {
+        "description": "Подтверждает калибровку или снимает подтверждение.\n\nОтдельное право `takeoff.verify`: подтверждение — это ответственность за число перед\nзаказчиком, и она не обязана совпадать с правом это число внести.",
+        "operationId": "set_calibration_verification",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calibration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calibration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScaleVerificationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScaleCalibrationRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Подтвердить масштаб",
+        "tags": [
+          "scale"
+        ]
+      }
+    },
     "/api/v1/sheets/{sheet_id}/geometry": {
       "get": {
         "description": "Размер страницы в точках PDF — единственное основание для физических величин.\n\nОтдельный ресурс, а не поле листа: список на 77 листов не должен тащить геометрию\nкаждого, а причина её отсутствия у геометрии своя (ADR-0016).",
@@ -5349,6 +5775,106 @@
         "summary": "Области на листе",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/v1/sheets/{sheet_id}/scale-calibrations": {
+      "get": {
+        "description": "Все калибровки листа, новые сверху.\n\nНе страница: калибровок на листе единицы, а не сотни. Пагинация здесь была бы\nмеханикой без причины.",
+        "operationId": "list_sheet_calibrations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sheet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScaleCalibrationRead"
+                  },
+                  "title": "Response List Sheet Calibrations",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Калибровки масштаба листа",
+        "tags": [
+          "scale"
+        ]
+      },
+      "post": {
+        "description": "Создаёт калибровку из двух точек и подписанного на чертеже размера.\n\nКоэффициент считает сервер. Клиент присылает точки и размер — не множитель.",
+        "operationId": "create_sheet_calibration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sheet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScaleCalibrationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScaleCalibrationRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Задать масштаб по известному размеру",
+        "tags": [
+          "scale"
         ]
       }
     },

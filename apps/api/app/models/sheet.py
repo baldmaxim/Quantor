@@ -16,6 +16,7 @@ from app.models.mixins import CreatedAtMixin, str_enum, uuid_pk
 if TYPE_CHECKING:
     from app.models.document import DocumentRevision
     from app.models.page_geometry import PageGeometry
+    from app.models.scale import ScaleCalibration
 
 
 class Sheet(CreatedAtMixin, Base):
@@ -48,6 +49,14 @@ class Sheet(CreatedAtMixin, Base):
     # извлечённой не бывает. Именно она, а не width_px, участвует в расчёте величин.
     geometry: Mapped[PageGeometry | None] = relationship(
         back_populates="sheet", cascade="all, delete-orphan", passive_deletes=True
+    )
+    # Калибровок у листа может быть несколько: план 1:100 и узел 1:20 на одном листе —
+    # обычное дело в проектной документации (ADR-0018).
+    scale_calibrations: Mapped[list[ScaleCalibration]] = relationship(
+        back_populates="sheet",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ScaleCalibration.created_at",
     )
 
     __table_args__ = (

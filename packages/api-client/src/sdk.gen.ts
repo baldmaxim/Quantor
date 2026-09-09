@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadSheetGeometryData, ReadSheetGeometryErrors, ReadSheetGeometryResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
+import type { BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompleteLoginData, CompleteLoginErrors, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateSheetCalibrationData, CreateSheetCalibrationErrors, CreateSheetCalibrationResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetCalibrationsData, ListSheetCalibrationsErrors, ListSheetCalibrationsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, MakeCalibrationDefaultData, MakeCalibrationDefaultErrors, MakeCalibrationDefaultResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadCalibrationData, ReadCalibrationErrors, ReadCalibrationResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadSheetGeometryData, ReadSheetGeometryErrors, ReadSheetGeometryResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, SetCalibrationVerificationData, SetCalibrationVerificationErrors, SetCalibrationVerificationResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -401,6 +401,38 @@ export const readRevisionContentUrl = <ThrowOnError extends boolean = false>(opt
 export const listRevisionSheets = <ThrowOnError extends boolean = false>(options: Options<ListRevisionSheetsData, ThrowOnError>): RequestResult<ListRevisionSheetsResponses, ListRevisionSheetsErrors, ThrowOnError> => (options.client ?? client).get<ListRevisionSheetsResponses, ListRevisionSheetsErrors, ThrowOnError>({ url: '/api/v1/revisions/{revision_id}/sheets', ...options });
 
 /**
+ * Калибровка
+ */
+export const readCalibration = <ThrowOnError extends boolean = false>(options: Options<ReadCalibrationData, ThrowOnError>): RequestResult<ReadCalibrationResponses, ReadCalibrationErrors, ThrowOnError> => (options.client ?? client).get<ReadCalibrationResponses, ReadCalibrationErrors, ThrowOnError>({ url: '/api/v1/scale-calibrations/{calibration_id}', ...options });
+
+/**
+ * Сделать масштаб действующим
+ *
+ * Назначает калибровку действующей для листа.
+ *
+ * Уже посчитанные измерения не меняются: каждое хранит явную ссылку на свою калибровку.
+ * Перепривязка — отдельное действие, а не побочный эффект этого нажатия (ADR-0018).
+ */
+export const makeCalibrationDefault = <ThrowOnError extends boolean = false>(options: Options<MakeCalibrationDefaultData, ThrowOnError>): RequestResult<MakeCalibrationDefaultResponses, MakeCalibrationDefaultErrors, ThrowOnError> => (options.client ?? client).post<MakeCalibrationDefaultResponses, MakeCalibrationDefaultErrors, ThrowOnError>({ url: '/api/v1/scale-calibrations/{calibration_id}/default', ...options });
+
+/**
+ * Подтвердить масштаб
+ *
+ * Подтверждает калибровку или снимает подтверждение.
+ *
+ * Отдельное право `takeoff.verify`: подтверждение — это ответственность за число перед
+ * заказчиком, и она не обязана совпадать с правом это число внести.
+ */
+export const setCalibrationVerification = <ThrowOnError extends boolean = false>(options: Options<SetCalibrationVerificationData, ThrowOnError>): RequestResult<SetCalibrationVerificationResponses, SetCalibrationVerificationErrors, ThrowOnError> => (options.client ?? client).post<SetCalibrationVerificationResponses, SetCalibrationVerificationErrors, ThrowOnError>({
+    url: '/api/v1/scale-calibrations/{calibration_id}/verification',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Каноническая геометрия листа
  *
  * Размер страницы в точках PDF — единственное основание для физических величин.
@@ -414,6 +446,32 @@ export const readSheetGeometry = <ThrowOnError extends boolean = false>(options:
  * Области на листе
  */
 export const listSheetRegions = <ThrowOnError extends boolean = false>(options: Options<ListSheetRegionsData, ThrowOnError>): RequestResult<ListSheetRegionsResponses, ListSheetRegionsErrors, ThrowOnError> => (options.client ?? client).get<ListSheetRegionsResponses, ListSheetRegionsErrors, ThrowOnError>({ url: '/api/v1/sheets/{sheet_id}/regions', ...options });
+
+/**
+ * Калибровки масштаба листа
+ *
+ * Все калибровки листа, новые сверху.
+ *
+ * Не страница: калибровок на листе единицы, а не сотни. Пагинация здесь была бы
+ * механикой без причины.
+ */
+export const listSheetCalibrations = <ThrowOnError extends boolean = false>(options: Options<ListSheetCalibrationsData, ThrowOnError>): RequestResult<ListSheetCalibrationsResponses, ListSheetCalibrationsErrors, ThrowOnError> => (options.client ?? client).get<ListSheetCalibrationsResponses, ListSheetCalibrationsErrors, ThrowOnError>({ url: '/api/v1/sheets/{sheet_id}/scale-calibrations', ...options });
+
+/**
+ * Задать масштаб по известному размеру
+ *
+ * Создаёт калибровку из двух точек и подписанного на чертеже размера.
+ *
+ * Коэффициент считает сервер. Клиент присылает точки и размер — не множитель.
+ */
+export const createSheetCalibration = <ThrowOnError extends boolean = false>(options: Options<CreateSheetCalibrationData, ThrowOnError>): RequestResult<CreateSheetCalibrationResponses, CreateSheetCalibrationErrors, ThrowOnError> => (options.client ?? client).post<CreateSheetCalibrationResponses, CreateSheetCalibrationErrors, ThrowOnError>({
+    url: '/api/v1/sheets/{sheet_id}/scale-calibrations',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Liveness probe

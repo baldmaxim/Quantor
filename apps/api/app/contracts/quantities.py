@@ -3,6 +3,10 @@
 Здесь только типы и правила. Таблиц для них на Stage 1 нет и быть не должно: пока нет
 реальных расчётов, любая схема окажется неверной, а мигрировать пустые таблицы бессмысленно.
 
+Перечисления отсюда переехали в `app/domain.py`: они перестали быть заготовкой и стали
+рабочими типами. `ScaleCalibration` отменён — старый `units_per_normalized` был математически
+неверен на прямоугольной странице, и его заменила настоящая модель (ADR-0018).
+
 Главное, что фиксируется, — разделение трёх понятий (ADR-0008):
 
 ```text
@@ -18,60 +22,8 @@ Quantity     детерминированно вычисленная велич�
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 
-
-class GeometryType(StrEnum):
-    """Что именно измеряют."""
-
-    COUNT = "count"
-    LINE = "line"
-    POLYLINE = "polyline"
-    POLYGON = "polygon"
-
-
-class MeasurementSource(StrEnum):
-    """Кто создал геометрию. Влияет на порядок проверки, а не на саму величину."""
-
-    MANUAL = "manual"
-    AI = "ai"
-    IMPORTED = "imported"
-
-
-class ScaleSource(StrEnum):
-    """Откуда взялся масштаб чертежа."""
-
-    MANUAL = "manual"
-    DETECTED_DIMENSION = "detected_dimension"
-    IMPORTED = "imported"
-
-
-class VerificationState(StrEnum):
-    """Состояние проверки величины человеком."""
-
-    UNVERIFIED = "unverified"
-    VERIFIED = "verified"
-    DISPUTED = "disputed"
-
-
-@dataclass(frozen=True, slots=True)
-class ScaleCalibration:
-    """Масштаб листа.
-
-    Определять масштаб автоматически портал сейчас не умеет, и интерфейс честно пишет
-    «Не задан». Тип объявлен заранее, чтобы измерения сразу проектировались с оглядкой
-    на калибровку, а не пересчитывались потом.
-    """
-
-    sheet_id: str
-    # Сколько единиц реального мира приходится на единицу нормализованных координат.
-    units_per_normalized: float
-    unit: str
-    source: ScaleSource
-    confidence: float | None = None
-    # Точки, по которым построена калибровка: без них проверить масштаб невозможно.
-    validation_points: tuple[tuple[float, float], ...] = ()
-    verified: bool = False
+from app.domain import GeometryType, MeasurementSource, VerificationState
 
 
 @dataclass(frozen=True, slots=True)

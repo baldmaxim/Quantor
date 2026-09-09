@@ -8,6 +8,7 @@ from app.models.identity import AuthSession, UserIdentity, Workspace, WorkspaceM
 from app.models.job import Job
 from app.models.page_geometry import PageGeometry
 from app.models.project import Project
+from app.models.scale import ScaleCalibration
 from app.models.sheet import Region, Sheet
 from app.models.worker import Worker
 
@@ -22,6 +23,7 @@ __all__ = [
     "Project",
     "RecognitionArtifact",
     "Region",
+    "ScaleCalibration",
     "SettingOverride",
     "Sheet",
     "UserIdentity",

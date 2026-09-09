@@ -26,3 +26,4 @@ ADR не переписываются задним числом. Если реш
 | [0015](0015-sloi-nalozheniya-na-canvas2d.md)            | Слои наложения на Canvas2D до замера                   | принято |
 | [0016](0016-kanonicheskaya-geometriya-stranicy-pdf.md)  | Каноническая геометрия страницы PDF на сервере         | принято |
 | [0017](0017-chislennaya-granica-hranenie-i-raschyot.md) | Численная граница: хранение десятичное, расчёт float64 | принято |
+| [0018](0018-kalibrovka-masshtaba-cherteja.md)           | Калибровка масштаба: мм на точку PDF, неизменяемо      | принято |

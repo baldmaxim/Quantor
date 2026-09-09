@@ -592,6 +592,17 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
 export type JobType = 'legacy_import' | 'pdf_geometry_extract';
 
 /**
+ * LengthUnit
+ *
+ * Единица, в которой человек вводит известный размер.
+ *
+ * Внутренний канон — миллиметр: именно в нём проставлены размеры на строительных
+ * чертежах. Введённое значение сохраняется вместе с единицей — как доказательство
+ * того, что именно набрал человек.
+ */
+export type LengthUnit = 'mm' | 'cm' | 'm';
+
+/**
  * LivenessResponse
  */
 export type LivenessResponse = {
@@ -1313,6 +1324,158 @@ export type RegionShape = 'rectangle' | 'polygon';
 export type Role = 'platform_admin' | 'workspace_admin' | 'engineer' | 'reviewer' | 'viewer' | 'service';
 
 /**
+ * ScaleCalibrationCreate
+ *
+ * Запрос на ручную калибровку.
+ *
+ * Коэффициент сюда не передаётся и не принимается: его считает сервер из точек и
+ * канонической геометрии страницы. Иначе величину можно было бы задать запросом.
+ */
+export type ScaleCalibrationCreate = {
+    /**
+     * Known Distance
+     */
+    known_distance: number | string;
+    /**
+     * Make Default
+     */
+    make_default?: boolean;
+    /**
+     * Point A
+     */
+    point_a: [
+        number | string,
+        number | string
+    ];
+    /**
+     * Point B
+     */
+    point_b: [
+        number | string,
+        number | string
+    ];
+    /**
+     * Supersedes Id
+     */
+    supersedes_id?: string | null;
+    unit?: LengthUnit;
+};
+
+/**
+ * ScaleCalibrationRead
+ *
+ * Калибровка масштаба листа (ADR-0018).
+ *
+ * Числа передаются строками: `JSON.parse` превратил бы их в float64 и потерял точную
+ * десятичную запись, по которой калибровку проверяют.
+ */
+export type ScaleCalibrationRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    input_unit: LengthUnit;
+    /**
+     * Input Value
+     */
+    input_value: string;
+    /**
+     * Is Default
+     */
+    is_default: boolean;
+    /**
+     * Known Distance Mm
+     */
+    known_distance_mm: string;
+    /**
+     * Mm Per Pt
+     */
+    mm_per_pt: string;
+    /**
+     * Page Distance Pt
+     */
+    page_distance_pt: string;
+    /**
+     * Page Geometry Fingerprint
+     */
+    page_geometry_fingerprint: string;
+    /**
+     * Point A X
+     */
+    point_a_x: string;
+    /**
+     * Point A Y
+     */
+    point_a_y: string;
+    /**
+     * Point B X
+     */
+    point_b_x: string;
+    /**
+     * Point B Y
+     */
+    point_b_y: string;
+    scope_kind: ScaleScopeKind;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string;
+    source: ScaleSource;
+    /**
+     * Supersedes Id
+     */
+    supersedes_id: string | null;
+    verification_state: VerificationState;
+    /**
+     * Verified At
+     */
+    verified_at: string | null;
+    /**
+     * Verified By
+     */
+    verified_by: string | null;
+};
+
+/**
+ * ScaleScopeKind
+ *
+ * На что распространяется калибровка.
+ *
+ * Лист с планом 1:100 и узлом 1:20 — обычное дело, поэтому `region` объявлен сразу.
+ * На Stage 2A создаётся только `sheet`, но схема локальный масштаб не запрещает:
+ * модель, исходящая из одного масштаба на лист, не пережила бы первый же такой чертёж.
+ */
+export type ScaleScopeKind = 'sheet' | 'region';
+
+/**
+ * ScaleSource
+ *
+ * Откуда взялся масштаб чертежа.
+ *
+ * На Stage 2A публичный API создаёт только `manual`. Остальные объявлены как контракт,
+ * но записать их через эндпоинт нельзя: иначе ручную калибровку можно было бы выдать
+ * за автоматически подтверждённую (ADR-0018).
+ */
+export type ScaleSource = 'manual' | 'detected_dimension' | 'imported';
+
+/**
+ * ScaleVerificationWrite
+ *
+ * Подтверждение калибровки или снятие подтверждения.
+ */
+export type ScaleVerificationWrite = {
+    state: VerificationState;
+};
+
+/**
  * SessionResponse
  *
  * Состояние сеанса.
@@ -1776,6 +1939,13 @@ export type ValidationError = {
  * «кем и где» — это половина сведений, по которой ничего не починить.
  */
 export type ValueSource = 'default' | 'system' | 'workspace' | 'deployment';
+
+/**
+ * VerificationState
+ *
+ * Состояние проверки человеком.
+ */
+export type VerificationState = 'unverified' | 'verified' | 'disputed';
 
 /**
  * WorkerRead
@@ -3100,6 +3270,96 @@ export type ListRevisionSheetsResponses = {
 
 export type ListRevisionSheetsResponse = ListRevisionSheetsResponses[keyof ListRevisionSheetsResponses];
 
+export type ReadCalibrationData = {
+    body?: never;
+    path: {
+        /**
+         * Calibration Id
+         */
+        calibration_id: string;
+    };
+    query?: never;
+    url: '/api/v1/scale-calibrations/{calibration_id}';
+};
+
+export type ReadCalibrationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCalibrationError = ReadCalibrationErrors[keyof ReadCalibrationErrors];
+
+export type ReadCalibrationResponses = {
+    /**
+     * Successful Response
+     */
+    200: ScaleCalibrationRead;
+};
+
+export type ReadCalibrationResponse = ReadCalibrationResponses[keyof ReadCalibrationResponses];
+
+export type MakeCalibrationDefaultData = {
+    body?: never;
+    path: {
+        /**
+         * Calibration Id
+         */
+        calibration_id: string;
+    };
+    query?: never;
+    url: '/api/v1/scale-calibrations/{calibration_id}/default';
+};
+
+export type MakeCalibrationDefaultErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MakeCalibrationDefaultError = MakeCalibrationDefaultErrors[keyof MakeCalibrationDefaultErrors];
+
+export type MakeCalibrationDefaultResponses = {
+    /**
+     * Successful Response
+     */
+    200: ScaleCalibrationRead;
+};
+
+export type MakeCalibrationDefaultResponse = MakeCalibrationDefaultResponses[keyof MakeCalibrationDefaultResponses];
+
+export type SetCalibrationVerificationData = {
+    body: ScaleVerificationWrite;
+    path: {
+        /**
+         * Calibration Id
+         */
+        calibration_id: string;
+    };
+    query?: never;
+    url: '/api/v1/scale-calibrations/{calibration_id}/verification';
+};
+
+export type SetCalibrationVerificationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetCalibrationVerificationError = SetCalibrationVerificationErrors[keyof SetCalibrationVerificationErrors];
+
+export type SetCalibrationVerificationResponses = {
+    /**
+     * Successful Response
+     */
+    200: ScaleCalibrationRead;
+};
+
+export type SetCalibrationVerificationResponse = SetCalibrationVerificationResponses[keyof SetCalibrationVerificationResponses];
+
 export type ReadSheetGeometryData = {
     body?: never;
     path: {
@@ -3184,6 +3444,68 @@ export type ListSheetRegionsResponses = {
 };
 
 export type ListSheetRegionsResponse = ListSheetRegionsResponses[keyof ListSheetRegionsResponses];
+
+export type ListSheetCalibrationsData = {
+    body?: never;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/sheets/{sheet_id}/scale-calibrations';
+};
+
+export type ListSheetCalibrationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSheetCalibrationsError = ListSheetCalibrationsErrors[keyof ListSheetCalibrationsErrors];
+
+export type ListSheetCalibrationsResponses = {
+    /**
+     * Response List Sheet Calibrations
+     *
+     * Successful Response
+     */
+    200: Array<ScaleCalibrationRead>;
+};
+
+export type ListSheetCalibrationsResponse = ListSheetCalibrationsResponses[keyof ListSheetCalibrationsResponses];
+
+export type CreateSheetCalibrationData = {
+    body: ScaleCalibrationCreate;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/sheets/{sheet_id}/scale-calibrations';
+};
+
+export type CreateSheetCalibrationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateSheetCalibrationError = CreateSheetCalibrationErrors[keyof CreateSheetCalibrationErrors];
+
+export type CreateSheetCalibrationResponses = {
+    /**
+     * Successful Response
+     */
+    201: ScaleCalibrationRead;
+};
+
+export type CreateSheetCalibrationResponse = CreateSheetCalibrationResponses[keyof CreateSheetCalibrationResponses];
 
 export type LivenessData = {
     body?: never;

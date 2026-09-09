@@ -184,6 +184,73 @@ class RegionShape(StrEnum):
     POLYGON = "polygon"
 
 
+class GeometryType(StrEnum):
+    """Что именно измеряют."""
+
+    COUNT = "count"
+    LINE = "line"
+    POLYLINE = "polyline"
+    POLYGON = "polygon"
+
+
+class MeasurementSource(StrEnum):
+    """Кто создал геометрию. Влияет на порядок проверки, а не на саму величину."""
+
+    MANUAL = "manual"
+    AI = "ai"
+    IMPORTED = "imported"
+
+
+class ScaleSource(StrEnum):
+    """Откуда взялся масштаб чертежа.
+
+    На Stage 2A публичный API создаёт только `manual`. Остальные объявлены как контракт,
+    но записать их через эндпоинт нельзя: иначе ручную калибровку можно было бы выдать
+    за автоматически подтверждённую (ADR-0018).
+    """
+
+    MANUAL = "manual"
+    DETECTED_DIMENSION = "detected_dimension"
+    IMPORTED = "imported"
+
+
+class ScaleScopeKind(StrEnum):
+    """На что распространяется калибровка.
+
+    Лист с планом 1:100 и узлом 1:20 — обычное дело, поэтому `region` объявлен сразу.
+    На Stage 2A создаётся только `sheet`, но схема локальный масштаб не запрещает:
+    модель, исходящая из одного масштаба на лист, не пережила бы первый же такой чертёж.
+    """
+
+    SHEET = "sheet"
+    REGION = "region"
+
+
+class LengthUnit(StrEnum):
+    """Единица, в которой человек вводит известный размер.
+
+    Внутренний канон — миллиметр: именно в нём проставлены размеры на строительных
+    чертежах. Введённое значение сохраняется вместе с единицей — как доказательство
+    того, что именно набрал человек.
+    """
+
+    MM = "mm"
+    CM = "cm"
+    M = "m"
+
+    @property
+    def to_mm(self) -> int:
+        return {LengthUnit.MM: 1, LengthUnit.CM: 10, LengthUnit.M: 1000}[self]
+
+
+class VerificationState(StrEnum):
+    """Состояние проверки человеком."""
+
+    UNVERIFIED = "unverified"
+    VERIFIED = "verified"
+    DISPUTED = "disputed"
+
+
 class JobType(StrEnum):
     """Типы заданий.
 

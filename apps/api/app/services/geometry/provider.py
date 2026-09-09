@@ -15,9 +15,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from app.errors import DomainError, ErrorCode
+
+if TYPE_CHECKING:
+    from pypdf import PdfReader
 
 # Точность хранения и отпечатка: 0,0001 pt — 35 нанометров чертежа. Значение выбрано
 # в ADR-0016 и повторяется здесь, потому что квантование обязано совпасть со схемой.
@@ -122,8 +125,8 @@ class PypdfGeometryProvider:
 
         return [self._page(reader, index) for index in range(page_count)]
 
-    def _page(self, reader: object, index: int) -> RawPageGeometry:
-        page = reader.pages[index]  # type: ignore[attr-defined]
+    def _page(self, reader: PdfReader, index: int) -> RawPageGeometry:
+        page = reader.pages[index]
 
         try:
             media = [_quantize(float(value)) for value in page.mediabox]
