@@ -495,13 +495,32 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 <ToolButton
                   key={mode}
                   label={label}
-                  hint={hint}
+                  // Когда рисовать некуда, подсказка говорит об этом, а не про два щелчка.
+                  hint={
+                    !activeItem || activeItem.geometry_type !== mode
+                      ? `нужна строка обмера типа «${label}»`
+                      : hint
+                  }
                   wide
                   active={toolMode === mode}
-                  // Инструмент включается только под подходящую строку: рисовать площадь
-                  // в строке «Двери» нечем — там считают штуки (ADR-0019).
-                  disabled={!activeItem || activeItem.geometry_type !== mode}
+                  disabled={!sheetId}
                   onClick={() => {
+                    // Инструмент работает только под подходящую строку: рисовать площадь
+                    // в строке «Двери» нечем — там считают штуки (ADR-0019).
+                    //
+                    // Но выключенная кнопка об этом молчит: щелчок ничего не делает, а
+                    // почему — неизвестно. Поэтому кнопка живая и объясняет, чего не
+                    // хватает, вместо того чтобы притворяться сломанной.
+                    if (!activeItem || activeItem.geometry_type !== mode) {
+                      setLeftTab('takeoff');
+                      setTakeoffError(
+                        `Инструмент «${label}» рисует в строку того же типа.` +
+                          ' Создайте её на панели обмеров или выберите существующую.',
+                      );
+                      return;
+                    }
+
+                    setTakeoffError(null);
                     const next: ToolMode = toolMode === mode ? 'select' : mode;
                     setToolMode(next);
                     tools.send({ type: 'setMode', mode: next });
