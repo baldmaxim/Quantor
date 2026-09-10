@@ -92,6 +92,22 @@ const readRegionColors = (): Record<string, string> => {
   };
 };
 
+/**
+ * Чернила обмера.
+ *
+ * Отдельные токены, а не `--accent`: тот в тёмной теме светлеет, а бумага листа остаётся
+ * светлой в обеих. Светлый штрих по светлой бумаге не виден — на этом уже спотыкались.
+ */
+const readSheetInk = (): Record<string, string> => {
+  if (typeof window === 'undefined') return {};
+  const style = getComputedStyle(document.documentElement);
+
+  return {
+    accent: style.getPropertyValue('--sheet-ink').trim(),
+    danger: style.getPropertyValue('--sheet-ink-danger').trim(),
+  };
+};
+
 export const DrawingViewport = ({
   backend,
   sheet,
@@ -382,7 +398,8 @@ export const DrawingViewport = ({
     const placed = placeRenderedPage(page, renderedScale.current, ratio);
     resizeOverlay(canvas, placed.width, placed.height, ratio);
 
-    const color = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    // Черновик калибровки рисуется по той же бумаге — и теми же чернилами.
+    const color = readSheetInk().accent;
     drawScaleDraft(
       context,
       placed,
@@ -411,9 +428,10 @@ export const DrawingViewport = ({
     resizeOverlay(canvas, placed.width, placed.height, ratio);
 
     const toolState = tools.getState();
-    const fallback =
-      getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() ||
-      'currentColor';
+    // Палитра строк обмера ложится поверх умолчаний: сама строка вправе назвать свой цвет,
+    // но по умолчанию берутся чернила, читаемые на бумаге.
+    const palette = { ...readSheetInk(), ...measurementColors };
+    const fallback = palette.accent || 'currentColor';
 
     drawMeasurements(
       context,
@@ -431,7 +449,7 @@ export const DrawingViewport = ({
           ? { id: toolState.drag.measurementId, points: toolState.drag.points }
           : null,
       },
-      { colors: measurementColors, fallbackColor: fallback },
+      { colors: palette, fallbackColor: fallback },
       ratio,
     );
   }, [page, tools, measurements, measurementColors]);
