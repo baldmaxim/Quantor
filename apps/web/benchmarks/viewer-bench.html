@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Замер просмотрщика</title>
+    <style>
+      /* Стенд собирается без Tailwind: здесь ровно те служебные классы, от которых зависит
+         раскладка холстов в DrawingViewport. Остальные классы на замер не влияют. */
+      :root {
+        --region-text: #2f6fed;
+        --region-image: #1f9d55;
+        --region-stamp: #d97706;
+        --sheet-ink: #1d4ed8;
+        --sheet-ink-danger: #b91c1c;
+      }
+      body {
+        margin: 0;
+        background: #101317;
+      }
+      #viewport-host {
+        width: 1600px;
+        height: 1000px;
+      }
+      .relative {
+        position: relative;
+      }
+      .absolute {
+        position: absolute;
+      }
+      .top-0 {
+        top: 0;
+      }
+      .left-0 {
+        left: 0;
+      }
+      .h-full {
+        height: 100%;
+      }
+      .w-full {
+        width: 100%;
+      }
+      .overflow-hidden {
+        overflow: hidden;
+      }
+      .origin-top-left {
+        transform-origin: top left;
+      }
+      .will-change-transform {
+        will-change: transform;
+      }
+      .block {
+        display: block;
+      }
+      .hidden {
+        display: none;
+      }
+      .pointer-events-none {
+        pointer-events: none;
+      }
+      .opacity-0 {
+        opacity: 0;
+      }
+      .bg-canvas {
+        background: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="viewport-host"></div>
+    <script type="module">
+      import * as bench from '/benchmarks/viewer-bench.ts';
+
+      // Замер не запускается сам: оболочка вызывает разделы по одному и видит, какой упал.
+      window.__viewerBench = bench;
+      window.__benchReady = true;
+    </script>
+  </body>
+</html>

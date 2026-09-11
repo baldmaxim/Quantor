@@ -39,6 +39,25 @@ class FakeBackend implements RenderBackend {
 }
 
 /**
+ * Отрисовщик с потолком разрешения.
+ *
+ * Рисует тот же лист в более грубый растр — ровно то, что сделал бы отрисовщик с лимитом
+ * числа пикселей. Координата под указателем от этого меняться не имеет права.
+ */
+class CappedBackend extends FakeBackend {
+  constructor(private readonly density: number) {
+    super();
+  }
+
+  override async render({ scale, canvas, signal }: RenderRequest): Promise<void> {
+    if (signal.aborted) return;
+    this.renders.push(scale);
+    canvas.width = Math.max(1, Math.floor(SHEET.width * scale * this.density));
+    canvas.height = Math.max(1, Math.floor(SHEET.height * scale * this.density));
+  }
+}
+
+/**
  * Отрисовщик, который не заканчивает работу сам.
  *
  * Нужен, чтобы поймать наложение задач: настоящий pdf.js рисует не мгновенно, а
@@ -372,6 +391,41 @@ describe('инструмент масштаба на холсте', () => {
     await flushFrame();
 
     expect(draft.getState().a).toEqual(first);
+  });
+
+  it('координата под указателем не зависит от разрешения растра страницы', async () => {
+    // Инвариант Stage 2B №12: разрешение растра отвечает за резкость, а не за координату.
+    // Тот же лист, та же камера, тот же щелчок — полный растр и растр вчетверо беднее по
+    // площади обязаны дать одну и ту же нормализованную точку, до последнего бита.
+    const pick = async (backend: RenderBackend) => {
+      const draft = new ScaleDraft();
+      const camera = new Camera();
+      const { view } = setup({ backend, camera, tool: 'scale', scaleDraft: draft });
+      await settle();
+
+      await act(async () => {
+        camera.set({ scale: 2.66, offsetX: -1234.5, offsetY: -567.25 });
+      });
+      await settle();
+
+      fireEvent.pointerDown(screen.getByTestId('viewport'), {
+        button: 0,
+        clientX: 812.75,
+        clientY: 431.5,
+      });
+      const point = draft.getState().a;
+      const rasterWidth = view.container.querySelector('canvas')?.width ?? 0;
+      view.unmount();
+      return { point, rasterWidth };
+    };
+
+    const full = await pick(new FakeBackend());
+    const capped = await pick(new CappedBackend(0.5));
+
+    // Проверка осмысленна, только если растры действительно разные.
+    expect(capped.rasterWidth).toBeLessThan(full.rasterWidth);
+    expect(full.point).not.toBeNull();
+    expect(capped.point).toEqual(full.point);
   });
 
   it('слой черновика скрыт, пока инструмент не выбран', async () => {

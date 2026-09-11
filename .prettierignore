@@ -15,3 +15,6 @@ _prompts
 # создаётся командой pnpm benchmark:measurement — правится только генератором
 docs/stage2a/benchmark-report.md
 docs/stage2a/benchmark-results.json
+# создаётся командой pnpm benchmark:viewer — правится только генератором
+docs/stage2b/viewer-benchmark-report.md
+docs/stage2b/viewer-benchmark-results.json
