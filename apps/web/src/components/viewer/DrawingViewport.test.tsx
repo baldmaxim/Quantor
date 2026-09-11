@@ -83,6 +83,22 @@ const flushFrame = async (): Promise<void> => {
   });
 };
 
+/**
+ * Ждёт, пока лист перестанет законно перерисовываться.
+ *
+ * При открытии лист вписывается в экран: масштаб меняется, и страница перерисовывается после
+ * задержки. Проверка «жест не перерисовал страницу» обязана снимать исходное число
+ * перерисовок уже после этого — иначе вписка, пришедшая под нагрузкой позже обычного,
+ * засчитывается жесту. Именно так тест «рисование не перерисовывает страницу» падал в одном
+ * прогоне из трёх.
+ */
+const settle = async (): Promise<void> => {
+  await flushFrame();
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  });
+};
+
 const stackOf = (): HTMLElement => {
   const viewport = screen.getByTestId('viewport');
   const stack = viewport.firstElementChild;
@@ -257,12 +273,7 @@ describe('холст рабочей области', () => {
     // пиксель в пиксель той же. На листе A1 при 266 % это растеризация десятков мегапикселей
     // после каждой паузы в перетаскивании.
     const { backend, camera } = setup({ tool: 'pan' });
-    await flushFrame();
-    // Вписка листа при открытии меняет масштаб и законно перерисовывает страницу. Ждём, пока
-    // она завершится, иначе её перерисовка засчиталась бы панораме.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    });
+    await settle();
     const rendersBefore = backend.renders.length;
     const viewport = screen.getByTestId('viewport');
 
@@ -290,7 +301,7 @@ describe('холст рабочей области', () => {
     // Обратная сторона предыдущей проверки: страница обязана перерисоваться, когда
     // масштаб действительно изменился. Иначе при увеличении лист оставался бы размытым.
     const { backend } = setup();
-    await flushFrame();
+    await settle();
     const rendersBefore = backend.renders.length;
 
     const viewport = screen.getByTestId('viewport');
@@ -330,7 +341,7 @@ describe('инструмент масштаба на холсте', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const draft = new ScaleDraft();
     const { backend } = setup({ tool: 'scale', scaleDraft: draft });
-    await flushFrame();
+    await settle();
     const rendersBefore = backend.renders.length;
 
     const viewport = screen.getByTestId('viewport');
@@ -421,7 +432,7 @@ describe('слой измерений', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const tools = new ToolController('polygon');
     const { backend } = setup({ tools });
-    await flushFrame();
+    await settle();
     const rendersBefore = backend.renders.length;
 
     const viewport = screen.getByTestId('viewport');
@@ -439,7 +450,7 @@ describe('слой измерений', () => {
   it('выбор измерения не перерисовывает страницу', async () => {
     const tools = new ToolController('select');
     const { backend } = setup({ tools, measurements: [wallMeasurement] });
-    await flushFrame();
+    await settle();
     const rendersBefore = backend.renders.length;
 
     tools.send({ type: 'selectMeasurement', measurementId: 'm1' });
@@ -452,7 +463,7 @@ describe('слой измерений', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const tools = new ToolController('select');
     const { backend } = setup({ tools, measurements: [wallMeasurement] });
-    await flushFrame();
+    await settle();
     const rendersBefore = backend.renders.length;
 
     tools.send({
