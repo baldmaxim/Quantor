@@ -15,7 +15,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.v1.deps import AuthDep, SessionDep, WorkspaceDep, require
+from app.api.v1.deps import AuthDep, SessionDep, WorkspaceDep, require, require_feature
 from app.auth.permissions import Permission
 from app.domain import AuditAction
 from app.errors import not_found
@@ -38,7 +38,9 @@ from app.services import projects as projects_service
 from app.services import scale as scale_service
 from app.services import takeoff as takeoff_service
 
-router = APIRouter(tags=["takeoff"])
+# Весь ручной обмер закрыт пилотным флагом: выключен для пространства — возможности нет и в
+# API, а не только на экране (ADR-0023).
+router = APIRouter(tags=["takeoff"], dependencies=[require_feature("takeoff.manual")])
 
 
 # ---------------------------------------------------------------------- строки обмера

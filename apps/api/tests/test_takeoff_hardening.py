@@ -271,6 +271,7 @@ class TestBodySizeLimit:
         assert response.status_code == 404
 
 
+@pytest.mark.usefixtures("takeoff_manual_enabled")
 class TestTenantBoundariesUnderAttack:
     """Границы арендатора на злонамеренных сочетаниях. Требует базы."""
 
@@ -382,6 +383,7 @@ class TestTenantBoundariesUnderAttack:
         assert body["version"] == 1
 
 
+@pytest.mark.usefixtures("takeoff_manual_enabled")
 class TestAuditDoesNotLeak:
     """Журнал обязан объяснять действие, не пересказывая данные."""
 

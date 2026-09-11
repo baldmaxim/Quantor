@@ -11,6 +11,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -34,6 +35,10 @@ from tests.test_performance import count_queries
 
 A1_WIDTH = Decimal("2384.0000")
 A1_HEIGHT = Decimal("1684.0000")
+
+# Весь файл — API ручного обмера, закрытого пилотным флагом (ADR-0023). Здесь проверяется
+# предметная логика, поэтому флаг включён; отказ при выключенном — в test_pilot_flag.py.
+pytestmark = pytest.mark.usefixtures("takeoff_manual_enabled")
 
 
 async def _sheet(session: AsyncSession, *, project: Project) -> Sheet:

@@ -225,9 +225,12 @@ def test_every_stage1_flag_key_survived() -> None:
 
 
 def test_unfinished_features_cannot_be_enabled_from_the_console() -> None:
-    """Незавершённое остаётся закрытым: включение флага не создаёт функциональность."""
+    """Незавершённое остаётся закрытым: включение флага не создаёт функциональность.
+
+    `takeoff.manual` отсюда ушёл осознанно: после закрытия Stage 2A это пилотная возможность,
+    которую владелец включает на пространство (ADR-0023). Проверки пилота — test_pilot_flag.py.
+    """
     for key in (
-        "takeoff.manual",
         "takeoff.ai",
         "models.gateway",
         "reports",

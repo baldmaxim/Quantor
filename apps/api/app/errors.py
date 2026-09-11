@@ -33,6 +33,7 @@ class ErrorCode(StrEnum):
     FLAG_UNKNOWN = "FLAG_UNKNOWN"
     FLAG_NOT_EDITABLE = "FLAG_NOT_EDITABLE"
     FLAG_SCOPE_INVALID = "FLAG_SCOPE_INVALID"
+    FEATURE_DISABLED = "FEATURE_DISABLED"
     TENDERHUB_BINDING_CONFLICT = "TENDERHUB_BINDING_CONFLICT"
     TENDERHUB_BINDING_IMMUTABLE = "TENDERHUB_BINDING_IMMUTABLE"
 
@@ -115,6 +116,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.FLAG_UNKNOWN: "Такого флага возможностей нет",
     ErrorCode.FLAG_NOT_EDITABLE: "Флаг закрыт до готовности возможности",
     ErrorCode.FLAG_SCOPE_INVALID: "Флаг не переопределяется на уровне пространства",
+    ErrorCode.FEATURE_DISABLED: "Возможность не включена для этого рабочего пространства",
     ErrorCode.TENDERHUB_BINDING_CONFLICT: "Этот тендер уже привязан к другому проекту",
     ErrorCode.TENDERHUB_BINDING_IMMUTABLE: "Связь с тендером меняется только администратором",
     ErrorCode.AUTH_NOT_CONFIGURED: "Вход в портал не настроен",
@@ -184,6 +186,9 @@ STATUS_CODES: dict[ErrorCode, int] = {
     # это конфликт с состоянием продукта, а не отказ в доступе.
     ErrorCode.FLAG_NOT_EDITABLE: status.HTTP_409_CONFLICT,
     ErrorCode.FLAG_SCOPE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    # 403, а не 404: существование возможности не секрет — оно видно в /api/v1/meta, а
+    # отдельный код позволяет интерфейсу объяснить, почему отказ (ADR-0023).
+    ErrorCode.FEATURE_DISABLED: status.HTTP_403_FORBIDDEN,
     ErrorCode.TENDERHUB_BINDING_CONFLICT: status.HTTP_409_CONFLICT,
     ErrorCode.TENDERHUB_BINDING_IMMUTABLE: status.HTTP_409_CONFLICT,
     ErrorCode.AUTH_NOT_CONFIGURED: status.HTTP_503_SERVICE_UNAVAILABLE,

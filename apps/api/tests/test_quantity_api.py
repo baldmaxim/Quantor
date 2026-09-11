@@ -15,6 +15,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -101,6 +102,7 @@ async def _calibrate(session: AsyncSession, *, sheet: Sheet) -> ScaleCalibration
     )
 
 
+@pytest.mark.usefixtures("takeoff_manual_enabled")
 class TestQuantitiesReachTheClient:
     async def test_line_across_the_sheet_is_ten_metres(
         self,
@@ -351,6 +353,7 @@ class TestQuantitiesReachTheClient:
         assert quantity.value == Decimal(10)
 
 
+@pytest.mark.usefixtures("takeoff_manual_enabled")
 class TestQuantitiesObeyTheBoundary:
     async def test_foreign_sheet_is_not_found(
         self,
@@ -393,6 +396,7 @@ class TestQuantitiesObeyTheBoundary:
         assert response.status_code == 200
 
 
+@pytest.mark.usefixtures("takeoff_manual_enabled")
 class TestNoQueryGrowth:
     async def test_quantities_do_not_grow_with_measurements(
         self,

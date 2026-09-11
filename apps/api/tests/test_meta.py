@@ -6,8 +6,9 @@ from httpx import AsyncClient
 
 from app import API_VERSION, SCHEMA_VERSION
 
-# Возможности, которые на Stage 1 обязаны быть выключены: портал не должен делать вид,
-# что умеет считать объёмы или обращаться к моделям.
+# Возможности, выключенные по умолчанию: портал не должен делать вид, что умеет обращаться
+# к моделям. `takeoff.manual` здесь остаётся — это пилот, и без переопределения для
+# пространства он тоже выключен (ADR-0023).
 STAGE2_FEATURES = (
     "takeoff.manual",
     "takeoff.ai",
@@ -25,7 +26,7 @@ async def test_meta_reports_contract_versions(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert payload["api_version"] == API_VERSION
     assert payload["schema_version"] == SCHEMA_VERSION
-    assert payload["stage"] == "stage-1.5"
+    assert payload["stage"] == "stage-2b"
 
 
 async def test_meta_keeps_stage2_features_disabled(client: AsyncClient) -> None:

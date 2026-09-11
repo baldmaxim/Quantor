@@ -52,7 +52,7 @@ async def read_meta(request: Request, session: SessionDep, settings: SettingsDep
         api_version=API_VERSION,
         schema_version=SCHEMA_VERSION,
         environment=settings.environment,
-        stage="stage-1.5",
+        stage="stage-2b",
         features=features,
         auth_mode=settings.auth_mode,
     )

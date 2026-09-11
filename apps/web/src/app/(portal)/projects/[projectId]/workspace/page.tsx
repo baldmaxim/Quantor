@@ -14,6 +14,7 @@ import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
 import { TakeoffPanel, type TakeoffGeometry } from '@/components/workspace/TakeoffPanel';
+import { takeoffAccess, type ITakeoffAccess } from '@/components/workspace/takeoff-access';
 import type { NormalizedPoint } from '@/lib/viewer/coordinates';
 import type { OverlayMeasurement } from '@/lib/viewer/measurement-overlay';
 import { ScaleDraft, type ScaleDraftPhase } from '@/lib/viewer/scale-draft';
@@ -47,6 +48,7 @@ import {
   useCreateMeasurement,
   useCreateTakeoffItem,
   useDeleteMeasurement,
+  useFeatures,
   useMeasurements,
   useScaleCalibrations,
   useSheetQuantities,
@@ -69,10 +71,13 @@ interface IPageProps {
   params: Promise<{ projectId: string }>;
 }
 
-const LEFT_TABS: readonly { id: LeftTab; label: string; enabled: boolean; hint?: string }[] = [
+const leftTabs = (
+  takeoff: ITakeoffAccess,
+): readonly { id: LeftTab; label: string; enabled: boolean; hint?: string }[] => [
   { id: 'documents', label: 'Листы', enabled: true },
   { id: 'recognition', label: 'Распознавание', enabled: true },
-  { id: 'takeoff', label: 'Обмеры', enabled: true },
+  // Обмер — пилотная возможность: вкладка следует тому же флагу, что и сервер (ADR-0023).
+  { id: 'takeoff', label: 'Обмеры', enabled: takeoff.enabled, hint: takeoff.hint },
 ];
 
 const WorkspacePage = ({ params }: IPageProps) => {
@@ -97,6 +102,14 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const toggleOverlay = useWorkspaceStore((state) => state.toggleOverlay);
   const hiddenTypes = useWorkspaceStore((state) => state.hiddenTypes);
   const toggleType = useWorkspaceStore((state) => state.toggleType);
+
+  // Выключенный пилот закрывает и вкладку, и инструменты масштаба. Запомненная открытой
+  // вкладка обмеров и выбранный инструмент масштаба при этом не открывают возможность, а
+  // уступают место листам и указателю — хранилище не переписывается, чтобы включение пилота
+  // вернуло пользователя туда, где он был.
+  const takeoff = takeoffAccess(useFeatures());
+  const activeTab: LeftTab = leftTab === 'takeoff' && !takeoff.enabled ? 'documents' : leftTab;
+  const activeTool = tool === 'scale' && !takeoff.enabled ? 'pointer' : tool;
 
   const camera = useMemo(() => new Camera(), []);
   useEffect(() => () => camera.dispose(), [camera]);
@@ -161,8 +174,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const [takeoffError, setTakeoffError] = useState<string | null>(null);
   const [toolMode, setToolMode] = useState<ToolMode>('select');
 
-  const takeoffItems = useTakeoffItems(projectId);
-  const measurements = useMeasurements(sheetId);
+  // При выключенном пилоте запросы обмера не отправляются: сервер ответил бы отказом.
+  const takeoffItems = useTakeoffItems(takeoff.enabled ? projectId : null);
+  const measurements = useMeasurements(takeoff.enabled ? sheetId : null);
   const createItem = useCreateTakeoffItem(projectId);
   const archiveItem = useArchiveTakeoffItem(projectId);
   const createMeasurement = useCreateMeasurement(sheetId ?? '');
@@ -200,7 +214,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
   // Величины считает сервер: число, посчитанное в браузере, невозможно ни проверить,
   // ни воспроизвести (ADR-0008).
-  const quantities = useSheetQuantities(sheetId);
+  const quantities = useSheetQuantities(takeoff.enabled ? sheetId : null);
 
   const quantityByMeasurement = useMemo(() => {
     const map: Record<string, MeasurementQuantityRead> = {};
@@ -214,7 +228,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
     return map;
   }, [quantities.data]);
 
-  const calibrations = useScaleCalibrations(sheetId);
+  const calibrations = useScaleCalibrations(takeoff.enabled ? sheetId : null);
   const defaultCalibration = calibrations.data?.find((item) => item.is_default) ?? null;
   const createCalibration = useCreateCalibration();
 
@@ -316,7 +330,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
   // Esc отменяет черновик, не обращаясь к серверу.
   useEffect(() => {
-    if (tool !== 'scale') return;
+    if (activeTool !== 'scale') return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
@@ -325,7 +339,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [tool, scaleDraft]);
+  }, [activeTool, scaleDraft]);
 
   // Смена листа обнуляет черновик: точки нормализованы к своему листу и на чужом
   // означали бы совсем другое место. Отмена императивная — состояние обновит подписка.
@@ -420,7 +434,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               <ToolButton
                 label="Выбор"
                 hint="V — выбрать измерение на чертеже"
-                active={tool === 'pointer' && toolMode === 'select'}
+                active={activeTool === 'pointer' && toolMode === 'select'}
                 onClick={() => {
                   setTool('pointer');
                   setToolMode('select');
@@ -434,7 +448,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               <ToolButton
                 label="Панорама"
                 hint="пробел или средняя кнопка с перетаскиванием; Shift и Alt с колесом"
-                active={tool === 'pan'}
+                active={activeTool === 'pan'}
                 onClick={() => setTool('pan')}
               >
                 <IconHand width={16} height={16} />
@@ -499,14 +513,14 @@ const WorkspacePage = ({ params }: IPageProps) => {
               </ToolButton>
               <ToolButton
                 label="Масштаб"
-                hint="два щелчка по известному размеру; Esc — отмена"
+                hint={takeoff.hint ?? 'два щелчка по известному размеру; Esc — отмена'}
                 wide
-                active={tool === 'scale'}
-                disabled={!sheetId}
+                active={activeTool === 'scale'}
+                disabled={!sheetId || !takeoff.enabled}
                 onClick={() => {
                   scaleDraft.cancel();
                   setScaleError(null);
-                  setTool(tool === 'scale' ? 'pointer' : 'scale');
+                  setTool(activeTool === 'scale' ? 'pointer' : 'scale');
                 }}
               >
                 Масштаб
@@ -526,13 +540,14 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   label={label}
                   // Когда рисовать некуда, подсказка говорит об этом, а не про два щелчка.
                   hint={
-                    !activeItem || activeItem.geometry_type !== mode
+                    takeoff.hint ??
+                    (!activeItem || activeItem.geometry_type !== mode
                       ? `нужна строка обмера типа «${label}»`
-                      : hint
+                      : hint)
                   }
                   wide
                   active={toolMode === mode}
-                  disabled={!sheetId}
+                  disabled={!sheetId || !takeoff.enabled}
                   onClick={() => {
                     // Инструмент работает только под подходящую строку: рисовать площадь
                     // в строке «Двери» нечем — там считают штуки (ADR-0019).
@@ -577,18 +592,18 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 aria-label="Разделы панели"
                 className="flex border-b border-border"
               >
-                {LEFT_TABS.map((tab) => (
+                {leftTabs(takeoff).map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     role="tab"
-                    aria-selected={leftTab === tab.id}
+                    aria-selected={activeTab === tab.id}
                     disabled={!tab.enabled}
                     title={tab.hint ? `${tab.label} — ${tab.hint}` : tab.label}
                     onClick={() => tab.enabled && setLeftTab(tab.id)}
                     className={cx(
                       'flex-1 border-r border-border py-[var(--s-3)] text-xs transition-colors last:border-r-0',
-                      leftTab === tab.id
+                      activeTab === tab.id
                         ? 'text-text shadow-[inset_0_-2px_0_var(--accent)]'
                         : 'text-muted',
                       tab.enabled ? 'hover:text-text' : 'cursor-not-allowed opacity-40',
@@ -600,7 +615,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               </div>
 
               <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
-                {leftTab === 'documents' && (
+                {activeTab === 'documents' && (
                   <SheetList
                     pages={pages.map((item) => ({
                       id: item.id,
@@ -613,7 +628,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   />
                 )}
 
-                {leftTab === 'recognition' && (
+                {activeTab === 'recognition' && (
                   <RecognitionPanel
                     counts={counts}
                     hiddenTypes={hiddenTypes}
@@ -626,7 +641,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   />
                 )}
 
-                {leftTab === 'takeoff' && (
+                {activeTab === 'takeoff' && (
                   <TakeoffPanel
                     items={items}
                     activeItemId={activeItemId}
@@ -677,10 +692,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 selectedId={selectedRegionId}
                 onSelect={(id) => setQuery({ region: id })}
                 camera={camera}
-                tool={tool}
+                tool={activeTool}
                 scaleDraft={scaleDraft}
                 measurements={overlayMeasurements}
-                tools={leftTab === 'takeoff' ? tools : null}
+                tools={activeTab === 'takeoff' ? tools : null}
                 onViewChange={(state) => setZoomPercent(Math.round(state.scale * 100))}
                 onError={setRenderError}
               />
@@ -720,10 +735,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
               )}
             </ViewportArea>
           }
-          rightTitle={leftTab === 'takeoff' ? 'Свойства измерения' : 'Свойства области'}
+          rightTitle={activeTab === 'takeoff' ? 'Свойства измерения' : 'Свойства области'}
           right={
             <div className="flex min-h-0 flex-1 flex-col gap-[var(--s-5)] overflow-auto overscroll-contain p-[var(--s-4)]">
-              {leftTab === 'takeoff' ? (
+              {activeTab === 'takeoff' ? (
                 <MeasurementInspector
                   measurement={selectedMeasurement}
                   item={

@@ -32,6 +32,7 @@ import {
   type TenderBriefRead,
 } from '@quantor/api-client';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useSyncExternalStore } from 'react';
 
 /**
  * Обращения к API.
@@ -85,15 +86,34 @@ export const useMeta = (): UseQueryResult<MetaResponse> =>
     staleTime: 5 * 60_000,
   });
 
+const subscribeToNothing = (): (() => void) => () => undefined;
+
+/**
+ * Идёт ли ещё гидратация. Во время неё React берёт серверный снимок (`false`), после —
+ * клиентский (`true`) и перерисовывает компонент.
+ */
+const useHydrated = (): boolean =>
+  useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false,
+  );
+
 /**
  * Флаги возможностей.
  *
  * Пока ответ не пришёл, всё считается выключенным: показать раздел, которого нет,
  * хуже, чем на мгновение не показать существующий.
+ *
+ * Во время гидратации флаги тоже пустые — ровно как на сервере, где `meta` никто не
+ * запрашивал. Иначе страница, гидрирующаяся после того, как `meta` уже пришла, получала
+ * `disabled` из серверной разметки, а React 19 расхождение атрибутов при гидратации не
+ * исправляет: вкладка обмеров оставалась выключенной при включённом пилоте навсегда.
  */
 export const useFeatures = (): Record<string, boolean> => {
   const { data } = useMeta();
-  return data?.features ?? {};
+  const hydrated = useHydrated();
+  return hydrated ? (data?.features ?? {}) : {};
 };
 
 export const useProjects = (params: ProjectsParams) =>

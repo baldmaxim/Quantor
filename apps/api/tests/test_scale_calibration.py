@@ -422,6 +422,7 @@ class TestTenantIsolation:
         assert found is None
 
 
+@pytest.mark.usefixtures("takeoff_manual_enabled")
 class TestApiAndPermissions:
     """Матрица прав: кто видит, кто вносит, кто подтверждает."""
 

@@ -60,6 +60,24 @@ test('незавершённую возможность включить нел�
   ).toBeDisabled();
 });
 
+test('пилотную возможность можно включить в пространстве', async ({ page }) => {
+  await page.goto('/feature-flags');
+
+  // Ручной обмер — пилот (ADR-0023): у него есть включение на текущее пространство, а у
+  // незавершённого «Автоматического подсчёта» такой кнопки нет вовсе.
+  const rows = page.locator('.admin-table tbody tr');
+  await expect(
+    rows
+      .filter({ hasText: 'Ручные измерения' })
+      .getByRole('button', { name: 'Включить в пространстве', exact: true }),
+  ).toBeEnabled();
+  await expect(
+    rows
+      .filter({ hasText: 'Автоматический подсчёт' })
+      .getByRole('button', { name: 'Включить в пространстве', exact: true }),
+  ).toHaveCount(0);
+});
+
 test('панель показывает числа сервера, а не выдуманные', async ({ page }) => {
   await page.goto('/dashboard');
 

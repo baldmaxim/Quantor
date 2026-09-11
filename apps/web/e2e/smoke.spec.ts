@@ -156,16 +156,46 @@ test.describe('рабочая область', () => {
     await expect(page.getByLabel('Панель документов и распознавания')).toBeVisible();
   });
 
-  test('вкладка обмеров открывает список строк', async ({ page }) => {
-    // Была выключена и подписана «Этап 2» до Stage 2A. Теперь ручной обмер существует,
-    // и тест переписан осознанно, а не подогнан: он проверяет новое поведение.
-    await page.goto(WORKSPACE);
+  test.describe('пилот ручного обмера', () => {
+    // Первая версия сценария с включённым пилотом падала через раз, и не из-за теста: если
+    // `meta` приходила раньше, чем гидрировалась страница, вкладка оставалась выключенной
+    // навсегда. Причина и защита — в `useFeatures` (features-hydration.test.tsx); сценарий
+    // проверен десятью повторами на обоих разрешениях.
+    test('вкладка обмеров открывает список строк, когда пилот включён', async ({ page }) => {
+      // Была выключена и подписана «Этап 2» до Stage 2A, затем включена жёстко. Теперь ручной
+      // обмер — пилотная возможность, и вкладку открывает флаг пространства (ADR-0023): тест
+      // переписан осознанно и проверяет именно это поведение.
+      await page.route('**/api/v1/meta*', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            api_version: '1.0.0',
+            schema_version: 10,
+            environment: 'test',
+            stage: 'stage-2b',
+            features: { viewer: true, 'takeoff.manual': true },
+            auth_mode: 'dev',
+          }),
+        }),
+      );
+      await page.goto(WORKSPACE);
 
-    const takeoff = page.getByRole('tab', { name: 'Обмеры' });
-    await expect(takeoff).toBeEnabled();
+      const takeoff = page.getByRole('tab', { name: 'Обмеры' });
+      await expect(takeoff).toBeEnabled();
 
-    await takeoff.click();
-    await expect(page.getByText('Строк обмера нет')).toBeVisible();
+      await takeoff.click();
+      await expect(page.getByText('Строк обмера нет')).toBeVisible();
+    });
+
+    test('без пилота вкладка обмеров выключена и объясняет почему', async ({ page }) => {
+      // Без бэкенда флагов нет, а отсутствие флага — это «выключено», а не «включено».
+      await page.goto(WORKSPACE);
+
+      const takeoff = page.getByRole('tab', { name: 'Обмеры' });
+      await expect(takeoff).toBeDisabled();
+      await expect(takeoff).toHaveAttribute('title', /пилот/);
+    });
   });
 
   test('без ревизии объясняет, что открывать нечего', async ({ page }) => {

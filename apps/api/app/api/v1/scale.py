@@ -11,7 +11,7 @@ import uuid
 
 from fastapi import APIRouter, status
 
-from app.api.v1.deps import SessionDep, WorkspaceDep, require
+from app.api.v1.deps import SessionDep, WorkspaceDep, require, require_feature
 from app.auth.permissions import Permission
 from app.domain import LengthUnit, VerificationState
 from app.errors import not_found
@@ -19,7 +19,8 @@ from app.schemas import ScaleCalibrationCreate, ScaleCalibrationRead, ScaleVerif
 from app.services import documents as documents_service
 from app.services import scale as scale_service
 
-router = APIRouter(tags=["scale"])
+# Калибровка — часть ручного обмера и закрыта тем же пилотным флагом (ADR-0023).
+router = APIRouter(tags=["scale"], dependencies=[require_feature("takeoff.manual")])
 
 
 @router.get(

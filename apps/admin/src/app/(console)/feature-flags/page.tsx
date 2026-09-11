@@ -4,7 +4,7 @@ import type { FlagStateRead } from '@quantor/api-client';
 import { Button, ErrorState, SkeletonRows, StatusBadge } from '@quantor/ui';
 
 import { Section } from '@/components/common/Section';
-import { useFeatureFlags, useResetFlag, useSetFlag } from '@/lib/queries';
+import { useFeatureFlags, useResetFlag, useSession, useSetFlag } from '@/lib/queries';
 import { sourceLabel, sourceTone } from '@/lib/status';
 
 /**
@@ -14,17 +14,33 @@ import { sourceLabel, sourceTone } from '@/lib/status';
  * Право у администратора есть, готовности у продукта — нет, и кнопка отключена не
  * из осторожности, а потому что включение флага не создаёт функциональность.
  *
+ * Пилотная возможность (ADR-0023) — сделана, но выключена по умолчанию — включается на
+ * пространство: у неё отдельные кнопки для текущего пространства администратора.
+ *
  * У каждого значения показано, откуда оно и почему: «выключено» без причины через
  * месяц превращается в вопрос, на который никто не помнит ответа.
  */
 
-const Row = ({ flag }: { flag: FlagStateRead }) => {
+/** Пилот: готов, выключен по умолчанию и переопределяется на уровне пространства. */
+const isPilot = (flag: FlagStateRead): boolean =>
+  flag.admin_editable && flag.workspace_scoped && !flag.follows_configuration && !flag.default;
+
+interface IRowProps {
+  flag: FlagStateRead;
+  /** Имя текущего пространства или `null`, если администратор работает вне пространства. */
+  workspaceName: string | null;
+  hasWorkspace: boolean;
+}
+
+const Row = ({ flag, workspaceName, hasWorkspace }: IRowProps) => {
   const save = useSetFlag();
   const reset = useResetFlag();
   const busy = save.isPending || reset.isPending;
 
   const locked = !flag.admin_editable || flag.follows_configuration;
   const overridden = flag.source === 'system' || flag.source === 'workspace';
+  const pilot = isPilot(flag);
+  const workspaceLabel = workspaceName ? `«${workspaceName}»` : 'текущем';
 
   const lockReason = !flag.admin_editable
     ? 'возможность не готова: включается кодом'
@@ -87,6 +103,38 @@ const Row = ({ flag }: { flag: FlagStateRead }) => {
             Сбросить
           </Button>
         </div>
+        {pilot && (
+          <div className="mt-[var(--s-3)] flex flex-col gap-[var(--s-2)]">
+            <span className="text-micro text-muted">В пространстве {workspaceLabel}:</span>
+            <div className="flex flex-wrap gap-[var(--s-3)]">
+              <Button
+                compact
+                variant={flag.effective ? 'default' : 'primary'}
+                disabled={!hasWorkspace || busy}
+                title={hasWorkspace ? undefined : 'нет текущего пространства'}
+                onClick={() =>
+                  save.mutate({
+                    key: flag.key,
+                    scope: 'workspace',
+                    enabled: !flag.effective,
+                    reason: flag.effective
+                      ? 'пилот выключен для пространства'
+                      : 'пилот включён для пространства',
+                  })
+                }
+              >
+                {flag.effective ? 'Выключить в пространстве' : 'Включить в пространстве'}
+              </Button>
+              <Button
+                compact
+                disabled={flag.source !== 'workspace' || busy}
+                onClick={() => reset.mutate({ key: flag.key, scope: 'workspace' })}
+              >
+                Сбросить для пространства
+              </Button>
+            </div>
+          </div>
+        )}
         {lockReason && <p className="mt-[var(--s-2)] text-micro text-muted">{lockReason}</p>}
         {save.isError && (
           <p className="mt-[var(--s-2)] text-xs text-danger">Сервер отклонил изменение.</p>
@@ -98,6 +146,12 @@ const Row = ({ flag }: { flag: FlagStateRead }) => {
 
 const Page = () => {
   const flags = useFeatureFlags();
+  const session = useSession();
+  // Переопределение на пространство сервер пишет в текущее пространство запроса, поэтому
+  // и подпись берётся из сеанса, а не выбирается на странице.
+  const workspaceId = session.data?.workspace_id ?? null;
+  const workspaceName =
+    session.data?.workspaces?.find((workspace) => workspace.id === workspaceId)?.name ?? null;
 
   if (flags.isPending) return <SkeletonRows rows={6} />;
   if (flags.isError) {
@@ -113,7 +167,7 @@ const Page = () => {
   return (
     <Section
       title="Флаги возможностей"
-      description="Флаг показывает возможность, а не создаёт её. Незавершённое включается кодом после проверки готовности, а не отсюда."
+      description="Флаг показывает возможность, а не создаёт её. Незавершённое включается кодом после проверки готовности, а не отсюда. Пилотные возможности включаются на пространство."
     >
       <div className="table-scroll rounded-[var(--radius-md)] border border-border bg-surface">
         <table className="admin-table">
@@ -129,7 +183,12 @@ const Page = () => {
           </thead>
           <tbody>
             {flags.data.map((flag) => (
-              <Row key={flag.key} flag={flag} />
+              <Row
+                key={flag.key}
+                flag={flag}
+                workspaceName={workspaceName}
+                hasWorkspace={workspaceId !== null}
+              />
             ))}
           </tbody>
         </table>

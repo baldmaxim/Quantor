@@ -33,9 +33,9 @@ from app.core.config import Settings, get_settings
 from app.core.workspace import DEV_WORKSPACE_ID
 from app.db.base import Base
 from app.db.session import get_session
-from app.domain import Role, UserKind
+from app.domain import OverrideScope, Role, UserKind
 from app.main import create_app
-from app.models import UserIdentity, Workspace
+from app.models import FeatureFlagOverride, UserIdentity, Workspace
 from app.services.job_runner import get_job_scheduler
 from app.storage import get_object_storage
 from app.storage.base import ObjectNotFoundError, ObjectStat, StoredObject
@@ -152,6 +152,29 @@ async def second_workspace(db_session: AsyncSession) -> Workspace:
     db_session.add(workspace)
     await db_session.commit()
     return workspace
+
+
+@pytest.fixture
+async def takeoff_manual_enabled(db_session: AsyncSession) -> None:
+    """Пилот ручного обмера включён для всей установки (ADR-0023).
+
+    Тесты API обмера и калибровки проверяют предметную логику и границу арендатора, а не
+    флаг: без включения каждый их запрос упирался бы в FEATURE_DISABLED. Переопределение
+    системное, а не на пространство, — чтобы проверка «чужое пространство отвечает 404»
+    видела именно границу арендатора, а не выключенную у соседа возможность.
+
+    Сам флаг проверяется отдельно — в `test_pilot_flag.py`.
+    """
+    db_session.add(
+        FeatureFlagOverride(
+            flag_key="takeoff.manual",
+            scope=OverrideScope.SYSTEM,
+            workspace_id=None,
+            enabled=True,
+            reason="тесты API обмера",
+        )
+    )
+    await db_session.commit()
 
 
 @pytest.fixture
@@ -412,8 +435,16 @@ def build_api(
     """
     apps: list[Any] = []
 
-    def _make(context: AuthContext | None = None, *, with_provider: bool = False) -> AsyncClient:
-        settings = oidc_settings() if (with_provider or context is None) else None
+    def _make(
+        context: AuthContext | None = None,
+        *,
+        with_provider: bool = False,
+        settings: Settings | None = None,
+    ) -> AsyncClient:
+        # Явные настройки нужны проверкам флагов: без них клиент читал бы `.env`, и отказ
+        # «флаг выключен» зависел бы от того, что лежит в окружении конкретной машины.
+        if settings is None and (with_provider or context is None):
+            settings = oidc_settings()
         app, client = _build_api(db_session, fake_storage, context=context, settings=settings)
         apps.append(app)
         return client

@@ -46,6 +46,12 @@ _prompts/stage2a_measurement_core/fixtures/**
 !_prompts/stage2a_measurement_core/fixtures/README.md
 !_prompts/stage2a_measurement_core/fixtures/**/.gitkeep
 
+# Stage 2B: в пакете только синтетика — фрагменты реальных проектов PlanSwift сюда не кладутся.
+_prompts/stage2b_ai_geometry_qwen/fixtures/**
+!_prompts/stage2b_ai_geometry_qwen/fixtures/**/
+!_prompts/stage2b_ai_geometry_qwen/fixtures/README.md
+!_prompts/stage2b_ai_geometry_qwen/fixtures/**/.gitkeep
+
 # --- OS / IDE ---
 .DS_Store
 Thumbs.db
