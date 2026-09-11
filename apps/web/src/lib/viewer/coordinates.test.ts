@@ -5,6 +5,7 @@ import {
   normalizeRotation,
   placeRenderedPage,
   placeSheet,
+  placeViewportPage,
   rectContains,
   toNormalizedPoint,
   toScreenPoint,
@@ -205,5 +206,29 @@ describe('прямоугольник отрисованной страницы',
 
   it('нулевая плотность не ломает раскладку', () => {
     expect(placeRenderedPage(RENDERED, 1, 0).width).toBe(2384);
+  });
+});
+
+describe('лист на экране по камере (ADR-0024)', () => {
+  const sheet = { width: 2384, height: 1684 };
+
+  it('угол — смещение камеры, размер — лист на масштаб, без округления', () => {
+    expect(placeViewportPage(sheet, { scale: 2.66, offsetX: -10.5, offsetY: 7.25 })).toEqual({
+      x: -10.5,
+      y: 7.25,
+      width: 2384 * 2.66,
+      height: 1684 * 2.66,
+      rotation: 0,
+    });
+  });
+
+  it('экран и лист взаимно обратны на любом масштабе', () => {
+    for (const scale of [0.3, 1, 2.66, 4, 16]) {
+      const placed = placeViewportPage(sheet, { scale, offsetX: -1234.5, offsetY: 88.25 });
+      const point = { x: 0.3141, y: 0.7182 };
+      const back = toNormalizedPoint(toScreenPoint(point, placed), placed);
+      expect(back.x).toBeCloseTo(point.x, 12);
+      expect(back.y).toBeCloseTo(point.y, 12);
+    }
   });
 });

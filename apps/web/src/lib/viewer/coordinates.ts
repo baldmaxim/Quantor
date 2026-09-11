@@ -235,6 +235,25 @@ export const placeRenderedPage = (
   };
 };
 
+/**
+ * Лист на экране по состоянию камеры (ADR-0024).
+ *
+ * Левый верхний угол — смещение камеры, размер — лист, умноженный на масштаб. Округления нет
+ * намеренно: слои наложения, указатель и CSS-размер растра страницы считаются по одной этой
+ * формуле, и совпадают до доли пикселя. Размер растра в неё не входит — он отвечает за
+ * резкость, а не за координату.
+ */
+export const placeViewportPage = (
+  page: { readonly width: number; readonly height: number },
+  camera: { readonly scale: number; readonly offsetX: number; readonly offsetY: number },
+): SheetPlacement => ({
+  x: camera.offsetX,
+  y: camera.offsetY,
+  width: page.width * camera.scale,
+  height: page.height * camera.scale,
+  rotation: 0,
+});
+
 /** Размер листа в пикселях при заданном масштабе и повороте. */
 export const placeSheet = (
   sheet: { readonly widthPx: number; readonly heightPx: number; readonly rotation: Rotation },

@@ -20,7 +20,9 @@
 
 Команда: `pnpm benchmark:viewer`. Числа — в сгенерированных
 [viewer-benchmark-report.md](viewer-benchmark-report.md) и
-[viewer-benchmark-results.json](viewer-benchmark-results.json); здесь — разбор.
+[viewer-benchmark-results.json](viewer-benchmark-results.json); здесь — разбор. Промт 03 перезаписал
+оба файла перемером после переписывания ([03-viewer-runtime.md](03-viewer-runtime.md)); отчёт, по
+которому написан этот разбор, — в истории на коммите `346d559`.
 
 | Что       | Как                                                                                                                                         |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |

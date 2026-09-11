@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -17,7 +17,12 @@ import { describe, expect, it } from 'vitest';
  */
 
 const BASE_CSS = join(process.cwd(), '..', '..', 'packages', 'ui', 'src', 'base.css');
-const VIEWPORT = join(process.cwd(), 'src', 'components', 'viewer', 'DrawingViewport.tsx');
+/**
+ * Исходники просмотрщика, где цвета читаются из токенов. Весь каталог, а не один файл: чтение
+ * цветов уже переезжало из `DrawingViewport` в хук слоёв, и проверка одного файла тихо
+ * превращалась в проверку ничего.
+ */
+const VIEWER_DIR = join(process.cwd(), 'src', 'components', 'viewer');
 
 /** Токены, которыми рисуют поверх листа. */
 const SHEET_TOKENS = [
@@ -58,11 +63,15 @@ describe('чернила по бумаге', () => {
   });
 
   it('просмотрщик не берёт цвет интерфейса для рисования по листу', () => {
-    const source = readFileSync(VIEWPORT, 'utf8');
-    const uiTokens = [...source.matchAll(/getPropertyValue\('(--[a-z-]+)'\)/g)].map(
-      (match) => match[1],
+    const sources = readdirSync(VIEWER_DIR)
+      .filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))
+      .map((name) => readFileSync(join(VIEWER_DIR, name), 'utf8'));
+    const uiTokens = sources.flatMap((source) =>
+      [...source.matchAll(/getPropertyValue\('(--[a-z-]+)'\)/g)].map((match) => match[1]),
     );
 
+    // Пустой список означал бы, что чтение цветов переехало туда, куда проверка не смотрит.
+    expect(uiTokens.length).toBeGreaterThan(0);
     for (const token of uiTokens) {
       expect(SHEET_TOKENS).toContain(token);
     }

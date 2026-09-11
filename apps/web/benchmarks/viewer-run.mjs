@@ -129,6 +129,9 @@ const main = async () => {
   const browser = await chromium.connect(browserServer.wsEndpoint());
   const browserPid = browserServer.process().pid;
 
+  // Разделы можно выбрать для прогона по частям; по умолчанию — все.
+  const sections = new Set(config.sections ?? ['sizing', 'consistency', 'pan']);
+
   const report = {
     schema: 'quantor.benchmark.viewer.v1',
     generatedAt: new Date().toISOString(),
@@ -146,6 +149,7 @@ const main = async () => {
     pdfRender: [],
     overlay: null,
     hitTest: null,
+    consistency: [],
     pan: [],
   };
 
@@ -186,7 +190,8 @@ const main = async () => {
       }
     };
 
-    for (const ratio of config.ratios) {
+    // Холсты, выделение, отрисовка pdf.js и слой — одна группа: слою нужна геометрия листа.
+    for (const ratio of sections.has('sizing') ? config.ratios : []) {
       for (const source of config.sources) {
         const sizing = await section(ratio, (page) =>
           page.evaluate(
@@ -286,7 +291,27 @@ const main = async () => {
       }
     }
 
-    for (const scenario of config.pan) {
+    // Резкая часть против того же куска листа целиком — побитно, на каждом листе.
+    for (const check of sections.has('consistency') ? config.consistency : []) {
+      for (const source of config.sources) {
+        const attempt = await section(check.ratio, (page) =>
+          page.evaluate(
+            ([url, pageIndex, zoom, viewport]) =>
+              window.__viewerBench.measureRasterConsistency(url, pageIndex, zoom, viewport),
+            [pdfUrl(source), source.pageIndex, check.zoom, config.viewport],
+          ),
+        );
+        report.consistency.push({
+          source: source.id,
+          ratio: check.ratio,
+          zoom: check.zoom,
+          result: attempt.value,
+          error: attempt.error,
+        });
+      }
+    }
+
+    for (const scenario of sections.has('pan') ? config.pan : []) {
       const source = config.sources.find((item) => item.id === scenario.source);
       const { context, page } = await open(scenario.ratio);
       const memory = [];

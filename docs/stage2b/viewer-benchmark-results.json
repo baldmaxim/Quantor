@@ -1,6 +1,6 @@
 {
   "schema": "quantor.benchmark.viewer.v1",
-  "generatedAt": "2026-09-11T14:39:25.914Z",
+  "generatedAt": "2026-09-11T16:47:10.130Z",
   "environment": {
     "node": "v24.14.1",
     "platform": "win32 node 10.0.19045",
@@ -40,6 +40,16 @@
       },
       "hitFrames": 60
     },
+    "consistency": [
+      {
+        "ratio": 1,
+        "zoom": 2
+      },
+      {
+        "ratio": 1.5,
+        "zoom": 2.66
+      }
+    ],
     "pan": [
       {
         "source": "reference",
@@ -572,12 +582,12 @@
           "zoom": 1,
           "single": {
             "ok": true,
-            "ms": 36,
+            "ms": 15,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 55.30000001192093,
+            "ms": 55.400000005960464,
             "error": null
           }
         },
@@ -585,12 +595,12 @@
           "zoom": 2.66,
           "single": {
             "ok": true,
-            "ms": 100.19999998807907,
+            "ms": 101.30000001192093,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 364.09999999403954,
+            "ms": 350.60000002384186,
             "error": null
           }
         },
@@ -598,12 +608,12 @@
           "zoom": 4,
           "single": {
             "ok": true,
-            "ms": 232.59999999403954,
+            "ms": 200.5,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 831.6999999880791,
+            "ms": 825.5,
             "error": null
           }
         }
@@ -617,12 +627,12 @@
           "zoom": 1,
           "single": {
             "ok": true,
-            "ms": 16.900000005960464,
+            "ms": 13.299999982118607,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 51.79999998211861,
+            "ms": 52.5,
             "error": null
           }
         },
@@ -630,12 +640,12 @@
           "zoom": 2.66,
           "single": {
             "ok": true,
-            "ms": 89.40000000596046,
+            "ms": 99,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 359.30000001192093,
+            "ms": 352.2999999821186,
             "error": null
           }
         },
@@ -643,12 +653,12 @@
           "zoom": 4,
           "single": {
             "ok": true,
-            "ms": 208.40000000596046,
+            "ms": 223.30000001192093,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 911.9000000059605,
+            "ms": 899.9000000059605,
             "error": null
           }
         }
@@ -662,12 +672,12 @@
           "zoom": 1,
           "single": {
             "ok": true,
-            "ms": 40.30000001192093,
+            "ms": 29.5,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 129.30000001192093,
+            "ms": 115,
             "error": null
           }
         },
@@ -675,12 +685,12 @@
           "zoom": 2.66,
           "single": {
             "ok": true,
-            "ms": 220.19999998807907,
+            "ms": 197.40000000596046,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 870.9000000059605,
+            "ms": 821.5999999940395,
             "error": null
           }
         },
@@ -688,12 +698,12 @@
           "zoom": 4,
           "single": {
             "ok": true,
-            "ms": 470.90000000596046,
+            "ms": 491.59999999403954,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 3942.2000000178814,
+            "ms": 3687.0999999940395,
             "error": null
           }
         }
@@ -707,12 +717,12 @@
           "zoom": 1,
           "single": {
             "ok": true,
-            "ms": 37.400000005960464,
+            "ms": 32.89999997615814,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 114.7000000178814,
+            "ms": 120.09999999403954,
             "error": null
           }
         },
@@ -720,12 +730,12 @@
           "zoom": 2.66,
           "single": {
             "ok": true,
-            "ms": 206.19999998807907,
+            "ms": 251.09999999403954,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 900.9000000059605,
+            "ms": 853.0999999940395,
             "error": null
           }
         },
@@ -733,12 +743,12 @@
           "zoom": 4,
           "single": {
             "ok": true,
-            "ms": 475.5,
+            "ms": 467.30000001192093,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 3069.800000011921,
+            "ms": 1871.5,
             "error": null
           }
         }
@@ -752,12 +762,12 @@
           "zoom": 1,
           "single": {
             "ok": true,
-            "ms": 57.80000001192093,
+            "ms": 53.5,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 212.59999999403954,
+            "ms": 301.69999998807907,
             "error": null
           }
         },
@@ -765,12 +775,12 @@
           "zoom": 2.66,
           "single": {
             "ok": true,
-            "ms": 348.59999999403954,
+            "ms": 401.40000000596046,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 2611.699999988079,
+            "ms": 3275.800000011921,
             "error": null
           }
         },
@@ -778,12 +788,12 @@
           "zoom": 4,
           "single": {
             "ok": true,
-            "ms": 1161.4000000059605,
+            "ms": 882,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 5745.300000011921,
+            "ms": 10592.799999982119,
             "error": null
           }
         }
@@ -797,12 +807,12 @@
           "zoom": 1,
           "single": {
             "ok": true,
-            "ms": 53.099999994039536,
+            "ms": 50.20000001788139,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 226,
+            "ms": 206,
             "error": null
           }
         },
@@ -810,12 +820,12 @@
           "zoom": 2.66,
           "single": {
             "ok": true,
-            "ms": 361.90000000596046,
+            "ms": 391.5,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 1490.699999988079,
+            "ms": 1364.1000000238419,
             "error": null
           }
         },
@@ -823,12 +833,12 @@
           "zoom": 4,
           "single": {
             "ok": true,
-            "ms": 825.1000000238419,
+            "ms": 785.1000000238419,
             "error": null
           },
           "stack": {
             "ok": true,
-            "ms": 4208.399999976158,
+            "ms": 10160.700000017881,
             "error": null
           }
         }
@@ -840,7 +850,7 @@
       "source": "reference",
       "ratio": 1,
       "pageCount": 77,
-      "warmupMs": 1147.199999988079,
+      "warmupMs": 1006.5,
       "rows": [
         {
           "zoom": 1,
@@ -851,7 +861,7 @@
             "megapixels": 4.014656,
             "rgbaMiB": 15.314697265625
           },
-          "ms": 638.2999999821186,
+          "ms": 541.0999999940395,
           "error": null
         },
         {
@@ -863,7 +873,7 @@
             "megapixels": 28.401339,
             "rgbaMiB": 108.34251022338867
           },
-          "ms": 794,
+          "ms": 756.3000000119209,
           "error": null
         },
         {
@@ -875,7 +885,7 @@
             "megapixels": 64.234496,
             "rgbaMiB": 245.03515625
           },
-          "ms": 1124.4000000059605,
+          "ms": 1073.199999988079,
           "error": null
         }
       ]
@@ -884,7 +894,7 @@
       "source": "synthetic",
       "ratio": 1,
       "pageCount": 1,
-      "warmupMs": 119.5,
+      "warmupMs": 119.90000000596046,
       "rows": [
         {
           "zoom": 1,
@@ -895,7 +905,7 @@
             "megapixels": 4.014656,
             "rgbaMiB": 15.314697265625
           },
-          "ms": 188.40000000596046,
+          "ms": 168.2000000178814,
           "error": null
         },
         {
@@ -907,7 +917,7 @@
             "megapixels": 28.401339,
             "rgbaMiB": 108.34251022338867
           },
-          "ms": 520.5999999940395,
+          "ms": 488.5,
           "error": null
         },
         {
@@ -919,7 +929,7 @@
             "megapixels": 64.234496,
             "rgbaMiB": 245.03515625
           },
-          "ms": 1315.300000011921,
+          "ms": 1272.7000000178814,
           "error": null
         }
       ]
@@ -928,7 +938,7 @@
       "source": "reference",
       "ratio": 1.5,
       "pageCount": 77,
-      "warmupMs": 1077.5999999940395,
+      "warmupMs": 1077,
       "rows": [
         {
           "zoom": 1,
@@ -939,7 +949,7 @@
             "megapixels": 9.032976,
             "rgbaMiB": 34.45806884765625
           },
-          "ms": 568.9000000059605,
+          "ms": 607,
           "error": null
         },
         {
@@ -951,7 +961,7 @@
             "megapixels": 63.911128,
             "rgbaMiB": 243.80160522460938
           },
-          "ms": 1223.300000011921,
+          "ms": 1058.5999999940395,
           "error": null
         },
         {
@@ -963,7 +973,7 @@
             "megapixels": 144.527616,
             "rgbaMiB": 551.3291015625
           },
-          "ms": 2158.0999999940395,
+          "ms": 2058.5,
           "error": null
         }
       ]
@@ -972,7 +982,7 @@
       "source": "synthetic",
       "ratio": 1.5,
       "pageCount": 1,
-      "warmupMs": 142.09999999403954,
+      "warmupMs": 113.7000000178814,
       "rows": [
         {
           "zoom": 1,
@@ -983,7 +993,7 @@
             "megapixels": 9.032976,
             "rgbaMiB": 34.45806884765625
           },
-          "ms": 295.5,
+          "ms": 278.19999998807907,
           "error": null
         },
         {
@@ -995,7 +1005,7 @@
             "megapixels": 63.911128,
             "rgbaMiB": 243.80160522460938
           },
-          "ms": 1389.4000000059605,
+          "ms": 1309.699999988079,
           "error": null
         },
         {
@@ -1007,7 +1017,7 @@
             "megapixels": 144.527616,
             "rgbaMiB": 551.3291015625
           },
-          "ms": 2391.0999999940395,
+          "ms": 2259,
           "error": null
         }
       ]
@@ -1016,7 +1026,7 @@
       "source": "reference",
       "ratio": 2,
       "pageCount": 77,
-      "warmupMs": 1282.7999999821186,
+      "warmupMs": 1183.8999999761581,
       "rows": [
         {
           "zoom": 1,
@@ -1027,7 +1037,7 @@
             "megapixels": 16.058624,
             "rgbaMiB": 61.2587890625
           },
-          "ms": 655.1999999880791,
+          "ms": 644.8000000119209,
           "error": null
         },
         {
@@ -1039,7 +1049,7 @@
             "megapixels": 113.605356,
             "rgbaMiB": 433.3700408935547
           },
-          "ms": 1862.4000000059605,
+          "ms": 1664.5999999940395,
           "error": null
         },
         {
@@ -1051,7 +1061,7 @@
             "megapixels": 256.937984,
             "rgbaMiB": 980.140625
           },
-          "ms": 2736.7000000178814,
+          "ms": 2604.699999988079,
           "error": null
         }
       ]
@@ -1060,7 +1070,7 @@
       "source": "synthetic",
       "ratio": 2,
       "pageCount": 1,
-      "warmupMs": 151.09999999403954,
+      "warmupMs": 189,
       "rows": [
         {
           "zoom": 1,
@@ -1071,7 +1081,7 @@
             "megapixels": 16.058624,
             "rgbaMiB": 61.2587890625
           },
-          "ms": 384.2999999821186,
+          "ms": 370.69999998807907,
           "error": null
         },
         {
@@ -1083,7 +1093,7 @@
             "megapixels": 113.605356,
             "rgbaMiB": 433.3700408935547
           },
-          "ms": 1967.5999999940395,
+          "ms": 1970.5999999940395,
           "error": null
         },
         {
@@ -1095,7 +1105,7 @@
             "megapixels": 256.937984,
             "rgbaMiB": 980.140625
           },
-          "ms": 3169.100000023842,
+          "ms": 3356.4000000059605,
           "error": null
         }
       ]
@@ -1116,12 +1126,12 @@
         },
         "draw": {
           "count": 30,
-          "median": 34,
-          "p95": 44.400000005960464,
-          "max": 49.5,
-          "mean": 34.99666666686535
+          "median": 28.80000001192093,
+          "p95": 36.20000001788139,
+          "max": 70.5,
+          "mean": 30.55
         },
-        "drawn": 1000
+        "drawn": 85
       },
       {
         "mode": "viewport",
@@ -1134,12 +1144,12 @@
         },
         "draw": {
           "count": 30,
-          "median": 155,
-          "p95": 185.59999999403954,
-          "max": 188.80000001192093,
-          "mean": 156.50333333313466
+          "median": 134,
+          "p95": 157.19999998807907,
+          "max": 165.40000000596046,
+          "mean": 135.97333333194257
         },
-        "drawn": 5000
+        "drawn": 487
       },
       {
         "mode": "viewport",
@@ -1152,12 +1162,12 @@
         },
         "draw": {
           "count": 30,
-          "median": 298.09999999403954,
-          "p95": 341.90000000596046,
-          "max": 355.89999997615814,
-          "mean": 298.3666666656733
+          "median": 263,
+          "p95": 311.7000000178814,
+          "max": 325.40000000596046,
+          "mean": 268.62333333293594
         },
-        "drawn": 10000
+        "drawn": 959
       },
       {
         "mode": "viewport",
@@ -1170,12 +1180,12 @@
         },
         "draw": {
           "count": 30,
-          "median": 722.8000000119209,
-          "p95": 769,
-          "max": 812.1999999880791,
-          "mean": 724.2733333339294
+          "median": 654.0999999940395,
+          "p95": 775.1999999880791,
+          "max": 776.3000000119209,
+          "mean": 668.1866666674614
         },
-        "drawn": 25000
+        "drawn": 2372
       },
       {
         "mode": "fullPage",
@@ -1188,10 +1198,10 @@
         },
         "draw": {
           "count": 8,
-          "median": 454.40000000596046,
-          "p95": 500.69999998807907,
-          "max": 500.69999998807907,
-          "mean": 457.48750000074506
+          "median": 439.7000000178814,
+          "p95": 478.19999998807907,
+          "max": 478.19999998807907,
+          "mean": 441.1625000014901
         },
         "drawn": 1000
       },
@@ -1206,10 +1216,10 @@
         },
         "draw": {
           "count": 8,
-          "median": 1952.5,
-          "p95": 2089.0999999940395,
-          "max": 2089.0999999940395,
-          "mean": 1935.8125
+          "median": 1979.5,
+          "p95": 2226.199999988079,
+          "max": 2226.199999988079,
+          "mean": 2029.3375000022352
         },
         "drawn": 5000
       },
@@ -1224,10 +1234,10 @@
         },
         "draw": {
           "count": 8,
-          "median": 3812.699999988079,
-          "p95": 4056.9000000059605,
-          "max": 4056.9000000059605,
-          "mean": 3813.824999999255
+          "median": 3814.600000023842,
+          "p95": 3964.0999999940395,
+          "max": 3964.0999999940395,
+          "mean": 3774.1500000059605
         },
         "drawn": 10000
       },
@@ -1242,10 +1252,10 @@
         },
         "draw": {
           "count": 8,
-          "median": 9478.09999999404,
-          "p95": 9713,
-          "max": 9713,
-          "mean": 9486.39999999851
+          "median": 9823.5,
+          "p95": 9984.800000011921,
+          "max": 9984.800000011921,
+          "mean": 9729.550000000745
         },
         "drawn": 25000
       }
@@ -1262,43 +1272,197 @@
           "count": 60,
           "median": 0.5999999940395355,
           "p95": 1.699999988079071,
-          "max": 2.199999988079071,
-          "mean": 0.7350000003973644
+          "max": 1.9000000059604645,
+          "mean": 0.6966666678587595
         }
       },
       {
         "primitives": 5000,
         "hit": {
           "count": 60,
-          "median": 2.399999976158142,
-          "p95": 5.4000000059604645,
-          "max": 6.300000011920929,
-          "mean": 2.721666667362054
+          "median": 2.5,
+          "p95": 4.5999999940395355,
+          "max": 5.5999999940395355,
+          "mean": 2.530000000198682
         }
       },
       {
         "primitives": 10000,
         "hit": {
           "count": 60,
-          "median": 3.699999988079071,
-          "p95": 5.799999982118607,
-          "max": 5.800000011920929,
-          "mean": 3.7983333339293797
+          "median": 4.4000000059604645,
+          "p95": 7.200000017881393,
+          "max": 9.199999988079071,
+          "mean": 4.593333333233992
         }
       },
       {
         "primitives": 25000,
         "hit": {
           "count": 60,
-          "median": 8.900000005960464,
-          "p95": 15,
-          "max": 17.299999982118607,
-          "mean": 9.725
+          "median": 9.900000005960464,
+          "p95": 13.900000005960464,
+          "max": 14.100000023841858,
+          "mean": 10.326666667560737
         }
       }
     ],
     "error": null
   },
+  "consistency": [
+    {
+      "source": "reference",
+      "ratio": 1,
+      "zoom": 2,
+      "result": {
+        "zoom": 2,
+        "devicePixelRatio": 1,
+        "page": {
+          "width": 4768,
+          "height": 3368,
+          "megapixels": 16.058624,
+          "rgbaMiB": 61.2587890625
+        },
+        "region": {
+          "width": 3201,
+          "height": 2001,
+          "megapixels": 6.405201,
+          "rgbaMiB": 24.433902740478516
+        },
+        "offset": {
+          "x": 660,
+          "y": 740
+        },
+        "aligned": {
+          "differing": 2450,
+          "visible": 0,
+          "maxChannelDiff": 63
+        },
+        "offByOnePixel": {
+          "differing": 482902,
+          "visible": 317893,
+          "maxChannelDiff": 255
+        },
+        "pageMs": 1257.9000000059605,
+        "regionMs": 581.5
+      },
+      "error": null
+    },
+    {
+      "source": "synthetic",
+      "ratio": 1,
+      "zoom": 2,
+      "result": {
+        "zoom": 2,
+        "devicePixelRatio": 1,
+        "page": {
+          "width": 4768,
+          "height": 3368,
+          "megapixels": 16.058624,
+          "rgbaMiB": 61.2587890625
+        },
+        "region": {
+          "width": 3201,
+          "height": 2001,
+          "megapixels": 6.405201,
+          "rgbaMiB": 24.433902740478516
+        },
+        "offset": {
+          "x": 660,
+          "y": 740
+        },
+        "aligned": {
+          "differing": 1518,
+          "visible": 0,
+          "maxChannelDiff": 37
+        },
+        "offByOnePixel": {
+          "differing": 1454721,
+          "visible": 1025367,
+          "maxChannelDiff": 255
+        },
+        "pageMs": 115.40000000596046,
+        "regionMs": 313.90000000596046
+      },
+      "error": null
+    },
+    {
+      "source": "reference",
+      "ratio": 1.5,
+      "zoom": 2.66,
+      "result": {
+        "zoom": 2.66,
+        "devicePixelRatio": 1.5,
+        "page": {
+          "width": 9512,
+          "height": 6719,
+          "megapixels": 63.911128,
+          "rgbaMiB": 243.80160522460938
+        },
+        "region": {
+          "width": 4801,
+          "height": 3001,
+          "megapixels": 14.407801,
+          "rgbaMiB": 54.96139907836914
+        },
+        "offset": {
+          "x": 2170,
+          "y": 1944
+        },
+        "aligned": {
+          "differing": 8335,
+          "visible": 0,
+          "maxChannelDiff": 62
+        },
+        "offByOnePixel": {
+          "differing": 690663,
+          "visible": 425760,
+          "maxChannelDiff": 255
+        },
+        "pageMs": 1720.4000000059605,
+        "regionMs": 642.3000000119209
+      },
+      "error": null
+    },
+    {
+      "source": "synthetic",
+      "ratio": 1.5,
+      "zoom": 2.66,
+      "result": {
+        "zoom": 2.66,
+        "devicePixelRatio": 1.5,
+        "page": {
+          "width": 9512,
+          "height": 6719,
+          "megapixels": 63.911128,
+          "rgbaMiB": 243.80160522460938
+        },
+        "region": {
+          "width": 4801,
+          "height": 3001,
+          "megapixels": 14.407801,
+          "rgbaMiB": 54.96139907836914
+        },
+        "offset": {
+          "x": 2170,
+          "y": 1944
+        },
+        "aligned": {
+          "differing": 19243,
+          "visible": 1,
+          "maxChannelDiff": 65
+        },
+        "offByOnePixel": {
+          "differing": 1803933,
+          "visible": 1256951,
+          "maxChannelDiff": 255
+        },
+        "pageMs": 310.09999999403954,
+        "regionMs": 1081.800000011921
+      },
+      "error": null
+    }
+  ],
   "pan": [
     {
       "source": "reference",
@@ -1307,205 +1471,326 @@
       "measurements": 5000,
       "regions": 400,
       "durationMs": 30000,
-      "evaluateStartedSeconds": 0.061,
+      "evaluateStartedSeconds": 0.042,
       "result": {
         "zoom": 2.66,
         "devicePixelRatio": 1.5,
         "durationMs": 30000,
         "canvases": [
           {
-            "width": 9512,
-            "height": 6719,
-            "megapixels": 63.911128,
-            "rgbaMiB": 243.80160522460938,
-            "visible": true
+            "width": 4759,
+            "height": 3361,
+            "megapixels": 15.994999,
+            "rgbaMiB": 61.01607894897461,
+            "visible": true,
+            "role": "лист"
           },
           {
-            "width": 9512,
-            "height": 6719,
-            "megapixels": 63.911128,
-            "rgbaMiB": 243.80160522460938,
-            "visible": true
+            "width": 4801,
+            "height": 3001,
+            "megapixels": 14.407801,
+            "rgbaMiB": 54.96139907836914,
+            "visible": true,
+            "role": "резкая часть"
+          },
+          {
+            "width": 2400,
+            "height": 1500,
+            "megapixels": 3.6,
+            "rgbaMiB": 13.73291015625,
+            "visible": true,
+            "role": "regions-layer"
           },
           {
             "width": 300,
             "height": 150,
             "megapixels": 0.045,
             "rgbaMiB": 0.171661376953125,
-            "visible": false
+            "visible": false,
+            "role": "scale-layer"
           },
           {
-            "width": 2021,
-            "height": 1428,
-            "megapixels": 2.885988,
-            "rgbaMiB": 11.009170532226562,
-            "visible": true
+            "width": 2400,
+            "height": 1500,
+            "megapixels": 3.6,
+            "rgbaMiB": 13.73291015625,
+            "visible": true,
+            "role": "measurement-layer"
           }
         ],
-        "stackRgbaMiB": 498.78404235839844,
-        "zoomRenderMs": 2990,
+        "stackRgbaMiB": 143.61495971679688,
+        "zoomRenderMs": 797.4000000059605,
+        "renders": [
+          {
+            "scale": 1,
+            "ms": 644.4000000059605,
+            "completed": false,
+            "kind": "page",
+            "canvas": {
+              "width": 3576,
+              "height": 2526,
+              "megapixels": 9.032976,
+              "rgbaMiB": 34.45806884765625
+            },
+            "startedAt": 1443
+          },
+          {
+            "scale": 0.5653206650831354,
+            "ms": 1560.7000000178814,
+            "completed": true,
+            "kind": "page",
+            "canvas": {
+              "width": 2021,
+              "height": 1428,
+              "megapixels": 2.885988,
+              "rgbaMiB": 11.009170532226562
+            },
+            "startedAt": 2085.7999999821186
+          },
+          {
+            "scale": 2.66,
+            "ms": 797.4000000059605,
+            "completed": true,
+            "kind": "region",
+            "canvas": {
+              "width": 4801,
+              "height": 3001,
+              "megapixels": 14.407801,
+              "rgbaMiB": 54.96139907836914
+            },
+            "startedAt": 3901.0999999940395
+          },
+          {
+            "scale": 1.3308973586848176,
+            "ms": 785.7000000178814,
+            "completed": true,
+            "kind": "page",
+            "canvas": {
+              "width": 4759,
+              "height": 3361,
+              "megapixels": 15.994999,
+              "rgbaMiB": 61.01607894897461
+            },
+            "startedAt": 4702.299999982119
+          },
+          {
+            "scale": 2.66,
+            "ms": 499.40000000596046,
+            "completed": true,
+            "kind": "region",
+            "canvas": {
+              "width": 3881,
+              "height": 2636,
+              "megapixels": 10.230316,
+              "rgbaMiB": 39.02555847167969
+            },
+            "startedAt": 38525.69999998808
+          }
+        ],
         "frameIntervals": {
-          "count": 230,
-          "median": 133.29999999999927,
-          "p95": 150,
-          "max": 300,
-          "mean": 130.50173913043483
+          "count": 213,
+          "median": 133.40000000000146,
+          "p95": 199.90000000000146,
+          "max": 250,
+          "mean": 141.15246009389676
         },
-        "framesPerSecond": 7.66273313032643,
+        "framesPerSecond": 7.084538231461108,
         "longTasks": {
-          "count": 229,
-          "totalMs": 29756,
-          "maxMs": 301
+          "count": 211,
+          "totalMs": 29688,
+          "maxMs": 257
         },
         "rendersDuringPan": 0,
-        "rendersAfterPan": 0,
+        "rendersAfterPan": 1,
         "longTasksAfterPan": {
-          "count": 2,
-          "totalMs": 254,
-          "maxMs": 132
+          "count": 5,
+          "totalMs": 555,
+          "maxMs": 143
         },
+        "layerConsistency": [
+          {
+            "layer": "regions-layer",
+            "pixels": 3600000,
+            "inked": 1544663,
+            "afterPan": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 2
+            },
+            "singleShift": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 2
+            },
+            "offByOnePixel": {
+              "differing": 38545,
+              "visible": 27977,
+              "maxChannelDiff": 255
+            }
+          },
+          {
+            "layer": "measurement-layer",
+            "pixels": 3600000,
+            "inked": 2706580,
+            "afterPan": {
+              "differing": 162049,
+              "visible": 7606,
+              "maxChannelDiff": 255
+            },
+            "singleShift": {
+              "differing": 54761,
+              "visible": 906,
+              "maxChannelDiff": 255
+            },
+            "offByOnePixel": {
+              "differing": 724520,
+              "visible": 365395,
+              "maxChannelDiff": 255
+            }
+          }
+        ],
         "heapUsedMiB": [
-          29.266474723815918,
-          29.280482292175293,
-          29.287158012390137,
-          29.29337978363037,
-          29.299471855163574,
-          29.304739952087402,
-          29.311320304870605,
-          29.317500114440918,
-          29.323695182800293,
-          29.329249382019043,
-          29.33737850189209,
-          29.34401226043701,
-          29.350123405456543,
-          29.35623073577881,
-          29.36161708831787,
-          29.36771297454834,
-          29.37311840057373,
-          29.379298210144043,
-          29.389491081237793,
-          29.395564079284668,
-          29.400946617126465,
-          29.405604362487793,
-          29.41249370574951,
-          29.418673515319824,
-          29.424853324890137,
-          29.430258750915527,
-          29.43643856048584,
-          29.44184398651123,
-          29.44791316986084,
-          29.455286979675293,
-          24.661967277526855,
-          24.661993980407715
+          32.456772804260254,
+          41.45788860321045,
+          27.04155158996582,
+          29.19344139099121,
+          31.18656063079834,
+          33.16609764099121,
+          34.52667808532715,
+          35.59619140625,
+          37.03378105163574,
+          38.004743576049805,
+          39.40976619720459,
+          40.54561901092529,
+          25.91163921356201,
+          26.1934871673584,
+          27.17348289489746,
+          28.233287811279297,
+          29.214065551757812,
+          30.058889389038086,
+          31.23243999481201,
+          32.13827133178711,
+          33.33007335662842,
+          34.01317024230957,
+          35.41394805908203,
+          25.479857444763184,
+          26.559871673583984,
+          27.56174373626709,
+          28.683513641357422,
+          29.829269409179688,
+          30.858391761779785,
+          31.986669540405273,
+          33.583102226257324,
+          33.583128929138184
         ],
         "phases": {
-          "zoomRendered": 9449.40000000596,
-          "panStarted": 11460,
-          "panEnded": 41479.90000000596
+          "zoomRendered": 6119.199999988079,
+          "panStarted": 8128.5,
+          "panEnded": 38198.5
         },
         "error": null
       },
       "memory": [
         {
-          "seconds": 1.545,
-          "workingSetMiB": 260.2578125,
-          "privateMiB": 151.453125,
+          "seconds": 1.36,
+          "workingSetMiB": 268.4375,
+          "privateMiB": 155.85546875,
           "processes": 4
         },
         {
-          "seconds": 4.118,
-          "workingSetMiB": 954.6015625,
-          "privateMiB": 394.91796875,
+          "seconds": 4.161,
+          "workingSetMiB": 691.0390625,
+          "privateMiB": 391.4921875,
           "processes": 4
         },
         {
-          "seconds": 6.692,
-          "workingSetMiB": 909.9140625,
-          "privateMiB": 625.1328125,
+          "seconds": 6.684,
+          "workingSetMiB": 1016.47265625,
+          "privateMiB": 528.578125,
           "processes": 4
         },
         {
-          "seconds": 9.25,
-          "workingSetMiB": 1846.15625,
-          "privateMiB": 868.9375,
+          "seconds": 9.26,
+          "workingSetMiB": 1252.2578125,
+          "privateMiB": 557.5703125,
           "processes": 4
         },
         {
-          "seconds": 11.922,
-          "workingSetMiB": 2289.10546875,
-          "privateMiB": 870.03125,
+          "seconds": 11.875,
+          "workingSetMiB": 1400.4375,
+          "privateMiB": 576.65625,
           "processes": 4
         },
         {
-          "seconds": 14.586,
-          "workingSetMiB": 3283.62890625,
-          "privateMiB": 871.94921875,
+          "seconds": 14.335,
+          "workingSetMiB": 1488.453125,
+          "privateMiB": 579.25,
           "processes": 4
         },
         {
-          "seconds": 17.254,
-          "workingSetMiB": 3801.10546875,
-          "privateMiB": 871.953125,
+          "seconds": 16.81,
+          "workingSetMiB": 1517.12890625,
+          "privateMiB": 582.1328125,
           "processes": 4
         },
         {
-          "seconds": 19.905,
-          "workingSetMiB": 3931.76953125,
-          "privateMiB": 872.078125,
+          "seconds": 19.299,
+          "workingSetMiB": 1530.7109375,
+          "privateMiB": 584.8984375,
           "processes": 4
         },
         {
-          "seconds": 22.418,
-          "workingSetMiB": 3993.30078125,
-          "privateMiB": 872.25,
+          "seconds": 22.125,
+          "workingSetMiB": 1544.30859375,
+          "privateMiB": 588.08203125,
           "processes": 4
         },
         {
-          "seconds": 24.994,
-          "workingSetMiB": 4141.57421875,
-          "privateMiB": 872.25,
+          "seconds": 24.731,
+          "workingSetMiB": 1548.140625,
+          "privateMiB": 588.0546875,
           "processes": 4
         },
         {
-          "seconds": 27.565,
-          "workingSetMiB": 4171.55859375,
-          "privateMiB": 872.25390625,
+          "seconds": 27.391,
+          "workingSetMiB": 1549.4765625,
+          "privateMiB": 588.0546875,
           "processes": 4
         },
         {
-          "seconds": 30.124,
-          "workingSetMiB": 4177.35546875,
-          "privateMiB": 872.203125,
+          "seconds": 29.988,
+          "workingSetMiB": 1551.01953125,
+          "privateMiB": 587.91796875,
           "processes": 4
         },
         {
-          "seconds": 32.831,
-          "workingSetMiB": 4180.171875,
-          "privateMiB": 872.3359375,
+          "seconds": 32.602,
+          "workingSetMiB": 1551.3046875,
+          "privateMiB": 587.43359375,
           "processes": 4
         },
         {
-          "seconds": 35.394,
-          "workingSetMiB": 4182.1484375,
-          "privateMiB": 872.33984375,
+          "seconds": 35.236,
+          "workingSetMiB": 1537.76953125,
+          "privateMiB": 573.5859375,
           "processes": 4
         },
         {
-          "seconds": 37.967,
-          "workingSetMiB": 4182.8828125,
-          "privateMiB": 872.3359375,
+          "seconds": 37.738,
+          "workingSetMiB": 1551.5703125,
+          "privateMiB": 587.32421875,
           "processes": 4
         },
         {
-          "seconds": 40.599,
-          "workingSetMiB": 4159.140625,
-          "privateMiB": 844.8046875,
+          "seconds": 40.303,
+          "workingSetMiB": 1282.74609375,
+          "privateMiB": 531.09765625,
           "processes": 4
         },
         {
-          "seconds": 43.186,
-          "workingSetMiB": 4120.48828125,
-          "privateMiB": 805.4453125,
+          "seconds": 42.841,
+          "workingSetMiB": 942.48046875,
+          "privateMiB": 423.7890625,
           "processes": 4
         }
       ]
@@ -1517,199 +1802,320 @@
       "measurements": 5000,
       "regions": 400,
       "durationMs": 30000,
-      "evaluateStartedSeconds": 0.01,
+      "evaluateStartedSeconds": 0.008,
       "result": {
         "zoom": 2.66,
         "devicePixelRatio": 1,
         "durationMs": 30000,
         "canvases": [
           {
-            "width": 6341,
-            "height": 4479,
-            "megapixels": 28.401339,
-            "rgbaMiB": 108.34251022338867,
-            "visible": true
+            "width": 4759,
+            "height": 3361,
+            "megapixels": 15.994999,
+            "rgbaMiB": 61.01607894897461,
+            "visible": true,
+            "role": "лист"
           },
           {
-            "width": 6341,
-            "height": 4479,
-            "megapixels": 28.401339,
-            "rgbaMiB": 108.34251022338867,
-            "visible": true
+            "width": 3201,
+            "height": 2001,
+            "megapixels": 6.405201,
+            "rgbaMiB": 24.433902740478516,
+            "visible": true,
+            "role": "резкая часть"
+          },
+          {
+            "width": 1600,
+            "height": 1000,
+            "megapixels": 1.6,
+            "rgbaMiB": 6.103515625,
+            "visible": true,
+            "role": "regions-layer"
           },
           {
             "width": 300,
             "height": 150,
             "megapixels": 0.045,
             "rgbaMiB": 0.171661376953125,
-            "visible": false
+            "visible": false,
+            "role": "scale-layer"
           },
           {
-            "width": 1347,
-            "height": 952,
-            "megapixels": 1.282344,
-            "rgbaMiB": 4.891754150390625,
-            "visible": true
+            "width": 1600,
+            "height": 1000,
+            "megapixels": 1.6,
+            "rgbaMiB": 6.103515625,
+            "visible": true,
+            "role": "measurement-layer"
           }
         ],
-        "stackRgbaMiB": 221.7484359741211,
-        "zoomRenderMs": 1777.2999999821186,
+        "stackRgbaMiB": 97.82867431640625,
+        "zoomRenderMs": 568.3000000119209,
+        "renders": [
+          {
+            "scale": 1,
+            "ms": 468.40000000596046,
+            "completed": false,
+            "kind": "page",
+            "canvas": {
+              "width": 2384,
+              "height": 1684,
+              "megapixels": 4.014656,
+              "rgbaMiB": 15.314697265625
+            },
+            "startedAt": 1583.699999988079
+          },
+          {
+            "scale": 0.5653206650831354,
+            "ms": 1183.7000000178814,
+            "completed": true,
+            "kind": "page",
+            "canvas": {
+              "width": 1347,
+              "height": 952,
+              "megapixels": 1.282344,
+              "rgbaMiB": 4.891754150390625
+            },
+            "startedAt": 2051.399999976158
+          },
+          {
+            "scale": 2.66,
+            "ms": 568.3000000119209,
+            "completed": true,
+            "kind": "region",
+            "canvas": {
+              "width": 3201,
+              "height": 2001,
+              "megapixels": 6.405201,
+              "rgbaMiB": 24.433902740478516
+            },
+            "startedAt": 3492.2999999821186
+          },
+          {
+            "scale": 1.9963460380272264,
+            "ms": 665,
+            "completed": true,
+            "kind": "page",
+            "canvas": {
+              "width": 4759,
+              "height": 3361,
+              "megapixels": 15.994999,
+              "rgbaMiB": 61.01607894897461
+            },
+            "startedAt": 4062.399999976158
+          },
+          {
+            "scale": 2.66,
+            "ms": 420.2000000178814,
+            "completed": true,
+            "kind": "region",
+            "canvas": {
+              "width": 2578,
+              "height": 1743,
+              "megapixels": 4.493454,
+              "rgbaMiB": 17.14116668701172
+            },
+            "startedAt": 37676.79999998212
+          }
+        ],
         "frameIntervals": {
-          "count": 490,
-          "median": 66.59999999999854,
-          "p95": 83.30000000000291,
-          "max": 150,
-          "mean": 61.324008163265255
+          "count": 418,
+          "median": 66.70000000000073,
+          "p95": 100,
+          "max": 150.0000000000009,
+          "mean": 71.88708133971295
         },
-        "framesPerSecond": 16.30682712939542,
+        "framesPerSecond": 13.91070525278879,
         "longTasks": {
-          "count": 489,
-          "totalMs": 29211,
-          "maxMs": 155
+          "count": 404,
+          "totalMs": 28669,
+          "maxMs": 157
         },
         "rendersDuringPan": 0,
-        "rendersAfterPan": 0,
+        "rendersAfterPan": 1,
         "longTasksAfterPan": {
-          "count": 2,
-          "totalMs": 118,
-          "maxMs": 60
+          "count": 4,
+          "totalMs": 287,
+          "maxMs": 78
         },
+        "layerConsistency": [
+          {
+            "layer": "regions-layer",
+            "pixels": 1600000,
+            "inked": 672233,
+            "afterPan": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 0
+            },
+            "singleShift": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 0
+            },
+            "offByOnePixel": {
+              "differing": 22326,
+              "visible": 18225,
+              "maxChannelDiff": 255
+            }
+          },
+          {
+            "layer": "measurement-layer",
+            "pixels": 1600000,
+            "inked": 1210759,
+            "afterPan": {
+              "differing": 133493,
+              "visible": 4692,
+              "maxChannelDiff": 255
+            },
+            "singleShift": {
+              "differing": 39567,
+              "visible": 746,
+              "maxChannelDiff": 255
+            },
+            "offByOnePixel": {
+              "differing": 469787,
+              "visible": 236718,
+              "maxChannelDiff": 255
+            }
+          }
+        ],
         "heapUsedMiB": [
-          29.25363063812256,
-          29.268980979919434,
-          29.27978801727295,
-          29.29331874847412,
-          29.306376457214355,
-          29.321139335632324,
-          29.33426570892334,
-          29.34651470184326,
-          29.361498832702637,
-          29.37476634979248,
-          29.38796901702881,
-          29.401148796081543,
-          29.41352367401123,
-          29.430155754089355,
-          29.443324089050293,
-          29.457114219665527,
-          29.46869945526123,
-          29.480387687683105,
-          29.496928215026855,
-          29.509169578552246,
-          29.52107524871826,
-          29.53831386566162,
-          24.76612377166748,
-          24.78079891204834,
-          24.79255199432373,
-          24.806200981140137,
-          24.6812162399292,
-          24.693324089050293,
-          24.706217765808105,
-          24.71936321258545,
-          24.722575187683105,
-          24.722601890563965
+          27.226340293884277,
+          30.409533500671387,
+          34.104050636291504,
+          36.46859836578369,
+          38.46799850463867,
+          27.85769748687744,
+          30.251689910888672,
+          32.23368549346924,
+          34.62783432006836,
+          36.70194721221924,
+          38.46157455444336,
+          25.59890365600586,
+          27.60818099975586,
+          29.52534008026123,
+          31.651686668395996,
+          33.74541187286377,
+          35.54652976989746,
+          37.397409439086914,
+          26.449835777282715,
+          28.39890766143799,
+          30.46938991546631,
+          32.273959159851074,
+          34.128353118896484,
+          25.82976722717285,
+          27.592039108276367,
+          29.651366233825684,
+          31.587227821350098,
+          33.44772815704346,
+          25.343896865844727,
+          27.25277614593506,
+          36.56271839141846,
+          36.562745094299316
         ],
         "phases": {
-          "zoomRendered": 6792,
-          "panStarted": 8794.40000000596,
-          "panEnded": 38849.30000001192
+          "zoomRendered": 5354.0999999940395,
+          "panStarted": 7367.199999988079,
+          "panEnded": 37413.39999997616
         },
         "error": null
       },
       "memory": [
         {
-          "seconds": 1.189,
-          "workingSetMiB": 254.43359375,
-          "privateMiB": 138.78125,
+          "seconds": 1.075,
+          "workingSetMiB": 243.68359375,
+          "privateMiB": 125.61328125,
           "processes": 4
         },
         {
-          "seconds": 3.818,
-          "workingSetMiB": 659.09765625,
-          "privateMiB": 341.6875,
+          "seconds": 3.599,
+          "workingSetMiB": 543.98046875,
+          "privateMiB": 372.3984375,
           "processes": 4
         },
         {
-          "seconds": 6.495,
-          "workingSetMiB": 1073.3359375,
-          "privateMiB": 482.984375,
+          "seconds": 6.074,
+          "workingSetMiB": 792.16015625,
+          "privateMiB": 482.72265625,
           "processes": 4
         },
         {
-          "seconds": 9.149,
-          "workingSetMiB": 1285.4921875,
-          "privateMiB": 592.16015625,
+          "seconds": 8.627,
+          "workingSetMiB": 1006.64453125,
+          "privateMiB": 497.3984375,
           "processes": 4
         },
         {
-          "seconds": 11.909,
-          "workingSetMiB": 1801.11328125,
-          "privateMiB": 593.1875,
+          "seconds": 11.106,
+          "workingSetMiB": 1104.98046875,
+          "privateMiB": 500.84765625,
           "processes": 4
         },
         {
-          "seconds": 14.527,
-          "workingSetMiB": 2037.09375,
-          "privateMiB": 593.3125,
+          "seconds": 13.599,
+          "workingSetMiB": 1179.296875,
+          "privateMiB": 510.72265625,
           "processes": 4
         },
         {
-          "seconds": 17.109,
-          "workingSetMiB": 2069.09765625,
-          "privateMiB": 593.4453125,
+          "seconds": 16.079,
+          "workingSetMiB": 1189.515625,
+          "privateMiB": 508.88671875,
           "processes": 4
         },
         {
-          "seconds": 19.748,
-          "workingSetMiB": 2090.23046875,
-          "privateMiB": 593.59375,
+          "seconds": 18.758,
+          "workingSetMiB": 1204.04296875,
+          "privateMiB": 519.484375,
           "processes": 4
         },
         {
-          "seconds": 22.27,
-          "workingSetMiB": 2126.1640625,
-          "privateMiB": 593.578125,
+          "seconds": 21.279,
+          "workingSetMiB": 1213.27734375,
+          "privateMiB": 520.91796875,
           "processes": 4
         },
         {
-          "seconds": 24.912,
-          "workingSetMiB": 2126.3828125,
-          "privateMiB": 593.6328125,
+          "seconds": 23.816,
+          "workingSetMiB": 1207.23046875,
+          "privateMiB": 514.70703125,
           "processes": 4
         },
         {
-          "seconds": 27.521,
-          "workingSetMiB": 2126.76953125,
-          "privateMiB": 593.8046875,
+          "seconds": 26.417,
+          "workingSetMiB": 1213.06640625,
+          "privateMiB": 521.4453125,
           "processes": 4
         },
         {
-          "seconds": 30.175,
-          "workingSetMiB": 2126.85546875,
-          "privateMiB": 593.83984375,
+          "seconds": 28.918,
+          "workingSetMiB": 1207.0078125,
+          "privateMiB": 515.3046875,
           "processes": 4
         },
         {
-          "seconds": 32.779,
-          "workingSetMiB": 2093.48828125,
-          "privateMiB": 560.6484375,
+          "seconds": 31.414,
+          "workingSetMiB": 1183.58203125,
+          "privateMiB": 495.22265625,
           "processes": 4
         },
         {
-          "seconds": 35.437,
-          "workingSetMiB": 2093.66015625,
-          "privateMiB": 561.39453125,
+          "seconds": 33.906,
+          "workingSetMiB": 1189.1953125,
+          "privateMiB": 494.734375,
           "processes": 4
         },
         {
-          "seconds": 38.035,
-          "workingSetMiB": 2091.70703125,
-          "privateMiB": 558.15234375,
+          "seconds": 36.608,
+          "workingSetMiB": 1189.20703125,
+          "privateMiB": 494.734375,
           "processes": 4
         },
         {
-          "seconds": 40.52,
-          "workingSetMiB": 2064.109375,
-          "privateMiB": 527.18359375,
+          "seconds": 39.133,
+          "workingSetMiB": 1081.60546875,
+          "privateMiB": 482.2578125,
           "processes": 4
         }
       ]
@@ -1721,7 +2127,7 @@
       "measurements": 5000,
       "regions": 400,
       "durationMs": 10000,
-      "evaluateStartedSeconds": 0.009,
+      "evaluateStartedSeconds": 0.007,
       "result": {
         "zoom": 1,
         "devicePixelRatio": 1.5,
@@ -1732,126 +2138,213 @@
             "height": 2526,
             "megapixels": 9.032976,
             "rgbaMiB": 34.45806884765625,
-            "visible": true
+            "visible": true,
+            "role": "лист"
           },
           {
-            "width": 3576,
-            "height": 2526,
-            "megapixels": 9.032976,
-            "rgbaMiB": 34.45806884765625,
-            "visible": true
+            "width": 2400,
+            "height": 1500,
+            "megapixels": 3.6,
+            "rgbaMiB": 13.73291015625,
+            "visible": true,
+            "role": "regions-layer"
           },
           {
             "width": 300,
             "height": 150,
             "megapixels": 0.045,
             "rgbaMiB": 0.171661376953125,
-            "visible": false
+            "visible": false,
+            "role": "scale-layer"
           },
           {
-            "width": 2021,
-            "height": 1428,
-            "megapixels": 2.885988,
-            "rgbaMiB": 11.009170532226562,
-            "visible": true
+            "width": 2400,
+            "height": 1500,
+            "megapixels": 3.6,
+            "rgbaMiB": 13.73291015625,
+            "visible": true,
+            "role": "measurement-layer"
           }
         ],
-        "stackRgbaMiB": 80.09696960449219,
-        "zoomRenderMs": 925,
+        "stackRgbaMiB": 62.095550537109375,
+        "zoomRenderMs": 1050.199999988079,
+        "renders": [
+          {
+            "scale": 1,
+            "ms": 643.2000000178814,
+            "completed": false,
+            "kind": "page",
+            "canvas": {
+              "width": 3576,
+              "height": 2526,
+              "megapixels": 9.032976,
+              "rgbaMiB": 34.45806884765625
+            },
+            "startedAt": 1784.0999999940395
+          },
+          {
+            "scale": 0.5653206650831354,
+            "ms": 1431.5,
+            "completed": true,
+            "kind": "page",
+            "canvas": {
+              "width": 2021,
+              "height": 1428,
+              "megapixels": 2.885988,
+              "rgbaMiB": 11.009170532226562
+            },
+            "startedAt": 2426.5
+          },
+          {
+            "scale": 1,
+            "ms": 1050.199999988079,
+            "completed": true,
+            "kind": "page",
+            "canvas": {
+              "width": 3576,
+              "height": 2526,
+              "megapixels": 9.032976,
+              "rgbaMiB": 34.45806884765625
+            },
+            "startedAt": 4179.800000011921
+          }
+        ],
         "frameIntervals": {
-          "count": 211,
-          "median": 50,
-          "p95": 83.29999999999927,
-          "max": 150,
-          "mean": 47.627962085308056
+          "count": 98,
+          "median": 100,
+          "p95": 133.29999999999927,
+          "max": 183.1999999999989,
+          "mean": 102.2061224489796
         },
-        "framesPerSecond": 20.99606945619185,
+        "framesPerSecond": 9.784149677522413,
         "longTasks": {
-          "count": 1,
-          "totalMs": 69,
-          "maxMs": 69
+          "count": 97,
+          "totalMs": 9916,
+          "maxMs": 185
         },
         "rendersDuringPan": 0,
         "rendersAfterPan": 0,
         "longTasksAfterPan": {
-          "count": 0,
-          "totalMs": 0,
-          "maxMs": 0
+          "count": 2,
+          "totalMs": 205,
+          "maxMs": 108
         },
+        "layerConsistency": [
+          {
+            "layer": "regions-layer",
+            "pixels": 3600000,
+            "inked": 1698084,
+            "afterPan": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 2
+            },
+            "singleShift": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 2
+            },
+            "offByOnePixel": {
+              "differing": 113905,
+              "visible": 85548,
+              "maxChannelDiff": 255
+            }
+          },
+          {
+            "layer": "measurement-layer",
+            "pixels": 3600000,
+            "inked": 3072045,
+            "afterPan": {
+              "differing": 351198,
+              "visible": 9347,
+              "maxChannelDiff": 255
+            },
+            "singleShift": {
+              "differing": 61419,
+              "visible": 1179,
+              "maxChannelDiff": 255
+            },
+            "offByOnePixel": {
+              "differing": 1423373,
+              "visible": 675416,
+              "maxChannelDiff": 255
+            }
+          }
+        ],
         "heapUsedMiB": [
-          33.680734634399414,
-          33.69639015197754,
-          33.713369369506836,
-          33.72616767883301,
-          33.742876052856445,
-          33.75704765319824,
-          33.7742862701416,
-          33.79050636291504,
-          33.80623817443848,
-          33.8211612701416,
-          33.82371711730957,
-          33.82374382019043
+          32.525240898132324,
+          27.09525203704834,
+          30.104978561401367,
+          33.738346099853516,
+          35.41086673736572,
+          37.346299171447754,
+          39.692352294921875,
+          26.732315063476562,
+          28.683859825134277,
+          30.45753765106201,
+          30.854483604431152,
+          30.85451030731201
         ],
         "phases": {
-          "zoomRendered": 7403.0999999940395,
-          "panStarted": 9411.40000000596,
-          "panEnded": 19451.40000000596
+          "zoomRendered": 5877,
+          "panStarted": 7882.800000011921,
+          "panEnded": 17914.19999998808
         },
         "error": null
       },
       "memory": [
         {
-          "seconds": 1.174,
-          "workingSetMiB": 232.09375,
-          "privateMiB": 114.3984375,
+          "seconds": 1.359,
+          "workingSetMiB": 258.00390625,
+          "privateMiB": 140.12109375,
           "processes": 4
         },
         {
-          "seconds": 3.863,
-          "workingSetMiB": 1000.359375,
-          "privateMiB": 389.59375,
+          "seconds": 4.026,
+          "workingSetMiB": 596.90625,
+          "privateMiB": 380.55078125,
           "processes": 4
         },
         {
-          "seconds": 6.508,
-          "workingSetMiB": 808.46875,
-          "privateMiB": 393.875,
+          "seconds": 6.639,
+          "workingSetMiB": 764.54296875,
+          "privateMiB": 435.2109375,
           "processes": 4
         },
         {
-          "seconds": 9.152,
-          "workingSetMiB": 860.578125,
-          "privateMiB": 457.6015625,
+          "seconds": 9.203,
+          "workingSetMiB": 922.203125,
+          "privateMiB": 479.29296875,
           "processes": 4
         },
         {
-          "seconds": 11.718,
-          "workingSetMiB": 1035.875,
-          "privateMiB": 457.87109375,
+          "seconds": 11.643,
+          "workingSetMiB": 965.765625,
+          "privateMiB": 490.921875,
           "processes": 4
         },
         {
-          "seconds": 14.35,
-          "workingSetMiB": 1077.02734375,
-          "privateMiB": 458.01171875,
+          "seconds": 14.264,
+          "workingSetMiB": 972.625,
+          "privateMiB": 497.44140625,
           "processes": 4
         },
         {
-          "seconds": 16.828,
-          "workingSetMiB": 1077.33203125,
-          "privateMiB": 458.109375,
+          "seconds": 16.881,
+          "workingSetMiB": 980.08984375,
+          "privateMiB": 504.78515625,
           "processes": 4
         },
         {
-          "seconds": 19.463,
-          "workingSetMiB": 1077.49609375,
-          "privateMiB": 458.09765625,
+          "seconds": 19.416,
+          "workingSetMiB": 971.08984375,
+          "privateMiB": 495.71875,
           "processes": 4
         },
         {
-          "seconds": 22.061,
-          "workingSetMiB": 979.62890625,
-          "privateMiB": 355.77734375,
+          "seconds": 21.935,
+          "workingSetMiB": 1058.6875,
+          "privateMiB": 583.49609375,
           "processes": 4
         }
       ]
@@ -1863,160 +2356,276 @@
       "measurements": 0,
       "regions": 0,
       "durationMs": 15000,
-      "evaluateStartedSeconds": 0.01,
+      "evaluateStartedSeconds": 0.008,
       "result": {
         "zoom": 2.66,
         "devicePixelRatio": 1.5,
         "durationMs": 15000,
         "canvases": [
           {
-            "width": 9512,
-            "height": 6719,
-            "megapixels": 63.911128,
-            "rgbaMiB": 243.80160522460938,
-            "visible": true
+            "width": 4759,
+            "height": 3361,
+            "megapixels": 15.994999,
+            "rgbaMiB": 61.01607894897461,
+            "visible": true,
+            "role": "лист"
           },
           {
-            "width": 9512,
-            "height": 6719,
-            "megapixels": 63.911128,
-            "rgbaMiB": 243.80160522460938,
-            "visible": true
+            "width": 4801,
+            "height": 3001,
+            "megapixels": 14.407801,
+            "rgbaMiB": 54.96139907836914,
+            "visible": true,
+            "role": "резкая часть"
+          },
+          {
+            "width": 2400,
+            "height": 1500,
+            "megapixels": 3.6,
+            "rgbaMiB": 13.73291015625,
+            "visible": true,
+            "role": "regions-layer"
           },
           {
             "width": 300,
             "height": 150,
             "megapixels": 0.045,
             "rgbaMiB": 0.171661376953125,
-            "visible": false
+            "visible": false,
+            "role": "scale-layer"
           },
           {
-            "width": 2021,
-            "height": 1428,
-            "megapixels": 2.885988,
-            "rgbaMiB": 11.009170532226562,
-            "visible": true
+            "width": 2400,
+            "height": 1500,
+            "megapixels": 3.6,
+            "rgbaMiB": 13.73291015625,
+            "visible": true,
+            "role": "measurement-layer"
           }
         ],
-        "stackRgbaMiB": 498.78404235839844,
-        "zoomRenderMs": 4103.5,
+        "stackRgbaMiB": 143.61495971679688,
+        "zoomRenderMs": 644.1000000238419,
+        "renders": [
+          {
+            "scale": 1,
+            "ms": 253.69999998807907,
+            "completed": false,
+            "kind": "page",
+            "canvas": {
+              "width": 3576,
+              "height": 2526,
+              "megapixels": 9.032976,
+              "rgbaMiB": 34.45806884765625
+            },
+            "startedAt": 1548.7000000178814
+          },
+          {
+            "scale": 0.5653206650831354,
+            "ms": 944.5999999940395,
+            "completed": true,
+            "kind": "page",
+            "canvas": {
+              "width": 2021,
+              "height": 1428,
+              "megapixels": 2.885988,
+              "rgbaMiB": 11.009170532226562
+            },
+            "startedAt": 1801.5
+          },
+          {
+            "scale": 2.66,
+            "ms": 644.1000000238419,
+            "completed": true,
+            "kind": "region",
+            "canvas": {
+              "width": 4801,
+              "height": 3001,
+              "megapixels": 14.407801,
+              "rgbaMiB": 54.96139907836914
+            },
+            "startedAt": 3032.0999999940395
+          },
+          {
+            "scale": 1.3308973586848176,
+            "ms": 765.5999999940395,
+            "completed": true,
+            "kind": "page",
+            "canvas": {
+              "width": 4759,
+              "height": 3361,
+              "megapixels": 15.994999,
+              "rgbaMiB": 61.01607894897461
+            },
+            "startedAt": 3677.9000000059605
+          },
+          {
+            "scale": 2.66,
+            "ms": 538.8000000119209,
+            "completed": true,
+            "kind": "region",
+            "canvas": {
+              "width": 4342,
+              "height": 2381,
+              "megapixels": 10.338302,
+              "rgbaMiB": 39.43749237060547
+            },
+            "startedAt": 22330.90000000596
+          }
+        ],
         "frameIntervals": {
-          "count": 112,
-          "median": 133.29999999999927,
-          "p95": 150,
-          "max": 566.7000000000007,
-          "mean": 134.51839285714283
+          "count": 343,
+          "median": 49.89999999999782,
+          "p95": 66.79999999999927,
+          "max": 116.69999999999982,
+          "mean": 43.77864139941691
         },
-        "framesPerSecond": 7.433927649299155,
+        "framesPerSecond": 22.842188976958955,
         "longTasks": {
-          "count": 110,
-          "totalMs": 14832,
-          "maxMs": 570
+          "count": 5,
+          "totalMs": 417,
+          "maxMs": 120
         },
         "rendersDuringPan": 0,
-        "rendersAfterPan": 0,
+        "rendersAfterPan": 1,
         "longTasksAfterPan": {
-          "count": 3,
-          "totalMs": 422,
-          "maxMs": 149
+          "count": 1,
+          "totalMs": 133,
+          "maxMs": 133
         },
+        "layerConsistency": [
+          {
+            "layer": "regions-layer",
+            "pixels": 3600000,
+            "inked": 0,
+            "afterPan": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 0
+            },
+            "singleShift": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 0
+            },
+            "offByOnePixel": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 0
+            }
+          },
+          {
+            "layer": "measurement-layer",
+            "pixels": 3600000,
+            "inked": 0,
+            "afterPan": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 0
+            },
+            "singleShift": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 0
+            },
+            "offByOnePixel": {
+              "differing": 0,
+              "visible": 0,
+              "maxChannelDiff": 0
+            }
+          }
+        ],
         "heapUsedMiB": [
-          24.260764122009277,
-          24.27334499359131,
-          24.281718254089355,
-          24.287283897399902,
-          24.293463706970215,
-          24.29897975921631,
-          24.30613613128662,
-          24.311522483825684,
-          24.318549156188965,
-          24.324660301208496,
-          24.3309965133667,
-          24.33743190765381,
-          24.344923973083496,
-          24.349581718444824,
-          24.35864543914795,
-          24.35911464691162,
-          24.35914134979248
+          24.279412269592285,
+          24.38350200653076,
+          24.491263389587402,
+          24.60539436340332,
+          24.723196029663086,
+          24.829895973205566,
+          24.920331954956055,
+          25.01024055480957,
+          25.113544464111328,
+          25.222201347351074,
+          25.33626651763916,
+          25.431612968444824,
+          25.519291877746582,
+          25.614760398864746,
+          25.69194221496582,
+          25.569239616394043,
+          25.569266319274902
         ],
         "phases": {
-          "zoomRendered": 9036.300000011921,
-          "panStarted": 11049.5,
-          "panEnded": 26132.5
+          "zoomRendered": 5056.800000011921,
+          "panStarted": 7069.200000017881,
+          "panEnded": 22094
         },
         "error": null
       },
       "memory": [
         {
-          "seconds": 1.13,
-          "workingSetMiB": 260.5625,
-          "privateMiB": 143.9609375,
+          "seconds": 1.165,
+          "workingSetMiB": 253.93359375,
+          "privateMiB": 134.32421875,
           "processes": 4
         },
         {
-          "seconds": 3.703,
-          "workingSetMiB": 965.5390625,
-          "privateMiB": 413.7890625,
+          "seconds": 3.721,
+          "workingSetMiB": 762.93359375,
+          "privateMiB": 453.0625,
           "processes": 4
         },
         {
-          "seconds": 6.49,
-          "workingSetMiB": 1768.62109375,
-          "privateMiB": 612.3984375,
+          "seconds": 6.179,
+          "workingSetMiB": 1016.828125,
+          "privateMiB": 522.34765625,
           "processes": 4
         },
         {
-          "seconds": 9.135,
-          "workingSetMiB": 2126.20703125,
-          "privateMiB": 873.6953125,
+          "seconds": 8.701,
+          "workingSetMiB": 1254.6875,
+          "privateMiB": 523.15234375,
           "processes": 4
         },
         {
-          "seconds": 11.679,
-          "workingSetMiB": 2386.2890625,
-          "privateMiB": 869.08984375,
+          "seconds": 11.236,
+          "workingSetMiB": 1390.16015625,
+          "privateMiB": 523.1328125,
           "processes": 4
         },
         {
-          "seconds": 14.281,
-          "workingSetMiB": 3262.78515625,
-          "privateMiB": 870.0546875,
+          "seconds": 13.877,
+          "workingSetMiB": 1461.203125,
+          "privateMiB": 523.14453125,
           "processes": 4
         },
         {
-          "seconds": 16.81,
-          "workingSetMiB": 3754.38671875,
-          "privateMiB": 870.01953125,
+          "seconds": 16.528,
+          "workingSetMiB": 1480.13671875,
+          "privateMiB": 523.13671875,
           "processes": 4
         },
         {
-          "seconds": 19.437,
-          "workingSetMiB": 3878.265625,
-          "privateMiB": 870.01953125,
+          "seconds": 19.264,
+          "workingSetMiB": 1484.62109375,
+          "privateMiB": 523.17578125,
           "processes": 4
         },
         {
-          "seconds": 22.047,
-          "workingSetMiB": 3967.80859375,
-          "privateMiB": 870.04296875,
+          "seconds": 21.839,
+          "workingSetMiB": 1492.30859375,
+          "privateMiB": 523.13671875,
           "processes": 4
         },
         {
-          "seconds": 24.738,
-          "workingSetMiB": 4123.56640625,
-          "privateMiB": 870.04296875,
-          "processes": 4
-        },
-        {
-          "seconds": 27.34,
-          "workingSetMiB": 4161.890625,
-          "privateMiB": 870.08203125,
+          "seconds": 24.612,
+          "workingSetMiB": 1212.34765625,
+          "privateMiB": 513.23046875,
           "processes": 4
         }
       ]
     }
   ],
-  "commit": "7f39732304043be774bcbabf530ecb0397d60cab",
+  "commit": "346d5597b7c788bfa6e8c856ed599ed6cffdd41a",
+  "dirty": true,
   "sources": [
     {
       "id": "reference",

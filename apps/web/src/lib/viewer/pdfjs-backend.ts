@@ -72,7 +72,14 @@ export class PdfJsRenderBackend implements RenderBackend {
     };
   }
 
-  async render({ pageIndex, scale, canvas, signal }: RenderRequest): Promise<void> {
+  async render({
+    pageIndex,
+    scale,
+    canvas,
+    signal,
+    region,
+    pixelRatio,
+  }: RenderRequest): Promise<void> {
     if (signal.aborted) throw new RenderCancelledError();
 
     const page = await this.page(pageIndex);
@@ -80,17 +87,30 @@ export class PdfJsRenderBackend implements RenderBackend {
 
     // Рисуем в физических пикселях экрана: иначе на мониторе с удвоенной плотностью
     // тонкие линии чертежа расплываются.
-    const ratio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
-    const viewport = page.getViewport({ scale: scale * ratio });
+    const ratio = pixelRatio ?? (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1);
+    const density = scale * ratio;
+    const viewport = page.getViewport({ scale: density });
 
-    canvas.width = Math.max(1, Math.floor(viewport.width));
-    canvas.height = Math.max(1, Math.floor(viewport.height));
-    canvas.style.width = `${Math.floor(viewport.width / ratio)}px`;
-    canvas.style.height = `${Math.floor(viewport.height / ratio)}px`;
+    let transform: number[] | undefined;
+    if (region) {
+      // Часть листа: холст размером с прямоугольник, а лист сдвинут так, чтобы угол
+      // прямоугольника пришёлся на пиксель (0, 0). pdf.js применяет сдвиг до преобразования
+      // страницы, поэтому поворот /Rotate и масштаб остаются его заботой.
+      const left = Math.round(region.x * density);
+      const top = Math.round(region.y * density);
+      canvas.width = Math.max(1, Math.round(region.width * density));
+      canvas.height = Math.max(1, Math.round(region.height * density));
+      transform = [1, 0, 0, 1, -left, -top];
+    } else {
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+    }
+    canvas.style.width = `${canvas.width / ratio}px`;
+    canvas.style.height = `${canvas.height / ratio}px`;
 
     // pdf.js 6: только `canvas`. Вместе с `canvasContext` контекст не берёт
     // переданный холст, а в паре с гонкой это ещё и валит отрисовку.
-    const task = page.render({ canvas, viewport });
+    const task = page.render(transform ? { canvas, viewport, transform } : { canvas, viewport });
     const onAbort = () => task.cancel();
     signal.addEventListener('abort', onAbort, { once: true });
 

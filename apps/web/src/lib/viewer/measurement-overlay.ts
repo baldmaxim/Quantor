@@ -8,8 +8,19 @@
  * Canvas2D. WebGL — только после замера, и замер этот делает промт 14, а не предположение.
  */
 
-import type { NormalizedPoint, ScreenPoint, SheetPlacement } from '@/lib/viewer/coordinates';
+import type {
+  NormalizedPoint,
+  ScreenPoint,
+  ScreenRect,
+  SheetPlacement,
+} from '@/lib/viewer/coordinates';
 import { toScreenPoint } from '@/lib/viewer/coordinates';
+import {
+  beginLayerPaint,
+  boundsIntersectAny,
+  visibleRects,
+  type PixelRect,
+} from '@/lib/viewer/layer-paint';
 
 /** Геометрия, как её рисует слой. Ровно то, что нужно отрисовке, и ничего больше. */
 export interface OverlayMeasurement {
@@ -53,11 +64,20 @@ const DRAFT_DASH = [6, 4];
 /** Радиус попадания по вершине в пикселях экрана. Меньше — в вершину не попасть мышью. */
 export const VERTEX_HIT_RADIUS = 8;
 
+/** Запас отсечения: самая широкая часть фигуры за пределами её геометрии — метка счёта. */
+const CULL_MARGIN = Math.max(COUNT_RADIUS, VERTEX_RADIUS) + SELECTED_LINE_WIDTH;
+
 const colorOf = (measurement: OverlayMeasurement, style: MeasurementOverlayStyle): string =>
   style.colors[measurement.colorKey] ?? style.fallbackColor;
 
 /**
  * Рисует слой и возвращает число нарисованных фигур.
+ *
+ * Рисуются только фигуры, задевающие холст или полосы `area`: слой размером с область
+ * просмотра, и при панораме сюда приходят только открывшиеся полосы (ADR-0025). Невидимое не
+ * растеризуется — именно растеризация, а не обход списка, стоит основного времени кадра. Обход
+ * при этом дешёвый: охват фигуры считается по нормализованным точкам, в пиксели переводятся два
+ * его угла, а все точки — только у видимых фигур.
  *
  * Возврат нужен тесту: «слой отрисовался» и «слой отрисовал то, что нужно» — разные
  * утверждения, и второе проверяется числом, а не скриншотом.
@@ -68,17 +88,18 @@ export const drawMeasurements = (
   state: MeasurementOverlayState,
   style: MeasurementOverlayStyle,
   devicePixelRatio = 1,
+  area: readonly PixelRect[] | null = null,
 ): number => {
-  const canvas = context.canvas;
-  context.setTransform(1, 0, 0, 1, 0, 0);
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.scale(devicePixelRatio, devicePixelRatio);
+  const visible = beginLayerPaint(context, devicePixelRatio, area, CULL_MARGIN);
 
   let drawn = 0;
   for (const measurement of state.measurements) {
-    const override =
+    const points =
       state.dragOverride?.id === measurement.id ? state.dragOverride.points : measurement.points;
-    drawShape(context, placement, measurement, override, state, style);
+    if (!pointsVisible(points, placement, visible)) continue;
+
+    const screen = points.map((point) => toScreenPoint(point, placement));
+    drawShape(context, measurement, screen, state, style);
     drawn += 1;
   }
 
@@ -86,21 +107,75 @@ export const drawMeasurements = (
     drawDraft(context, placement, state, style);
   }
 
+  context.restore();
   return drawn;
+};
+
+/**
+ * Есть ли в полосах `area` что рисовать: черновик или хоть одно видимое измерение (ADR-0025).
+ *
+ * Нет — слой на панораме сдвигается одним CSS и холст не трогает. Отсечение то же, что у
+ * `drawMeasurements`, поэтому ответ «нечего» никогда не теряет фигуру, которую отрисовка нарисовала
+ * бы. Черновик считается задевающим всегда: он живёт под курсором и дёшев.
+ */
+export const measurementsTouch = (
+  placement: SheetPlacement,
+  state: MeasurementOverlayState,
+  devicePixelRatio: number,
+  area: readonly PixelRect[],
+): boolean => {
+  if (state.draft.length > 0 && state.draftType !== null) return true;
+
+  const visible = visibleRects(area, devicePixelRatio, CULL_MARGIN);
+  return state.measurements.some((measurement) => {
+    const points =
+      state.dragOverride?.id === measurement.id ? state.dragOverride.points : measurement.points;
+    return pointsVisible(points, placement, visible);
+  });
+};
+
+/** Задевает ли охват точек видимые прямоугольники. Вызывается на тысячах фигур за кадр. */
+const pointsVisible = (
+  points: readonly NormalizedPoint[],
+  placement: SheetPlacement,
+  visible: readonly ScreenRect[],
+): boolean => {
+  if (points.length === 0) return false;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const point of points) {
+    if (point.x < minX) minX = point.x;
+    if (point.x > maxX) maxX = point.x;
+    if (point.y < minY) minY = point.y;
+    if (point.y > maxY) maxY = point.y;
+  }
+
+  // Поворот переставляет углы охвата, поэтому в пиксели переводятся оба угла, а охват
+  // собирается заново — прямоугольник остаётся прямоугольником при повороте на 90°.
+  const first = toScreenPoint({ x: minX, y: minY }, placement);
+  const second = toScreenPoint({ x: maxX, y: maxY }, placement);
+  return boundsIntersectAny(
+    Math.min(first.x, second.x),
+    Math.min(first.y, second.y),
+    Math.max(first.x, second.x),
+    Math.max(first.y, second.y),
+    visible,
+  );
 };
 
 const drawShape = (
   context: CanvasRenderingContext2D,
-  placement: SheetPlacement,
   measurement: OverlayMeasurement,
-  points: readonly NormalizedPoint[],
+  screen: readonly ScreenPoint[],
   state: MeasurementOverlayState,
   style: MeasurementOverlayStyle,
 ): void => {
   const selected = state.selectedId === measurement.id;
   const hovered = state.hoveredId === measurement.id;
   const color = colorOf(measurement, style);
-  const screen = points.map((point) => toScreenPoint(point, placement));
 
   context.save();
   context.strokeStyle = color;

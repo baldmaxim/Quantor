@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { SheetPlacement } from '@/lib/viewer/coordinates';
 import type { ScaleDraftState } from '@/lib/viewer/scale-draft';
-import { drawScaleDraft } from '@/lib/viewer/scale-overlay';
+import { drawScaleDraft, scaleDraftTouches } from '@/lib/viewer/scale-overlay';
 
 const placement: SheetPlacement = { x: 0, y: 0, width: 1000, height: 2000, rotation: 0 };
 const style = { color: '#14539e' };
@@ -184,5 +184,14 @@ describe('слой черновика калибровки', () => {
     drawScaleDraft(recorded.context, placement, state({ hover: { x: 0.5, y: 0.5 } }), style, 2);
 
     expect(recorded.context.scale).toHaveBeenCalledWith(2, 2);
+  });
+
+  it('пустой черновик нечего рисовать, с курсором или точкой — есть', () => {
+    // Панорама не трогает холст пустого слоя; перекрестие под курсором — уже содержимое.
+    expect(scaleDraftTouches(state())).toBe(false);
+    expect(scaleDraftTouches(state({ hover: { x: 0.5, y: 0.5 } }))).toBe(true);
+    expect(scaleDraftTouches(state({ phase: 'awaiting-second', a: { x: 0.1, y: 0.1 } }))).toBe(
+      true,
+    );
   });
 });

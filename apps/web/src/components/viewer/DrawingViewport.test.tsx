@@ -114,7 +114,7 @@ const flushFrame = async (): Promise<void> => {
 const settle = async (): Promise<void> => {
   await flushFrame();
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 400));
   });
 };
 
@@ -230,9 +230,9 @@ describe('холст рабочей области', () => {
     await flushFrame();
 
     fireEvent.wheel(screen.getByTestId('viewport'), { deltaY: -100 });
-    // Перерисовка по зуму отложена на RERENDER_DELAY_MS; ждём заведомо дольше.
+    // Перерисовка по зуму ждёт затихания жеста: паузу и два тихих кадра. Ждём заведомо дольше.
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 260));
+      await new Promise((resolve) => setTimeout(resolve, 400));
     });
 
     expect(backend.maxLive).toBe(1);
@@ -308,7 +308,7 @@ describe('холст рабочей области', () => {
       });
       // Пауза длиннее задержки перерисовки: именно после неё страница и перерисовывалась.
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        await new Promise((resolve) => setTimeout(resolve, 400));
       });
     }
 
@@ -328,7 +328,7 @@ describe('холст рабочей области', () => {
       fireEvent.wheel(viewport, { deltaY: -100, clientX: 200, clientY: 200 });
     });
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise((resolve) => setTimeout(resolve, 400));
     });
 
     expect(backend.renders.length).toBeGreaterThan(rendersBefore);

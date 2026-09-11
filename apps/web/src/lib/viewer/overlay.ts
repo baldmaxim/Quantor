@@ -18,8 +18,11 @@ import {
   toScreenPolygon,
   toScreenRect,
   type NormalizedRect,
+  type ScreenPoint,
+  type ScreenRect,
   type SheetPlacement,
 } from './coordinates';
+import { beginLayerPaint, boundsIntersectAny, visibleRects, type PixelRect } from './layer-paint';
 
 export interface OverlayRegion {
   readonly id: string;
@@ -44,15 +47,18 @@ export interface OverlayState {
 
 const LINE_WIDTH = 1.5;
 const SELECTED_LINE_WIDTH = 2.5;
+/** Запас отсечения — толщина штриха выделенной области. */
+const CULL_MARGIN = SELECTED_LINE_WIDTH;
 const FILL_ALPHA = 0.14;
 const HOVER_ALPHA = 0.2;
 const SELECTED_ALPHA = 0.28;
 
 /**
- * Рисует слой целиком.
+ * Рисует видимую часть слоя — весь холст или только полосы `area` (ADR-0025).
  *
  * Функция чистая относительно холста: она не хранит состояния и не подписывается
- * на события. Это позволяет вызывать её из кадра анимации сколько угодно часто.
+ * на события. Слой размером с область просмотра; при панораме его пиксели сдвигаются, а
+ * сюда приходят только открывшиеся полосы. Области вне холста или вне полос не растеризуются.
  */
 export const drawOverlay = (
   context: CanvasRenderingContext2D,
@@ -60,16 +66,15 @@ export const drawOverlay = (
   state: OverlayState,
   style: OverlayStyle,
   devicePixelRatio = 1,
+  area: readonly PixelRect[] | null = null,
 ): number => {
-  const { canvas } = context;
-  context.save();
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.scale(devicePixelRatio, devicePixelRatio);
-
+  const visible = beginLayerPaint(context, devicePixelRatio, area, CULL_MARGIN);
   let drawn = 0;
 
   for (const region of state.regions) {
-    if (state.hiddenTypes.has(region.blockType)) continue;
+    const shape = visibleShape(region, placement, state, visible);
+    if (!shape) continue;
+    const { polygon, rect } = shape;
 
     const color = style.colors[region.blockType] ?? style.fallbackColor;
     const selected = region.id === state.selectedId;
@@ -80,10 +85,10 @@ export const drawOverlay = (
     context.globalAlpha = selected ? SELECTED_ALPHA : hovered ? HOVER_ALPHA : FILL_ALPHA;
     context.lineWidth = selected ? SELECTED_LINE_WIDTH : LINE_WIDTH;
 
-    if (region.shapeType === 'polygon' && region.polygon && region.polygon.length >= 3) {
-      drawPolygon(context, region.polygon, placement);
-    } else {
-      drawRect(context, region.coords, placement);
+    if (polygon) {
+      drawPolygon(context, polygon);
+    } else if (rect) {
+      drawRect(context, rect);
     }
 
     drawn += 1;
@@ -93,23 +98,69 @@ export const drawOverlay = (
   return drawn;
 };
 
-const drawRect = (
-  context: CanvasRenderingContext2D,
-  coords: NormalizedRect,
+/**
+ * Есть ли в полосах `area` хоть одна видимая область (ADR-0025).
+ *
+ * Нет — слой на панораме сдвигается одним CSS и холст не трогает: передача холста композитору
+ * на каждом кадре стоит дороже, чем кажется. Отсечение то же, что у `drawOverlay`, поэтому ответ
+ * «нечего» никогда не теряет область, которую отрисовка нарисовала бы.
+ */
+export const overlayTouches = (
   placement: SheetPlacement,
-): void => {
-  const rect = toScreenRect(coords, placement);
+  state: OverlayState,
+  devicePixelRatio: number,
+  area: readonly PixelRect[],
+): boolean => {
+  const visible = visibleRects(area, devicePixelRatio, CULL_MARGIN);
+  return state.regions.some((region) => visibleShape(region, placement, state, visible) !== null);
+};
+
+/** Экранная форма области, если она не скрыта и задевает видимые прямоугольники. */
+const visibleShape = (
+  region: OverlayRegion,
+  placement: SheetPlacement,
+  state: OverlayState,
+  visible: readonly ScreenRect[],
+): { readonly polygon: ScreenPoint[] | null; readonly rect: ScreenRect | null } | null => {
+  if (state.hiddenTypes.has(region.blockType)) return null;
+
+  const polygon =
+    region.shapeType === 'polygon' && region.polygon && region.polygon.length >= 3
+      ? toScreenPolygon(region.polygon, placement)
+      : null;
+  if (polygon) return polygonVisible(polygon, visible) ? { polygon, rect: null } : null;
+
+  const rect = toScreenRect(region.coords, placement);
+  return rectVisible(rect, visible) ? { polygon: null, rect } : null;
+};
+
+const rectVisible = (rect: ScreenRect, visible: readonly ScreenRect[]): boolean =>
+  boundsIntersectAny(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height, visible);
+
+const polygonVisible = (
+  points: readonly ScreenPoint[],
+  visible: readonly ScreenRect[],
+): boolean => {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const point of points) {
+    if (point.x < minX) minX = point.x;
+    if (point.x > maxX) maxX = point.x;
+    if (point.y < minY) minY = point.y;
+    if (point.y > maxY) maxY = point.y;
+  }
+  return points.length > 0 && boundsIntersectAny(minX, minY, maxX, maxY, visible);
+};
+
+const drawRect = (context: CanvasRenderingContext2D, rect: ScreenRect): void => {
   context.fillRect(rect.x, rect.y, rect.width, rect.height);
   context.globalAlpha = 1;
   context.strokeRect(rect.x, rect.y, rect.width, rect.height);
 };
 
-const drawPolygon = (
-  context: CanvasRenderingContext2D,
-  polygon: readonly (readonly [number, number])[],
-  placement: SheetPlacement,
-): void => {
-  const points = toScreenPolygon(polygon, placement);
+const drawPolygon = (context: CanvasRenderingContext2D, points: readonly ScreenPoint[]): void => {
   const first = points[0];
   if (!first) return;
 

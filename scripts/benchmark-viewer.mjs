@@ -11,6 +11,11 @@
  * тест геометрии, меряется и он. Путь можно задать явно: VIEWER_BENCH_PDF (PDF) или
  * VIEWER_BENCH_PACKAGE (ZIP-пакет), номер листа — VIEWER_BENCH_PAGE (с единицы, умолчание 71).
  *
+ * Для итераций — часть разделов: VIEWER_BENCH_ONLY=pan,consistency (из sizing, consistency,
+ * pan), сценарии панорамы по номерам VIEWER_BENCH_PAN=0,3 и их длительность
+ * VIEWER_BENCH_PAN_SECONDS. Такой прогон печатает отчёт в stdout и файлы в docs не трогает;
+ * JSON — по пути из VIEWER_BENCH_JSON, если он задан.
+ *
  * В отчёт попадают размеры, отпечаток и номер листа, но не имя клиентского файла.
  */
 
@@ -98,7 +103,7 @@ const buildReport = (report) => {
     '<!-- Файл создаётся командой `pnpm benchmark:viewer`. Руками не правится: числа в нём и в',
     '     viewer-benchmark-results.json обязаны совпадать. -->',
     '',
-    `Снято: ${report.generatedAt}. Коммит: \`${report.commit ?? '—'}\`.`,
+    `Снято: ${report.generatedAt}. Коммит: \`${report.commit ?? '—'}\`${report.dirty ? ' и незафиксированные изменения рабочего дерева поверх него' : ''}.`,
     '',
     '## Среда',
     '',
@@ -138,9 +143,10 @@ const buildReport = (report) => {
     '',
     '## Холсты и память',
     '',
-    'Холст страницы — формула pdf.js-отрисовщика; слой — рабочий `resizeOverlay`. Стопка —',
-    'страница и три слоя во весь лист, как держит их DrawingViewport с открытыми обмерами и',
-    'масштабом. Слой по области просмотра — 1600 × 1000 CSS-пикселей.',
+    'Модель прежней архитектуры — точка отсчёта для ADR-0024. Холст страницы — формула',
+    'pdf.js-отрисовщика; слой — рабочий `resizeOverlay`. Стопка — страница и три слоя во весь лист,',
+    'как держал их DrawingViewport до промта 03. Слой по области просмотра — 1600 × 1000',
+    'CSS-пикселей. Что держит рабочий компонент сейчас, видно в разделе панорамы.',
     '',
   ];
 
@@ -247,12 +253,70 @@ const buildReport = (report) => {
     );
   }
 
+  if (report.consistency?.length) {
+    lines.push(
+      '## Резкая часть против листа целиком',
+      '',
+      'Резкая часть (ADR-0025) рисуется pdf.js со сдвигом и сверяется попиксельно с тем же куском растра',
+      'во весь лист. «Всего» — пиксели, где хоть один канал разошёлся больше чем на 2 из 255,',
+      '«заметно» — больше чем на 64. Проба «сдвиг на пиксель» — то же сравнение с куском листа на пиксель',
+      'левее: так выглядел бы шов. Skia растеризует тонкий штрих в разных местах холста не бит в бит,',
+      'поэтому мерило выравнивания — разница между двумя столбцами, а не ноль.',
+      '',
+      table(
+        [
+          'Лист',
+          'DPR',
+          'Масштаб',
+          'Растр листа',
+          'Резкая часть',
+          'Угол, px',
+          'Совпадение: заметно / всего',
+          'Сдвиг на пиксель: заметно / всего',
+          'Лист, мс',
+          'Часть, мс',
+        ],
+        report.consistency.map((item) => {
+          const r = item.result;
+          if (!r) {
+            return [
+              sourceName(item.source),
+              String(item.ratio),
+              pct(item.zoom),
+              `**не выполнено:** ${item.error}`,
+              '—',
+              '—',
+              '—',
+              '—',
+              '—',
+              '—',
+            ];
+          }
+          return [
+            sourceName(item.source),
+            String(item.ratio),
+            pct(item.zoom),
+            `${r.page.width} × ${r.page.height}`,
+            `${r.region.width} × ${r.region.height}`,
+            `${r.offset.x}, ${r.offset.y}`,
+            `${r.aligned.visible} / ${r.aligned.differing}`,
+            `${r.offByOnePixel.visible} / ${r.offByOnePixel.differing}`,
+            f(r.pageMs, 0),
+            f(r.regionMs, 0),
+          ];
+        }),
+      ),
+      '',
+    );
+  }
+
   lines.push(
     '## Панорама настоящего DrawingViewport',
     '',
     'Камера двигается каждый кадр по фигуре Лиссажу в пределах листа. Длинная задача — дольше 50 мс',
     'на главном потоке. Память процессов — рабочее множество и частные байты всего дерева',
-    'процессов Chromium по данным ОС.',
+    'процессов Chromium по данным ОС. Слои после панорамы сверяются побитно с перерисовкой целиком',
+    'при той же камере.',
     '',
   );
   for (const pan of report.pan) {
@@ -276,18 +340,27 @@ const buildReport = (report) => {
       samples.length
         ? `${f(samples[0].workingSetMiB, 0)} → ${f(samples[samples.length - 1].workingSetMiB, 0)} (макс. ${f(Math.max(...samples.map((m) => m.workingSetMiB)), 0)})`
         : '—';
+    const panEnd = r.phases.panEnded;
+    const afterPan = (r.renders ?? []).filter(
+      (item) => typeof panEnd === 'number' && item.startedAt >= panEnd,
+    );
+    const renderKind = (item) =>
+      `${item.kind === 'region' ? 'часть' : 'лист'} ${item.canvas.width} × ${item.canvas.height} при ${pct(item.scale)}, ${f(item.ms, 0)} мс${item.completed ? '' : ' (оборвана)'}`;
     lines.push(
       table(
         ['Что', 'Значение'],
         [
           [
-            'Холсты стопки',
+            'Холсты',
             r.canvases
-              .map((c) => `${c.width} × ${c.height}${c.visible ? '' : ' (скрыт)'}`)
+              .map(
+                (c) =>
+                  `${c.role ? `${c.role}: ` : ''}${c.width} × ${c.height}${c.visible ? '' : ' (скрыт)'}`,
+              )
               .join('; '),
           ],
           ['Память холстов, RGBA', `${f(r.stackRgbaMiB, 0)} МиБ`],
-          ['Отрисовка страницы в этом масштабе', `${f(r.zoomRenderMs, 0)} мс`],
+          ['Отрисовка в этом масштабе', `${f(r.zoomRenderMs, 0)} мс`],
           [
             'Интервал кадра: медиана / p95 / максимум',
             `${f(r.frameIntervals.median)} / ${f(r.frameIntervals.p95)} / ${f(r.frameIntervals.max)} мс`,
@@ -302,6 +375,14 @@ const buildReport = (report) => {
             'Перерисовок и длинных задач после остановки',
             `${r.rendersAfterPan}; ${r.longTasksAfterPan.count} задач, ${f(r.longTasksAfterPan.totalMs, 0)} мс`,
           ],
+          [
+            'Отрисовки после остановки',
+            afterPan.length ? afterPan.map(renderKind).join('; ') : '—',
+          ],
+          ...(r.layerConsistency ?? []).map((c) => [
+            `Слой ${c.layer} после панорамы против перерисовки целиком`,
+            `закрашено ${c.inked} из ${c.pixels}; после панорамы — заметно ${c.afterPan.visible}, всего ${c.afterPan.differing}; порог шума (один сдвиг) — заметно ${c.singleShift.visible}, всего ${c.singleShift.differing}; сдвиг на пиксель — заметно ${c.offByOnePixel.visible}, всего ${c.offByOnePixel.differing}`,
+          ]),
           [
             'Куча JS, МиБ (раз в секунду)',
             r.heapUsedMiB.length
@@ -357,6 +438,11 @@ try {
       frames: { viewport: 30, fullPage: 8 },
       hitFrames: 60,
     },
+    // Резкая часть против листа целиком: обычная плотность и сценарий живой приёмки.
+    consistency: [
+      { ratio: 1, zoom: 2 },
+      { ratio: 1.5, zoom: 2.66 },
+    ],
     // Сценарий живой приёмки (266 %, DPR 1,5) и соседние: другая плотность и вписанный лист.
     pan: [
       {
@@ -386,9 +472,28 @@ try {
       { source: primary, ratio: 1.5, zoom: 2.66, measurements: 0, regions: 0, durationMs: 15_000 },
     ],
   };
-  const config = quick
+  // Часть разделов (VIEWER_BENCH_ONLY=pan,consistency) — для итераций: отчёт в stdout, файлы
+  // в docs не трогаются, потому что неполный замер не может заменить полный.
+  const only = process.env.VIEWER_BENCH_ONLY
+    ? process.env.VIEWER_BENCH_ONLY.split(',').map((item) => item.trim())
+    : null;
+  // Сценарии панорамы по номерам (с нуля) и длительность — тоже только для итераций.
+  const panIndices = process.env.VIEWER_BENCH_PAN?.split(',').map(Number) ?? null;
+  const panSeconds = Number(process.env.VIEWER_BENCH_PAN_SECONDS ?? 0);
+  const selected = only
     ? {
         ...fullConfig,
+        sections: only,
+        pan: fullConfig.pan
+          .filter((_, index) => !panIndices || panIndices.includes(index))
+          .map((scenario) =>
+            panSeconds > 0 ? { ...scenario, durationMs: panSeconds * 1000 } : scenario,
+          ),
+      }
+    : fullConfig;
+  const config = quick
+    ? {
+        ...selected,
         zooms: [1, 2.66],
         ratios: [1.5],
         overlay: {
@@ -397,10 +502,11 @@ try {
           frames: { viewport: 3, fullPage: 2 },
           hitFrames: 5,
         },
+        consistency: [{ ratio: 1, zoom: 2 }],
         pan: [{ ...fullConfig.pan[0], durationMs: 3000 }],
         settleMs: 500,
       }
-    : fullConfig;
+    : selected;
   const configPath = join(WORK, 'config.json');
   writeFileSync(configPath, JSON.stringify(config));
 
@@ -420,15 +526,25 @@ try {
     cwd: ROOT,
     encoding: 'utf8',
   }).stdout.trim();
+  // Замер обычно снимается до коммита, в который войдёт: отчёт честно говорит, что код новее хеша.
+  const dirty =
+    spawnSync('git', ['status', '--porcelain', '--', 'apps/web', 'scripts'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    }).stdout.trim().length > 0;
   const report = {
     ...measured,
     commit: commit || null,
+    dirty,
     // Пути к файлам в отчёт не попадают: у эталона это путь к частным данным.
     sources: config.sources.map(({ path: _path, ...rest }) => rest),
     config: { ...measured.config, sources: undefined },
   };
 
-  if (quick) {
+  if (quick || only) {
+    if (process.env.VIEWER_BENCH_JSON) {
+      writeFileSync(process.env.VIEWER_BENCH_JSON, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+    }
     process.stdout.write(buildReport(report));
   } else {
     mkdirSync(OUT_DIR, { recursive: true });

@@ -11,6 +11,7 @@
 
 import type { SheetPlacement } from '@/lib/viewer/coordinates';
 import { toScreenPoint } from '@/lib/viewer/coordinates';
+import { beginLayerPaint, type PixelRect } from '@/lib/viewer/layer-paint';
 import type { ScaleDraftState } from '@/lib/viewer/scale-draft';
 
 export interface ScaleOverlayStyle {
@@ -28,6 +29,9 @@ const PENDING_DASH = [6, 4];
 /**
  * Рисует черновик и возвращает число нарисованных точек.
  *
+ * `area` — полосы, открывшиеся при панораме (ADR-0025); нет — весь холст. Отсекать на слое из
+ * трёх примитивов нечего, полосы только ограничивают рисование.
+ *
  * Возврат нужен тесту: «слой отрисовался» и «слой отрисовал то, что нужно» — разные
  * утверждения, и второе проверяется числом, а не скриншотом.
  */
@@ -37,12 +41,27 @@ export const drawScaleDraft = (
   state: ScaleDraftState,
   style: ScaleOverlayStyle,
   devicePixelRatio = 1,
+  area: readonly PixelRect[] | null = null,
 ): number => {
-  const canvas = context.canvas;
-  context.setTransform(1, 0, 0, 1, 0, 0);
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.scale(devicePixelRatio, devicePixelRatio);
+  beginLayerPaint(context, devicePixelRatio, area, 0);
+  const drawn = paintDraft(context, placement, state, style);
+  context.restore();
+  return drawn;
+};
 
+/**
+ * Есть ли у черновика что рисовать (ADR-0025). Слой из трёх примитивов не отсекается по полосам:
+ * пока есть точка или курсор, полосы дорисовываются, без них холст пуст и не трогается.
+ */
+export const scaleDraftTouches = (state: ScaleDraftState): boolean =>
+  state.a !== null || state.b !== null || state.hover !== null;
+
+const paintDraft = (
+  context: CanvasRenderingContext2D,
+  placement: SheetPlacement,
+  state: ScaleDraftState,
+  style: ScaleOverlayStyle,
+): number => {
   const first = state.a;
   if (first === null) {
     // Инструмент включён, но точек нет: показываем перекрестие под курсором, чтобы

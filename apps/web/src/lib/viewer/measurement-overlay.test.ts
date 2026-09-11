@@ -12,6 +12,7 @@ import {
   drawMeasurements,
   hitTestMeasurements,
   hitTestVertex,
+  measurementsTouch,
   type MeasurementOverlayState,
   type OverlayMeasurement,
 } from '@/lib/viewer/measurement-overlay';
@@ -67,6 +68,8 @@ const fakeContext = (): Recorded => {
     restore: vi.fn(),
     scale: vi.fn(),
     setTransform: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
     clearRect: vi.fn(() => {
       counters.cleared += 1;
     }),
@@ -267,12 +270,159 @@ describe('отрисовка', () => {
     expect(recorded.lines).not.toContainEqual({ x: 900, y: 500 });
   });
 
+  it('фигура за краем холста не растеризуется', () => {
+    const recorded = fakeContext();
+
+    const drawn = drawMeasurements(
+      recorded.context,
+      { ...placement, x: -5000 },
+      state({ measurements: [measurement()] }),
+      style,
+    );
+
+    expect(drawn).toBe(0);
+    expect(recorded.strokes).toBe(0);
+  });
+
+  it('фигура, задевающая край холста, рисуется', () => {
+    const recorded = fakeContext();
+
+    // Линия от 0,1 до 0,9 листа в 1000 пикселей, сдвинутого на -800: правый конец на холсте.
+    const drawn = drawMeasurements(
+      recorded.context,
+      { ...placement, x: -800 },
+      state({ measurements: [measurement()] }),
+      style,
+    );
+
+    expect(drawn).toBe(1);
+  });
+
   it('учитывает плотность пикселей', () => {
     const recorded = fakeContext();
 
     drawMeasurements(recorded.context, placement, state(), style, 2);
 
     expect(recorded.context.scale).toHaveBeenCalledWith(2, 2);
+  });
+
+  it('на повёрнутом листе отсечение идёт по повёрнутым координатам', () => {
+    // Охват считается по нормализованным точкам, а в пиксели переводятся его углы. При повороте
+    // на 90° точка (x, y) встаёт в (1 − y, x): отсекать по неповёрнутым было бы ошибкой.
+    const recorded = fakeContext();
+    const rotated: SheetPlacement = { ...placement, x: -900, rotation: 90 };
+    // (0,05; 0,05) → (0,95; 0,05) → x = −900 + 950 = 50: на холсте.
+    const visible = measurement({ id: 'visible', geometryType: 'count', points: [p(0.05, 0.05)] });
+    // (0,95; 0,95) → (0,05; 0,95) → x = −900 + 50 = −850: за краем, хотя без поворота был бы на 50.
+    const hidden = measurement({ id: 'hidden', geometryType: 'count', points: [p(0.95, 0.95)] });
+
+    const drawn = drawMeasurements(
+      recorded.context,
+      rotated,
+      state({ measurements: [visible, hidden] }),
+      style,
+    );
+
+    expect(drawn).toBe(1);
+    expect(recorded.arcs[0]).toMatchObject({ x: 50, y: 50 });
+  });
+});
+
+describe('отрисовка полосами', () => {
+  // Панорама сдвигает пиксели слоя и присылает только открывшиеся полосы (ADR-0025).
+  const left = measurement({ id: 'left', geometryType: 'count', points: [p(0.1, 0.5)] });
+  const right = measurement({ id: 'right', geometryType: 'count', points: [p(0.9, 0.5)] });
+
+  it('рисует только фигуры, задевающие полосу', () => {
+    const recorded = fakeContext();
+
+    const drawn = drawMeasurements(
+      recorded.context,
+      placement,
+      state({ measurements: [left, right] }),
+      style,
+      1,
+      [{ x: 850, y: 0, width: 150, height: 1000 }],
+    );
+
+    expect(drawn).toBe(1);
+    expect(recorded.arcs).toEqual([expect.objectContaining({ x: 900, y: 500 })]);
+    expect(recorded.context.clip).toHaveBeenCalledTimes(1);
+  });
+
+  it('метка у самой границы полосы рисуется: запас на радиус', () => {
+    const recorded = fakeContext();
+    // Центр метки в 3 пикселях левее полосы: её правый край заходит в полосу.
+    const edge = measurement({ id: 'edge', geometryType: 'count', points: [p(0.847, 0.5)] });
+
+    const drawn = drawMeasurements(
+      recorded.context,
+      placement,
+      state({ measurements: [edge] }),
+      style,
+      1,
+      [{ x: 850, y: 0, width: 150, height: 1000 }],
+    );
+
+    expect(drawn).toBe(1);
+  });
+
+  it('вопрос «есть ли что рисовать» отвечает так же, как отрисовка', () => {
+    const areas = [
+      [{ x: 850, y: 0, width: 150, height: 1000 }],
+      [{ x: 0, y: 0, width: 50, height: 1000 }],
+      [{ x: 400, y: 0, width: 50, height: 1000 }],
+    ];
+
+    for (const area of areas) {
+      const recorded = fakeContext();
+      const drawn = drawMeasurements(
+        recorded.context,
+        placement,
+        state({ measurements: [left, right] }),
+        style,
+        1,
+        area,
+      );
+      expect(measurementsTouch(placement, state({ measurements: [left, right] }), 1, area)).toBe(
+        drawn > 0,
+      );
+    }
+  });
+
+  it('перетаскиваемая фигура отвечает по перетаскиваемой геометрии', () => {
+    // Вершину утащили в полосу: пока жест идёт, в полосе есть что рисовать.
+    const area = [{ x: 850, y: 0, width: 150, height: 1000 }];
+    const dragged = state({
+      measurements: [left],
+      dragOverride: { id: 'left', points: [p(0.9, 0.5)] },
+    });
+
+    expect(measurementsTouch(placement, dragged, 1, area)).toBe(true);
+    expect(measurementsTouch(placement, state({ measurements: [left] }), 1, area)).toBe(false);
+  });
+
+  it('черновик задевает любую полосу: он под курсором и дёшев', () => {
+    expect(
+      measurementsTouch(placement, state({ draft: [p(0.1, 0.1)], draftType: 'polyline' }), 1, [
+        { x: 900, y: 900, width: 10, height: 10 },
+      ]),
+    ).toBe(true);
+  });
+
+  it('черновик рисуется и в полосе: он часть того же слоя', () => {
+    const recorded = fakeContext();
+
+    drawMeasurements(
+      recorded.context,
+      placement,
+      state({ draft: [p(0.1, 0.5), p(0.9, 0.5)], draftType: 'line' }),
+      style,
+      1,
+      [{ x: 850, y: 0, width: 150, height: 1000 }],
+    );
+
+    expect(recorded.dashes).toContainEqual([6, 4]);
   });
 });
 

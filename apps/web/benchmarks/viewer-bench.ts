@@ -1,10 +1,13 @@
 /**
- * Замер просмотрщика в настоящем браузере (Stage 2B, промт 02).
+ * Замер просмотрщика в настоящем браузере (Stage 2B, промты 02–03).
  *
- * Меряется нынешняя архитектура — до переписывания, чтобы решение о слоях и тайлах стояло на
- * числах, а не на ощущении «тормозит». Разделы используют рабочий код портала: тот же
- * pdf.js-отрисовщик, те же функции размещения, тот же слой измерений. Подставной код измерил
- * бы сам себя.
+ * Промт 02 снял архитектуру до переписывания, промт 03 — после: решение о слоях и растре по
+ * видимой части стоит на числах, а не на ощущении «тормозит» (ADR-0024, ADR-0025). Разделы
+ * используют рабочий код портала: тот же pdf.js-отрисовщик, те же функции размещения, тот же
+ * слой измерений. Подставной код измерил бы сам себя.
+ *
+ * Разделы «Холсты и память» и «Слой измерений» моделируют прежнюю стопку во весь лист — это
+ * точка отсчёта. Панорама и сверка растров меряют рабочий компонент как есть.
  *
  * Числа снимаются в headless Chromium на программной растеризации — это верхняя оценка.
  */
@@ -23,6 +26,7 @@ import {
 } from '@/lib/viewer/measurement-overlay';
 import { resizeOverlay } from '@/lib/viewer/overlay';
 import { PdfJsRenderBackend } from '@/lib/viewer/pdfjs-backend';
+import { surfaceRegionFor } from '@/lib/viewer/surface';
 
 import {
   buildMeasurements,
@@ -219,6 +223,114 @@ export const measurePdfRender = async (
     for (const zoom of zooms) rows.push(await renderAt(zoom));
     return { pageCount: backend.pageCount, warmupMs: warm.ms ?? 0, rows };
   } finally {
+    backend.destroy();
+  }
+};
+
+/* ---------------------------------------------------------------- резкая часть против листа */
+
+interface RasterDiff {
+  /** Пикселей, где хоть один канал разошёлся больше чем на 2 из 255. */
+  readonly differing: number;
+  /** Пикселей, где расхождение заметно глазом — больше 64 из 255. */
+  readonly visible: number;
+  readonly maxChannelDiff: number;
+}
+
+export interface RasterConsistency {
+  readonly zoom: number;
+  readonly devicePixelRatio: number;
+  readonly page: CanvasSize;
+  readonly region: CanvasSize;
+  /** Угол резкой части в физических пикселях растра листа. */
+  readonly offset: { readonly x: number; readonly y: number };
+  /** Часть против того же куска листа. */
+  readonly aligned: RasterDiff;
+  /** Часть против куска листа, сдвинутого на пиксель вправо: так выглядел бы шов. */
+  readonly offByOnePixel: RasterDiff;
+  readonly pageMs: number;
+  readonly regionMs: number;
+}
+
+/**
+ * Резкая часть, нарисованная отрисовщиком, против того же куска растра во весь лист.
+ *
+ * Если прямоугольник части и сдвиг pdf.js разошлись хоть на пиксель, часть ляжет на подложку со
+ * швом или сдвигом — ровно «оторвавшийся фрагмент» живой проверки. Нуля ждать нельзя: Skia
+ * растеризует тонкий штрих в разных местах холста не бит в бит. Поэтому рядом — проба сдвига на
+ * пиксель: при верном выравнивании расхождение много меньше, чем со сдвигом.
+ */
+export const measureRasterConsistency = async (
+  url: string,
+  pageIndex: number,
+  zoom: number,
+  viewport: Viewport,
+): Promise<RasterConsistency> => {
+  const backend = await PdfJsRenderBackend.open(url);
+  const full = document.createElement('canvas');
+  const part = document.createElement('canvas');
+  try {
+    const geometry = await backend.geometry(pageIndex);
+    const dpr = devicePixelRatio();
+    // Дробный сдвиг от центра: выравнивание по пикселям обязано справиться и с ним.
+    const camera = {
+      scale: zoom,
+      offsetX: viewport.width / 2 - (geometry.width * zoom) / 2 + 123.4,
+      offsetY: viewport.height / 2 - (geometry.height * zoom) / 2 - 56.7,
+    };
+    const region = surfaceRegionFor(geometry, camera, viewport, dpr);
+    if (!region) throw new Error('резкая часть не построена');
+
+    const signal = new AbortController().signal;
+    let started = performance.now();
+    await backend.render({ pageIndex, scale: zoom, canvas: full, signal, pixelRatio: dpr });
+    const pageMs = performance.now() - started;
+    started = performance.now();
+    await backend.render({ pageIndex, scale: zoom, canvas: part, signal, pixelRatio: dpr, region });
+    const regionMs = performance.now() - started;
+
+    const x = Math.round(region.x * zoom * dpr);
+    const y = Math.round(region.y * zoom * dpr);
+    const fullContext = full.getContext('2d');
+    const actual = part.getContext('2d')?.getImageData(0, 0, part.width, part.height);
+    const expected = fullContext?.getImageData(x, y, part.width, part.height);
+    // Кусок листа на пиксель левее: пиксель (i, j) части сравнивается с (i − 1, j) листа.
+    const shifted = fullContext?.getImageData(x - 1, y, part.width, part.height);
+    if (!expected || !actual || !shifted) throw new Error('пиксели растров не прочитаны');
+
+    const compare = (reference: ImageData): RasterDiff => {
+      let differing = 0;
+      let visible = 0;
+      let maxChannelDiff = 0;
+      for (let index = 0; index < actual.data.length; index += 4) {
+        let pixelDiff = 0;
+        for (let channel = 0; channel < 4; channel += 1) {
+          const diff = Math.abs(
+            (actual.data[index + channel] ?? 0) - (reference.data[index + channel] ?? 0),
+          );
+          if (diff > pixelDiff) pixelDiff = diff;
+        }
+        if (pixelDiff > 2) differing += 1;
+        if (pixelDiff > 64) visible += 1;
+        if (pixelDiff > maxChannelDiff) maxChannelDiff = pixelDiff;
+      }
+      return { differing, visible, maxChannelDiff };
+    };
+
+    return {
+      zoom,
+      devicePixelRatio: dpr,
+      page: sized(full.width, full.height),
+      region: sized(part.width, part.height),
+      offset: { x, y },
+      aligned: compare(expected),
+      offByOnePixel: compare(shifted),
+      pageMs,
+      regionMs,
+    };
+  } finally {
+    release(full);
+    release(part);
     backend.destroy();
   }
 };
