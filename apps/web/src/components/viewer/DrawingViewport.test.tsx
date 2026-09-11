@@ -250,6 +250,59 @@ describe('холст рабочей области', () => {
     expect(after.offsetX - before.offsetX).toBeCloseTo(60, 5);
     expect(after.offsetY - before.offsetY).toBeCloseTo(40, 5);
   });
+
+  it('панорама не перерисовывает страницу', async () => {
+    // Найдено на живой приёмке: лист «крутился с подгрузками». Перерисовка запускалась
+    // после любого движения камеры, а панорама масштаба не меняет — картинка выходила
+    // пиксель в пиксель той же. На листе A1 при 266 % это растеризация десятков мегапикселей
+    // после каждой паузы в перетаскивании.
+    const { backend, camera } = setup({ tool: 'pan' });
+    await flushFrame();
+    // Вписка листа при открытии меняет масштаб и законно перерисовывает страницу. Ждём, пока
+    // она завершится, иначе её перерисовка засчиталась бы панораме.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+    const rendersBefore = backend.renders.length;
+    const viewport = screen.getByTestId('viewport');
+
+    for (let step = 0; step < 5; step += 1) {
+      await act(async () => {
+        fireEvent.pointerDown(viewport, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
+        fireEvent.pointerMove(viewport, {
+          pointerId: 1,
+          clientX: 100 + step * 30,
+          clientY: 100 + step * 20,
+        });
+        fireEvent.pointerUp(viewport, { pointerId: 1 });
+      });
+      // Пауза длиннее задержки перерисовки: именно после неё страница и перерисовывалась.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      });
+    }
+
+    expect(camera.getState().offsetX).not.toBe(0);
+    expect(backend.renders.length).toBe(rendersBefore);
+  });
+
+  it('зум по-прежнему перерисовывает страницу', async () => {
+    // Обратная сторона предыдущей проверки: страница обязана перерисоваться, когда
+    // масштаб действительно изменился. Иначе при увеличении лист оставался бы размытым.
+    const { backend } = setup();
+    await flushFrame();
+    const rendersBefore = backend.renders.length;
+
+    const viewport = screen.getByTestId('viewport');
+    await act(async () => {
+      fireEvent.wheel(viewport, { deltaY: -100, clientX: 200, clientY: 200 });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+
+    expect(backend.renders.length).toBeGreaterThan(rendersBefore);
+  });
 });
 
 describe('инструмент масштаба на холсте', () => {

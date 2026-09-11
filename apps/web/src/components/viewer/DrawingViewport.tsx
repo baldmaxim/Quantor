@@ -152,6 +152,9 @@ export const DrawingViewport = ({
   // без единой перерисовки PDF. Когда жест затих, страница перерисовывается в новом
   // масштабе, и коэффициент растяжения снова становится единичным.
   const renderedScale = useRef(1);
+  // Плотность пикселей последней отрисовки. Нужна вместе с масштабом: окно, перенесённое на
+  // экран с другим devicePixelRatio, требует перерисовки при том же масштабе камеры.
+  const renderedRatio = useRef(0);
 
   // Одна активная отрисовка: первая вписка листа и перерисовка после зума иначе
   // бегут параллельно с разными AbortController и оба зовут pdf.js render() на одном
@@ -242,6 +245,7 @@ export const DrawingViewport = ({
       if (signal.aborted) return;
 
       renderedScale.current = scale;
+      renderedRatio.current = window.devicePixelRatio || 1;
       applyCamera(cameraState.current);
       paintOverlay();
     },
@@ -305,13 +309,22 @@ export const DrawingViewport = ({
   // пересоздаваемые на каждый рендер, а рендер случался на каждый щелчок колеса —
   // очистка эффекта снимала таймер раньше, чем он срабатывал, и страница не
   // перерисовывалась вообще. Зум при этом «не работал»: менялся только слой областей.
+  //
+  // Перерисовывается только то, что стало другим. Панорама масштаба не меняет, и картинка
+  // после неё вышла бы пиксель в пиксель той же — а стоит это растеризации всего листа:
+  // на A1 при 266 % это десятки мегапикселей после каждой паузы в перетаскивании. На живой
+  // приёмке так и выглядело: лист «крутился с подгрузками».
   useEffect(() => {
     let timer: number | undefined;
 
     const unsubscribe = camera.subscribe(() => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        startRender({ showBadge: false });
+        // Проверка в момент затихания жеста, а не в начале: масштаб мог измениться по ходу.
+        const stale =
+          camera.getState().scale !== renderedScale.current ||
+          (window.devicePixelRatio || 1) !== renderedRatio.current;
+        if (stale) startRender({ showBadge: false });
       }, RERENDER_DELAY_MS);
     });
 
