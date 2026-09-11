@@ -1,13 +1,14 @@
 /**
- * Замер просмотрщика в настоящем браузере (Stage 2B, промты 02–03).
+ * Замер просмотрщика в настоящем браузере (Stage 2B, промты 02–04).
  *
  * Промт 02 снял архитектуру до переписывания, промт 03 — после: решение о слоях и растре по
- * видимой части стоит на числах, а не на ощущении «тормозит» (ADR-0024, ADR-0025). Разделы
- * используют рабочий код портала: тот же pdf.js-отрисовщик, те же функции размещения, тот же
- * слой измерений. Подставной код измерил бы сам себя.
+ * видимой части стоит на числах, а не на ощущении «тормозит» (ADR-0024, ADR-0025). Промт 04
+ * добавил пространственный индекс измерений. Разделы используют рабочий код портала: тот же
+ * pdf.js-отрисовщик, те же функции размещения, тот же слой измерений и индекс. Подставной код
+ * измерил бы сам себя.
  *
- * Разделы «Холсты и память» и «Слой измерений» моделируют прежнюю стопку во весь лист — это
- * точка отсчёта. Панорама и сверка растров меряют рабочий компонент как есть.
+ * Разделы «Холсты и память», «Слой измерений» и «Попадание (линейный перебор)» моделируют прежнюю
+ * архитектуру — это точка отсчёта. Индекс, панорама и сверка растров меряют рабочий код как есть.
  *
  * Числа снимаются в headless Chromium на программной растеризации — это верхняя оценка.
  */
@@ -26,6 +27,8 @@ import {
 } from '@/lib/viewer/measurement-overlay';
 import { resizeOverlay } from '@/lib/viewer/overlay';
 import { PdfJsRenderBackend } from '@/lib/viewer/pdfjs-backend';
+import { boundsOfPoints, ShapeIndex } from '@/lib/viewer/shape-index';
+import { GridIndex } from '@/lib/viewer/spatial-index';
 import { surfaceRegionFor } from '@/lib/viewer/surface';
 
 import {
@@ -428,6 +431,234 @@ export const measureOverlay = (
   }
 
   return rows;
+};
+
+/* ---------------------------------------------------------------- пространственный индекс */
+
+export interface SpatialIndexRow {
+  readonly primitives: number;
+  /** Построение индекса по списку с нуля. */
+  readonly build: Stats;
+  /** Попадание целиком (кандидаты + точная геометрия): полный перебор и с индексом. */
+  readonly hitLinear: Stats;
+  readonly hitIndexed: Stats;
+  /** Кандидаты полосы панорамы: 5 % ширины листа на высоту области. */
+  readonly strip: Stats;
+  readonly stripCandidates: number;
+  /** Синхронизация со списком, где изменилось одно измерение: путь правки в портале. */
+  readonly syncOneChange: Stats;
+  /** Перенос одной записи в сетке. */
+  readonly moveOne: Stats;
+  /**
+   * Среднее на операцию, мс, по серии подряд. Таймер браузера без изоляции огрублён до 0,1 мс, и
+   * медиана быстрых операций читается как ноль; среднее по серии это огрубление снимает.
+   */
+  readonly meanMs: {
+    readonly hitLinear: number;
+    readonly hitIndexed: number;
+    readonly strip: number;
+    readonly moveOne: number;
+  };
+  /** Удержанная куча после построения, МиБ; `null` — браузер не дал собрать мусор. */
+  readonly heapMiB: number | null;
+  readonly cellReferences: number;
+}
+
+declare global {
+  interface Window {
+    gc?: () => void;
+  }
+}
+
+const heapUsed = (): number | null => {
+  const info = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
+  return info ? info.usedJSHeapSize : null;
+};
+
+/**
+ * Пространственный индекс измерений (промт 04) на данных смеси промта 02.
+ *
+ * Попадание меряется целиком — и полным перебором, и с индексом, по одним и тем же случайным
+ * точкам: так видна цена для пользователя, а не только скорость структуры. Совпадение ответов
+ * проверяют тесты, здесь же — время.
+ */
+export const measureSpatialIndex = (
+  geometry: Viewport,
+  sizes: readonly number[],
+  zoom: number,
+  probes: number,
+): SpatialIndexRow[] => {
+  const placement = placeRenderedPage(geometry, zoom, devicePixelRatio());
+  const next = (() => {
+    let state = 20260912;
+    return () => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state / 0x100000000;
+    };
+  })();
+
+  return sizes.map((size) => {
+    const measurements = buildMeasurements(size);
+    const points: NormalizedPoint[] = Array.from({ length: probes }, () => ({
+      x: next(),
+      y: next(),
+    }));
+
+    const build = stats(
+      Array.from({ length: 5 }, () => {
+        const started = performance.now();
+        new ShapeIndex<OverlayMeasurement>().sync(measurements);
+        return performance.now() - started;
+      }),
+    );
+
+    const index = new ShapeIndex<OverlayMeasurement>();
+    index.sync(measurements);
+    const time = (run: (point: NormalizedPoint) => void): Stats =>
+      stats(
+        points.map((point) => {
+          const started = performance.now();
+          run(point);
+          return performance.now() - started;
+        }),
+      );
+    const mean = (run: (point: NormalizedPoint) => void): number => {
+      const started = performance.now();
+      for (const point of points) run(point);
+      return (performance.now() - started) / points.length;
+    };
+    // Прогрев обоих путей: первый вызов платит за компиляцию, а не за перебор.
+    for (const point of points.slice(0, 20)) {
+      hitTestMeasurements(measurements, point, placement);
+      hitTestMeasurements(measurements, point, placement, undefined, index);
+    }
+    const hitLinear = time((point) => hitTestMeasurements(measurements, point, placement));
+    const hitIndexed = time((point) =>
+      hitTestMeasurements(measurements, point, placement, undefined, index),
+    );
+
+    const stripOf = (point: NormalizedPoint) => ({
+      minX: point.x * 0.95,
+      minY: point.y * 0.78,
+      maxX: point.x * 0.95 + 0.05,
+      maxY: point.y * 0.78 + 0.22,
+    });
+    let stripCandidates = 0;
+    const strip = time((point) => {
+      stripCandidates += index.query([stripOf(point)]).length;
+    });
+    const meanHitLinear = mean((point) => hitTestMeasurements(measurements, point, placement));
+    const meanHitIndexed = mean((point) =>
+      hitTestMeasurements(measurements, point, placement, undefined, index),
+    );
+    const meanStrip = mean((point) => index.query([stripOf(point)]));
+
+    const syncOneChange = stats(
+      Array.from({ length: 50 }, (_, step) => {
+        const target = Math.floor(next() * size);
+        const changed = measurements.map((item, position) =>
+          position === target
+            ? {
+                ...item,
+                points: item.points.map((point) => ({ x: point.x + 0.001 * step, y: point.y })),
+              }
+            : item,
+        );
+        const started = performance.now();
+        index.sync(changed);
+        return performance.now() - started;
+      }),
+    );
+
+    const grid = new GridIndex<string>();
+    for (const item of measurements) grid.set(item.id, boundsOfPoints(item.points));
+    const moveOne = stats(
+      Array.from({ length: 200 }, () => {
+        const item = measurements[Math.floor(next() * size)];
+        if (!item) return 0;
+        const bounds = boundsOfPoints(item.points);
+        const dx = (next() - 0.5) * 0.02;
+        const started = performance.now();
+        grid.set(item.id, {
+          minX: bounds.minX + dx,
+          minY: bounds.minY,
+          maxX: bounds.maxX + dx,
+          maxY: bounds.maxY,
+        });
+        return performance.now() - started;
+      }),
+    );
+
+    const moves = Array.from({ length: 2000 }, () => {
+      const item = measurements[Math.floor(next() * size)];
+      const bounds = boundsOfPoints(item?.points ?? []);
+      const dx = (next() - 0.5) * 0.02;
+      return {
+        id: item?.id ?? '',
+        bounds: {
+          minX: bounds.minX + dx,
+          minY: bounds.minY,
+          maxX: bounds.maxX + dx,
+          maxY: bounds.maxY,
+        },
+      };
+    });
+    const movesStarted = performance.now();
+    for (const move of moves) grid.set(move.id, move.bounds);
+    const meanMoveOne = (performance.now() - movesStarted) / moves.length;
+
+    // Удержанная память: сборка мусора до и после построения. Без `gc` оценка была бы шумом.
+    let heapMiB: number | null = null;
+    if (typeof window.gc === 'function' && heapUsed() !== null) {
+      const samples: number[] = [];
+      for (let repeat = 0; repeat < 3; repeat += 1) {
+        window.gc();
+        const before = heapUsed() ?? 0;
+        const kept = new ShapeIndex<OverlayMeasurement>();
+        kept.sync(measurements);
+        window.gc();
+        samples.push(((heapUsed() ?? 0) - before) / (1024 * 1024));
+        kept.sync([]);
+      }
+      heapMiB = stats(samples).median;
+    }
+
+    return {
+      primitives: size,
+      build,
+      hitLinear,
+      hitIndexed,
+      strip,
+      stripCandidates: Math.round(stripCandidates / probes),
+      syncOneChange,
+      moveOne,
+      meanMs: {
+        hitLinear: meanHitLinear,
+        hitIndexed: meanHitIndexed,
+        strip: meanStrip,
+        moveOne: meanMoveOne,
+      },
+      heapMiB,
+      cellReferences: index.cellReferences(),
+    };
+  });
+};
+
+/** Индекс на геометрии настоящего листа: размер листа задаёт пиксели попадания. */
+export const measureSpatialIndexOnSheet = async (
+  url: string,
+  pageIndex: number,
+  sizes: readonly number[],
+  zoom: number,
+  probes: number,
+): Promise<SpatialIndexRow[]> => {
+  const backend = await PdfJsRenderBackend.open(url);
+  try {
+    const geometry = await backend.geometry(pageIndex);
+    return measureSpatialIndex(geometry, sizes, zoom, probes);
+  } finally {
+    backend.destroy();
+  }
 };
 
 export const measureHitTest = (

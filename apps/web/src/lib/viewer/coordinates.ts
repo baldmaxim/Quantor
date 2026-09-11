@@ -141,6 +141,26 @@ export const toScreenRect = (rect: NormalizedRect, placement: SheetPlacement): S
   };
 };
 
+/**
+ * Прямоугольник на экране → охват в нормализованных координатах листа.
+ *
+ * Углы переводятся обратным преобразованием и собираются в охват заново: при повороте на 90° углы
+ * меняются местами, а прямоугольник остаётся прямоугольником.
+ */
+export const toNormalizedBounds = (
+  rect: ScreenRect,
+  placement: SheetPlacement,
+): { minX: number; minY: number; maxX: number; maxY: number } => {
+  const first = toNormalizedPoint({ x: rect.x, y: rect.y }, placement);
+  const second = toNormalizedPoint({ x: rect.x + rect.width, y: rect.y + rect.height }, placement);
+  return {
+    minX: Math.min(first.x, second.x),
+    minY: Math.min(first.y, second.y),
+    maxX: Math.max(first.x, second.x),
+    maxY: Math.max(first.y, second.y),
+  };
+};
+
 /** Полигон в нормализованных координатах → точки на экране. */
 export const toScreenPolygon = (
   points: readonly (readonly [number, number])[],

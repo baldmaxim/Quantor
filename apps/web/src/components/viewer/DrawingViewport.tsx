@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { cx } from '@/components/ui';
 import { usePageRaster } from '@/components/viewer/usePageRaster';
@@ -12,6 +12,7 @@ import { GestureSettle } from '@/lib/viewer/gesture-settle';
 import type { OverlayRegion } from '@/lib/viewer/overlay';
 import type { ScaleDraft } from '@/lib/viewer/scale-draft';
 import type { OverlayMeasurement } from '@/lib/viewer/measurement-overlay';
+import { ShapeIndex } from '@/lib/viewer/shape-index';
 import type { ToolController } from '@/lib/viewer/tool-controller';
 
 /** Инструменты, которые понимает холст. Остальные живут выше и сюда не доходят. */
@@ -115,6 +116,9 @@ export const DrawingViewport = ({
   // класть его в состояние React значило бы перерисовывать дерево на каждом кадре.
   const cameraState = useRef<CameraState>(camera.getState());
   const hovered = useRef<string | null>(null);
+  // Пространственный индекс измерений (промт 04). Один на холст: отсечение и попадание
+  // синхронизируют его со списком сами, в момент обращения, а не при рендере.
+  const [measurementIndex] = useState(() => new ShapeIndex<OverlayMeasurement>());
 
   // Обработчики родителя приходят стрелками и пересоздаются на каждый рендер. Держим их
   // в ссылках, чтобы подписки на камеру не пересоздавались вместе с ними.
@@ -171,6 +175,7 @@ export const DrawingViewport = ({
       scaleDraft,
       tools,
       measurements,
+      measurementIndex,
       measurementColors,
     },
   );
@@ -242,6 +247,7 @@ export const DrawingViewport = ({
     hiddenTypes,
     overlayVisible,
     measurements,
+    measurementIndex,
     tools,
     scaleDraft,
     tool,

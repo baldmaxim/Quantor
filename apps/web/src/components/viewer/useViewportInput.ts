@@ -10,6 +10,7 @@ import {
   type OverlayMeasurement,
 } from '@/lib/viewer/measurement-overlay';
 import type { OverlayRegion } from '@/lib/viewer/overlay';
+import type { ShapeIndex } from '@/lib/viewer/shape-index';
 import type { ScaleDraft } from '@/lib/viewer/scale-draft';
 import type { ToolController } from '@/lib/viewer/tool-controller';
 import { DRAWING_MODES } from '@/lib/viewer/tool-machine';
@@ -36,6 +37,8 @@ interface IViewportInput {
   readonly hiddenTypes: ReadonlySet<string>;
   readonly overlayVisible: boolean;
   readonly measurements: readonly OverlayMeasurement[];
+  /** Пространственный индекс измерений: попадание проверяет только его кандидатов (промт 04). */
+  readonly measurementIndex: ShapeIndex<OverlayMeasurement> | null;
   readonly tools: ToolController | null;
   readonly scaleDraft: ScaleDraft | null;
   readonly tool: 'pointer' | 'pan' | 'scale';
@@ -53,6 +56,7 @@ export const useViewportInput = ({
   hiddenTypes,
   overlayVisible,
   measurements,
+  measurementIndex,
   tools,
   scaleDraft,
   tool,
@@ -171,7 +175,13 @@ export const useViewportInput = ({
           // Пустой черновик: щелчок по уже сохранённой фигуре выбирает её, а не начинает
           // новую. Иначе в режиме «Линия» нельзя ни выделить, ни удалить нарисованное.
           if (state.points.length === 0) {
-            const found = hitTestMeasurements(measurements, point, placed);
+            const found = hitTestMeasurements(
+              measurements,
+              point,
+              placed,
+              undefined,
+              measurementIndex,
+            );
             if (found) {
               tools.send({ type: 'selectMeasurement', measurementId: found.id });
               return;
@@ -181,7 +191,7 @@ export const useViewportInput = ({
           return;
         }
 
-        const found = hitTestMeasurements(measurements, point, placed);
+        const found = hitTestMeasurements(measurements, point, placed, undefined, measurementIndex);
         if (found) {
           tools.send({ type: 'selectMeasurement', measurementId: found.id });
           return;

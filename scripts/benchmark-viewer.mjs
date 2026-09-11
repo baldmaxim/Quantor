@@ -11,7 +11,7 @@
  * тест геометрии, меряется и он. Путь можно задать явно: VIEWER_BENCH_PDF (PDF) или
  * VIEWER_BENCH_PACKAGE (ZIP-пакет), номер листа — VIEWER_BENCH_PAGE (с единицы, умолчание 71).
  *
- * Для итераций — часть разделов: VIEWER_BENCH_ONLY=pan,consistency (из sizing, consistency,
+ * Для итераций — часть разделов: VIEWER_BENCH_ONLY=pan,consistency (из sizing, index, consistency,
  * pan), сценарии панорамы по номерам VIEWER_BENCH_PAN=0,3 и их длительность
  * VIEWER_BENCH_PAN_SECONDS. Такой прогон печатает отчёт в stdout и файлы в docs не трогает;
  * JSON — по пути из VIEWER_BENCH_JSON, если он задан.
@@ -253,6 +253,49 @@ const buildReport = (report) => {
     );
   }
 
+  if (report.spatialIndex) {
+    const index = report.spatialIndex;
+    const ms = (s, digits = 3) => `${f(s.median, digits)} / ${f(s.p95, digits)}`;
+    lines.push(
+      '## Пространственный индекс измерений',
+      '',
+      `Сетка 32 × 32 (промт 04), смесь фигур промта 02, DPR ${index.ratio}, масштаб ${pct(index.zoom)}. Время — медиана / p95, мс;`,
+      'в скобках — среднее на операцию по серии подряд: таймер браузера огрублён до 0,1 мс, и медиана',
+      'быстрых операций читается как ноль. Попадание меряется целиком — кандидаты и точная геометрия — по',
+      'одним и тем же случайным точкам. Синхронизация — путь правки в портале: новый список, где',
+      'изменилось одно измерение.',
+      '',
+      ...(index.error ? [`**Раздел оборван:** ${index.error}`, ''] : []),
+      table(
+        [
+          'Фигур',
+          'Построение',
+          'Попадание перебором',
+          'Попадание с индексом',
+          'Полоса панорамы',
+          'Кандидатов в полосе',
+          'Синхронизация одной правки',
+          'Перенос записи',
+          'Удержанная куча, МиБ',
+          'Ссылок в ячейках',
+        ],
+        index.rows.map((row) => [
+          String(row.primitives),
+          ms(row.build, 1),
+          `${ms(row.hitLinear, 2)} (${f(row.meanMs?.hitLinear, 3)})`,
+          `${ms(row.hitIndexed, 1)} (${f(row.meanMs?.hitIndexed, 4)})`,
+          `${ms(row.strip, 1)} (${f(row.meanMs?.strip, 4)})`,
+          String(row.stripCandidates),
+          ms(row.syncOneChange, 2),
+          `${ms(row.moveOne, 1)} (${f(row.meanMs?.moveOne, 5)})`,
+          row.heapMiB === null ? '—' : f(row.heapMiB, 2),
+          String(row.cellReferences),
+        ]),
+      ),
+      '',
+    );
+  }
+
   if (report.consistency?.length) {
     lines.push(
       '## Резкая часть против листа целиком',
@@ -438,6 +481,8 @@ try {
       frames: { viewport: 30, fullPage: 8 },
       hitFrames: 60,
     },
+    // Пространственный индекс измерений (промт 04): объёмы промта, случайные точки попадания.
+    index: { sizes: [1000, 5000, 10000, 25000], probes: 500 },
     // Резкая часть против листа целиком: обычная плотность и сценарий живой приёмки.
     consistency: [
       { ratio: 1, zoom: 2 },
@@ -502,6 +547,7 @@ try {
           frames: { viewport: 3, fullPage: 2 },
           hitFrames: 5,
         },
+        index: { sizes: [1000], probes: 50 },
         consistency: [{ ratio: 1, zoom: 2 }],
         pan: [{ ...fullConfig.pan[0], durationMs: 3000 }],
         settleMs: 500,

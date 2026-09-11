@@ -14,13 +14,14 @@ import type {
   ScreenRect,
   SheetPlacement,
 } from '@/lib/viewer/coordinates';
-import { toScreenPoint } from '@/lib/viewer/coordinates';
+import { toNormalizedBounds, toScreenPoint } from '@/lib/viewer/coordinates';
 import {
   beginLayerPaint,
   boundsIntersectAny,
   visibleRects,
   type PixelRect,
 } from '@/lib/viewer/layer-paint';
+import type { ShapeIndex } from '@/lib/viewer/shape-index';
 
 /** Геометрия, как её рисует слой. Ровно то, что нужно отрисовке, и ничего больше. */
 export interface OverlayMeasurement {
@@ -45,6 +46,11 @@ export interface MeasurementOverlayState {
     readonly id: string;
     readonly points: readonly NormalizedPoint[];
   } | null;
+  /**
+   * Пространственный индекс измерений (промт 04). Есть — отсечение спрашивает его, нет — перебирает
+   * список. Результат один и тот же, индекс только быстрее; синхронизируется со списком сам.
+   */
+  readonly index?: ShapeIndex<OverlayMeasurement> | null;
 }
 
 export interface MeasurementOverlayStyle {
@@ -93,7 +99,7 @@ export const drawMeasurements = (
   const visible = beginLayerPaint(context, devicePixelRatio, area, CULL_MARGIN);
 
   let drawn = 0;
-  for (const measurement of state.measurements) {
+  for (const measurement of candidatesFor(state, placement, visible)) {
     const points =
       state.dragOverride?.id === measurement.id ? state.dragOverride.points : measurement.points;
     if (!pointsVisible(points, placement, visible)) continue;
@@ -127,11 +133,45 @@ export const measurementsTouch = (
   if (state.draft.length > 0 && state.draftType !== null) return true;
 
   const visible = visibleRects(area, devicePixelRatio, CULL_MARGIN);
-  return state.measurements.some((measurement) => {
+  return candidatesFor(state, placement, visible).some((measurement) => {
     const points =
       state.dragOverride?.id === measurement.id ? state.dragOverride.points : measurement.points;
     return pointsVisible(points, placement, visible);
   });
+};
+
+/**
+ * Измерения, которые стоит проверить на видимость, в порядке списка: без индекса — все, с индексом —
+ * его кандидаты по видимым прямоугольникам.
+ *
+ * Перетаскиваемое измерение в индексе лежит со старым охватом: жест меняет геометрию на каждом
+ * движении, и переносить запись ради кадра незачем. Поэтому оно добавляется в кандидаты всегда, а
+ * видимость решает его новая геометрия.
+ */
+const candidatesFor = (
+  state: MeasurementOverlayState,
+  placement: SheetPlacement,
+  visible: readonly ScreenRect[],
+): readonly OverlayMeasurement[] => {
+  const index = state.index;
+  if (!index) return state.measurements;
+
+  index.sync(state.measurements);
+  const hits = index.query(visible.map((rect) => toNormalizedBounds(rect, placement)));
+  const dragged = state.dragOverride
+    ? { id: state.dragOverride.id, order: index.orderOf(state.dragOverride.id) }
+    : null;
+  if (!dragged || dragged.order === null) return hits.map((hit) => hit.item);
+
+  const draggedOrder = dragged.order;
+  const others = hits.filter((hit) => hit.item.id !== dragged.id);
+  const item = state.measurements[draggedOrder];
+  if (!item) return others.map((hit) => hit.item);
+
+  const position = others.findIndex((hit) => hit.order > draggedOrder);
+  const merged = others.map((hit) => hit.item);
+  merged.splice(position < 0 ? merged.length : position, 0, item);
+  return merged;
 };
 
 /** Задевает ли охват точек видимые прямоугольники. Вызывается на тысячах фигур за кадр. */
@@ -264,22 +304,40 @@ const tracePath = (
  *
  * Из перекрывающихся побеждает наименьшее по охвату: крупная фигура обычно окружает
  * мелкие, и выбирать нужно то, во что пользователь целился. То же правило, что у областей
- * (`coordinates.hitTest`), — иначе выбор вёл бы себя на двух слоях по-разному.
+ * (`coordinates.hitTest`), — иначе выбор вёл бы себя на двух слоях по-разному. При равном охвате
+ * побеждает первое в списке.
  *
- * Перебор линейный. На листе десятки измерений, и это дёшево; когда их станут тысячи,
- * сюда встанет пространственный индекс, а сигнатура не изменится (промт 14).
+ * С индексом (промт 04) точная проверка идёт только по кандидатам: тем, чей охват задевает квадрат
+ * вокруг курсора со стороной в радиус попадания. Это надмножество всего, во что можно попасть: метка
+ * счёта ловится в радиусе метки и допуска, отрезок — в допуске, а точка внутри многоугольника лежит в
+ * его охвате. Без индекса перебираются все, и ответ тот же.
  */
 export const hitTestMeasurements = (
   measurements: readonly OverlayMeasurement[],
   point: NormalizedPoint,
   placement: SheetPlacement,
   tolerancePx = 6,
+  index: ShapeIndex<OverlayMeasurement> | null = null,
 ): OverlayMeasurement | null => {
   const target = toScreenPoint(point, placement);
   let best: OverlayMeasurement | null = null;
   let bestExtent = Number.POSITIVE_INFINITY;
 
-  for (const measurement of measurements) {
+  let candidates = measurements;
+  if (index) {
+    const reach = COUNT_RADIUS + tolerancePx;
+    index.sync(measurements);
+    candidates = index
+      .query([
+        toNormalizedBounds(
+          { x: target.x - reach, y: target.y - reach, width: reach * 2, height: reach * 2 },
+          placement,
+        ),
+      ])
+      .map((hit) => hit.item);
+  }
+
+  for (const measurement of candidates) {
     const screen = measurement.points.map((item) => toScreenPoint(item, placement));
     if (!hits(measurement, screen, target, tolerancePx)) continue;
 

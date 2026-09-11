@@ -11,6 +11,7 @@ import {
 import { drawOverlay, overlayTouches, type OverlayRegion } from '@/lib/viewer/overlay';
 import type { ScaleDraft } from '@/lib/viewer/scale-draft';
 import { drawScaleDraft, scaleDraftTouches } from '@/lib/viewer/scale-overlay';
+import type { ShapeIndex } from '@/lib/viewer/shape-index';
 import type { ToolController } from '@/lib/viewer/tool-controller';
 import { DRAWING_MODES } from '@/lib/viewer/tool-machine';
 import { ViewportLayer, type LayerPainter, type LayerView } from '@/lib/viewer/viewport-layer';
@@ -47,6 +48,8 @@ interface IViewportLayersInput {
   readonly scaleDraft: ScaleDraft | null;
   readonly tools: ToolController | null;
   readonly measurements: readonly OverlayMeasurement[];
+  /** Пространственный индекс измерений: отсечение спрашивает его, а не весь список (промт 04). */
+  readonly measurementIndex: ShapeIndex<OverlayMeasurement>;
   readonly measurementColors: Readonly<Record<string, string>>;
 }
 
@@ -93,6 +96,7 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
     scaleDraft,
     tools,
     measurements,
+    measurementIndex,
     measurementColors,
   } = input;
 
@@ -165,6 +169,7 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
         dragOverride: toolState.drag
           ? { id: toolState.drag.measurementId, points: toolState.drag.points }
           : null,
+        index: measurementIndex,
       };
     };
 
@@ -181,7 +186,7 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
       },
       touches: (placement, ratio, area) => measurementsTouch(placement, state(), ratio, area),
     };
-  }, [tools, measurements, measurementColors, sheetInk]);
+  }, [tools, measurements, measurementIndex, measurementColors, sheetInk]);
 
   // Слой создаётся на свой холст один раз и помнит, как нарисован. Холст не пересоздаётся
   // React, пока жив компонент.

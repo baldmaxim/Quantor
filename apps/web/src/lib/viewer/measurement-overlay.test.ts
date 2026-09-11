@@ -16,6 +16,7 @@ import {
   type MeasurementOverlayState,
   type OverlayMeasurement,
 } from '@/lib/viewer/measurement-overlay';
+import { ShapeIndex } from '@/lib/viewer/shape-index';
 
 const placement: SheetPlacement = { x: 0, y: 0, width: 1000, height: 1000, rotation: 0 };
 const style = { colors: { accent: '#14539e', danger: '#b42318' }, fallbackColor: '#000000' };
@@ -499,5 +500,130 @@ describe('попадание по вершине', () => {
     const zoomed: SheetPlacement = { ...placement, width: 5000, height: 5000 };
 
     expect(hitTestVertex(points, p(0.1, 0.1), zoomed)).toBe(0);
+  });
+});
+
+describe('с пространственным индексом — тот же результат (промт 04)', () => {
+  const sequence = (seed: number): (() => number) => {
+    let state = seed >>> 0;
+    return () => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state / 0x100000000;
+    };
+  };
+
+  const TYPES: OverlayMeasurement['geometryType'][] = ['count', 'line', 'polyline', 'polygon'];
+  const VERTICES = { count: 1, line: 2, polyline: 5, polygon: 4 } as const;
+
+  /** Смесь фигур: крупные и мелкие, перекрывающиеся, часть — у самого края листа. */
+  const randomMeasurements = (seed: number, total: number): OverlayMeasurement[] => {
+    const next = sequence(seed);
+    return Array.from({ length: total }, (_, index) => {
+      const geometryType = TYPES[index % TYPES.length] ?? 'line';
+      const size = next() < 0.2 ? 0.3 : 0.03;
+      const originX = next() * 1.05 - 0.02;
+      const originY = next() * 1.05 - 0.02;
+      return {
+        id: `m-${index}`,
+        geometryType,
+        points: Array.from({ length: VERTICES[geometryType] }, () =>
+          p(originX + next() * size, originY + next() * size),
+        ),
+        colorKey: 'accent',
+      };
+    });
+  };
+
+  const placements: SheetPlacement[] = [
+    { x: -350.5, y: -120.25, width: 2384, height: 1684, rotation: 0 },
+    { x: 40, y: -900, width: 1684, height: 2384, rotation: 90 },
+    { x: 0, y: 0, width: 600, height: 420, rotation: 0 },
+  ];
+
+  it('попадание совпадает с полным перебором, включая правило наименьшего охвата', () => {
+    for (const [seed, placed] of placements.entries()) {
+      const measurements = randomMeasurements(seed + 1, 600);
+      const index = new ShapeIndex<OverlayMeasurement>();
+      const next = sequence(seed + 100);
+
+      for (let probe = 0; probe < 400; probe += 1) {
+        const point = p(next() * 1.1 - 0.05, next() * 1.1 - 0.05);
+        for (const tolerance of [0, 6, 14]) {
+          expect(
+            hitTestMeasurements(measurements, point, placed, tolerance, index)?.id ?? null,
+          ).toBe(hitTestMeasurements(measurements, point, placed, tolerance)?.id ?? null);
+        }
+      }
+    }
+  });
+
+  it('отрисовка рисует те же фигуры в том же порядке — целиком и полосами', () => {
+    const measurements = randomMeasurements(7, 500);
+    const placed = placements[0] ?? placement;
+    const areas = [
+      null,
+      [{ x: 0, y: 0, width: 120, height: 1000 }],
+      [
+        { x: 880, y: 0, width: 120, height: 1000 },
+        { x: 0, y: 930, width: 1000, height: 70 },
+      ],
+    ];
+
+    for (const area of areas) {
+      const plain = fakeContext();
+      const indexed = fakeContext();
+      const drawnPlain = drawMeasurements(
+        plain.context,
+        placed,
+        state({ measurements }),
+        style,
+        1,
+        area,
+      );
+      const drawnIndexed = drawMeasurements(
+        indexed.context,
+        placed,
+        state({ measurements, index: new ShapeIndex<OverlayMeasurement>() }),
+        style,
+        1,
+        area,
+      );
+
+      expect(drawnIndexed).toBe(drawnPlain);
+      expect(indexed.moves).toEqual(plain.moves);
+      expect(indexed.arcs).toEqual(plain.arcs);
+      if (area) {
+        expect(
+          measurementsTouch(
+            placed,
+            state({ measurements, index: new ShapeIndex<OverlayMeasurement>() }),
+            1,
+            area,
+          ),
+        ).toBe(measurementsTouch(placed, state({ measurements }), 1, area));
+      }
+    }
+  });
+
+  it('перетаскиваемая фигура рисуется по новой геометрии, даже если индекс помнит старую', () => {
+    // Фигура за краем холста, её вершину утащили в видимую часть: индекс хранит старый охват.
+    const far = measurement({ id: 'far', points: [p(0.95, 0.95), p(0.99, 0.99)] });
+    const near = measurement({ id: 'near', points: [p(0.1, 0.1), p(0.2, 0.1)] });
+    const index = new ShapeIndex<OverlayMeasurement>();
+    const zoomed: SheetPlacement = { x: 0, y: 0, width: 4000, height: 4000, rotation: 0 };
+    const dragged = state({
+      measurements: [near, far],
+      index,
+      dragOverride: { id: 'far', points: [p(0.05, 0.05), p(0.1, 0.12)] },
+    });
+
+    const recorded = fakeContext();
+    const drawn = drawMeasurements(recorded.context, zoomed, dragged, style);
+
+    expect(drawn).toBe(2);
+    expect(recorded.lines).toContainEqual({ x: 400, y: 480 });
+    expect(
+      measurementsTouch(zoomed, dragged, 1, [{ x: 150, y: 150, width: 100, height: 100 }]),
+    ).toBe(true);
   });
 });

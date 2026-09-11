@@ -125,12 +125,15 @@ const main = async () => {
 
   // Сервер браузера, а не обычный запуск: только у него есть идентификатор процесса,
   // по которому снимается память дерева процессов.
-  const browserServer = await chromium.launchServer({ args: ['--enable-precise-memory-info'] });
+  // --expose-gc — для оценки удержанной памяти индекса: без сборки мусора разница кучи была бы шумом.
+  const browserServer = await chromium.launchServer({
+    args: ['--enable-precise-memory-info', '--js-flags=--expose-gc'],
+  });
   const browser = await chromium.connect(browserServer.wsEndpoint());
   const browserPid = browserServer.process().pid;
 
   // Разделы можно выбрать для прогона по частям; по умолчанию — все.
-  const sections = new Set(config.sections ?? ['sizing', 'consistency', 'pan']);
+  const sections = new Set(config.sections ?? ['sizing', 'index', 'consistency', 'pan']);
 
   const report = {
     schema: 'quantor.benchmark.viewer.v1',
@@ -149,6 +152,7 @@ const main = async () => {
     pdfRender: [],
     overlay: null,
     hitTest: null,
+    spatialIndex: null,
     consistency: [],
     pan: [],
   };
@@ -289,6 +293,30 @@ const main = async () => {
           };
         }
       }
+    }
+
+    // Пространственный индекс измерений (промт 04) на геометрии основного листа.
+    if (sections.has('index')) {
+      const primary = config.sources[0];
+      const attempt = await section(config.overlay.ratio, (page) =>
+        page.evaluate(
+          ([url, pageIndex, sizes, zoom, probes]) =>
+            window.__viewerBench.measureSpatialIndexOnSheet(url, pageIndex, sizes, zoom, probes),
+          [
+            pdfUrl(primary),
+            primary.pageIndex,
+            config.index.sizes,
+            config.overlay.zoom,
+            config.index.probes,
+          ],
+        ),
+      );
+      report.spatialIndex = {
+        ratio: config.overlay.ratio,
+        zoom: config.overlay.zoom,
+        rows: attempt.value ?? [],
+        error: attempt.error,
+      };
     }
 
     // Резкая часть против того же куска листа целиком — побитно, на каждом листе.
