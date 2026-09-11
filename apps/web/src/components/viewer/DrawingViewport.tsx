@@ -513,6 +513,16 @@ export const DrawingViewport = ({
         }
 
         if (drawing) {
+          // Пустой черновик: щелчок по уже сохранённой фигуре выбирает её, а не начинает
+          // новую. Иначе в режиме «Линия» нельзя ни выделить, ни удалить нарисованное —
+          // каждый щелчок только ставит следующую линию.
+          if (state.points.length === 0) {
+            const found = hitTestMeasurements(measurements, point, placed);
+            if (found) {
+              tools.send({ type: 'selectMeasurement', measurementId: found.id });
+              return;
+            }
+          }
           tools.send({ type: 'pointerDown', point });
           return;
         }

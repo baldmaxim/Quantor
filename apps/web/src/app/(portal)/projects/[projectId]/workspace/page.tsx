@@ -266,7 +266,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
     [tools],
   );
 
-  // Клавиатура рисования: Enter завершает, Backspace убирает вершину, Esc отменяет.
+  // Клавиатура: Enter завершает, Backspace убирает вершину черновика, Delete — выбранное
+  // сохранённое измерение, Esc отменяет. Delete живёт над машиной состояний намеренно:
+  // удаление — запрос к серверу, а не переход черновика (UX_MEASUREMENT_WORKFLOW).
   useEffect(() => {
     const isTyping = (target: EventTarget | null) =>
       target instanceof HTMLElement &&
@@ -274,9 +276,30 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping(event.target)) return;
+
+      const state = tools.getState();
+      const canDeleteSaved =
+        state.selectedId !== null && state.points.length === 0 && state.drag === null;
+
+      if (canDeleteSaved && (event.key === 'Delete' || event.key === 'Backspace')) {
+        event.preventDefault();
+        const id = state.selectedId;
+        setTakeoffError(null);
+        removeMeasurement.mutate(id, {
+          onSuccess: () => tools.send({ type: 'selectMeasurement', measurementId: null }),
+          onError: (error) => setTakeoffError(describeTakeoffError(error)),
+        });
+        return;
+      }
+
       if (event.key === 'Enter') tools.send({ type: 'finish' });
       if (event.key === 'Backspace') tools.send({ type: 'backspace' });
       if (event.key === 'Escape') tools.send({ type: 'cancel' });
+      if (event.key === 'v' || event.key === 'V') {
+        setTool('pointer');
+        setToolMode('select');
+        tools.send({ type: 'setMode', mode: 'select' });
+      }
       if (event.code === 'Space') tools.send({ type: 'setPanOverride', pressed: true });
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -289,7 +312,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
     };
-  }, [tools]);
+  }, [tools, removeMeasurement, setTool]);
 
   // Esc отменяет черновик, не обращаясь к серверу.
   useEffect(() => {
@@ -396,9 +419,15 @@ const WorkspacePage = ({ params }: IPageProps) => {
             <>
               <ToolButton
                 label="Выбор"
-                hint="V"
-                active={tool === 'pointer'}
-                onClick={() => setTool('pointer')}
+                hint="V — выбрать измерение на чертеже"
+                active={tool === 'pointer' && toolMode === 'select'}
+                onClick={() => {
+                  setTool('pointer');
+                  setToolMode('select');
+                  tools.send({ type: 'setMode', mode: 'select' });
+                  scaleDraft.cancel();
+                  setScaleError(null);
+                }}
               >
                 <IconCursor width={16} height={16} />
               </ToolButton>
@@ -712,7 +741,12 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   }
                   sheetLabel={sheet?.page_label ?? null}
                   canEdit
-                  onDelete={(id) => removeMeasurement.mutate(id)}
+                  onDelete={(id) => {
+                    removeMeasurement.mutate(id, {
+                      onSuccess: () => tools.send({ type: 'selectMeasurement', measurementId: null }),
+                      onError: (error) => setTakeoffError(describeTakeoffError(error)),
+                    });
+                  }}
                 />
               ) : selectedRegion ? (
                 <RegionInspector

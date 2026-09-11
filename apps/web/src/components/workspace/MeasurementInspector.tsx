@@ -139,6 +139,7 @@ export const MeasurementInspector: FC<IMeasurementInspectorProps> = ({
         <button
           type="button"
           onClick={() => onDelete(measurement.id)}
+          title="Delete или Backspace"
           className="self-start text-micro text-danger hover:underline"
         >
           Удалить измерение
