@@ -743,7 +743,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   canEdit
                   onDelete={(id) => {
                     removeMeasurement.mutate(id, {
-                      onSuccess: () => tools.send({ type: 'selectMeasurement', measurementId: null }),
+                      onSuccess: () =>
+                        tools.send({ type: 'selectMeasurement', measurementId: null }),
                       onError: (error) => setTakeoffError(describeTakeoffError(error)),
                     });
                   }}
