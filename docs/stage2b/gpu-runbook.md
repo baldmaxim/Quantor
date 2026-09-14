@@ -81,9 +81,7 @@ pnpm planswift validate "$R\gt\mosfilm31a" --source "$R\raw\mosfilm\Мосфил
 ```
 
 Корни проектов для `qa`, `validate --source` и `source_root` в конфиге сборки —
-`$R
-aw\stories\ЖК Stories Кладка` и `$R
-aw\mosfilm\Мосфильмовская 31А`.
+`$R\raw\stories\ЖК Stories Кладка` и `$R\raw\mosfilm\Мосфильмовская 31А`.
 
 Отпечатки обязаны совпасть (смотреть в `manifest.json`):
 
