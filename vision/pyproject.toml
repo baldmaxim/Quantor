@@ -23,6 +23,15 @@ vectorize = ["opencv-python-headless"]
 [project.scripts]
 vision = "quantor_vision.cli:main"
 
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+# Явный список пакетов: рядом лежат licenses/ и tests/, и автопоиск setuptools отказывается
+# ставить проект с несколькими каталогами верхнего уровня (editable-установка на GPU-машине).
+[tool.setuptools.packages.find]
+include = ["quantor_vision*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

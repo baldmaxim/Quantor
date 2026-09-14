@@ -198,3 +198,21 @@ cd vision
 - не менять `split.json` и не пересобирать с `--refreeze` после начала обучения;
 - не запускать Unsloth Studio;
 - не ставить torch в venv бэкенда `apps/api`.
+
+## Состояние машины владельца — 2026-09-14
+
+| Раздел            | Результат                                                                                                      |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1. Драйвер        | 591.44, CUDA 13.1; RTX 5050, 8 151 МиБ                                                                         |
+| 2–3. Данные       | `D:\QuantorData`, путь 3б; SHA-256 архивов, оба `dataset_fingerprint`, `split_sha256` и `tiles_sha256` совпали |
+| 4. Оверлеи        | сгенерированы в `D:\QuantorData\planswift\qa\`; **просмотр и таблица PASS/FAIL — за владельцем**               |
+| 5а. `.venv-train` | `torch 2.11.0+cu128`, CUDA доступна, compute capability (12, 0); `quantor-vision` editable                     |
+| 5б. Unsloth       | готового окружения нет; найдена установка Studio в `%USERPROFILE%\.unsloth\studio` — по Р-2 не запускается     |
+| 6. Готовность     | `environment`: GPU виден, torch есть; `dataset verify`: `ok: true`                                             |
+
+Для editable-установки в `vision/pyproject.toml` добавлены `build-system` и явный
+`tool.setuptools.packages.find` — без них setuptools отказывался из-за каталогов `licenses/` и
+`tests/` рядом с пакетом.
+
+Промт 10 готов к запуску на этой машине. `vision\.venv-unsloth` по § 5б создаётся перед промтом 13;
+Studio-установка на обучение не влияет и не используется.
