@@ -66,6 +66,12 @@ _prompts/stage2b_ai_geometry_qwen/fixtures/**
 /vision/data/
 /vision/runs/
 /vision/weights/
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.gguf
 
 # --- OS / IDE ---
 .DS_Store

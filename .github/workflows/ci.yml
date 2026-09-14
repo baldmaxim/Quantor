@@ -104,6 +104,36 @@ jobs:
             exit 1
           fi
 
+  vision:
+    name: ML-контур, датасет и лицензии
+    # Только стандартная библиотека и инструменты проверки: тяжёлые extras (torch, SAM,
+    # Transformers) здесь не ставятся, частных данных здесь нет — тесты идут на синтетике.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Инструменты проверки
+        run: pip install pytest==9.1.1 ruff==0.16.6 mypy==2.3.1
+      - name: Лицензионный гейт по всем манифестам
+        working-directory: vision
+        run: python -m quantor_vision licenses-check
+      - name: Каркас vision
+        working-directory: vision
+        run: |
+          ruff check .
+          ruff format --check .
+          mypy quantor_vision tests
+          pytest -q
+      - name: Импорт и сборка датасета PlanSwift на синтетике
+        working-directory: tools/planswift_gt
+        run: |
+          ruff check .
+          ruff format --check .
+          mypy planswift_gt tests
+          pytest -q
+
   contract:
     name: Контракт API
     runs-on: ubuntu-latest

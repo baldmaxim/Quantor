@@ -29,6 +29,7 @@
     "lint": "pnpm run lint:api && pnpm run lint:web && pnpm run lint:format",
     "lint:api": "node scripts/py.mjs -m ruff check . && node scripts/py.mjs -m ruff format --check .",
     "lint:format": "prettier --check --ignore-unknown .",
+    "lint:licenses": "node scripts/vision.mjs licenses-check",
     "lint:web": "pnpm --filter @quantor/web lint && pnpm --filter @quantor/admin lint",
     "planswift": "node scripts/planswift.mjs",
     "setup": "node scripts/setup.mjs",
@@ -36,10 +37,12 @@
     "test:api": "node scripts/py.mjs -m pytest",
     "test:e2e": "pnpm --filter @quantor/web test:e2e && pnpm --filter @quantor/admin test:e2e",
     "test:planswift": "node scripts/planswift.mjs check",
+    "test:vision": "node scripts/vision.mjs check",
     "test:web": "pnpm --filter @quantor/web test && pnpm --filter @quantor/admin test",
     "typecheck": "pnpm run typecheck:api && pnpm run typecheck:web",
     "typecheck:api": "node scripts/py.mjs -m mypy app benchmarks",
-    "typecheck:web": "pnpm --filter @quantor/web typecheck && pnpm --filter @quantor/admin typecheck"
+    "typecheck:web": "pnpm --filter @quantor/web typecheck && pnpm --filter @quantor/admin typecheck",
+    "vision": "node scripts/vision.mjs"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",

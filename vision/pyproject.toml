@@ -1,0 +1,43 @@
+[project]
+name = "quantor-vision"
+version = "0.1.0"
+description = "Офлайн ML-контур Stage 2B: обучение, оценка, векторизация (ADR-0021). Не часть apps/api."
+requires-python = ">=3.12"
+# База — только стандартная библиотека: каркас, контракт эксперимента и лицензионный гейт работают и
+# проверяются в CI без тяжёлых зависимостей. Всё тяжёлое — в extras, и каждая строка extras обязана
+# иметь решение allow/conditional в licenses/decisions.json.
+dependencies = []
+
+[project.optional-dependencies]
+# Промт 10: малая сегментация. Версии фиксируются при первом настоящем прогоне на GPU-хосте.
+train = ["torch", "torchvision"]
+# Промт 11: SAM 2 / MobileSAM.
+sam = ["sam2", "mobile-sam"]
+# Промты 12–14: Qwen3-VL SFT без Unsloth, пока по нему нет решения владельца.
+qwen = ["transformers", "peft", "trl"]
+# Промты 16–17: маска → вектор.
+vectorize = ["opencv-python-headless"]
+
+[project.scripts]
+vision = "quantor_vision.cli:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "S"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+# git и nvidia-smi вызываются списком аргументов без оболочки, из PATH намеренно.
+"quantor_vision/environment.py" = ["S603", "S607"]
+"quantor_vision/runrecord.py" = ["S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

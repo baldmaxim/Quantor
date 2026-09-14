@@ -31,6 +31,9 @@ pnpm benchmark:measurement       # замер точности и стоимос
 pnpm benchmark:geometry          # замер валидатора многоугольника и area_with_holes.v1 (ADR-0026)
 pnpm planswift <команда>         # офлайн PlanSwift: inspect/convert/validate/stats/qa/card/build (вне git)
 pnpm test:planswift              # ruff, mypy, pytest импортёра на синтетике
+pnpm vision <команда>            # ML-контур vision/: dataset verify, environment, train… (BLOCKED без GPU)
+pnpm test:vision                 # ruff, mypy, pytest каркаса vision и лицензионный гейт
+pnpm lint:licenses               # гейт лицензий моделей по всем манифестам (vision/licenses)
 pnpm benchmark:viewer            # замер просмотрщика: холсты, память, отрисовка, панорама (ADR-0024)
 ```
 

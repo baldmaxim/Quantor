@@ -1,0 +1,125 @@
+{
+  "_note": "Машиночитаемая матрица лицензий Stage 2B (docs/stage2b/model-license-matrix.md). Проверено 2026-09-14. Не юридическое заключение. Пакет или вес без строки allow/conditional здесь не добавляется ни в один манифест репозитория: это проверяет `vision licenses-check` в CI.",
+  "checked": "2026-09-14",
+  "packages": {
+    "torch": {
+      "spdx": "BSD-3-Clause (дистрибутив PyPI: Apache-2.0 AND BSD-2/3-Clause AND MIT AND BSL-1.0 AND LLVM-exception)",
+      "decision": "allow",
+      "scope": "vision[train]",
+      "evidence": "https://raw.githubusercontent.com/pytorch/pytorch/main/LICENSE sha256:bd018feef8825e88181c84eb7e3aa4eafb8f08a20d9fd6ef948569610c4a3e43; PyPI torch 2.14.0 License-Expression"
+    },
+    "torchvision": {
+      "spdx": "BSD-3-Clause",
+      "decision": "allow",
+      "scope": "vision[train]",
+      "evidence": "https://raw.githubusercontent.com/pytorch/vision/main/LICENSE sha256:6502f676851cfe25f8af75531dfb32375b7325b73c37e7b43741fa422893e71d",
+      "weights": "предобученные веса torchvision — отдельная строка на каждый вес; в baseline промта 10 — инициализация с нуля"
+    },
+    "opencv-python-headless": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "scope": "vision[vectorize]",
+      "evidence": "https://raw.githubusercontent.com/opencv/opencv/4.x/LICENSE sha256:cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30; PyPI 5.0.0.93",
+      "notice": "THIRD_PARTY_NOTICES при распространении; колёса PyPI несут собственные bundled-лицензии"
+    },
+    "sam2": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "scope": "vision[sam]",
+      "evidence": "https://raw.githubusercontent.com/facebookresearch/sam2/main/LICENSE sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "weights": "facebook/sam2.1-hiera-small revision ee5bba1d82bb8749febdf90f45e84b687142ba03, cardData.license apache-2.0"
+    },
+    "mobile-sam": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "scope": "vision[sam]",
+      "evidence": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/master/LICENSE sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "weights": "веса MobileSAM из репозитория — ревизия и SHA-256 фиксируются при скачивании"
+    },
+    "transformers": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "scope": "vision[qwen]",
+      "evidence": "https://raw.githubusercontent.com/huggingface/transformers/main/LICENSE sha256:77fd4710def9ec3c0f6225800e0235f15a425abd4a8b03559127fcd782612049"
+    },
+    "peft": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "scope": "vision[qwen]",
+      "evidence": "https://raw.githubusercontent.com/huggingface/peft/main/LICENSE sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    "trl": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "scope": "vision[qwen]",
+      "evidence": "https://raw.githubusercontent.com/huggingface/trl/main/LICENSE sha256:1bf614b1fdc40fbd344aa58d00d17d5fd0d252ea333a05be018a38959c8b2998"
+    },
+    "pypdfium2": {
+      "spdx": "BSD-3-Clause OR Apache-2.0 (+ bundled PDFium third-party)",
+      "decision": "conditional",
+      "scope": "кандидат серверного растра (промт 20)",
+      "evidence": "PyPI pypdfium2 5.13.0 license: BSD-3-Clause, Apache-2.0, dependency licenses",
+      "condition": "перед образом — список bundled-лицензий PDFium; решение Stage 2A «не добавлять без необходимости» пересматривает владелец"
+    },
+    "segmentation-models-pytorch": {
+      "spdx": "MIT",
+      "decision": "conditional",
+      "scope": "vision[train], не используется в промте 10",
+      "evidence": "https://raw.githubusercontent.com/qubvel-org/segmentation_models.pytorch/main/LICENSE sha256:a9acb108113b9d7582a69a7cbeadef1ff6042bb93cd4890eae2c970727be538c",
+      "condition": "каждый предобученный энкодер — отдельная строка лицензии веса"
+    },
+    "shapely": {
+      "spdx": "BSD-3-Clause (GEOS: LGPL-2.1)",
+      "decision": "conditional",
+      "scope": "vision[vectorize]",
+      "evidence": "https://raw.githubusercontent.com/shapely/shapely/main/LICENSE.txt sha256:4a207eac9bf257ed286e1c6f0fce253d1abfdb134fc61ec855e37f5692a3f754",
+      "condition": "в производственный образ — только после ADR о способе распространения GEOS"
+    },
+    "unsloth": {
+      "spdx": "Apache-2.0 для пакета; внутри wheel — AGPL-3.0 файлы",
+      "decision": "blocked",
+      "scope": "обучение Qwen (промты 12–13)",
+      "evidence": "wheel unsloth-2026.9.4 sha256:7892ac14733ba22200ef4a228ac26e06275562c5f72b96a654605d4dcbd05264: 1364 файла studio/ (studio/LICENSE.AGPL-3.0), unsloth/kernels/moe/LICENSE — AGPL-3.0, dist-info/licenses/COPYING — AGPL-3.0; README: dual license Apache-2.0 / AGPL-3.0",
+      "condition": "решение владельца: AGPL-файлы ставятся в окружение даже без запуска Studio; до решения — transformers + peft + trl"
+    },
+    "unsloth-zoo": {
+      "spdx": "не проверен",
+      "decision": "blocked",
+      "scope": "зависимость unsloth",
+      "evidence": "не аудирован — следует за решением по unsloth"
+    },
+    "ultralytics": {
+      "spdx": "AGPL-3.0",
+      "decision": "blocked",
+      "scope": "не используется",
+      "evidence": "https://raw.githubusercontent.com/ultralytics/ultralytics/main/LICENSE sha256:0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0; PyPI 8.4.152 AGPL-3.0",
+      "condition": "только после явного решения владельца о корпоративной лицензии Ultralytics"
+    }
+  },
+  "weights": {
+    "Qwen/Qwen3-VL-2B-Instruct": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "revision": "89644892e4d85e24eaac8bacfd4f463576704203",
+      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-2B-Instruct cardData.license apache-2.0, lastModified 2025-10-23, не gated"
+    },
+    "Qwen/Qwen3-VL-4B-Instruct": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "revision": "ebb281ec70b05090aa6165b016eac8ec08e71b17",
+      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-4B-Instruct cardData.license apache-2.0, lastModified 2025-10-15, не gated"
+    },
+    "Qwen/Qwen3-VL-8B-Instruct": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
+      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-8B-Instruct cardData.license apache-2.0, lastModified 2025-10-15, не gated"
+    },
+    "facebook/sam2.1-hiera-small": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "revision": "ee5bba1d82bb8749febdf90f45e84b687142ba03",
+      "evidence": "https://huggingface.co/api/models/facebook/sam2.1-hiera-small cardData.license apache-2.0"
+    }
+  }
+}
