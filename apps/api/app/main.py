@@ -89,8 +89,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
-def _error_body(code: ErrorCode, message: str | None = None) -> dict[str, dict[str, str]]:
-    return {"detail": {"code": code.value, "message": message or MESSAGES[code]}}
+def _error_body(
+    code: ErrorCode,
+    message: str | None = None,
+    issue: dict[str, str | int | None] | None = None,
+) -> dict[str, dict[str, object]]:
+    body: dict[str, object] = {"code": code.value, "message": message or MESSAGES[code]}
+    if issue is not None:
+        body["issue"] = issue
+    return {"detail": body}
 
 
 def _register_error_handlers(app: FastAPI) -> None:
@@ -107,7 +114,7 @@ def _register_error_handlers(app: FastAPI) -> None:
         log.warning("domain_error", code=error.code.value)
         return JSONResponse(
             status_code=error.status_code,
-            content=_error_body(error.code, error.detail),
+            content=_error_body(error.code, error.detail, error.issue),
         )
 
     # ConnectionError нужен отдельно: отказ в соединении с базой приходит как обычная

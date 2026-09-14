@@ -1,0 +1,165 @@
+{
+  "benchmark": "geometry_validity.v1",
+  "python": "3.12.8",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 85 Stepping 4, GenuineIntel",
+  "accuracy": [
+    {
+      "name": "квадрат 8×8 без отверстий",
+      "state": "ready",
+      "rule_key": "area.v1",
+      "value_m2": "64.00000000000000000000",
+      "expected_m2": "64",
+      "geometry_issue": null,
+      "passed": true
+    },
+    {
+      "name": "квадрат 8×8 − 2×2",
+      "state": "ready",
+      "rule_key": "area_with_holes.v1",
+      "value_m2": "60.00000000000000000000",
+      "expected_m2": "60",
+      "geometry_issue": null,
+      "passed": true
+    },
+    {
+      "name": "квадрат 8×8 − 2×2 − треугольник 4,5",
+      "state": "ready",
+      "rule_key": "area_with_holes.v1",
+      "value_m2": "55.50000000000000000000",
+      "expected_m2": "55.5",
+      "geometry_issue": null,
+      "passed": true
+    },
+    {
+      "name": "плита 9×6 − четыре отверстия 1×1",
+      "state": "ready",
+      "rule_key": "area_with_holes.v1",
+      "value_m2": "50.00000000000000000000",
+      "expected_m2": "50",
+      "geometry_issue": null,
+      "passed": true
+    },
+    {
+      "name": "бантик",
+      "state": "invalid_geometry",
+      "rule_key": "area.v1",
+      "value_m2": null,
+      "expected_m2": null,
+      "geometry_issue": "self_intersection",
+      "passed": true
+    },
+    {
+      "name": "повтор вершины",
+      "state": "invalid_geometry",
+      "rule_key": "area.v1",
+      "value_m2": null,
+      "expected_m2": null,
+      "geometry_issue": "duplicate_vertex",
+      "passed": true
+    },
+    {
+      "name": "вырожденный в линию",
+      "state": "invalid_geometry",
+      "rule_key": "area.v1",
+      "value_m2": null,
+      "expected_m2": null,
+      "geometry_issue": "degenerate_ring",
+      "passed": true
+    },
+    {
+      "name": "отверстие снаружи",
+      "state": "invalid_geometry",
+      "rule_key": "area_with_holes.v1",
+      "value_m2": null,
+      "expected_m2": null,
+      "geometry_issue": "hole_outside_outer",
+      "passed": true
+    },
+    {
+      "name": "отверстие касается контура",
+      "state": "invalid_geometry",
+      "rule_key": "area_with_holes.v1",
+      "value_m2": null,
+      "expected_m2": null,
+      "geometry_issue": "ring_intersection",
+      "passed": true
+    },
+    {
+      "name": "отверстие в отверстии",
+      "state": "invalid_geometry",
+      "rule_key": "area_with_holes.v1",
+      "value_m2": null,
+      "expected_m2": null,
+      "geometry_issue": "hole_inside_hole",
+      "passed": true
+    }
+  ],
+  "accuracy_passed": 10,
+  "accuracy_total": 10,
+  "cost": [
+    {
+      "name": "шестиугольник",
+      "vertices": 6,
+      "holes": 0,
+      "outcome": "valid",
+      "validate_median_ms": 0.0515,
+      "validate_p95_ms": 0.0698,
+      "compute_median_ms": 0.1615
+    },
+    {
+      "name": "круг 100",
+      "vertices": 100,
+      "holes": 0,
+      "outcome": "valid",
+      "validate_median_ms": 1.2368,
+      "validate_p95_ms": 1.5629,
+      "compute_median_ms": 2.6994
+    },
+    {
+      "name": "круг 1 000",
+      "vertices": 1000,
+      "holes": 0,
+      "outcome": "valid",
+      "validate_median_ms": 18.1814,
+      "validate_p95_ms": 21.9832,
+      "compute_median_ms": 23.7484
+    },
+    {
+      "name": "круг 10 000",
+      "vertices": 10000,
+      "holes": 0,
+      "outcome": "valid",
+      "validate_median_ms": 161.0423,
+      "validate_p95_ms": 318.3201,
+      "compute_median_ms": 247.0003
+    },
+    {
+      "name": "круг 1 000 + 50 отверстий × 20",
+      "vertices": 2000,
+      "holes": 50,
+      "outcome": "valid",
+      "validate_median_ms": 39.6355,
+      "validate_p95_ms": 46.2262,
+      "compute_median_ms": 63.3803
+    },
+    {
+      "name": "круг 10 000 + 200 отверстий × 50",
+      "vertices": 20000,
+      "holes": 200,
+      "outcome": "valid",
+      "validate_median_ms": 587.216,
+      "validate_p95_ms": 601.949,
+      "compute_median_ms": 775.9136
+    },
+    {
+      "name": "гребёнка 2 500 зубьев",
+      "vertices": 10002,
+      "holes": 0,
+      "outcome": "too_complex",
+      "validate_median_ms": 69.1222,
+      "validate_p95_ms": 74.5168,
+      "compute_median_ms": 100.9721
+    }
+  ]
+}

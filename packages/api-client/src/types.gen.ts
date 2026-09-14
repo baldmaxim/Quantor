@@ -467,6 +467,15 @@ export type FlagStateRead = {
 };
 
 /**
+ * GeometryIssueCode
+ *
+ * Почему контур не годится для площади (ADR-0026).
+ *
+ * Коды стабильны: по ним объясняет интерфейс и по ним же проверяются тесты.
+ */
+export type GeometryIssueCode = 'too_few_vertices' | 'duplicate_vertex' | 'degenerate_ring' | 'self_intersection' | 'ring_intersection' | 'hole_outside_outer' | 'hole_inside_hole' | 'too_complex';
+
+/**
  * GeometryStatus
  *
  * Состояние извлечения канонической геометрии страниц ревизии.
@@ -663,6 +672,13 @@ export type MeasurementBatchCreate = {
  */
 export type MeasurementCreate = {
     /**
+     * Holes
+     */
+    holes?: Array<Array<[
+        number,
+        number
+    ]>>;
+    /**
      * Points
      */
     points: Array<[
@@ -699,6 +715,7 @@ export type MeasurementQuantityRead = {
      * Canonical Value
      */
     canonical_value: string | null;
+    geometry_issue?: GeometryIssueCode | null;
     /**
      * Input Fingerprint
      */
@@ -752,6 +769,10 @@ export type MeasurementRead = {
     created_by: string | null;
     geometry_type: GeometryType;
     /**
+     * Holes
+     */
+    holes?: Array<Array<Array<number>>>;
+    /**
      * Id
      */
     id: string;
@@ -797,6 +818,13 @@ export type MeasurementSource = 'manual' | 'ai' | 'imported';
  * Версия обязательна: без неё старый клиент молча перетёр бы чужую правку.
  */
 export type MeasurementUpdate = {
+    /**
+     * Holes
+     */
+    holes?: Array<Array<[
+        number,
+        number
+    ]>> | null;
     /**
      * Points
      */
@@ -1391,7 +1419,7 @@ export type ProviderKind = 'openai_compatible' | 'anthropic_compatible' | 'lm_st
  * нет. Показать вместо этого ноль значило бы соврать в смете: строка с нулём выглядит
  * посчитанной, строка с прочерком видна сразу.
  */
-export type QuantityState = 'ready' | 'unavailable_no_scale' | 'unavailable_no_geometry';
+export type QuantityState = 'ready' | 'unavailable_no_scale' | 'unavailable_no_geometry' | 'invalid_geometry';
 
 /**
  * QuantityUnit
@@ -1953,6 +1981,10 @@ export type TakeoffItemQuantityRead = {
      * Canonical Value
      */
     canonical_value: string;
+    /**
+     * Invalid Count
+     */
+    invalid_count?: number;
     /**
      * Measurement Count
      */

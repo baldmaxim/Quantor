@@ -141,6 +141,12 @@ class Measurement(TimestampMixin, Base):
         str_enum(GeometryType, name="geometry_type"), nullable=False
     )
     points: Mapped[list[list[float]]] = mapped_column(pg.JSONB, nullable=False)
+    # Отверстия многоугольника (ADR-0026): список колец в том же каноне, что `points` — внешний
+    # контур. Пусто у прочих типов и у многоугольника без отверстий; строки до миграции 0011
+    # получили `[]` и считаются прежним правилом `area.v1`.
+    holes: Mapped[list[list[list[float]]]] = mapped_column(
+        pg.JSONB, nullable=False, default=list, server_default="[]"
+    )
 
     source: Mapped[MeasurementSource] = mapped_column(
         str_enum(MeasurementSource, name="measurement_source"),
@@ -192,6 +198,17 @@ class Measurement(TimestampMixin, Base):
             " or (geometry_type = 'polyline' and jsonb_array_length(points) >= 2)"
             " or (geometry_type = 'polygon' and jsonb_array_length(points) >= 3))",
             name="points_match_geometry",
+        ),
+        # Форма отверстий — тоже забота базы: отверстия только у многоугольника, каждое кольцо —
+        # массив минимум из трёх точек. `strict` обязателен: в нестрогом режиме jsonpath
+        # разворачивает кольцо до точек, и фильтр «меньше трёх» срабатывал на любой паре координат.
+        # Топологию (внутри контура, без касаний) база не выражает — её держит сервис.
+        CheckConstraint(
+            "jsonb_typeof(holes) = 'array'"
+            " and (geometry_type = 'polygon' or jsonb_array_length(holes) = 0)"
+            " and not jsonb_path_exists(holes,"
+            " 'strict $[*] ? (@.type() != \"array\" || @.size() < 3)')",
+            name="holes_match_geometry",
         ),
         CheckConstraint("version >= 1", name="version_positive"),
         Index("ix_measurements_sheet_id_item_id", "sheet_id", "takeoff_item_id"),

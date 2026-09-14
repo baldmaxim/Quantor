@@ -28,6 +28,11 @@ export interface OverlayMeasurement {
   readonly id: string;
   readonly geometryType: 'count' | 'line' | 'polyline' | 'polygon';
   readonly points: readonly NormalizedPoint[];
+  /**
+   * Отверстия многоугольника (ADR-0026): кольца внутри внешнего контура `points`. Лежат внутри его
+   * охвата, поэтому на отсечение и индекс не влияют. Нет — фигура сплошная.
+   */
+  readonly holes?: readonly (readonly NormalizedPoint[])[];
   /** Ключ палитры темы: цвет строки обмера. */
   readonly colorKey: string;
 }
@@ -105,7 +110,7 @@ export const drawMeasurements = (
     if (!pointsVisible(points, placement, visible)) continue;
 
     const screen = points.map((point) => toScreenPoint(point, placement));
-    drawShape(context, measurement, screen, state, style);
+    drawShape(context, measurement, screen, state, style, placement);
     drawn += 1;
   }
 
@@ -212,6 +217,7 @@ const drawShape = (
   screen: readonly ScreenPoint[],
   state: MeasurementOverlayState,
   style: MeasurementOverlayStyle,
+  placement: SheetPlacement,
 ): void => {
   const selected = state.selectedId === measurement.id;
   const hovered = state.hoveredId === measurement.id;
@@ -233,10 +239,19 @@ const drawShape = (
   } else {
     const closed = measurement.geometryType === 'polygon';
     tracePath(context, screen, closed);
+    // Отверстия — подпути того же пути: заливка по правилу чёт-нечет оставляет их пустыми, а обводка
+    // рисует и контур, и кольца отверстий одним вызовом.
+    const holes = closed ? (measurement.holes ?? []) : [];
+    for (const ring of holes) {
+      traceRing(
+        context,
+        ring.map((point) => toScreenPoint(point, placement)),
+      );
+    }
 
     if (closed) {
       context.globalAlpha = selected ? SELECTED_FILL_ALPHA : FILL_ALPHA;
-      context.fill();
+      context.fill(holes.length > 0 ? 'evenodd' : 'nonzero');
       context.globalAlpha = 1;
     }
     context.stroke();
@@ -299,6 +314,15 @@ const tracePath = (
   if (closed) context.closePath();
 };
 
+/** Замкнутое кольцо как подпуть текущего пути: без `beginPath`, чтобы отверстие ушло в ту же заливку. */
+const traceRing = (context: CanvasRenderingContext2D, points: readonly ScreenPoint[]): void => {
+  points.forEach((point, index) => {
+    if (index === 0) context.moveTo(point.x, point.y);
+    else context.lineTo(point.x, point.y);
+  });
+  if (points.length > 0) context.closePath();
+};
+
 /**
  * Ищет измерение под курсором.
  *
@@ -339,7 +363,10 @@ export const hitTestMeasurements = (
 
   for (const measurement of candidates) {
     const screen = measurement.points.map((item) => toScreenPoint(item, placement));
-    if (!hits(measurement, screen, target, tolerancePx)) continue;
+    const holes = (measurement.holes ?? []).map((ring) =>
+      ring.map((item) => toScreenPoint(item, placement)),
+    );
+    if (!hits(measurement, screen, holes, target, tolerancePx)) continue;
 
     const extent = boundingExtent(screen);
     if (extent < bestExtent) {
@@ -373,6 +400,7 @@ export const hitTestVertex = (
 const hits = (
   measurement: OverlayMeasurement,
   screen: readonly ScreenPoint[],
+  holes: readonly (readonly ScreenPoint[])[],
   target: ScreenPoint,
   tolerance: number,
 ): boolean => {
@@ -383,11 +411,27 @@ const hits = (
       : false;
   }
 
-  if (measurement.geometryType === 'polygon' && insidePolygon(screen, target)) {
+  const closed = measurement.geometryType === 'polygon';
+  // Внутри отверстия фигуры нет: клик туда достаётся тому, что лежит под отверстием.
+  if (
+    closed &&
+    insidePolygon(screen, target) &&
+    !holes.some((ring) => insidePolygon(ring, target))
+  ) {
     return true;
   }
 
-  const closed = measurement.geometryType === 'polygon';
+  if (nearOutline(screen, target, tolerance, closed)) return true;
+  // Кромка отверстия — тоже край фигуры.
+  return closed && holes.some((ring) => nearOutline(ring, target, tolerance, true));
+};
+
+const nearOutline = (
+  screen: readonly ScreenPoint[],
+  target: ScreenPoint,
+  tolerance: number,
+  closed: boolean,
+): boolean => {
   for (let index = 1; index < screen.length; index += 1) {
     const from = screen[index - 1];
     const to = screen[index];

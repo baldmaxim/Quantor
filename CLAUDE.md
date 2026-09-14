@@ -28,6 +28,7 @@ pnpm build                       # генерация клиента + сбор�
 pnpm db:migrate                  # alembic upgrade head
 pnpm api-client:generate         # FastAPI -> openapi.json -> TS
 pnpm benchmark:measurement       # замер точности и стоимости измерительного ядра
+pnpm benchmark:geometry          # замер валидатора многоугольника и area_with_holes.v1 (ADR-0026)
 pnpm benchmark:viewer            # замер просмотрщика: холсты, память, отрисовка, панорама (ADR-0024)
 ```
 

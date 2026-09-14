@@ -292,6 +292,20 @@ def _points(raw: dict[str, object], where: str) -> list[list[float]]:
     return [[float(x), float(y)] for x, y in (_pair(item, f"{where}.points") for item in items)]
 
 
+def _holes(raw: dict[str, object], where: str) -> list[list[list[float]]]:
+    """Отверстия многоугольника (ADR-0026, датасет v2). Нет поля — фигура сплошная."""
+    rings = _sequence(raw.get("holes", []), f"{where}.holes")
+    return [
+        [
+            [float(x), float(y)]
+            for x, y in (
+                _pair(item, f"{where}.holes") for item in _sequence(ring, f"{where}.holes[]")
+            )
+        ]
+        for ring in rings
+    ]
+
+
 def _generated_points(raw: dict[str, object], where: str) -> list[list[float]]:
     """Разворачивает крупную геометрию, которую нет смысла хранить поточечно."""
     kind = _text(raw, "kind", where)
@@ -362,12 +376,14 @@ def load(path: Path, *, repo_root: Path) -> Dataset:
             )
 
         points = _points(raw, where)
+        holes = _holes(raw, where)
         measurement = Measurement(
             id=uuid.uuid4(),
             takeoff_item_id=uuid.uuid4(),
             sheet_id=uuid.uuid4(),
             geometry_type=GeometryType(_text(raw, "geometry_type", where)),
             points=points,
+            holes=holes,
             source=MeasurementSource.MANUAL,
             scale_calibration_id=calibration.id if calibration is not None else None,
             version=1,
@@ -382,7 +398,7 @@ def load(path: Path, *, repo_root: Path) -> Dataset:
                 expected=_expectation(_mapping(raw["expected"], f"{where}.expected"), where),
                 tolerance=_tolerance(_mapping(raw["tolerance"], f"{where}.tolerance"), where),
                 source_note=_text(raw, "source_note", where),
-                vertex_count=len(points),
+                vertex_count=len(points) + sum(len(ring) for ring in holes),
                 page_id=page_id,
                 calibration_id=calibration_id,
                 evidence=evidence,

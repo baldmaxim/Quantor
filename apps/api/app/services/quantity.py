@@ -8,7 +8,12 @@
 count.v1   COUNT   → 1 шт, калибровка не нужна
 length.v1  LINE, POLYLINE → нормализованные → точки PDF → мм → м
 area.v1    POLYGON        → нормализованные → точки PDF² → мм² → м²
+area_with_holes.v1  POLYGON с отверстиями → площадь контура − Σ площадей отверстий
 ```
+
+Многоугольник проверяется валидатором до расчёта (ADR-0026). Недействительный контур —
+самопересечение, касание, отверстие снаружи — получает состояние `invalid_geometry` и
+**никакой** площади: формула шнурков на нём дала бы разность площадей, выглядящую как ответ.
 
 ## Чего здесь не происходит
 
@@ -30,7 +35,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Final
 
-from app.domain import GeometryType, QuantityState, QuantityUnit
+from app.domain import GeometryIssueCode, GeometryType, QuantityState, QuantityUnit
 from app.errors import DomainError, ErrorCode
 from app.models import Measurement, PageGeometry, ScaleCalibration
 from app.services.geometry.transform import (
@@ -39,12 +44,17 @@ from app.services.geometry.transform import (
     polygon_area_pdf_points2,
     polyline_length_pdf_points,
 )
+from app.services.geometry.validity import validate_polygon
 
 # Ключи правил. Версия в ключе, а не рядом: величина, посчитанная правилом v1, обязана
 # оставаться объяснимой после появления v2.
 RULE_COUNT: Final = "count.v1"
 RULE_LENGTH: Final = "length.v1"
 RULE_AREA: Final = "area.v1"
+# Многоугольник с отверстиями (ADR-0026): площадь внешнего контура минус сумма площадей
+# отверстий. Отдельный ключ, а не новая версия `area.v1`: фигура без отверстий считается
+# прежним правилом с прежним отпечатком, и уже выданные числа не меняются.
+RULE_AREA_WITH_HOLES: Final = "area_with_holes.v1"
 
 RULE_BY_GEOMETRY: Final[dict[GeometryType, str]] = {
     GeometryType.COUNT: RULE_COUNT,
@@ -92,9 +102,13 @@ class QuantityResult:
     # давать одно число — на этом и держится воспроизводимость.
     input_fingerprint: str
     verification_state: str
+    # Что не так с контуром, если состояние `invalid_geometry`; иначе пусто.
+    geometry_issue: GeometryIssueCode | None = None
 
 
-def rule_for(geometry_type: GeometryType) -> str:
+def rule_for(geometry_type: GeometryType, *, has_holes: bool = False) -> str:
+    if geometry_type is GeometryType.POLYGON and has_holes:
+        return RULE_AREA_WITH_HOLES
     return RULE_BY_GEOMETRY[geometry_type]
 
 
@@ -102,8 +116,17 @@ def _version_of(rule_key: str) -> str:
     return rule_key.rsplit(".", 1)[-1]
 
 
+def _ring(points: list[list[float]]) -> list[NormalizedPoint]:
+    return [NormalizedPoint(float(x), float(y)) for x, y in points]
+
+
 def _points(measurement: Measurement) -> list[NormalizedPoint]:
-    return [NormalizedPoint(float(x), float(y)) for x, y in measurement.points]
+    return _ring(measurement.points)
+
+
+def _holes(measurement: Measurement) -> list[list[list[float]]]:
+    # Строка, созданная объектом без flush, может ещё не иметь значения по умолчанию.
+    return list(measurement.holes or [])
 
 
 def _fingerprint(
@@ -125,6 +148,9 @@ def _fingerprint(
         geometry.geometry_fingerprint if geometry is not None else "-",
         str(calibration.mm_per_pt) if calibration is not None else "-",
     ]
+    # Отверстия входят в отпечаток только когда они есть: отпечаток `area.v1` прежний.
+    for ring in _holes(measurement):
+        parts.append("hole:" + ";".join(f"{x!r},{y!r}" for x, y in ring))
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
@@ -139,12 +165,13 @@ def compute(
     Ничего не читает из базы и ничего не пишет: вход передан целиком. Отсюда и
     воспроизводимость — функция не зависит ни от порядка запросов, ни от состояния сессии.
     """
-    rule_key = rule_for(measurement.geometry_type)
+    holes = _holes(measurement)
+    rule_key = rule_for(measurement.geometry_type, has_holes=bool(holes))
     version = _version_of(rule_key)
     fingerprint = _fingerprint(measurement, geometry, calibration, rule_key)
     unit = _unit_for(measurement.geometry_type)
 
-    def unavailable(state: QuantityState) -> QuantityResult:
+    def unavailable(state: QuantityState, issue: GeometryIssueCode | None = None) -> QuantityResult:
         return QuantityResult(
             measurement_id=str(measurement.id),
             takeoff_item_id=str(measurement.takeoff_item_id),
@@ -163,6 +190,7 @@ def compute(
             verification_state=(
                 calibration.verification_state.value if calibration is not None else "unverified"
             ),
+            geometry_issue=issue,
         )
 
     # Счёт не требует ни масштаба, ни геометрии страницы: штука есть штука.
@@ -185,6 +213,16 @@ def compute(
             verification_state="unverified",
         )
 
+    if measurement.geometry_type is GeometryType.POLYGON:
+        # Запись недействительный контур не принимает, но строка могла лечь раньше политики
+        # или ручным SQL. Площади у неё нет — ни при каком масштабе, и никогда не 0 м².
+        issue = validate_polygon(
+            [(float(x), float(y)) for x, y in measurement.points],
+            [[(float(x), float(y)) for x, y in ring] for ring in holes],
+        )
+        if issue is not None:
+            return unavailable(QuantityState.INVALID_GEOMETRY, issue.code)
+
     if geometry is None:
         return unavailable(QuantityState.UNAVAILABLE_NO_GEOMETRY)
     if calibration is None:
@@ -197,6 +235,9 @@ def compute(
     if measurement.geometry_type is GeometryType.POLYGON:
         # Площадь: сначала в точках PDF в квадрате, затем коэффициент в квадрате.
         area_pt2 = polygon_area_pdf_points2(points, page)
+        # Порядок сложения — часть контракта: контур, затем отверстия по порядку хранения.
+        for ring in holes:
+            area_pt2 -= polygon_area_pdf_points2(_ring(ring), page)
         canonical = _to_decimal(area_pt2) * factor * factor
         display = canonical / MM2_PER_M2
         canonical_unit = "mm2"
@@ -266,6 +307,8 @@ class QuantityTotal:
     # Сколько измерений не попало в итог: у них нет масштаба или геометрии. Прятать их
     # нельзя — итог по половине измерений выглядит как полный.
     unavailable_count: int
+    # Из них — с недействительной геометрией: их не исправит калибровка, только перерисовка.
+    invalid_count: int = 0
 
 
 def total(item_id: str, results: list[QuantityResult]) -> QuantityTotal:
@@ -308,7 +351,12 @@ def total(item_id: str, results: list[QuantityResult]) -> QuantityTotal:
         canonical_unit=first.canonical_unit,
         value=canonical / divisor,
         canonical_value=canonical,
-        rule_key=first.rule_key,
+        # В строке площадей могут встретиться и `area.v1`, и `area_with_holes.v1`: итог называет
+        # все правила, по которым сложен, а не первое попавшееся.
+        rule_key="+".join(sorted({result.rule_key for result in results})),
         measurement_count=len(ready),
         unavailable_count=len(results) - len(ready),
+        invalid_count=sum(
+            1 for result in results if result.state is QuantityState.INVALID_GEOMETRY
+        ),
     )

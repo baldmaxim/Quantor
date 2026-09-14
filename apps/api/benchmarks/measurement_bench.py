@@ -66,7 +66,9 @@ from benchmarks import dataset as dataset_module
 from benchmarks.dataset import BenchCase, Dataset
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_DATASET = REPO_ROOT / "benchmarks" / "datasets" / "measurement_v1.json"
+# v2 — действующая политика (ADR-0026): бантик недействителен, есть отверстия. v1 оставлен как
+# есть: по нему сняты отчёты Stage 2A, и повторный прогон на нём покажет смену поведения.
+DEFAULT_DATASET = REPO_ROOT / "benchmarks" / "datasets" / "measurement_v2.json"
 
 # Команды, которыми поднимается стенд. Печатаются в отчёт вместо выдуманных чисел.
 STAND_COMMANDS = [

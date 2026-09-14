@@ -627,3 +627,64 @@ describe('с пространственным индексом — тот же �
     ).toBe(true);
   });
 });
+
+describe('многоугольник с отверстиями (ADR-0026)', () => {
+  const outer = [p(0.1, 0.1), p(0.9, 0.1), p(0.9, 0.9), p(0.1, 0.9)];
+  const hole = [p(0.4, 0.4), p(0.6, 0.4), p(0.6, 0.6), p(0.4, 0.6)];
+  const slab = measurement({ id: 'slab', geometryType: 'polygon', points: outer, holes: [hole] });
+
+  it('отверстие — подпуть той же заливки по правилу чёт-нечет', () => {
+    const recorded = fakeContext();
+
+    drawMeasurements(recorded.context, placement, state({ measurements: [slab] }), style);
+
+    // Два кольца: два moveTo, два замыкания, одна заливка и одна обводка на всю фигуру.
+    expect(recorded.moves).toEqual([
+      { x: 100, y: 100 },
+      { x: 400, y: 400 },
+    ]);
+    expect(recorded.closes).toBe(2);
+    expect(recorded.fills).toBe(1);
+    expect(recorded.strokes).toBe(1);
+    expect(recorded.context.fill).toHaveBeenCalledWith('evenodd');
+  });
+
+  it('без отверстий заливка прежняя', () => {
+    const recorded = fakeContext();
+    const plain = measurement({ id: 'plain', geometryType: 'polygon', points: outer });
+
+    drawMeasurements(recorded.context, placement, state({ measurements: [plain] }), style);
+
+    expect(recorded.context.fill).toHaveBeenCalledWith('nonzero');
+    expect(recorded.closes).toBe(1);
+  });
+
+  it('клик внутри отверстия фигуру не выбирает', () => {
+    expect(hitTestMeasurements([slab], p(0.5, 0.5), placement)).toBeNull();
+  });
+
+  it('клик в теле фигуры между контуром и отверстием выбирает её', () => {
+    expect(hitTestMeasurements([slab], p(0.25, 0.25), placement)?.id).toBe('slab');
+  });
+
+  it('кромка отверстия — край фигуры', () => {
+    expect(hitTestMeasurements([slab], p(0.5, 0.402), placement)?.id).toBe('slab');
+  });
+
+  it('клик в отверстие достаётся фигуре под ним', () => {
+    const inside = measurement({
+      id: 'inside',
+      geometryType: 'count',
+      points: [p(0.5, 0.5)],
+    });
+
+    expect(hitTestMeasurements([slab, inside], p(0.5, 0.5), placement)?.id).toBe('inside');
+  });
+
+  it('с индексом ответ тот же', () => {
+    const index = new ShapeIndex<OverlayMeasurement>();
+
+    expect(hitTestMeasurements([slab], p(0.5, 0.5), placement, 6, index)).toBeNull();
+    expect(hitTestMeasurements([slab], p(0.25, 0.25), placement, 6, index)?.id).toBe('slab');
+  });
+});

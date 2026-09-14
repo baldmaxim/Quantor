@@ -18,8 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain import (
     COORDINATES_PER_POINT,
     EXACT_POINTS_BY_GEOMETRY,
+    MAX_HOLE_POINTS_TOTAL,
     MAX_MEASUREMENT_BATCH,
     MAX_MEASUREMENT_POINTS,
+    MAX_POLYGON_HOLES,
     MIN_POINTS_BY_GEOMETRY,
     UNIT_BY_GEOMETRY,
     GeometryType,
@@ -37,6 +39,7 @@ from app.models import (
 )
 from app.services import quantity as quantity_service
 from app.services import scale as scale_service
+from app.services.geometry.validity import validate_polygon
 
 # Предел числа вершин. Не про производительность: многоугольник из ста тысяч точек —
 # это отказ, а не тяжёлая фигура. Без предела он же становится способом положить сервер
@@ -45,6 +48,32 @@ from app.services import scale as scale_service
 # Цвет строки по умолчанию. Ключ палитры темы, а не значение: хардкод hex здесь
 # разъехался бы с тёмной темой.
 DEFAULT_COLOR_KEY = "accent"
+
+
+def _canonical_ring(points: list[list[float]], label: str = "") -> list[list[float]]:
+    """Пары конечных координат в пределах листа — в том порядке, в каком их поставил человек."""
+    canonical: list[list[float]] = []
+    for index, point in enumerate(points):
+        if len(point) != COORDINATES_PER_POINT:
+            raise DomainError(
+                ErrorCode.VALIDATION_FAILED, f"{label}Точка {index + 1}: ожидается пара координат"
+            )
+        x, y = float(point[0]), float(point[1])
+        for name, value in (("x", x), ("y", y)):
+            # NaN и бесконечность прошли бы JSON и легли бы в базу, превратив любую
+            # величину по этой геометрии в бессмыслицу.
+            if value != value or value in (float("inf"), float("-inf")):
+                raise DomainError(
+                    ErrorCode.VALIDATION_FAILED,
+                    f"{label}Точка {index + 1}: {name} должно быть конечным числом",
+                )
+            if not 0.0 <= value <= 1.0:
+                raise DomainError(
+                    ErrorCode.VALIDATION_FAILED,
+                    f"{label}Точка {index + 1}: {name}={value} вне листа",
+                )
+        canonical.append([x, y])
+    return canonical
 
 
 def validate_points(geometry_type: GeometryType, points: list[list[float]]) -> list[list[float]]:
@@ -72,29 +101,64 @@ def validate_points(geometry_type: GeometryType, points: list[list[float]]) -> l
             f"Слишком много вершин: {len(points)}, предел {MAX_MEASUREMENT_POINTS}",
         )
 
-    canonical: list[list[float]] = []
-    for index, point in enumerate(points):
-        if len(point) != COORDINATES_PER_POINT:
-            raise DomainError(
-                ErrorCode.VALIDATION_FAILED, f"Точка {index + 1}: ожидается пара координат"
-            )
-        x, y = float(point[0]), float(point[1])
-        for name, value in (("x", x), ("y", y)):
-            # NaN и бесконечность прошли бы JSON и легли бы в базу, превратив любую
-            # величину по этой геометрии в бессмыслицу.
-            if value != value or value in (float("inf"), float("-inf")):
-                raise DomainError(
-                    ErrorCode.VALIDATION_FAILED,
-                    f"Точка {index + 1}: {name} должно быть конечным числом",
-                )
-            if not 0.0 <= value <= 1.0:
-                raise DomainError(
-                    ErrorCode.VALIDATION_FAILED,
-                    f"Точка {index + 1}: {name}={value} вне листа",
-                )
-        canonical.append([x, y])
+    return _canonical_ring(points)
 
+
+def validate_holes(
+    geometry_type: GeometryType, holes: list[list[list[float]]]
+) -> list[list[list[float]]]:
+    """Проверяет форму отверстий и возвращает канонические кольца (ADR-0026).
+
+    Отверстия бывают только у многоугольника; каждое кольцо — минимум три точки. Пределы числа
+    колец и суммы их вершин повторяют контракт: сервис вызывается не только из HTTP.
+    """
+    if not holes:
+        return []
+    if geometry_type is not GeometryType.POLYGON:
+        raise DomainError(
+            ErrorCode.VALIDATION_FAILED,
+            f"Отверстия бывают только у многоугольника, а не у «{geometry_type.value}»",
+        )
+    if len(holes) > MAX_POLYGON_HOLES:
+        raise DomainError(
+            ErrorCode.VALIDATION_FAILED,
+            f"Слишком много отверстий: {len(holes)}, предел {MAX_POLYGON_HOLES}",
+        )
+    total = sum(len(ring) for ring in holes)
+    if total > MAX_HOLE_POINTS_TOTAL:
+        raise DomainError(
+            ErrorCode.VALIDATION_FAILED,
+            f"В отверстиях {total} вершин, предел суммы {MAX_HOLE_POINTS_TOTAL}",
+        )
+
+    canonical: list[list[list[float]]] = []
+    for number, ring in enumerate(holes, start=1):
+        if len(ring) < MIN_POINTS_BY_GEOMETRY[GeometryType.POLYGON]:
+            raise DomainError(
+                ErrorCode.VALIDATION_FAILED,
+                f"Отверстие {number}: нужно минимум 3 точки, передано {len(ring)}",
+            )
+        canonical.append(_canonical_ring(ring, f"Отверстие {number}. "))
     return canonical
+
+
+def validate_geometry(
+    geometry_type: GeometryType,
+    points: list[list[float]],
+    holes: list[list[list[float]]] | None = None,
+) -> tuple[list[list[float]], list[list[list[float]]]]:
+    """Форма и, для многоугольника, топология: годится ли фигура для величины (ADR-0026).
+
+    Недействительный многоугольник отвергается кодом `GEOMETRY_INVALID` с уточнением, что и где
+    не так. Геометрия не чинится: убранная молча вершина дала бы площадь другой фигуры.
+    """
+    outer = validate_points(geometry_type, points)
+    inner = validate_holes(geometry_type, holes or [])
+    if geometry_type is GeometryType.POLYGON:
+        issue = validate_polygon(outer, inner)
+        if issue is not None:
+            raise DomainError(ErrorCode.GEOMETRY_INVALID, issue.message, issue=issue.as_payload())
+    return outer, inner
 
 
 # --------------------------------------------------------------------------- строки
@@ -227,6 +291,7 @@ async def create_measurement(
     item: TakeoffItem,
     sheet: Sheet,
     points: list[list[float]],
+    holes: list[list[list[float]]] | None = None,
     calibration: ScaleCalibration | None = None,
     created_by: uuid.UUID | None = None,
 ) -> Measurement:
@@ -253,13 +318,14 @@ async def create_measurement(
     if calibration is not None and calibration.sheet_id != sheet.id:
         raise DomainError(ErrorCode.VALIDATION_FAILED, "Калибровка относится к другому листу")
 
-    canonical = validate_points(item.geometry_type, points)
+    canonical, inner = validate_geometry(item.geometry_type, points, holes)
 
     measurement = Measurement(
         takeoff_item_id=item.id,
         sheet_id=sheet.id,
         geometry_type=item.geometry_type,
         points=canonical,
+        holes=inner,
         source=MeasurementSource.MANUAL,
         scale_calibration_id=calibration.id if calibration is not None else None,
         version=1,
@@ -278,12 +344,16 @@ async def update_geometry(
     measurement: Measurement,
     points: list[list[float]],
     expected_version: int,
+    holes: list[list[list[float]]] | None = None,
     actor: uuid.UUID | None = None,
 ) -> Measurement:
     """Меняет геометрию с проверкой версии.
 
     Двое, тянущие одну вершину, должны получить понятный конфликт, а не молча затереть
     работу друг друга.
+
+    `holes=None` — отверстия прежние: перетаскивание вершины внешнего контура не должно их
+    терять. Новый контур проверяется вместе с ними — отверстие могло оказаться снаружи.
     """
     if measurement.deleted_at is not None:
         raise DomainError(ErrorCode.VALIDATION_FAILED, "Измерение удалено")
@@ -295,7 +365,13 @@ async def update_geometry(
             f" а ожидалась {expected_version}",
         )
 
-    measurement.points = validate_points(measurement.geometry_type, points)
+    outer, inner = validate_geometry(
+        measurement.geometry_type,
+        points,
+        measurement.holes if holes is None else holes,
+    )
+    measurement.points = outer
+    measurement.holes = inner
     measurement.version += 1
     measurement.updated_by = actor
     await session.flush()
@@ -449,7 +525,7 @@ async def create_measurements_batch(
     # результат, если следующая точка негодная, — а обработчик DomainError не всегда
     # откатывает сессию до ответа клиенту.
     for points in batch:
-        validate_points(item.geometry_type, points)
+        validate_geometry(item.geometry_type, points)
 
     created: list[Measurement] = []
     for points in batch:
@@ -466,13 +542,17 @@ async def create_measurements_batch(
     return created
 
 
-def geometry_digest(points: list[list[float]]) -> str:
+def geometry_digest(points: list[list[float]], holes: list[list[list[float]]] | None = None) -> str:
     """Короткий отпечаток геометрии для журнала.
 
     В журнал не кладётся массив из тысяч координат: он раздул бы записи и ничего бы не
     объяснил. Отпечатка и числа точек хватает, чтобы понять, менялась ли геометрия.
+
+    Отверстия дописываются только когда они есть: отпечаток фигуры без отверстий прежний.
     """
     payload = ";".join(f"{x!r},{y!r}" for x, y in points)
+    for ring in holes or []:
+        payload += "|" + ";".join(f"{x!r},{y!r}" for x, y in ring)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 

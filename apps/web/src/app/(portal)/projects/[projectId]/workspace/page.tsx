@@ -38,6 +38,7 @@ import {
 import { ToolButton, ToolDivider, ToolField } from '@/components/workspace/Toolbar';
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { errorMessage } from '@/lib/errors';
+import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
 import { REGIONS_FORMS, blockType, countOf } from '@/lib/format';
 import {
   useContentUrl,
@@ -194,6 +195,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
         id: row.id,
         geometryType: row.geometry_type,
         points: row.points.map(([x, y]) => ({ x: x ?? 0, y: y ?? 0 })),
+        holes: (row.holes ?? []).map((ring) => ring.map(([x, y]) => ({ x: x ?? 0, y: y ?? 0 }))),
         colorKey: items.find((item) => item.id === row.takeoff_item_id)?.color_key ?? 'accent',
       })),
     [measurements.data, items],
@@ -889,6 +891,12 @@ const describeTakeoffError = (error: unknown): string => {
       return 'Измерение изменил кто-то другой. Обновите лист и повторите правку.';
     case 'VALIDATION_FAILED':
       return 'Геометрия не подходит выбранной строке обмера.';
+    case 'GEOMETRY_INVALID': {
+      // Контур не сохранён: площади у такой фигуры нет. Сказать, что именно не так, — иначе
+      // непонятно, какую вершину двигать.
+      const issue = geometryIssueOf(error);
+      return `Контур не сохранён: ${issue ? GEOMETRY_ISSUE_LABELS[issue] : 'он не годится для площади'}.`;
+    }
     case 'PERMISSION_DENIED':
       return 'Недостаточно прав для обмера.';
     case 'NOT_FOUND':

@@ -11,16 +11,19 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.contracts.models import DataPolicy, ProviderKind
 from app.domain import (
     COORDINATES_PER_POINT,
+    MAX_HOLE_POINTS_TOTAL,
     MAX_MEASUREMENT_BATCH,
     MAX_MEASUREMENT_POINTS,
+    MAX_POLYGON_HOLES,
     ArtifactKind,
     AuditResult,
     DocumentKind,
+    GeometryIssueCode,
     GeometryStatus,
     GeometryType,
     JobScope,
@@ -75,6 +78,23 @@ MeasurementPoint = Annotated[
 MeasurementPoints = Annotated[
     list[MeasurementPoint], Field(min_length=1, max_length=MAX_MEASUREMENT_POINTS)
 ]
+
+MeasurementHoleRing = Annotated[
+    list[MeasurementPoint], Field(min_length=1, max_length=MAX_HOLE_POINTS_TOTAL)
+]
+"""Кольцо отверстия. Нижняя граница «три точки» — доменное правило сервиса, как и у контура."""
+
+MeasurementHoles = Annotated[list[MeasurementHoleRing], Field(max_length=MAX_POLYGON_HOLES)]
+"""Отверстия многоугольника (ADR-0026). Сумма вершин всех колец ограничена отдельно — валидатором
+модели: предел на кольцо её не держит."""
+
+
+def _bounded_hole_points(holes: list[list[list[float]]] | None) -> None:
+    if holes is None:
+        return
+    total = sum(len(ring) for ring in holes)
+    if total > MAX_HOLE_POINTS_TOTAL:
+        raise ValueError(f"В отверстиях {total} вершин, предел суммы {MAX_HOLE_POINTS_TOTAL}")
 
 
 class Page[ItemT](BaseModel):
@@ -605,7 +625,11 @@ class MeasurementRead(ApiModel):
     sheet_id: uuid.UUID
     geometry_type: GeometryType
     points: list[list[float]]
-    """Нормализованные точки листа: [[x, y], …] от левого верхнего угла, значения в [0, 1]."""
+    """Нормализованные точки листа: [[x, y], …] от левого верхнего угла, значения в [0, 1].
+    У многоугольника — внешний контур."""
+    holes: list[list[list[float]]] = Field(default_factory=list)
+    """Отверстия многоугольника: кольца в том же каноне, что `points` (ADR-0026). Пусто у прочих
+    типов и у многоугольника без отверстий."""
     source: MeasurementSource
     scale_calibration_id: uuid.UUID | None
     """Та калибровка, по которой посчитано, а не действующая сейчас (ADR-0018)."""
@@ -619,8 +643,15 @@ class MeasurementRead(ApiModel):
 class MeasurementCreate(BaseModel):
     takeoff_item_id: uuid.UUID
     points: MeasurementPoints
+    holes: MeasurementHoles = Field(default_factory=list)
+    """Отверстия многоугольника (ADR-0026). У прочих типов — только пустой список."""
     scale_calibration_id: uuid.UUID | None = None
     """Пусто — берётся действующая калибровка листа, если она есть."""
+
+    @model_validator(mode="after")
+    def _holes_are_bounded(self) -> MeasurementCreate:
+        _bounded_hole_points(self.holes)
+        return self
 
 
 class MeasurementBatchCreate(BaseModel):
@@ -643,7 +674,15 @@ class MeasurementUpdate(BaseModel):
     """
 
     points: MeasurementPoints
+    holes: MeasurementHoles | None = None
+    """Отверстия. Не передано — остаются прежние: клиент, тянущий вершину контура, не обязан
+    знать про отверстия, а стереть их молча было бы потерей чужой работы."""
     version: Annotated[int, Field(ge=1)]
+
+    @model_validator(mode="after")
+    def _holes_are_bounded(self) -> MeasurementUpdate:
+        _bounded_hole_points(self.holes)
+        return self
 
 
 class MeasurementQuantityRead(ApiModel):
@@ -659,7 +698,10 @@ class MeasurementQuantityRead(ApiModel):
     measurement_id: uuid.UUID
     takeoff_item_id: uuid.UUID
     state: QuantityState
-    """`ready` — величина есть. `unavailable_*` — не ноль, а отсутствие основания."""
+    """`ready` — величина есть. `unavailable_*` — не ноль, а отсутствие основания.
+    `invalid_geometry` — контур недействителен, площади у него нет."""
+    geometry_issue: GeometryIssueCode | None = None
+    """Почему контур недействителен — при `invalid_geometry`, иначе пусто (ADR-0026)."""
 
     value: Decimal | None
     unit: QuantityUnit
@@ -668,7 +710,7 @@ class MeasurementQuantityRead(ApiModel):
 
     # --- происхождение: без него величину нечем объяснить (ADR-0008) ---
     rule_key: str
-    """Правило с версией: `count.v1`, `length.v1`, `area.v1`."""
+    """Правило с версией: `count.v1`, `length.v1`, `area.v1`, `area_with_holes.v1`."""
     rule_version: str
     page_geometry_fingerprint: str | None
     scale_calibration_id: uuid.UUID | None
@@ -687,10 +729,15 @@ class TakeoffItemQuantityRead(ApiModel):
     value: Decimal
     canonical_value: Decimal
     rule_key: str
+    """Правило итога. Если в строке смешаны правила (многоугольники с отверстиями и без), —
+    их ключи через «+» по алфавиту: итог честно называет всё, чем посчитан."""
     measurement_count: int
     """Сколько измерений вошло в итог."""
     unavailable_count: int
     """Сколько не вошло: у них нет масштаба или геометрии. Нулями они не считаются."""
+    invalid_count: int = 0
+    """Сколько не вошло, потому что контур недействителен (ADR-0026). Отдельно от
+    `unavailable_count`: нет масштаба — это про лист, недействительный контур — про фигуру."""
 
 
 class SheetQuantitiesRead(ApiModel):

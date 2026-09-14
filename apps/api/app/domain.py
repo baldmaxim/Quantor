@@ -272,6 +272,25 @@ class QuantityState(StrEnum):
     READY = "ready"
     UNAVAILABLE_NO_SCALE = "unavailable_no_scale"
     UNAVAILABLE_NO_GEOMETRY = "unavailable_no_geometry"
+    # Контур недействителен: самопересечение, нулевое ребро, отверстие вне контура (ADR-0026).
+    # Не ноль и не «нет масштаба»: величина есть у правильной фигуры, а эта фигура неправильна.
+    INVALID_GEOMETRY = "invalid_geometry"
+
+
+class GeometryIssueCode(StrEnum):
+    """Почему контур не годится для площади (ADR-0026).
+
+    Коды стабильны: по ним объясняет интерфейс и по ним же проверяются тесты.
+    """
+
+    TOO_FEW_VERTICES = "too_few_vertices"
+    DUPLICATE_VERTEX = "duplicate_vertex"
+    DEGENERATE_RING = "degenerate_ring"
+    SELF_INTERSECTION = "self_intersection"
+    RING_INTERSECTION = "ring_intersection"
+    HOLE_OUTSIDE_OUTER = "hole_outside_outer"
+    HOLE_INSIDE_HOLE = "hole_inside_hole"
+    TOO_COMPLEX = "too_complex"
 
 
 # Верхние границы геометрии. Живут здесь, а не в сервисе, потому что граница API обязана
@@ -282,6 +301,10 @@ class QuantityState(StrEnum):
 # а не тысячи; счётные метки ставят десятками за подход.
 MAX_MEASUREMENT_POINTS = 10_000
 MAX_MEASUREMENT_BATCH = 200
+# Отверстия многоугольника (ADR-0026). Предел числа колец и **суммы** их вершин: без второго
+# двести отверстий по десять тысяч вершин прошли бы каждое своё ограничение.
+MAX_POLYGON_HOLES = 200
+MAX_HOLE_POINTS_TOTAL = 10_000
 # Пара координат — ровно две. Без этого предела одна «точка» из миллиона чисел пролезла бы
 # сквозь ограничение на число точек.
 COORDINATES_PER_POINT = 2

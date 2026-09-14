@@ -19,7 +19,7 @@ from app.api.v1.deps import AuthDep, SessionDep, WorkspaceDep, require, require_
 from app.auth.permissions import Permission
 from app.domain import AuditAction
 from app.errors import not_found
-from app.models import ScaleCalibration, Sheet, TakeoffItem
+from app.models import Measurement, ScaleCalibration, Sheet, TakeoffItem
 from app.schemas import (
     MeasurementBatchCreate,
     MeasurementCreate,
@@ -41,6 +41,15 @@ from app.services import takeoff as takeoff_service
 # Весь ручной обмер закрыт пилотным флагом: выключен для пространства — возможности нет и в
 # API, а не только на экране (ADR-0023).
 router = APIRouter(tags=["takeoff"], dependencies=[require_feature("takeoff.manual")])
+
+
+def _geometry_summary(measurement: Measurement) -> dict[str, int | str]:
+    """Сводка геометрии для журнала: числа вершин и отверстий и отпечаток, а не координаты."""
+    return {
+        "point_count": len(measurement.points),
+        "hole_count": len(measurement.holes),
+        "geometry_digest": takeoff_service.geometry_digest(measurement.points, measurement.holes),
+    }
 
 
 # ---------------------------------------------------------------------- строки обмера
@@ -287,6 +296,7 @@ async def create_measurement(
         item=item,
         sheet=sheet,
         points=payload.points,
+        holes=payload.holes,
         calibration=calibration,
         created_by=context.principal.user_id,
     )
@@ -300,8 +310,7 @@ async def create_measurement(
             "takeoff_item_id": str(item.id),
             "sheet_id": str(sheet.id),
             "geometry_type": measurement.geometry_type.value,
-            "point_count": len(measurement.points),
-            "geometry_digest": takeoff_service.geometry_digest(measurement.points),
+            **_geometry_summary(measurement),
         },
     )
     await session.commit()
@@ -380,15 +389,12 @@ async def update_measurement(
     if measurement is None:
         raise not_found("Измерение")
 
-    before = {
-        "version": measurement.version,
-        "point_count": len(measurement.points),
-        "geometry_digest": takeoff_service.geometry_digest(measurement.points),
-    }
+    before = {"version": measurement.version, **_geometry_summary(measurement)}
     await takeoff_service.update_geometry(
         session,
         measurement=measurement,
         points=payload.points,
+        holes=payload.holes,
         expected_version=payload.version,
         actor=context.principal.user_id,
     )
@@ -399,11 +405,7 @@ async def update_measurement(
         resource_type="measurement",
         resource_id=str(measurement.id),
         before=before,
-        after={
-            "version": measurement.version,
-            "point_count": len(measurement.points),
-            "geometry_digest": takeoff_service.geometry_digest(measurement.points),
-        },
+        after={"version": measurement.version, **_geometry_summary(measurement)},
     )
     await session.commit()
     await session.refresh(measurement)

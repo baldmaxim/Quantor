@@ -10,6 +10,7 @@
   "scripts": {
     "api-client:check": "node scripts/gen-api-client.mjs --check",
     "api-client:generate": "node scripts/gen-api-client.mjs",
+    "benchmark:geometry": "node scripts/py.mjs -m benchmarks.geometry_bench --out ../../docs/stage2b/benchmarks/05-geometry-validity.json",
     "benchmark:measurement": "node scripts/benchmark.mjs",
     "benchmark:viewer": "node scripts/benchmark-viewer.mjs",
     "build": "pnpm run api-client:generate && pnpm --filter @quantor/web build && pnpm --filter @quantor/admin build",

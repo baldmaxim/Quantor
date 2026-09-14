@@ -823,6 +823,21 @@
         "title": "FlagStateRead",
         "type": "object"
       },
+      "GeometryIssueCode": {
+        "description": "Почему контур не годится для площади (ADR-0026).\n\nКоды стабильны: по ним объясняет интерфейс и по ним же проверяются тесты.",
+        "enum": [
+          "too_few_vertices",
+          "duplicate_vertex",
+          "degenerate_ring",
+          "self_intersection",
+          "ring_intersection",
+          "hole_outside_outer",
+          "hole_inside_hole",
+          "too_complex"
+        ],
+        "title": "GeometryIssueCode",
+        "type": "string"
+      },
       "GeometryStatus": {
         "description": "Состояние извлечения канонической геометрии страниц ревизии.\n\nОтносится ко всей ревизии, а не к отдельной странице: если число страниц в PDF не\nсовпало с числом листов, доверять нельзя ни одной. Частично извлечённой геометрии не\nбывает (ADR-0016).\n\nОтдельно от `ProcessingStatus`: тот описывает импорт распознанного пакета и у обычного\nPDF навсегда остаётся `unprocessed`. Одно поле на два независимых процесса означало бы,\nчто успех одного стирает отказ другого.",
         "enum": [
@@ -1123,6 +1138,24 @@
       },
       "MeasurementCreate": {
         "properties": {
+          "holes": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "maxItems": 10000,
+              "minItems": 1,
+              "type": "array"
+            },
+            "maxItems": 200,
+            "title": "Holes",
+            "type": "array"
+          },
           "points": {
             "items": {
               "items": {
@@ -1180,6 +1213,16 @@
               }
             ],
             "title": "Canonical Value"
+          },
+          "geometry_issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeometryIssueCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "input_fingerprint": {
             "title": "Input Fingerprint",
@@ -1289,6 +1332,19 @@
           "geometry_type": {
             "$ref": "#/components/schemas/GeometryType"
           },
+          "holes": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "title": "Holes",
+            "type": "array"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1368,6 +1424,31 @@
       "MeasurementUpdate": {
         "description": "Правка геометрии с проверкой версии.\n\nВерсия обязательна: без неё старый клиент молча перетёр бы чужую правку.",
         "properties": {
+          "holes": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "type": "array"
+                  },
+                  "maxItems": 10000,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "maxItems": 200,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holes"
+          },
           "points": {
             "items": {
               "items": {
@@ -2293,7 +2374,8 @@
         "enum": [
           "ready",
           "unavailable_no_scale",
-          "unavailable_no_geometry"
+          "unavailable_no_geometry",
+          "invalid_geometry"
         ],
         "title": "QuantityState",
         "type": "string"
@@ -3300,6 +3382,11 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Canonical Value",
             "type": "string"
+          },
+          "invalid_count": {
+            "default": 0,
+            "title": "Invalid Count",
+            "type": "integer"
           },
           "measurement_count": {
             "title": "Measurement Count",

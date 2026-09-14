@@ -72,6 +72,10 @@ class ErrorCode(StrEnum):
 
     # --- ручной обмер (ADR-0019) ---
     MEASUREMENT_VERSION_CONFLICT = "MEASUREMENT_VERSION_CONFLICT"
+    # Контур не годится для площади: самопересечение, нулевое ребро, отверстие вне контура
+    # (ADR-0026). Отдельный код, а не VALIDATION_FAILED: интерфейсу нужно показать, что именно
+    # не так с фигурой, а не «данные некорректны».
+    GEOMETRY_INVALID = "GEOMETRY_INVALID"
 
     # --- инфраструктура ---
     STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
@@ -143,6 +147,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SCALE_GEOMETRY_REQUIRED: "Масштаб нельзя задать до извлечения геометрии страницы",
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: "Отрезок калибровки слишком короткий",
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: "Измерение изменено другим пользователем",
+    ErrorCode.GEOMETRY_INVALID: "Контур не годится для площади",
     ErrorCode.STORAGE_UNAVAILABLE: "Хранилище файлов недоступно",
     ErrorCode.DATABASE_UNAVAILABLE: "База данных недоступна",
     ErrorCode.CONTENT_NOT_AVAILABLE: "Файл ревизии недоступен",
@@ -215,6 +220,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.SCALE_GEOMETRY_REQUIRED: status.HTTP_409_CONFLICT,
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: status.HTTP_409_CONFLICT,
+    ErrorCode.GEOMETRY_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.CONTENT_NOT_AVAILABLE: status.HTTP_404_NOT_FOUND,
@@ -240,11 +246,22 @@ STATUS_CODES: dict[ErrorCode, int] = {
 
 
 class DomainError(Exception):
-    """Ошибка предметной области с безопасным кодом."""
+    """Ошибка предметной области с безопасным кодом.
 
-    def __init__(self, code: ErrorCode, detail: str | None = None) -> None:
+    `issue` — машиночитаемое уточнение для интерфейса: что именно и где не так. Туда кладутся
+    только коды и номера, никогда не данные запроса целиком.
+    """
+
+    def __init__(
+        self,
+        code: ErrorCode,
+        detail: str | None = None,
+        *,
+        issue: dict[str, str | int | None] | None = None,
+    ) -> None:
         self.code = code
         self.detail = detail or MESSAGES[code]
+        self.issue = issue
         super().__init__(self.detail)
 
     @property

@@ -3,6 +3,7 @@
 import type { FC, ReactNode } from 'react';
 
 import { UNIT_LABELS } from '@/components/workspace/TakeoffPanel';
+import { GEOMETRY_ISSUE_LABELS } from '@/lib/geometry-issues';
 import type {
   MeasurementQuantityRead,
   MeasurementRead,
@@ -41,6 +42,15 @@ const QuantityValue: FC<{ quantity: MeasurementQuantityRead | null; unit: string
   unit,
 }) => {
   if (!quantity) return <span className="text-muted">…</span>;
+  if (quantity.state === 'invalid_geometry') {
+    // Не ноль и не «нет масштаба»: калибровка такую фигуру не исправит, только перерисовка.
+    const issue = quantity.geometry_issue;
+    return (
+      <span className="text-danger" title={issue ? GEOMETRY_ISSUE_LABELS[issue] : undefined}>
+        контур недействителен
+      </span>
+    );
+  }
   if (quantity.state !== 'ready' || quantity.value === null) {
     return (
       <span className="text-danger">
@@ -120,6 +130,11 @@ export const MeasurementInspector: FC<IMeasurementInspectorProps> = ({
         <Field label="Вершин">
           <span className="tabular">{measurement.points.length}</span>
         </Field>
+        {(measurement.holes?.length ?? 0) > 0 && (
+          <Field label="Отверстий">
+            <span className="tabular">{measurement.holes?.length}</span>
+          </Field>
+        )}
         {quantity && (
           <Field label="Отпечаток входа">
             {/* Полный отпечаток не помещается и не читается; хвост различает записи,
@@ -128,6 +143,16 @@ export const MeasurementInspector: FC<IMeasurementInspectorProps> = ({
           </Field>
         )}
       </dl>
+
+      {quantity?.state === 'invalid_geometry' && (
+        <p role="status" className="text-micro text-danger">
+          Площади нет:{' '}
+          {quantity.geometry_issue
+            ? GEOMETRY_ISSUE_LABELS[quantity.geometry_issue]
+            : 'контур не годится для площади'}
+          . Перерисуйте контур.
+        </p>
+      )}
 
       {!scaled && needsScale && (
         <p role="status" className="text-micro text-danger">
