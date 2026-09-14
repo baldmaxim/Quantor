@@ -106,8 +106,8 @@ jobs:
 
   vision:
     name: ML-контур, датасет и лицензии
-    # Только стандартная библиотека и инструменты проверки: тяжёлые extras (torch, SAM,
-    # Transformers) здесь не ставятся, частных данных здесь нет — тесты идут на синтетике.
+    # torch — CPU-сборка той же версии, что на GPU-машине: mypy видит типы, обучение проверяется
+    # дымовым прогоном на синтетике. SAM и Transformers здесь не ставятся, частных данных нет.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -116,6 +116,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Инструменты проверки
         run: pip install pytest==9.1.1 ruff==0.16.6 mypy==2.3.1
+      - name: torch для проверки vision (CPU)
+        run: pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cpu
       - name: Лицензионный гейт по всем манифестам
         working-directory: vision
         run: python -m quantor_vision licenses-check

@@ -4,11 +4,11 @@
 vision dataset verify <сборка>      проверка сборки промта 08: хеши split/tiles/views, утечка
 vision licenses-check [--root DIR]  лицензионный гейт по всем манифестам репозитория
 vision environment                  что есть в окружении: модули, GPU, решения
-vision train ...                    промт 10/15   — малая сегментация / осевая кладки
+vision train slab --build DIR       промт 10      — малая сегментация плиты (masonry — промт 15)
 vision qwen-build-sft ...           промт 12      — SFT-наборы из видов Qwen промта 08
 vision qwen-train ...               промт 13      — SFT Qwen3-VL
 vision qwen-evaluate ...            промт 14      — прямая геометрия и Qwen→SAM
-vision evaluate ...                 промты 10–18  — метрики на frozen test
+vision evaluate slab --build --run  промт 10      — метрики на frozen test, один раз
 vision infer ...                    промт 20      — доверенный исполнитель (после PASS 18)
 vision vectorize ...                промты 16–17  — маска → вектор
 ```
@@ -23,7 +23,9 @@ import argparse
 import hashlib
 import io
 import json
+import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from quantor_vision import licenses
@@ -40,14 +42,14 @@ REPO_ROOT = VISION_ROOT.parent
 DECISIONS = VISION_ROOT / "licenses" / "decisions.json"
 
 REQUIREMENTS: dict[str, tuple[Requirement, str]] = {
-    "train": (Requirement(("torch", "torchvision"), needs_gpu=True), "промт 10 / 15"),
+    "train masonry": (Requirement(("torch", "torchvision"), needs_gpu=True), "промт 15"),
     "qwen-build-sft": (Requirement((), needs_gpu=False), "промт 12"),
     "qwen-train": (
         Requirement(("torch", "transformers", "peft", "trl"), needs_gpu=True),
         "промт 13",
     ),
     "qwen-evaluate": (Requirement(("torch", "transformers"), needs_gpu=True), "промт 14"),
-    "evaluate": (Requirement(("torch",), needs_gpu=False), "промты 10–18"),
+    "evaluate masonry": (Requirement(("torch",), needs_gpu=False), "промты 15–18"),
     "infer": (Requirement(("torch",), needs_gpu=False), "промт 20 — только после PASS промта 18"),
     "vectorize": (Requirement(("cv2",), needs_gpu=False), "промты 16–17"),
 }
@@ -124,18 +126,90 @@ def _environment(_: argparse.Namespace) -> int:
 
 
 def _pending(args: argparse.Namespace) -> int:
-    requirement, prompt = REQUIREMENTS[args.command]
+    key = args.command if args.command in REQUIREMENTS else f"{args.command} {args.task}"
+    requirement, prompt = REQUIREMENTS[key]
     reasons = blockers(requirement)
     status = "BLOCKED" if reasons else "NOT_IMPLEMENTED"
     _print(
         {
-            "command": args.command,
+            "command": key,
             "prompt": prompt,
             "status": status,
             "reasons": reasons or ["реализуется в своём промте"],
         }
     )
     return BLOCKED_EXIT
+
+
+def _inside_git_worktree(path: Path) -> Path | None:
+    current = path.resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _runs_root(value: str | None) -> Path | None:
+    if value:
+        return Path(value)
+    root = os.environ.get("QUANTOR_DATASET_ROOT")
+    return Path(root) / "runs" if root else None
+
+
+def _blocked(command: str, reasons: list[str]) -> int:
+    _print({"command": command, "status": "BLOCKED", "reasons": reasons})
+    return BLOCKED_EXIT
+
+
+def _train_slab(args: argparse.Namespace) -> int:
+    reasons = blockers(Requirement(("torch",), needs_gpu=False))
+    if not args.allow_cpu and not nvidia_gpus():
+        reasons.append("нет NVIDIA GPU; дымовой прогон на CPU — только с --allow-cpu")
+    runs = _runs_root(args.runs)
+    if runs is None:
+        reasons.append("не задан --runs и нет QUANTOR_DATASET_ROOT")
+    elif _inside_git_worktree(runs) is not None and not args.allow_inside_repo:
+        reasons.append(f"{runs} внутри git-репозитория: веса и прогнозы туда не пишутся")
+    if reasons or runs is None:
+        return _blocked("train slab", reasons)
+
+    from quantor_vision.slab.train import TrainConfig, train
+
+    run_id = args.run_id or "slab-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    config = TrainConfig(
+        run_id=run_id,
+        seed=args.seed,
+        epochs=args.epochs,
+        patience=args.patience,
+        batch_size=args.batch_size,
+        learning_rate=args.lr,
+        base_width=args.base,
+        amp=args.amp,
+        limit_tiles=args.limit_tiles,
+        device=args.device,
+    )
+    run_dir = train(Path(args.build), runs, config)
+    metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+    _print({"run_dir": str(run_dir), "val": metrics["val"], "best_epoch": metrics["best_epoch"]})
+    return 0
+
+
+def _evaluate_slab(args: argparse.Namespace) -> int:
+    reasons = blockers(Requirement(("torch",), needs_gpu=False))
+    if reasons:
+        return _blocked("evaluate slab", reasons)
+
+    from quantor_vision.slab.train import evaluate
+
+    try:
+        result = evaluate(
+            Path(args.build), Path(args.run), split=args.split, device_choice=args.device
+        )
+    except ValueError as error:
+        _print({"command": "evaluate slab", "status": "REFUSED", "reason": str(error)})
+        return 2
+    _print(result)
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -156,7 +230,45 @@ def build_parser() -> argparse.ArgumentParser:
         handler=_environment
     )
 
+    trainer = commands.add_parser("train", help="обучение: slab — промт 10, masonry — промт 15")
+    train_tasks = trainer.add_subparsers(dest="task", required=True)
+    slab = train_tasks.add_parser("slab", help="малый U-Net плиты на сборке промта 08")
+    slab.add_argument("--build", required=True)
+    slab.add_argument("--runs", help="каталог прогонов; по умолчанию $QUANTOR_DATASET_ROOT/runs")
+    slab.add_argument("--run-id")
+    slab.add_argument("--seed", type=int, default=20260914)
+    slab.add_argument("--epochs", type=int, default=60)
+    slab.add_argument("--patience", type=int, default=10)
+    slab.add_argument("--batch-size", type=int, default=4)
+    slab.add_argument("--lr", type=float, default=2e-3)
+    slab.add_argument("--base", type=int, default=16)
+    slab.add_argument("--amp", choices=("bf16", "off"), default="bf16")
+    slab.add_argument(
+        "--limit-tiles", type=int, default=0, help="дымовой прогон: N тайлов на часть"
+    )
+    slab.add_argument("--device", default="auto")
+    slab.add_argument("--allow-cpu", action="store_true", help="разрешить обучение без GPU")
+    slab.add_argument("--allow-inside-repo", action="store_true", help="только для тестов")
+    slab.set_defaults(handler=_train_slab)
+    train_tasks.add_parser("masonry", help="промт 15").set_defaults(
+        handler=_pending, accepts_unknown=True
+    )
+
+    evaluator = commands.add_parser("evaluate", help="оценка на замороженной части")
+    evaluate_tasks = evaluator.add_subparsers(dest="task", required=True)
+    slab_eval = evaluate_tasks.add_parser("slab", help="метрики маски плиты и площади листа")
+    slab_eval.add_argument("--build", required=True)
+    slab_eval.add_argument("--run", required=True)
+    slab_eval.add_argument("--split", choices=("val", "test"), default="test")
+    slab_eval.add_argument("--device", default="auto")
+    slab_eval.set_defaults(handler=_evaluate_slab)
+    evaluate_tasks.add_parser("masonry", help="промты 15–18").set_defaults(
+        handler=_pending, accepts_unknown=True
+    )
+
     for name in REQUIREMENTS:
+        if " " in name:
+            continue
         pending = commands.add_parser(name, help=f"{REQUIREMENTS[name][1]}")
         pending.set_defaults(handler=_pending, accepts_unknown=True)
     return parser

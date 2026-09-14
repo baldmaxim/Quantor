@@ -182,13 +182,14 @@ cd vision
 
 Команды обучения появятся по промтам:
 
-| Промт | Команда (будет)           | Окружение       | Что пришлёте                           |
-| ----- | ------------------------- | --------------- | -------------------------------------- |
-| 10    | `vision train slab …`     | `.venv-train`   | `run.json`, `metrics.json`, хвост лога |
-| 11    | `vision evaluate sam …`   | `.venv-train`   | то же                                  |
-| 12    | `vision qwen-build-sft …` | любое           | счётчики набора                        |
-| 13    | `vision qwen-train …`     | Unsloth         | `run.json`, `metrics.json`             |
-| 14    | `vision qwen-evaluate …`  | Unsloth / train | `metrics.json`                         |
+| Промт | Команда (будет)                                                               | Окружение       | Что пришлёте                           |
+| ----- | ----------------------------------------------------------------------------- | --------------- | -------------------------------------- |
+| 10    | `vision train slab` — **готово**, шаги в [10, § 6](10-slab-small-baseline.md) | `.venv-train`   | `run.json`, `metrics.json`, хвост лога |
+| 10    | `vision evaluate slab` — test один раз                                        | `.venv-train`   | `test-metrics.json`                    |
+| 11    | `vision evaluate sam …`                                                       | `.venv-train`   | то же                                  |
+| 12    | `vision qwen-build-sft …`                                                     | любое           | счётчики набора                        |
+| 13    | `vision qwen-train …`                                                         | Unsloth         | `run.json`, `metrics.json`             |
+| 14    | `vision qwen-evaluate …`                                                      | Unsloth / train | `metrics.json`                         |
 
 Каждая команда пишет результаты в `$env:QUANTOR_DATASET_ROOT\runs\<run_id>\` — вне репозитория.
 
