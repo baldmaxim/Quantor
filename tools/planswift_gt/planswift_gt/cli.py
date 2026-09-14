@@ -22,7 +22,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from planswift_gt import FORMAT, card, qa
+from planswift_gt import FORMAT, buildconfig, card, qa
+from planswift_gt import build as dataset_build
 from planswift_gt.archive import ArchiveRejectedError, extract
 from planswift_gt.manifest import (
     compare_expectations,
@@ -33,6 +34,7 @@ from planswift_gt.manifest import (
     write,
 )
 from planswift_gt.parser import ProjectRejectedError, parse_project
+from planswift_gt.splits import SplitFrozenError
 
 DATASET_ROOT_ENV = "QUANTOR_DATASET_ROOT"
 
@@ -140,6 +142,23 @@ def _qa(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build(args: argparse.Namespace) -> int:
+    out = Path(args.out)
+    repo = _inside_git_worktree(out)
+    if repo is not None and not args.allow_inside_repo:
+        sys.stderr.write(f"{out} внутри git-репозитория {repo}: тайлы чертежей туда не пишутся\n")
+        return 2
+    try:
+        config = buildconfig.load(Path(args.config))
+        manifest = dataset_build.build(config, out, refreeze=args.refreeze)
+    except (buildconfig.ConfigError, SplitFrozenError) as error:
+        sys.stderr.write(f"{error}\n")
+        return 2
+    _print(manifest)
+    leakage = manifest.get("leakage")
+    return 0 if isinstance(leakage, dict) and all(leakage.values()) else 1
+
+
 def _card(args: argparse.Namespace) -> int:
     text = card.build(
         Path(args.dataset), qa_report=Path(args.qa_report) if args.qa_report else None
@@ -210,6 +229,13 @@ def build_parser() -> argparse.ArgumentParser:
     review.add_argument("--max-side", type=int, default=2400)
     review.add_argument("--allow-inside-repo", action="store_true", help="только для синтетики")
     review.set_defaults(handler=_qa)
+
+    assemble = commands.add_parser("build", help="тайлы, цели, замороженное разбиение, виды Qwen")
+    assemble.add_argument("config")
+    assemble.add_argument("--out", required=True)
+    assemble.add_argument("--refreeze", action="store_true", help="пересобрать разбиение явно")
+    assemble.add_argument("--allow-inside-repo", action="store_true", help="только для синтетики")
+    assemble.set_defaults(handler=_build)
 
     describe = commands.add_parser("card", help="карточка датасета без изображений")
     describe.add_argument("dataset")

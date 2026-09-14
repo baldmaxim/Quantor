@@ -216,6 +216,47 @@ def downscale(raster: TiffRaster, *, max_side: int) -> Gray:
     return Gray(out_width, out_height, step, b"".join(rows))
 
 
+def working_page(raster: TiffRaster, downsample: int) -> Gray:
+    """Рабочий растр датасета: целый шаг уменьшения, пиксель — самый тёмный из отсчётов блока.
+
+    Держится в памяти одна рабочая копия листа (при шаге 2 это четверть исходных пикселей по байту),
+    а не полный растр; тайлы — срезы этой копии.
+    """
+    step = max(1, downsample)
+    width = raster.width // step
+    height = raster.height // step
+    half = step // 2
+    rows: list[bytes] = []
+    for out_y in range(height):
+        y = out_y * step
+        darkest = bytes((255,)) * width
+        for line in (raster.row(y), raster.row(y + half)) if half else (raster.row(y),):
+            a = line[0::step][:width]
+            b = line[half::step][:width] if half else a
+            darkest = bytes(map(min, darkest, map(min, a, b)))
+        rows.append(darkest)
+    return Gray(width, height, step, b"".join(rows))
+
+
+def write_png_gray(path: Path, width: int, height: int, pixels: bytes | bytearray) -> None:
+    """Полутоновый PNG 8 бит — тайлы и маски."""
+    raw = b"".join(b"\0" + bytes(pixels[y * width : (y + 1) * width]) for y in range(height))
+    _write_chunks(path, struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0), raw)
+
+
+def _write_chunks(path: Path, header: bytes, raw: bytes) -> None:
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        crc = zlib.crc32(kind + body) & 0xFFFFFFFF
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", crc)
+
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(raw, 6))
+        + chunk(b"IEND", b"")
+    )
+
+
 def write_png(path: Path, width: int, height: int, rgb: bytes | bytearray) -> None:
     """RGB 8 бит. Без метаданных времени: одинаковый вход — одинаковые байты."""
     stride = width * 3

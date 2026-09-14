@@ -1,0 +1,41 @@
+{
+  "_note": "Пример без частных путей: ${QUANTOR_DATASET_ROOT} раскрывается на машине с данными. Разбиение зависит от seed, датасетов, долей, порога pHash и downsample; смена размера тайла его не меняет.",
+  "build_id": "planswift-build-v1",
+  "seed": 20260914,
+  "datasets": [
+    {
+      "project_key": "mosfilm31a",
+      "dataset_dir": "${QUANTOR_DATASET_ROOT}/planswift-gt-v1/mosfilm31a",
+      "source_root": "${QUANTOR_DATASET_ROOT}/raw/mosfilm31a",
+      "tasks": ["slab"]
+    },
+    {
+      "project_key": "stories_masonry",
+      "dataset_dir": "${QUANTOR_DATASET_ROOT}/planswift-gt-v1/stories_masonry",
+      "source_root": "${QUANTOR_DATASET_ROOT}/raw/stories_masonry",
+      "tasks": ["masonry"]
+    }
+  ],
+  "downsample": 2,
+  "tile_px": 1024,
+  "overlap_px": 128,
+  "pad_value": 255,
+  "targets": {
+    "slab": { "kinds": ["polygon"], "labels": [], "min_positive_fraction": 0.001 },
+    "masonry": {
+      "kinds": ["polyline"],
+      "labels": [],
+      "min_positive_fraction": 0.0005,
+      "radius_px": 6
+    }
+  },
+  "train_negative_ratio": 0.3,
+  "hard_negative_ink_fraction": 0.02,
+  "train_positive_crops_per_page": 8,
+  "split_fractions": { "train": 0.7, "val": 0.15, "test": 0.15 },
+  "phash_hamming_threshold": 10,
+  "qwen_coordinate_range": 1000,
+  "qwen_polygon_max_vertices": 64,
+  "qwen_simplify_tolerance_px": 2.0,
+  "qwen_masonry_guide_points": 8
+}
