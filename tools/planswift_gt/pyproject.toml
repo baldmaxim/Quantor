@@ -1,0 +1,29 @@
+[project]
+name = "planswift-gt"
+version = "1.0.0"
+description = "Офлайн-импорт частной разметки PlanSwift в ground truth planswift-gt-v1 (Stage 2B, промт 06)"
+requires-python = ">=3.12"
+# Намеренно без зависимостей: только стандартная библиотека. Импортёр запускается на выделенной
+# машине с частными данными, и каждая зависимость — лишняя поверхность для недоверенных архивов.
+dependencies = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "S"]
+# Документация и комментарии на русском: кириллица не «неоднозначный символ».
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+# 7z вызывается списком аргументов без оболочки; путь к исполняемому берётся из PATH намеренно.
+"planswift_gt/archive.py" = ["S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

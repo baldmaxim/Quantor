@@ -52,6 +52,21 @@ _prompts/stage2b_ai_geometry_qwen/fixtures/**
 !_prompts/stage2b_ai_geometry_qwen/fixtures/README.md
 !_prompts/stage2b_ai_geometry_qwen/fixtures/**/.gitkeep
 
+# Stage 2B: частные данные PlanSwift, растры, датасеты и веса в git не попадают никогда.
+# Правила только защищают — пользовательские файлы не удаляются. Dataset root лучше держать
+# вне репозитория (QUANTOR_DATASET_ROOT), но и случайно положенное сюда не уйдёт в коммит.
+*.7z
+*.pst2
+*.tif
+*.tiff
+/datasets/
+/dataset-root/
+/private/
+/planswift*/
+/vision/data/
+/vision/runs/
+/vision/weights/
+
 # --- OS / IDE ---
 .DS_Store
 Thumbs.db

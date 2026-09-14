@@ -1,0 +1,11 @@
+{
+  "_note": "Ориентиры из PLANSWIFT_GROUND_TRUTH_CONTRACT.md пакета r2 (предварительный ручной разбор). Только sanity check: разбор эти числа не знает, stats сверяет и показывает расхождение.",
+  "stories_masonry": {
+    "summary:pages": { "expected": 16, "tolerance": 0 },
+    "annotations:polyline": { "expected": 2540, "tolerance": 50 }
+  },
+  "mosfilm31a": {
+    "summary:pages": { "expected": 32, "tolerance": 0 },
+    "summary:annotations": { "expected": 2903, "tolerance": 60 }
+  }
+}
