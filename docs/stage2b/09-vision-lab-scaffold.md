@@ -8,8 +8,8 @@
 - **`vision/` — отдельный Python-пакет `quantor-vision`**, не часть `apps/api`: база без
   зависимостей, тяжёлое — в extras `train`, `sam`, `qwen`, `vectorize`, каждая строка которых имеет
   решение в матрице лицензий.
-- **Единые команды** `vision dataset | train | qwen-build-sft | qwen-train | qwen-evaluate |
-evaluate | infer | vectorize`, плюс `licenses-check` и `environment`. Команды обучения и оценки
+- **Единые команды** `dataset`, `train`, `qwen-build-sft`, `qwen-train`, `qwen-evaluate`,
+  `evaluate`, `infer`, `vectorize`, плюс `licenses-check` и `environment`. Команды обучения и оценки
   пока отвечают `BLOCKED` с причинами (модулей нет, GPU нет) и кодом 3 — не делают вид, что работают.
 - **Контракт эксперимента** `run.json` со всеми полями промта; запись без метрик, с не-SHA хешем
   разбиения или с несовпадающим хешем весов не пишется.
