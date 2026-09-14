@@ -7,7 +7,7 @@
 <out>/tiles/<id>.png           тайл рабочего растра (полутон 8 бит)
 <out>/targets/slab/<id>.png    маска площади с отверстиями (0/255)
 <out>/targets/masonry/<id>.png цель осевой: 255 на линии, спад до 0 на radius_px
-<out>/views/<вид>.jsonl        qwen_slab_localization_v1, qwen_slab_polygon_v0, qwen_masonry_roi_v0
+<out>/views/<вид>.jsonl        qwen_slab_localization_v1, qwen_masonry_roi_v0
 ```
 
 Главная истина оценки — векторная разметка `planswift-gt-v1`; растровые цели — только для обучения.
@@ -36,7 +36,6 @@ from planswift_gt.geometry2d import (
     interior_point,
     phash,
     point_in_rings,
-    simplify,
 )
 from planswift_gt.raster import TiffRaster, downscale, working_page, write_png_gray
 from planswift_gt.splits import PageInfo, assign, clusters, freeze
@@ -49,12 +48,6 @@ INSTRUCTIONS = {
         "Найди на изображении фрагмента чертежа все области монолитных плит. Верни строго JSON"
         ' {"objects": [{"class": "slab", "bbox": [x0, y0, x1, y1], "seed_points": [[x, y]]}]}'
         " с целыми координатами 0..1000 относительно этого изображения. Нет плит — пустой список."
-    ),
-    "qwen_slab_polygon_v0": (
-        "Обведи на изображении фрагмента чертежа контуры монолитных плит с отверстиями."
-        ' Верни строго JSON {"polygons": [{"outer": [[x, y], ...], "holes": [[[x, y], ...]]}]}'
-        " с целыми"
-        " координатами 0..1000 относительно этого изображения."
     ),
     "qwen_masonry_roi_v0": (
         "Есть ли на изображении фрагмента чертежа стены кладки? Верни строго JSON"
@@ -166,14 +159,19 @@ def _seed(
     return None
 
 
-def slab_views(
-    shapes: PageShapes, t: TileTransform, config: BuildConfig
-) -> tuple[JsonObject, JsonObject | None]:
+# Виды, признанные неподдерживаемыми решением владельца: в сборку не входят, причина — в build.json.
+UNSUPPORTED_VIEWS = {
+    "qwen_slab_polygon_v0": (
+        "решение владельца 2026-09-14: прямой полигон от Qwen не поддерживается. При тайле 1024"
+        " ни один тайл не содержал все плиты целиком (0 положительных примеров), а окна по разметке"
+        " в val/test — утечка. Путь для плит — localization → SAM → mask→vector (промт 14)."
+    )
+}
+
+
+def slab_localization(shapes: PageShapes, t: TileTransform, config: BuildConfig) -> JsonObject:
     scale = config.qwen_coordinate_range
     objects: list[JsonObject] = []
-    polygons: list[JsonObject] = []
-    complete = True
-    budget = 0
     for rings in shapes.polygons:
         box = _clip_box(rings, t)
         if box is None:
@@ -186,38 +184,8 @@ def slab_views(
                 "seed_points": [list(t.to_qwen(seed[0], seed[1], scale))] if seed else [],
             }
         )
-        xs = [x - t.x0 for ring in rings for x, _ in ring]
-        ys = [y - t.y0 for ring in rings for _, y in ring]
-        inside = (
-            min(xs) >= 0 and min(ys) >= 0 and max(xs) <= t.valid_width and max(ys) <= t.valid_height
-        )
-        if not inside:
-            complete = False
-            continue
-        simplified = [
-            simplify(
-                [(x - t.x0, y - t.y0) for x, y in ring],
-                config.qwen_simplify_tolerance_px,
-                closed=True,
-            )
-            for ring in rings
-        ]
-        budget += sum(len(ring) for ring in simplified)
-        polygons.append(
-            {
-                "outer": [list(t.to_qwen(x, y, scale)) for x, y in simplified[0]],
-                "holes": [
-                    [list(t.to_qwen(x, y, scale)) for x, y in ring] for ring in simplified[1:]
-                ],
-            }
-        )
     objects.sort(key=lambda item: _dump(item["bbox"]))
-    localization: JsonObject = {"objects": objects}
-    # Полигональный вид — только когда в тайле все фигуры целиком и укладываются в бюджет вершин.
-    polygon: JsonObject | None = None
-    if complete and budget <= config.qwen_polygon_max_vertices:
-        polygon = {"polygons": polygons}
-    return localization, polygon
+    return {"objects": objects}
 
 
 def masonry_view(shapes: PageShapes, t: TileTransform, config: BuildConfig) -> JsonObject:
@@ -354,6 +322,7 @@ def build(config: BuildConfig, out: Path, *, refreeze: bool = False) -> JsonObje
         "counters": dict(sorted(counters.items())),
         "tiles_sha256": hashlib.sha256((out / "tiles.jsonl").read_bytes()).hexdigest(),
         "views_sha256": view_hashes,
+        "unsupported_views": UNSUPPORTED_VIEWS,
         "leakage": leakage_report(out),
     }
     (out / "build.json").write_text(
@@ -511,7 +480,7 @@ def _build_dataset(
                 "crop_policy": policy,
             }
             if "slab" in dataset.tasks:
-                localization, polygon = slab_views(shapes, t, config)
+                localization = slab_localization(shapes, t, config)
                 views["qwen_slab_localization_v1"].append(
                     _dump(
                         {
@@ -522,19 +491,6 @@ def _build_dataset(
                         }
                     )
                 )
-                if polygon is not None:
-                    views["qwen_slab_polygon_v0"].append(
-                        _dump(
-                            {
-                                **base,
-                                "view": "qwen_slab_polygon_v0",
-                                "instruction": INSTRUCTIONS["qwen_slab_polygon_v0"],
-                                "target": _dump(polygon),
-                            }
-                        )
-                    )
-                else:
-                    counters["qwen_slab_polygon_v0:skipped_tiles"] += 1
             if "masonry" in dataset.tasks:
                 views["qwen_masonry_roi_v0"].append(
                     _dump(

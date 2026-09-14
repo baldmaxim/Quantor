@@ -271,7 +271,7 @@ class TestBuild:
     ) -> None:
         dataset, source = converted
         out = tmp_path / "build"
-        dataset_build.build(_config(dataset, source, tile_px=1024, overlap_px=0), out)
+        manifest = dataset_build.build(_config(dataset, source, tile_px=1024, overlap_px=0), out)
 
         rows = [
             json.loads(line)
@@ -291,18 +291,6 @@ class TestBuild:
         ]
         seed = target["objects"][0]["seed_points"][0]
         assert not (195 <= seed[0] <= 293 and 195 <= seed[1] <= 293)  # не в отверстии
-        polygon = [
-            json.loads(line)
-            for line in (out / "views" / "qwen_slab_polygon_v0.jsonl")
-            .read_text(encoding="utf-8")
-            .splitlines()
-        ]
-        assert json.loads(polygon[0]["target"])["polygons"][0]["holes"][0] == [
-            [195, 195],
-            [293, 195],
-            [293, 293],
-            [195, 293],
-        ]
         masonry = [
             json.loads(line)
             for line in (out / "views" / "qwen_masonry_roi_v0.jsonl")
@@ -311,6 +299,10 @@ class TestBuild:
         ]
         assert json.loads(masonry[0]["target"])["contains_masonry"] is True
         assert rows[0]["instruction"] == dataset_build.INSTRUCTIONS["qwen_slab_localization_v1"]
+        # Прямой полигон — неподдерживаемый вид: не собирается, причина записана.
+        assert not (out / "views" / "qwen_slab_polygon_v0.jsonl").exists()
+        unsupported = manifest["unsupported_views"]
+        assert isinstance(unsupported, dict) and "qwen_slab_polygon_v0" in unsupported
 
     def test_rebuild_is_identical_and_split_change_needs_refreeze(
         self, converted: tuple[Path, Path], tmp_path: Path

@@ -77,16 +77,17 @@
     },
     "unsloth": {
       "spdx": "Apache-2.0 для пакета; внутри wheel — AGPL-3.0 файлы",
-      "decision": "blocked",
-      "scope": "обучение Qwen (промты 12–13)",
+      "decision": "conditional",
+      "scope": "vision[qwen-unsloth], промты 12–13",
       "evidence": "wheel unsloth-2026.9.4 sha256:7892ac14733ba22200ef4a228ac26e06275562c5f72b96a654605d4dcbd05264: 1364 файла studio/ (studio/LICENSE.AGPL-3.0), unsloth/kernels/moe/LICENSE — AGPL-3.0, dist-info/licenses/COPYING — AGPL-3.0; README: dual license Apache-2.0 / AGPL-3.0",
-      "condition": "решение владельца: AGPL-файлы ставятся в окружение даже без запуска Studio; до решения — transformers + peft + trl"
+      "condition": "решение владельца 2026-09-14: разрешено только в локальном окружении обучения на GPU-машине владельца; не в apps/api и не в производственном образе; окружение и образ с файлами Unsloth не распространяются; Unsloth Studio не запускается и не встраивается; выходной checkpoint сохраняется стандартным safetensors/PEFT и загружается без Unsloth; версии unsloth и unsloth-zoo с SHA-256 wheel записываются в run.json каждого прогона"
     },
     "unsloth-zoo": {
-      "spdx": "не проверен",
-      "decision": "blocked",
+      "spdx": "LGPL-3.0-or-later для пакета; 41 файл .py с заголовком AGPL-3.0, COPYING — AGPL-3.0",
+      "decision": "conditional",
       "scope": "зависимость unsloth",
-      "evidence": "не аудирован — следует за решением по unsloth"
+      "evidence": "wheel unsloth_zoo-2026.9.3 sha256:d846a0cdf343ff4ca79a01806e45249362b4ad107442d3c68d32cee3527d350c: dist-info/licenses/LICENSE — LGPL-3.0, dist-info/licenses/COPYING — AGPL-3.0; 61 файл с заголовком LGPL, 41 — AGPL (dataset_num_proc.py, device_map_planner.py, …)",
+      "condition": "те же условия, что у unsloth"
     },
     "ultralytics": {
       "spdx": "AGPL-3.0",

@@ -13,8 +13,10 @@ dependencies = []
 train = ["torch", "torchvision"]
 # Промт 11: SAM 2 / MobileSAM.
 sam = ["sam2", "mobile-sam"]
-# Промты 12–14: Qwen3-VL SFT без Unsloth, пока по нему нет решения владельца.
+# Промты 12–14: Qwen3-VL SFT на Apache-стеке — и как запасной путь, и для инференса без Unsloth.
 qwen = ["transformers", "peft", "trl"]
+# Промты 12–13 на Unsloth: только локальное окружение обучения, условия — licenses/decisions.json.
+qwen-unsloth = ["unsloth", "unsloth-zoo", "transformers", "peft", "trl"]
 # Промты 16–17: маска → вектор.
 vectorize = ["opencv-python-headless"]
 

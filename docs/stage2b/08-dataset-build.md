@@ -120,6 +120,10 @@ Stories: 11 листов — один кластер типовых этажей
 | `instructions_without_counts` | true      |
 | `tile_filenames_opaque`       | true      |
 
+> **Обновление 2026-09-14.** По решению владельца (Р-1, [журнал](owner-decisions.md))
+> `qwen_slab_polygon_v0` — неподдерживаемый вид: сборщик его больше не пишет, причина — в
+> `build.json → unsupported_views`. Цифры ниже — из сборки до решения.
+
 ## 5. Виды для Qwen — тот же разбиение, без второго split
 
 Строка вида: `tile_id`, `split`, путь и SHA-256 изображения, размер, `coordinate_range: 1000`,

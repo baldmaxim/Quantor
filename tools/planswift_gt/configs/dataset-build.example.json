@@ -35,7 +35,5 @@
   "split_fractions": { "train": 0.7, "val": 0.15, "test": 0.15 },
   "phash_hamming_threshold": 10,
   "qwen_coordinate_range": 1000,
-  "qwen_polygon_max_vertices": 64,
-  "qwen_simplify_tolerance_px": 2.0,
   "qwen_masonry_guide_points": 8
 }

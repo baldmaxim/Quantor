@@ -16,6 +16,7 @@ git-репозитория инструмент отказывается: час
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import sys
@@ -250,7 +251,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _utf8_output() -> None:
+    """Отчёты — JSON в UTF-8. Консоль Windows в cp1251 падала на «→» в причинах."""
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_output()
     args = build_parser().parse_args(argv)
     try:
         code: int = args.handler(args)

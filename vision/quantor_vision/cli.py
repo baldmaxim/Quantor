@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import sys
 from pathlib import Path
@@ -162,6 +163,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Отчёты — JSON в UTF-8: консоль Windows в cp1251 не выводит часть символов причин.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
     parser = build_parser()
     # Аргументы будущих команд обучения ещё не описаны: сейчас они принимаются и игнорируются,
     # а команда честно отвечает BLOCKED. Остальным командам лишние аргументы — ошибка.

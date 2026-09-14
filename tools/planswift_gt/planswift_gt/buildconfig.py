@@ -57,8 +57,6 @@ class BuildConfig:
     )
     phash_hamming_threshold: int = 10
     qwen_coordinate_range: int = 1000
-    qwen_polygon_max_vertices: int = 64
-    qwen_simplify_tolerance_px: float = 2.0
     qwen_masonry_guide_points: int = 8
 
     def fingerprint(self) -> str:

@@ -15,22 +15,22 @@
 
 ## Пакеты
 
-| Пакет                         | SPDX                                                                               | Решение        | Где                 | Доказательство (SHA-256 файла лицензии или источник)                                 |
-| ----------------------------- | ---------------------------------------------------------------------------------- | -------------- | ------------------- | ------------------------------------------------------------------------------------ |
-| `torch`                       | BSD-3-Clause; дистрибутив PyPI 2.14.0 — Apache-2.0 AND BSD-2/3 AND MIT AND BSL-1.0 | allow          | `vision[train]`     | pytorch/LICENSE `bd018fee…0e43`                                                      |
-| `torchvision`                 | BSD-3-Clause                                                                       | allow          | `vision[train]`     | vision/LICENSE `6502f676…e71d`                                                       |
-| `opencv-python-headless`      | Apache-2.0                                                                         | allow + notice | `vision[vectorize]` | opencv/LICENSE `cfc7749b…3d30`; PyPI 5.0.0.93                                        |
-| `sam2`                        | Apache-2.0                                                                         | allow + notice | `vision[sam]`       | sam2/LICENSE `c71d239d…0ab4`                                                         |
-| `mobile-sam`                  | Apache-2.0                                                                         | allow + notice | `vision[sam]`       | MobileSAM/LICENSE `c71d239d…0ab4`                                                    |
-| `transformers`                | Apache-2.0                                                                         | allow          | `vision[qwen]`      | transformers/LICENSE `77fd4710…2049`                                                 |
-| `peft`                        | Apache-2.0                                                                         | allow          | `vision[qwen]`      | peft/LICENSE `c71d239d…0ab4`                                                         |
-| `trl`                         | Apache-2.0                                                                         | allow          | `vision[qwen]`      | trl/LICENSE `1bf614b1…8998`                                                          |
-| `pypdfium2`                   | BSD-3-Clause OR Apache-2.0 + bundled PDFium                                        | conditional    | промт 20            | PyPI 5.13.0; до образа — список bundled-лицензий, решение 2A пересматривает владелец |
-| `segmentation-models-pytorch` | MIT                                                                                | conditional    | не в промте 10      | smp/LICENSE `a9acb108…538c`; каждый энкодер — своя строка                            |
-| `shapely`                     | BSD-3-Clause (GEOS LGPL-2.1)                                                       | conditional    | `vision[vectorize]` | shapely/LICENSE.txt `4a207eac…f754`; в прод-образ — после ADR                        |
-| `unsloth`                     | Apache-2.0 для пакета, **AGPL-3.0 файлы внутри wheel**                             | **blocked**    | промты 12–13        | см. ниже                                                                             |
-| `unsloth-zoo`                 | не аудирован                                                                       | **blocked**    | зависимость unsloth | следует решению по unsloth                                                           |
-| `ultralytics`                 | AGPL-3.0                                                                           | **blocked**    | не используется     | ultralytics/LICENSE `0d96a4ff…abcb0`; PyPI 8.4.152                                   |
+| Пакет                         | SPDX                                                                               | Решение                                        | Где                                  | Доказательство (SHA-256 файла лицензии или источник)                                 |
+| ----------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------ |
+| `torch`                       | BSD-3-Clause; дистрибутив PyPI 2.14.0 — Apache-2.0 AND BSD-2/3 AND MIT AND BSL-1.0 | allow                                          | `vision[train]`                      | pytorch/LICENSE `bd018fee…0e43`                                                      |
+| `torchvision`                 | BSD-3-Clause                                                                       | allow                                          | `vision[train]`                      | vision/LICENSE `6502f676…e71d`                                                       |
+| `opencv-python-headless`      | Apache-2.0                                                                         | allow + notice                                 | `vision[vectorize]`                  | opencv/LICENSE `cfc7749b…3d30`; PyPI 5.0.0.93                                        |
+| `sam2`                        | Apache-2.0                                                                         | allow + notice                                 | `vision[sam]`                        | sam2/LICENSE `c71d239d…0ab4`                                                         |
+| `mobile-sam`                  | Apache-2.0                                                                         | allow + notice                                 | `vision[sam]`                        | MobileSAM/LICENSE `c71d239d…0ab4`                                                    |
+| `transformers`                | Apache-2.0                                                                         | allow                                          | `vision[qwen]`                       | transformers/LICENSE `77fd4710…2049`                                                 |
+| `peft`                        | Apache-2.0                                                                         | allow                                          | `vision[qwen]`                       | peft/LICENSE `c71d239d…0ab4`                                                         |
+| `trl`                         | Apache-2.0                                                                         | allow                                          | `vision[qwen]`                       | trl/LICENSE `1bf614b1…8998`                                                          |
+| `pypdfium2`                   | BSD-3-Clause OR Apache-2.0 + bundled PDFium                                        | conditional                                    | промт 20                             | PyPI 5.13.0; до образа — список bundled-лицензий, решение 2A пересматривает владелец |
+| `segmentation-models-pytorch` | MIT                                                                                | conditional                                    | не в промте 10                       | smp/LICENSE `a9acb108…538c`; каждый энкодер — своя строка                            |
+| `shapely`                     | BSD-3-Clause (GEOS LGPL-2.1)                                                       | conditional                                    | `vision[vectorize]`                  | shapely/LICENSE.txt `4a207eac…f754`; в прод-образ — после ADR                        |
+| `unsloth`                     | Apache-2.0 для пакета, **AGPL-3.0 файлы внутри wheel**                             | **conditional** (решение владельца 2026-09-14) | `vision[qwen-unsloth]`, промты 12–13 | см. ниже                                                                             |
+| `unsloth-zoo`                 | LGPL-3.0-or-later; 41 файл с заголовком AGPL-3.0                                   | **conditional**                                | зависимость unsloth                  | wheel 2026.9.3 `d846a0cd…350c`; COPYING — AGPL-3.0                                   |
+| `ultralytics`                 | AGPL-3.0                                                                           | **blocked**                                    | не используется                      | ultralytics/LICENSE `0d96a4ff…abcb0`; PyPI 8.4.152                                   |
 
 ## Веса
 
@@ -45,7 +45,7 @@
 
 Репозиторий QwenLM/Qwen3-VL — Apache-2.0 (`c71d239d…0ab4`).
 
-## Unsloth: почему blocked, хотя пакет объявлен Apache-2.0
+## Unsloth: AGPL внутри пакета и условия разрешения
 
 Текст пакета промтов предполагал «core Apache-2.0, AGPL — только Studio UI, его просто не встраивать».
 Аудит конкретного артефакта это не подтвердил:
@@ -59,12 +59,15 @@
   METADATA — `Apache-2.0`, то есть метаданные неполны;
 - README: «dual-licensing model of Apache 2.0 and AGPL-3.0».
 
-Для dense-моделей Qwen3-VL MoE-ядра не нужны, но файлы в окружении есть. Решение — за владельцем:
-допустимо ли окружение обучения с AGPL-файлами при условии, что оно не распространяется и Studio не
-запускается. До решения SFT Qwen планируется на `transformers + peft + trl` (все Apache-2.0).
+- `unsloth-zoo 2026.9.3` (SHA-256 `d846a0cdf343ff4ca79a01806e45249362b4ad107442d3c68d32cee3527d350c`)
+  объявлен LGPL-3.0-or-later, но `COPYING` — AGPL-3.0 и 41 файл `.py` с заголовком AGPL-3.0.
 
-Это расходится с формулировкой `CLAUDE.md` «Unsloth core в изолированном окружении обучения» — там
-разрешение дано по описанию пакета, а не по составу артефакта.
+**Решение владельца 2026-09-14** ([журнал](owner-decisions.md), Р-2): Unsloth разрешён для обучения
+в локальном окружении при условиях — не в `apps/api` и не в производственном образе; окружение и
+образы с файлами Unsloth не распространяются; Studio не запускается и не встраивается; checkpoint
+сохраняется стандартным safetensors / PEFT-адаптером и грузится без Unsloth; версии и SHA-256 wheel
+пишутся в `run.json`. `transformers + peft + trl` (Apache-2.0) остаются запасным путём и путём
+инференса. Формулировка `CLAUDE.md` обновлена под эти условия.
 
 ## Источники
 

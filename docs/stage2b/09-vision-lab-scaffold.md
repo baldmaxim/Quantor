@@ -3,6 +3,9 @@
 Дата: 2026-09-14. Граница — [ADR-0021](../adr/0021-oflajn-eksperiment-ne-proizvodstvennaya-vozmozhnost.md),
 матрица — [model-license-matrix](model-license-matrix.md). Модели в этом промте не обучались.
 
+> **Обновление 2026-09-14.** Unsloth разрешён владельцем для локального обучения с условиями
+> (Р-2, [журнал](owner-decisions.md)); в матрице — `conditional`, extra `vision[qwen-unsloth]`.
+
 ## Итог
 
 - **`vision/` — отдельный Python-пакет `quantor-vision`**, не часть `apps/api`: база без

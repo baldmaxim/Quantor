@@ -73,11 +73,13 @@ class TestLicenseGate:
 
         assert licenses.check(tmp_path, DECISIONS) == []
 
-    def test_matrix_blocks_ultralytics_and_unsloth(self) -> None:
+    def test_matrix_blocks_ultralytics_and_conditions_unsloth(self) -> None:
         decisions = licenses.load_decisions(DECISIONS)
 
         assert decisions["ultralytics"] == "blocked"
-        assert decisions["unsloth"] == "blocked"
+        # Unsloth разрешён владельцем только с условиями: локальное обучение, без распространения.
+        assert decisions["unsloth"] == "conditional"
+        assert decisions["unsloth-zoo"] == "conditional"
         assert all(name in decisions for name in ("torch", "sam2", "transformers", "peft", "trl"))
 
 

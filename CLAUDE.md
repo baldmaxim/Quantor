@@ -64,7 +64,9 @@ PlanSwift GT → малая сегментация / SAM 2 / Qwen3-VL + Unsloth 
 - частный офлайн-импорт PlanSwift и сборка датасета — вне git и вне производственного API;
 - отдельный ML-контур `vision/`: обучение, оценка, векторизация, бенчмарк ([ADR-0021](docs/adr/0021-oflajn-eksperiment-ne-proizvodstvennaya-vozmozhnost.md));
 - модели и веса только с записью в матрице лицензий: SAM 2, MobileSAM, официальные Qwen3-VL
-  2B / 4B / 8B Instruct, Unsloth core в изолированном окружении обучения;
+  2B / 4B / 8B Instruct; Unsloth — только в локальном окружении обучения на условиях решения
+  владельца от 2026-09-14 (wheel несёт AGPL-файлы: без распространения окружения, без Studio,
+  checkpoint грузится без Unsloth — [матрица лицензий](docs/stage2b/model-license-matrix.md));
 - после PASS Prompt 18 и утверждения владельцем конкретных pipeline и checkpoint — домен
   кандидатов, доверенный исполнитель инференса, проверка человеком, AI-интерфейс за флагом
   `takeoff.ai`.
