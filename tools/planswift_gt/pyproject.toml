@@ -1,6 +1,6 @@
 [project]
 name = "planswift-gt"
-version = "1.0.0"
+version = "1.1.0"
 description = "Офлайн-импорт частной разметки PlanSwift в ground truth planswift-gt-v1 (Stage 2B, промт 06)"
 requires-python = ">=3.12"
 # Намеренно без зависимостей: только стандартная библиотека. Импортёр запускается на выделенной

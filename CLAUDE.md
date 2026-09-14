@@ -29,7 +29,7 @@ pnpm db:migrate                  # alembic upgrade head
 pnpm api-client:generate         # FastAPI -> openapi.json -> TS
 pnpm benchmark:measurement       # замер точности и стоимости измерительного ядра
 pnpm benchmark:geometry          # замер валидатора многоугольника и area_with_holes.v1 (ADR-0026)
-pnpm planswift <команда>         # офлайн-импорт PlanSwift: inspect / convert / validate / stats (вне git)
+pnpm planswift <команда>         # офлайн PlanSwift: inspect / convert / validate / stats / qa / card (вне git)
 pnpm test:planswift              # ruff, mypy, pytest импортёра на синтетике
 pnpm benchmark:viewer            # замер просмотрщика: холсты, память, отрисовка, панорама (ADR-0024)
 ```

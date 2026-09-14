@@ -122,6 +122,8 @@ class ParseResult:
     annotations: list[Annotation] = field(default_factory=list)
     rejections: list[Rejection] = field(default_factory=list)
     counters: Counter[str] = field(default_factory=Counter)
+    # Каждый прочитанный XML: путь и SHA-256 — основа отпечатка источника.
+    sources: list[tuple[str, str]] = field(default_factory=list)
 
 
 def resolve_project_root(source: Path) -> Path:
@@ -153,6 +155,7 @@ def _read_node(root: Path, path: Path, result: ParseResult) -> Node | Rejection:
     raw = path.read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     result.counters["xml_files"] += 1
+    result.sources.append((relative, digest))
     try:
         decoded = decode(raw)
         element = parse_text(decoded.text)

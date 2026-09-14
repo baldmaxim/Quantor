@@ -20,6 +20,7 @@ import json
 import math
 from collections import Counter
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 
 from planswift_gt import FORMAT, TOOL_NAME, TOOL_VERSION
@@ -35,7 +36,27 @@ JsonObject = dict[str, object]
 
 
 def _dumps(value: object) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    # allow_nan=False: NaN и бесконечность в JSON не пишутся никогда — лучше отказ записи.
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+
+
+def dataset_fingerprint(files: dict[str, str]) -> str:
+    """Отпечаток датасета: формат и хеши трёх файлов. Те же данные — тот же отпечаток."""
+    lines = [FORMAT, *(f"{name} {files[name]}" for name in sorted(files))]
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def source_fingerprint(result: ParseResult) -> str:
+    """Отпечаток источника: все прочитанные XML и растры листов по пути и хешу."""
+    lines = [f"xml {path} {digest}" for path, digest in sorted(result.sources)]
+    lines += sorted(
+        f"image {page.image_path} {page.image.sha256}"
+        for page in result.pages
+        if page.image is not None
+    )
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 
 def page_record(page: Page) -> JsonObject:
@@ -155,6 +176,8 @@ def write(result: ParseResult, out_dir: Path, *, dataset_id: str, project_key: s
         "source": "planswift",
         "project_name": result.project_name,
         "files": files,
+        "dataset_fingerprint": dataset_fingerprint(files),
+        "source_fingerprint": source_fingerprint(result),
         "summary": summary(result),
     }
     (out_dir / MANIFEST).write_text(
@@ -225,6 +248,9 @@ def validate(out_dir: Path, *, source_root: Path | None = None) -> list[Problem]
             problems.append(Problem(name, "SHA-256 не совпадает с manifest.json"))
     if problems:
         return problems
+    typed_files = {str(key): str(value) for key, value in files.items()}
+    if manifest.get("dataset_fingerprint") != dataset_fingerprint(typed_files):
+        problems.append(Problem(MANIFEST, "dataset_fingerprint не соответствует файлам"))
 
     pages = {str(row.get("page_guid")): row for row in _load_jsonl(out_dir / PAGES, problems)}
     annotations = _load_jsonl(out_dir / ANNOTATIONS, problems)
@@ -257,7 +283,15 @@ def validate(out_dir: Path, *, source_root: Path | None = None) -> list[Problem]
             or image.get("height_px") != page_ref.get("height_px")
         ):
             problems.append(Problem(where, "растр листа расходится с pages.jsonl"))
+        else:
+            issue = _source_consistent(annotation, image, kind)
+            if issue is not None:
+                problems.append(Problem(where, issue))
 
+    page_of = {
+        str(_mapping(row.get("annotation")).get("id")): _mapping(row.get("page")).get("page_guid")
+        for row in annotations
+    }
     for index, row in enumerate(annotations, start=1):
         annotation = _mapping(row.get("annotation"))
         parent_id = annotation.get("parent_annotation_id")
@@ -270,9 +304,7 @@ def validate(out_dir: Path, *, source_root: Path | None = None) -> list[Problem]
             problems.append(
                 Problem(f"{ANNOTATIONS}:{index}", "отверстие без многоугольника-родителя")
             )
-        elif _mapping(row.get("page")).get("page_guid") != _parent_page(
-            annotations, str(parent_id)
-        ):
+        elif _mapping(row.get("page")).get("page_guid") != page_of.get(str(parent_id)):
             problems.append(
                 Problem(f"{ANNOTATIONS}:{index}", "отверстие на другом листе, чем родитель")
             )
@@ -290,11 +322,63 @@ def validate(out_dir: Path, *, source_root: Path | None = None) -> list[Problem]
     return problems
 
 
-def _parent_page(annotations: list[JsonObject], parent_id: str) -> object:
-    for row in annotations:
-        if _mapping(row.get("annotation")).get("id") == parent_id:
-            return _mapping(row.get("page")).get("page_guid")
+NORMALIZATION_TOLERANCE = 1e-12
+
+
+def _source_consistent(annotation: JsonObject, image: JsonObject, kind: str) -> str | None:
+    """Исходные пиксели конечны, не заглушки, внутри растра и дают записанную нормализацию."""
+    width, height = image.get("width_px"), image.get("height_px")
+    source = annotation.get("points_source_px")
+    normalized = annotation.get("points_normalized")
+    types = annotation.get("point_types")
+    if not isinstance(width, int) or not isinstance(height, int) or width <= 0 or height <= 0:
+        return "размер растра не задан"
+    if not isinstance(source, list) or not isinstance(normalized, list):
+        return "нет точек"
+    if len(source) != len(normalized) or not isinstance(types, list) or len(types) != len(source):
+        return "число исходных точек, нормализованных и типов расходится"
+    for raw, norm in zip(source, normalized, strict=True):
+        if not isinstance(raw, list) or len(raw) != 2 or not isinstance(norm, list):
+            return "точка не пара чисел"
+        x, y = raw
+        if not all(isinstance(v, int | float) and math.isfinite(v) for v in (x, y)):
+            return "исходная координата не конечна"
+        if x < 0 or y < 0:
+            return "заглушка или отрицательная координата"
+        if x > width or y > height:
+            return "исходная точка за краем растра"
+        if (
+            abs(norm[0] - x / width) > NORMALIZATION_TOLERANCE
+            or abs(norm[1] - y / height) > NORMALIZATION_TOLERANCE
+        ):
+            return "нормализация не совпадает с исходными пикселями"
+    expected_objects = len(source) if kind == "count" else 1
+    if annotation.get("object_count") != expected_objects:
+        return f"object_count {annotation.get('object_count')}, ожидается {expected_objects}"
     return None
+
+
+def findings(out_dir: Path) -> JsonObject:
+    """Замечания, не делающие датасет негодным, но видимые: дубли и повторы вершин."""
+    problems: list[Problem] = []
+    annotations = _load_jsonl(out_dir / ANNOTATIONS, problems)
+    geometry: dict[str, list[str]] = {}
+    repeated_vertices: list[str] = []
+    for row in annotations:
+        annotation = _mapping(row.get("annotation"))
+        points = annotation.get("points_source_px")
+        key = _dumps([_mapping(row.get("page")).get("page_guid"), annotation.get("kind"), points])
+        geometry.setdefault(key, []).append(str(annotation.get("id")))
+        if isinstance(points, list) and any(a == b for a, b in pairwise(points)):
+            repeated_vertices.append(str(annotation.get("id")))
+    duplicates = sorted(ids for ids in geometry.values() if len(ids) > 1)
+    return {
+        "duplicate_geometry_groups": len(duplicates),
+        "duplicate_geometry_annotations": sum(len(ids) for ids in duplicates),
+        "duplicate_geometry_examples": duplicates[:5],
+        "repeated_consecutive_vertex_annotations": len(repeated_vertices),
+        "repeated_consecutive_vertex_examples": repeated_vertices[:5],
+    }
 
 
 # ------------------------------------------------------------------------------ сводка

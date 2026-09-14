@@ -22,7 +22,7 @@ class TestParse:
         result = parse_project(project)
         found = _by_id(result)
 
-        assert set(found) == {GUIDS.linear, GUIDS.area, GUIDS.hole, GUIDS.count}
+        assert set(found) == {GUIDS.linear, GUIDS.duplicate, GUIDS.area, GUIDS.hole, GUIDS.count}
         assert found[GUIDS.linear].kind == "polyline"
         assert found[GUIDS.area].kind == "polygon"
         assert found[GUIDS.hole].kind == "polygon_hole"
@@ -109,7 +109,7 @@ class TestFormat:
             "count": 1,
             "polygon": 1,
             "polygon_hole": 1,
-            "polyline": 1,
+            "polyline": 2,
         }
 
     def test_repeated_import_is_byte_identical(self, project: Path, tmp_path: Path) -> None:

@@ -5,6 +5,8 @@ python -m planswift_gt inspect  <каталог|архив.7z> [--work-dir DIR]
 python -m planswift_gt convert  <каталог|архив.7z> --project-key KEY [--out DIR] [--dataset-id ID]
 python -m planswift_gt validate <каталог результата> [--source <каталог проекта>]
 python -m planswift_gt stats    <каталог результата> [--expect ожидания.json]
+python -m planswift_gt qa       <каталог результата> --source <проект> --out <каталог оверлеев>
+python -m planswift_gt card     <каталог результата> [--qa-report qa-report.json] [--out card.md]
 ```
 
 Корень частных данных — `--out` или переменная `QUANTOR_DATASET_ROOT`. Писать результат внутрь
@@ -17,11 +19,19 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
-from planswift_gt import FORMAT
+from planswift_gt import FORMAT, card, qa
 from planswift_gt.archive import ArchiveRejectedError, extract
-from planswift_gt.manifest import compare_expectations, stats, summary, validate, write
+from planswift_gt.manifest import (
+    compare_expectations,
+    findings,
+    stats,
+    summary,
+    validate,
+    write,
+)
 from planswift_gt.parser import ProjectRejectedError, parse_project
 
 DATASET_ROOT_ENV = "QUANTOR_DATASET_ROOT"
@@ -85,9 +95,60 @@ def _convert(args: argparse.Namespace) -> int:
 
 
 def _validate(args: argparse.Namespace) -> int:
-    problems = validate(Path(args.dataset), source_root=Path(args.source) if args.source else None)
-    _print({"ok": not problems, "problems": [f"{p.where}: {p.message}" for p in problems]})
+    dataset = Path(args.dataset)
+    problems = [
+        f"{p.where}: {p.message}"
+        for p in validate(dataset, source_root=Path(args.source) if args.source else None)
+    ]
+    report: dict[str, object] = {}
+    if args.reparse:
+        # Повторный разбор источника во временный каталог: тот же вход обязан дать тот же отпечаток.
+        manifest = json.loads((dataset / "manifest.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory(prefix="planswift-reparse-") as scratch:
+            again = write(
+                parse_project(Path(args.reparse)),
+                Path(scratch),
+                dataset_id=str(manifest["dataset_id"]),
+                project_key=str(manifest["project_key"]),
+            )
+        same = again["dataset_fingerprint"] == manifest.get("dataset_fingerprint")
+        report["reparse_dataset_fingerprint"] = again["dataset_fingerprint"]
+        report["reparse_matches"] = same
+        if not same:
+            problems.append("reparse: отпечаток повторного разбора отличается от записанного")
+        if again["source_fingerprint"] != manifest.get("source_fingerprint"):
+            problems.append("reparse: источник изменился с момента импорта")
+    report["findings"] = findings(dataset)
+    _print({"ok": not problems, "problems": problems, **report})
     return 0 if not problems else 1
+
+
+def _qa(args: argparse.Namespace) -> int:
+    out = Path(args.out)
+    repo = _inside_git_worktree(out)
+    if repo is not None and not args.allow_inside_repo:
+        sys.stderr.write(f"{out} внутри git-репозитория {repo}: оверлеи чертежей туда не пишутся\n")
+        return 2
+    summary_value = qa.run(
+        Path(args.dataset),
+        Path(args.source),
+        out,
+        debug_pages=args.debug_pages,
+        max_side=args.max_side,
+    )
+    _print({key: value for key, value in summary_value.items() if key != "pages_report"})
+    return 0
+
+
+def _card(args: argparse.Namespace) -> int:
+    text = card.build(
+        Path(args.dataset), qa_report=Path(args.qa_report) if args.qa_report else None
+    )
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+    return 0
 
 
 def _stats(args: argparse.Namespace) -> int:
@@ -136,7 +197,25 @@ def build_parser() -> argparse.ArgumentParser:
     check = commands.add_parser("validate", help="проверить каталог результата")
     check.add_argument("dataset")
     check.add_argument("--source", help="корень проекта: перепроверить хеши растров")
+    check.add_argument(
+        "--reparse", help="распакованный проект: разобрать заново и сверить отпечаток"
+    )
     check.set_defaults(handler=_validate)
+
+    review = commands.add_parser("qa", help="оверлеи листов и проверка совмещения с растром")
+    review.add_argument("dataset")
+    review.add_argument("--source", required=True, help="корень проекта с растрами")
+    review.add_argument("--out", required=True)
+    review.add_argument("--debug-pages", type=int, default=3)
+    review.add_argument("--max-side", type=int, default=2400)
+    review.add_argument("--allow-inside-repo", action="store_true", help="только для синтетики")
+    review.set_defaults(handler=_qa)
+
+    describe = commands.add_parser("card", help="карточка датасета без изображений")
+    describe.add_argument("dataset")
+    describe.add_argument("--qa-report")
+    describe.add_argument("--out")
+    describe.set_defaults(handler=_card)
 
     report = commands.add_parser("stats", help="сводка и сверка с ожиданиями")
     report.add_argument("dataset")

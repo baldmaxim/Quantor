@@ -6,4 +6,4 @@
 
 FORMAT = "planswift-gt-v1"
 TOOL_NAME = "planswift_gt"
-TOOL_VERSION = "1.0.0"
+TOOL_VERSION = "1.1.0"
