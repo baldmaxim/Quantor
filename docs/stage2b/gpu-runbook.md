@@ -73,17 +73,11 @@ Get-FileHash "ЖК Stories Кладка.7z","Мосфильмовская 31А P
 
 ```powershell
 $R = "$env:QUANTOR_DATASET_ROOT\planswift"
-7z x "ЖК Stories Кладка.7z" -o"$R
-aw\stories"
-7z x "Мосфильмовская 31А Planswift.7z" -o"$R
-aw\mosfilm"
-pnpm planswift convert "$R
-aw\stories" --project-key stories_masonry --out "$R\gt\stories_masonry"
-pnpm planswift convert "$R
-aw\mosfilm" --project-key mosfilm31a --out "$R\gt\mosfilm31a"
-pnpm planswift validate "$R\gt\mosfilm31a" --source "$R
-aw\mosfilm\Мосфильмовская 31А" --reparse "$R
-aw\mosfilm"
+7z x "ЖК Stories Кладка.7z" -o"$R\raw\stories"
+7z x "Мосфильмовская 31А Planswift.7z" -o"$R\raw\mosfilm"
+pnpm planswift convert "$R\raw\stories" --project-key stories_masonry --out "$R\gt\stories_masonry"
+pnpm planswift convert "$R\raw\mosfilm" --project-key mosfilm31a --out "$R\gt\mosfilm31a"
+pnpm planswift validate "$R\gt\mosfilm31a" --source "$R\raw\mosfilm\Мосфильмовская 31А" --reparse "$R\raw\mosfilm"
 ```
 
 Корни проектов для `qa`, `validate --source` и `source_root` в конфиге сборки —
