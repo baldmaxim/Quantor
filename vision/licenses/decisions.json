@@ -57,9 +57,9 @@
     "pypdfium2": {
       "spdx": "BSD-3-Clause OR Apache-2.0 (+ bundled PDFium third-party)",
       "decision": "conditional",
-      "scope": "кандидат серверного растра (промт 20)",
+      "scope": "Р-9: листы PDF в офлайн-импорте и сборке PlanSwift (tools/planswift_gt[pdf], 5.13.0); кандидат серверного растра (промт 20)",
       "evidence": "PyPI pypdfium2 5.13.0 license: BSD-3-Clause, Apache-2.0, dependency licenses",
-      "condition": "перед образом — список bundled-лицензий PDFium; решение Stage 2A «не добавлять без необходимости» пересматривает владелец"
+      "condition": "решение владельца 2026-09-15 (Р-9): разрешено в офлайн-импорте и сборке датасета, не в apps/api; перед производственным образом — список bundled-лицензий PDFium и отдельное решение"
     },
     "segmentation-models-pytorch": {
       "spdx": "MIT",

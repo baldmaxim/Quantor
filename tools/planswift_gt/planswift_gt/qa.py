@@ -28,7 +28,14 @@ from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
 
-from planswift_gt.raster import DARK_BELOW, TiffRaster, downscale, write_png
+from planswift_gt.raster import (
+    DARK_BELOW,
+    DEFAULT_PDF_DPI,
+    PageRaster,
+    downscale,
+    open_raster,
+    write_png,
+)
 
 JsonObject = dict[str, object]
 
@@ -141,7 +148,7 @@ def _pages(dataset: Path) -> list[JsonObject]:
 
 
 def render_page(
-    raster: TiffRaster,
+    raster: PageRaster,
     annotations: list[JsonObject],
     out_path: Path,
     *,
@@ -212,7 +219,8 @@ def _samples(annotations: list[JsonObject], width: int, height: int) -> list[tup
         kind = annotation["kind"]
         if kind == "count":
             continue
-        ring = _pairs(annotation["points_source_px"])
+        # Нормализованные координаты × размер растра: для PDF исходные числа — точки, а не пиксели.
+        ring = [(x * width, y * height) for x, y in _pairs(annotation["points_normalized"])]
         if kind in ("polygon", "polygon_hole"):
             ring = [*ring, ring[0]]
         for (x0, y0), (x1, y1) in pairwise(ring):
@@ -230,7 +238,7 @@ def _samples(annotations: list[JsonObject], width: int, height: int) -> list[tup
     ]
 
 
-def alignment(raster: TiffRaster, annotations: list[JsonObject]) -> Alignment:
+def alignment(raster: PageRaster, annotations: list[JsonObject]) -> Alignment:
     samples = _samples(annotations, raster.width, raster.height)
     rows: OrderedDict[int, bytes] = OrderedDict()
 
@@ -267,6 +275,7 @@ def run(
     *,
     debug_pages: int,
     max_side: int,
+    pdf_dpi: float = DEFAULT_PDF_DPI,
 ) -> JsonObject:
     grouped = _annotations_by_page(dataset)
     pages = sorted(_pages(dataset), key=lambda page: str(page["page_guid"]))
@@ -282,7 +291,7 @@ def run(
             continue
         annotations = grouped.get(guid, [])
         path = source_root / str(image["path"])
-        with TiffRaster(path, strip_cache=2) as raster:
+        with open_raster(path, pdf_dpi=pdf_dpi, strip_cache=2) as raster:
             render_page(
                 raster,
                 annotations,

@@ -331,7 +331,15 @@ def _source_consistent(annotation: JsonObject, image: JsonObject, kind: str) -> 
     source = annotation.get("points_source_px")
     normalized = annotation.get("points_normalized")
     types = annotation.get("point_types")
-    if not isinstance(width, int) or not isinstance(height, int) or width <= 0 or height <= 0:
+    # TIFF — целые пиксели, PDF — дробные точки страницы (Р-9).
+    if (
+        isinstance(width, bool)
+        or isinstance(height, bool)
+        or not isinstance(width, int | float)
+        or not isinstance(height, int | float)
+        or width <= 0
+        or height <= 0
+    ):
         return "размер растра не задан"
     if not isinstance(source, list) or not isinstance(normalized, list):
         return "нет точек"

@@ -120,6 +120,8 @@ jobs:
         run: |
           pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cpu
           pip install transformers==5.5.0
+          # Р-9: листы PDF в импортёре PlanSwift — тесты рендера на синтетическом PDF.
+          pip install pypdfium2==5.13.0
       - name: Лицензионный гейт по всем манифестам
         working-directory: vision
         run: python -m quantor_vision licenses-check

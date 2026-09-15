@@ -7,6 +7,7 @@ python -m planswift_gt validate <каталог результата> [--source 
 python -m planswift_gt stats    <каталог результата> [--expect ожидания.json]
 python -m planswift_gt qa       <каталог результата> --source <проект> --out <каталог оверлеев>
 python -m planswift_gt card     <каталог результата> [--qa-report qa-report.json] [--out card.md]
+python -m planswift_gt import-all <каталог архивов> --work DIR --out DIR --rules правила.json
 ```
 
 Корень частных данных — `--out` или переменная `QUANTOR_DATASET_ROOT`. Писать результат внутрь
@@ -23,7 +24,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from planswift_gt import FORMAT, buildconfig, card, qa
+from planswift_gt import FORMAT, batch, buildconfig, card, qa
 from planswift_gt import build as dataset_build
 from planswift_gt.archive import ArchiveRejectedError, extract
 from planswift_gt.manifest import (
@@ -160,6 +161,32 @@ def _build(args: argparse.Namespace) -> int:
     return 0 if isinstance(leakage, dict) and all(leakage.values()) else 1
 
 
+def _import_all(args: argparse.Namespace) -> int:
+    reasons: list[str] = []
+    for flag, value in (("--work", args.work), ("--out", args.out)):
+        repo = _inside_git_worktree(Path(value))
+        if repo is not None:
+            reasons.append(f"{flag} {value} внутри git-репозитория {repo}")
+    if reasons:
+        sys.stderr.write("; ".join(reasons) + ": частные данные туда не пишутся\n")
+        return 2
+    Path(args.out).mkdir(parents=True, exist_ok=True)
+    report = batch.import_all(
+        Path(args.archives), Path(args.work), Path(args.out), Path(args.rules)
+    )
+    projects = report["projects"]
+    _print(
+        {
+            "projects": len(projects) if isinstance(projects, list) else 0,
+            "identical_projects": report["identical_projects"],
+            "families": report["families"],
+            "config": str(Path(args.out) / "build-v2.json"),
+            "report": str(Path(args.out) / "import-all-report.json"),
+        }
+    )
+    return 0
+
+
 def _card(args: argparse.Namespace) -> int:
     text = card.build(
         Path(args.dataset), qa_report=Path(args.qa_report) if args.qa_report else None
@@ -248,6 +275,15 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("dataset")
     report.add_argument("--expect", help="JSON ожиданий по project_key")
     report.set_defaults(handler=_stats)
+
+    everything = commands.add_parser(
+        "import-all", help="все архивы каталога → planswift-gt-v1 и черновик build-v2.json"
+    )
+    everything.add_argument("archives", help="каталог с .7z/.rar проектов")
+    everything.add_argument("--work", required=True, help="каталог распаковки вне репозитория")
+    everything.add_argument("--out", required=True, help="корень planswift-gt-v1 вне репозитория")
+    everything.add_argument("--rules", required=True, help="правила целей и семейств (JSON)")
+    everything.set_defaults(handler=_import_all)
     return parser
 
 

@@ -4,7 +4,7 @@
 
 ```text
 <проект>/Data.xml                         Item Type=Job
-<проект>/Pages/<лист>/Data.xml            Class=Page, растр {Image GUID}.tiff рядом
+<проект>/Pages/<лист>/Data.xml            Class=Page, лист {Image GUID}.tiff или .pdf рядом
 <проект>/Takeoff/…/<позиция>/Data.xml     Class=Area | Linear | Count — позиция с именем
             …/<позиция>/<секция>/Data.xml Class=Area Section | Linear Section | Count Section
                      …/<секция>/<выч.>/   Class=Area Subtract Section — без собственного PageGUID
@@ -33,7 +33,12 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from planswift_gt.images import ImageInfo, ImageRejectedError, inspect_image
+from planswift_gt.images import (
+    PAGE_IMAGE_SUFFIXES,
+    ImageInfo,
+    ImageRejectedError,
+    inspect_image,
+)
 from planswift_gt.xmlio import XmlRejectedError, decode, parse_text
 
 DATA_FILE = "Data.xml"
@@ -200,7 +205,9 @@ def _page(root: Path, node: Node, result: ParseResult) -> Page:
         found = sorted(
             candidate
             for candidate in directory.iterdir()
-            if candidate.is_file() and candidate.stem.upper() == image_guid.upper()
+            if candidate.is_file()
+            and candidate.stem.upper() == image_guid.upper()
+            and candidate.suffix.lower() in PAGE_IMAGE_SUFFIXES
         )
         if not found:
             rejection = "image_file_missing"

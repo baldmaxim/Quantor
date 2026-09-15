@@ -177,6 +177,54 @@ cd vision
 
 Каждая команда пишет результаты в `$env:QUANTOR_DATASET_ROOT\runs\<run_id>\` — вне репозитория.
 
+## 8. Сборка v2 — все проекты PlanSwift (Р-9)
+
+GPU не нужен. Место на `D:`: распакованные проекты — порядка 5–10 ГБ, сборка — ещё несколько ГБ.
+Команды — из корня репозитория после `git pull`.
+
+**1. Окружение и архивы.**
+
+```powershell
+$R = "$env:QUANTOR_DATASET_ROOT\planswift"
+.\vision\.venv-train\Scripts\python -m pip install pypdfium2==5.13.0
+7z x "PLANSWIFT\Обводки Planswift.7z" -o"$R\archives-v2"
+Copy-Item tools\planswift_gt\configs\dataset-build-v2.rules.example.json "$R\rules-v2.json"
+```
+
+**2. Импорт всех проектов** (архивы проверяются до распаковки, разметка пишется в `planswift-gt-v1`):
+
+```powershell
+cd tools\planswift_gt
+..\..\vision\.venv-train\Scripts\python -m planswift_gt import-all "$R\archives-v2\Обводки Planswift" --work "$R\raw-v2" --out "$R\gt-v2" --rules "$R\rules-v2.json"
+```
+
+Выход: `$R\gt-v2\import-all-report.json` и черновик `$R\gt-v2\build-v2.json`.
+
+**3. Совмещение PDF** — до сборки, на двух проектах с PDF. Путь `--source` — поле `source_root`
+проекта из `build-v2.json`:
+
+```powershell
+..\..\vision\.venv-train\Scripts\python -m planswift_gt qa "$R\gt-v2\lsr_kladka" --source "<source_root lsr_kladka>" --out "$R\qa-v2\lsr_kladka"
+..\..\vision\.venv-train\Scripts\python -m planswift_gt qa "$R\gt-v2\lsr_mzhbk_obemy" --source "<source_root lsr_mzhbk_obemy>" --out "$R\qa-v2\lsr_mzhbk_obemy"
+```
+
+Открыть 2–3 оверлея каждого: линии кладки и плиты обязаны лежать на чертеже, а не рядом.
+
+**Прислать текстом и остановиться:**
+
+1. из `import-all-report.json` — для каждого проекта `project_key`, `status`, `family`, `pages`,
+   `pages_without_image`, `page_formats`, `task_annotations`, `in_build`; и `identical_projects`;
+2. сводку `qa` обоих PDF-проектов (совмещение) и словами — лежит ли разметка на чертеже.
+
+**4. Сборка** — только после ответа по пунктам 1–2:
+
+```powershell
+..\..\vision\.venv-train\Scripts\python -m planswift_gt build "$R\gt-v2\build-v2.json" --out "$R\build\planswift-build-v2"
+```
+
+Прислать из `build.json`: `families`, `leakage`, `duplicate_pages_skipped` (число), `counters`,
+`split_sha256`, `tiles_sha256`.
+
 ## Чего не делать
 
 - не копировать тайлы, оверлеи, датасеты и веса в репозиторий или в чат;

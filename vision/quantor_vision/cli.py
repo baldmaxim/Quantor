@@ -87,8 +87,9 @@ def verify_build(build_dir: Path) -> list[str]:
     leakage = manifest.get("leakage", {})
     if not leakage or not all(leakage.values()):
         problems.append(f"проверки утечки не пройдены: {leakage}")
-    if split.get("holdout") != "within-project grouped holdout":
-        problems.append("разбиение не помечено как within-project grouped holdout")
+    # v1 — листы одного проекта; v2 (Р-9) — семейства объектов целиком.
+    if split.get("holdout") not in ("within-project grouped holdout", "project-family holdout"):
+        problems.append("вид разбиения не распознан")
     return problems
 
 

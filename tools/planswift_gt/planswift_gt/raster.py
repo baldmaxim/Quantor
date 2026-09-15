@@ -15,9 +15,27 @@ import zlib
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Protocol, Self
 
-from planswift_gt.images import ImageRejectedError
+from planswift_gt.images import PDF_POINTS_PER_INCH, ImageRejectedError, pdfium
+
+DEFAULT_PDF_DPI = 200.0
+
+
+class PageRaster(Protocol):
+    """Лист как строки яркости 0…255 — одинаково для TIFF и отрендеренного PDF."""
+
+    width: int
+    height: int
+
+    def row(self, y: int) -> bytes: ...
+
+    def close(self) -> None: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(self, *_: object) -> None: ...
+
 
 _TAGS = {
     256: "width",
@@ -147,7 +165,7 @@ class TiffRaster:
     def close(self) -> None:
         self._stream.close()
 
-    def __enter__(self) -> TiffRaster:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -184,6 +202,69 @@ class TiffRaster:
         return b"".join(self._bits1[byte] for byte in line)[: self.width]
 
 
+class PdfRaster:
+    """Первая страница PDF, отрендеренная pypdfium2 в оттенках серого при `dpi`.
+
+    Страница рендерится целиком один раз (лист A0 при 200 dpi — около 62 МБ полутона); строки —
+    срезы буфера. Поворот страницы применяет сам рендер — так же, как он учтён в размере в точках,
+    по которому нормализована разметка.
+    """
+
+    def __init__(self, path: Path, *, dpi: float = DEFAULT_PDF_DPI) -> None:
+        module = pdfium()
+        try:
+            document = module.PdfDocument(str(path))
+        except Exception as error:
+            raise ImageRejectedError("image_pdf_unreadable", type(error).__name__) from error
+        try:
+            page = document[0]
+            bitmap = page.render(
+                scale=dpi / PDF_POINTS_PER_INCH, grayscale=True, fill_color=(255, 255, 255, 255)
+            )
+            self.width: int = int(bitmap.width)
+            self.height: int = int(bitmap.height)
+            self._stride = int(bitmap.stride)
+            self._channels = int(bitmap.n_channels)
+            self._buffer = bytes(bitmap.buffer)
+            page.close()
+        finally:
+            document.close()
+        self.dpi = dpi
+
+    def row(self, y: int) -> bytes:
+        start = y * self._stride
+        line = self._buffer[start : start + self.width * self._channels]
+        if self._channels == 1:
+            return line
+        # Порядок каналов pdfium — BGR(A); яркость по весам ITU-R BT.601 в целых.
+        blue, green, red = (
+            line[0 :: self._channels],
+            line[1 :: self._channels],
+            line[2 :: self._channels],
+        )
+        return bytes(
+            (29 * b + 150 * g + 77 * r) >> 8 for b, g, r in zip(blue, green, red, strict=True)
+        )
+
+    def close(self) -> None:
+        self._buffer = b""
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
+
+def open_raster(
+    path: Path, *, pdf_dpi: float = DEFAULT_PDF_DPI, strip_cache: int = 8
+) -> PageRaster:
+    """TIFF или PDF по расширению файла листа."""
+    if path.suffix.lower() == ".pdf":
+        return PdfRaster(path, dpi=pdf_dpi)
+    return TiffRaster(path, strip_cache=strip_cache)
+
+
 @dataclass(frozen=True, slots=True)
 class Gray:
     """Уменьшенная копия: пиксель — самый тёмный из четырёх отсчётов блока `step × step`."""
@@ -194,7 +275,7 @@ class Gray:
     pixels: bytes
 
 
-def downscale(raster: TiffRaster, *, max_side: int) -> Gray:
+def downscale(raster: PageRaster, *, max_side: int) -> Gray:
     step = max(1, -(-max(raster.width, raster.height) // max_side))
     out_width = -(-raster.width // step)
     out_height = -(-raster.height // step)
@@ -216,7 +297,7 @@ def downscale(raster: TiffRaster, *, max_side: int) -> Gray:
     return Gray(out_width, out_height, step, b"".join(rows))
 
 
-def working_page(raster: TiffRaster, downsample: int) -> Gray:
+def working_page(raster: PageRaster, downsample: int) -> Gray:
     """Рабочий растр датасета: целый шаг уменьшения, пиксель — самый тёмный из отсчётов блока.
 
     Держится в памяти одна рабочая копия листа (при шаге 2 это четверть исходных пикселей по байту),

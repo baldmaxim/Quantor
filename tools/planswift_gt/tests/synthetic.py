@@ -145,6 +145,48 @@ def tiff_image(
     return header + struct.pack("<H", tags) + ifd + b"\0\0\0\0" + arrays + b"".join(strips)
 
 
+def pdf_bytes(
+    width_pt: float,
+    height_pt: float,
+    rects: list[tuple[float, float, float, float]],
+    *,
+    rotate: int = 0,
+) -> bytes:
+    """Одностраничный PDF с чёрными прямоугольниками; прямоугольник — (x0, y0, x1, y1) от верха.
+
+    Собран вручную с корректной таблицей xref: без сторонних библиотек и без реальных листов.
+    """
+    content = "0 g\n" + "".join(
+        f"{x0} {height_pt - y1} {x1 - x0} {y1 - y0} re f\n" for x0, y0, x1, y1 in rects
+    )
+    stream = content.encode("ascii")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width_pt} {height_pt}]"
+            f" /Rotate {rotate} /Contents 4 0 R /Resources << >> >>"
+        ).encode("ascii"),
+        b"<< /Length "
+        + str(len(stream)).encode("ascii")
+        + b" >>\nstream\n"
+        + stream
+        + b"endstream",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n".encode("ascii") + body + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("ascii")
+    out += b"".join(f"{offset:010d} 00000 n \n".encode("ascii") for offset in offsets)
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n"
+    ).encode("ascii")
+    return bytes(out)
+
+
 def draw_segments(
     luminance: bytearray, width: int, height: int, points: list[tuple[float, float]], closed: bool
 ) -> None:

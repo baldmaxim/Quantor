@@ -6,6 +6,9 @@
 поверх существующего без явного `--refreeze` нельзя.
 
 Честное имя такого теста — within-project grouped holdout, а не проверка обобщения.
+
+Сборка v2 (Р-9) — `project-family holdout`: семейство объекта (все проекты одного здания) целиком
+уходит в одну часть, и test проверяет перенос на здания, которых модель не видела.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from pathlib import Path
 from planswift_gt.geometry2d import hamming
 
 HOLDOUT_KIND = "within-project grouped holdout"
+FAMILY_HOLDOUT_KIND = "project-family holdout"
 
 
 class SplitFrozenError(RuntimeError):
@@ -32,6 +36,8 @@ class PageInfo:
     phash: int
     # Вес страницы при распределении: число аннотаций целевых задач (пустые листы — вес 0).
     weight: int
+    # Число аннотаций по задачам — для семейств: доли считаются по каждой задаче отдельно.
+    task_weights: tuple[tuple[str, int], ...] = ()
 
     @property
     def key(self) -> str:
@@ -120,6 +126,64 @@ def assign(groups: list[list[PageInfo]], fractions: dict[str, float], seed: int)
     return result
 
 
+def assign_families(
+    pages: list[PageInfo],
+    family_of: dict[str, str],
+    fractions: dict[str, float],
+    seed: int,
+) -> dict[str, str]:
+    """Семейство объекта целиком — в часть с наибольшим недобором веса аннотаций.
+
+    Вес семейства — сумма долей по задачам: сколько от всех плит, сколько от всех стен. Иначе
+    десятки тысяч линий стен решали бы разбиение за плиты. Семейства идут от тяжёлого к лёгкому,
+    при равенстве — по хешу от seed. Если val или test остались пустыми, туда переносится самое
+    лёгкое семейство с разметкой из train. Кластеры pHash не нужны: семейство и так в одной части.
+    """
+    members: dict[str, list[PageInfo]] = {}
+    for page in pages:
+        members.setdefault(family_of[page.project_key], []).append(page)
+    task_totals: dict[str, int] = {}
+    for page in pages:
+        for task, count in page.task_weights:
+            task_totals[task] = task_totals.get(task, 0) + count
+
+    def weight(family: str) -> float:
+        if not task_totals:
+            return float(sum(page.weight for page in members[family]))
+        share = 0.0
+        for page in members[family]:
+            for task, count in page.task_weights:
+                if task_totals[task]:
+                    share += count / task_totals[task]
+        return share
+
+    def order(family: str) -> str:
+        return hashlib.sha256(f"{seed}:family:{family}".encode()).hexdigest()
+
+    total = sum(weight(family) for family in members) or 1.0
+    filled = {"train": 0.0, "val": 0.0, "test": 0.0}
+    placed: dict[str, list[str]] = {"train": [], "val": [], "test": []}
+    for family in sorted(members, key=lambda name: (-weight(name), order(name))):
+        part = max(
+            ("test", "val", "train"), key=lambda name: fractions[name] * total - filled[name]
+        )
+        filled[part] += weight(family)
+        placed[part].append(family)
+    for part in ("test", "val"):
+        if not placed[part]:
+            donors = [family for family in placed["train"] if weight(family) > 0]
+            if len(donors) > 1:
+                lightest = min(donors, key=lambda name: (weight(name), order(name)))
+                placed["train"].remove(lightest)
+                placed[part].append(lightest)
+    return {
+        page.key: part
+        for part, families in placed.items()
+        for family in families
+        for page in members[family]
+    }
+
+
 def freeze(
     path: Path,
     *,
@@ -128,22 +192,25 @@ def freeze(
     groups: list[list[PageInfo]],
     assignment: dict[str, str],
     refreeze: bool,
+    family_of: dict[str, str] | None = None,
 ) -> dict[str, object]:
-    pages = [
-        {
-            "project_key": page.project_key,
-            "page_guid": page.page_guid,
-            "image_sha256": page.image_sha256,
-            "phash": f"{page.phash:016x}",
-            "cluster": index,
-            "weight": page.weight,
-            "split": assignment[page.key],
-        }
-        for index, group in enumerate(groups)
-        for page in group
-    ]
+    pages: list[dict[str, object]] = []
+    for index, group in enumerate(groups):
+        for page in group:
+            record: dict[str, object] = {
+                "project_key": page.project_key,
+                "page_guid": page.page_guid,
+                "image_sha256": page.image_sha256,
+                "phash": f"{page.phash:016x}",
+                "cluster": index,
+                "weight": page.weight,
+                "split": assignment[page.key],
+            }
+            if family_of is not None:
+                record["family"] = family_of[page.project_key]
+            pages.append(record)
     body: dict[str, object] = {
-        "holdout": HOLDOUT_KIND,
+        "holdout": HOLDOUT_KIND if family_of is None else FAMILY_HOLDOUT_KIND,
         "seed": seed,
         "split_config_fingerprint": config_fingerprint,
         "pages": sorted(pages, key=lambda page: (str(page["project_key"]), str(page["page_guid"]))),

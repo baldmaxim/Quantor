@@ -1,15 +1,25 @@
-"""Размер и отпечаток растра листа без сторонних библиотек.
+"""Размер и отпечаток листа: TIFF — стандартной библиотекой, PDF — через pypdfium2.
 
-Нужны только ширина, высота и SHA-256: пиксели импортёр не читает. Классический TIFF (II/MM, 42)
-разбирается по первому IFD; BigTIFF и прочее — отказ с причиной, а не догадка.
+Нужны только размер системы координат разметки и SHA-256: пиксели импортёр не читает.
+
+- **TIFF** (II/MM, 42) разбирается по первому IFD; координаты PlanSwift — пиксели растра.
+  BigTIFF и прочее — отказ с причиной, а не догадка.
+- **PDF** (Р-9): координаты PlanSwift — точки PDF первой страницы (72 dpi) с учётом поворота
+  страницы; правило взято у SU10 (`build_canonical_v2.py`) и проверяется оверлеями QA. Размер —
+  дробный, в точках; растр для тайлов рендерится позже с `pdf_render_dpi` сборки.
 """
 
 from __future__ import annotations
 
 import hashlib
+import importlib
+import importlib.util
 import struct
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
+
+PDF_POINTS_PER_INCH = 72.0
 
 _TAG_WIDTH = 256
 _TAG_HEIGHT = 257
@@ -26,8 +36,10 @@ class ImageRejectedError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ImageInfo:
-    width_px: int
-    height_px: int
+    # Размер системы координат разметки: пиксели TIFF (целые) или точки PDF (дробные). Имя поля
+    # сохранено ради совместимости planswift-gt-v1: у TIFF значения и отпечатки не меняются.
+    width_px: float
+    height_px: float
     sha256: str
     size_bytes: int
     format: str
@@ -80,7 +92,50 @@ def tiff_size(path: Path) -> tuple[int, int]:
     return width, height
 
 
+PAGE_IMAGE_SUFFIXES = (".tif", ".tiff", ".pdf")
+
+
+def pdfium() -> ModuleType:
+    """Модуль pypdfium2 или отказ с причиной: PDF без него не читается, а не пропускается молча.
+
+    Импорт в момент вызова: импортёр TIFF по-прежнему работает на одной стандартной библиотеке.
+    """
+    if importlib.util.find_spec("pypdfium2") is None:
+        raise ImageRejectedError("image_pdf_reader_missing", "не установлен pypdfium2 (extra pdf)")
+    return importlib.import_module("pypdfium2")
+
+
+def pdf_size(path: Path) -> tuple[float, float]:
+    """Ширина и высота первой страницы в точках с учётом /Rotate."""
+    module = pdfium()
+    try:
+        document = module.PdfDocument(str(path))
+    except Exception as error:
+        raise ImageRejectedError("image_pdf_unreadable", type(error).__name__) from error
+    try:
+        if len(document) < 1:
+            raise ImageRejectedError("image_pdf_empty", "в PDF нет страниц")
+        page = document[0]
+        width, height = page.get_size()
+        page.close()
+    finally:
+        document.close()
+    if not (width > 0 and height > 0):
+        raise ImageRejectedError("image_no_size", f"размер страницы {width}×{height}")
+    return float(width), float(height)
+
+
 def inspect_image(path: Path) -> ImageInfo:
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        width_pt, height_pt = pdf_size(path)
+        return ImageInfo(
+            width_px=width_pt,
+            height_px=height_pt,
+            sha256=sha256_file(path),
+            size_bytes=path.stat().st_size,
+            format="pdf",
+        )
     width, height = tiff_size(path)
     return ImageInfo(
         width_px=width,

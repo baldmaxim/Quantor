@@ -6,7 +6,8 @@
 <out>/tiles.jsonl              тайл: часть, политика отбора, преобразование, доли цели и чернил
 <out>/tiles/<id>.png           тайл рабочего растра (полутон 8 бит)
 <out>/targets/slab/<id>.png    маска площади с отверстиями (0/255)
-<out>/targets/masonry/<id>.png цель осевой: 255 на линии, спад до 0 на radius_px
+<out>/targets/masonry/<id>.png цель осевой: 255 на линии, спад до 0 на radius_px (v1)
+<out>/targets/wall/<id>.png    осевые стен v2 — монолит и кладка одним классом (Р-9)
 <out>/views/<вид>.jsonl        qwen_slab_localization_v1, qwen_masonry_roi_v0
 ```
 
@@ -27,7 +28,7 @@ from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
 
-from planswift_gt.buildconfig import BuildConfig, DatasetRef
+from planswift_gt.buildconfig import LINE_TASKS, BuildConfig, DatasetRef, TargetConfig
 from planswift_gt.geometry2d import (
     Point,
     Ring,
@@ -37,8 +38,8 @@ from planswift_gt.geometry2d import (
     phash,
     point_in_rings,
 )
-from planswift_gt.raster import TiffRaster, downscale, working_page, write_png_gray
-from planswift_gt.splits import PageInfo, assign, clusters, freeze
+from planswift_gt.raster import downscale, open_raster, working_page, write_png_gray
+from planswift_gt.splits import PageInfo, assign, assign_families, clusters, freeze
 from planswift_gt.tiles import TileTransform, crop, grid_origins, stable_fraction, tile_id
 
 JsonObject = dict[str, object]
@@ -61,7 +62,12 @@ INSTRUCTIONS = {
 @dataclass(frozen=True, slots=True)
 class PageShapes:
     polygons: list[list[Ring]]  # внешний контур + отверстия, рабочие пиксели
-    polylines: list[list[Point]]
+    # Осевые по линейным задачам: masonry (сборка v1), wall (v2 — монолит и кладка).
+    lines: dict[str, list[list[Point]]]
+
+    @property
+    def all_lines(self) -> list[list[Point]]:
+        return [line for task in sorted(self.lines) for line in self.lines[task]]
 
 
 def _obj(value: object) -> JsonObject:
@@ -82,14 +88,18 @@ def _dump(value: object) -> str:
     )
 
 
-def _selected(annotation: JsonObject, kinds: tuple[str, ...], labels: tuple[str, ...]) -> bool:
-    return annotation.get("kind") in kinds and (not labels or annotation.get("label_raw") in labels)
+def _selected(annotation: JsonObject, target: TargetConfig) -> bool:
+    return target.selects(annotation.get("kind"), annotation.get("label_raw"))
 
 
 def _shapes(
     annotations: list[JsonObject], config: BuildConfig, source: tuple[int, int]
 ) -> PageShapes:
-    """Геометрия листа в рабочих пикселях. Одинаковые секции-дубли входят один раз."""
+    """Геометрия листа в рабочих пикселях. Одинаковые секции-дубли входят один раз.
+
+    `source` — размер растра, по которому нормализована разметка в пикселях рендера: для TIFF это
+    сам растр, для PDF — страница, отрендеренная с `pdf_render_dpi`.
+    """
     scale_x = source[0] / config.downsample
     scale_y = source[1] / config.downsample
 
@@ -101,7 +111,7 @@ def _shapes(
         ]
 
     slab = config.targets.get("slab")
-    masonry = config.targets.get("masonry")
+    line_targets = {task: config.targets[task] for task in LINE_TASKS if task in config.targets}
     holes: dict[str, list[Ring]] = {}
     for annotation in annotations:
         if annotation.get("kind") == "polygon_hole":
@@ -111,21 +121,18 @@ def _shapes(
 
     seen: set[str] = set()
     polygons: list[list[Ring]] = []
-    polylines: list[list[Point]] = []
+    lines: dict[str, list[list[Point]]] = {task: [] for task in line_targets}
     for annotation in annotations:
         key = _dump([annotation.get("kind"), annotation.get("points_source_px")])
         if key in seen:
             continue
         seen.add(key)
-        if (
-            slab
-            and annotation.get("kind") == "polygon"
-            and _selected(annotation, slab.kinds, slab.labels)
-        ):
+        if slab and annotation.get("kind") == "polygon" and _selected(annotation, slab):
             polygons.append([ring(annotation), *holes.get(str(annotation["id"]), [])])
-        if masonry and _selected(annotation, masonry.kinds, masonry.labels):
-            polylines.append(ring(annotation))
-    return PageShapes(polygons, polylines)
+        for task, target in line_targets.items():
+            if _selected(annotation, target):
+                lines[task].append(ring(annotation))
+    return PageShapes(polygons, lines)
 
 
 # ------------------------------------------------------------------------------ виды Qwen
@@ -191,7 +198,7 @@ def slab_localization(shapes: PageShapes, t: TileTransform, config: BuildConfig)
 def masonry_view(shapes: PageShapes, t: TileTransform, config: BuildConfig) -> JsonObject:
     scale = config.qwen_coordinate_range
     inside: list[Point] = []
-    for line in shapes.polylines:
+    for line in shapes.lines.get("masonry", []):
         for (x0, y0), (x1, y1) in pairwise(line):
             steps = max(1, math.ceil(max(abs(x1 - x0), abs(y1 - y0)) / 8))
             for index in range(steps + 1):
@@ -223,36 +230,57 @@ def _ink_fraction(pixels: bytes, valid: int) -> float:
     return 0.0 if valid == 0 else sum(dark) / valid
 
 
-def page_infos(config: BuildConfig) -> list[PageInfo]:
+def page_infos(config: BuildConfig) -> tuple[list[PageInfo], list[JsonObject]]:
+    """Листы всех проектов и дубли: лист с тем же SHA-256 файла, что уже взятый, не берётся.
+
+    Один и тот же проект, выгруженный дважды (или лист, повторённый в двух проектах одного здания),
+    иначе мог бы оказаться и в train, и в test. Берётся первое вхождение в порядке `datasets`.
+    """
     infos: list[PageInfo] = []
+    duplicates: list[JsonObject] = []
+    owner: dict[str, str] = {}
     for dataset in config.datasets:
         root = Path(dataset.dataset_dir)
         weights: Counter[str] = Counter()
+        by_task: dict[str, Counter[str]] = {task: Counter() for task in dataset.tasks}
         for row in _jsonl(root / "annotations.jsonl"):
             annotation = _obj(row.get("annotation"))
-            if any(
-                _selected(annotation, config.targets[task].kinds, config.targets[task].labels)
-                for task in dataset.tasks
-            ):
-                weights[str(_obj(row.get("page")).get("page_guid"))] += 1
+            guid = str(_obj(row.get("page")).get("page_guid"))
+            selected = [
+                task for task in dataset.tasks if _selected(annotation, config.targets[task])
+            ]
+            if selected:
+                weights[guid] += 1
+            for task in selected:
+                by_task[task][guid] += 1
         for page in _jsonl(root / "pages.jsonl"):
             image = page.get("image")
             if not isinstance(image, dict):
                 continue
-            with TiffRaster(
-                Path(dataset.source_root) / str(image["path"]), strip_cache=1
+            guid = str(page["page_guid"])
+            sha = str(image["sha256"])
+            key = f"{dataset.project_key}|{guid}"
+            if sha in owner:
+                duplicates.append({"page": key, "duplicate_of": owner[sha], "image_sha256": sha})
+                continue
+            owner[sha] = key
+            with open_raster(
+                Path(dataset.source_root) / str(image["path"]),
+                pdf_dpi=config.pdf_render_dpi,
+                strip_cache=1,
             ) as raster:
                 small = downscale(raster, max_side=256)
             infos.append(
                 PageInfo(
                     project_key=dataset.project_key,
-                    page_guid=str(page["page_guid"]),
-                    image_sha256=str(image["sha256"]),
+                    page_guid=guid,
+                    image_sha256=sha,
                     phash=phash(small.pixels, small.width, small.height),
-                    weight=weights[str(page["page_guid"])],
+                    weight=weights[guid],
+                    task_weights=tuple((task, by_task[task][guid]) for task in sorted(by_task)),
                 )
             )
-    return infos
+    return infos, duplicates
 
 
 def select_train_negatives(
@@ -271,9 +299,14 @@ def select_train_negatives(
 
 
 def build(config: BuildConfig, out: Path, *, refreeze: bool = False) -> JsonObject:
-    infos = page_infos(config)
+    infos, duplicates = page_infos(config)
     groups = clusters(infos, config.phash_hamming_threshold)
-    assignment = assign(groups, config.split_fractions, config.seed)
+    family_of: dict[str, str] | None = None
+    if config.holdout == "families":
+        family_of = {dataset.project_key: dataset.family_key for dataset in config.datasets}
+        assignment = assign_families(infos, family_of, config.split_fractions, config.seed)
+    else:
+        assignment = assign(groups, config.split_fractions, config.seed)
     frozen = freeze(
         out / "split.json",
         config_fingerprint=config.split_fingerprint(),
@@ -281,6 +314,7 @@ def build(config: BuildConfig, out: Path, *, refreeze: bool = False) -> JsonObje
         groups=groups,
         assignment=assignment,
         refreeze=refreeze,
+        family_of=family_of,
     )
     split_of = {
         f"{_obj(page).get('project_key')}|{_obj(page).get('page_guid')}": str(
@@ -289,7 +323,7 @@ def build(config: BuildConfig, out: Path, *, refreeze: bool = False) -> JsonObje
         for page in _list(frozen.get("pages"))
     }
 
-    for folder in ("tiles", "targets/slab", "targets/masonry", "views"):
+    for folder in ("tiles", "views", *(f"targets/{task}" for task in ("slab", *LINE_TASKS))):
         (out / folder).mkdir(parents=True, exist_ok=True)
     tile_rows: list[str] = []
     views: dict[str, list[str]] = {name: [] for name in INSTRUCTIONS}
@@ -323,8 +357,12 @@ def build(config: BuildConfig, out: Path, *, refreeze: bool = False) -> JsonObje
         "tiles_sha256": hashlib.sha256((out / "tiles.jsonl").read_bytes()).hexdigest(),
         "views_sha256": view_hashes,
         "unsupported_views": UNSUPPORTED_VIEWS,
-        "leakage": leakage_report(out),
+        "leakage": leakage_report(out, frozen),
     }
+    if duplicates or family_of is not None:
+        manifest["duplicate_pages_skipped"] = duplicates
+    if family_of is not None:
+        manifest["families"] = _family_report(frozen, counters)
     (out / "build.json").write_text(
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8"
     )
@@ -352,9 +390,19 @@ def _build_dataset(
         if not isinstance(image, dict):
             continue
         guid = str(page["page_guid"])
-        split = split_of[f"{dataset.project_key}|{guid}"]
-        source = (int(image["width_px"]), int(image["height_px"]))
-        with TiffRaster(Path(dataset.source_root) / str(image["path"]), strip_cache=1) as raster:
+        split = split_of.get(f"{dataset.project_key}|{guid}")
+        if split is None:
+            # Лист-дубль уже взят из другого проекта (page_infos): второй раз в сборку не входит.
+            counters["pages:duplicate_skipped"] += 1
+            continue
+        with open_raster(
+            Path(dataset.source_root) / str(image["path"]),
+            pdf_dpi=config.pdf_render_dpi,
+            strip_cache=1,
+        ) as raster:
+            # Размер растра, по которому нормализованная разметка переводится в пиксели: у TIFF он
+            # равен записанному в pages.jsonl, у PDF это рендер страницы с pdf_render_dpi.
+            source = (raster.width, raster.height)
             work = working_page(raster, config.downsample)
         shapes = _shapes(by_page.get(guid, []), config, source)
 
@@ -364,12 +412,14 @@ def _build_dataset(
             for rings in shapes.polygons:
                 fill_rings(mask, work.width, work.height, rings)
             targets["slab"] = mask
-        if "masonry" in dataset.tasks:
+        for task in LINE_TASKS:
+            if task not in dataset.tasks:
+                continue
             heat = bytearray(work.width * work.height)
-            radius = config.targets["masonry"].radius_px
-            for line in shapes.polylines:
+            radius = config.targets[task].radius_px
+            for line in shapes.lines.get(task, []):
                 centerline_target(heat, work.width, work.height, line, radius)
-            targets["masonry"] = heat
+            targets[task] = heat
 
         candidates: list[tuple[int, int, str]] = [
             (x0, y0, "grid")
@@ -448,26 +498,27 @@ def _build_dataset(
                     config.tile_px,
                     patch,
                 )
-            tile_rows.append(
-                _dump(
-                    {
-                        "tile_id": identifier,
-                        "project_key": dataset.project_key,
-                        "page_guid": guid,
-                        "split": split,
-                        "crop_policy": policy,
-                        "tasks": list(dataset.tasks),
-                        "image": f"tiles/{identifier}.png",
-                        "image_sha256": image_sha,
-                        "transform": t.record(),
-                        "ink_fraction": round(ink, 6),
-                        "target_fraction": {
-                            task: round(value, 6) for task, value in fractions.items()
-                        },
-                        "positive": positive(fractions),
-                    }
-                )
-            )
+            row: JsonObject = {
+                "tile_id": identifier,
+                "project_key": dataset.project_key,
+                "page_guid": guid,
+                "split": split,
+                "crop_policy": policy,
+                "tasks": list(dataset.tasks),
+                "image": f"tiles/{identifier}.png",
+                "image_sha256": image_sha,
+                "transform": t.record(),
+                "ink_fraction": round(ink, 6),
+                "target_fraction": {task: round(value, 6) for task, value in fractions.items()},
+                "positive": positive(fractions),
+            }
+            if config.holdout == "families":
+                # Только в v2: строки тайлов v1 и их хеш не меняются.
+                row["family"] = dataset.family_key
+                for task, value in fractions.items():
+                    if value >= config.targets[task].min_positive_fraction:
+                        counters[f"tiles:{split}:{task}:positive"] += 1
+            tile_rows.append(_dump(row))
             counters[f"tiles:{split}:{policy}"] += 1
             counters[f"tiles:{split}:{'positive' if positive(fractions) else 'negative'}"] += 1
             base = {
@@ -513,7 +564,7 @@ def _positive_crops(
     for rings in shapes.polygons:
         xs, ys = [x for x, _ in rings[0]], [y for _, y in rings[0]]
         centers.append(((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2))
-    for line in shapes.polylines:
+    for line in shapes.all_lines:
         xs, ys = [x for x, _ in line], [y for _, y in line]
         centers.append(((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2))
     ordered = sorted(
@@ -532,13 +583,34 @@ def _positive_crops(
     return crops
 
 
-def leakage_report(out: Path) -> JsonObject:
+def _family_report(frozen: JsonObject, counters: Counter[str]) -> JsonObject:
+    """Семейства по частям и положительные тайлы по задачам — для проверки глазами."""
+    families: dict[str, dict[str, object]] = {}
+    for page in _list(frozen.get("pages")):
+        record = _obj(page)
+        family = str(record.get("family"))
+        entry = families.setdefault(family, {"split": record.get("split"), "pages": 0})
+        entry["pages"] = int(str(entry["pages"])) + 1
+    by_split: dict[str, list[str]] = {}
+    for family, entry in sorted(families.items()):
+        by_split.setdefault(str(entry["split"]), []).append(family)
+    positives = {key: value for key, value in counters.items() if key.endswith(":positive")}
+    return {
+        "by_split": by_split,
+        "pages_by_family": {name: entry["pages"] for name, entry in sorted(families.items())},
+        "positive_tiles": dict(sorted(positives.items())),
+    }
+
+
+def leakage_report(out: Path, frozen: JsonObject | None = None) -> JsonObject:
     """Проверки утечки по готовой сборке: отбор val/test и отсутствие подсказок в инструкциях."""
     tiles = _jsonl(out / "tiles.jsonl")
     evaluation = [t for t in tiles if t["split"] in ("val", "test")]
     pages_by_split: dict[str, set[str]] = {}
     for tile in tiles:
-        pages_by_split.setdefault(str(tile["split"]), set()).add(str(tile["page_guid"]))
+        # GUID листа уникален только внутри проекта: ключ — проект и лист.
+        page_key = f"{tile.get('project_key')}|{tile['page_guid']}"
+        pages_by_split.setdefault(str(tile["split"]), set()).add(page_key)
     overlap = sorted(
         (a, b)
         for a in pages_by_split
@@ -552,9 +624,24 @@ def leakage_report(out: Path) -> JsonObject:
         if (out / "views" / f"{name}.jsonl").exists()
         for row in _jsonl(out / "views" / f"{name}.jsonl")
     )
-    return {
+    report: JsonObject = {
         "evaluation_tiles_grid_only": all(t["crop_policy"] == "grid" for t in evaluation),
         "pages_in_one_split_only": not overlap,
         "instructions_without_counts": instructions_clean,
         "tile_filenames_opaque": all(str(t["image"]) == f"tiles/{t['tile_id']}.png" for t in tiles),
     }
+    pages = [_obj(page) for page in _list((frozen or {}).get("pages"))]
+    if any("family" in page for page in pages):
+        split_of_family: dict[str, set[str]] = {}
+        for page in pages:
+            split_of_family.setdefault(str(page["family"]), set()).add(str(page["split"]))
+        images: dict[str, set[str]] = {}
+        for page in pages:
+            images.setdefault(str(page["image_sha256"]), set()).add(str(page["split"]))
+        report["families_in_one_split_only"] = all(
+            len(splits) == 1 for splits in split_of_family.values()
+        )
+        report["page_images_in_one_split_only"] = all(
+            len(splits) == 1 for splits in images.values()
+        )
+    return report

@@ -2,6 +2,11 @@
 
 Пути в конфиге могут ссылаться на `${QUANTOR_DATASET_ROOT}`: пример в git не содержит частных путей,
 а на машине с данными переменная раскрывается.
+
+Сборка v2 (Р-9) добавляет: класс `wall` — осевые стен (монолит и кладка — один класс: кладка тоже
+стена, только из блоков), шаблоны меток `label_patterns` (одна позиция пишется по-разному),
+семейства объектов `family` и режим `holdout: families` — семейство целиком в одной части, и
+`pdf_render_dpi` для листов PDF. Конфиг v1 без этих полей даёт прежнее разбиение.
 """
 
 from __future__ import annotations
@@ -9,11 +14,15 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-TASKS = ("slab", "masonry")
+TASKS = ("slab", "masonry", "wall")
+# Задачи, цель которых — осевая линия; остальные — площадь.
+LINE_TASKS = ("masonry", "wall")
 SPLITS = ("train", "val", "test")
+HOLDOUTS = ("pages", "families")
 
 
 class ConfigError(ValueError):
@@ -26,17 +35,35 @@ class DatasetRef:
     dataset_dir: str
     source_root: str
     tasks: tuple[str, ...]
+    # Семейство объекта: проекты одного здания. Пусто — сам проект.
+    family: str = ""
+
+    @property
+    def family_key(self) -> str:
+        return self.family or self.project_key
 
 
 @dataclass(frozen=True, slots=True)
 class TargetConfig:
     kinds: tuple[str, ...]
-    # Метки позиций PlanSwift, входящие в цель; пусто — все аннотации указанных видов.
+    # Метки позиций PlanSwift, входящие в цель; пусто вместе с шаблонами — все аннотации видов.
     labels: tuple[str, ...] = ()
+    # Регулярные выражения (re.search) по метке: «Плита Перекрытия», «Плита Перекытия» и т. п.
+    label_patterns: tuple[str, ...] = ()
     # Доля пикселей цели в тайле, с которой тайл считается положительным.
     min_positive_fraction: float = 0.001
     # Только для осевой: радиус спада цели в пикселях рабочего растра.
     radius_px: float = 6.0
+
+    def selects(self, kind: object, label: object) -> bool:
+        if kind not in self.kinds:
+            return False
+        if not self.labels and not self.label_patterns:
+            return True
+        text = label if isinstance(label, str) else ""
+        return text in self.labels or any(
+            re.search(pattern, text) for pattern in self.label_patterns
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +85,8 @@ class BuildConfig:
     phash_hamming_threshold: int = 10
     qwen_coordinate_range: int = 1000
     qwen_masonry_guide_points: int = 8
+    holdout: str = "pages"
+    pdf_render_dpi: float = 200.0
 
     def fingerprint(self) -> str:
         payload = json.dumps(asdict(self), sort_keys=True, ensure_ascii=False)
@@ -65,16 +94,23 @@ class BuildConfig:
 
     def split_fingerprint(self) -> str:
         """Отпечаток того, от чего зависит разбиение. Смена размера тайла разбиение не меняет."""
-        payload = json.dumps(
-            {
-                "seed": self.seed,
-                "datasets": [(d.project_key, d.tasks) for d in self.datasets],
-                "fractions": self.split_fractions,
-                "phash_hamming_threshold": self.phash_hamming_threshold,
-                "downsample": self.downsample,
-            },
-            sort_keys=True,
-        )
+        body: dict[str, object] = {
+            "seed": self.seed,
+            "datasets": [(d.project_key, d.tasks) for d in self.datasets],
+            "fractions": self.split_fractions,
+            "phash_hamming_threshold": self.phash_hamming_threshold,
+            "downsample": self.downsample,
+        }
+        # Поля v2 входят в отпечаток, только когда заданы: разбиение v1 не меняется.
+        if self.holdout != "pages":
+            body["holdout"] = self.holdout
+        if any(d.family for d in self.datasets):
+            body["families"] = {d.project_key: d.family_key for d in self.datasets}
+        if any(target.label_patterns for target in self.targets.values()):
+            body["label_patterns"] = {
+                name: list(target.label_patterns) for name, target in sorted(self.targets.items())
+            }
+        payload = json.dumps(body, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -96,6 +132,7 @@ def load(path: Path) -> BuildConfig:
                 dataset_dir=_expand(str(item["dataset_dir"])),
                 source_root=_expand(str(item["source_root"])),
                 tasks=tuple(str(task) for task in item["tasks"]),
+                family=str(item.get("family") or ""),
             )
             for item in raw["datasets"]
         )
@@ -103,6 +140,7 @@ def load(path: Path) -> BuildConfig:
             str(name): TargetConfig(
                 kinds=tuple(spec["kinds"]),
                 labels=tuple(spec.get("labels") or ()),
+                label_patterns=tuple(spec.get("label_patterns") or ()),
                 min_positive_fraction=float(spec.get("min_positive_fraction", 0.001)),
                 radius_px=float(spec.get("radius_px", 6.0)),
             )
@@ -119,10 +157,19 @@ def load(path: Path) -> BuildConfig:
 
 
 def _check(config: BuildConfig) -> None:
+    keys = [dataset.project_key for dataset in config.datasets]
+    if len(set(keys)) != len(keys):
+        raise ConfigError("project_key повторяется в datasets")
     for dataset in config.datasets:
         for task in dataset.tasks:
             if task not in TASKS or task not in config.targets:
                 raise ConfigError(f"{dataset.project_key}: задача {task!r} не описана в targets")
+    for name, target in config.targets.items():
+        for pattern in target.label_patterns:
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                raise ConfigError(f"targets.{name}: шаблон {pattern!r} — {error}") from error
     if (
         set(config.split_fractions) != set(SPLITS)
         or abs(sum(config.split_fractions.values()) - 1) > 1e-9
@@ -132,3 +179,9 @@ def _check(config: BuildConfig) -> None:
         raise ConfigError("overlap_px должен быть меньше tile_px")
     if config.downsample < 1:
         raise ConfigError("downsample — целое ≥ 1")
+    if config.holdout not in HOLDOUTS:
+        raise ConfigError(f"holdout {config.holdout!r} не из {HOLDOUTS}")
+    if config.holdout == "families" and len({d.family_key for d in config.datasets}) < 3:
+        raise ConfigError("holdout families: нужно не меньше трёх семейств на train/val/test")
+    if config.pdf_render_dpi <= 0:
+        raise ConfigError("pdf_render_dpi должен быть положительным")
