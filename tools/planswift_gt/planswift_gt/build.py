@@ -498,7 +498,7 @@ def _build_dataset(
                     config.tile_px,
                     patch,
                 )
-            row: JsonObject = {
+            tile_row: JsonObject = {
                 "tile_id": identifier,
                 "project_key": dataset.project_key,
                 "page_guid": guid,
@@ -514,11 +514,11 @@ def _build_dataset(
             }
             if config.holdout == "families":
                 # Только в v2: строки тайлов v1 и их хеш не меняются.
-                row["family"] = dataset.family_key
+                tile_row["family"] = dataset.family_key
                 for task, value in fractions.items():
                     if value >= config.targets[task].min_positive_fraction:
                         counters[f"tiles:{split}:{task}:positive"] += 1
-            tile_rows.append(_dump(row))
+            tile_rows.append(_dump(tile_row))
             counters[f"tiles:{split}:{policy}"] += 1
             counters[f"tiles:{split}:{'positive' if positive(fractions) else 'negative'}"] += 1
             base = {

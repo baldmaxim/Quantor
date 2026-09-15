@@ -131,11 +131,17 @@ class TestAlignmentAndOverlays:
             json.loads(line)
             for line in (dataset / ANNOTATIONS).read_text(encoding="utf-8").splitlines()
         ]
+        # Совмещение проверяется по нормализованным координатам (они общие для TIFF и PDF),
+        # поэтому сдвиг применяется к обоим представлениям точек одинаково.
         shifted = [
             {
                 **row["annotation"],
                 "points_source_px": [
                     [x + 30, y + 30] for x, y in row["annotation"]["points_source_px"]
+                ],
+                "points_normalized": [
+                    [x + 30 / WIDTH, y + 30 / HEIGHT]
+                    for x, y in row["annotation"]["points_normalized"]
                 ],
             }
             for row in rows
