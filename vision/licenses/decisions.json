@@ -1,17 +1,17 @@
 {
   "_note": "Машиночитаемая матрица лицензий Stage 2B (docs/stage2b/model-license-matrix.md). Проверено 2026-09-14. Не юридическое заключение. Пакет или вес без строки allow/conditional здесь не добавляется ни в один манифест репозитория: это проверяет `vision licenses-check` в CI.",
-  "checked": "2026-09-14",
+  "checked": "2026-09-15",
   "packages": {
     "torch": {
       "spdx": "BSD-3-Clause (дистрибутив PyPI: Apache-2.0 AND BSD-2/3-Clause AND MIT AND BSL-1.0 AND LLVM-exception)",
       "decision": "allow",
-      "scope": "vision[train]",
+      "scope": "vision[train]; 2.11.0+cu128 на RTX 5050, в CI — 2.11.0 CPU",
       "evidence": "https://raw.githubusercontent.com/pytorch/pytorch/main/LICENSE sha256:bd018feef8825e88181c84eb7e3aa4eafb8f08a20d9fd6ef948569610c4a3e43; PyPI torch 2.14.0 License-Expression"
     },
     "torchvision": {
       "spdx": "BSD-3-Clause",
       "decision": "allow",
-      "scope": "vision[train]",
+      "scope": "vision[train]; 0.26.0+cu128",
       "evidence": "https://raw.githubusercontent.com/pytorch/vision/main/LICENSE sha256:6502f676851cfe25f8af75531dfb32375b7325b73c37e7b43741fa422893e71d",
       "weights": "предобученные веса torchvision — отдельная строка на каждый вес; в baseline промта 10 — инициализация с нуля"
     },
@@ -45,13 +45,13 @@
     "peft": {
       "spdx": "Apache-2.0",
       "decision": "allow",
-      "scope": "vision[qwen]",
+      "scope": "vision[qwen], vision[qwen-unsloth]; 0.20.0",
       "evidence": "https://raw.githubusercontent.com/huggingface/peft/main/LICENSE sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
     },
     "trl": {
       "spdx": "Apache-2.0",
       "decision": "allow",
-      "scope": "vision[qwen]",
+      "scope": "vision[qwen], vision[qwen-unsloth]; 0.24.0 — верхняя граница Unsloth",
       "evidence": "https://raw.githubusercontent.com/huggingface/trl/main/LICENSE sha256:1bf614b1fdc40fbd344aa58d00d17d5fd0d252ea333a05be018a38959c8b2998"
     },
     "pypdfium2": {
@@ -78,14 +78,14 @@
     "unsloth": {
       "spdx": "Apache-2.0 для пакета; внутри wheel — AGPL-3.0 файлы",
       "decision": "conditional",
-      "scope": "vision[qwen-unsloth], промты 12–13",
+      "scope": "vision[qwen-unsloth], промты 12–13; закреплён 2026.9.4 в requirements-qwen-unsloth.txt",
       "evidence": "wheel unsloth-2026.9.4 sha256:7892ac14733ba22200ef4a228ac26e06275562c5f72b96a654605d4dcbd05264: 1364 файла studio/ (studio/LICENSE.AGPL-3.0), unsloth/kernels/moe/LICENSE — AGPL-3.0, dist-info/licenses/COPYING — AGPL-3.0; README: dual license Apache-2.0 / AGPL-3.0",
       "condition": "решение владельца 2026-09-14: разрешено только в локальном окружении обучения на GPU-машине владельца; не в apps/api и не в производственном образе; окружение и образ с файлами Unsloth не распространяются; Unsloth Studio не запускается и не встраивается; выходной checkpoint сохраняется стандартным safetensors/PEFT и загружается без Unsloth; версии unsloth и unsloth-zoo с SHA-256 wheel записываются в run.json каждого прогона"
     },
     "unsloth-zoo": {
       "spdx": "LGPL-3.0-or-later для пакета; 41 файл .py с заголовком AGPL-3.0, COPYING — AGPL-3.0",
       "decision": "conditional",
-      "scope": "зависимость unsloth",
+      "scope": "зависимость unsloth; закреплён 2026.9.3",
       "evidence": "wheel unsloth_zoo-2026.9.3 sha256:d846a0cdf343ff4ca79a01806e45249362b4ad107442d3c68d32cee3527d350c: dist-info/licenses/LICENSE — LGPL-3.0, dist-info/licenses/COPYING — AGPL-3.0; 61 файл с заголовком LGPL, 41 — AGPL (dataset_num_proc.py, device_map_planner.py, …)",
       "condition": "те же условия, что у unsloth"
     },
@@ -95,6 +95,19 @@
       "scope": "не используется",
       "evidence": "https://raw.githubusercontent.com/ultralytics/ultralytics/main/LICENSE sha256:0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0; PyPI 8.4.152 AGPL-3.0",
       "condition": "только после явного решения владельца о корпоративной лицензии Ultralytics"
+    },
+    "accelerate": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "scope": "vision[qwen-unsloth]; 1.15.0 в requirements-qwen-unsloth.txt",
+      "evidence": "https://raw.githubusercontent.com/huggingface/accelerate/main/LICENSE sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4; PyPI 1.15.0"
+    },
+    "bitsandbytes": {
+      "spdx": "MIT",
+      "decision": "allow",
+      "scope": "vision[qwen-unsloth]: 4-бит QLoRA; 0.50.2",
+      "evidence": "https://raw.githubusercontent.com/bitsandbytes-foundation/bitsandbytes/main/LICENSE sha256:52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85; PyPI 0.50.2 License-Expression MIT",
+      "condition": "4-бит — эксперимент экономии памяти: продвижение только по измеренному качеству QTO (QWEN_UNSLOTH_EXPERIMENTS.md)"
     }
   },
   "weights": {
@@ -102,19 +115,35 @@
       "spdx": "Apache-2.0",
       "decision": "allow",
       "revision": "89644892e4d85e24eaac8bacfd4f463576704203",
-      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-2B-Instruct cardData.license apache-2.0, lastModified 2025-10-23, не gated"
+      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-2B-Instruct cardData.license apache-2.0, lastModified 2025-10-23, не gated; ревизия и SHA-256 весов повторно сверены 2026-09-15 (API revision?blobs=true)",
+      "weights_sha256": {
+        "model.safetensors": "7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0"
+      },
+      "card": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/blob/89644892e4d85e24eaac8bacfd4f463576704203/README.md"
     },
     "Qwen/Qwen3-VL-4B-Instruct": {
       "spdx": "Apache-2.0",
       "decision": "allow",
       "revision": "ebb281ec70b05090aa6165b016eac8ec08e71b17",
-      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-4B-Instruct cardData.license apache-2.0, lastModified 2025-10-15, не gated"
+      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-4B-Instruct cardData.license apache-2.0, lastModified 2025-10-15, не gated; ревизия и SHA-256 весов повторно сверены 2026-09-15 (API revision?blobs=true)",
+      "weights_sha256": {
+        "model-00001-of-00002.safetensors": "30a01a0556622645a3cce87b655bbbbbc1f170c196099f1b666c93202c3339a9",
+        "model-00002-of-00002.safetensors": "046296a2a387efb43b0c997d5833c789604d168834f6e0d3064bf7bb13d002a6"
+      },
+      "card": "https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct/blob/ebb281ec70b05090aa6165b016eac8ec08e71b17/README.md"
     },
     "Qwen/Qwen3-VL-8B-Instruct": {
       "spdx": "Apache-2.0",
       "decision": "allow",
       "revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
-      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-8B-Instruct cardData.license apache-2.0, lastModified 2025-10-15, не gated"
+      "evidence": "https://huggingface.co/api/models/Qwen/Qwen3-VL-8B-Instruct cardData.license apache-2.0, lastModified 2025-10-15, не gated; ревизия и SHA-256 весов повторно сверены 2026-09-15 (API revision?blobs=true)",
+      "weights_sha256": {
+        "model-00001-of-00004.safetensors": "d5d0aef0eb170fc7453a296c43c0849a56f510555d3588e4fd662bb35490aefa",
+        "model-00002-of-00004.safetensors": "8be88fb5501e4d5719a6d4cc212e6a13480330e74f3e8c77daa1a68f199106b5",
+        "model-00003-of-00004.safetensors": "83de00eafe6e0d57ccd009dbcf71c9974d74df2f016c27afb7e95aafd16b2192",
+        "model-00004-of-00004.safetensors": "0a88b98e9f96270973f567e6a2c103ede6ccdf915ca3075e21c755604d0377a5"
+      },
+      "card": "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct/blob/0c351dd01ed87e9c1b53cbc748cba10e6187ff3b/README.md"
     },
     "facebook/sam2.1-hiera-small": {
       "spdx": "Apache-2.0",

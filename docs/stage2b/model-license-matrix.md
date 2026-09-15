@@ -1,6 +1,6 @@
 # Матрица лицензий моделей и ML-зависимостей
 
-Проверено 2026-09-14, дополнено 2026-09-15 (промт 11). Машиночитаемая копия — [`vision/licenses/decisions.json`](../../vision/licenses/decisions.json);
+Проверено 2026-09-14, дополнено 2026-09-15 (промты 11 и 12). Машиночитаемая копия — [`vision/licenses/decisions.json`](../../vision/licenses/decisions.json);
 её читает гейт `pnpm lint:licenses` в CI. Не юридическое заключение: решение `allow` значит «есть
 задокументированный permissive-путь», а не «проверено юристом».
 
@@ -23,8 +23,10 @@
 | `sam2` (PyPI)                 | Apache-2.0 заявлено                                                                | **blocked**                                    | не используется                      | PyPI `sam2` 1.1.0 — сторонний форк `JinsuaFeito-dev/segment-anything-2`, не Meta; SAM 2 — через `transformers` |
 | `mobile-sam`                  | Apache-2.0                                                                         | **blocked**                                    | промт 11 не выполнен                 | MobileSAM/LICENSE `c71d239d…0ab4`; на PyPI нет, только git + `timm` без решения                                |
 | `transformers`                | Apache-2.0                                                                         | allow                                          | `vision[sam]`, `vision[qwen]`; 5.5.0 | transformers/LICENSE `77fd4710…2049`                                                                           |
-| `peft`                        | Apache-2.0                                                                         | allow                                          | `vision[qwen]`                       | peft/LICENSE `c71d239d…0ab4`                                                                                   |
-| `trl`                         | Apache-2.0                                                                         | allow                                          | `vision[qwen]`                       | trl/LICENSE `1bf614b1…8998`                                                                                    |
+| `peft`                        | Apache-2.0                                                                         | allow                                          | `vision[qwen]`; 0.20.0               | peft/LICENSE `c71d239d…0ab4`                                                                                   |
+| `trl`                         | Apache-2.0                                                                         | allow                                          | `vision[qwen]`; 0.24.0               | trl/LICENSE `1bf614b1…8998`                                                                                    |
+| `accelerate`                  | Apache-2.0                                                                         | allow                                          | `vision[qwen-unsloth]`; 1.15.0       | accelerate/LICENSE `c71d239d…0ab4`                                                                             |
+| `bitsandbytes`                | MIT                                                                                | allow + условие                                | `vision[qwen-unsloth]`; 0.50.2       | bitsandbytes/LICENSE `52412d7b…fc85`; 4 бита продвигаются только по измеренному качеству QTO                   |
 | `pypdfium2`                   | BSD-3-Clause OR Apache-2.0 + bundled PDFium                                        | conditional                                    | промт 20                             | PyPI 5.13.0; до образа — список bundled-лицензий, решение 2A пересматривает владелец                           |
 | `segmentation-models-pytorch` | MIT                                                                                | conditional                                    | не в промте 10                       | smp/LICENSE `a9acb108…538c`; каждый энкодер — своя строка                                                      |
 | `shapely`                     | BSD-3-Clause (GEOS LGPL-2.1)                                                       | conditional                                    | `vision[vectorize]`                  | shapely/LICENSE.txt `4a207eac…f754`; в прод-образ — после ADR                                                  |
@@ -46,6 +48,51 @@
 | предобученные веса torchvision    | —          | нет строки      | —                                          | baseline промта 10 — инициализация с нуля                          |
 
 Репозиторий QwenLM/Qwen3-VL — Apache-2.0 (`c71d239d…0ab4`).
+
+### Qwen3-VL: карточки и хеши родительских весов (промт 12)
+
+Ревизии и SHA-256 файлов сверены повторно 2026-09-15 через `api/models/<id>/revision/<sha>?blobs=true`
+до скачивания; закреплены в [`vision/quantor_vision/qwen/models.py`](../../vision/quantor_vision/qwen/models.py)
+и в `decisions.json`. `vision qwen-env fetch` отказывает, если скачанный файл не совпал. Лицензия
+весов — из карточки модели (`cardData.license`), а не из лицензии пакета `transformers`.
+
+| Модель      | Роль                     | Карточка на ревизии                                                     | Файлы весов и SHA-256                                                       |
+| ----------- | ------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 2B Instruct | нижняя граница           | `huggingface.co/Qwen/Qwen3-VL-2B-Instruct/blob/89644892…4203/README.md` | `model.safetensors` `7de1838c…77a0`                                         |
+| 4B Instruct | основная                 | `huggingface.co/Qwen/Qwen3-VL-4B-Instruct/blob/ebb281ec…1b17/README.md` | `-00001-of-00002` `30a01a05…39a9`, `-00002-of-00002` `046296a2…02a6`        |
+| 8B Instruct | условная верхняя граница | `huggingface.co/Qwen/Qwen3-VL-8B-Instruct/blob/0c351dd0…ff3b/README.md` | 4 файла: `d5d0aef0…aefa`, `8be88fb5…06b5`, `83de00ea…2192`, `0a88b98e…77a5` |
+
+Thinking-редакции не используются: нужен строгий структурированный ответ, а не рассуждение.
+
+### Стек обучения Qwen (промт 12)
+
+Одно окружение `vision\.venv-unsloth`, только на GPU-машине владельца, из
+[`vision/requirements-qwen-unsloth.txt`](../../vision/requirements-qwen-unsloth.txt); полный снимок
+после установки — `requirements-qwen-unsloth.lock.txt` (его тоже проверяет гейт).
+
+| Компонент                                                                                  | Версия                           | Лицензия                                        | Замечание                                                                               |
+| ------------------------------------------------------------------------------------------ | -------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `unsloth`                                                                                  | 2026.9.4, wheel `7892ac14…5264`  | Apache-2.0 + AGPL-3.0 файлы                     | Р-2; Studio (`studio/` в wheel) не запускается, не встраивается, не вендорится          |
+| `unsloth-zoo`                                                                              | 2026.9.3, wheel `d846a0cd…350c`  | LGPL-3.0-or-later + AGPL-3.0 файлы              | те же условия                                                                           |
+| `torch` / `torchvision`                                                                    | 2.11.0+cu128 / 0.26.0+cu128      | BSD-3-Clause                                    | Unsloth требует `torch < 2.13`                                                          |
+| CUDA-библиотеки в колёсах cu128                                                            | CUDA 12.8, cuDNN из колеса torch | NVIDIA Software License                         | не распространяются: окружение остаётся на машине владельца                             |
+| `xformers`                                                                                 | 0.0.35                           | BSD-3-Clause (xformers/LICENSE `8b069586…b7ea`) | зависимость Unsloth на Windows                                                          |
+| `transformers`                                                                             | 5.5.0                            | Apache-2.0                                      | верхняя граница Unsloth                                                                 |
+| `trl`, `peft`, `accelerate`                                                                | 0.24.0, 0.20.0, 1.15.0           | Apache-2.0                                      | —                                                                                       |
+| `bitsandbytes`                                                                             | 0.50.2                           | MIT                                             | только QLoRA-эксперимент                                                                |
+| `datasets`                                                                                 | 4.3.0 (Unsloth: `< 4.4.0`)       | Apache-2.0 (datasets/LICENSE `cfc7749b…3d30`)   | —                                                                                       |
+| транзитивные: `triton-windows`, `torchao`, `diffusers`, `cut-cross-entropy`, `hf_transfer` | из lock-файла                    | MIT / BSD-3 / Apache-2.0 / по lock              | лицензии сверяются по lock-файлу; пакет из охраняемого списка без строки — красный гейт |
+
+### Адаптер и слитые веса: происхождение
+
+- Выход обучения промта 13 — PEFT-адаптер (`adapter_model.safetensors`, `adapter_config.json`),
+  сохранённый стандартным `save_pretrained` и загружаемый **без Unsloth** (`transformers + peft`).
+- В `run.json` пишутся: SHA-256 каждого файла адаптера; родитель — `repo_id`, полная ревизия и SHA-256
+  всех файлов весов из таблицы выше; SHA-256 wheel `unsloth` и `unsloth-zoo` и `RECORD` установленных
+  пакетов; версии стека; SHA-256 SFT-набора (`sft.json`).
+- Слитые веса (merge) по умолчанию не делаются. Если сделаны — отдельный SHA-256 каждого файла и
+  ссылка на адаптер и родителя; лицензия слитых весов — Apache-2.0 родителя, код Unsloth в веса не
+  попадает.
 
 ## Unsloth: AGPL внутри пакета и условия разрешения
 
@@ -81,7 +128,9 @@
 - https://raw.githubusercontent.com/qubvel-org/segmentation_models.pytorch/main/LICENSE
 - https://raw.githubusercontent.com/shapely/shapely/main/LICENSE.txt
 - https://raw.githubusercontent.com/unslothai/unsloth/main/LICENSE, README.md (раздел License), wheel 2026.9.4 на PyPI
-- https://raw.githubusercontent.com/huggingface/transformers/main/LICENSE, peft, trl
+- https://raw.githubusercontent.com/huggingface/transformers/main/LICENSE, peft, trl, accelerate, datasets
+- https://raw.githubusercontent.com/bitsandbytes-foundation/bitsandbytes/main/LICENSE, facebookresearch/xformers
+- https://pypi.org/pypi/unsloth/2026.9.4/json, unsloth-zoo/2026.9.3 — `requires_dist` для закрепления версий
 - https://raw.githubusercontent.com/QwenLM/Qwen3-VL/main/LICENSE
 - https://huggingface.co/api/models/Qwen/Qwen3-VL-2B-Instruct, -4B-, -8B-, facebook/sam2.1-hiera-small
 - https://pypi.org/pypi/pypdfium2/json, torch, ultralytics, unsloth, opencv-python-headless

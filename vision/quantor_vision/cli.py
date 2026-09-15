@@ -5,7 +5,8 @@ vision dataset verify <сборка>      проверка сборки пром
 vision licenses-check [--root DIR]  лицензионный гейт по всем манифестам репозитория
 vision environment                  что есть в окружении: модули, GPU, решения
 vision train slab --build DIR       промт 10      — малая сегментация плиты (masonry — промт 15)
-vision qwen-build-sft ...           промт 12      — SFT-наборы из видов Qwen промта 08
+vision qwen-build-sft --build --out промт 12      — SFT-наборы Qwen из сборки промта 08
+vision qwen-env probe|fetch|smoke   промт 12      — GPU и BF16, закреплённые веса, дымовой прогон
 vision qwen-train ...               промт 13      — SFT Qwen3-VL
 vision qwen-evaluate ...            промт 14      — прямая геометрия и Qwen→SAM
 vision evaluate slab --build --run  промт 10      — метрики на frozen test, один раз
@@ -44,7 +45,6 @@ DECISIONS = VISION_ROOT / "licenses" / "decisions.json"
 
 REQUIREMENTS: dict[str, tuple[Requirement, str]] = {
     "train masonry": (Requirement(("torch", "torchvision"), needs_gpu=True), "промт 15"),
-    "qwen-build-sft": (Requirement((), needs_gpu=False), "промт 12"),
     "qwen-train": (
         Requirement(("torch", "transformers", "peft", "trl"), needs_gpu=True),
         "промт 13",
@@ -261,6 +261,84 @@ def _sam_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _data_subdir(value: str | None, name: str) -> Path | None:
+    if value:
+        return Path(value)
+    root = os.environ.get("QUANTOR_DATASET_ROOT")
+    return Path(root) / name if root else None
+
+
+def _outside_repo(path: Path | None, flag: str, what: str, reasons: list[str]) -> None:
+    if path is None:
+        reasons.append(f"не задан {flag} и нет QUANTOR_DATASET_ROOT")
+    elif _inside_git_worktree(path) is not None:
+        reasons.append(f"{path} внутри git-репозитория: {what} туда не пишутся")
+
+
+def _qwen_build_sft(args: argparse.Namespace) -> int:
+    from quantor_vision.qwen.schema import Limits
+    from quantor_vision.qwen.sft import SftConfig, SftRefusedError, build_sft
+    from quantor_vision.qwen.targets import TargetConfig
+
+    build = Path(args.build)
+    reasons = [] if args.skip_verify else verify_build(build)
+    out = Path(args.out)
+    _outside_repo(out, "--out", "SFT-наборы", reasons)
+    if reasons:
+        return _blocked("qwen-build-sft", reasons)
+    config = SftConfig(
+        targets=TargetConfig(stride=args.stride, min_area_px=args.min_area_px),
+        limits=Limits(max_objects=args.max_objects),
+    )
+    try:
+        result = build_sft(build, out, config)
+    except SftRefusedError as error:
+        _print({"command": "qwen-build-sft", "status": "REFUSED", "reason": str(error)})
+        return 2
+    _print(
+        {"out": str(out), "counters": result["counters"], "anti_leakage": result["anti_leakage"]}
+    )
+    return 0
+
+
+def _qwen_env(args: argparse.Namespace) -> int:
+    from quantor_vision.qwen import environment
+
+    if args.env_command == "probe":
+        report = environment.probe()
+        _print(report)
+        return 0 if report["status"] == "OK" else BLOCKED_EXIT
+
+    models = _data_subdir(args.models, "models")
+    reasons: list[str] = []
+    _outside_repo(models, "--models", "веса", reasons)
+    if args.env_command == "fetch":
+        reasons.extend(blockers(Requirement(("huggingface_hub",), needs_gpu=False)))
+        if reasons or models is None:
+            return _blocked("qwen-env fetch", reasons)
+        result = environment.fetch(args.model, models)
+        _print(result)
+        return 0 if result["verified"] else 1
+
+    modules = ("torch", "transformers", "PIL") + (("unsloth",) if args.backend == "unsloth" else ())
+    reasons.extend(blockers(Requirement(modules, needs_gpu=True)))
+    runs = _data_subdir(args.runs, "runs")
+    _outside_repo(runs, "--runs", "записи прогонов", reasons)
+    if reasons or models is None or runs is None:
+        return _blocked("qwen-env smoke", reasons)
+    record = environment.smoke(
+        model_key=args.model,
+        backend=args.backend,
+        quantization=args.quantization,
+        models_root=models,
+        out_dir=runs / "qwen-env",
+        max_new_tokens=args.max_new_tokens,
+    )
+    printable = {key: value for key, value in record.items() if key != "traceback"}
+    _print(printable)
+    return 0 if record["status"] == "OK" else BLOCKED_EXIT
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vision", description="ML-контур Quantor Stage 2B")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -331,6 +409,31 @@ def build_parser() -> argparse.ArgumentParser:
     sam_run.add_argument("--device", default="auto")
     sam_run.add_argument("--allow-cpu", action="store_true")
     sam_run.set_defaults(handler=_sam_run)
+
+    sft = commands.add_parser("qwen-build-sft", help="промт 12: SFT-наборы Qwen из сборки 08")
+    sft.add_argument("--build", required=True)
+    sft.add_argument("--out", required=True, help="пустой каталог вне репозитория")
+    sft.add_argument("--stride", type=int, default=4, help="шаг сетки целей, px тайла")
+    sft.add_argument("--min-area-px", type=int, default=1024)
+    sft.add_argument("--max-objects", type=int, default=16)
+    sft.add_argument("--skip-verify", action="store_true", help="только для синтетики в тестах")
+    sft.set_defaults(handler=_qwen_build_sft)
+
+    qwen_env = commands.add_parser("qwen-env", help="промт 12: окружение Qwen3-VL")
+    env_commands = qwen_env.add_subparsers(dest="env_command", required=True)
+    env_commands.add_parser("probe", help="версии, GPU, BF16, телеметрия").set_defaults(
+        handler=_qwen_env
+    )
+    for name, text in (("fetch", "скачать и сверить веса"), ("smoke", "загрузка и один ответ")):
+        sub = env_commands.add_parser(name, help=text)
+        sub.add_argument("--model", choices=("2b", "4b", "8b"), required=True)
+        sub.add_argument("--models", help="каталог весов; иначе $QUANTOR_DATASET_ROOT/models")
+        if name == "smoke":
+            sub.add_argument("--backend", choices=("transformers", "unsloth"), required=True)
+            sub.add_argument("--quantization", choices=("bf16", "4bit"), default="bf16")
+            sub.add_argument("--runs", help="по умолчанию $QUANTOR_DATASET_ROOT/runs")
+            sub.add_argument("--max-new-tokens", type=int, default=256)
+        sub.set_defaults(handler=_qwen_env)
 
     for name in REQUIREMENTS:
         if " " in name:

@@ -22,7 +22,20 @@ const trainPython = join(
   '.venv-train',
   process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
 );
-const python = existsSync(trainPython) ? trainPython : venvExists() ? venvPython() : null;
+// Окружение Qwen на Unsloth vision/.venv-unsloth (промты 12–13, условия Р-2) — только для qwen-env.
+const unslothPython = join(
+  visionDir,
+  '.venv-unsloth',
+  process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
+);
+const wantsUnsloth = process.argv[2] === 'qwen-env' && existsSync(unslothPython);
+const python = wantsUnsloth
+  ? unslothPython
+  : existsSync(trainPython)
+    ? trainPython
+    : venvExists()
+      ? venvPython()
+      : null;
 if (python === null) {
   console.error(
     '\nНет ни vision/.venv-train, ни apps/api/.venv. Инструкция — docs/stage2b/gpu-runbook.md, § 5а\n',

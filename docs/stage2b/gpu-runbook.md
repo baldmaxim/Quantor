@@ -142,30 +142,12 @@ py -3.12 -m venv .venv-train
 
 ### 5б. Qwen на Unsloth (Р-2)
 
-У вас Unsloth уже работает — окружение пересоздавать не нужно, достаточно проверить совместимость
-с условиями и зафиксировать версии:
-
-```powershell
-New-Item -ItemType Directory -Force "$env:QUANTOR_DATASET_ROOT\envs" | Out-Null
-<ваш python окружения Unsloth> -m pip show unsloth unsloth-zoo torch transformers trl peft bitsandbytes
-<ваш python окружения Unsloth> -m pip freeze > "$env:QUANTOR_DATASET_ROOT\envs\unsloth-freeze.txt"
-```
-
-Совместимые ориентиры для RTX 50 на дату проверки: `torch 2.11.0+cu128`, `torchvision 0.26.0+cu128`
-(связка extra `unsloth[cu128onlytorch2110]`), `transformers ≤ 5.5.0` (и не 4.57.0), `trl ≤ 0.24.0`,
-`peft ≥ 0.18`. Если окружения нет или оно старое — создать рядом `vision\.venv-unsloth`:
-
-```powershell
-py -3.12 -m venv .venv-unsloth
-.\.venv-unsloth\Scripts\python -m pip install torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cu128
-.\.venv-unsloth\Scripts\python -m pip install unsloth unsloth-zoo
-.\.venv-unsloth\Scripts\python -m pip install -e .
-```
+Окружение `vision\.venv-unsloth` строго из `vision\requirements-qwen-unsloth.txt` со сверкой SHA-256
+wheel Unsloth — пошагово в [12, § 6](12-qwen-unsloth-dataset-env.md). Произвольная установка
+`pip install unsloth` без закреплённых версий не используется: прогон на другом стеке несравним.
 
 Условия Р-2 на этой машине: Unsloth Studio не запускать; окружение и архивы с ним никому не
 передавать; адаптер сохранять стандартным PEFT/safetensors.
-
-Прислать вывод `pip show` из 5б.
 
 ## 6. Проверка готовности
 
@@ -182,14 +164,14 @@ cd vision
 
 Команды обучения появятся по промтам:
 
-| Промт | Команда (будет)                                                                                   | Окружение       | Что пришлёте                                  |
-| ----- | ------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------- |
-| 10    | `vision train slab` — **готово**, шаги в [10, § 6](10-slab-small-baseline.md)                     | `.venv-train`   | `run.json`, `metrics.json`, хвост лога        |
-| 10    | `vision evaluate slab` — test один раз                                                            | `.venv-train`   | `test-metrics.json`                           |
-| 11    | `vision sam run` — **готово**, шаги в [11, § 6](11-sam-baselines.md); нужен `transformers==5.5.0` | `.venv-train`   | `val-metrics.json`, затем `test-metrics.json` |
-| 12    | `vision qwen-build-sft …`                                                                         | любое           | счётчики набора                               |
-| 13    | `vision qwen-train …`                                                                             | Unsloth         | `run.json`, `metrics.json`                    |
-| 14    | `vision qwen-evaluate …`                                                                          | Unsloth / train | `metrics.json`                                |
+| Промт | Команда (будет)                                                                                                             | Окружение       | Что пришлёте                                        |
+| ----- | --------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------- |
+| 10    | `vision train slab` — **готово**, шаги в [10, § 6](10-slab-small-baseline.md)                                               | `.venv-train`   | `run.json`, `metrics.json`, хвост лога              |
+| 10    | `vision evaluate slab` — test один раз                                                                                      | `.venv-train`   | `test-metrics.json`                                 |
+| 11    | `vision sam run` — **готово**, шаги в [11, § 6](11-sam-baselines.md); нужен `transformers==5.5.0`                           | `.venv-train`   | `val-metrics.json`, затем `test-metrics.json`       |
+| 12    | `vision qwen-env probe/fetch/smoke`, `vision qwen-build-sft` — **готово**, шаги в [12, § 6](12-qwen-unsloth-dataset-env.md) | `.venv-unsloth` | lock-файл, `probe`, 5 дымовых записей, счётчики SFT |
+| 13    | `vision qwen-train …`                                                                                                       | Unsloth         | `run.json`, `metrics.json`                          |
+| 14    | `vision qwen-evaluate …`                                                                                                    | Unsloth / train | `metrics.json`                                      |
 
 Каждая команда пишет результаты в `$env:QUANTOR_DATASET_ROOT\runs\<run_id>\` — вне репозитория.
 
@@ -215,7 +197,7 @@ cd vision
 `tool.setuptools.packages.find` — без них setuptools отказывался из-за каталогов `licenses/` и
 `tests/` рядом с пакетом.
 
-Промт 10 готов к запуску на этой машине. `vision\.venv-unsloth` по § 5б создаётся перед промтом 13;
+Промт 10 готов к запуску на этой машине. `vision\.venv-unsloth` по § 5б создаётся в промте 12;
 Studio-установка на обучение не влияет и не используется.
 
 ## Прогоны

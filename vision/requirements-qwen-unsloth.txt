@@ -1,0 +1,18 @@
+# Окружение Qwen3-VL + Unsloth (промты 12–13): только vision/.venv-unsloth на GPU-машине владельца.
+# Условия Unsloth — docs/stage2b/model-license-matrix.md: не распространяется, Studio не запускается.
+# Python 3.12, Windows x64, RTX 5050 (sm_120) → колёса CUDA 12.8.
+# Прямые зависимости закреплены здесь; полный снимок после установки — requirements-qwen-unsloth.lock.txt
+# (pip freeze), его тоже проверяет лицензионный гейт.
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
+xformers==0.0.35
+transformers==5.5.0
+trl==0.24.0
+peft==0.20.0
+accelerate==1.15.0
+bitsandbytes==0.50.2
+datasets==4.3.0
+unsloth==2026.9.4
+unsloth-zoo==2026.9.3

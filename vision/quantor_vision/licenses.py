@@ -74,7 +74,9 @@ def declared_in_pyproject(path: Path) -> list[str]:
 
 def declared_in_requirements(path: Path) -> list[str]:
     names = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    # utf-8-sig: снимок `pip freeze`, сохранённый из PowerShell, начинается с BOM, и без этого
+    # первый пакет списка молча выпал бы из проверки.
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         stripped = line.split("#", 1)[0].strip()
         if stripped and not stripped.startswith("-"):
             names.append(_requirement_name(stripped))

@@ -17,7 +17,16 @@ sam = ["transformers"]
 # Промты 12–14: Qwen3-VL SFT на Apache-стеке — и как запасной путь, и для инференса без Unsloth.
 qwen = ["transformers", "peft", "trl"]
 # Промты 12–13 на Unsloth: только локальное окружение обучения, условия — licenses/decisions.json.
-qwen-unsloth = ["unsloth", "unsloth-zoo", "transformers", "peft", "trl"]
+# Точные версии и индекс CUDA — requirements-qwen-unsloth.txt; ставится только оттуда.
+qwen-unsloth = [
+    "unsloth",
+    "unsloth-zoo",
+    "transformers",
+    "peft",
+    "trl",
+    "accelerate",
+    "bitsandbytes",
+]
 # Промты 16–17: маска → вектор.
 vectorize = ["opencv-python-headless"]
 
