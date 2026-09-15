@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from quantor_vision.cli import BLOCKED_EXIT, VISION_ROOT, main
+from quantor_vision.cli import VISION_ROOT, main
+from quantor_vision.environment import BLOCKED_EXIT
 from quantor_vision.qwen import environment
 from quantor_vision.qwen.models import MODELS, local_dir_name
 from quantor_vision.qwen.schema import (

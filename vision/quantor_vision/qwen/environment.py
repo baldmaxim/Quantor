@@ -121,7 +121,6 @@ def probe() -> dict[str, object]:
                 "capability": f"{major}.{minor}",
                 "total_memory_gib": round(properties.total_memory / 1024**3, 2),
                 "torch_cuda": str(torch.version.cuda),
-                "cudnn": str(torch.backends.cudnn.version()),
                 "arch_list": torch.cuda.get_arch_list(),
                 "bf16_supported": torch.cuda.is_bf16_supported(),
             }
