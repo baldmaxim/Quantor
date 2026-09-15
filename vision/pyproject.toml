@@ -45,6 +45,8 @@ include = ["quantor_vision*"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Кэш, который Unsloth генерирует в рабочем каталоге при загрузке модели: не исходники проекта.
+extend-exclude = ["unsloth_compiled_cache"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "S"]

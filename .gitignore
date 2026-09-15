@@ -15,6 +15,8 @@ build/
 # --- Python ---
 .venv/
 .venv-*/
+# Unsloth компилирует патчи в текущий каталог (vision/) при загрузке модели.
+unsloth_compiled_cache/
 venv/
 __pycache__/
 *.py[cod]

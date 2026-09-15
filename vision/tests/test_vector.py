@@ -108,7 +108,8 @@ class TestPolygonize:
         polygon = vectors.polygons[0]
         assert polygon.status == "valid", polygon.issue
         assert polygon.holes == []
-        assert _area_px(polygon.outer) == pytest.approx(34, abs=0.1)
+        # Разведение перетяжки меняет площадь на доли пикселя.
+        assert _area_px(polygon.outer) == pytest.approx(34, abs=0.5)
 
     def test_frame_with_open_corner_is_valid(self) -> None:
         # Рамка 3×3 без центра и без угла (4, 4): центр выходит наружу через угол.
@@ -121,7 +122,7 @@ class TestPolygonize:
 
         assert len(vectors.polygons) == 1
         assert vectors.polygons[0].status == "valid", vectors.polygons[0].issue
-        assert vectors.polygons[0].net_area_px == pytest.approx(7, abs=0.1)
+        assert vectors.polygons[0].net_area_px == pytest.approx(7, abs=0.5)
 
     def test_corner_touching_components_are_separate_polygons(self) -> None:
         mask = _mask()
