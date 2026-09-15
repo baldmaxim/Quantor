@@ -193,8 +193,10 @@ class TestTargets:
         assert target.objects == []
 
     def test_small_fragments_are_dropped_and_counted(self) -> None:
+        # Обрывок 2×2 px накрывает центр клетки (1, 1), по которому сетка шага 2 и опрашивает маску.
         mask = bytearray(TILE * TILE)
-        mask[0] = mask[1] = 255
+        for index in (0, 1, TILE, TILE + 1):
+            mask[index] = 255
         target = slab_target(bytes(mask), GEOMETRY, TargetConfig(stride=2, min_area_px=64))
         assert target.objects == []
         assert target.dropped_small == 1
