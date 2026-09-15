@@ -11,7 +11,7 @@ vision qwen-train ...               промт 13      — SFT Qwen3-VL
 vision qwen-evaluate ...            промт 14      — прямая геометрия и Qwen→SAM
 vision evaluate slab --build --run  промт 10      — метрики на frozen test, один раз
 vision infer ...                    промт 20      — доверенный исполнитель (после PASS 18)
-vision vectorize ...                промты 16–17  — маска → вектор
+vision vectorize slab --build --run промт 16      — маска → многоугольник с отверстиями, метрики
 vision sam run --policy auto|coarse промт 11      — SAM 2: val настраивает, test один раз
 ```
 
@@ -52,7 +52,6 @@ REQUIREMENTS: dict[str, tuple[Requirement, str]] = {
     "qwen-evaluate": (Requirement(("torch", "transformers"), needs_gpu=True), "промт 14"),
     "evaluate masonry": (Requirement(("torch",), needs_gpu=False), "промты 15–18"),
     "infer": (Requirement(("torch",), needs_gpu=False), "промт 20 — только после PASS промта 18"),
-    "vectorize": (Requirement(("cv2",), needs_gpu=False), "промты 16–17"),
 }
 
 
@@ -275,6 +274,32 @@ def _outside_repo(path: Path | None, flag: str, what: str, reasons: list[str]) -
         reasons.append(f"{path} внутри git-репозитория: {what} туда не пишутся")
 
 
+def _vectorize_slab(args: argparse.Namespace) -> int:
+    reasons = blockers(Requirement(("torch",), needs_gpu=False))
+    if reasons:
+        return _blocked("vectorize slab", reasons)
+
+    from quantor_vision.vector.polygonize import VectorConfig
+    from quantor_vision.vector.run import VectorizeRefusedError, vectorize_run
+
+    overrides = {key: value for key, _, value in (item.partition("=") for item in args.set or [])}
+    try:
+        config = VectorConfig.with_overrides(overrides)
+        result = vectorize_run(
+            Path(args.build),
+            Path(args.run),
+            split=args.split,
+            build_config=Path(args.build_config),
+            config=config,
+            new_experiment=args.new_experiment,
+        )
+    except (VectorizeRefusedError, ValueError) as error:
+        _print({"command": "vectorize slab", "status": "REFUSED", "reason": str(error)})
+        return 2
+    _print(result)
+    return 0
+
+
 def _qwen_build_sft(args: argparse.Namespace) -> int:
     from quantor_vision.qwen.schema import Limits
     from quantor_vision.qwen.sft import SftConfig, SftRefusedError, build_sft
@@ -409,6 +434,19 @@ def build_parser() -> argparse.ArgumentParser:
     sam_run.add_argument("--device", default="auto")
     sam_run.add_argument("--allow-cpu", action="store_true")
     sam_run.set_defaults(handler=_sam_run)
+
+    vectorize = commands.add_parser("vectorize", help="маска → вектор: slab — промт 16")
+    vectorize_tasks = vectorize.add_subparsers(dest="task", required=True)
+    vector_slab = vectorize_tasks.add_parser("slab", help="многоугольники плиты и метрики")
+    vector_slab.add_argument("--build", required=True)
+    vector_slab.add_argument("--run", required=True, help="каталог прогона с predictions/<split>")
+    vector_slab.add_argument("--split", choices=("val", "test"), default="val")
+    vector_slab.add_argument(
+        "--build-config", required=True, help="конфиг сборки 08: пути разметки и метки плит"
+    )
+    vector_slab.add_argument("--set", action="append", help="настройка: ключ=значение (только val)")
+    vector_slab.add_argument("--new-experiment", help="причина повторного test")
+    vector_slab.set_defaults(handler=_vectorize_slab)
 
     sft = commands.add_parser("qwen-build-sft", help="промт 12: SFT-наборы Qwen из сборки 08")
     sft.add_argument("--build", required=True)

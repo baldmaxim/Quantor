@@ -170,6 +170,7 @@ cd vision
 | 10    | `vision evaluate slab` — test один раз                                                                                      | `.venv-train`   | `test-metrics.json`                                 |
 | 11    | `vision sam run` — **готово**, шаги в [11, § 6](11-sam-baselines.md); нужен `transformers==5.5.0`                           | `.venv-train`   | `val-metrics.json`, затем `test-metrics.json`       |
 | 12    | `vision qwen-env probe/fetch/smoke`, `vision qwen-build-sft` — **готово**, шаги в [12, § 6](12-qwen-unsloth-dataset-env.md) | `.venv-unsloth` | lock-файл, `probe`, 5 дымовых записей, счётчики SFT |
+| 16    | `vision vectorize slab` — **готово**, шаги в [16, § 6](16-mask-to-polygon.md); GPU не нужен                                 | `.venv-train`   | `summary` val, затем test                           |
 | 13    | `vision qwen-train …`                                                                                                       | Unsloth         | `run.json`, `metrics.json`                          |
 | 14    | `vision qwen-evaluate …`                                                                                                    | Unsloth / train | `metrics.json`                                      |
 
