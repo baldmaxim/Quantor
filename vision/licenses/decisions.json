@@ -23,23 +23,23 @@
       "notice": "THIRD_PARTY_NOTICES при распространении; колёса PyPI несут собственные bundled-лицензии"
     },
     "sam2": {
-      "spdx": "Apache-2.0",
-      "decision": "allow",
-      "scope": "vision[sam]",
-      "evidence": "https://raw.githubusercontent.com/facebookresearch/sam2/main/LICENSE sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-      "weights": "facebook/sam2.1-hiera-small revision ee5bba1d82bb8749febdf90f45e84b687142ba03, cardData.license apache-2.0"
+      "spdx": "Apache-2.0 (заявлено)",
+      "decision": "blocked",
+      "scope": "не используется",
+      "evidence": "PyPI sam2 1.1.0 — сторонний форк github.com/JinsuaFeito-dev/segment-anything-2, не код Meta (проверено 2026-09-15)",
+      "condition": "риск подмены пакета: SAM 2 используется через transformers (Sam2Model) с официальными весами facebook/sam2.1-hiera-*"
     },
     "mobile-sam": {
       "spdx": "Apache-2.0",
-      "decision": "allow",
-      "scope": "vision[sam]",
-      "evidence": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/master/LICENSE sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-      "weights": "веса MobileSAM из репозитория — ревизия и SHA-256 фиксируются при скачивании"
+      "decision": "blocked",
+      "scope": "промт 11 — не выполнен",
+      "evidence": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/master/LICENSE sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4; на PyPI нет (проверено 2026-09-15)",
+      "condition": "установка только из git и с timm без решения в матрице; включить можно по решению владельца с закреплённым коммитом и аудитом timm"
     },
     "transformers": {
       "spdx": "Apache-2.0",
       "decision": "allow",
-      "scope": "vision[qwen]",
+      "scope": "vision[sam], vision[qwen]; 5.5.0 — совместимо с Unsloth (≤ 5.5.0)",
       "evidence": "https://raw.githubusercontent.com/huggingface/transformers/main/LICENSE sha256:77fd4710def9ec3c0f6225800e0235f15a425abd4a8b03559127fcd782612049"
     },
     "peft": {
@@ -120,7 +120,19 @@
       "spdx": "Apache-2.0",
       "decision": "allow",
       "revision": "ee5bba1d82bb8749febdf90f45e84b687142ba03",
-      "evidence": "https://huggingface.co/api/models/facebook/sam2.1-hiera-small cardData.license apache-2.0"
+      "evidence": "https://huggingface.co/api/models/facebook/sam2.1-hiera-small cardData.license apache-2.0, library transformers"
+    },
+    "facebook/sam2.1-hiera-tiny": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "revision": "de431c4043854a71d8101e17995dfe596bf101a5",
+      "evidence": "https://huggingface.co/api/models/facebook/sam2.1-hiera-tiny cardData.license apache-2.0, library transformers; model.safetensors sha256:48c14467e5cf9e51870511feb72c89688e82dd74523142c0538b663e193ac2a7"
+    },
+    "facebook/sam2.1-hiera-base-plus": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "revision": "b7320756a13354e7530a63935656d35b2f91a290",
+      "evidence": "https://huggingface.co/api/models/facebook/sam2.1-hiera-base-plus cardData.license apache-2.0, library transformers"
     }
   }
 }

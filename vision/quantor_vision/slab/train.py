@@ -14,11 +14,8 @@
 from __future__ import annotations
 
 import json
-import math
 import platform
-import struct
 import time
-import zlib
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -27,9 +24,9 @@ import torch
 from torch.nn import functional
 
 from quantor_vision import runrecord
-from quantor_vision.png import SIGNATURE
 from quantor_vision.slab.data import BuildInfo, SlabTiles, TileRef, load_build, positive_fraction
-from quantor_vision.slab.metrics import MaskMetrics, page_area_errors
+from quantor_vision.slab.evaluation import evaluate_predictor, save_outputs
+from quantor_vision.slab.metrics import MaskMetrics
 from quantor_vision.slab.model import TinyUNet, parameter_count
 
 THRESHOLDS = tuple(round(0.2 + 0.05 * step, 2) for step in range(13))
@@ -265,8 +262,7 @@ def _evaluate(
         or build.tiles_sha256 != record["dataset_fingerprint"]
     ):
         raise ValueError("сборка не та, на которой обучалась модель")
-    output = run_dir / f"{split}-metrics.json"
-    if split == "test" and output.exists():
+    if split == "test" and (run_dir / "test-metrics.json").exists():
         raise ValueError("test уже оценён этим прогоном; повторная оценка не выполняется")
 
     training = record["training"]
@@ -274,108 +270,21 @@ def _evaluate(
     model = TinyUNet(int(training["base_width"]), int(training["depth"])).to(device)
     model.load_state_dict(torch.load(run_dir / "best.pt", map_location=device, weights_only=True))
     model.eval()
-    threshold = float(training["frozen_threshold"])
     amp = str(training["amp"])
     dataset = SlabTiles(
         [tile for tile in build.tiles if tile.split == split], augment=False, seed=0
     )
 
-    metrics = MaskMetrics()
-    pages: dict[str, dict[str, torch.Tensor]] = {}
-    predictions_dir = run_dir / "predictions" / split
-    predictions_dir.mkdir(parents=True, exist_ok=True)
-    hashes: list[dict[str, str]] = []
-    latencies: list[float] = []
-    if device.type == "cuda":
-        torch.cuda.reset_peak_memory_stats(device)
-
-    for index, tile in enumerate(dataset.tiles):
-        x, y, valid = dataset[index]
-        if device.type == "cuda":
-            torch.cuda.synchronize(device)
-        started = time.perf_counter()
+    def predict(_: TileRef, x: torch.Tensor) -> torch.Tensor:
         with _autocast(device, amp):
             logits = model(x.unsqueeze(0).to(device))
-        probability = torch.sigmoid(logits.float())
-        if device.type == "cuda":
-            torch.cuda.synchronize(device)
-        latencies.append((time.perf_counter() - started) * 1000)
-        probability = probability.cpu()[0]
-        prediction = (probability >= threshold).float()
-        metrics.update(prediction.unsqueeze(0), y.unsqueeze(0), valid.unsqueeze(0))
+        return torch.sigmoid(logits.float()).cpu()[0]
 
-        path = predictions_dir / f"{tile.tile_id}.png"
-        _write_mask(path, prediction[0])
-        hashes.append({"tile_id": tile.tile_id, "sha256": runrecord.sha256_file(path)})
-
-        # Сшивка листа: вероятности окон складываются и делятся на число покрытий.
-        page = pages.setdefault(
-            tile.page_guid,
-            {
-                "sum": torch.zeros(tile.working_size[1], tile.working_size[0]),
-                "count": torch.zeros(tile.working_size[1], tile.working_size[0]),
-                "truth": torch.zeros(tile.working_size[1], tile.working_size[0]),
-            },
-        )
-        x0, y0 = tile.origin
-        h, w = tile.valid_height, tile.valid_width
-        page["sum"][y0 : y0 + h, x0 : x0 + w] += probability[0, :h, :w]
-        page["count"][y0 : y0 + h, x0 : x0 + w] += 1
-        page["truth"][y0 : y0 + h, x0 : x0 + w] = torch.maximum(
-            page["truth"][y0 : y0 + h, x0 : x0 + w], y[0, :h, :w]
-        )
-
-    areas: dict[str, tuple[float, float]] = {}
-    uncovered = 0
-    for guid, page in pages.items():
-        covered = page["count"] > 0
-        uncovered += int((~covered).sum())
-        mask = (page["sum"] / page["count"].clamp(min=1)) >= threshold
-        areas[guid] = (float((mask & covered).sum()), float((page["truth"] * covered).sum()))
-
-    ordered = sorted(latencies)
-    result: dict[str, object] = {
-        "run_id": record["run_id"],
-        "split": split,
-        "frozen_threshold": threshold,
-        "tiles": len(dataset),
-        "pixel": metrics.summary(),
-        "page": {**page_area_errors(areas), "uncovered_pixels": uncovered},
-        "latency_ms_per_tile": {
-            "median": ordered[len(ordered) // 2] if ordered else None,
-            "p90": ordered[min(len(ordered) - 1, math.floor(0.9 * len(ordered)))]
-            if ordered
-            else None,
-        },
-        "peak_memory_mib": round(torch.cuda.max_memory_allocated(device) / 2**20, 1)
-        if device.type == "cuda"
-        else None,
-        "device": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu",
-    }
-    (run_dir / f"{split}-predictions.jsonl").write_text(
-        "".join(json.dumps(h) + "\n" for h in hashes), encoding="utf-8"
+    output = evaluate_predictor(
+        dataset,
+        predict,
+        threshold=float(training["frozen_threshold"]),
+        device=device,
+        predictions_dir=run_dir / "predictions" / split,
     )
-    output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return result
-
-
-def _write_mask(path: Path, mask: torch.Tensor) -> None:
-    height, width = mask.shape
-    # Без numpy: у колёс torch он не обязательная зависимость.
-    pixels = bytes((mask > 0).to(torch.uint8).mul(255).flatten().tolist())
-    raw = b"".join(b"\0" + pixels[y * width : (y + 1) * width] for y in range(height))
-
-    def chunk(kind: bytes, body: bytes) -> bytes:
-        return (
-            struct.pack(">I", len(body))
-            + kind
-            + body
-            + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
-        )
-
-    path.write_bytes(
-        SIGNATURE
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0))
-        + chunk(b"IDAT", zlib.compress(raw, 6))
-        + chunk(b"IEND", b"")
-    )
+    return save_outputs(run_dir, split, output, {"run_id": record["run_id"]})

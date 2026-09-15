@@ -11,6 +11,7 @@ vision qwen-evaluate ...            промт 14      — прямая геом
 vision evaluate slab --build --run  промт 10      — метрики на frozen test, один раз
 vision infer ...                    промт 20      — доверенный исполнитель (после PASS 18)
 vision vectorize ...                промты 16–17  — маска → вектор
+vision sam run --policy auto|coarse промт 11      — SAM 2: val настраивает, test один раз
 ```
 
 Команды обучения и оценки пока не реализованы: они проверяют окружение и сообщают BLOCKED с
@@ -212,6 +213,54 @@ def _evaluate_slab(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sam_run(args: argparse.Namespace) -> int:
+    reasons = blockers(Requirement(("torch", "transformers"), needs_gpu=False))
+    if not args.allow_cpu and not nvidia_gpus():
+        reasons.append("нет NVIDIA GPU; прогон на CPU — только с --allow-cpu")
+    runs = _runs_root(args.runs)
+    if runs is None:
+        reasons.append("не задан --runs и нет QUANTOR_DATASET_ROOT")
+    elif _inside_git_worktree(runs) is not None:
+        reasons.append(f"{runs} внутри git-репозитория: прогнозы туда не пишутся")
+    if reasons or runs is None:
+        return _blocked("sam run", reasons)
+
+    import torch
+
+    from quantor_vision.sam.run import RunRefusedError, run
+    from quantor_vision.sam.segmenter import Sam2Segmenter
+
+    config: dict[str, object] = {}
+    for item in args.set or []:
+        key, _, value = item.partition("=")
+        config[key] = float(value) if "." in value else int(value)
+    device = torch.device(
+        "cuda"
+        if args.device == "auto" and torch.cuda.is_available()
+        else ("cpu" if args.device == "auto" else args.device)
+    )
+    try:
+        result = run(
+            Path(args.build),
+            runs,
+            run_id=args.run_id,
+            split=args.split,
+            device=device,
+            factory=Sam2Segmenter,
+            policy=args.policy,
+            model_size=args.model,
+            config=config or None,
+            coarse_run=Path(args.coarse_run) if args.coarse_run else None,
+            new_experiment=args.new_experiment,
+            limit_tiles=args.limit_tiles,
+        )
+    except RunRefusedError as error:
+        _print({"command": "sam run", "status": "REFUSED", "reason": str(error)})
+        return 2
+    _print(result)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vision", description="ML-контур Quantor Stage 2B")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -265,6 +314,23 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_tasks.add_parser("masonry", help="промты 15–18").set_defaults(
         handler=_pending, accepts_unknown=True
     )
+
+    sam = commands.add_parser("sam", help="промт 11: SAM 2 без разметки в подсказках")
+    sam_commands = sam.add_subparsers(dest="sam_command", required=True)
+    sam_run = sam_commands.add_parser("run", help="прогон политики на val или test")
+    sam_run.add_argument("--build", required=True)
+    sam_run.add_argument("--runs", help="каталог прогонов; по умолчанию $QUANTOR_DATASET_ROOT/runs")
+    sam_run.add_argument("--run-id", required=True)
+    sam_run.add_argument("--split", choices=("val", "test"), default="val")
+    sam_run.add_argument("--policy", choices=("auto", "coarse"), help="только для нового прогона")
+    sam_run.add_argument("--model", choices=("tiny", "small", "base-plus"), default="small")
+    sam_run.add_argument("--coarse-run", help="каталог прогона промта 10 для политики coarse")
+    sam_run.add_argument("--set", action="append", help="настройка политики: ключ=значение")
+    sam_run.add_argument("--new-experiment", help="причина второго test той же политики")
+    sam_run.add_argument("--limit-tiles", type=int, default=0, help="дымовой прогон; test запрещён")
+    sam_run.add_argument("--device", default="auto")
+    sam_run.add_argument("--allow-cpu", action="store_true")
+    sam_run.set_defaults(handler=_sam_run)
 
     for name in REQUIREMENTS:
         if " " in name:

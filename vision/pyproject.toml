@@ -11,8 +11,9 @@ dependencies = []
 [project.optional-dependencies]
 # Промт 10: малая сегментация. Версии фиксируются при первом настоящем прогоне на GPU-хосте.
 train = ["torch", "torchvision"]
-# Промт 11: SAM 2 / MobileSAM.
-sam = ["sam2", "mobile-sam"]
+# Промт 11: SAM 2.1 через transformers и официальные веса Meta. Пакет sam2 с PyPI — сторонний
+# форк, MobileSAM на PyPI нет: оба заблокированы в licenses/decisions.json.
+sam = ["transformers"]
 # Промты 12–14: Qwen3-VL SFT на Apache-стеке — и как запасной путь, и для инференса без Unsloth.
 qwen = ["transformers", "peft", "trl"]
 # Промты 12–13 на Unsloth: только локальное окружение обучения, условия — licenses/decisions.json.
