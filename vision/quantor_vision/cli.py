@@ -187,6 +187,9 @@ def _train_slab(args: argparse.Namespace) -> int:
         amp=args.amp,
         limit_tiles=args.limit_tiles,
         device=args.device,
+        architecture=args.arch,
+        encoder=args.encoder,
+        head_width=args.head_width,
     )
     run_dir = train(Path(args.build), runs, config)
     metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
@@ -399,6 +402,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--limit-tiles", type=int, default=0, help="дымовой прогон: N тайлов на часть"
     )
     slab.add_argument("--device", default="auto")
+    slab.add_argument(
+        "--arch",
+        choices=("tiny-unet", "dinov2-probe"),
+        default="tiny-unet",
+        help="tiny-unet — промт 10; dinov2-probe — замороженный DINOv2 + голова (Р-8)",
+    )
+    slab.add_argument("--encoder", choices=("large", "base"), default="large")
+    slab.add_argument("--head-width", type=int, default=256)
     slab.add_argument("--allow-cpu", action="store_true", help="разрешить обучение без GPU")
     slab.add_argument("--allow-inside-repo", action="store_true", help="только для тестов")
     slab.set_defaults(handler=_train_slab)

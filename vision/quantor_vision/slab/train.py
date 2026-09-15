@@ -16,18 +16,22 @@ from __future__ import annotations
 import json
 import platform
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import torch
+from torch import nn
 from torch.nn import functional
 
 from quantor_vision import runrecord
 from quantor_vision.slab.data import BuildInfo, SlabTiles, TileRef, load_build, positive_fraction
+from quantor_vision.slab.dino import DinoProbe
 from quantor_vision.slab.evaluation import evaluate_predictor, save_outputs
 from quantor_vision.slab.metrics import MaskMetrics
 from quantor_vision.slab.model import TinyUNet, parameter_count
+
+ARCHITECTURES = ("tiny-unet", "dinov2-probe")
 
 THRESHOLDS = tuple(round(0.2 + 0.05 * step, 2) for step in range(13))
 
@@ -47,6 +51,36 @@ class TrainConfig:
     max_pos_weight: float = 20.0
     limit_tiles: int = 0  # 0 — все; >0 — дымовой прогон на первых тайлах
     device: str = "auto"
+    # tiny-unet — промт 10; dinov2-probe — замороженный DINOv2 + голова (Р-8).
+    architecture: str = "tiny-unet"
+    encoder: str = "large"
+    head_width: int = 256
+
+
+@dataclass(frozen=True, slots=True)
+class BuiltModel:
+    module: nn.Module
+    # Часть, которая обучается и сохраняется в best.pt: весь U-Net или только голова DINOv2.
+    trainable: nn.Module
+    name: str
+    initialization: str
+
+
+ModelFactory = Callable[[TrainConfig, torch.device], BuiltModel]
+
+
+def build_model(config: TrainConfig, device: torch.device) -> BuiltModel:
+    if config.architecture == "tiny-unet":
+        unet = TinyUNet(config.base_width, config.depth).to(device)
+        return BuiltModel(unet, unet, unet.name, "scratch")
+    if config.architecture == "dinov2-probe":
+        from quantor_vision.slab.dino import ENCODERS, load_encoder
+
+        encoder, initialization = load_encoder(config.encoder, device)
+        probe = DinoProbe(encoder, ENCODERS[config.encoder].embed_dim, config.head_width)
+        probe = probe.to(device)
+        return BuiltModel(probe, probe.head, probe.name, initialization)
+    raise ValueError(f"архитектура {config.architecture!r} не из {ARCHITECTURES}")
 
 
 def _device(choice: str) -> torch.device:
@@ -80,8 +114,28 @@ def _autocast(device: torch.device, amp: str) -> torch.autocast:
     return torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=enabled)
 
 
+def _logits(
+    model: nn.Module, x: torch.Tensor, index: int, cache: list[torch.Tensor] | None
+) -> torch.Tensor:
+    """Логиты тайла. У DINOv2 признаки неизменной части (val без аугментаций) считаются один раз."""
+    if not isinstance(model, DinoProbe):
+        logits: torch.Tensor = model(x)
+        return logits
+    if cache is not None and index < len(cache):
+        features = cache[index].to(x.device)
+    else:
+        features = model.features(x)
+        if cache is not None:
+            cache.append(features.to("cpu", torch.float16))
+    return model.decode(features, x.shape[2], x.shape[3])
+
+
 def _probabilities(
-    model: TinyUNet, dataset: SlabTiles, device: torch.device, amp: str
+    model: nn.Module,
+    dataset: SlabTiles,
+    device: torch.device,
+    amp: str,
+    cache: list[torch.Tensor] | None = None,
 ) -> list[torch.Tensor]:
     model.eval()
     outputs: list[torch.Tensor] = []
@@ -89,7 +143,7 @@ def _probabilities(
         for index in range(len(dataset)):
             x, _, _ = dataset[index]
             with _autocast(device, amp):
-                logits = model(x.unsqueeze(0).to(device))
+                logits = _logits(model, x.unsqueeze(0).to(device), index, cache)
             outputs.append(torch.sigmoid(logits.float()).cpu()[0])
     return outputs
 
@@ -120,7 +174,12 @@ def _split(build: BuildInfo, name: str, limit: int) -> list[TileRef]:
     return tiles[:limit] if limit else tiles
 
 
-def train(build_dir: Path, runs_root: Path, config: TrainConfig) -> Path:
+def train(
+    build_dir: Path,
+    runs_root: Path,
+    config: TrainConfig,
+    model_factory: ModelFactory = build_model,
+) -> Path:
     _seed(config.seed)
     device = _device(config.device)
     build = load_build(build_dir)
@@ -135,10 +194,12 @@ def train(build_dir: Path, runs_root: Path, config: TrainConfig) -> Path:
     pos_weight = torch.tensor(
         min(config.max_pos_weight, (1 - fraction) / max(fraction, 1e-6)), device=device
     )
-    model = TinyUNet(config.base_width, config.depth).to(device)
+    built = model_factory(config, device)
+    model = built.module
     optimizer = torch.optim.AdamW(
-        model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
+        built.trainable.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
     )
+    val_cache: list[torch.Tensor] | None = [] if isinstance(model, DinoProbe) else None
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, config.epochs))
     shuffle = torch.Generator().manual_seed(config.seed)
 
@@ -158,13 +219,13 @@ def train(build_dir: Path, runs_root: Path, config: TrainConfig) -> Path:
             x, y, valid = x.to(device), y.to(device), valid.to(device)
             optimizer.zero_grad(set_to_none=True)
             with _autocast(device, config.amp):
-                logits = model(x)
+                logits = _logits(model, x, 0, None)
             loss = _loss(logits.float(), y, valid, pos_weight)
             torch.autograd.backward(loss)
             optimizer.step()
             total += float(loss.detach()) * x.shape[0]
         scheduler.step()
-        val = _score(_probabilities(model, val_set, device, config.amp), val_set, 0.5)
+        val = _score(_probabilities(model, val_set, device, config.amp, val_cache), val_set, 0.5)
         entry = {
             "epoch": epoch,
             "train_loss": total / len(train_set),
@@ -177,7 +238,7 @@ def train(build_dir: Path, runs_root: Path, config: TrainConfig) -> Path:
         iou = float(val["iou"] or 0.0)
         if iou > best_iou:
             best_iou, best_epoch, waited = iou, epoch, 0
-            torch.save(model.state_dict(), run_dir / "best.pt")
+            torch.save(built.trainable.state_dict(), run_dir / "best.pt")
         else:
             waited += 1
             if waited >= config.patience:
@@ -185,8 +246,10 @@ def train(build_dir: Path, runs_root: Path, config: TrainConfig) -> Path:
     log.close()
     elapsed = time.perf_counter() - started
 
-    model.load_state_dict(torch.load(run_dir / "best.pt", map_location=device, weights_only=True))
-    probabilities = _probabilities(model, val_set, device, config.amp)
+    built.trainable.load_state_dict(
+        torch.load(run_dir / "best.pt", map_location=device, weights_only=True)
+    )
+    probabilities = _probabilities(model, val_set, device, config.amp, val_cache)
     sweep = {threshold: _score(probabilities, val_set, threshold) for threshold in THRESHOLDS}
     threshold = max(
         THRESHOLDS, key=lambda value: (float(sweep[value]["iou"] or 0.0), -abs(value - 0.5))
@@ -211,12 +274,15 @@ def train(build_dir: Path, runs_root: Path, config: TrainConfig) -> Path:
         task="slab_segmentation",
         dataset_fingerprint=build.tiles_sha256,
         split_sha256=build.split_sha256,
-        architecture=f"{model.name} ({parameter_count(model)} параметров)",
-        initialization="scratch",
+        architecture=f"{built.name} ({parameter_count(built.trainable)} обучаемых параметров)",
+        initialization=built.initialization,
         seed=config.seed,
         preprocessing={
             "input": "тайл 1 024 px рабочего растра, яркость /255",
             "valid_region": "без заливки",
+            "encoder_input": "заливка белым до кратного 14, 3 канала, нормировка ImageNet"
+            if isinstance(model, DinoProbe)
+            else "нет",
         },
         augmentation={"rot90": "k ∈ {0,1,2,3}", "horizontal_flip": 0.5},
         training={
@@ -243,15 +309,22 @@ def train(build_dir: Path, runs_root: Path, config: TrainConfig) -> Path:
 
 
 def evaluate(
-    build_dir: Path, run_dir: Path, *, split: str = "test", device_choice: str = "auto"
+    build_dir: Path,
+    run_dir: Path,
+    *,
+    split: str = "test",
+    device_choice: str = "auto",
+    model_factory: ModelFactory = build_model,
 ) -> dict[str, object]:
     """Оценка на замороженной части. Порог и веса — из `run.json`; test здесь ничего не выбирает."""
     with torch.no_grad():
-        return _evaluate(build_dir, run_dir, split=split, device_choice=device_choice)
+        return _evaluate(
+            build_dir, run_dir, split=split, device_choice=device_choice, factory=model_factory
+        )
 
 
 def _evaluate(
-    build_dir: Path, run_dir: Path, *, split: str, device_choice: str
+    build_dir: Path, run_dir: Path, *, split: str, device_choice: str, factory: ModelFactory
 ) -> dict[str, object]:
     record = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
     if runrecord.sha256_file(run_dir / "best.pt") != record["weights"][0]["sha256"]:
@@ -267,8 +340,20 @@ def _evaluate(
 
     training = record["training"]
     device = _device(device_choice)
-    model = TinyUNet(int(training["base_width"]), int(training["depth"])).to(device)
-    model.load_state_dict(torch.load(run_dir / "best.pt", map_location=device, weights_only=True))
+    # Прогоны промта 10 записаны до выбора архитектуры: у них её поле отсутствует — это tiny-unet.
+    config = TrainConfig(
+        run_id=str(record["run_id"]),
+        base_width=int(training["base_width"]),
+        depth=int(training["depth"]),
+        architecture=str(training.get("architecture", "tiny-unet")),
+        encoder=str(training.get("encoder", "large")),
+        head_width=int(training.get("head_width", 256)),
+    )
+    built = factory(config, device)
+    built.trainable.load_state_dict(
+        torch.load(run_dir / "best.pt", map_location=device, weights_only=True)
+    )
+    model = built.module
     model.eval()
     amp = str(training["amp"])
     dataset = SlabTiles(
@@ -277,7 +362,7 @@ def _evaluate(
 
     def predict(_: TileRef, x: torch.Tensor) -> torch.Tensor:
         with _autocast(device, amp):
-            logits = model(x.unsqueeze(0).to(device))
+            logits = _logits(model, x.unsqueeze(0).to(device), 0, None)
         return torch.sigmoid(logits.float()).cpu()[0]
 
     output = evaluate_predictor(

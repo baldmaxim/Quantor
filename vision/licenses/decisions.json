@@ -162,6 +162,26 @@
       "decision": "allow",
       "revision": "b7320756a13354e7530a63935656d35b2f91a290",
       "evidence": "https://huggingface.co/api/models/facebook/sam2.1-hiera-base-plus cardData.license apache-2.0, library transformers"
+    },
+    "facebook/dinov2-large": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "revision": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+      "weights_sha256": {
+        "model.safetensors": "399fba97a95f22c36834418bc69373364a99af3a1153da1c0fb31db567c92e23"
+      },
+      "evidence": "https://huggingface.co/api/models/facebook/dinov2-large cardData.license apache-2.0, не gated, library transformers; код https://raw.githubusercontent.com/facebookresearch/dinov2/main/LICENSE sha256:600cc67cc4cb2f5ea317dcfc687ad1c74dc4bec8782bbe9db0afd83513b935b7 (проверено 2026-09-15)",
+      "scope": "Р-8: замороженный энкодер плиты (vision train slab --arch dinov2-probe)"
+    },
+    "facebook/dinov2-base": {
+      "spdx": "Apache-2.0",
+      "decision": "allow",
+      "revision": "f9e44c814b77203eaa57a6bdbbd535f21ede1415",
+      "weights_sha256": {
+        "model.safetensors": "d73036b56966966d07975d696bde331762f37297e2f095de8cea0040c3aa0841"
+      },
+      "evidence": "https://huggingface.co/api/models/facebook/dinov2-base cardData.license apache-2.0, не gated (проверено 2026-09-15)",
+      "scope": "Р-8: запасной энкодер меньшего размера"
     }
   }
 }

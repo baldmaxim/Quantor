@@ -278,6 +278,8 @@ def _predictor(
     if coarse_record["split_sha256"] != record["split_sha256"]:
         raise RunRefusedError("грубая модель обучалась на другом разбиении")
     training = _object(coarse_record["training"])
+    if training.get("architecture", "tiny-unet") != "tiny-unet":
+        raise RunRefusedError("политика coarse пока принимает только грубую модель tiny-unet")
     model = TinyUNet(int(_number(training["base_width"])), int(_number(training["depth"])))
     model = model.to(device)
     model.load_state_dict(torch.load(weights, map_location=device, weights_only=True))

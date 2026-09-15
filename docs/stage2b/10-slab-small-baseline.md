@@ -187,3 +187,31 @@ $B = "$env:QUANTOR_DATASET_ROOT\planswift\build\planswift-build-v1"
   пикселя — ожидаемо трудный класс отверстий. Hole recall посчитает промт 16/18.
 - Детерминизм на GPU — «с предупреждением»: часть ядер CUDA недетерминирована, повторный прогон может
   отличаться в последних знаках; seed и все параметры записаны.
+
+## 9. Замороженный DINOv2 + голова (Р-8)
+
+Тот же конвейер обучения и оценки, другая модель: `--arch dinov2-probe`. Энкодер
+`facebook/dinov2-large@47b73eef…` скачивается при первом запуске (≈ 1,2 ГБ в кэш Hugging Face) и
+сверяется по SHA-256 `399fba97…`; обучается только голова. Признаки val считаются один раз и держатся
+в памяти в float16 (≈ 1,6 ГБ ОЗУ на 150 тайлах).
+
+```powershell
+cd vision
+$B = "$env:QUANTOR_DATASET_ROOT\planswift\build\planswift-build-v1"
+# дымовой прогон: 4 тайла на часть, 2 эпохи
+.\.venv-train\Scripts\python -m quantor_vision train slab --build $B --arch dinov2-probe --run-id dino-smoke --epochs 2 --limit-tiles 4 --batch-size 2
+# основной прогон
+.\.venv-train\Scripts\python -m quantor_vision train slab --build $B --arch dinov2-probe --run-id slab-dinov2l-h256-v1 --epochs 40 --patience 8 --batch-size 4 --lr 1e-3
+```
+
+Настройки объявлены до запуска: 40 эпох, ранняя остановка 8, AdamW 1e-3, BF16, те же аугментации и
+потеря, что у U-Net. Критерий продолжения — до прогона: на val IoU выше U-Net (0,272) и SAM `coarse`
+(0,289) **и** медиана ошибки площади листа по вектору ниже 0,110; иначе ветка DINOv2 на сборке v1
+закрывается без test.
+
+Прислать: хвост `train.log`, `metrics.json` (val, порог, пик памяти, время). Test и векторизация — после
+разбора val:
+
+```powershell
+.\.venv-train\Scripts\python -m quantor_vision evaluate slab --build $B --run "$env:QUANTOR_DATASET_ROOT\runs\slab-dinov2l-h256-v1" --split val
+```

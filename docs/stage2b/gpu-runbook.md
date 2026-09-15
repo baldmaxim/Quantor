@@ -164,15 +164,16 @@ cd vision
 
 Команды обучения появятся по промтам:
 
-| Промт | Команда (будет)                                                                                                             | Окружение       | Что пришлёте                                        |
-| ----- | --------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------- |
-| 10    | `vision train slab` — **готово**, шаги в [10, § 6](10-slab-small-baseline.md)                                               | `.venv-train`   | `run.json`, `metrics.json`, хвост лога              |
-| 10    | `vision evaluate slab` — test один раз                                                                                      | `.venv-train`   | `test-metrics.json`                                 |
-| 11    | `vision sam run` — **готово**, шаги в [11, § 6](11-sam-baselines.md); нужен `transformers==5.5.0`                           | `.venv-train`   | `val-metrics.json`, затем `test-metrics.json`       |
-| 12    | `vision qwen-env probe/fetch/smoke`, `vision qwen-build-sft` — **готово**, шаги в [12, § 6](12-qwen-unsloth-dataset-env.md) | `.venv-unsloth` | lock-файл, `probe`, 5 дымовых записей, счётчики SFT |
-| 16    | `vision vectorize slab` — **готово**, шаги в [16, § 6](16-mask-to-polygon.md); GPU не нужен                                 | `.venv-train`   | `summary` val, затем test                           |
-| 13    | `vision qwen-train …`                                                                                                       | Unsloth         | `run.json`, `metrics.json`                          |
-| 14    | `vision qwen-evaluate …`                                                                                                    | Unsloth / train | `metrics.json`                                      |
+| Промт | Команда (будет)                                                                                                             | Окружение       | Что пришлёте                                             |
+| ----- | --------------------------------------------------------------------------------------------------------------------------- | --------------- | -------------------------------------------------------- |
+| 10    | `vision train slab` — **готово**, шаги в [10, § 6](10-slab-small-baseline.md)                                               | `.venv-train`   | `run.json`, `metrics.json`, хвост лога                   |
+| 10    | `vision evaluate slab` — test один раз                                                                                      | `.venv-train`   | `test-metrics.json`                                      |
+| 11    | `vision sam run` — **готово**, шаги в [11, § 6](11-sam-baselines.md); нужен `transformers==5.5.0`                           | `.venv-train`   | `val-metrics.json`, затем `test-metrics.json`            |
+| 12    | `vision qwen-env probe/fetch/smoke`, `vision qwen-build-sft` — **готово**, шаги в [12, § 6](12-qwen-unsloth-dataset-env.md) | `.venv-unsloth` | lock-файл, `probe`, 5 дымовых записей, счётчики SFT      |
+| 16    | `vision vectorize slab` — **готово**, шаги в [16, § 6](16-mask-to-polygon.md); GPU не нужен                                 | `.venv-train`   | `summary` val, затем test                                |
+| Р-8   | `vision train slab --arch dinov2-probe` — **готово**, шаги в [10, § 9](10-slab-small-baseline.md)                           | `.venv-train`   | `metrics.json`, затем `test-metrics.json` и векторизация |
+| 13    | `vision qwen-train …`                                                                                                       | Unsloth         | `run.json`, `metrics.json`                               |
+| 14    | `vision qwen-evaluate …`                                                                                                    | Unsloth / train | `metrics.json`                                           |
 
 Каждая команда пишет результаты в `$env:QUANTOR_DATASET_ROOT\runs\<run_id>\` — вне репозитория.
 

@@ -36,16 +36,19 @@
 
 ## Веса
 
-| Вес                               | SPDX       | Решение         | Ревизия (HF `sha`)                         | Источник                                                           |
-| --------------------------------- | ---------- | --------------- | ------------------------------------------ | ------------------------------------------------------------------ |
-| `Qwen/Qwen3-VL-2B-Instruct`       | Apache-2.0 | allow           | `89644892e4d85e24eaac8bacfd4f463576704203` | HF API `cardData.license: apache-2.0`, не gated, 2025-10-23        |
-| `Qwen/Qwen3-VL-4B-Instruct`       | Apache-2.0 | allow           | `ebb281ec70b05090aa6165b016eac8ec08e71b17` | HF API `cardData.license: apache-2.0`, не gated, 2025-10-15        |
-| `Qwen/Qwen3-VL-8B-Instruct`       | Apache-2.0 | allow           | `0c351dd01ed87e9c1b53cbc748cba10e6187ff3b` | HF API `cardData.license: apache-2.0`, не gated, 2025-10-15        |
-| `facebook/sam2.1-hiera-small`     | Apache-2.0 | allow           | `ee5bba1d82bb8749febdf90f45e84b687142ba03` | HF API `cardData.license: apache-2.0`                              |
-| `facebook/sam2.1-hiera-tiny`      | Apache-2.0 | allow           | `de431c4043854a71d8101e17995dfe596bf101a5` | HF API, формат `transformers`; `model.safetensors` `48c14467…c2a7` |
-| `facebook/sam2.1-hiera-base-plus` | Apache-2.0 | allow           | `b7320756a13354e7530a63935656d35b2f91a290` | HF API, формат `transformers`                                      |
-| веса MobileSAM                    | Apache-2.0 | не используются | —                                          | MobileSAM заблокирован как зависимость (промт 11)                  |
-| предобученные веса torchvision    | —          | нет строки      | —                                          | baseline промта 10 — инициализация с нуля                          |
+| Вес                               | SPDX                 | Решение         | Ревизия (HF `sha`)                         | Источник                                                           |
+| --------------------------------- | -------------------- | --------------- | ------------------------------------------ | ------------------------------------------------------------------ |
+| `Qwen/Qwen3-VL-2B-Instruct`       | Apache-2.0           | allow           | `89644892e4d85e24eaac8bacfd4f463576704203` | HF API `cardData.license: apache-2.0`, не gated, 2025-10-23        |
+| `Qwen/Qwen3-VL-4B-Instruct`       | Apache-2.0           | allow           | `ebb281ec70b05090aa6165b016eac8ec08e71b17` | HF API `cardData.license: apache-2.0`, не gated, 2025-10-15        |
+| `Qwen/Qwen3-VL-8B-Instruct`       | Apache-2.0           | allow           | `0c351dd01ed87e9c1b53cbc748cba10e6187ff3b` | HF API `cardData.license: apache-2.0`, не gated, 2025-10-15        |
+| `facebook/sam2.1-hiera-small`     | Apache-2.0           | allow           | `ee5bba1d82bb8749febdf90f45e84b687142ba03` | HF API `cardData.license: apache-2.0`                              |
+| `facebook/sam2.1-hiera-tiny`      | Apache-2.0           | allow           | `de431c4043854a71d8101e17995dfe596bf101a5` | HF API, формат `transformers`; `model.safetensors` `48c14467…c2a7` |
+| `facebook/sam2.1-hiera-base-plus` | Apache-2.0           | allow           | `b7320756a13354e7530a63935656d35b2f91a290` | HF API, формат `transformers`                                      |
+| `facebook/dinov2-large`           | Apache-2.0           | allow           | `47b73eefe95e8d44ec3623f8890bd894b6ea2d6c` | HF API, не gated; `model.safetensors` `399fba97…2e23`; Р-8         |
+| `facebook/dinov2-base`            | Apache-2.0           | allow           | `f9e44c814b77203eaa57a6bdbbd535f21ede1415` | HF API, не gated; `model.safetensors` `d73036b5…0841`; запасной    |
+| веса DINOv3 (SU10)                | лицензия Meta DINOv3 | не используются | —                                          | нужна проверка лицензии до любого использования (Р-7)              |
+| веса MobileSAM                    | Apache-2.0           | не используются | —                                          | MobileSAM заблокирован как зависимость (промт 11)                  |
+| предобученные веса torchvision    | —                    | нет строки      | —                                          | baseline промта 10 — инициализация с нуля                          |
 
 Репозиторий QwenLM/Qwen3-VL — Apache-2.0 (`c71d239d…0ab4`).
 
