@@ -235,7 +235,5 @@ def masonry_target(pixels: bytes, tile: TileGeometry, config: TargetConfig) -> M
     roi = _box(cells, stride, tile)
     guides = _spread([(0, cell) for cell in cells], config.guide_points)
     points = sorted(_to_model(cell, stride, tile) for cell in guides)
-    inside = tuple(
-        (min(max(x, roi[0]), roi[2]), min(max(y, roi[1]), roi[3])) for x, y in points
-    )
+    inside = tuple((min(max(x, roi[0]), roi[2]), min(max(y, roi[1]), roi[3])) for x, y in points)
     return MasonryRoi(contains_masonry=True, roi=roi, guide_points=inside)

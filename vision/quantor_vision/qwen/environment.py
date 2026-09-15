@@ -1,9 +1,9 @@
 """Окружение Qwen3-VL: проверка GPU и BF16, скачивание закреплённых весов, дымовой прогон.
 
-Окружение — отдельный `vision/.venv-unsloth` из `requirements-qwen-unsloth.txt`, только на GPU-машине
-владельца (условия Unsloth — матрица лицензий). В CI оно не ставится, поэтому transformers, Unsloth,
-huggingface_hub и Pillow здесь загружаются через `importlib` в момент вызова: модуль импортируется и
-проверяется без них.
+Окружение — отдельный `vision/.venv-unsloth` из `requirements-qwen-unsloth.txt`, только на
+GPU-машине владельца (условия Unsloth — матрица лицензий). В CI оно не ставится, поэтому
+transformers, Unsloth, huggingface_hub и Pillow загружаются через `importlib` в момент вызова:
+модуль импортируется и проверяется без них.
 
 Телеметрия выключается до первого импорта тяжёлых пакетов, дымовой прогон идёт с
 `HF_HUB_OFFLINE=1` — веса уже скачаны и сверены, сеть ему не нужна. Вход дымового прогона —
@@ -98,9 +98,7 @@ def probe() -> dict[str, object]:
     report: dict[str, object] = {
         "packages": versions,
         "version_mismatches": version_mismatches(versions),
-        "unsloth_record_sha256": {
-            name: record_sha256(name) for name in ("unsloth", "unsloth-zoo")
-        },
+        "unsloth_record_sha256": {name: record_sha256(name) for name in ("unsloth", "unsloth-zoo")},
         "unsloth_statistics_opt_out": unsloth_statistics_opt_out(),
         "telemetry_env": {name: os.environ.get(name, "") for name in TELEMETRY_OFF},
     }
