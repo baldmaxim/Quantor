@@ -172,13 +172,14 @@ def _import_all(args: argparse.Namespace) -> int:
         return 2
     Path(args.out).mkdir(parents=True, exist_ok=True)
     report = batch.import_all(
-        Path(args.archives), Path(args.work), Path(args.out), Path(args.rules)
+        Path(args.archives), Path(args.work), Path(args.out), Path(args.rules), force=args.force
     )
     projects = report["projects"]
     _print(
         {
             "projects": len(projects) if isinstance(projects, list) else 0,
             "identical_projects": report["identical_projects"],
+            "pages_shared_with_other_projects": report["pages_shared_with_other_projects"],
             "families": report["families"],
             "config": str(Path(args.out) / "build-v2.json"),
             "report": str(Path(args.out) / "import-all-report.json"),
@@ -283,6 +284,9 @@ def build_parser() -> argparse.ArgumentParser:
     everything.add_argument("--work", required=True, help="каталог распаковки вне репозитория")
     everything.add_argument("--out", required=True, help="корень planswift-gt-v1 вне репозитория")
     everything.add_argument("--rules", required=True, help="правила целей и семейств (JSON)")
+    everything.add_argument(
+        "--force", action="store_true", help="распаковать и разобрать заново, даже если уже есть"
+    )
     everything.set_defaults(handler=_import_all)
     return parser
 
