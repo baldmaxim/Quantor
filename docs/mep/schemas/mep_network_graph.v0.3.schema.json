@@ -1,0 +1,1283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "CalibrationSnapshot": {
+      "additionalProperties": false,
+      "description": "Неизменяемый снимок калибровки и геометрии страницы, по которому считаются метры.\n\nКопия значений, а не только ссылка: граф должен считаться одинаково и после того, как в\nпортале появится новая калибровка листа (ADR-0018 — калибровка не правится, а заменяется).",
+      "properties": {
+        "calibration_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Calibration Id",
+          "type": "string"
+        },
+        "page_geometry_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Page Geometry Fingerprint",
+          "type": "string"
+        },
+        "display_width_pt": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Display Width Pt"
+        },
+        "display_height_pt": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Display Height Pt"
+        },
+        "mm_per_pt": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Mm Per Pt"
+        },
+        "verification_state": {
+          "enum": ["unverified", "verified", "disputed"],
+          "title": "Verification State",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "calibration_id",
+        "page_geometry_fingerprint",
+        "display_width_pt",
+        "display_height_pt",
+        "mm_per_pt",
+        "verification_state",
+        "fingerprint"
+      ],
+      "title": "CalibrationSnapshot",
+      "type": "object"
+    },
+    "CorpusRef": {
+      "additionalProperties": false,
+      "description": "Корпус случаев РД для retrieval. Только TRAIN: отложенные проекты — не источник.",
+      "properties": {
+        "corpus_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Corpus Id",
+          "type": "string"
+        },
+        "dataset_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Dataset Fingerprint",
+          "type": "string"
+        },
+        "split_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Split Sha256",
+          "type": "string"
+        },
+        "split": {
+          "const": "train",
+          "default": "train",
+          "title": "Split",
+          "type": "string"
+        }
+      },
+      "required": ["corpus_id", "dataset_fingerprint", "split_sha256"],
+      "title": "CorpusRef",
+      "type": "object"
+    },
+    "Derivation": {
+      "additionalProperties": false,
+      "description": "Происхождение элемента или значения сети.",
+      "properties": {
+        "provenance": {
+          "$ref": "#/$defs/GenerationProvenance"
+        },
+        "step_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Step Ids",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        }
+      },
+      "required": ["provenance"],
+      "title": "Derivation",
+      "type": "object"
+    },
+    "DocumentRef": {
+      "additionalProperties": false,
+      "description": "Исходный документ Quantor. Хеши — неизменяемый вход, а не копия.",
+      "properties": {
+        "project_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "revision_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "source_pdf_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Pdf Sha256",
+          "type": "string"
+        },
+        "package_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Sha256"
+        }
+      },
+      "required": ["project_id", "revision_id", "source_pdf_sha256"],
+      "title": "DocumentRef",
+      "type": "object"
+    },
+    "EvidenceGraphRef": {
+      "additionalProperties": false,
+      "properties": {
+        "graph_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Graph Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "input_mode": {
+          "$ref": "#/$defs/EvidenceInputMode"
+        }
+      },
+      "required": ["graph_id", "sha256", "input_mode"],
+      "title": "EvidenceGraphRef",
+      "type": "object"
+    },
+    "EvidenceInputMode": {
+      "description": "Как получен граф целиком (Track B, Track A, проверенный гибрид).",
+      "enum": ["MODEL_EXTRACTED", "HUMAN_GT", "HYBRID_REVIEWED"],
+      "title": "EvidenceInputMode",
+      "type": "string"
+    },
+    "GenerationProvenance": {
+      "enum": [
+        "evidence_observed",
+        "rd_prior_inferred",
+        "retrieved_pattern",
+        "deterministic_rule",
+        "human_confirmed",
+        "unresolved"
+      ],
+      "title": "GenerationProvenance",
+      "type": "string"
+    },
+    "GenerationRun": {
+      "additionalProperties": false,
+      "description": "Прогон генератора: без него шаги нельзя воспроизвести.",
+      "properties": {
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "git_commit": {
+          "pattern": "^[0-9a-f]{7,40}$",
+          "title": "Git Commit",
+          "type": "string"
+        },
+        "dirty": {
+          "title": "Dirty",
+          "type": "boolean"
+        },
+        "config_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Config Sha256",
+          "type": "string"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        }
+      },
+      "required": ["run_id", "git_commit", "dirty", "config_sha256"],
+      "title": "GenerationRun",
+      "type": "object"
+    },
+    "InferenceKind": {
+      "description": "Какое решение принято на шаге. Виды общие для любой дисциплины.",
+      "enum": [
+        "evidence_adoption",
+        "system_assignment",
+        "topology",
+        "routing",
+        "element_addition",
+        "attribute",
+        "rule_application"
+      ],
+      "title": "InferenceKind",
+      "type": "string"
+    },
+    "InferenceStep": {
+      "additionalProperties": false,
+      "description": "Одно решение генератора. Входы шага — только evidence и более ранние шаги.",
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/InferenceKind"
+        },
+        "tool_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Tool Id",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "corpus_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corpus Id"
+        },
+        "config_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Config Sha256"
+        },
+        "evidence_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "relation_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Relation Ids",
+          "type": "array"
+        },
+        "input_step_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Input Step Ids",
+          "type": "array"
+        },
+        "retrieved_case_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Retrieved Case Ids",
+          "type": "array"
+        },
+        "rule_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Rule Ids",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "alternatives_considered": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Alternatives Considered",
+          "type": "integer"
+        },
+        "rationale": {
+          "default": [],
+          "items": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "title": "Rationale",
+          "type": "array"
+        }
+      },
+      "required": ["id", "kind", "tool_id"],
+      "title": "InferenceStep",
+      "type": "object"
+    },
+    "Level": {
+      "additionalProperties": false,
+      "description": "Уровень здания. Отметка может быть неизвестна — тогда она `None`, а не ноль.",
+      "properties": {
+        "level_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Level Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "elevation_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elevation Mm"
+        }
+      },
+      "required": ["level_id", "name"],
+      "title": "Level",
+      "type": "object"
+    },
+    "NetworkNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/NodeRole"
+        },
+        "class_key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Class Key"
+        },
+        "system_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "System Ids",
+          "type": "array"
+        },
+        "position": {
+          "$ref": "#/$defs/Vertex"
+        },
+        "ports": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Port"
+          },
+          "title": "Ports",
+          "type": "array"
+        },
+        "parameters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "title": "Parameters",
+          "type": "array"
+        },
+        "derivation": {
+          "$ref": "#/$defs/Derivation"
+        }
+      },
+      "required": ["id", "role", "class_key", "position", "derivation"],
+      "title": "NetworkNode",
+      "type": "object"
+    },
+    "NetworkSegment": {
+      "additionalProperties": false,
+      "description": "Участок между двумя портами. Вертикальный переход — участок между уровнями или отметками.",
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "class_key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Class Key"
+        },
+        "system_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "System Id",
+          "type": "string"
+        },
+        "start": {
+          "$ref": "#/$defs/PortRef"
+        },
+        "end": {
+          "$ref": "#/$defs/PortRef"
+        },
+        "path": {
+          "items": {
+            "$ref": "#/$defs/Vertex"
+          },
+          "minItems": 2,
+          "title": "Path",
+          "type": "array"
+        },
+        "orientation": {
+          "default": "unknown",
+          "enum": ["horizontal", "vertical", "inclined", "unknown"],
+          "title": "Orientation",
+          "type": "string"
+        },
+        "parameters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "title": "Parameters",
+          "type": "array"
+        },
+        "derivation": {
+          "$ref": "#/$defs/Derivation"
+        }
+      },
+      "required": ["id", "class_key", "system_id", "start", "end", "path", "derivation"],
+      "title": "NetworkSegment",
+      "type": "object"
+    },
+    "NetworkSystem": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "system_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "System Key",
+          "type": "string"
+        },
+        "derivation": {
+          "$ref": "#/$defs/Derivation"
+        }
+      },
+      "required": ["id", "system_key", "derivation"],
+      "title": "NetworkSystem",
+      "type": "object"
+    },
+    "NodeRole": {
+      "description": "Топологическая роль узла сети. Роль — не класс: класс задаёт профиль.",
+      "enum": [
+        "source",
+        "terminal",
+        "junction",
+        "equipment",
+        "device",
+        "transition",
+        "endpoint",
+        "unresolved_anchor"
+      ],
+      "title": "NodeRole",
+      "type": "string"
+    },
+    "Parameter": {
+      "additionalProperties": false,
+      "description": "Параметр сети. Своё происхождение у каждого значения, а не у элемента целиком.",
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "derivation": {
+          "$ref": "#/$defs/Derivation"
+        }
+      },
+      "required": ["key", "value", "derivation"],
+      "title": "Parameter",
+      "type": "object"
+    },
+    "Port": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "direction": {
+          "default": "unknown",
+          "enum": ["in", "out", "bidirectional", "unknown"],
+          "title": "Direction",
+          "type": "string"
+        },
+        "system_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System Id"
+        },
+        "parameters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "title": "Parameters",
+          "type": "array"
+        }
+      },
+      "required": ["id"],
+      "title": "Port",
+      "type": "object"
+    },
+    "PortRef": {
+      "additionalProperties": false,
+      "properties": {
+        "node_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "port_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Port Id",
+          "type": "string"
+        }
+      },
+      "required": ["node_id", "port_id"],
+      "title": "PortRef",
+      "type": "object"
+    },
+    "ProfileRef": {
+      "additionalProperties": false,
+      "description": "Профиль системы, по которому толкуются ключи графа.",
+      "properties": {
+        "profile_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "profile_version": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Sha256"
+        }
+      },
+      "required": ["profile_id", "profile_version"],
+      "title": "ProfileRef",
+      "type": "object"
+    },
+    "ScaleStatus": {
+      "description": "Есть ли у листа явная калибровка. Автоматического масштаба нет (ADR-0018).",
+      "enum": ["calibrated", "uncalibrated"],
+      "title": "ScaleStatus",
+      "type": "string"
+    },
+    "SheetRef": {
+      "additionalProperties": false,
+      "description": "Лист, на котором лежит геометрия, и основание для метрики.",
+      "properties": {
+        "sheet_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Sheet Id",
+          "type": "string"
+        },
+        "page_index": {
+          "minimum": 0,
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "geometry_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Geometry Fingerprint",
+          "type": "string"
+        },
+        "level_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level Id"
+        },
+        "scale_status": {
+          "$ref": "#/$defs/ScaleStatus",
+          "default": "uncalibrated"
+        },
+        "scale_calibration_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale Calibration Id"
+        },
+        "calibration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CalibrationSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": ["sheet_id", "page_index", "geometry_fingerprint"],
+      "title": "SheetRef",
+      "type": "object"
+    },
+    "SubjectKind": {
+      "description": "Вид объекта, на который ссылается контракт. Только понятия ядра, без дисциплины.",
+      "enum": [
+        "evidence_element",
+        "evidence_relation",
+        "inference_step",
+        "system",
+        "node",
+        "port",
+        "segment",
+        "unresolved_decision",
+        "sheet",
+        "level",
+        "tool",
+        "corpus"
+      ],
+      "title": "SubjectKind",
+      "type": "string"
+    },
+    "SubjectRef": {
+      "additionalProperties": false,
+      "description": "Типизированная ссылка: `{\"kind\": \"segment\", \"id\": \"seg-b1\"}`. Голый id неоднозначен.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SubjectKind"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": ["kind", "id"],
+      "title": "SubjectRef",
+      "type": "object"
+    },
+    "Tool": {
+      "additionalProperties": false,
+      "description": "Экстрактор, генератор или правило с версией и хешами — происхождение без догадок.",
+      "properties": {
+        "tool_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Tool Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Id"
+        },
+        "weights_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weights Sha256"
+        },
+        "config_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Config Sha256"
+        },
+        "rule_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Source"
+        }
+      },
+      "required": ["tool_id", "name", "version"],
+      "title": "Tool",
+      "type": "object"
+    },
+    "UnresolvedCode": {
+      "enum": [
+        "missing_evidence",
+        "ambiguous_connection",
+        "conflicting_evidence",
+        "missing_attribute",
+        "missing_rule",
+        "missing_scale",
+        "out_of_profile"
+      ],
+      "title": "UnresolvedCode",
+      "type": "string"
+    },
+    "UnresolvedDecision": {
+      "additionalProperties": false,
+      "description": "Решение, которое генератор не принял. Не прячется в уверенную выдумку.",
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "code": {
+          "$ref": "#/$defs/UnresolvedCode"
+        },
+        "subject_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Subject Ids",
+          "type": "array"
+        },
+        "subjects": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SubjectRef"
+          },
+          "title": "Subjects",
+          "type": "array"
+        },
+        "step_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Step Ids",
+          "type": "array"
+        },
+        "candidate_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Candidate Ids",
+          "type": "array"
+        },
+        "blocks_quantity": {
+          "default": true,
+          "title": "Blocks Quantity",
+          "type": "boolean"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": ["id", "code"],
+      "title": "UnresolvedDecision",
+      "type": "object"
+    },
+    "Vertex": {
+      "additionalProperties": false,
+      "description": "Точка сети: на листе (x, y нормализованы), по высоте (z_mm) и/или на уровне.",
+      "properties": {
+        "sheet_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sheet Id"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "z_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Z Mm"
+        },
+        "level_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level Id"
+        }
+      },
+      "title": "Vertex",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.3.0",
+      "default": "0.3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "graph_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._:\\-]+$",
+      "title": "Graph Id",
+      "type": "string"
+    },
+    "profile": {
+      "$ref": "#/$defs/ProfileRef"
+    },
+    "document": {
+      "$ref": "#/$defs/DocumentRef"
+    },
+    "evidence_graph": {
+      "$ref": "#/$defs/EvidenceGraphRef"
+    },
+    "sheets": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SheetRef"
+      },
+      "title": "Sheets",
+      "type": "array"
+    },
+    "levels": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Level"
+      },
+      "title": "Levels",
+      "type": "array"
+    },
+    "tools": {
+      "items": {
+        "$ref": "#/$defs/Tool"
+      },
+      "minItems": 1,
+      "title": "Tools",
+      "type": "array"
+    },
+    "run": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GenerationRun"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "corpora": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CorpusRef"
+      },
+      "title": "Corpora",
+      "type": "array"
+    },
+    "inference_steps": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/InferenceStep"
+      },
+      "title": "Inference Steps",
+      "type": "array"
+    },
+    "systems": {
+      "items": {
+        "$ref": "#/$defs/NetworkSystem"
+      },
+      "title": "Systems",
+      "type": "array"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/NetworkNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "segments": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/NetworkSegment"
+      },
+      "title": "Segments",
+      "type": "array"
+    },
+    "unresolved": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/UnresolvedDecision"
+      },
+      "title": "Unresolved",
+      "type": "array"
+    }
+  },
+  "required": ["graph_id", "profile", "document", "evidence_graph", "tools", "systems", "nodes"],
+  "title": "MepNetworkGraph",
+  "type": "object"
+}

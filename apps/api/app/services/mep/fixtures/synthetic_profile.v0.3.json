@@ -1,0 +1,112 @@
+{
+  "schema_version": "0.3.0",
+  "profile_id": "synthetic.demo",
+  "profile_version": "0.3.0",
+  "discipline": "synthetic",
+  "title": "Синтетический профиль для проверки контрактов",
+  "status": "synthetic",
+  "source": "Синтетика для тестов контракта v0.3. Не описывает ВК, ОВ или другую реальную систему.",
+  "systems": [
+    {
+      "key": "syn.sys_a",
+      "label": "Система A",
+      "topology": "tree"
+    }
+  ],
+  "attributes": [
+    {
+      "key": "syn.mark",
+      "value_type": "string"
+    },
+    {
+      "key": "syn.size_label",
+      "value_type": "string"
+    },
+    {
+      "key": "syn.nominal_size_mm",
+      "value_type": "number",
+      "unit": "mm"
+    },
+    {
+      "key": "syn.material",
+      "value_type": "string"
+    }
+  ],
+  "classes": [
+    {
+      "key": "syn.ev.source_symbol",
+      "label": "Символ источника",
+      "layer": "evidence",
+      "evidence_kind": "symbol",
+      "allowed_geometry": ["point", "bbox"],
+      "attribute_keys": ["syn.mark"]
+    },
+    {
+      "key": "syn.ev.terminal_symbol",
+      "label": "Символ потребителя",
+      "layer": "evidence",
+      "evidence_kind": "symbol",
+      "allowed_geometry": ["point", "bbox"]
+    },
+    {
+      "key": "syn.ev.label",
+      "label": "Подпись",
+      "layer": "evidence",
+      "evidence_kind": "text",
+      "allowed_geometry": ["bbox"]
+    },
+    {
+      "key": "syn.ev.visible_route",
+      "label": "Видимая трасса",
+      "layer": "evidence",
+      "evidence_kind": "route",
+      "allowed_geometry": ["polyline"],
+      "attribute_keys": ["syn.size_label"]
+    },
+    {
+      "key": "syn.net.source",
+      "label": "Источник",
+      "layer": "network",
+      "network_element": "node",
+      "node_roles": ["source"]
+    },
+    {
+      "key": "syn.net.terminal",
+      "label": "Потребитель",
+      "layer": "network",
+      "network_element": "node",
+      "node_roles": ["terminal"],
+      "quantity": "count"
+    },
+    {
+      "key": "syn.net.junction",
+      "label": "Разветвление",
+      "layer": "network",
+      "network_element": "node",
+      "node_roles": ["junction"]
+    },
+    {
+      "key": "syn.net.segment",
+      "label": "Участок",
+      "layer": "network",
+      "network_element": "segment",
+      "attribute_keys": ["syn.nominal_size_mm", "syn.material"],
+      "quantity": "length",
+      "quantity_group_keys": ["syn.nominal_size_mm", "syn.material"]
+    }
+  ],
+  "relation_types": [
+    {
+      "key": "syn.rel.labels",
+      "label": "Подпись относится к",
+      "from_kinds": ["text"],
+      "to_kinds": ["symbol", "route"]
+    },
+    {
+      "key": "syn.rel.touches",
+      "label": "Трасса касается символа",
+      "from_kinds": ["route"],
+      "to_kinds": ["symbol"]
+    }
+  ]
+}

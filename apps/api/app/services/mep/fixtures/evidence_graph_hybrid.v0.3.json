@@ -1,0 +1,380 @@
+{
+  "schema_version": "0.3.0",
+  "graph_id": "eg-demo-002-hybrid",
+  "input_mode": "HYBRID_REVIEWED",
+  "profile": {
+    "profile_id": "synthetic.demo",
+    "profile_version": "0.3.0",
+    "profile_sha256": "2b52c95e9936fa6ffb10245a3fdd39737bee3699eb5272b5dffb81733b95c972"
+  },
+  "document": {
+    "project_id": "proj-demo",
+    "revision_id": "rev-demo",
+    "source_pdf_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "sheets": [
+    {
+      "sheet_id": "sheet-p3",
+      "page_index": 3,
+      "geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+      "level_id": "L01",
+      "scale_status": "calibrated",
+      "scale_calibration_id": "scale-001",
+      "calibration": {
+        "calibration_id": "scale-001",
+        "page_geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "display_width_pt": "2383.9370",
+        "display_height_pt": "1683.7795",
+        "mm_per_pt": "35.277777777778",
+        "verification_state": "verified",
+        "fingerprint": "d8c24118daa0e8be1f42a6df11525788d7ce6b73dd4cbb0792884bdd8ffaaecf"
+      }
+    }
+  ],
+  "levels": [
+    {
+      "level_id": "L01",
+      "name": "Этаж 1",
+      "elevation_mm": null
+    }
+  ],
+  "tools": [
+    {
+      "tool_id": "det",
+      "name": "synthetic-symbol-detector",
+      "version": "0.0.0"
+    },
+    {
+      "tool_id": "txt",
+      "name": "pdf-text-layer-reader",
+      "version": "0.0.0"
+    },
+    {
+      "tool_id": "link",
+      "name": "geometric-linker",
+      "version": "0.0.0"
+    }
+  ],
+  "source_availability": [
+    {
+      "source_type": "page_raster",
+      "sheet_id": "sheet-p3",
+      "availability": "available"
+    },
+    {
+      "source_type": "pdf_text_layer",
+      "sheet_id": "sheet-p3",
+      "availability": "available"
+    }
+  ],
+  "elements": [
+    {
+      "id": "ev-src-1",
+      "kind": "symbol",
+      "sheet_id": "sheet-p3",
+      "geometry": {
+        "kind": "point",
+        "point": [0.2, 0.5]
+      },
+      "class_key": "syn.ev.source_symbol",
+      "attributes": [
+        {
+          "key": "syn.mark",
+          "value": "A1",
+          "status": "extraction_inferred",
+          "source_element_ids": ["ev-txt-1"]
+        }
+      ],
+      "confidence": 0.93,
+      "provenance": "mep_model_observed",
+      "status": "observed",
+      "sources": [
+        {
+          "source_type": "page_raster",
+          "ref_id": "raster-p3-150dpi",
+          "tool_id": "det"
+        }
+      ]
+    },
+    {
+      "id": "ev-term-1",
+      "kind": "symbol",
+      "sheet_id": "sheet-p3",
+      "geometry": {
+        "kind": "point",
+        "point": [0.6, 0.3]
+      },
+      "class_key": "syn.ev.terminal_symbol",
+      "confidence": 0.88,
+      "provenance": "mep_model_observed",
+      "status": "human_confirmed",
+      "sources": [
+        {
+          "source_type": "page_raster",
+          "ref_id": "raster-p3-150dpi",
+          "tool_id": "det"
+        }
+      ],
+      "review": "confirmed",
+      "review_history": [
+        {
+          "event_id": "rv-100",
+          "action": "confirm",
+          "reviewer_id": "user-engineer-01",
+          "reviewed_at": "2026-09-15T09:38:00Z"
+        }
+      ]
+    },
+    {
+      "id": "ev-term-2",
+      "kind": "symbol",
+      "sheet_id": "sheet-p3",
+      "geometry": {
+        "kind": "point",
+        "point": [0.6, 0.7]
+      },
+      "class_key": "syn.ev.terminal_symbol",
+      "confidence": 0.41,
+      "provenance": "human_ground_truth",
+      "status": "human_confirmed",
+      "sources": [
+        {
+          "source_type": "human_annotation",
+          "ref_id": "ann-102"
+        },
+        {
+          "source_type": "page_raster",
+          "ref_id": "raster-p3-150dpi",
+          "tool_id": "det"
+        }
+      ],
+      "original": {
+        "provenance": "mep_model_observed",
+        "tool_id": "det",
+        "class_key": "syn.ev.terminal_symbol",
+        "geometry": {
+          "kind": "point",
+          "point": [0.63, 0.74]
+        },
+        "confidence": 0.41,
+        "sources": [
+          {
+            "source_type": "page_raster",
+            "ref_id": "raster-p3-150dpi",
+            "tool_id": "det"
+          }
+        ]
+      },
+      "review": "confirmed",
+      "review_history": [
+        {
+          "event_id": "rv-102",
+          "action": "correct_geometry",
+          "reviewer_id": "user-engineer-01",
+          "reviewed_at": "2026-09-15T09:42:00Z",
+          "note": "символ смещён к подписи соседнего прибора"
+        }
+      ]
+    },
+    {
+      "id": "ev-sym-3",
+      "kind": "symbol",
+      "sheet_id": "sheet-p3",
+      "geometry": {
+        "kind": "bbox",
+        "min": [0.84, 0.48],
+        "max": [0.86, 0.52]
+      },
+      "class_key": null,
+      "confidence": 0.3,
+      "provenance": "mep_model_observed",
+      "status": "observed",
+      "sources": [
+        {
+          "source_type": "page_raster",
+          "ref_id": "raster-p3-150dpi",
+          "tool_id": "det"
+        }
+      ],
+      "unresolved": [
+        {
+          "field": "class_key",
+          "reason": "ambiguous"
+        }
+      ]
+    },
+    {
+      "id": "ev-txt-1",
+      "kind": "text",
+      "sheet_id": "sheet-p3",
+      "geometry": {
+        "kind": "bbox",
+        "min": [0.18, 0.45],
+        "max": [0.22, 0.47]
+      },
+      "class_key": "syn.ev.label",
+      "text": "A1",
+      "provenance": "deterministic_extracted",
+      "status": "observed",
+      "sources": [
+        {
+          "source_type": "pdf_text_layer",
+          "ref_id": "span-p3-0001",
+          "tool_id": "txt"
+        }
+      ]
+    },
+    {
+      "id": "ev-txt-2",
+      "kind": "text",
+      "sheet_id": "sheet-p3",
+      "geometry": {
+        "kind": "bbox",
+        "min": [0.3, 0.47],
+        "max": [0.34, 0.49]
+      },
+      "class_key": "syn.ev.label",
+      "text": "d50",
+      "provenance": "deterministic_extracted",
+      "status": "observed",
+      "sources": [
+        {
+          "source_type": "pdf_text_layer",
+          "ref_id": "span-p3-0002",
+          "tool_id": "txt"
+        }
+      ]
+    },
+    {
+      "id": "ev-route-1",
+      "kind": "route",
+      "sheet_id": "sheet-p3",
+      "geometry": {
+        "kind": "polyline",
+        "points": [
+          [0.2, 0.5],
+          [0.45, 0.5]
+        ]
+      },
+      "class_key": "syn.ev.visible_route",
+      "attributes": [
+        {
+          "key": "syn.size_label",
+          "value": "d50",
+          "status": "human_confirmed",
+          "source_element_ids": ["ev-txt-2"]
+        }
+      ],
+      "confidence": 0.8,
+      "provenance": "human_ground_truth",
+      "status": "human_confirmed",
+      "sources": [
+        {
+          "source_type": "human_annotation",
+          "ref_id": "ann-101"
+        },
+        {
+          "source_type": "page_raster",
+          "ref_id": "raster-p3-150dpi",
+          "tool_id": "det"
+        }
+      ],
+      "original": {
+        "provenance": "mep_model_observed",
+        "tool_id": "det",
+        "class_key": "syn.ev.visible_route",
+        "geometry": {
+          "kind": "polyline",
+          "points": [
+            [0.2, 0.5],
+            [0.45, 0.5]
+          ]
+        },
+        "attributes": [
+          {
+            "key": "syn.size_label",
+            "value": "d63",
+            "status": "extraction_inferred",
+            "source_element_ids": ["ev-txt-2"]
+          }
+        ],
+        "confidence": 0.8,
+        "sources": [
+          {
+            "source_type": "page_raster",
+            "ref_id": "raster-p3-150dpi",
+            "tool_id": "det"
+          }
+        ]
+      },
+      "review": "confirmed",
+      "review_history": [
+        {
+          "event_id": "rv-101",
+          "action": "correct_attributes",
+          "reviewer_id": "user-engineer-01",
+          "reviewed_at": "2026-09-15T09:40:00Z",
+          "note": "модель прочла подпись d50 как d63"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel-1",
+      "relation_key": "syn.rel.labels",
+      "from_id": "ev-txt-1",
+      "to_id": "ev-src-1",
+      "confidence": 0.9,
+      "provenance": "deterministic_extracted",
+      "status": "extraction_inferred",
+      "sources": [
+        {
+          "source_type": "pdf_text_layer",
+          "ref_id": "span-p3-0001",
+          "tool_id": "link"
+        }
+      ]
+    },
+    {
+      "id": "rel-2",
+      "relation_key": "syn.rel.labels",
+      "from_id": "ev-txt-2",
+      "to_id": "ev-route-1",
+      "confidence": 0.85,
+      "provenance": "deterministic_extracted",
+      "status": "extraction_inferred",
+      "sources": [
+        {
+          "source_type": "pdf_text_layer",
+          "ref_id": "span-p3-0002",
+          "tool_id": "link"
+        }
+      ]
+    },
+    {
+      "id": "rel-3",
+      "relation_key": "syn.rel.touches",
+      "from_id": "ev-route-1",
+      "to_id": "ev-src-1",
+      "confidence": 0.8,
+      "provenance": "deterministic_extracted",
+      "status": "extraction_inferred",
+      "sources": [
+        {
+          "source_type": "page_raster",
+          "ref_id": "raster-p3-150dpi",
+          "tool_id": "link"
+        }
+      ]
+    }
+  ],
+  "gaps": [
+    {
+      "code": "no_visible_route_to_terminals",
+      "sheet_id": "sheet-p3",
+      "subject_ids": ["ev-term-1", "ev-term-2"],
+      "note": "Трасса к потребителям на листе П не показана."
+    }
+  ]
+}

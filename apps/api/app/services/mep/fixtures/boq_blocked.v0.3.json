@@ -1,0 +1,265 @@
+{
+  "schema_version": "0.3.0",
+  "boq_id": "boq-f7e71212fde2a2f2",
+  "lane": "STRICT",
+  "status": "partial",
+  "network_graph": {
+    "graph_id": "ng-demo-001",
+    "sha256": "f7e71212fde2a2f2b760f0306167c2a5cc483a46ecae2b2933145ae1bc8bf1e9"
+  },
+  "evidence_graph": {
+    "graph_id": "eg-demo-001",
+    "sha256": "de632a3ce32f1f550efc5f3304df039a091396cbb4d3335d111002758fd088db",
+    "input_mode": "MODEL_EXTRACTED"
+  },
+  "profile": {
+    "profile_id": "synthetic.demo",
+    "profile_version": "0.3.0",
+    "profile_sha256": "2b52c95e9936fa6ffb10245a3fdd39737bee3699eb5272b5dffb81733b95c972"
+  },
+  "engine": {
+    "name": "mep-quantity-engine",
+    "version": "0.3.1"
+  },
+  "rules": [
+    {
+      "rule_id": "mep.segment_length.v0",
+      "description": "Сумма длин участков: план по калибровке, высота по отметкам."
+    },
+    {
+      "rule_id": "mep.node_count.v0",
+      "description": "Число узлов класса с правилом count."
+    },
+    {
+      "rule_id": "mep.path_turns.v0",
+      "description": "Промежуточные вершины посчитанных участков со сменой направления."
+    },
+    {
+      "rule_id": "mep.branch_nodes.v0",
+      "description": "Узлы, к которым подключено не меньше трёх участков."
+    },
+    {
+      "rule_id": "mep.parameter_change.v0",
+      "description": "Узлы, где подключённые участки различаются значением ключа."
+    }
+  ],
+  "lines": [
+    {
+      "line_id": "bl-7e666eb5179c61df",
+      "rule_id": "mep.branch_nodes.v0",
+      "category": "topology",
+      "system_key": "syn.sys_a",
+      "class_key": "syn.net.junction",
+      "group": [
+        {
+          "key": "core.degree",
+          "value": 3,
+          "unit": null
+        }
+      ],
+      "unit": "pcs",
+      "quantity": "1",
+      "canonical_unit": "pcs",
+      "canonical_quantity": "1",
+      "source_ids": ["n-j1"],
+      "provenance": [
+        {
+          "provenance": "deterministic_rule",
+          "count": 2
+        },
+        {
+          "provenance": "evidence_observed",
+          "count": 1
+        },
+        {
+          "provenance": "rd_prior_inferred",
+          "count": 1
+        }
+      ],
+      "min_confidence": 0.6,
+      "review_required": true,
+      "additive": true,
+      "sources": [
+        {
+          "subject": {
+            "kind": "node",
+            "id": "n-j1"
+          },
+          "quantity": "1",
+          "canonical_quantity": "1",
+          "group_values": [],
+          "participants": [
+            {
+              "subject": {
+                "kind": "node",
+                "id": "n-j1"
+              },
+              "role": "anchor",
+              "parameter_key": null,
+              "value": null
+            },
+            {
+              "subject": {
+                "kind": "segment",
+                "id": "seg-b1"
+              },
+              "role": "connected",
+              "parameter_key": null,
+              "value": null
+            },
+            {
+              "subject": {
+                "kind": "segment",
+                "id": "seg-b2"
+              },
+              "role": "connected",
+              "parameter_key": null,
+              "value": null
+            },
+            {
+              "subject": {
+                "kind": "segment",
+                "id": "seg-main"
+              },
+              "role": "connected",
+              "parameter_key": null,
+              "value": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "line_id": "bl-103279eeb5edc5da",
+      "rule_id": "mep.node_count.v0",
+      "category": "count",
+      "system_key": "syn.sys_a",
+      "class_key": "syn.net.terminal",
+      "group": [],
+      "unit": "pcs",
+      "quantity": "2",
+      "canonical_unit": "pcs",
+      "canonical_quantity": "2",
+      "source_ids": ["n-t1", "n-t2"],
+      "provenance": [
+        {
+          "provenance": "evidence_observed",
+          "count": 2
+        }
+      ],
+      "min_confidence": 0.41,
+      "review_required": false,
+      "additive": true,
+      "sources": [
+        {
+          "subject": {
+            "kind": "node",
+            "id": "n-t1"
+          },
+          "quantity": "1",
+          "canonical_quantity": "1",
+          "group_values": [],
+          "participants": []
+        },
+        {
+          "subject": {
+            "kind": "node",
+            "id": "n-t2"
+          },
+          "quantity": "1",
+          "canonical_quantity": "1",
+          "group_values": [],
+          "participants": []
+        }
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "code": "DECISION_BLOCKS_QUANTITY",
+      "severity": "blocker",
+      "subject_ids": ["seg-b1"],
+      "key": null,
+      "message": "решение не принято",
+      "subjects": [
+        {
+          "kind": "segment",
+          "id": "seg-b1"
+        }
+      ]
+    },
+    {
+      "code": "DECISION_BLOCKS_QUANTITY",
+      "severity": "blocker",
+      "subject_ids": ["seg-b2"],
+      "key": null,
+      "message": "решение не принято",
+      "subjects": [
+        {
+          "kind": "segment",
+          "id": "seg-b2"
+        }
+      ]
+    },
+    {
+      "code": "DECISION_BLOCKS_QUANTITY",
+      "severity": "blocker",
+      "subject_ids": ["seg-main"],
+      "key": null,
+      "message": "решение не принято",
+      "subjects": [
+        {
+          "kind": "segment",
+          "id": "seg-main"
+        }
+      ]
+    },
+    {
+      "code": "FITTING_RULES_NOT_APPROVED",
+      "severity": "warning",
+      "subject_ids": [],
+      "key": null,
+      "message": "топология не сопоставлена с фитингами (Р-MEP-7)",
+      "subjects": []
+    },
+    {
+      "code": "PARAMETER_UNRESOLVED",
+      "severity": "blocker",
+      "subject_ids": ["seg-b1"],
+      "key": "syn.material",
+      "message": "syn.material не определён",
+      "subjects": [
+        {
+          "kind": "segment",
+          "id": "seg-b1"
+        }
+      ]
+    },
+    {
+      "code": "PARAMETER_UNRESOLVED",
+      "severity": "blocker",
+      "subject_ids": ["seg-b2"],
+      "key": "syn.material",
+      "message": "syn.material не определён",
+      "subjects": [
+        {
+          "kind": "segment",
+          "id": "seg-b2"
+        }
+      ]
+    },
+    {
+      "code": "PARAMETER_UNRESOLVED",
+      "severity": "blocker",
+      "subject_ids": ["seg-main"],
+      "key": "syn.material",
+      "message": "syn.material не определён",
+      "subjects": [
+        {
+          "kind": "segment",
+          "id": "seg-main"
+        }
+      ]
+    }
+  ]
+}

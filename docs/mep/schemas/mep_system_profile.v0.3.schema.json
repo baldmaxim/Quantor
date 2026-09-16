@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "AttributeDef": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "value_type": {
+          "$ref": "#/$defs/ValueType"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "allowed_values": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Values",
+          "type": "array"
+        }
+      },
+      "required": ["key", "value_type"],
+      "title": "AttributeDef",
+      "type": "object"
+    },
+    "ClassDef": {
+      "additionalProperties": false,
+      "description": "Класс элемента. Слой evidence и слой сети описываются раздельно даже для одного объекта.",
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "layer": {
+          "enum": ["evidence", "network"],
+          "title": "Layer",
+          "type": "string"
+        },
+        "evidence_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "network_element": {
+          "anyOf": [
+            {
+              "enum": ["node", "segment"],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Network Element"
+        },
+        "node_roles": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NodeRole"
+          },
+          "title": "Node Roles",
+          "type": "array"
+        },
+        "allowed_geometry": {
+          "default": [],
+          "items": {
+            "enum": ["point", "bbox", "polyline", "polygon"],
+            "type": "string"
+          },
+          "title": "Allowed Geometry",
+          "type": "array"
+        },
+        "attribute_keys": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "type": "string"
+          },
+          "title": "Attribute Keys",
+          "type": "array"
+        },
+        "quantity": {
+          "default": "none",
+          "enum": ["length", "count", "none"],
+          "title": "Quantity",
+          "type": "string"
+        },
+        "quantity_group_keys": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "type": "string"
+          },
+          "title": "Quantity Group Keys",
+          "type": "array"
+        }
+      },
+      "required": ["key", "label", "layer"],
+      "title": "ClassDef",
+      "type": "object"
+    },
+    "EvidenceKind": {
+      "description": "Что можно увидеть на листе — без дисциплины.",
+      "enum": ["symbol", "route", "zone", "text"],
+      "title": "EvidenceKind",
+      "type": "string"
+    },
+    "NodeRole": {
+      "description": "Топологическая роль узла сети. Роль — не класс: класс задаёт профиль.",
+      "enum": [
+        "source",
+        "terminal",
+        "junction",
+        "equipment",
+        "device",
+        "transition",
+        "endpoint",
+        "unresolved_anchor"
+      ],
+      "title": "NodeRole",
+      "type": "string"
+    },
+    "ProfileStatus": {
+      "enum": ["synthetic", "draft", "approved"],
+      "title": "ProfileStatus",
+      "type": "string"
+    },
+    "RelationTypeDef": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "from_kinds": {
+          "items": {
+            "$ref": "#/$defs/EvidenceKind"
+          },
+          "title": "From Kinds",
+          "type": "array"
+        },
+        "to_kinds": {
+          "items": {
+            "$ref": "#/$defs/EvidenceKind"
+          },
+          "title": "To Kinds",
+          "type": "array"
+        }
+      },
+      "required": ["key", "label", "from_kinds", "to_kinds"],
+      "title": "RelationTypeDef",
+      "type": "object"
+    },
+    "SystemDef": {
+      "additionalProperties": false,
+      "description": "Система. `tree` запрещает циклы в сети этой системы — правило профиля, а не ядра.",
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "topology": {
+          "default": "any",
+          "enum": ["tree", "any"],
+          "title": "Topology",
+          "type": "string"
+        }
+      },
+      "required": ["key", "label"],
+      "title": "SystemDef",
+      "type": "object"
+    },
+    "ValueType": {
+      "enum": ["string", "number", "integer", "boolean"],
+      "title": "ValueType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.3.0",
+      "default": "0.3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "profile_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._:\\-]+$",
+      "title": "Profile Id",
+      "type": "string"
+    },
+    "profile_version": {
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Profile Version",
+      "type": "string"
+    },
+    "discipline": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Discipline",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/ProfileStatus"
+    },
+    "source": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "systems": {
+      "items": {
+        "$ref": "#/$defs/SystemDef"
+      },
+      "title": "Systems",
+      "type": "array"
+    },
+    "classes": {
+      "items": {
+        "$ref": "#/$defs/ClassDef"
+      },
+      "title": "Classes",
+      "type": "array"
+    },
+    "attributes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/AttributeDef"
+      },
+      "title": "Attributes",
+      "type": "array"
+    },
+    "relation_types": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RelationTypeDef"
+      },
+      "title": "Relation Types",
+      "type": "array"
+    }
+  },
+  "required": [
+    "profile_id",
+    "profile_version",
+    "discipline",
+    "title",
+    "status",
+    "source",
+    "systems",
+    "classes"
+  ],
+  "title": "MepSystemProfile",
+  "type": "object"
+}

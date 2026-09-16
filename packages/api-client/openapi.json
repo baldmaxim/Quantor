@@ -211,6 +211,96 @@
         "title": "ArtifactKind",
         "type": "string"
       },
+      "Attribute": {
+        "additionalProperties": false,
+        "description": "Атрибут из профиля. Отсутствие значения — `None` со статусом, а не пустая строка.",
+        "properties": {
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "Attribute",
+        "type": "object"
+      },
+      "AttributeDef": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_values": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Values",
+            "type": "array"
+          },
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value_type": {
+            "$ref": "#/components/schemas/ValueType"
+          }
+        },
+        "required": [
+          "key",
+          "value_type"
+        ],
+        "title": "AttributeDef",
+        "type": "object"
+      },
       "AuditEventRead": {
         "description": "Запись журнала. Только чтение: операций изменения у журнала нет вовсе.",
         "properties": {
@@ -355,6 +445,32 @@
         "title": "AuditResult",
         "type": "string"
       },
+      "Availability": {
+        "enum": [
+          "available",
+          "unavailable",
+          "not_checked"
+        ],
+        "title": "Availability",
+        "type": "string"
+      },
+      "BlockerCode": {
+        "enum": [
+          "NETWORK_INVALID",
+          "DECISION_BLOCKS_QUANTITY",
+          "CLASS_UNRESOLVED",
+          "PARAMETER_MISSING",
+          "PARAMETER_UNRESOLVED",
+          "NODE_SYSTEM_AMBIGUOUS",
+          "NO_SCALE",
+          "CROSS_SHEET_PLANAR",
+          "ELEVATION_INCOMPLETE",
+          "LENGTH_UNDETERMINED",
+          "FITTING_RULES_NOT_APPROVED"
+        ],
+        "title": "BlockerCode",
+        "type": "string"
+      },
       "Body_upload_file": {
         "properties": {
           "document_id": {
@@ -381,6 +497,386 @@
           "file"
         ],
         "title": "Body_upload_file",
+        "type": "object"
+      },
+      "BoqLine": {
+        "additionalProperties": false,
+        "description": "Строка ВОР: правило, группа по ключам профиля, количество и все элементы-источники.",
+        "properties": {
+          "additive": {
+            "default": false,
+            "title": "Additive",
+            "type": "boolean"
+          },
+          "canonical_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Canonical Quantity",
+            "type": "string"
+          },
+          "canonical_unit": {
+            "enum": [
+              "mm",
+              "pcs"
+            ],
+            "title": "Canonical Unit",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "length",
+              "count",
+              "topology"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "class_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Key"
+          },
+          "group": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Attribute"
+            },
+            "title": "Group",
+            "type": "array"
+          },
+          "line_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Line Id",
+            "type": "string"
+          },
+          "min_confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Confidence"
+          },
+          "provenance": {
+            "items": {
+              "$ref": "#/components/schemas/ProvenanceCount"
+            },
+            "title": "Provenance",
+            "type": "array"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "review_required": {
+            "title": "Review Required",
+            "type": "boolean"
+          },
+          "rule_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "source_ids": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Source Ids",
+            "type": "array"
+          },
+          "sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LineSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "system_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "System Key",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "m",
+              "pcs"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "rule_id",
+          "category",
+          "system_key",
+          "class_key",
+          "unit",
+          "quantity",
+          "canonical_unit",
+          "canonical_quantity",
+          "source_ids",
+          "provenance",
+          "review_required"
+        ],
+        "title": "BoqLine",
+        "type": "object"
+      },
+      "BoqStatus": {
+        "enum": [
+          "complete",
+          "partial",
+          "refused"
+        ],
+        "title": "BoqStatus",
+        "type": "string"
+      },
+      "BoxGeometry": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "bbox",
+            "default": "bbox",
+            "title": "Kind",
+            "type": "string"
+          },
+          "max": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "title": "Max",
+            "type": "array"
+          },
+          "min": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "title": "Min",
+            "type": "array"
+          }
+        },
+        "required": [
+          "min",
+          "max"
+        ],
+        "title": "BoxGeometry",
+        "type": "object"
+      },
+      "CalibrationSnapshot": {
+        "additionalProperties": false,
+        "description": "Неизменяемый снимок калибровки и геометрии страницы, по которому считаются метры.\n\nКопия значений, а не только ссылка: граф должен считаться одинаково и после того, как в\nпортале появится новая калибровка листа (ADR-0018 — калибровка не правится, а заменяется).",
+        "properties": {
+          "calibration_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Calibration Id",
+            "type": "string"
+          },
+          "display_height_pt": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Display Height Pt",
+            "type": "string"
+          },
+          "display_width_pt": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Display Width Pt",
+            "type": "string"
+          },
+          "fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "mm_per_pt": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Mm Per Pt",
+            "type": "string"
+          },
+          "page_geometry_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Page Geometry Fingerprint",
+            "type": "string"
+          },
+          "verification_state": {
+            "enum": [
+              "unverified",
+              "verified",
+              "disputed"
+            ],
+            "title": "Verification State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "calibration_id",
+          "page_geometry_fingerprint",
+          "display_width_pt",
+          "display_height_pt",
+          "mm_per_pt",
+          "verification_state",
+          "fingerprint"
+        ],
+        "title": "CalibrationSnapshot",
+        "type": "object"
+      },
+      "ClassDef": {
+        "additionalProperties": false,
+        "description": "Класс элемента. Слой evidence и слой сети описываются раздельно даже для одного объекта.",
+        "properties": {
+          "allowed_geometry": {
+            "default": [],
+            "items": {
+              "enum": [
+                "point",
+                "bbox",
+                "polyline",
+                "polygon"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Geometry",
+            "type": "array"
+          },
+          "attribute_keys": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            "title": "Attribute Keys",
+            "type": "array"
+          },
+          "evidence_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "layer": {
+            "enum": [
+              "evidence",
+              "network"
+            ],
+            "title": "Layer",
+            "type": "string"
+          },
+          "network_element": {
+            "anyOf": [
+              {
+                "enum": [
+                  "node",
+                  "segment"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network Element"
+          },
+          "node_roles": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NodeRole"
+            },
+            "title": "Node Roles",
+            "type": "array"
+          },
+          "quantity": {
+            "default": "none",
+            "enum": [
+              "length",
+              "count",
+              "none"
+            ],
+            "title": "Quantity",
+            "type": "string"
+          },
+          "quantity_group_keys": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            "title": "Quantity Group Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "layer"
+        ],
+        "title": "ClassDef",
         "type": "object"
       },
       "ComponentDiagnosticsRead": {
@@ -532,6 +1028,42 @@
         "title": "ContentUrl",
         "type": "object"
       },
+      "CorpusRef": {
+        "additionalProperties": false,
+        "description": "Корпус случаев РД для retrieval. Только TRAIN: отложенные проекты — не источник.",
+        "properties": {
+          "corpus_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Corpus Id",
+            "type": "string"
+          },
+          "dataset_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Dataset Fingerprint",
+            "type": "string"
+          },
+          "split": {
+            "const": "train",
+            "default": "train",
+            "title": "Split",
+            "type": "string"
+          },
+          "split_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Split Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "corpus_id",
+          "dataset_fingerprint",
+          "split_sha256"
+        ],
+        "title": "CorpusRef",
+        "type": "object"
+      },
       "DataPolicy": {
         "description": "Куда позволено уходить данным.\n\nДля проектной документации это бывает жёстким требованием заказчика, а не\nпожеланием: чертёж объекта нельзя отправлять наружу ни при каких условиях.",
         "enum": [
@@ -541,6 +1073,55 @@
         ],
         "title": "DataPolicy",
         "type": "string"
+      },
+      "Derivation": {
+        "additionalProperties": false,
+        "description": "Происхождение элемента или значения сети.",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "evidence_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/GenerationProvenance"
+          },
+          "step_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Step Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "provenance"
+        ],
+        "title": "Derivation",
+        "type": "object"
       },
       "DiagnosticsReport": {
         "description": "Сводка по установке. Итог считается по обязательным компонентам.",
@@ -633,6 +1214,50 @@
           "updated_at"
         ],
         "title": "DocumentRead",
+        "type": "object"
+      },
+      "DocumentRef": {
+        "additionalProperties": false,
+        "description": "Исходный документ Quantor. Хеши — неизменяемый вход, а не копия.",
+        "properties": {
+          "package_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Sha256"
+          },
+          "project_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "revision_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "source_pdf_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Pdf Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "revision_id",
+          "source_pdf_sha256"
+        ],
+        "title": "DocumentRef",
         "type": "object"
       },
       "DocumentRevisionRead": {
@@ -731,6 +1356,487 @@
         "title": "DocumentRevisionRead",
         "type": "object"
       },
+      "EngineRef": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "EngineRef",
+        "type": "object"
+      },
+      "EvidenceAttribute": {
+        "additionalProperties": false,
+        "description": "Атрибут evidence.\n\n`labelled` — прочитан с листа (подпись «Ø50»), `measured` — снят с геометрии листа и\nтребует калибровки. `source_element_ids` — текстовые элементы, из которых он прочитан.",
+        "properties": {
+          "derivation": {
+            "default": "labelled",
+            "enum": [
+              "labelled",
+              "measured"
+            ],
+            "title": "Derivation",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "source_element_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Source Element Ids",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EvidenceStatus"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "status"
+        ],
+        "title": "EvidenceAttribute",
+        "type": "object"
+      },
+      "EvidenceElement": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceAttribute"
+            },
+            "title": "Attributes",
+            "type": "array"
+          },
+          "class_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Key"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "geometry": {
+            "discriminator": {
+              "mapping": {
+                "bbox": "#/components/schemas/BoxGeometry",
+                "point": "#/components/schemas/PointGeometry",
+                "polygon": "#/components/schemas/PolygonGeometry",
+                "polyline": "#/components/schemas/PolylineGeometry"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PointGeometry"
+              },
+              {
+                "$ref": "#/components/schemas/BoxGeometry"
+              },
+              {
+                "$ref": "#/components/schemas/PolylineGeometry"
+              },
+              {
+                "$ref": "#/components/schemas/PolygonGeometry"
+              }
+            ],
+            "title": "Geometry"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EvidenceKind"
+          },
+          "level_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
+          "original": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OriginalPrediction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/EvidenceProvenance"
+          },
+          "review": {
+            "$ref": "#/components/schemas/ReviewStatus",
+            "default": "unreviewed"
+          },
+          "review_history": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReviewEvent"
+            },
+            "title": "Review History",
+            "type": "array"
+          },
+          "sheet_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Sheet Id",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EvidenceStatus"
+          },
+          "system_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Key"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "unresolved": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/UnresolvedField"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "sheet_id",
+          "geometry",
+          "class_key",
+          "provenance",
+          "status",
+          "sources"
+        ],
+        "title": "EvidenceElement",
+        "type": "object"
+      },
+      "EvidenceGap": {
+        "additionalProperties": false,
+        "description": "Известный пробел входа: чего не хватает, чтобы граф считался полным.",
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "sheet_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Id"
+          },
+          "subject_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Subject Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "EvidenceGap",
+        "type": "object"
+      },
+      "EvidenceGraphRef": {
+        "additionalProperties": false,
+        "properties": {
+          "graph_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Graph Id",
+            "type": "string"
+          },
+          "input_mode": {
+            "$ref": "#/components/schemas/EvidenceInputMode"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "graph_id",
+          "sha256",
+          "input_mode"
+        ],
+        "title": "EvidenceGraphRef",
+        "type": "object"
+      },
+      "EvidenceInputMode": {
+        "description": "Как получен граф целиком (Track B, Track A, проверенный гибрид).",
+        "enum": [
+          "MODEL_EXTRACTED",
+          "HUMAN_GT",
+          "HYBRID_REVIEWED"
+        ],
+        "title": "EvidenceInputMode",
+        "type": "string"
+      },
+      "EvidenceKind": {
+        "description": "Что можно увидеть на листе — без дисциплины.",
+        "enum": [
+          "symbol",
+          "route",
+          "zone",
+          "text"
+        ],
+        "title": "EvidenceKind",
+        "type": "string"
+      },
+      "EvidenceProvenance": {
+        "description": "Кто утверждает, что элемент есть на листе. `rd_prior_inferred` здесь нет намеренно.",
+        "enum": [
+          "base_recognition_observed",
+          "mep_model_observed",
+          "deterministic_extracted",
+          "human_ground_truth",
+          "unresolved"
+        ],
+        "title": "EvidenceProvenance",
+        "type": "string"
+      },
+      "EvidenceRelation": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "from_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "From Id",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/EvidenceProvenance"
+          },
+          "relation_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Relation Key",
+            "type": "string"
+          },
+          "review": {
+            "$ref": "#/components/schemas/ReviewStatus",
+            "default": "unreviewed"
+          },
+          "review_history": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReviewEvent"
+            },
+            "title": "Review History",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EvidenceStatus"
+          },
+          "to_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "To Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "relation_key",
+          "from_id",
+          "to_id",
+          "provenance",
+          "status",
+          "sources"
+        ],
+        "title": "EvidenceRelation",
+        "type": "object"
+      },
+      "EvidenceStatus": {
+        "description": "Насколько прямо элемент виден.\n\n`extraction_inferred` — вывод в пределах листа (подпись отнесена к ближайшему символу),\nа не достройка РД.",
+        "enum": [
+          "observed",
+          "extraction_inferred",
+          "human_confirmed"
+        ],
+        "title": "EvidenceStatus",
+        "type": "string"
+      },
       "FlagOverrideWrite": {
         "properties": {
           "enabled": {
@@ -823,6 +1929,64 @@
         "title": "FlagStateRead",
         "type": "object"
       },
+      "GenerationProvenance": {
+        "enum": [
+          "evidence_observed",
+          "rd_prior_inferred",
+          "retrieved_pattern",
+          "deterministic_rule",
+          "human_confirmed",
+          "unresolved"
+        ],
+        "title": "GenerationProvenance",
+        "type": "string"
+      },
+      "GenerationRun": {
+        "additionalProperties": false,
+        "description": "Прогон генератора: без него шаги нельзя воспроизвести.",
+        "properties": {
+          "config_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Config Sha256",
+            "type": "string"
+          },
+          "dirty": {
+            "title": "Dirty",
+            "type": "boolean"
+          },
+          "git_commit": {
+            "pattern": "^[0-9a-f]{7,40}$",
+            "title": "Git Commit",
+            "type": "string"
+          },
+          "run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "required": [
+          "run_id",
+          "git_commit",
+          "dirty",
+          "config_sha256"
+        ],
+        "title": "GenerationRun",
+        "type": "object"
+      },
       "GeometryIssueCode": {
         "description": "Почему контур не годится для площади (ADR-0026).\n\nКоды стабильны: по ним объясняет интерфейс и по ним же проверяются тесты.",
         "enum": [
@@ -861,6 +2025,36 @@
         "title": "GeometryType",
         "type": "string"
       },
+      "GroupValueRef": {
+        "additionalProperties": false,
+        "description": "Откуда значение ключа группы: параметр элемента сети. История вывода — у самого параметра.",
+        "properties": {
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "parameter_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Parameter Key",
+            "type": "string"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectRef"
+          }
+        },
+        "required": [
+          "key",
+          "subject",
+          "parameter_key"
+        ],
+        "title": "GroupValueRef",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -872,6 +2066,173 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InferenceKind": {
+        "description": "Какое решение принято на шаге. Виды общие для любой дисциплины.",
+        "enum": [
+          "evidence_adoption",
+          "system_assignment",
+          "topology",
+          "routing",
+          "element_addition",
+          "attribute",
+          "rule_application"
+        ],
+        "title": "InferenceKind",
+        "type": "string"
+      },
+      "InferenceStep": {
+        "additionalProperties": false,
+        "description": "Одно решение генератора. Входы шага — только evidence и более ранние шаги.",
+        "properties": {
+          "alternatives_considered": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Alternatives Considered",
+            "type": "integer"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "config_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Sha256"
+          },
+          "corpus_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corpus Id"
+          },
+          "evidence_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "input_step_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Input Step Ids",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/InferenceKind"
+          },
+          "rationale": {
+            "default": [],
+            "items": {
+              "maxLength": 256,
+              "type": "string"
+            },
+            "title": "Rationale",
+            "type": "array"
+          },
+          "relation_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Relation Ids",
+            "type": "array"
+          },
+          "retrieved_case_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Retrieved Case Ids",
+            "type": "array"
+          },
+          "rule_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Rule Ids",
+            "type": "array"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "tool_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Tool Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "tool_id"
+        ],
+        "title": "InferenceStep",
         "type": "object"
       },
       "JobRead": {
@@ -1062,6 +2423,96 @@
         ],
         "title": "LengthUnit",
         "type": "string"
+      },
+      "Level": {
+        "additionalProperties": false,
+        "description": "Уровень здания. Отметка может быть неизвестна — тогда она `None`, а не ноль.",
+        "properties": {
+          "elevation_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elevation Mm"
+          },
+          "level_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Level Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level_id",
+          "name"
+        ],
+        "title": "Level",
+        "type": "object"
+      },
+      "LineSource": {
+        "additionalProperties": false,
+        "description": "Источник строки. Вклад есть только у аддитивной строки и выдан движком, а не интерфейсом.",
+        "properties": {
+          "canonical_quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Quantity"
+          },
+          "group_values": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/GroupValueRef"
+            },
+            "title": "Group Values",
+            "type": "array"
+          },
+          "participants": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Participant"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectRef"
+          }
+        },
+        "required": [
+          "subject"
+        ],
+        "title": "LineSource",
+        "type": "object"
       },
       "LivenessResponse": {
         "properties": {
@@ -1476,6 +2927,507 @@
         "title": "MeasurementUpdate",
         "type": "object"
       },
+      "MepBoq": {
+        "additionalProperties": false,
+        "properties": {
+          "blockers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/QuantityBlocker"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "boq_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Boq Id",
+            "type": "string"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineRef"
+          },
+          "evidence_graph": {
+            "$ref": "#/components/schemas/EvidenceGraphRef"
+          },
+          "lane": {
+            "const": "STRICT",
+            "default": "STRICT",
+            "title": "Lane",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BoqLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "network_graph": {
+            "$ref": "#/components/schemas/NetworkGraphRef"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileRef"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleRef"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "0.3.0",
+            "default": "0.3.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BoqStatus"
+          }
+        },
+        "required": [
+          "boq_id",
+          "status",
+          "network_graph",
+          "evidence_graph",
+          "profile",
+          "engine",
+          "rules",
+          "lines"
+        ],
+        "title": "MepBoq",
+        "type": "object"
+      },
+      "MepContractIssueRead": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "subject_id",
+          "message"
+        ],
+        "title": "MepContractIssueRead",
+        "type": "object"
+      },
+      "MepEvidenceGraph": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentRef"
+          },
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceElement"
+            },
+            "title": "Elements",
+            "type": "array"
+          },
+          "gaps": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceGap"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "graph_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Graph Id",
+            "type": "string"
+          },
+          "input_mode": {
+            "$ref": "#/components/schemas/EvidenceInputMode"
+          },
+          "levels": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Level"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileRef"
+          },
+          "relations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRelation"
+            },
+            "title": "Relations",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "0.3.0",
+            "default": "0.3.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sheets": {
+            "items": {
+              "$ref": "#/components/schemas/SheetRef"
+            },
+            "minItems": 1,
+            "title": "Sheets",
+            "type": "array"
+          },
+          "source_availability": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SourceAvailability"
+            },
+            "title": "Source Availability",
+            "type": "array"
+          },
+          "tools": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "graph_id",
+          "input_mode",
+          "profile",
+          "document",
+          "sheets",
+          "elements"
+        ],
+        "title": "MepEvidenceGraph",
+        "type": "object"
+      },
+      "MepNetworkGraph": {
+        "additionalProperties": false,
+        "properties": {
+          "corpora": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CorpusRef"
+            },
+            "title": "Corpora",
+            "type": "array"
+          },
+          "document": {
+            "$ref": "#/components/schemas/DocumentRef"
+          },
+          "evidence_graph": {
+            "$ref": "#/components/schemas/EvidenceGraphRef"
+          },
+          "graph_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Graph Id",
+            "type": "string"
+          },
+          "inference_steps": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/InferenceStep"
+            },
+            "title": "Inference Steps",
+            "type": "array"
+          },
+          "levels": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Level"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileRef"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GenerationRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "const": "0.3.0",
+            "default": "0.3.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "segments": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NetworkSegment"
+            },
+            "title": "Segments",
+            "type": "array"
+          },
+          "sheets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SheetRef"
+            },
+            "title": "Sheets",
+            "type": "array"
+          },
+          "systems": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkSystem"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "minItems": 1,
+            "title": "Tools",
+            "type": "array"
+          },
+          "unresolved": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/UnresolvedDecision"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "graph_id",
+          "profile",
+          "document",
+          "evidence_graph",
+          "tools",
+          "systems",
+          "nodes"
+        ],
+        "title": "MepNetworkGraph",
+        "type": "object"
+      },
+      "MepScenarioRead": {
+        "description": "Сценарий целиком: входы, замечания проверок и ВОР, посчитанный движком на сервере.",
+        "properties": {
+          "boq": {
+            "$ref": "#/components/schemas/MepBoq"
+          },
+          "boq_issues": {
+            "items": {
+              "$ref": "#/components/schemas/MepContractIssueRead"
+            },
+            "title": "Boq Issues",
+            "type": "array"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/MepEvidenceGraph"
+          },
+          "evidence_issues": {
+            "items": {
+              "$ref": "#/components/schemas/MepContractIssueRead"
+            },
+            "title": "Evidence Issues",
+            "type": "array"
+          },
+          "evidence_sha256": {
+            "title": "Evidence Sha256",
+            "type": "string"
+          },
+          "mode": {
+            "const": "MOCK",
+            "default": "MOCK",
+            "title": "Mode",
+            "type": "string"
+          },
+          "network": {
+            "$ref": "#/components/schemas/MepNetworkGraph"
+          },
+          "network_issues": {
+            "items": {
+              "$ref": "#/components/schemas/MepContractIssueRead"
+            },
+            "title": "Network Issues",
+            "type": "array"
+          },
+          "network_sha256": {
+            "title": "Network Sha256",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/MepSystemProfile"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/MepScenarioSummary"
+          }
+        },
+        "required": [
+          "scenario",
+          "profile",
+          "evidence",
+          "network",
+          "evidence_sha256",
+          "network_sha256",
+          "evidence_issues",
+          "network_issues",
+          "boq",
+          "boq_issues"
+        ],
+        "title": "MepScenarioRead",
+        "type": "object"
+      },
+      "MepScenarioSummary": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "scenario_id": {
+            "title": "Scenario Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenario_id",
+          "title",
+          "description"
+        ],
+        "title": "MepScenarioSummary",
+        "type": "object"
+      },
+      "MepSystemProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AttributeDef"
+            },
+            "title": "Attributes",
+            "type": "array"
+          },
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/ClassDef"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "discipline": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Discipline",
+            "type": "string"
+          },
+          "profile_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "profile_version": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Profile Version",
+            "type": "string"
+          },
+          "relation_types": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RelationTypeDef"
+            },
+            "title": "Relation Types",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "0.3.0",
+            "default": "0.3.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProfileStatus"
+          },
+          "systems": {
+            "items": {
+              "$ref": "#/components/schemas/SystemDef"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "profile_version",
+          "discipline",
+          "title",
+          "status",
+          "source",
+          "systems",
+          "classes"
+        ],
+        "title": "MepSystemProfile",
+        "type": "object"
+      },
       "MetaResponse": {
         "properties": {
           "api_version": {
@@ -1691,6 +3643,338 @@
           "max_output_tokens"
         ],
         "title": "ModelSpecRead",
+        "type": "object"
+      },
+      "NetworkGraphRef": {
+        "additionalProperties": false,
+        "properties": {
+          "graph_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Graph Id",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "graph_id",
+          "sha256"
+        ],
+        "title": "NetworkGraphRef",
+        "type": "object"
+      },
+      "NetworkNode": {
+        "additionalProperties": false,
+        "properties": {
+          "class_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Key"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "parameters": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Parameter"
+            },
+            "title": "Parameters",
+            "type": "array"
+          },
+          "ports": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Port"
+            },
+            "title": "Ports",
+            "type": "array"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Vertex"
+          },
+          "role": {
+            "$ref": "#/components/schemas/NodeRole"
+          },
+          "system_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "System Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "class_key",
+          "position",
+          "derivation"
+        ],
+        "title": "NetworkNode",
+        "type": "object"
+      },
+      "NetworkSegment": {
+        "additionalProperties": false,
+        "description": "Участок между двумя портами. Вертикальный переход — участок между уровнями или отметками.",
+        "properties": {
+          "class_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Key"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "end": {
+            "$ref": "#/components/schemas/PortRef"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "orientation": {
+            "default": "unknown",
+            "enum": [
+              "horizontal",
+              "vertical",
+              "inclined",
+              "unknown"
+            ],
+            "title": "Orientation",
+            "type": "string"
+          },
+          "parameters": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Parameter"
+            },
+            "title": "Parameters",
+            "type": "array"
+          },
+          "path": {
+            "items": {
+              "$ref": "#/components/schemas/Vertex"
+            },
+            "minItems": 2,
+            "title": "Path",
+            "type": "array"
+          },
+          "start": {
+            "$ref": "#/components/schemas/PortRef"
+          },
+          "system_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "System Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "class_key",
+          "system_id",
+          "start",
+          "end",
+          "path",
+          "derivation"
+        ],
+        "title": "NetworkSegment",
+        "type": "object"
+      },
+      "NetworkSystem": {
+        "additionalProperties": false,
+        "properties": {
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "system_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "System Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "system_key",
+          "derivation"
+        ],
+        "title": "NetworkSystem",
+        "type": "object"
+      },
+      "NodeRole": {
+        "description": "Топологическая роль узла сети. Роль — не класс: класс задаёт профиль.",
+        "enum": [
+          "source",
+          "terminal",
+          "junction",
+          "equipment",
+          "device",
+          "transition",
+          "endpoint",
+          "unresolved_anchor"
+        ],
+        "title": "NodeRole",
+        "type": "string"
+      },
+      "OriginalPrediction": {
+        "additionalProperties": false,
+        "description": "Исходный выход модели или детерминированного экстрактора до исправлений человека.",
+        "properties": {
+          "attributes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceAttribute"
+            },
+            "title": "Attributes",
+            "type": "array"
+          },
+          "class_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Key"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "geometry": {
+            "discriminator": {
+              "mapping": {
+                "bbox": "#/components/schemas/BoxGeometry",
+                "point": "#/components/schemas/PointGeometry",
+                "polygon": "#/components/schemas/PolygonGeometry",
+                "polyline": "#/components/schemas/PolylineGeometry"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PointGeometry"
+              },
+              {
+                "$ref": "#/components/schemas/BoxGeometry"
+              },
+              {
+                "$ref": "#/components/schemas/PolylineGeometry"
+              },
+              {
+                "$ref": "#/components/schemas/PolygonGeometry"
+              }
+            ],
+            "title": "Geometry"
+          },
+          "provenance": {
+            "enum": [
+              "mep_model_observed",
+              "deterministic_extracted"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          },
+          "system_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Key"
+          },
+          "tool_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Tool Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provenance",
+          "tool_id",
+          "class_key",
+          "geometry",
+          "sources"
+        ],
+        "title": "OriginalPrediction",
         "type": "object"
       },
       "OverrideScope": {
@@ -2054,6 +4338,329 @@
         "title": "Page[SheetRead]",
         "type": "object"
       },
+      "Parameter": {
+        "additionalProperties": false,
+        "description": "Параметр сети. Своё происхождение у каждого значения, а не у элемента целиком.",
+        "properties": {
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "derivation"
+        ],
+        "title": "Parameter",
+        "type": "object"
+      },
+      "Participant": {
+        "additionalProperties": false,
+        "description": "Участник производной величины: узел-якорь, подключённые или сравниваемые участки.",
+        "properties": {
+          "parameter_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Key"
+          },
+          "role": {
+            "enum": [
+              "anchor",
+              "connected",
+              "compared"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectRef"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "subject",
+          "role"
+        ],
+        "title": "Participant",
+        "type": "object"
+      },
+      "PointGeometry": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "point",
+            "default": "point",
+            "title": "Kind",
+            "type": "string"
+          },
+          "point": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "title": "Point",
+            "type": "array"
+          }
+        },
+        "required": [
+          "point"
+        ],
+        "title": "PointGeometry",
+        "type": "object"
+      },
+      "PolygonGeometry": {
+        "additionalProperties": false,
+        "properties": {
+          "holes": {
+            "default": [],
+            "items": {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "minItems": 3,
+              "type": "array"
+            },
+            "title": "Holes",
+            "type": "array"
+          },
+          "kind": {
+            "const": "polygon",
+            "default": "polygon",
+            "title": "Kind",
+            "type": "string"
+          },
+          "outer": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 3,
+            "title": "Outer",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outer"
+        ],
+        "title": "PolygonGeometry",
+        "type": "object"
+      },
+      "PolylineGeometry": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "polyline",
+            "default": "polyline",
+            "title": "Kind",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 2,
+            "title": "Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "points"
+        ],
+        "title": "PolylineGeometry",
+        "type": "object"
+      },
+      "Port": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "default": "unknown",
+            "enum": [
+              "in",
+              "out",
+              "bidirectional",
+              "unknown"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "parameters": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Parameter"
+            },
+            "title": "Parameters",
+            "type": "array"
+          },
+          "system_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Id"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Port",
+        "type": "object"
+      },
+      "PortRef": {
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "port_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Port Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "port_id"
+        ],
+        "title": "PortRef",
+        "type": "object"
+      },
       "ProbeSource": {
         "description": "Откуда взялось состояние. Показывается рядом с ним — иначе непонятно, насколько свежее.",
         "enum": [
@@ -2087,6 +4694,52 @@
           "failed"
         ],
         "title": "ProcessingStatus",
+        "type": "string"
+      },
+      "ProfileRef": {
+        "additionalProperties": false,
+        "description": "Профиль системы, по которому толкуются ключи графа.",
+        "properties": {
+          "profile_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "profile_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Sha256"
+          },
+          "profile_version": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Profile Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "profile_version"
+        ],
+        "title": "ProfileRef",
+        "type": "object"
+      },
+      "ProfileStatus": {
+        "enum": [
+          "synthetic",
+          "draft",
+          "approved"
+        ],
+        "title": "ProfileStatus",
         "type": "string"
       },
       "ProjectCreate": {
@@ -2356,6 +5009,25 @@
         "title": "ProjectUpdate",
         "type": "object"
       },
+      "ProvenanceCount": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/GenerationProvenance"
+          }
+        },
+        "required": [
+          "provenance",
+          "count"
+        ],
+        "title": "ProvenanceCount",
+        "type": "object"
+      },
       "ProviderKind": {
         "description": "Как разговаривать с поставщиком.\n\nРазличие протокольное, а не маркетинговое: vLLM, SGLang и LM Studio отвечают\nOpenAI-совместимым API, и адаптер у них будет общий.",
         "enum": [
@@ -2368,6 +5040,67 @@
         ],
         "title": "ProviderKind",
         "type": "string"
+      },
+      "QuantityBlocker": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/BlockerCode"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-z0-9._\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "message": {
+            "maxLength": 512,
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "subject_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Subject Ids",
+            "type": "array"
+          },
+          "subjects": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SubjectRef"
+            },
+            "title": "Subjects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "QuantityBlocker",
+        "type": "object"
       },
       "QuantityState": {
         "description": "Состояние величины.\n\n`unavailable` — не ошибка и не ноль: геометрия есть, а основания для перевода в метры\nнет. Показать вместо этого ноль значило бы соврать в смете: строка с нулём выглядит\nпосчитанной, строка с прочерком видна сразу.",
@@ -2589,6 +5322,119 @@
         "title": "RegionShape",
         "type": "string"
       },
+      "RelationTypeDef": {
+        "additionalProperties": false,
+        "properties": {
+          "from_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceKind"
+            },
+            "title": "From Kinds",
+            "type": "array"
+          },
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "to_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceKind"
+            },
+            "title": "To Kinds",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "from_kinds",
+          "to_kinds"
+        ],
+        "title": "RelationTypeDef",
+        "type": "object"
+      },
+      "ReviewAction": {
+        "enum": [
+          "confirm",
+          "correct_class",
+          "correct_geometry",
+          "correct_attributes",
+          "correct_system",
+          "mark_ambiguous",
+          "reject",
+          "add_missing"
+        ],
+        "title": "ReviewAction",
+        "type": "string"
+      },
+      "ReviewEvent": {
+        "additionalProperties": false,
+        "description": "Одно действие проверяющего. История только дописывается и упорядочена по времени.",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ReviewAction"
+          },
+          "event_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reviewed_at": {
+            "format": "date-time",
+            "title": "Reviewed At",
+            "type": "string"
+          },
+          "reviewer_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Reviewer Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "action",
+          "reviewer_id",
+          "reviewed_at"
+        ],
+        "title": "ReviewEvent",
+        "type": "object"
+      },
+      "ReviewStatus": {
+        "enum": [
+          "unreviewed",
+          "confirmed",
+          "ambiguous",
+          "rejected",
+          "ignore_for_train"
+        ],
+        "title": "ReviewStatus",
+        "type": "string"
+      },
       "Role": {
         "description": "Роль — именованный набор разрешений, а не проверяемая сущность.\n\nБизнес-код спрашивает разрешение (`Permission`), а не имя роли: состав набора меняется\nв одном месте, а не по всем обработчикам. Соответствие описано в `app/auth/permissions.py`.\n\n`PLATFORM_ADMIN` и `SERVICE` относятся к платформе и живут на самой личности; остальные\nвыдаются членством в конкретном рабочем пространстве.",
         "enum": [
@@ -2601,6 +5447,29 @@
         ],
         "title": "Role",
         "type": "string"
+      },
+      "RuleRef": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "rule_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Rule Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "description"
+        ],
+        "title": "RuleRef",
+        "type": "object"
       },
       "ScaleCalibrationCreate": {
         "description": "Запрос на ручную калибровку.\n\nКоэффициент сюда не передаётся и не принимается: его считает сервер из точек и\nканонической геометрии страницы. Иначе величину можно было бы задать запросом.",
@@ -2852,6 +5721,15 @@
           "imported"
         ],
         "title": "ScaleSource",
+        "type": "string"
+      },
+      "ScaleStatus": {
+        "description": "Есть ли у листа явная калибровка. Автоматического масштаба нет (ADR-0018).",
+        "enum": [
+          "calibrated",
+          "uncalibrated"
+        ],
+        "title": "ScaleStatus",
         "type": "string"
       },
       "ScaleVerificationWrite": {
@@ -3326,6 +6204,249 @@
           "region_count"
         ],
         "title": "SheetRead",
+        "type": "object"
+      },
+      "SheetRef": {
+        "additionalProperties": false,
+        "description": "Лист, на котором лежит геометрия, и основание для метрики.",
+        "properties": {
+          "calibration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geometry_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Geometry Fingerprint",
+            "type": "string"
+          },
+          "level_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
+          "page_index": {
+            "minimum": 0.0,
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "scale_calibration_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Calibration Id"
+          },
+          "scale_status": {
+            "$ref": "#/components/schemas/ScaleStatus",
+            "default": "uncalibrated"
+          },
+          "sheet_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Sheet Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sheet_id",
+          "page_index",
+          "geometry_fingerprint"
+        ],
+        "title": "SheetRef",
+        "type": "object"
+      },
+      "SourceAvailability": {
+        "additionalProperties": false,
+        "description": "Какие каналы были доступны. Отсутствие текстового слоя — `unavailable`, не ошибка.",
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "sheet_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Sheet Id",
+            "type": "string"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType"
+          }
+        },
+        "required": [
+          "source_type",
+          "sheet_id",
+          "availability"
+        ],
+        "title": "SourceAvailability",
+        "type": "object"
+      },
+      "SourceRef": {
+        "additionalProperties": false,
+        "description": "Ссылка на конкретный артефакт-источник, а не его копия.",
+        "properties": {
+          "ref_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Ref Id",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType"
+          },
+          "tool_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Id"
+          }
+        },
+        "required": [
+          "source_type",
+          "ref_id"
+        ],
+        "title": "SourceRef",
+        "type": "object"
+      },
+      "SourceType": {
+        "description": "Канал, из которого взят элемент.\n\n`base_region_text` — только тело TEXT-блока распознавалки. Описания IMAGE-блоков написаны её\nмоделью и источником observed-evidence не являются, поэтому канала для них нет.",
+        "enum": [
+          "pdf_text_layer",
+          "page_raster",
+          "base_region_text",
+          "human_annotation"
+        ],
+        "title": "SourceType",
+        "type": "string"
+      },
+      "SubjectKind": {
+        "description": "Вид объекта, на который ссылается контракт. Только понятия ядра, без дисциплины.",
+        "enum": [
+          "evidence_element",
+          "evidence_relation",
+          "inference_step",
+          "system",
+          "node",
+          "port",
+          "segment",
+          "unresolved_decision",
+          "sheet",
+          "level",
+          "tool",
+          "corpus"
+        ],
+        "title": "SubjectKind",
+        "type": "string"
+      },
+      "SubjectRef": {
+        "additionalProperties": false,
+        "description": "Типизированная ссылка: `{\"kind\": \"segment\", \"id\": \"seg-b1\"}`. Голый id неоднозначен.",
+        "properties": {
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SubjectKind"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "SubjectRef",
+        "type": "object"
+      },
+      "SystemDef": {
+        "additionalProperties": false,
+        "description": "Система. `tree` запрещает циклы в сети этой системы — правило профиля, а не ядра.",
+        "properties": {
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9._\\-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "topology": {
+            "default": "any",
+            "enum": [
+              "tree",
+              "any"
+            ],
+            "title": "Topology",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "SystemDef",
         "type": "object"
       },
       "TakeoffItemCreate": {
@@ -3912,6 +7033,218 @@
         "title": "TenderRebindRequest",
         "type": "object"
       },
+      "Tool": {
+        "additionalProperties": false,
+        "description": "Экстрактор, генератор или правило с версией и хешами — происхождение без догадок.",
+        "properties": {
+          "config_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Sha256"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "rule_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Source"
+          },
+          "tool_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          },
+          "weights_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights Sha256"
+          }
+        },
+        "required": [
+          "tool_id",
+          "name",
+          "version"
+        ],
+        "title": "Tool",
+        "type": "object"
+      },
+      "UnresolvedCode": {
+        "enum": [
+          "missing_evidence",
+          "ambiguous_connection",
+          "conflicting_evidence",
+          "missing_attribute",
+          "missing_rule",
+          "missing_scale",
+          "out_of_profile"
+        ],
+        "title": "UnresolvedCode",
+        "type": "string"
+      },
+      "UnresolvedDecision": {
+        "additionalProperties": false,
+        "description": "Решение, которое генератор не принял. Не прячется в уверенную выдумку.",
+        "properties": {
+          "blocks_quantity": {
+            "default": true,
+            "title": "Blocks Quantity",
+            "type": "boolean"
+          },
+          "candidate_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Candidate Ids",
+            "type": "array"
+          },
+          "code": {
+            "$ref": "#/components/schemas/UnresolvedCode"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "step_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Step Ids",
+            "type": "array"
+          },
+          "subject_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            "title": "Subject Ids",
+            "type": "array"
+          },
+          "subjects": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SubjectRef"
+            },
+            "title": "Subjects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "code"
+        ],
+        "title": "UnresolvedDecision",
+        "type": "object"
+      },
+      "UnresolvedField": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Field",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/UnresolvedReason"
+          }
+        },
+        "required": [
+          "field",
+          "reason"
+        ],
+        "title": "UnresolvedField",
+        "type": "object"
+      },
+      "UnresolvedReason": {
+        "enum": [
+          "not_visible",
+          "ambiguous",
+          "conflicting",
+          "missing_source",
+          "out_of_profile"
+        ],
+        "title": "UnresolvedReason",
+        "type": "string"
+      },
       "UploadRead": {
         "description": "Результат загрузки.\n\nis_duplicate означает, что такой файл в проекте уже был: возвращается прежняя ревизия,\nвторая копия не создаётся.",
         "properties": {
@@ -4030,6 +7363,16 @@
         "title": "ValueSource",
         "type": "string"
       },
+      "ValueType": {
+        "enum": [
+          "string",
+          "number",
+          "integer",
+          "boolean"
+        ],
+        "title": "ValueType",
+        "type": "string"
+      },
       "VerificationState": {
         "description": "Состояние проверки человеком.",
         "enum": [
@@ -4039,6 +7382,79 @@
         ],
         "title": "VerificationState",
         "type": "string"
+      },
+      "Vertex": {
+        "additionalProperties": false,
+        "description": "Точка сети: на листе (x, y нормализованы), по высоте (z_mm) и/или на уровне.",
+        "properties": {
+          "level_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
+          "sheet_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._:\\-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Id"
+          },
+          "x": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "X"
+          },
+          "y": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Y"
+          },
+          "z_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Mm"
+          }
+        },
+        "title": "Vertex",
+        "type": "object"
       },
       "WorkerRead": {
         "description": "Исполнитель заданий. Показывается в эксплуатации, а не пользователю.",
@@ -5618,6 +9034,73 @@
         "summary": "Изменить геометрию измерения",
         "tags": [
           "takeoff"
+        ]
+      }
+    },
+    "/api/v1/mep/experiment/scenarios": {
+      "get": {
+        "operationId": "list_mep_scenarios",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MepScenarioSummary"
+                  },
+                  "title": "Response List Mep Scenarios",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Синтетические сценарии MEP-эксперимента",
+        "tags": [
+          "mep"
+        ]
+      }
+    },
+    "/api/v1/mep/experiment/scenarios/{scenario_id}": {
+      "get": {
+        "operationId": "get_mep_scenario",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scenario_id",
+            "required": true,
+            "schema": {
+              "title": "Scenario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MepScenarioRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сценарий MEP-эксперимента: evidence, сеть РД и физический ВОР",
+        "tags": [
+          "mep"
         ]
       }
     },

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantor.local/schema/mep-boq/0.1.0",
+  "title": "Quantor MEP BOQ 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "boq_id",
+    "system",
+    "mode",
+    "items",
+    "pricing_context",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "boq_id": {
+      "type": "string"
+    },
+    "system": {
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "STRICT",
+        "ESTIMATE"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pricing_context": {
+      "type": "object"
+    },
+    "summary": {
+      "type": "object"
+    }
+  }
+}

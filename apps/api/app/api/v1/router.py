@@ -26,6 +26,7 @@ from app.api.v1 import (
     documents,
     integrations,
     jobs,
+    mep,
     meta,
     projects,
     scale,
@@ -50,6 +51,8 @@ protected_router.include_router(scale.router)
 protected_router.include_router(takeoff.router)
 protected_router.include_router(jobs.router)
 protected_router.include_router(integrations.router)
+# MEP-эксперимент: только синтетика, закрыт флагом (ADR-0027).
+protected_router.include_router(mep.router)
 
 api_v1_router.include_router(protected_router)
 

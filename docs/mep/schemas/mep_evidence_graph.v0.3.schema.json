@@ -1,0 +1,1316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Availability": {
+      "enum": ["available", "unavailable", "not_checked"],
+      "title": "Availability",
+      "type": "string"
+    },
+    "BoxGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "bbox",
+          "default": "bbox",
+          "title": "Kind",
+          "type": "string"
+        },
+        "min": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            }
+          ],
+          "title": "Min",
+          "type": "array"
+        },
+        "max": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            }
+          ],
+          "title": "Max",
+          "type": "array"
+        }
+      },
+      "required": ["min", "max"],
+      "title": "BoxGeometry",
+      "type": "object"
+    },
+    "CalibrationSnapshot": {
+      "additionalProperties": false,
+      "description": "Неизменяемый снимок калибровки и геометрии страницы, по которому считаются метры.\n\nКопия значений, а не только ссылка: граф должен считаться одинаково и после того, как в\nпортале появится новая калибровка листа (ADR-0018 — калибровка не правится, а заменяется).",
+      "properties": {
+        "calibration_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Calibration Id",
+          "type": "string"
+        },
+        "page_geometry_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Page Geometry Fingerprint",
+          "type": "string"
+        },
+        "display_width_pt": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Display Width Pt"
+        },
+        "display_height_pt": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Display Height Pt"
+        },
+        "mm_per_pt": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Mm Per Pt"
+        },
+        "verification_state": {
+          "enum": ["unverified", "verified", "disputed"],
+          "title": "Verification State",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "calibration_id",
+        "page_geometry_fingerprint",
+        "display_width_pt",
+        "display_height_pt",
+        "mm_per_pt",
+        "verification_state",
+        "fingerprint"
+      ],
+      "title": "CalibrationSnapshot",
+      "type": "object"
+    },
+    "DocumentRef": {
+      "additionalProperties": false,
+      "description": "Исходный документ Quantor. Хеши — неизменяемый вход, а не копия.",
+      "properties": {
+        "project_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "revision_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "source_pdf_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Pdf Sha256",
+          "type": "string"
+        },
+        "package_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Sha256"
+        }
+      },
+      "required": ["project_id", "revision_id", "source_pdf_sha256"],
+      "title": "DocumentRef",
+      "type": "object"
+    },
+    "EvidenceAttribute": {
+      "additionalProperties": false,
+      "description": "Атрибут evidence.\n\n`labelled` — прочитан с листа (подпись «Ø50»), `measured` — снят с геометрии листа и\nтребует калибровки. `source_element_ids` — текстовые элементы, из которых он прочитан.",
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "derivation": {
+          "default": "labelled",
+          "enum": ["labelled", "measured"],
+          "title": "Derivation",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/EvidenceStatus"
+        },
+        "source_element_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Source Element Ids",
+          "type": "array"
+        }
+      },
+      "required": ["key", "value", "status"],
+      "title": "EvidenceAttribute",
+      "type": "object"
+    },
+    "EvidenceElement": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EvidenceKind"
+        },
+        "sheet_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Sheet Id",
+          "type": "string"
+        },
+        "level_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level Id"
+        },
+        "geometry": {
+          "discriminator": {
+            "mapping": {
+              "bbox": "#/$defs/BoxGeometry",
+              "point": "#/$defs/PointGeometry",
+              "polygon": "#/$defs/PolygonGeometry",
+              "polyline": "#/$defs/PolylineGeometry"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PointGeometry"
+            },
+            {
+              "$ref": "#/$defs/BoxGeometry"
+            },
+            {
+              "$ref": "#/$defs/PolylineGeometry"
+            },
+            {
+              "$ref": "#/$defs/PolygonGeometry"
+            }
+          ],
+          "title": "Geometry"
+        },
+        "class_key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Class Key"
+        },
+        "system_key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System Key"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "attributes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EvidenceAttribute"
+          },
+          "title": "Attributes",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "provenance": {
+          "$ref": "#/$defs/EvidenceProvenance"
+        },
+        "status": {
+          "$ref": "#/$defs/EvidenceStatus"
+        },
+        "review": {
+          "$ref": "#/$defs/ReviewStatus",
+          "default": "unreviewed"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "unresolved": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/UnresolvedField"
+          },
+          "title": "Unresolved",
+          "type": "array"
+        },
+        "original": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OriginalPrediction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "review_history": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ReviewEvent"
+          },
+          "title": "Review History",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "sheet_id",
+        "geometry",
+        "class_key",
+        "provenance",
+        "status",
+        "sources"
+      ],
+      "title": "EvidenceElement",
+      "type": "object"
+    },
+    "EvidenceGap": {
+      "additionalProperties": false,
+      "description": "Известный пробел входа: чего не хватает, чтобы граф считался полным.",
+      "properties": {
+        "code": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "sheet_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sheet Id"
+        },
+        "subject_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Subject Ids",
+          "type": "array"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": ["code"],
+      "title": "EvidenceGap",
+      "type": "object"
+    },
+    "EvidenceInputMode": {
+      "description": "Как получен граф целиком (Track B, Track A, проверенный гибрид).",
+      "enum": ["MODEL_EXTRACTED", "HUMAN_GT", "HYBRID_REVIEWED"],
+      "title": "EvidenceInputMode",
+      "type": "string"
+    },
+    "EvidenceKind": {
+      "description": "Что можно увидеть на листе — без дисциплины.",
+      "enum": ["symbol", "route", "zone", "text"],
+      "title": "EvidenceKind",
+      "type": "string"
+    },
+    "EvidenceProvenance": {
+      "description": "Кто утверждает, что элемент есть на листе. `rd_prior_inferred` здесь нет намеренно.",
+      "enum": [
+        "base_recognition_observed",
+        "mep_model_observed",
+        "deterministic_extracted",
+        "human_ground_truth",
+        "unresolved"
+      ],
+      "title": "EvidenceProvenance",
+      "type": "string"
+    },
+    "EvidenceRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "relation_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Relation Key",
+          "type": "string"
+        },
+        "from_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "From Id",
+          "type": "string"
+        },
+        "to_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "To Id",
+          "type": "string"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "provenance": {
+          "$ref": "#/$defs/EvidenceProvenance"
+        },
+        "status": {
+          "$ref": "#/$defs/EvidenceStatus"
+        },
+        "review": {
+          "$ref": "#/$defs/ReviewStatus",
+          "default": "unreviewed"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "review_history": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ReviewEvent"
+          },
+          "title": "Review History",
+          "type": "array"
+        }
+      },
+      "required": ["id", "relation_key", "from_id", "to_id", "provenance", "status", "sources"],
+      "title": "EvidenceRelation",
+      "type": "object"
+    },
+    "EvidenceStatus": {
+      "description": "Насколько прямо элемент виден.\n\n`extraction_inferred` — вывод в пределах листа (подпись отнесена к ближайшему символу),\nа не достройка РД.",
+      "enum": ["observed", "extraction_inferred", "human_confirmed"],
+      "title": "EvidenceStatus",
+      "type": "string"
+    },
+    "Level": {
+      "additionalProperties": false,
+      "description": "Уровень здания. Отметка может быть неизвестна — тогда она `None`, а не ноль.",
+      "properties": {
+        "level_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Level Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "elevation_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elevation Mm"
+        }
+      },
+      "required": ["level_id", "name"],
+      "title": "Level",
+      "type": "object"
+    },
+    "OriginalPrediction": {
+      "additionalProperties": false,
+      "description": "Исходный выход модели или детерминированного экстрактора до исправлений человека.",
+      "properties": {
+        "provenance": {
+          "enum": ["mep_model_observed", "deterministic_extracted"],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "tool_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Tool Id",
+          "type": "string"
+        },
+        "class_key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Class Key"
+        },
+        "system_key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System Key"
+        },
+        "geometry": {
+          "discriminator": {
+            "mapping": {
+              "bbox": "#/$defs/BoxGeometry",
+              "point": "#/$defs/PointGeometry",
+              "polygon": "#/$defs/PolygonGeometry",
+              "polyline": "#/$defs/PolylineGeometry"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PointGeometry"
+            },
+            {
+              "$ref": "#/$defs/BoxGeometry"
+            },
+            {
+              "$ref": "#/$defs/PolylineGeometry"
+            },
+            {
+              "$ref": "#/$defs/PolygonGeometry"
+            }
+          ],
+          "title": "Geometry"
+        },
+        "attributes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EvidenceAttribute"
+          },
+          "title": "Attributes",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": ["provenance", "tool_id", "class_key", "geometry", "sources"],
+      "title": "OriginalPrediction",
+      "type": "object"
+    },
+    "PointGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "point",
+          "default": "point",
+          "title": "Kind",
+          "type": "string"
+        },
+        "point": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            }
+          ],
+          "title": "Point",
+          "type": "array"
+        }
+      },
+      "required": ["point"],
+      "title": "PointGeometry",
+      "type": "object"
+    },
+    "PolygonGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "polygon",
+          "default": "polygon",
+          "title": "Kind",
+          "type": "string"
+        },
+        "outer": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 3,
+          "title": "Outer",
+          "type": "array"
+        },
+        "holes": {
+          "default": [],
+          "items": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 3,
+            "type": "array"
+          },
+          "title": "Holes",
+          "type": "array"
+        }
+      },
+      "required": ["outer"],
+      "title": "PolygonGeometry",
+      "type": "object"
+    },
+    "PolylineGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "polyline",
+          "default": "polyline",
+          "title": "Kind",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Points",
+          "type": "array"
+        }
+      },
+      "required": ["points"],
+      "title": "PolylineGeometry",
+      "type": "object"
+    },
+    "ProfileRef": {
+      "additionalProperties": false,
+      "description": "Профиль системы, по которому толкуются ключи графа.",
+      "properties": {
+        "profile_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "profile_version": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Sha256"
+        }
+      },
+      "required": ["profile_id", "profile_version"],
+      "title": "ProfileRef",
+      "type": "object"
+    },
+    "ReviewAction": {
+      "enum": [
+        "confirm",
+        "correct_class",
+        "correct_geometry",
+        "correct_attributes",
+        "correct_system",
+        "mark_ambiguous",
+        "reject",
+        "add_missing"
+      ],
+      "title": "ReviewAction",
+      "type": "string"
+    },
+    "ReviewEvent": {
+      "additionalProperties": false,
+      "description": "Одно действие проверяющего. История только дописывается и упорядочена по времени.",
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/ReviewAction"
+        },
+        "reviewer_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "format": "date-time",
+          "title": "Reviewed At",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": ["event_id", "action", "reviewer_id", "reviewed_at"],
+      "title": "ReviewEvent",
+      "type": "object"
+    },
+    "ReviewStatus": {
+      "enum": ["unreviewed", "confirmed", "ambiguous", "rejected", "ignore_for_train"],
+      "title": "ReviewStatus",
+      "type": "string"
+    },
+    "ScaleStatus": {
+      "description": "Есть ли у листа явная калибровка. Автоматического масштаба нет (ADR-0018).",
+      "enum": ["calibrated", "uncalibrated"],
+      "title": "ScaleStatus",
+      "type": "string"
+    },
+    "SheetRef": {
+      "additionalProperties": false,
+      "description": "Лист, на котором лежит геометрия, и основание для метрики.",
+      "properties": {
+        "sheet_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Sheet Id",
+          "type": "string"
+        },
+        "page_index": {
+          "minimum": 0,
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "geometry_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Geometry Fingerprint",
+          "type": "string"
+        },
+        "level_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level Id"
+        },
+        "scale_status": {
+          "$ref": "#/$defs/ScaleStatus",
+          "default": "uncalibrated"
+        },
+        "scale_calibration_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale Calibration Id"
+        },
+        "calibration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CalibrationSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": ["sheet_id", "page_index", "geometry_fingerprint"],
+      "title": "SheetRef",
+      "type": "object"
+    },
+    "SourceAvailability": {
+      "additionalProperties": false,
+      "description": "Какие каналы были доступны. Отсутствие текстового слоя — `unavailable`, не ошибка.",
+      "properties": {
+        "source_type": {
+          "$ref": "#/$defs/SourceType"
+        },
+        "sheet_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Sheet Id",
+          "type": "string"
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": ["source_type", "sheet_id", "availability"],
+      "title": "SourceAvailability",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "Ссылка на конкретный артефакт-источник, а не его копия.",
+      "properties": {
+        "source_type": {
+          "$ref": "#/$defs/SourceType"
+        },
+        "ref_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Ref Id",
+          "type": "string"
+        },
+        "tool_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Id"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        }
+      },
+      "required": ["source_type", "ref_id"],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "SourceType": {
+      "description": "Канал, из которого взят элемент.\n\n`base_region_text` — только тело TEXT-блока распознавалки. Описания IMAGE-блоков написаны её\nмоделью и источником observed-evidence не являются, поэтому канала для них нет.",
+      "enum": ["pdf_text_layer", "page_raster", "base_region_text", "human_annotation"],
+      "title": "SourceType",
+      "type": "string"
+    },
+    "Tool": {
+      "additionalProperties": false,
+      "description": "Экстрактор, генератор или правило с версией и хешами — происхождение без догадок.",
+      "properties": {
+        "tool_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Tool Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Id"
+        },
+        "weights_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weights Sha256"
+        },
+        "config_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Config Sha256"
+        },
+        "rule_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Source"
+        }
+      },
+      "required": ["tool_id", "name", "version"],
+      "title": "Tool",
+      "type": "object"
+    },
+    "UnresolvedField": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Field",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/UnresolvedReason"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": ["field", "reason"],
+      "title": "UnresolvedField",
+      "type": "object"
+    },
+    "UnresolvedReason": {
+      "enum": ["not_visible", "ambiguous", "conflicting", "missing_source", "out_of_profile"],
+      "title": "UnresolvedReason",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.3.0",
+      "default": "0.3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "graph_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._:\\-]+$",
+      "title": "Graph Id",
+      "type": "string"
+    },
+    "input_mode": {
+      "$ref": "#/$defs/EvidenceInputMode"
+    },
+    "profile": {
+      "$ref": "#/$defs/ProfileRef"
+    },
+    "document": {
+      "$ref": "#/$defs/DocumentRef"
+    },
+    "sheets": {
+      "items": {
+        "$ref": "#/$defs/SheetRef"
+      },
+      "minItems": 1,
+      "title": "Sheets",
+      "type": "array"
+    },
+    "levels": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Level"
+      },
+      "title": "Levels",
+      "type": "array"
+    },
+    "tools": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Tool"
+      },
+      "title": "Tools",
+      "type": "array"
+    },
+    "source_availability": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SourceAvailability"
+      },
+      "title": "Source Availability",
+      "type": "array"
+    },
+    "elements": {
+      "items": {
+        "$ref": "#/$defs/EvidenceElement"
+      },
+      "title": "Elements",
+      "type": "array"
+    },
+    "relations": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/EvidenceRelation"
+      },
+      "title": "Relations",
+      "type": "array"
+    },
+    "gaps": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/EvidenceGap"
+      },
+      "title": "Gaps",
+      "type": "array"
+    }
+  },
+  "required": ["graph_id", "input_mode", "profile", "document", "sheets", "elements"],
+  "title": "MepEvidenceGraph",
+  "type": "object"
+}

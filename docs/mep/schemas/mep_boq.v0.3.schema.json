@@ -1,0 +1,686 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Attribute": {
+      "additionalProperties": false,
+      "description": "Атрибут из профиля. Отсутствие значения — `None` со статусом, а не пустая строка.",
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        }
+      },
+      "required": ["key", "value"],
+      "title": "Attribute",
+      "type": "object"
+    },
+    "BlockerCode": {
+      "enum": [
+        "NETWORK_INVALID",
+        "DECISION_BLOCKS_QUANTITY",
+        "CLASS_UNRESOLVED",
+        "PARAMETER_MISSING",
+        "PARAMETER_UNRESOLVED",
+        "NODE_SYSTEM_AMBIGUOUS",
+        "NO_SCALE",
+        "CROSS_SHEET_PLANAR",
+        "ELEVATION_INCOMPLETE",
+        "LENGTH_UNDETERMINED",
+        "FITTING_RULES_NOT_APPROVED"
+      ],
+      "title": "BlockerCode",
+      "type": "string"
+    },
+    "BoqLine": {
+      "additionalProperties": false,
+      "description": "Строка ВОР: правило, группа по ключам профиля, количество и все элементы-источники.",
+      "properties": {
+        "line_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Line Id",
+          "type": "string"
+        },
+        "rule_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "category": {
+          "enum": ["length", "count", "topology"],
+          "title": "Category",
+          "type": "string"
+        },
+        "system_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "System Key",
+          "type": "string"
+        },
+        "class_key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Class Key"
+        },
+        "group": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Attribute"
+          },
+          "title": "Group",
+          "type": "array"
+        },
+        "unit": {
+          "enum": ["m", "pcs"],
+          "title": "Unit",
+          "type": "string"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Quantity"
+        },
+        "canonical_unit": {
+          "enum": ["mm", "pcs"],
+          "title": "Canonical Unit",
+          "type": "string"
+        },
+        "canonical_quantity": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Canonical Quantity"
+        },
+        "source_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "provenance": {
+          "items": {
+            "$ref": "#/$defs/ProvenanceCount"
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "min_confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Confidence"
+        },
+        "review_required": {
+          "title": "Review Required",
+          "type": "boolean"
+        },
+        "additive": {
+          "default": false,
+          "title": "Additive",
+          "type": "boolean"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LineSource"
+          },
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "line_id",
+        "rule_id",
+        "category",
+        "system_key",
+        "class_key",
+        "unit",
+        "quantity",
+        "canonical_unit",
+        "canonical_quantity",
+        "source_ids",
+        "provenance",
+        "review_required"
+      ],
+      "title": "BoqLine",
+      "type": "object"
+    },
+    "BoqStatus": {
+      "enum": ["complete", "partial", "refused"],
+      "title": "BoqStatus",
+      "type": "string"
+    },
+    "EngineRef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": ["name", "version"],
+      "title": "EngineRef",
+      "type": "object"
+    },
+    "EvidenceGraphRef": {
+      "additionalProperties": false,
+      "properties": {
+        "graph_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Graph Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "input_mode": {
+          "$ref": "#/$defs/EvidenceInputMode"
+        }
+      },
+      "required": ["graph_id", "sha256", "input_mode"],
+      "title": "EvidenceGraphRef",
+      "type": "object"
+    },
+    "EvidenceInputMode": {
+      "description": "Как получен граф целиком (Track B, Track A, проверенный гибрид).",
+      "enum": ["MODEL_EXTRACTED", "HUMAN_GT", "HYBRID_REVIEWED"],
+      "title": "EvidenceInputMode",
+      "type": "string"
+    },
+    "GenerationProvenance": {
+      "enum": [
+        "evidence_observed",
+        "rd_prior_inferred",
+        "retrieved_pattern",
+        "deterministic_rule",
+        "human_confirmed",
+        "unresolved"
+      ],
+      "title": "GenerationProvenance",
+      "type": "string"
+    },
+    "GroupValueRef": {
+      "additionalProperties": false,
+      "description": "Откуда значение ключа группы: параметр элемента сети. История вывода — у самого параметра.",
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "subject": {
+          "$ref": "#/$defs/SubjectRef"
+        },
+        "parameter_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._\\-]+$",
+          "title": "Parameter Key",
+          "type": "string"
+        }
+      },
+      "required": ["key", "subject", "parameter_key"],
+      "title": "GroupValueRef",
+      "type": "object"
+    },
+    "LineSource": {
+      "additionalProperties": false,
+      "description": "Источник строки. Вклад есть только у аддитивной строки и выдан движком, а не интерфейсом.",
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/SubjectRef"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity"
+        },
+        "canonical_quantity": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Quantity"
+        },
+        "group_values": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/GroupValueRef"
+          },
+          "title": "Group Values",
+          "type": "array"
+        },
+        "participants": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Participant"
+          },
+          "title": "Participants",
+          "type": "array"
+        }
+      },
+      "required": ["subject"],
+      "title": "LineSource",
+      "type": "object"
+    },
+    "NetworkGraphRef": {
+      "additionalProperties": false,
+      "properties": {
+        "graph_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Graph Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": ["graph_id", "sha256"],
+      "title": "NetworkGraphRef",
+      "type": "object"
+    },
+    "Participant": {
+      "additionalProperties": false,
+      "description": "Участник производной величины: узел-якорь, подключённые или сравниваемые участки.",
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/SubjectRef"
+        },
+        "role": {
+          "enum": ["anchor", "connected", "compared"],
+          "title": "Role",
+          "type": "string"
+        },
+        "parameter_key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameter Key"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": ["subject", "role"],
+      "title": "Participant",
+      "type": "object"
+    },
+    "ProfileRef": {
+      "additionalProperties": false,
+      "description": "Профиль системы, по которому толкуются ключи графа.",
+      "properties": {
+        "profile_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "profile_version": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Sha256"
+        }
+      },
+      "required": ["profile_id", "profile_version"],
+      "title": "ProfileRef",
+      "type": "object"
+    },
+    "ProvenanceCount": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "$ref": "#/$defs/GenerationProvenance"
+        },
+        "count": {
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": ["provenance", "count"],
+      "title": "ProvenanceCount",
+      "type": "object"
+    },
+    "QuantityBlocker": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/BlockerCode"
+        },
+        "severity": {
+          "enum": ["blocker", "warning"],
+          "title": "Severity",
+          "type": "string"
+        },
+        "subject_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:\\-]+$",
+            "type": "string"
+          },
+          "title": "Subject Ids",
+          "type": "array"
+        },
+        "key": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._\\-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Key"
+        },
+        "message": {
+          "maxLength": 512,
+          "title": "Message",
+          "type": "string"
+        },
+        "subjects": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SubjectRef"
+          },
+          "title": "Subjects",
+          "type": "array"
+        }
+      },
+      "required": ["code", "severity", "message"],
+      "title": "QuantityBlocker",
+      "type": "object"
+    },
+    "RuleRef": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": ["rule_id", "description"],
+      "title": "RuleRef",
+      "type": "object"
+    },
+    "SubjectKind": {
+      "description": "Вид объекта, на который ссылается контракт. Только понятия ядра, без дисциплины.",
+      "enum": [
+        "evidence_element",
+        "evidence_relation",
+        "inference_step",
+        "system",
+        "node",
+        "port",
+        "segment",
+        "unresolved_decision",
+        "sheet",
+        "level",
+        "tool",
+        "corpus"
+      ],
+      "title": "SubjectKind",
+      "type": "string"
+    },
+    "SubjectRef": {
+      "additionalProperties": false,
+      "description": "Типизированная ссылка: `{\"kind\": \"segment\", \"id\": \"seg-b1\"}`. Голый id неоднозначен.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SubjectKind"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:\\-]+$",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": ["kind", "id"],
+      "title": "SubjectRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.3.0",
+      "default": "0.3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "boq_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._:\\-]+$",
+      "title": "Boq Id",
+      "type": "string"
+    },
+    "lane": {
+      "const": "STRICT",
+      "default": "STRICT",
+      "title": "Lane",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/BoqStatus"
+    },
+    "network_graph": {
+      "$ref": "#/$defs/NetworkGraphRef"
+    },
+    "evidence_graph": {
+      "$ref": "#/$defs/EvidenceGraphRef"
+    },
+    "profile": {
+      "$ref": "#/$defs/ProfileRef"
+    },
+    "engine": {
+      "$ref": "#/$defs/EngineRef"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/RuleRef"
+      },
+      "title": "Rules",
+      "type": "array"
+    },
+    "lines": {
+      "items": {
+        "$ref": "#/$defs/BoqLine"
+      },
+      "title": "Lines",
+      "type": "array"
+    },
+    "blockers": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QuantityBlocker"
+      },
+      "title": "Blockers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "boq_id",
+    "status",
+    "network_graph",
+    "evidence_graph",
+    "profile",
+    "engine",
+    "rules",
+    "lines"
+  ],
+  "title": "MepBoq",
+  "type": "object"
+}

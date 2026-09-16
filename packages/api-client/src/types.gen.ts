@@ -99,6 +99,45 @@ export type AdminJobRead = {
 export type ArtifactKind = 'blocks_json' | 'results_md' | 'results_html' | 'package_zip' | 'other';
 
 /**
+ * Attribute
+ *
+ * Атрибут из профиля. Отсутствие значения — `None` со статусом, а не пустая строка.
+ */
+export type Attribute = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+    /**
+     * Value
+     */
+    value: boolean | number | number | string | null;
+};
+
+/**
+ * AttributeDef
+ */
+export type AttributeDef = {
+    /**
+     * Allowed Values
+     */
+    allowed_values?: Array<string>;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+    value_type: ValueType;
+};
+
+/**
  * AuditEventRead
  *
  * Запись журнала. Только чтение: операций изменения у журнала нет вовсе.
@@ -170,6 +209,16 @@ export type AuditEventRead = {
 export type AuditResult = 'success' | 'failure' | 'denied';
 
 /**
+ * Availability
+ */
+export type Availability = 'available' | 'unavailable' | 'not_checked';
+
+/**
+ * BlockerCode
+ */
+export type BlockerCode = 'NETWORK_INVALID' | 'DECISION_BLOCKS_QUANTITY' | 'CLASS_UNRESOLVED' | 'PARAMETER_MISSING' | 'PARAMETER_UNRESOLVED' | 'NODE_SYSTEM_AMBIGUOUS' | 'NO_SCALE' | 'CROSS_SHEET_PLANAR' | 'ELEVATION_INCOMPLETE' | 'LENGTH_UNDETERMINED' | 'FITTING_RULES_NOT_APPROVED';
+
+/**
  * Body_upload_file
  */
 export type BodyUploadFile = {
@@ -185,6 +234,191 @@ export type BodyUploadFile = {
      * Файл проекта
      */
     file: Blob | File;
+};
+
+/**
+ * BoqLine
+ *
+ * Строка ВОР: правило, группа по ключам профиля, количество и все элементы-источники.
+ */
+export type BoqLine = {
+    /**
+     * Additive
+     */
+    additive?: boolean;
+    /**
+     * Canonical Quantity
+     */
+    canonical_quantity: string;
+    /**
+     * Canonical Unit
+     */
+    canonical_unit: 'mm' | 'pcs';
+    /**
+     * Category
+     */
+    category: 'length' | 'count' | 'topology';
+    /**
+     * Class Key
+     */
+    class_key: string | null;
+    /**
+     * Group
+     */
+    group?: Array<Attribute>;
+    /**
+     * Line Id
+     */
+    line_id: string;
+    /**
+     * Min Confidence
+     */
+    min_confidence?: number | null;
+    /**
+     * Provenance
+     */
+    provenance: Array<ProvenanceCount>;
+    /**
+     * Quantity
+     */
+    quantity: string;
+    /**
+     * Review Required
+     */
+    review_required: boolean;
+    /**
+     * Rule Id
+     */
+    rule_id: string;
+    /**
+     * Source Ids
+     */
+    source_ids: Array<string>;
+    /**
+     * Sources
+     */
+    sources?: Array<LineSource>;
+    /**
+     * System Key
+     */
+    system_key: string;
+    /**
+     * Unit
+     */
+    unit: 'm' | 'pcs';
+};
+
+/**
+ * BoqStatus
+ */
+export type BoqStatus = 'complete' | 'partial' | 'refused';
+
+/**
+ * BoxGeometry
+ */
+export type BoxGeometry = {
+    /**
+     * Kind
+     */
+    kind?: 'bbox';
+    /**
+     * Max
+     */
+    max: [
+        number,
+        number
+    ];
+    /**
+     * Min
+     */
+    min: [
+        number,
+        number
+    ];
+};
+
+/**
+ * CalibrationSnapshot
+ *
+ * Неизменяемый снимок калибровки и геометрии страницы, по которому считаются метры.
+ *
+ * Копия значений, а не только ссылка: граф должен считаться одинаково и после того, как в
+ * портале появится новая калибровка листа (ADR-0018 — калибровка не правится, а заменяется).
+ */
+export type CalibrationSnapshot = {
+    /**
+     * Calibration Id
+     */
+    calibration_id: string;
+    /**
+     * Display Height Pt
+     */
+    display_height_pt: string;
+    /**
+     * Display Width Pt
+     */
+    display_width_pt: string;
+    /**
+     * Fingerprint
+     */
+    fingerprint: string;
+    /**
+     * Mm Per Pt
+     */
+    mm_per_pt: string;
+    /**
+     * Page Geometry Fingerprint
+     */
+    page_geometry_fingerprint: string;
+    /**
+     * Verification State
+     */
+    verification_state: 'unverified' | 'verified' | 'disputed';
+};
+
+/**
+ * ClassDef
+ *
+ * Класс элемента. Слой evidence и слой сети описываются раздельно даже для одного объекта.
+ */
+export type ClassDef = {
+    /**
+     * Allowed Geometry
+     */
+    allowed_geometry?: Array<'point' | 'bbox' | 'polyline' | 'polygon'>;
+    /**
+     * Attribute Keys
+     */
+    attribute_keys?: Array<string>;
+    evidence_kind?: EvidenceKind | null;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Layer
+     */
+    layer: 'evidence' | 'network';
+    /**
+     * Network Element
+     */
+    network_element?: 'node' | 'segment' | null;
+    /**
+     * Node Roles
+     */
+    node_roles?: Array<NodeRole>;
+    /**
+     * Quantity
+     */
+    quantity?: 'length' | 'count' | 'none';
+    /**
+     * Quantity Group Keys
+     */
+    quantity_group_keys?: Array<string>;
 };
 
 /**
@@ -284,6 +518,30 @@ export type ContentUrl = {
 };
 
 /**
+ * CorpusRef
+ *
+ * Корпус случаев РД для retrieval. Только TRAIN: отложенные проекты — не источник.
+ */
+export type CorpusRef = {
+    /**
+     * Corpus Id
+     */
+    corpus_id: string;
+    /**
+     * Dataset Fingerprint
+     */
+    dataset_fingerprint: string;
+    /**
+     * Split
+     */
+    split?: 'train';
+    /**
+     * Split Sha256
+     */
+    split_sha256: string;
+};
+
+/**
  * DataPolicy
  *
  * Куда позволено уходить данным.
@@ -292,6 +550,27 @@ export type ContentUrl = {
  * пожеланием: чертёж объекта нельзя отправлять наружу ни при каких условиях.
  */
 export type DataPolicy = 'local_only' | 'remote_allowed' | 'restricted_data';
+
+/**
+ * Derivation
+ *
+ * Происхождение элемента или значения сети.
+ */
+export type Derivation = {
+    /**
+     * Confidence
+     */
+    confidence?: number | null;
+    /**
+     * Evidence Ids
+     */
+    evidence_ids?: Array<string>;
+    provenance: GenerationProvenance;
+    /**
+     * Step Ids
+     */
+    step_ids?: Array<string>;
+};
 
 /**
  * DiagnosticsReport
@@ -349,6 +628,30 @@ export type DocumentRead = {
 };
 
 /**
+ * DocumentRef
+ *
+ * Исходный документ Quantor. Хеши — неизменяемый вход, а не копия.
+ */
+export type DocumentRef = {
+    /**
+     * Package Sha256
+     */
+    package_sha256?: string | null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Source Pdf Sha256
+     */
+    source_pdf_sha256: string;
+};
+
+/**
  * DocumentRevisionRead
  */
 export type DocumentRevisionRead = {
@@ -401,6 +704,226 @@ export type DocumentRevisionRead = {
      */
     source_size: number;
 };
+
+/**
+ * EngineRef
+ */
+export type EngineRef = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Version
+     */
+    version: string;
+};
+
+/**
+ * EvidenceAttribute
+ *
+ * Атрибут evidence.
+ *
+ * `labelled` — прочитан с листа (подпись «Ø50»), `measured` — снят с геометрии листа и
+ * требует калибровки. `source_element_ids` — текстовые элементы, из которых он прочитан.
+ */
+export type EvidenceAttribute = {
+    /**
+     * Derivation
+     */
+    derivation?: 'labelled' | 'measured';
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Source Element Ids
+     */
+    source_element_ids?: Array<string>;
+    status: EvidenceStatus;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+    /**
+     * Value
+     */
+    value: boolean | number | number | string | null;
+};
+
+/**
+ * EvidenceElement
+ */
+export type EvidenceElement = {
+    /**
+     * Attributes
+     */
+    attributes?: Array<EvidenceAttribute>;
+    /**
+     * Class Key
+     */
+    class_key: string | null;
+    /**
+     * Confidence
+     */
+    confidence?: number | null;
+    /**
+     * Geometry
+     */
+    geometry: ({
+        kind: 'point';
+    } & PointGeometry) | ({
+        kind: 'bbox';
+    } & BoxGeometry) | ({
+        kind: 'polyline';
+    } & PolylineGeometry) | ({
+        kind: 'polygon';
+    } & PolygonGeometry);
+    /**
+     * Id
+     */
+    id: string;
+    kind: EvidenceKind;
+    /**
+     * Level Id
+     */
+    level_id?: string | null;
+    original?: OriginalPrediction | null;
+    provenance: EvidenceProvenance;
+    review?: ReviewStatus;
+    /**
+     * Review History
+     */
+    review_history?: Array<ReviewEvent>;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string;
+    /**
+     * Sources
+     */
+    sources: Array<SourceRef>;
+    status: EvidenceStatus;
+    /**
+     * System Key
+     */
+    system_key?: string | null;
+    /**
+     * Text
+     */
+    text?: string | null;
+    /**
+     * Unresolved
+     */
+    unresolved?: Array<UnresolvedField>;
+};
+
+/**
+ * EvidenceGap
+ *
+ * Известный пробел входа: чего не хватает, чтобы граф считался полным.
+ */
+export type EvidenceGap = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Sheet Id
+     */
+    sheet_id?: string | null;
+    /**
+     * Subject Ids
+     */
+    subject_ids?: Array<string>;
+};
+
+/**
+ * EvidenceGraphRef
+ */
+export type EvidenceGraphRef = {
+    /**
+     * Graph Id
+     */
+    graph_id: string;
+    input_mode: EvidenceInputMode;
+    /**
+     * Sha256
+     */
+    sha256: string;
+};
+
+/**
+ * EvidenceInputMode
+ *
+ * Как получен граф целиком (Track B, Track A, проверенный гибрид).
+ */
+export type EvidenceInputMode = 'MODEL_EXTRACTED' | 'HUMAN_GT' | 'HYBRID_REVIEWED';
+
+/**
+ * EvidenceKind
+ *
+ * Что можно увидеть на листе — без дисциплины.
+ */
+export type EvidenceKind = 'symbol' | 'route' | 'zone' | 'text';
+
+/**
+ * EvidenceProvenance
+ *
+ * Кто утверждает, что элемент есть на листе. `rd_prior_inferred` здесь нет намеренно.
+ */
+export type EvidenceProvenance = 'base_recognition_observed' | 'mep_model_observed' | 'deterministic_extracted' | 'human_ground_truth' | 'unresolved';
+
+/**
+ * EvidenceRelation
+ */
+export type EvidenceRelation = {
+    /**
+     * Confidence
+     */
+    confidence?: number | null;
+    /**
+     * From Id
+     */
+    from_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    provenance: EvidenceProvenance;
+    /**
+     * Relation Key
+     */
+    relation_key: string;
+    review?: ReviewStatus;
+    /**
+     * Review History
+     */
+    review_history?: Array<ReviewEvent>;
+    /**
+     * Sources
+     */
+    sources: Array<SourceRef>;
+    status: EvidenceStatus;
+    /**
+     * To Id
+     */
+    to_id: string;
+};
+
+/**
+ * EvidenceStatus
+ *
+ * Насколько прямо элемент виден.
+ *
+ * `extraction_inferred` — вывод в пределах листа (подпись отнесена к ближайшему символу),
+ * а не достройка РД.
+ */
+export type EvidenceStatus = 'observed' | 'extraction_inferred' | 'human_confirmed';
 
 /**
  * FlagOverrideWrite
@@ -467,6 +990,39 @@ export type FlagStateRead = {
 };
 
 /**
+ * GenerationProvenance
+ */
+export type GenerationProvenance = 'evidence_observed' | 'rd_prior_inferred' | 'retrieved_pattern' | 'deterministic_rule' | 'human_confirmed' | 'unresolved';
+
+/**
+ * GenerationRun
+ *
+ * Прогон генератора: без него шаги нельзя воспроизвести.
+ */
+export type GenerationRun = {
+    /**
+     * Config Sha256
+     */
+    config_sha256: string;
+    /**
+     * Dirty
+     */
+    dirty: boolean;
+    /**
+     * Git Commit
+     */
+    git_commit: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Seed
+     */
+    seed?: number | null;
+};
+
+/**
  * GeometryIssueCode
  *
  * Почему контур не годится для площади (ADR-0026).
@@ -498,6 +1054,23 @@ export type GeometryStatus = 'not_applicable' | 'pending' | 'extracting' | 'read
 export type GeometryType = 'count' | 'line' | 'polyline' | 'polygon';
 
 /**
+ * GroupValueRef
+ *
+ * Откуда значение ключа группы: параметр элемента сети. История вывода — у самого параметра.
+ */
+export type GroupValueRef = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Parameter Key
+     */
+    parameter_key: string;
+    subject: SubjectRef;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -505,6 +1078,74 @@ export type HttpValidationError = {
      * Detail
      */
     detail?: Array<ValidationError>;
+};
+
+/**
+ * InferenceKind
+ *
+ * Какое решение принято на шаге. Виды общие для любой дисциплины.
+ */
+export type InferenceKind = 'evidence_adoption' | 'system_assignment' | 'topology' | 'routing' | 'element_addition' | 'attribute' | 'rule_application';
+
+/**
+ * InferenceStep
+ *
+ * Одно решение генератора. Входы шага — только evidence и более ранние шаги.
+ */
+export type InferenceStep = {
+    /**
+     * Alternatives Considered
+     */
+    alternatives_considered?: number;
+    /**
+     * Confidence
+     */
+    confidence?: number | null;
+    /**
+     * Config Sha256
+     */
+    config_sha256?: string | null;
+    /**
+     * Corpus Id
+     */
+    corpus_id?: string | null;
+    /**
+     * Evidence Ids
+     */
+    evidence_ids?: Array<string>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Input Step Ids
+     */
+    input_step_ids?: Array<string>;
+    kind: InferenceKind;
+    /**
+     * Rationale
+     */
+    rationale?: Array<string>;
+    /**
+     * Relation Ids
+     */
+    relation_ids?: Array<string>;
+    /**
+     * Retrieved Case Ids
+     */
+    retrieved_case_ids?: Array<string>;
+    /**
+     * Rule Ids
+     */
+    rule_ids?: Array<string>;
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Tool Id
+     */
+    tool_id: string;
 };
 
 /**
@@ -617,6 +1258,51 @@ export type JobType = 'legacy_import' | 'pdf_geometry_extract';
  * того, что именно набрал человек.
  */
 export type LengthUnit = 'mm' | 'cm' | 'm';
+
+/**
+ * Level
+ *
+ * Уровень здания. Отметка может быть неизвестна — тогда она `None`, а не ноль.
+ */
+export type Level = {
+    /**
+     * Elevation Mm
+     */
+    elevation_mm?: number | null;
+    /**
+     * Level Id
+     */
+    level_id: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * LineSource
+ *
+ * Источник строки. Вклад есть только у аддитивной строки и выдан движком, а не интерфейсом.
+ */
+export type LineSource = {
+    /**
+     * Canonical Quantity
+     */
+    canonical_quantity?: string | null;
+    /**
+     * Group Values
+     */
+    group_values?: Array<GroupValueRef>;
+    /**
+     * Participants
+     */
+    participants?: Array<Participant>;
+    /**
+     * Quantity
+     */
+    quantity?: string | null;
+    subject: SubjectRef;
+};
 
 /**
  * LivenessResponse
@@ -839,6 +1525,264 @@ export type MeasurementUpdate = {
 };
 
 /**
+ * MepBoq
+ */
+export type MepBoq = {
+    /**
+     * Blockers
+     */
+    blockers?: Array<QuantityBlocker>;
+    /**
+     * Boq Id
+     */
+    boq_id: string;
+    engine: EngineRef;
+    evidence_graph: EvidenceGraphRef;
+    /**
+     * Lane
+     */
+    lane?: 'STRICT';
+    /**
+     * Lines
+     */
+    lines: Array<BoqLine>;
+    network_graph: NetworkGraphRef;
+    profile: ProfileRef;
+    /**
+     * Rules
+     */
+    rules: Array<RuleRef>;
+    /**
+     * Schema Version
+     */
+    schema_version?: '0.3.0';
+    status: BoqStatus;
+};
+
+/**
+ * MepContractIssueRead
+ */
+export type MepContractIssueRead = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Severity
+     */
+    severity: 'error' | 'warning';
+    /**
+     * Subject Id
+     */
+    subject_id: string | null;
+};
+
+/**
+ * MepEvidenceGraph
+ */
+export type MepEvidenceGraph = {
+    document: DocumentRef;
+    /**
+     * Elements
+     */
+    elements: Array<EvidenceElement>;
+    /**
+     * Gaps
+     */
+    gaps?: Array<EvidenceGap>;
+    /**
+     * Graph Id
+     */
+    graph_id: string;
+    input_mode: EvidenceInputMode;
+    /**
+     * Levels
+     */
+    levels?: Array<Level>;
+    profile: ProfileRef;
+    /**
+     * Relations
+     */
+    relations?: Array<EvidenceRelation>;
+    /**
+     * Schema Version
+     */
+    schema_version?: '0.3.0';
+    /**
+     * Sheets
+     */
+    sheets: Array<SheetRef>;
+    /**
+     * Source Availability
+     */
+    source_availability?: Array<SourceAvailability>;
+    /**
+     * Tools
+     */
+    tools?: Array<Tool>;
+};
+
+/**
+ * MepNetworkGraph
+ */
+export type MepNetworkGraph = {
+    /**
+     * Corpora
+     */
+    corpora?: Array<CorpusRef>;
+    document: DocumentRef;
+    evidence_graph: EvidenceGraphRef;
+    /**
+     * Graph Id
+     */
+    graph_id: string;
+    /**
+     * Inference Steps
+     */
+    inference_steps?: Array<InferenceStep>;
+    /**
+     * Levels
+     */
+    levels?: Array<Level>;
+    /**
+     * Nodes
+     */
+    nodes: Array<NetworkNode>;
+    profile: ProfileRef;
+    run?: GenerationRun | null;
+    /**
+     * Schema Version
+     */
+    schema_version?: '0.3.0';
+    /**
+     * Segments
+     */
+    segments?: Array<NetworkSegment>;
+    /**
+     * Sheets
+     */
+    sheets?: Array<SheetRef>;
+    /**
+     * Systems
+     */
+    systems: Array<NetworkSystem>;
+    /**
+     * Tools
+     */
+    tools: Array<Tool>;
+    /**
+     * Unresolved
+     */
+    unresolved?: Array<UnresolvedDecision>;
+};
+
+/**
+ * MepScenarioRead
+ *
+ * Сценарий целиком: входы, замечания проверок и ВОР, посчитанный движком на сервере.
+ */
+export type MepScenarioRead = {
+    boq: MepBoq;
+    /**
+     * Boq Issues
+     */
+    boq_issues: Array<MepContractIssueRead>;
+    evidence: MepEvidenceGraph;
+    /**
+     * Evidence Issues
+     */
+    evidence_issues: Array<MepContractIssueRead>;
+    /**
+     * Evidence Sha256
+     */
+    evidence_sha256: string;
+    /**
+     * Mode
+     */
+    mode?: 'MOCK';
+    network: MepNetworkGraph;
+    /**
+     * Network Issues
+     */
+    network_issues: Array<MepContractIssueRead>;
+    /**
+     * Network Sha256
+     */
+    network_sha256: string;
+    profile: MepSystemProfile;
+    scenario: MepScenarioSummary;
+};
+
+/**
+ * MepScenarioSummary
+ */
+export type MepScenarioSummary = {
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Scenario Id
+     */
+    scenario_id: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * MepSystemProfile
+ */
+export type MepSystemProfile = {
+    /**
+     * Attributes
+     */
+    attributes?: Array<AttributeDef>;
+    /**
+     * Classes
+     */
+    classes: Array<ClassDef>;
+    /**
+     * Discipline
+     */
+    discipline: string;
+    /**
+     * Profile Id
+     */
+    profile_id: string;
+    /**
+     * Profile Version
+     */
+    profile_version: string;
+    /**
+     * Relation Types
+     */
+    relation_types?: Array<RelationTypeDef>;
+    /**
+     * Schema Version
+     */
+    schema_version?: '0.3.0';
+    /**
+     * Source
+     */
+    source: string;
+    status: ProfileStatus;
+    /**
+     * Systems
+     */
+    systems: Array<SystemDef>;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * MetaResponse
  */
 export type MetaResponse = {
@@ -981,6 +1925,154 @@ export type ModelSpecRead = {
      * Model Id
      */
     model_id: string;
+};
+
+/**
+ * NetworkGraphRef
+ */
+export type NetworkGraphRef = {
+    /**
+     * Graph Id
+     */
+    graph_id: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+};
+
+/**
+ * NetworkNode
+ */
+export type NetworkNode = {
+    /**
+     * Class Key
+     */
+    class_key: string | null;
+    derivation: Derivation;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Parameters
+     */
+    parameters?: Array<Parameter>;
+    /**
+     * Ports
+     */
+    ports?: Array<Port>;
+    position: Vertex;
+    role: NodeRole;
+    /**
+     * System Ids
+     */
+    system_ids?: Array<string>;
+};
+
+/**
+ * NetworkSegment
+ *
+ * Участок между двумя портами. Вертикальный переход — участок между уровнями или отметками.
+ */
+export type NetworkSegment = {
+    /**
+     * Class Key
+     */
+    class_key: string | null;
+    derivation: Derivation;
+    end: PortRef;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Orientation
+     */
+    orientation?: 'horizontal' | 'vertical' | 'inclined' | 'unknown';
+    /**
+     * Parameters
+     */
+    parameters?: Array<Parameter>;
+    /**
+     * Path
+     */
+    path: Array<Vertex>;
+    start: PortRef;
+    /**
+     * System Id
+     */
+    system_id: string;
+};
+
+/**
+ * NetworkSystem
+ */
+export type NetworkSystem = {
+    derivation: Derivation;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * System Key
+     */
+    system_key: string;
+};
+
+/**
+ * NodeRole
+ *
+ * Топологическая роль узла сети. Роль — не класс: класс задаёт профиль.
+ */
+export type NodeRole = 'source' | 'terminal' | 'junction' | 'equipment' | 'device' | 'transition' | 'endpoint' | 'unresolved_anchor';
+
+/**
+ * OriginalPrediction
+ *
+ * Исходный выход модели или детерминированного экстрактора до исправлений человека.
+ */
+export type OriginalPrediction = {
+    /**
+     * Attributes
+     */
+    attributes?: Array<EvidenceAttribute>;
+    /**
+     * Class Key
+     */
+    class_key: string | null;
+    /**
+     * Confidence
+     */
+    confidence?: number | null;
+    /**
+     * Geometry
+     */
+    geometry: ({
+        kind: 'point';
+    } & PointGeometry) | ({
+        kind: 'bbox';
+    } & BoxGeometry) | ({
+        kind: 'polyline';
+    } & PolylineGeometry) | ({
+        kind: 'polygon';
+    } & PolygonGeometry);
+    /**
+     * Provenance
+     */
+    provenance: 'mep_model_observed' | 'deterministic_extracted';
+    /**
+     * Sources
+     */
+    sources: Array<SourceRef>;
+    /**
+     * System Key
+     */
+    system_key?: string | null;
+    /**
+     * Tool Id
+     */
+    tool_id: string;
 };
 
 /**
@@ -1234,6 +2326,142 @@ export type PageSheetRead = {
 };
 
 /**
+ * Parameter
+ *
+ * Параметр сети. Своё происхождение у каждого значения, а не у элемента целиком.
+ */
+export type Parameter = {
+    derivation: Derivation;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+    /**
+     * Value
+     */
+    value: boolean | number | number | string | null;
+};
+
+/**
+ * Participant
+ *
+ * Участник производной величины: узел-якорь, подключённые или сравниваемые участки.
+ */
+export type Participant = {
+    /**
+     * Parameter Key
+     */
+    parameter_key?: string | null;
+    /**
+     * Role
+     */
+    role: 'anchor' | 'connected' | 'compared';
+    subject: SubjectRef;
+    /**
+     * Value
+     */
+    value?: boolean | number | number | string | null;
+};
+
+/**
+ * PointGeometry
+ */
+export type PointGeometry = {
+    /**
+     * Kind
+     */
+    kind?: 'point';
+    /**
+     * Point
+     */
+    point: [
+        number,
+        number
+    ];
+};
+
+/**
+ * PolygonGeometry
+ */
+export type PolygonGeometry = {
+    /**
+     * Holes
+     */
+    holes?: Array<Array<[
+        number,
+        number
+    ]>>;
+    /**
+     * Kind
+     */
+    kind?: 'polygon';
+    /**
+     * Outer
+     */
+    outer: Array<[
+        number,
+        number
+    ]>;
+};
+
+/**
+ * PolylineGeometry
+ */
+export type PolylineGeometry = {
+    /**
+     * Kind
+     */
+    kind?: 'polyline';
+    /**
+     * Points
+     */
+    points: Array<[
+        number,
+        number
+    ]>;
+};
+
+/**
+ * Port
+ */
+export type Port = {
+    /**
+     * Direction
+     */
+    direction?: 'in' | 'out' | 'bidirectional' | 'unknown';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Parameters
+     */
+    parameters?: Array<Parameter>;
+    /**
+     * System Id
+     */
+    system_id?: string | null;
+};
+
+/**
+ * PortRef
+ */
+export type PortRef = {
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Port Id
+     */
+    port_id: string;
+};
+
+/**
  * ProbeSource
  *
  * Откуда взялось состояние. Показывается рядом с ним — иначе непонятно, насколько свежее.
@@ -1253,6 +2481,31 @@ export type ProbeStatus = 'healthy' | 'degraded' | 'unavailable' | 'not_configur
  * Единственное изменяемое поле ревизии: описывает не файл, а ход работы над ним.
  */
 export type ProcessingStatus = 'pending' | 'unprocessed' | 'processor_unavailable' | 'importing' | 'ready' | 'failed';
+
+/**
+ * ProfileRef
+ *
+ * Профиль системы, по которому толкуются ключи графа.
+ */
+export type ProfileRef = {
+    /**
+     * Profile Id
+     */
+    profile_id: string;
+    /**
+     * Profile Sha256
+     */
+    profile_sha256?: string | null;
+    /**
+     * Profile Version
+     */
+    profile_version: string;
+};
+
+/**
+ * ProfileStatus
+ */
+export type ProfileStatus = 'synthetic' | 'draft' | 'approved';
 
 /**
  * ProjectCreate
@@ -1401,6 +2654,17 @@ export type ProjectUpdate = {
 };
 
 /**
+ * ProvenanceCount
+ */
+export type ProvenanceCount = {
+    /**
+     * Count
+     */
+    count: number;
+    provenance: GenerationProvenance;
+};
+
+/**
  * ProviderKind
  *
  * Как разговаривать с поставщиком.
@@ -1409,6 +2673,33 @@ export type ProjectUpdate = {
  * OpenAI-совместимым API, и адаптер у них будет общий.
  */
 export type ProviderKind = 'openai_compatible' | 'anthropic_compatible' | 'lm_studio' | 'vllm' | 'sglang' | 'custom';
+
+/**
+ * QuantityBlocker
+ */
+export type QuantityBlocker = {
+    code: BlockerCode;
+    /**
+     * Key
+     */
+    key?: string | null;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Severity
+     */
+    severity: 'blocker' | 'warning';
+    /**
+     * Subject Ids
+     */
+    subject_ids?: Array<string>;
+    /**
+     * Subjects
+     */
+    subjects?: Array<SubjectRef>;
+};
 
 /**
  * QuantityState
@@ -1546,6 +2837,63 @@ export type RegionRead = {
 export type RegionShape = 'rectangle' | 'polygon';
 
 /**
+ * RelationTypeDef
+ */
+export type RelationTypeDef = {
+    /**
+     * From Kinds
+     */
+    from_kinds: Array<EvidenceKind>;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * To Kinds
+     */
+    to_kinds: Array<EvidenceKind>;
+};
+
+/**
+ * ReviewAction
+ */
+export type ReviewAction = 'confirm' | 'correct_class' | 'correct_geometry' | 'correct_attributes' | 'correct_system' | 'mark_ambiguous' | 'reject' | 'add_missing';
+
+/**
+ * ReviewEvent
+ *
+ * Одно действие проверяющего. История только дописывается и упорядочена по времени.
+ */
+export type ReviewEvent = {
+    action: ReviewAction;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Reviewed At
+     */
+    reviewed_at: string;
+    /**
+     * Reviewer Id
+     */
+    reviewer_id: string;
+};
+
+/**
+ * ReviewStatus
+ */
+export type ReviewStatus = 'unreviewed' | 'confirmed' | 'ambiguous' | 'rejected' | 'ignore_for_train';
+
+/**
  * Role
  *
  * Роль — именованный набор разрешений, а не проверяемая сущность.
@@ -1557,6 +2905,20 @@ export type RegionShape = 'rectangle' | 'polygon';
  * выдаются членством в конкретном рабочем пространстве.
  */
 export type Role = 'platform_admin' | 'workspace_admin' | 'engineer' | 'reviewer' | 'viewer' | 'service';
+
+/**
+ * RuleRef
+ */
+export type RuleRef = {
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Rule Id
+     */
+    rule_id: string;
+};
 
 /**
  * ScaleCalibrationCreate
@@ -1700,6 +3062,13 @@ export type ScaleScopeKind = 'sheet' | 'region';
  * за автоматически подтверждённую (ADR-0018).
  */
 export type ScaleSource = 'manual' | 'detected_dimension' | 'imported';
+
+/**
+ * ScaleStatus
+ *
+ * Есть ли у листа явная калибровка. Автоматического масштаба нет (ADR-0018).
+ */
+export type ScaleStatus = 'calibrated' | 'uncalibrated';
 
 /**
  * ScaleVerificationWrite
@@ -1946,6 +3315,125 @@ export type SheetRead = {
      * Width Px
      */
     width_px: number | null;
+};
+
+/**
+ * SheetRef
+ *
+ * Лист, на котором лежит геометрия, и основание для метрики.
+ */
+export type SheetRef = {
+    calibration?: CalibrationSnapshot | null;
+    /**
+     * Geometry Fingerprint
+     */
+    geometry_fingerprint: string;
+    /**
+     * Level Id
+     */
+    level_id?: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Scale Calibration Id
+     */
+    scale_calibration_id?: string | null;
+    scale_status?: ScaleStatus;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string;
+};
+
+/**
+ * SourceAvailability
+ *
+ * Какие каналы были доступны. Отсутствие текстового слоя — `unavailable`, не ошибка.
+ */
+export type SourceAvailability = {
+    availability: Availability;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string;
+    source_type: SourceType;
+};
+
+/**
+ * SourceRef
+ *
+ * Ссылка на конкретный артефакт-источник, а не его копия.
+ */
+export type SourceRef = {
+    /**
+     * Ref Id
+     */
+    ref_id: string;
+    /**
+     * Sha256
+     */
+    sha256?: string | null;
+    source_type: SourceType;
+    /**
+     * Tool Id
+     */
+    tool_id?: string | null;
+};
+
+/**
+ * SourceType
+ *
+ * Канал, из которого взят элемент.
+ *
+ * `base_region_text` — только тело TEXT-блока распознавалки. Описания IMAGE-блоков написаны её
+ * моделью и источником observed-evidence не являются, поэтому канала для них нет.
+ */
+export type SourceType = 'pdf_text_layer' | 'page_raster' | 'base_region_text' | 'human_annotation';
+
+/**
+ * SubjectKind
+ *
+ * Вид объекта, на который ссылается контракт. Только понятия ядра, без дисциплины.
+ */
+export type SubjectKind = 'evidence_element' | 'evidence_relation' | 'inference_step' | 'system' | 'node' | 'port' | 'segment' | 'unresolved_decision' | 'sheet' | 'level' | 'tool' | 'corpus';
+
+/**
+ * SubjectRef
+ *
+ * Типизированная ссылка: `{"kind": "segment", "id": "seg-b1"}`. Голый id неоднозначен.
+ */
+export type SubjectRef = {
+    /**
+     * Id
+     */
+    id: string;
+    kind: SubjectKind;
+};
+
+/**
+ * SystemDef
+ *
+ * Система. `tree` запрещает циклы в сети этой системы — правило профиля, а не ядра.
+ */
+export type SystemDef = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Topology
+     */
+    topology?: 'tree' | 'any';
 };
 
 /**
@@ -2263,6 +3751,104 @@ export type TenderRebindRequest = {
 };
 
 /**
+ * Tool
+ *
+ * Экстрактор, генератор или правило с версией и хешами — происхождение без догадок.
+ */
+export type Tool = {
+    /**
+     * Config Sha256
+     */
+    config_sha256?: string | null;
+    /**
+     * Model Id
+     */
+    model_id?: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Rule Source
+     */
+    rule_source?: string | null;
+    /**
+     * Tool Id
+     */
+    tool_id: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Weights Sha256
+     */
+    weights_sha256?: string | null;
+};
+
+/**
+ * UnresolvedCode
+ */
+export type UnresolvedCode = 'missing_evidence' | 'ambiguous_connection' | 'conflicting_evidence' | 'missing_attribute' | 'missing_rule' | 'missing_scale' | 'out_of_profile';
+
+/**
+ * UnresolvedDecision
+ *
+ * Решение, которое генератор не принял. Не прячется в уверенную выдумку.
+ */
+export type UnresolvedDecision = {
+    /**
+     * Blocks Quantity
+     */
+    blocks_quantity?: boolean;
+    /**
+     * Candidate Ids
+     */
+    candidate_ids?: Array<string>;
+    code: UnresolvedCode;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Step Ids
+     */
+    step_ids?: Array<string>;
+    /**
+     * Subject Ids
+     */
+    subject_ids?: Array<string>;
+    /**
+     * Subjects
+     */
+    subjects?: Array<SubjectRef>;
+};
+
+/**
+ * UnresolvedField
+ */
+export type UnresolvedField = {
+    /**
+     * Field
+     */
+    field: string;
+    /**
+     * Note
+     */
+    note?: string | null;
+    reason: UnresolvedReason;
+};
+
+/**
+ * UnresolvedReason
+ */
+export type UnresolvedReason = 'not_visible' | 'ambiguous' | 'conflicting' | 'missing_source' | 'out_of_profile';
+
+/**
  * UploadRead
  *
  * Результат загрузки.
@@ -2344,11 +3930,44 @@ export type ValidationError = {
 export type ValueSource = 'default' | 'system' | 'workspace' | 'deployment';
 
 /**
+ * ValueType
+ */
+export type ValueType = 'string' | 'number' | 'integer' | 'boolean';
+
+/**
  * VerificationState
  *
  * Состояние проверки человеком.
  */
 export type VerificationState = 'unverified' | 'verified' | 'disputed';
+
+/**
+ * Vertex
+ *
+ * Точка сети: на листе (x, y нормализованы), по высоте (z_mm) и/или на уровне.
+ */
+export type Vertex = {
+    /**
+     * Level Id
+     */
+    level_id?: string | null;
+    /**
+     * Sheet Id
+     */
+    sheet_id?: string | null;
+    /**
+     * X
+     */
+    x?: number | null;
+    /**
+     * Y
+     */
+    y?: number | null;
+    /**
+     * Z Mm
+     */
+    z_mm?: number | null;
+};
 
 /**
  * WorkerRead
@@ -3305,6 +4924,54 @@ export type UpdateMeasurementResponses = {
 };
 
 export type UpdateMeasurementResponse = UpdateMeasurementResponses[keyof UpdateMeasurementResponses];
+
+export type ListMepScenariosData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/mep/experiment/scenarios';
+};
+
+export type ListMepScenariosResponses = {
+    /**
+     * Response List Mep Scenarios
+     *
+     * Successful Response
+     */
+    200: Array<MepScenarioSummary>;
+};
+
+export type ListMepScenariosResponse = ListMepScenariosResponses[keyof ListMepScenariosResponses];
+
+export type GetMepScenarioData = {
+    body?: never;
+    path: {
+        /**
+         * Scenario Id
+         */
+        scenario_id: string;
+    };
+    query?: never;
+    url: '/api/v1/mep/experiment/scenarios/{scenario_id}';
+};
+
+export type GetMepScenarioErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetMepScenarioError = GetMepScenarioErrors[keyof GetMepScenarioErrors];
+
+export type GetMepScenarioResponses = {
+    /**
+     * Successful Response
+     */
+    200: MepScenarioRead;
+};
+
+export type GetMepScenarioResponse = GetMepScenarioResponses[keyof GetMepScenarioResponses];
 
 export type ReadMetaData = {
     body?: never;

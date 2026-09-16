@@ -121,6 +121,14 @@ REGISTRY: Final[MappingProxyType[str, FlagDefinition]] = MappingProxyType(
             _stage2("reports", "Отчёты", "Ведомость объёмов работ."),
             _stage2("bim.import", "Импорт BIM", "Разбор RVT, NWD, NWC и IFC."),
             _stage2("drawing.compare", "Сравнение ревизий", "Различия между версиями чертежа."),
+            # Изолированный MEP-эксперимент (ADR-0027, ADR-0028). Страница в режиме MOCK на
+            # синтетических сценариях (PROMPT 11): пилот, выключен, включается на пространство.
+            _pilot(
+                "mep_rd_hypothesis_v1",
+                "MEP-эксперимент П → РД → ВОР",
+                "Синтетические сценарии: evidence, сеть РД, физический ВОР. Не рабочий ВОР.",
+                stage="MEP-эксперимент · пилот",
+            ),
         )
     }
 )

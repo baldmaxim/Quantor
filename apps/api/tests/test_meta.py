@@ -16,6 +16,7 @@ STAGE2_FEATURES = (
     "reports",
     "bim.import",
     "drawing.compare",
+    "mep_rd_hypothesis_v1",
 )
 
 

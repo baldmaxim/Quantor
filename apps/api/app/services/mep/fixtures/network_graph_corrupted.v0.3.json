@@ -1,0 +1,442 @@
+{
+  "schema_version": "0.3.0",
+  "graph_id": "ng-demo-001-corrupted",
+  "profile": {
+    "profile_id": "synthetic.demo",
+    "profile_version": "0.3.0",
+    "profile_sha256": "2b52c95e9936fa6ffb10245a3fdd39737bee3699eb5272b5dffb81733b95c972"
+  },
+  "document": {
+    "project_id": "proj-demo",
+    "revision_id": "rev-demo",
+    "source_pdf_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "evidence_graph": {
+    "graph_id": "eg-demo-001",
+    "sha256": "de632a3ce32f1f550efc5f3304df039a091396cbb4d3335d111002758fd088db",
+    "input_mode": "MODEL_EXTRACTED"
+  },
+  "sheets": [
+    {
+      "sheet_id": "sheet-p3",
+      "page_index": 3,
+      "geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+      "level_id": "L01",
+      "scale_status": "calibrated",
+      "scale_calibration_id": "scale-001",
+      "calibration": {
+        "calibration_id": "scale-001",
+        "page_geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "display_width_pt": "2383.9370",
+        "display_height_pt": "1683.7795",
+        "mm_per_pt": "36.0",
+        "verification_state": "verified",
+        "fingerprint": "d8c24118daa0e8be1f42a6df11525788d7ce6b73dd4cbb0792884bdd8ffaaecf"
+      }
+    }
+  ],
+  "levels": [
+    {
+      "level_id": "L01",
+      "name": "Этаж 1",
+      "elevation_mm": null
+    }
+  ],
+  "tools": [
+    {
+      "tool_id": "gen",
+      "name": "synthetic-retrieval-baseline",
+      "version": "0.0.0"
+    },
+    {
+      "tool_id": "router",
+      "name": "deterministic-router",
+      "version": "0.0.0",
+      "rule_source": "синтетическое правило минимальной длины"
+    }
+  ],
+  "run": {
+    "run_id": "run-demo-001",
+    "git_commit": "d570e83",
+    "dirty": true,
+    "config_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "corpora": [
+    {
+      "corpus_id": "corpus-demo",
+      "dataset_fingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "split_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "split": "train"
+    }
+  ],
+  "inference_steps": [
+    {
+      "id": "st-1",
+      "kind": "evidence_adoption",
+      "tool_id": "gen",
+      "run_id": "run-demo-001",
+      "evidence_ids": ["ev-src-1", "ev-term-1", "ev-term-2"],
+      "confidence": 0.9
+    },
+    {
+      "id": "st-2",
+      "kind": "system_assignment",
+      "tool_id": "gen",
+      "run_id": "run-demo-001",
+      "corpus_id": "corpus-demo",
+      "input_step_ids": ["st-1"],
+      "retrieved_case_ids": ["train-case-017"],
+      "confidence": 0.7
+    },
+    {
+      "id": "st-3",
+      "kind": "topology",
+      "tool_id": "gen",
+      "run_id": "run-demo-001",
+      "corpus_id": "corpus-demo",
+      "evidence_ids": ["ev-route-1"],
+      "relation_ids": ["rel-3"],
+      "input_step_ids": ["st-2"],
+      "retrieved_case_ids": ["train-case-017"],
+      "confidence": 0.6,
+      "alternatives_considered": 2,
+      "rationale": ["tree_from_nearest_train_case"]
+    },
+    {
+      "id": "st-4",
+      "kind": "routing",
+      "tool_id": "router",
+      "run_id": "run-demo-001",
+      "input_step_ids": ["st-3"],
+      "rule_ids": ["syn.routing.min_length.v0"]
+    },
+    {
+      "id": "st-5",
+      "kind": "attribute",
+      "tool_id": "gen",
+      "run_id": "run-demo-001",
+      "evidence_ids": ["ev-route-1", "ev-txt-2"],
+      "relation_ids": ["rel-2"],
+      "input_step_ids": ["st-3"],
+      "confidence": 0.85,
+      "rationale": ["size_label_parsed"]
+    },
+    {
+      "id": "st-6",
+      "kind": "attribute",
+      "tool_id": "gen",
+      "run_id": "run-demo-001",
+      "corpus_id": "corpus-demo",
+      "input_step_ids": ["st-3"],
+      "retrieved_case_ids": ["train-case-017"],
+      "confidence": 0.55
+    },
+    {
+      "id": "st-7",
+      "kind": "rule_application",
+      "tool_id": "router",
+      "run_id": "run-demo-001",
+      "input_step_ids": ["st-3"],
+      "rule_ids": ["syn.material.single.v0"],
+      "rationale": ["synthetic_single_material_rule"]
+    }
+  ],
+  "systems": [
+    {
+      "id": "sys-1",
+      "system_key": "syn.sys_a",
+      "derivation": {
+        "provenance": "retrieved_pattern",
+        "step_ids": ["st-2"],
+        "confidence": 0.7
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n-src",
+      "role": "source",
+      "class_key": "syn.net.source",
+      "system_ids": ["sys-1"],
+      "position": {
+        "sheet_id": "sheet-p3",
+        "x": 0.2,
+        "y": 0.5,
+        "level_id": "L01"
+      },
+      "ports": [
+        {
+          "id": "p-src-out",
+          "direction": "out",
+          "system_id": "sys-1"
+        }
+      ],
+      "derivation": {
+        "provenance": "evidence_observed",
+        "step_ids": ["st-1"],
+        "evidence_ids": ["ev-src-1"],
+        "confidence": 0.93
+      }
+    },
+    {
+      "id": "n-j1",
+      "role": "junction",
+      "class_key": "syn.net.junction",
+      "system_ids": ["sys-1"],
+      "position": {
+        "sheet_id": "sheet-p3",
+        "x": 0.45,
+        "y": 0.5,
+        "level_id": "L01"
+      },
+      "ports": [
+        {
+          "id": "p-j1-in",
+          "direction": "in",
+          "system_id": "sys-1"
+        },
+        {
+          "id": "p-j1-o1",
+          "direction": "out",
+          "system_id": "sys-1"
+        },
+        {
+          "id": "p-j1-o2",
+          "direction": "out",
+          "system_id": "sys-1"
+        }
+      ],
+      "derivation": {
+        "provenance": "rd_prior_inferred",
+        "step_ids": ["st-3"],
+        "confidence": 0.6
+      }
+    },
+    {
+      "id": "n-t1",
+      "role": "terminal",
+      "class_key": "syn.net.terminal",
+      "system_ids": ["sys-1"],
+      "position": {
+        "sheet_id": "sheet-p3",
+        "x": 0.6,
+        "y": 0.3,
+        "level_id": "L01"
+      },
+      "ports": [
+        {
+          "id": "p-t1-in",
+          "direction": "in",
+          "system_id": "sys-1"
+        }
+      ],
+      "derivation": {
+        "provenance": "evidence_observed",
+        "step_ids": ["st-1"],
+        "evidence_ids": ["ev-term-1"],
+        "confidence": 0.88
+      }
+    },
+    {
+      "id": "n-t2",
+      "role": "terminal",
+      "class_key": "syn.net.terminal",
+      "system_ids": ["sys-1"],
+      "position": {
+        "sheet_id": "sheet-p3",
+        "x": 0.6,
+        "y": 0.7,
+        "level_id": "L01"
+      },
+      "ports": [
+        {
+          "id": "p-t2-in",
+          "direction": "in",
+          "system_id": "sys-1"
+        }
+      ],
+      "derivation": {
+        "provenance": "evidence_observed",
+        "step_ids": ["st-1"],
+        "evidence_ids": ["ev-term-2"],
+        "confidence": 0.41
+      }
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg-main",
+      "class_key": "syn.net.segment",
+      "system_id": "sys-1",
+      "start": {
+        "node_id": "n-src",
+        "port_id": "p-src-out"
+      },
+      "end": {
+        "node_id": "n-j1",
+        "port_id": "p-j1-in"
+      },
+      "path": [
+        {
+          "sheet_id": "sheet-p3",
+          "x": 0.2,
+          "y": 0.5,
+          "level_id": "L01"
+        },
+        {
+          "sheet_id": "sheet-p3",
+          "x": 0.45,
+          "y": 0.5,
+          "level_id": "L01"
+        }
+      ],
+      "orientation": "horizontal",
+      "parameters": [
+        {
+          "key": "syn.nominal_size_mm",
+          "value": 50,
+          "unit": "mm",
+          "derivation": {
+            "provenance": "evidence_observed",
+            "step_ids": ["st-5"],
+            "evidence_ids": ["ev-route-1", "ev-txt-2"],
+            "confidence": 0.85
+          }
+        },
+        {
+          "key": "syn.material",
+          "value": "syn.mat_a",
+          "derivation": {
+            "provenance": "deterministic_rule",
+            "step_ids": ["st-7"]
+          }
+        }
+      ],
+      "derivation": {
+        "provenance": "evidence_observed",
+        "step_ids": ["st-3"],
+        "evidence_ids": ["ev-route-1"],
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "seg-b1",
+      "class_key": "syn.net.segment",
+      "system_id": "sys-1",
+      "start": {
+        "node_id": "n-j1",
+        "port_id": "p-j1-o1"
+      },
+      "end": {
+        "node_id": "n-t1",
+        "port_id": "p-t1-in"
+      },
+      "path": [
+        {
+          "sheet_id": "sheet-p3",
+          "x": 0.45,
+          "y": 0.5,
+          "level_id": "L01"
+        },
+        {
+          "sheet_id": "sheet-p3",
+          "x": 0.45,
+          "y": 0.3,
+          "level_id": "L01"
+        },
+        {
+          "sheet_id": "sheet-p3",
+          "x": 0.6,
+          "y": 0.3,
+          "level_id": "L01"
+        }
+      ],
+      "orientation": "horizontal",
+      "parameters": [
+        {
+          "key": "syn.nominal_size_mm",
+          "value": 32,
+          "unit": "mm",
+          "derivation": {
+            "provenance": "rd_prior_inferred",
+            "step_ids": ["st-6"],
+            "confidence": 0.55
+          }
+        },
+        {
+          "key": "syn.material",
+          "value": "syn.mat_a",
+          "derivation": {
+            "provenance": "deterministic_rule",
+            "step_ids": ["st-7"]
+          }
+        }
+      ],
+      "derivation": {
+        "provenance": "deterministic_rule",
+        "step_ids": ["st-3", "st-4"],
+        "confidence": 0.6
+      }
+    },
+    {
+      "id": "seg-b2",
+      "class_key": "syn.net.segment",
+      "system_id": "sys-1",
+      "start": {
+        "node_id": "n-j1",
+        "port_id": "p-j1-o2"
+      },
+      "end": {
+        "node_id": "n-t2",
+        "port_id": "p-t2-in"
+      },
+      "path": [
+        {
+          "sheet_id": "sheet-p3",
+          "x": 0.45,
+          "y": 0.5,
+          "level_id": "L01"
+        },
+        {
+          "sheet_id": "sheet-p3",
+          "x": 0.45,
+          "y": 0.7,
+          "level_id": "L01"
+        },
+        {
+          "sheet_id": "sheet-p3",
+          "x": 0.6,
+          "y": 0.7,
+          "level_id": "L01"
+        }
+      ],
+      "orientation": "horizontal",
+      "parameters": [
+        {
+          "key": "syn.nominal_size_mm",
+          "value": 32,
+          "unit": "mm",
+          "derivation": {
+            "provenance": "rd_prior_inferred",
+            "step_ids": ["st-6"],
+            "confidence": 0.55
+          }
+        },
+        {
+          "key": "syn.material",
+          "value": "syn.mat_a",
+          "derivation": {
+            "provenance": "deterministic_rule",
+            "step_ids": ["st-7"]
+          }
+        }
+      ],
+      "derivation": {
+        "provenance": "deterministic_rule",
+        "step_ids": ["st-3", "st-4"],
+        "confidence": 0.6
+      }
+    }
+  ],
+  "unresolved": []
+}

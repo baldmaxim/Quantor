@@ -1,0 +1,1613 @@
+{
+  "scenario": {
+    "scenario_id": "complete",
+    "title": "A · все параметры определены",
+    "description": "Материал задан правилом генератора: физический ВОР рассчитан полностью."
+  },
+  "mode": "MOCK",
+  "profile": {
+    "schema_version": "0.3.0",
+    "profile_id": "synthetic.demo",
+    "profile_version": "0.3.0",
+    "discipline": "synthetic",
+    "title": "Синтетический профиль для проверки контрактов",
+    "status": "synthetic",
+    "source": "Синтетика для тестов контракта v0.3. Не описывает ВК, ОВ или другую реальную систему.",
+    "systems": [
+      {
+        "key": "syn.sys_a",
+        "label": "Система A",
+        "topology": "tree"
+      }
+    ],
+    "classes": [
+      {
+        "key": "syn.ev.source_symbol",
+        "label": "Символ источника",
+        "layer": "evidence",
+        "evidence_kind": "symbol",
+        "network_element": null,
+        "node_roles": [],
+        "allowed_geometry": ["point", "bbox"],
+        "attribute_keys": ["syn.mark"],
+        "quantity": "none",
+        "quantity_group_keys": []
+      },
+      {
+        "key": "syn.ev.terminal_symbol",
+        "label": "Символ потребителя",
+        "layer": "evidence",
+        "evidence_kind": "symbol",
+        "network_element": null,
+        "node_roles": [],
+        "allowed_geometry": ["point", "bbox"],
+        "attribute_keys": [],
+        "quantity": "none",
+        "quantity_group_keys": []
+      },
+      {
+        "key": "syn.ev.label",
+        "label": "Подпись",
+        "layer": "evidence",
+        "evidence_kind": "text",
+        "network_element": null,
+        "node_roles": [],
+        "allowed_geometry": ["bbox"],
+        "attribute_keys": [],
+        "quantity": "none",
+        "quantity_group_keys": []
+      },
+      {
+        "key": "syn.ev.visible_route",
+        "label": "Видимая трасса",
+        "layer": "evidence",
+        "evidence_kind": "route",
+        "network_element": null,
+        "node_roles": [],
+        "allowed_geometry": ["polyline"],
+        "attribute_keys": ["syn.size_label"],
+        "quantity": "none",
+        "quantity_group_keys": []
+      },
+      {
+        "key": "syn.net.source",
+        "label": "Источник",
+        "layer": "network",
+        "evidence_kind": null,
+        "network_element": "node",
+        "node_roles": ["source"],
+        "allowed_geometry": [],
+        "attribute_keys": [],
+        "quantity": "none",
+        "quantity_group_keys": []
+      },
+      {
+        "key": "syn.net.terminal",
+        "label": "Потребитель",
+        "layer": "network",
+        "evidence_kind": null,
+        "network_element": "node",
+        "node_roles": ["terminal"],
+        "allowed_geometry": [],
+        "attribute_keys": [],
+        "quantity": "count",
+        "quantity_group_keys": []
+      },
+      {
+        "key": "syn.net.junction",
+        "label": "Разветвление",
+        "layer": "network",
+        "evidence_kind": null,
+        "network_element": "node",
+        "node_roles": ["junction"],
+        "allowed_geometry": [],
+        "attribute_keys": [],
+        "quantity": "none",
+        "quantity_group_keys": []
+      },
+      {
+        "key": "syn.net.segment",
+        "label": "Участок",
+        "layer": "network",
+        "evidence_kind": null,
+        "network_element": "segment",
+        "node_roles": [],
+        "allowed_geometry": [],
+        "attribute_keys": ["syn.nominal_size_mm", "syn.material"],
+        "quantity": "length",
+        "quantity_group_keys": ["syn.nominal_size_mm", "syn.material"]
+      }
+    ],
+    "attributes": [
+      {
+        "key": "syn.mark",
+        "value_type": "string",
+        "unit": null,
+        "allowed_values": []
+      },
+      {
+        "key": "syn.size_label",
+        "value_type": "string",
+        "unit": null,
+        "allowed_values": []
+      },
+      {
+        "key": "syn.nominal_size_mm",
+        "value_type": "number",
+        "unit": "mm",
+        "allowed_values": []
+      },
+      {
+        "key": "syn.material",
+        "value_type": "string",
+        "unit": null,
+        "allowed_values": []
+      }
+    ],
+    "relation_types": [
+      {
+        "key": "syn.rel.labels",
+        "label": "Подпись относится к",
+        "from_kinds": ["text"],
+        "to_kinds": ["symbol", "route"]
+      },
+      {
+        "key": "syn.rel.touches",
+        "label": "Трасса касается символа",
+        "from_kinds": ["route"],
+        "to_kinds": ["symbol"]
+      }
+    ]
+  },
+  "evidence": {
+    "schema_version": "0.3.0",
+    "graph_id": "eg-demo-001",
+    "input_mode": "MODEL_EXTRACTED",
+    "profile": {
+      "profile_id": "synthetic.demo",
+      "profile_version": "0.3.0",
+      "profile_sha256": "2b52c95e9936fa6ffb10245a3fdd39737bee3699eb5272b5dffb81733b95c972"
+    },
+    "document": {
+      "project_id": "proj-demo",
+      "revision_id": "rev-demo",
+      "source_pdf_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "package_sha256": null
+    },
+    "sheets": [
+      {
+        "sheet_id": "sheet-p3",
+        "page_index": 3,
+        "geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "level_id": "L01",
+        "scale_status": "calibrated",
+        "scale_calibration_id": "scale-001",
+        "calibration": {
+          "calibration_id": "scale-001",
+          "page_geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+          "display_width_pt": "2383.9370",
+          "display_height_pt": "1683.7795",
+          "mm_per_pt": "35.277777777778",
+          "verification_state": "verified",
+          "fingerprint": "d8c24118daa0e8be1f42a6df11525788d7ce6b73dd4cbb0792884bdd8ffaaecf"
+        }
+      }
+    ],
+    "levels": [
+      {
+        "level_id": "L01",
+        "name": "Этаж 1",
+        "elevation_mm": null
+      }
+    ],
+    "tools": [
+      {
+        "tool_id": "det",
+        "name": "synthetic-symbol-detector",
+        "version": "0.0.0",
+        "model_id": null,
+        "weights_sha256": null,
+        "config_sha256": null,
+        "rule_source": null
+      },
+      {
+        "tool_id": "txt",
+        "name": "pdf-text-layer-reader",
+        "version": "0.0.0",
+        "model_id": null,
+        "weights_sha256": null,
+        "config_sha256": null,
+        "rule_source": null
+      },
+      {
+        "tool_id": "link",
+        "name": "geometric-linker",
+        "version": "0.0.0",
+        "model_id": null,
+        "weights_sha256": null,
+        "config_sha256": null,
+        "rule_source": null
+      }
+    ],
+    "source_availability": [
+      {
+        "source_type": "page_raster",
+        "sheet_id": "sheet-p3",
+        "availability": "available",
+        "note": null
+      },
+      {
+        "source_type": "pdf_text_layer",
+        "sheet_id": "sheet-p3",
+        "availability": "available",
+        "note": null
+      }
+    ],
+    "elements": [
+      {
+        "id": "ev-src-1",
+        "kind": "symbol",
+        "sheet_id": "sheet-p3",
+        "level_id": null,
+        "geometry": {
+          "kind": "point",
+          "point": [0.2, 0.5]
+        },
+        "class_key": "syn.ev.source_symbol",
+        "system_key": null,
+        "text": null,
+        "attributes": [
+          {
+            "key": "syn.mark",
+            "value": "A1",
+            "unit": null,
+            "derivation": "labelled",
+            "status": "extraction_inferred",
+            "source_element_ids": ["ev-txt-1"]
+          }
+        ],
+        "confidence": 0.93,
+        "provenance": "mep_model_observed",
+        "status": "observed",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "page_raster",
+            "ref_id": "raster-p3-150dpi",
+            "tool_id": "det",
+            "sha256": null
+          }
+        ],
+        "unresolved": [],
+        "original": null,
+        "review_history": []
+      },
+      {
+        "id": "ev-term-1",
+        "kind": "symbol",
+        "sheet_id": "sheet-p3",
+        "level_id": null,
+        "geometry": {
+          "kind": "point",
+          "point": [0.6, 0.3]
+        },
+        "class_key": "syn.ev.terminal_symbol",
+        "system_key": null,
+        "text": null,
+        "attributes": [],
+        "confidence": 0.88,
+        "provenance": "mep_model_observed",
+        "status": "observed",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "page_raster",
+            "ref_id": "raster-p3-150dpi",
+            "tool_id": "det",
+            "sha256": null
+          }
+        ],
+        "unresolved": [],
+        "original": null,
+        "review_history": []
+      },
+      {
+        "id": "ev-term-2",
+        "kind": "symbol",
+        "sheet_id": "sheet-p3",
+        "level_id": null,
+        "geometry": {
+          "kind": "point",
+          "point": [0.6, 0.7]
+        },
+        "class_key": "syn.ev.terminal_symbol",
+        "system_key": null,
+        "text": null,
+        "attributes": [],
+        "confidence": 0.41,
+        "provenance": "mep_model_observed",
+        "status": "observed",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "page_raster",
+            "ref_id": "raster-p3-150dpi",
+            "tool_id": "det",
+            "sha256": null
+          }
+        ],
+        "unresolved": [],
+        "original": null,
+        "review_history": []
+      },
+      {
+        "id": "ev-sym-3",
+        "kind": "symbol",
+        "sheet_id": "sheet-p3",
+        "level_id": null,
+        "geometry": {
+          "kind": "bbox",
+          "min": [0.84, 0.48],
+          "max": [0.86, 0.52]
+        },
+        "class_key": null,
+        "system_key": null,
+        "text": null,
+        "attributes": [],
+        "confidence": 0.3,
+        "provenance": "mep_model_observed",
+        "status": "observed",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "page_raster",
+            "ref_id": "raster-p3-150dpi",
+            "tool_id": "det",
+            "sha256": null
+          }
+        ],
+        "unresolved": [
+          {
+            "field": "class_key",
+            "reason": "ambiguous",
+            "note": null
+          }
+        ],
+        "original": null,
+        "review_history": []
+      },
+      {
+        "id": "ev-txt-1",
+        "kind": "text",
+        "sheet_id": "sheet-p3",
+        "level_id": null,
+        "geometry": {
+          "kind": "bbox",
+          "min": [0.18, 0.45],
+          "max": [0.22, 0.47]
+        },
+        "class_key": "syn.ev.label",
+        "system_key": null,
+        "text": "A1",
+        "attributes": [],
+        "confidence": null,
+        "provenance": "deterministic_extracted",
+        "status": "observed",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "pdf_text_layer",
+            "ref_id": "span-p3-0001",
+            "tool_id": "txt",
+            "sha256": null
+          }
+        ],
+        "unresolved": [],
+        "original": null,
+        "review_history": []
+      },
+      {
+        "id": "ev-txt-2",
+        "kind": "text",
+        "sheet_id": "sheet-p3",
+        "level_id": null,
+        "geometry": {
+          "kind": "bbox",
+          "min": [0.3, 0.47],
+          "max": [0.34, 0.49]
+        },
+        "class_key": "syn.ev.label",
+        "system_key": null,
+        "text": "d50",
+        "attributes": [],
+        "confidence": null,
+        "provenance": "deterministic_extracted",
+        "status": "observed",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "pdf_text_layer",
+            "ref_id": "span-p3-0002",
+            "tool_id": "txt",
+            "sha256": null
+          }
+        ],
+        "unresolved": [],
+        "original": null,
+        "review_history": []
+      },
+      {
+        "id": "ev-route-1",
+        "kind": "route",
+        "sheet_id": "sheet-p3",
+        "level_id": null,
+        "geometry": {
+          "kind": "polyline",
+          "points": [
+            [0.2, 0.5],
+            [0.45, 0.5]
+          ]
+        },
+        "class_key": "syn.ev.visible_route",
+        "system_key": null,
+        "text": null,
+        "attributes": [
+          {
+            "key": "syn.size_label",
+            "value": "d50",
+            "unit": null,
+            "derivation": "labelled",
+            "status": "extraction_inferred",
+            "source_element_ids": ["ev-txt-2"]
+          }
+        ],
+        "confidence": 0.8,
+        "provenance": "mep_model_observed",
+        "status": "observed",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "page_raster",
+            "ref_id": "raster-p3-150dpi",
+            "tool_id": "det",
+            "sha256": null
+          }
+        ],
+        "unresolved": [],
+        "original": null,
+        "review_history": []
+      }
+    ],
+    "relations": [
+      {
+        "id": "rel-1",
+        "relation_key": "syn.rel.labels",
+        "from_id": "ev-txt-1",
+        "to_id": "ev-src-1",
+        "confidence": 0.9,
+        "provenance": "deterministic_extracted",
+        "status": "extraction_inferred",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "pdf_text_layer",
+            "ref_id": "span-p3-0001",
+            "tool_id": "link",
+            "sha256": null
+          }
+        ],
+        "review_history": []
+      },
+      {
+        "id": "rel-2",
+        "relation_key": "syn.rel.labels",
+        "from_id": "ev-txt-2",
+        "to_id": "ev-route-1",
+        "confidence": 0.85,
+        "provenance": "deterministic_extracted",
+        "status": "extraction_inferred",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "pdf_text_layer",
+            "ref_id": "span-p3-0002",
+            "tool_id": "link",
+            "sha256": null
+          }
+        ],
+        "review_history": []
+      },
+      {
+        "id": "rel-3",
+        "relation_key": "syn.rel.touches",
+        "from_id": "ev-route-1",
+        "to_id": "ev-src-1",
+        "confidence": 0.8,
+        "provenance": "deterministic_extracted",
+        "status": "extraction_inferred",
+        "review": "unreviewed",
+        "sources": [
+          {
+            "source_type": "page_raster",
+            "ref_id": "raster-p3-150dpi",
+            "tool_id": "link",
+            "sha256": null
+          }
+        ],
+        "review_history": []
+      }
+    ],
+    "gaps": [
+      {
+        "code": "no_visible_route_to_terminals",
+        "sheet_id": "sheet-p3",
+        "subject_ids": ["ev-term-1", "ev-term-2"],
+        "note": "Трасса к потребителям на листе П не показана."
+      }
+    ]
+  },
+  "network": {
+    "schema_version": "0.3.0",
+    "graph_id": "ng-demo-001-resolved",
+    "profile": {
+      "profile_id": "synthetic.demo",
+      "profile_version": "0.3.0",
+      "profile_sha256": "2b52c95e9936fa6ffb10245a3fdd39737bee3699eb5272b5dffb81733b95c972"
+    },
+    "document": {
+      "project_id": "proj-demo",
+      "revision_id": "rev-demo",
+      "source_pdf_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "package_sha256": null
+    },
+    "evidence_graph": {
+      "graph_id": "eg-demo-001",
+      "sha256": "de632a3ce32f1f550efc5f3304df039a091396cbb4d3335d111002758fd088db",
+      "input_mode": "MODEL_EXTRACTED"
+    },
+    "sheets": [
+      {
+        "sheet_id": "sheet-p3",
+        "page_index": 3,
+        "geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "level_id": "L01",
+        "scale_status": "calibrated",
+        "scale_calibration_id": "scale-001",
+        "calibration": {
+          "calibration_id": "scale-001",
+          "page_geometry_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+          "display_width_pt": "2383.9370",
+          "display_height_pt": "1683.7795",
+          "mm_per_pt": "35.277777777778",
+          "verification_state": "verified",
+          "fingerprint": "d8c24118daa0e8be1f42a6df11525788d7ce6b73dd4cbb0792884bdd8ffaaecf"
+        }
+      }
+    ],
+    "levels": [
+      {
+        "level_id": "L01",
+        "name": "Этаж 1",
+        "elevation_mm": null
+      }
+    ],
+    "tools": [
+      {
+        "tool_id": "gen",
+        "name": "synthetic-retrieval-baseline",
+        "version": "0.0.0",
+        "model_id": null,
+        "weights_sha256": null,
+        "config_sha256": null,
+        "rule_source": null
+      },
+      {
+        "tool_id": "router",
+        "name": "deterministic-router",
+        "version": "0.0.0",
+        "model_id": null,
+        "weights_sha256": null,
+        "config_sha256": null,
+        "rule_source": "синтетическое правило минимальной длины"
+      }
+    ],
+    "run": {
+      "run_id": "run-demo-001",
+      "git_commit": "d570e83",
+      "dirty": true,
+      "config_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "seed": null
+    },
+    "corpora": [
+      {
+        "corpus_id": "corpus-demo",
+        "dataset_fingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+        "split_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "split": "train"
+      }
+    ],
+    "inference_steps": [
+      {
+        "id": "st-1",
+        "kind": "evidence_adoption",
+        "tool_id": "gen",
+        "run_id": "run-demo-001",
+        "corpus_id": null,
+        "config_sha256": null,
+        "evidence_ids": ["ev-src-1", "ev-term-1", "ev-term-2"],
+        "relation_ids": [],
+        "input_step_ids": [],
+        "retrieved_case_ids": [],
+        "rule_ids": [],
+        "confidence": 0.9,
+        "alternatives_considered": 0,
+        "rationale": []
+      },
+      {
+        "id": "st-2",
+        "kind": "system_assignment",
+        "tool_id": "gen",
+        "run_id": "run-demo-001",
+        "corpus_id": "corpus-demo",
+        "config_sha256": null,
+        "evidence_ids": [],
+        "relation_ids": [],
+        "input_step_ids": ["st-1"],
+        "retrieved_case_ids": ["train-case-017"],
+        "rule_ids": [],
+        "confidence": 0.7,
+        "alternatives_considered": 0,
+        "rationale": []
+      },
+      {
+        "id": "st-3",
+        "kind": "topology",
+        "tool_id": "gen",
+        "run_id": "run-demo-001",
+        "corpus_id": "corpus-demo",
+        "config_sha256": null,
+        "evidence_ids": ["ev-route-1"],
+        "relation_ids": ["rel-3"],
+        "input_step_ids": ["st-2"],
+        "retrieved_case_ids": ["train-case-017"],
+        "rule_ids": [],
+        "confidence": 0.6,
+        "alternatives_considered": 2,
+        "rationale": ["tree_from_nearest_train_case"]
+      },
+      {
+        "id": "st-4",
+        "kind": "routing",
+        "tool_id": "router",
+        "run_id": "run-demo-001",
+        "corpus_id": null,
+        "config_sha256": null,
+        "evidence_ids": [],
+        "relation_ids": [],
+        "input_step_ids": ["st-3"],
+        "retrieved_case_ids": [],
+        "rule_ids": ["syn.routing.min_length.v0"],
+        "confidence": null,
+        "alternatives_considered": 0,
+        "rationale": []
+      },
+      {
+        "id": "st-5",
+        "kind": "attribute",
+        "tool_id": "gen",
+        "run_id": "run-demo-001",
+        "corpus_id": null,
+        "config_sha256": null,
+        "evidence_ids": ["ev-route-1", "ev-txt-2"],
+        "relation_ids": ["rel-2"],
+        "input_step_ids": ["st-3"],
+        "retrieved_case_ids": [],
+        "rule_ids": [],
+        "confidence": 0.85,
+        "alternatives_considered": 0,
+        "rationale": ["size_label_parsed"]
+      },
+      {
+        "id": "st-6",
+        "kind": "attribute",
+        "tool_id": "gen",
+        "run_id": "run-demo-001",
+        "corpus_id": "corpus-demo",
+        "config_sha256": null,
+        "evidence_ids": [],
+        "relation_ids": [],
+        "input_step_ids": ["st-3"],
+        "retrieved_case_ids": ["train-case-017"],
+        "rule_ids": [],
+        "confidence": 0.55,
+        "alternatives_considered": 0,
+        "rationale": []
+      },
+      {
+        "id": "st-7",
+        "kind": "rule_application",
+        "tool_id": "router",
+        "run_id": "run-demo-001",
+        "corpus_id": null,
+        "config_sha256": null,
+        "evidence_ids": [],
+        "relation_ids": [],
+        "input_step_ids": ["st-3"],
+        "retrieved_case_ids": [],
+        "rule_ids": ["syn.material.single.v0"],
+        "confidence": null,
+        "alternatives_considered": 0,
+        "rationale": ["synthetic_single_material_rule"]
+      }
+    ],
+    "systems": [
+      {
+        "id": "sys-1",
+        "system_key": "syn.sys_a",
+        "derivation": {
+          "provenance": "retrieved_pattern",
+          "step_ids": ["st-2"],
+          "evidence_ids": [],
+          "confidence": 0.7
+        }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-src",
+        "role": "source",
+        "class_key": "syn.net.source",
+        "system_ids": ["sys-1"],
+        "position": {
+          "sheet_id": "sheet-p3",
+          "x": 0.2,
+          "y": 0.5,
+          "z_mm": null,
+          "level_id": "L01"
+        },
+        "ports": [
+          {
+            "id": "p-src-out",
+            "direction": "out",
+            "system_id": "sys-1",
+            "parameters": []
+          }
+        ],
+        "parameters": [],
+        "derivation": {
+          "provenance": "evidence_observed",
+          "step_ids": ["st-1"],
+          "evidence_ids": ["ev-src-1"],
+          "confidence": 0.93
+        }
+      },
+      {
+        "id": "n-j1",
+        "role": "junction",
+        "class_key": "syn.net.junction",
+        "system_ids": ["sys-1"],
+        "position": {
+          "sheet_id": "sheet-p3",
+          "x": 0.45,
+          "y": 0.5,
+          "z_mm": null,
+          "level_id": "L01"
+        },
+        "ports": [
+          {
+            "id": "p-j1-in",
+            "direction": "in",
+            "system_id": "sys-1",
+            "parameters": []
+          },
+          {
+            "id": "p-j1-o1",
+            "direction": "out",
+            "system_id": "sys-1",
+            "parameters": []
+          },
+          {
+            "id": "p-j1-o2",
+            "direction": "out",
+            "system_id": "sys-1",
+            "parameters": []
+          }
+        ],
+        "parameters": [],
+        "derivation": {
+          "provenance": "rd_prior_inferred",
+          "step_ids": ["st-3"],
+          "evidence_ids": [],
+          "confidence": 0.6
+        }
+      },
+      {
+        "id": "n-t1",
+        "role": "terminal",
+        "class_key": "syn.net.terminal",
+        "system_ids": ["sys-1"],
+        "position": {
+          "sheet_id": "sheet-p3",
+          "x": 0.6,
+          "y": 0.3,
+          "z_mm": null,
+          "level_id": "L01"
+        },
+        "ports": [
+          {
+            "id": "p-t1-in",
+            "direction": "in",
+            "system_id": "sys-1",
+            "parameters": []
+          }
+        ],
+        "parameters": [],
+        "derivation": {
+          "provenance": "evidence_observed",
+          "step_ids": ["st-1"],
+          "evidence_ids": ["ev-term-1"],
+          "confidence": 0.88
+        }
+      },
+      {
+        "id": "n-t2",
+        "role": "terminal",
+        "class_key": "syn.net.terminal",
+        "system_ids": ["sys-1"],
+        "position": {
+          "sheet_id": "sheet-p3",
+          "x": 0.6,
+          "y": 0.7,
+          "z_mm": null,
+          "level_id": "L01"
+        },
+        "ports": [
+          {
+            "id": "p-t2-in",
+            "direction": "in",
+            "system_id": "sys-1",
+            "parameters": []
+          }
+        ],
+        "parameters": [],
+        "derivation": {
+          "provenance": "evidence_observed",
+          "step_ids": ["st-1"],
+          "evidence_ids": ["ev-term-2"],
+          "confidence": 0.41
+        }
+      }
+    ],
+    "segments": [
+      {
+        "id": "seg-main",
+        "class_key": "syn.net.segment",
+        "system_id": "sys-1",
+        "start": {
+          "node_id": "n-src",
+          "port_id": "p-src-out"
+        },
+        "end": {
+          "node_id": "n-j1",
+          "port_id": "p-j1-in"
+        },
+        "path": [
+          {
+            "sheet_id": "sheet-p3",
+            "x": 0.2,
+            "y": 0.5,
+            "z_mm": null,
+            "level_id": "L01"
+          },
+          {
+            "sheet_id": "sheet-p3",
+            "x": 0.45,
+            "y": 0.5,
+            "z_mm": null,
+            "level_id": "L01"
+          }
+        ],
+        "orientation": "horizontal",
+        "parameters": [
+          {
+            "key": "syn.nominal_size_mm",
+            "value": 50,
+            "unit": "mm",
+            "derivation": {
+              "provenance": "evidence_observed",
+              "step_ids": ["st-5"],
+              "evidence_ids": ["ev-route-1", "ev-txt-2"],
+              "confidence": 0.85
+            }
+          },
+          {
+            "key": "syn.material",
+            "value": "syn.mat_a",
+            "unit": null,
+            "derivation": {
+              "provenance": "deterministic_rule",
+              "step_ids": ["st-7"],
+              "evidence_ids": [],
+              "confidence": null
+            }
+          }
+        ],
+        "derivation": {
+          "provenance": "evidence_observed",
+          "step_ids": ["st-3"],
+          "evidence_ids": ["ev-route-1"],
+          "confidence": 0.8
+        }
+      },
+      {
+        "id": "seg-b1",
+        "class_key": "syn.net.segment",
+        "system_id": "sys-1",
+        "start": {
+          "node_id": "n-j1",
+          "port_id": "p-j1-o1"
+        },
+        "end": {
+          "node_id": "n-t1",
+          "port_id": "p-t1-in"
+        },
+        "path": [
+          {
+            "sheet_id": "sheet-p3",
+            "x": 0.45,
+            "y": 0.5,
+            "z_mm": null,
+            "level_id": "L01"
+          },
+          {
+            "sheet_id": "sheet-p3",
+            "x": 0.45,
+            "y": 0.3,
+            "z_mm": null,
+            "level_id": "L01"
+          },
+          {
+            "sheet_id": "sheet-p3",
+            "x": 0.6,
+            "y": 0.3,
+            "z_mm": null,
+            "level_id": "L01"
+          }
+        ],
+        "orientation": "horizontal",
+        "parameters": [
+          {
+            "key": "syn.nominal_size_mm",
+            "value": 32,
+            "unit": "mm",
+            "derivation": {
+              "provenance": "rd_prior_inferred",
+              "step_ids": ["st-6"],
+              "evidence_ids": [],
+              "confidence": 0.55
+            }
+          },
+          {
+            "key": "syn.material",
+            "value": "syn.mat_a",
+            "unit": null,
+            "derivation": {
+              "provenance": "deterministic_rule",
+              "step_ids": ["st-7"],
+              "evidence_ids": [],
+              "confidence": null
+            }
+          }
+        ],
+        "derivation": {
+          "provenance": "deterministic_rule",
+          "step_ids": ["st-3", "st-4"],
+          "evidence_ids": [],
+          "confidence": 0.6
+        }
+      },
+      {
+        "id": "seg-b2",
+        "class_key": "syn.net.segment",
+        "system_id": "sys-1",
+        "start": {
+          "node_id": "n-j1",
+          "port_id": "p-j1-o2"
+        },
+        "end": {
+          "node_id": "n-t2",
+          "port_id": "p-t2-in"
+        },
+        "path": [
+          {
+            "sheet_id": "sheet-p3",
+            "x": 0.45,
+            "y": 0.5,
+            "z_mm": null,
+            "level_id": "L01"
+          },
+          {
+            "sheet_id": "sheet-p3",
+            "x": 0.45,
+            "y": 0.7,
+            "z_mm": null,
+            "level_id": "L01"
+          },
+          {
+            "sheet_id": "sheet-p3",
+            "x": 0.6,
+            "y": 0.7,
+            "z_mm": null,
+            "level_id": "L01"
+          }
+        ],
+        "orientation": "horizontal",
+        "parameters": [
+          {
+            "key": "syn.nominal_size_mm",
+            "value": 32,
+            "unit": "mm",
+            "derivation": {
+              "provenance": "rd_prior_inferred",
+              "step_ids": ["st-6"],
+              "evidence_ids": [],
+              "confidence": 0.55
+            }
+          },
+          {
+            "key": "syn.material",
+            "value": "syn.mat_a",
+            "unit": null,
+            "derivation": {
+              "provenance": "deterministic_rule",
+              "step_ids": ["st-7"],
+              "evidence_ids": [],
+              "confidence": null
+            }
+          }
+        ],
+        "derivation": {
+          "provenance": "deterministic_rule",
+          "step_ids": ["st-3", "st-4"],
+          "evidence_ids": [],
+          "confidence": 0.6
+        }
+      }
+    ],
+    "unresolved": []
+  },
+  "evidence_sha256": "de632a3ce32f1f550efc5f3304df039a091396cbb4d3335d111002758fd088db",
+  "network_sha256": "1f42089a6ff5d93e62649cc5f3bd221856a9636bcce31a74d1652b180ea9529c",
+  "evidence_issues": [],
+  "network_issues": [],
+  "boq": {
+    "schema_version": "0.3.0",
+    "boq_id": "boq-1f42089a6ff5d93e",
+    "lane": "STRICT",
+    "status": "complete",
+    "network_graph": {
+      "graph_id": "ng-demo-001-resolved",
+      "sha256": "1f42089a6ff5d93e62649cc5f3bd221856a9636bcce31a74d1652b180ea9529c"
+    },
+    "evidence_graph": {
+      "graph_id": "eg-demo-001",
+      "sha256": "de632a3ce32f1f550efc5f3304df039a091396cbb4d3335d111002758fd088db",
+      "input_mode": "MODEL_EXTRACTED"
+    },
+    "profile": {
+      "profile_id": "synthetic.demo",
+      "profile_version": "0.3.0",
+      "profile_sha256": "2b52c95e9936fa6ffb10245a3fdd39737bee3699eb5272b5dffb81733b95c972"
+    },
+    "engine": {
+      "name": "mep-quantity-engine",
+      "version": "0.3.1"
+    },
+    "rules": [
+      {
+        "rule_id": "mep.segment_length.v0",
+        "description": "Сумма длин участков: план по калибровке, высота по отметкам."
+      },
+      {
+        "rule_id": "mep.node_count.v0",
+        "description": "Число узлов класса с правилом count."
+      },
+      {
+        "rule_id": "mep.path_turns.v0",
+        "description": "Промежуточные вершины посчитанных участков со сменой направления."
+      },
+      {
+        "rule_id": "mep.branch_nodes.v0",
+        "description": "Узлы, к которым подключено не меньше трёх участков."
+      },
+      {
+        "rule_id": "mep.parameter_change.v0",
+        "description": "Узлы, где подключённые участки различаются значением ключа."
+      }
+    ],
+    "lines": [
+      {
+        "line_id": "bl-7e666eb5179c61df",
+        "rule_id": "mep.branch_nodes.v0",
+        "category": "topology",
+        "system_key": "syn.sys_a",
+        "class_key": "syn.net.junction",
+        "group": [
+          {
+            "key": "core.degree",
+            "value": 3,
+            "unit": null
+          }
+        ],
+        "unit": "pcs",
+        "quantity": "1",
+        "canonical_unit": "pcs",
+        "canonical_quantity": "1",
+        "source_ids": ["n-j1"],
+        "provenance": [
+          {
+            "provenance": "deterministic_rule",
+            "count": 2
+          },
+          {
+            "provenance": "evidence_observed",
+            "count": 1
+          },
+          {
+            "provenance": "rd_prior_inferred",
+            "count": 1
+          }
+        ],
+        "min_confidence": 0.6,
+        "review_required": true,
+        "additive": true,
+        "sources": [
+          {
+            "subject": {
+              "kind": "node",
+              "id": "n-j1"
+            },
+            "quantity": "1",
+            "canonical_quantity": "1",
+            "group_values": [],
+            "participants": [
+              {
+                "subject": {
+                  "kind": "node",
+                  "id": "n-j1"
+                },
+                "role": "anchor",
+                "parameter_key": null,
+                "value": null
+              },
+              {
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b1"
+                },
+                "role": "connected",
+                "parameter_key": null,
+                "value": null
+              },
+              {
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b2"
+                },
+                "role": "connected",
+                "parameter_key": null,
+                "value": null
+              },
+              {
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-main"
+                },
+                "role": "connected",
+                "parameter_key": null,
+                "value": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "line_id": "bl-103279eeb5edc5da",
+        "rule_id": "mep.node_count.v0",
+        "category": "count",
+        "system_key": "syn.sys_a",
+        "class_key": "syn.net.terminal",
+        "group": [],
+        "unit": "pcs",
+        "quantity": "2",
+        "canonical_unit": "pcs",
+        "canonical_quantity": "2",
+        "source_ids": ["n-t1", "n-t2"],
+        "provenance": [
+          {
+            "provenance": "evidence_observed",
+            "count": 2
+          }
+        ],
+        "min_confidence": 0.41,
+        "review_required": false,
+        "additive": true,
+        "sources": [
+          {
+            "subject": {
+              "kind": "node",
+              "id": "n-t1"
+            },
+            "quantity": "1",
+            "canonical_quantity": "1",
+            "group_values": [],
+            "participants": []
+          },
+          {
+            "subject": {
+              "kind": "node",
+              "id": "n-t2"
+            },
+            "quantity": "1",
+            "canonical_quantity": "1",
+            "group_values": [],
+            "participants": []
+          }
+        ]
+      },
+      {
+        "line_id": "bl-e8971752adac078e",
+        "rule_id": "mep.parameter_change.v0",
+        "category": "topology",
+        "system_key": "syn.sys_a",
+        "class_key": null,
+        "group": [
+          {
+            "key": "core.parameter",
+            "value": "syn.nominal_size_mm",
+            "unit": null
+          },
+          {
+            "key": "core.values",
+            "value": "32|50",
+            "unit": null
+          }
+        ],
+        "unit": "pcs",
+        "quantity": "1",
+        "canonical_unit": "pcs",
+        "canonical_quantity": "1",
+        "source_ids": ["n-j1"],
+        "provenance": [
+          {
+            "provenance": "deterministic_rule",
+            "count": 2
+          },
+          {
+            "provenance": "evidence_observed",
+            "count": 1
+          },
+          {
+            "provenance": "rd_prior_inferred",
+            "count": 1
+          }
+        ],
+        "min_confidence": 0.6,
+        "review_required": true,
+        "additive": true,
+        "sources": [
+          {
+            "subject": {
+              "kind": "node",
+              "id": "n-j1"
+            },
+            "quantity": "1",
+            "canonical_quantity": "1",
+            "group_values": [],
+            "participants": [
+              {
+                "subject": {
+                  "kind": "node",
+                  "id": "n-j1"
+                },
+                "role": "anchor",
+                "parameter_key": null,
+                "value": null
+              },
+              {
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b1"
+                },
+                "role": "compared",
+                "parameter_key": "syn.nominal_size_mm",
+                "value": 32
+              },
+              {
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b2"
+                },
+                "role": "compared",
+                "parameter_key": "syn.nominal_size_mm",
+                "value": 32
+              },
+              {
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-main"
+                },
+                "role": "compared",
+                "parameter_key": "syn.nominal_size_mm",
+                "value": 50
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "line_id": "bl-5a3c4eb3c24788bb",
+        "rule_id": "mep.path_turns.v0",
+        "category": "topology",
+        "system_key": "syn.sys_a",
+        "class_key": "syn.net.segment",
+        "group": [
+          {
+            "key": "syn.nominal_size_mm",
+            "value": 32,
+            "unit": null
+          },
+          {
+            "key": "syn.material",
+            "value": "syn.mat_a",
+            "unit": null
+          }
+        ],
+        "unit": "pcs",
+        "quantity": "2",
+        "canonical_unit": "pcs",
+        "canonical_quantity": "2",
+        "source_ids": ["seg-b1", "seg-b2"],
+        "provenance": [
+          {
+            "provenance": "deterministic_rule",
+            "count": 4
+          },
+          {
+            "provenance": "rd_prior_inferred",
+            "count": 2
+          }
+        ],
+        "min_confidence": 0.55,
+        "review_required": true,
+        "additive": true,
+        "sources": [
+          {
+            "subject": {
+              "kind": "segment",
+              "id": "seg-b1"
+            },
+            "quantity": "1",
+            "canonical_quantity": "1",
+            "group_values": [
+              {
+                "key": "syn.nominal_size_mm",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b1"
+                },
+                "parameter_key": "syn.nominal_size_mm"
+              },
+              {
+                "key": "syn.material",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b1"
+                },
+                "parameter_key": "syn.material"
+              }
+            ],
+            "participants": []
+          },
+          {
+            "subject": {
+              "kind": "segment",
+              "id": "seg-b2"
+            },
+            "quantity": "1",
+            "canonical_quantity": "1",
+            "group_values": [
+              {
+                "key": "syn.nominal_size_mm",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b2"
+                },
+                "parameter_key": "syn.nominal_size_mm"
+              },
+              {
+                "key": "syn.material",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b2"
+                },
+                "parameter_key": "syn.material"
+              }
+            ],
+            "participants": []
+          }
+        ]
+      },
+      {
+        "line_id": "bl-0eac316720973d5e",
+        "rule_id": "mep.segment_length.v0",
+        "category": "length",
+        "system_key": "syn.sys_a",
+        "class_key": "syn.net.segment",
+        "group": [
+          {
+            "key": "syn.nominal_size_mm",
+            "value": 32,
+            "unit": null
+          },
+          {
+            "key": "syn.material",
+            "value": "syn.mat_a",
+            "unit": null
+          }
+        ],
+        "unit": "m",
+        "quantity": "48.990",
+        "canonical_unit": "mm",
+        "canonical_quantity": "48990.000",
+        "source_ids": ["seg-b1", "seg-b2"],
+        "provenance": [
+          {
+            "provenance": "deterministic_rule",
+            "count": 4
+          },
+          {
+            "provenance": "rd_prior_inferred",
+            "count": 2
+          }
+        ],
+        "min_confidence": 0.55,
+        "review_required": true,
+        "additive": true,
+        "sources": [
+          {
+            "subject": {
+              "kind": "segment",
+              "id": "seg-b1"
+            },
+            "quantity": "24.495",
+            "canonical_quantity": "24495.000",
+            "group_values": [
+              {
+                "key": "syn.nominal_size_mm",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b1"
+                },
+                "parameter_key": "syn.nominal_size_mm"
+              },
+              {
+                "key": "syn.material",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b1"
+                },
+                "parameter_key": "syn.material"
+              }
+            ],
+            "participants": []
+          },
+          {
+            "subject": {
+              "kind": "segment",
+              "id": "seg-b2"
+            },
+            "quantity": "24.495",
+            "canonical_quantity": "24495.000",
+            "group_values": [
+              {
+                "key": "syn.nominal_size_mm",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b2"
+                },
+                "parameter_key": "syn.nominal_size_mm"
+              },
+              {
+                "key": "syn.material",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-b2"
+                },
+                "parameter_key": "syn.material"
+              }
+            ],
+            "participants": []
+          }
+        ]
+      },
+      {
+        "line_id": "bl-8b0651fd66f317cd",
+        "rule_id": "mep.segment_length.v0",
+        "category": "length",
+        "system_key": "syn.sys_a",
+        "class_key": "syn.net.segment",
+        "group": [
+          {
+            "key": "syn.nominal_size_mm",
+            "value": 50,
+            "unit": null
+          },
+          {
+            "key": "syn.material",
+            "value": "syn.mat_a",
+            "unit": null
+          }
+        ],
+        "unit": "m",
+        "quantity": "21.025",
+        "canonical_unit": "mm",
+        "canonical_quantity": "21025.000",
+        "source_ids": ["seg-main"],
+        "provenance": [
+          {
+            "provenance": "deterministic_rule",
+            "count": 1
+          },
+          {
+            "provenance": "evidence_observed",
+            "count": 2
+          }
+        ],
+        "min_confidence": 0.8,
+        "review_required": true,
+        "additive": true,
+        "sources": [
+          {
+            "subject": {
+              "kind": "segment",
+              "id": "seg-main"
+            },
+            "quantity": "21.025",
+            "canonical_quantity": "21025.000",
+            "group_values": [
+              {
+                "key": "syn.nominal_size_mm",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-main"
+                },
+                "parameter_key": "syn.nominal_size_mm"
+              },
+              {
+                "key": "syn.material",
+                "subject": {
+                  "kind": "segment",
+                  "id": "seg-main"
+                },
+                "parameter_key": "syn.material"
+              }
+            ],
+            "participants": []
+          }
+        ]
+      }
+    ],
+    "blockers": [
+      {
+        "code": "FITTING_RULES_NOT_APPROVED",
+        "severity": "warning",
+        "subject_ids": [],
+        "key": null,
+        "message": "топология не сопоставлена с фитингами (Р-MEP-7)",
+        "subjects": []
+      }
+    ]
+  },
+  "boq_issues": []
+}

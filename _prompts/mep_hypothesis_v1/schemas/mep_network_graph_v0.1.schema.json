@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantor.local/schema/mep-network-graph/0.1.0",
+  "title": "Quantor MEP NetworkGraph 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "graph_id",
+    "system",
+    "scale_status",
+    "nodes",
+    "ports",
+    "edges",
+    "validation",
+    "unresolved"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "graph_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "system": {
+      "type": "string"
+    },
+    "scale_status": {
+      "enum": [
+        "observed",
+        "inferred",
+        "conflicting",
+        "unresolved"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "ports": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "validation": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}
