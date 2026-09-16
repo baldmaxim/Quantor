@@ -238,6 +238,19 @@ cd tools\planswift_gt
 ..\..\vision\.venv-train\Scripts\python -m planswift_gt build "$R\gt-v2\build-v2.json" --out "$R\build\planswift-build-v2"
 ```
 
+**4а. Пересборка с закреплённой кладкой (Р-10).** Первая сборка v2 отдала обе семьи с кладкой в
+test. Разбиение меняется до обучения, поэтому старую сборку удалить и собрать заново (≈ 35 мин):
+
+```powershell
+cd ..\..
+git pull
+Copy-Item tools\planswift_gt\configs\dataset-build-v2.rules.example.json "$R\rules-v2.json" -Force
+cd tools\planswift_gt
+..\..\vision\.venv-train\Scripts\python -m planswift_gt import-all "$R\archives-v2\Обводки Planswift" --work "$R\raw-v2" --out "$R\gt-v2" --rules "$R\rules-v2.json"
+Remove-Item -Recurse -Force "$R\build\planswift-build-v2"
+..\..\vision\.venv-train\Scripts\python -m planswift_gt build "$R\gt-v2\build-v2.json" --out "$R\build\planswift-build-v2"
+```
+
 Прислать из `build.json`: `families`, `leakage`, `duplicate_pages_skipped` (число), `counters`,
 `split_sha256`, `tiles_sha256`.
 

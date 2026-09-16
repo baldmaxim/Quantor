@@ -333,7 +333,9 @@ def build(config: BuildConfig, out: Path, *, refreeze: bool = False) -> JsonObje
     family_of: dict[str, str] | None = None
     if config.holdout == "families":
         family_of = {dataset.project_key: dataset.family_key for dataset in config.datasets}
-        assignment = assign_families(infos, family_of, config.split_fractions, config.seed)
+        assignment = assign_families(
+            infos, family_of, config.split_fractions, config.seed, config.family_splits
+        )
     else:
         assignment = assign(groups, config.split_fractions, config.seed)
     frozen = freeze(

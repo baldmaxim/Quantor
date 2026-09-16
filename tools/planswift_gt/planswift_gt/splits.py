@@ -131,8 +131,13 @@ def assign_families(
     family_of: dict[str, str],
     fractions: dict[str, float],
     seed: int,
+    pinned: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Семейство объекта целиком — в часть с наибольшим недобором веса аннотаций.
+
+    `pinned` — семейства, закреплённые за частью решением владельца по составу данных (не по
+    результатам модели): они ставятся первыми, остальные распределяются с учётом их веса и
+    никогда не переносятся в пустую часть.
 
     Вес семейства — сумма долей по задачам: сколько от всех плит, сколько от всех стен. Иначе
     десятки тысяч линий стен решали бы разбиение за плиты. Семейства идут от тяжёлого к лёгкому,
@@ -163,7 +168,12 @@ def assign_families(
     total = sum(weight(family) for family in members) or 1.0
     filled = {"train": 0.0, "val": 0.0, "test": 0.0}
     placed: dict[str, list[str]] = {"train": [], "val": [], "test": []}
-    for family in sorted(members, key=lambda name: (-weight(name), order(name))):
+    fixed = {family: part for family, part in (pinned or {}).items() if family in members}
+    for family in sorted(fixed):
+        filled[fixed[family]] += weight(family)
+        placed[fixed[family]].append(family)
+    free = [family for family in members if family not in fixed]
+    for family in sorted(free, key=lambda name: (-weight(name), order(name))):
         part = max(
             ("test", "val", "train"), key=lambda name: fractions[name] * total - filled[name]
         )
@@ -171,7 +181,9 @@ def assign_families(
         placed[part].append(family)
     for part in ("test", "val"):
         if not placed[part]:
-            donors = [family for family in placed["train"] if weight(family) > 0]
+            donors = [
+                family for family in placed["train"] if weight(family) > 0 and family not in fixed
+            ]
             if len(donors) > 1:
                 lightest = min(donors, key=lambda name: (weight(name), order(name)))
                 placed["train"].remove(lightest)

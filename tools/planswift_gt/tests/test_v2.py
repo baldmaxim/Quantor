@@ -13,7 +13,7 @@ import pytest
 
 from planswift_gt import build as dataset_build
 from planswift_gt.batch import family_for, slug
-from planswift_gt.buildconfig import BuildConfig, DatasetRef, TargetConfig, load
+from planswift_gt.buildconfig import BuildConfig, ConfigError, DatasetRef, TargetConfig, load
 from planswift_gt.cli import main
 from planswift_gt.parser import parse_project
 from planswift_gt.splits import PageInfo, assign_families
@@ -134,6 +134,58 @@ class TestFamilySplit:
         assert split["a1|p1"] == split["a2|p2"]
         assert set(split.values()) == {"train", "val", "test"}
         assert split == assign_families(pages, family_of, fractions, seed=3)
+
+    def test_pinned_family_keeps_its_part_and_others_rebalance(self) -> None:
+        # Крупное семейство занимает train первым, и без закрепления кладка уходит в test —
+        # ровно как lsr_kladka в первой сборке v2.
+        pages = [
+            _page("big", "p0", 400, 9000),
+            _page("masonry", "p1", 0, 5000),
+            _page("b", "p2", 30, 500),
+            _page("c", "p3", 20, 900),
+            _page("d", "p4", 25, 100),
+            _page("e", "p5", 10, 700),
+            _page("f", "p6", 15, 400),
+        ]
+        family_of = {page.project_key: page.project_key for page in pages}
+        fractions = {"train": 0.7, "val": 0.15, "test": 0.15}
+
+        free = assign_families(pages, family_of, fractions, seed=3)
+        pinned = assign_families(pages, family_of, fractions, seed=3, pinned={"masonry": "train"})
+
+        assert free["masonry|p1"] == "test"
+        assert pinned["masonry|p1"] == "train"
+        assert set(pinned.values()) == {"train", "val", "test"}
+
+    def test_family_splits_are_validated_and_fingerprinted(self, tmp_path: Path) -> None:
+        rules = _rules()
+        rules.pop("families")
+        rules["datasets"] = [
+            {"project_key": key, "dataset_dir": "d", "source_root": "s", "tasks": ["wall"],
+             "family": key}
+            for key in ("lsr_kladka", "b", "c")
+        ]  # fmt: skip
+        path = tmp_path / "build-v2.json"
+        path.write_text(json.dumps(rules, ensure_ascii=False), encoding="utf-8")
+        config = load(path)
+        assert config.family_splits == {"lsr_kladka": "train"}
+        free = BuildConfig(
+            build_id=config.build_id,
+            seed=config.seed,
+            datasets=config.datasets,
+            targets=config.targets,
+            holdout="families",
+        )
+        assert config.split_fingerprint() != free.split_fingerprint()
+
+        rules["family_splits"] = {"unknown": "train"}
+        path.write_text(json.dumps(rules, ensure_ascii=False), encoding="utf-8")
+        with pytest.raises(ConfigError):
+            load(path)
+        rules["family_splits"] = {"b": "holdout"}
+        path.write_text(json.dumps(rules, ensure_ascii=False), encoding="utf-8")
+        with pytest.raises(ConfigError):
+            load(path)
 
     def test_v1_split_fingerprint_is_unchanged(self) -> None:
         config = BuildConfig(
@@ -285,7 +337,7 @@ class TestBuildV2:
         rules["datasets"] = [
             {"project_key": key, "dataset_dir": "d", "source_root": "s", "tasks": ["slab"],
              "family": key}
-            for key in ("a", "b", "c")
+            for key in ("lsr_kladka", "b", "c")
         ]  # fmt: skip
         path = tmp_path / "build-v2.json"
         path.write_text(json.dumps(rules, ensure_ascii=False), encoding="utf-8")

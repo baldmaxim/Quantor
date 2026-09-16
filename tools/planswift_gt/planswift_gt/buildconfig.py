@@ -87,6 +87,8 @@ class BuildConfig:
     qwen_masonry_guide_points: int = 8
     holdout: str = "pages"
     pdf_render_dpi: float = 200.0
+    # Семейство → часть, закреплённое решением владельца по составу данных (Р-10).
+    family_splits: dict[str, str] = field(default_factory=dict)
 
     def fingerprint(self) -> str:
         payload = json.dumps(asdict(self), sort_keys=True, ensure_ascii=False)
@@ -104,6 +106,8 @@ class BuildConfig:
         # Поля v2 входят в отпечаток, только когда заданы: разбиение v1 не меняется.
         if self.holdout != "pages":
             body["holdout"] = self.holdout
+        if self.family_splits:
+            body["family_splits"] = dict(sorted(self.family_splits.items()))
         if any(d.family for d in self.datasets):
             body["families"] = {d.project_key: d.family_key for d in self.datasets}
         if any(target.label_patterns for target in self.targets.values()):
@@ -185,3 +189,12 @@ def _check(config: BuildConfig) -> None:
         raise ConfigError("holdout families: нужно не меньше трёх семейств на train/val/test")
     if config.pdf_render_dpi <= 0:
         raise ConfigError("pdf_render_dpi должен быть положительным")
+    if config.family_splits:
+        if config.holdout != "families":
+            raise ConfigError("family_splits работает только с holdout: families")
+        known = {dataset.family_key for dataset in config.datasets}
+        for family, part in config.family_splits.items():
+            if family not in known:
+                raise ConfigError(f"family_splits: семейства {family!r} нет среди datasets")
+            if part not in SPLITS:
+                raise ConfigError(f"family_splits.{family}: часть {part!r} не из {SPLITS}")
