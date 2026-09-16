@@ -105,6 +105,9 @@ class TestBatchKeys:
         assert family_for("zhk_seligerkorp_h", families) == "seliger"
         assert family_for("k_22_fp_amfiteatra", families) == "korpus_22"
         assert family_for("zhk_sb5", families) == "zhk_sb5"
+        # Все листы автостоянки входят в МЖБК Полковая 1 — одно здание, одно семейство.
+        assert family_for("avtostoyanka_i_odnoet", families) == "polkovaya"
+        assert family_for("avtostoyanka_korpus_2", families) == "polkovaya"
 
 
 def _page(project: str, guid: str, slab: int, wall: int) -> PageInfo:
@@ -218,6 +221,63 @@ class TestBuildV2:
         assert any(row["target_fraction"]["wall"] > 0 for row in rows)
         split = json.loads((tmp_path / "build" / "split.json").read_text(encoding="utf-8"))
         assert split["holdout"] == "project-family holdout"
+
+    def test_duplicate_page_markup_is_merged_without_cancelling_holes(
+        self, converted: tuple[Path, Path], tmp_path: Path
+    ) -> None:
+        dataset, source = converted
+        targets = {
+            "slab": TargetConfig(kinds=("polygon",), label_patterns=("^Плита",)),
+            "wall": TargetConfig(
+                kinds=("polyline",), label_patterns=("^Стены",), min_positive_fraction=0.0005
+            ),
+        }
+
+        def config(build_id: str, datasets: tuple[DatasetRef, ...]) -> BuildConfig:
+            return BuildConfig(
+                build_id=build_id,
+                seed=5,
+                datasets=datasets,
+                tile_px=256,
+                overlap_px=32,
+                targets=targets,
+                split_fractions={"train": 1.0, "val": 0.0, "test": 0.0},
+                holdout="families",
+            )
+
+        # Эталон — один проект со всей разметкой, без дублей.
+        single = config(
+            "single",
+            (DatasetRef("owner", str(dataset), str(source), ("slab", "wall"), family="f1"),),
+        )
+        # Владелец листа размечал только плиты; дубли того же листа — стены и те же плиты.
+        split_markup = config(
+            "merged",
+            (
+                DatasetRef("owner", str(dataset), str(source), ("slab",), family="f1"),
+                DatasetRef("walls", str(dataset), str(source), ("slab", "wall"), family="f2"),
+                DatasetRef("again", str(dataset), str(source), ("slab",), family="f3"),
+            ),
+        )
+
+        dataset_build.build(single, tmp_path / "single")
+        manifest = dataset_build.build(split_markup, tmp_path / "merged")
+
+        def rows(name: str) -> dict[str, dict[str, object]]:
+            lines = (tmp_path / name / "tiles.jsonl").read_text(encoding="utf-8").splitlines()
+            return {json.loads(line)["tile_id"]: json.loads(line) for line in lines}
+
+        expected, actual = rows("single"), rows("merged")
+        assert actual.keys() == expected.keys()
+        for tile_id, row in actual.items():
+            assert row["project_key"] == "owner"
+            assert row["tasks"] == ["slab", "wall"]
+            # Те же доли плиты, что без дублей: повторённое отверстие не отменило себя.
+            assert row["target_fraction"] == expected[tile_id]["target_fraction"]
+        counters = manifest["counters"]
+        assert isinstance(counters, dict)
+        assert counters["pages:with_merged_duplicates"] == 1
+        assert counters["pages:duplicate_merged"] == 2
 
     def test_loaded_rules_config_is_valid(self, tmp_path: Path) -> None:
         rules = _rules()

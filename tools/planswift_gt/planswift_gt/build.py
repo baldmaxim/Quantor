@@ -113,11 +113,17 @@ def _shapes(
     slab = config.targets.get("slab")
     line_targets = {task: config.targets[task] for task in LINE_TASKS if task in config.targets}
     holes: dict[str, list[Ring]] = {}
+    hole_keys: set[str] = set()
     for annotation in annotations:
         if annotation.get("kind") == "polygon_hole":
-            holes.setdefault(str(annotation.get("parent_annotation_id")), []).append(
-                ring(annotation)
-            )
+            parent = str(annotation.get("parent_annotation_id"))
+            # Одно и то же отверстие из двух выгрузок проекта: второе по правилу чёт-нечет
+            # отменило бы первое и вернуло плиту на место отверстия.
+            hole_key = _dump([parent, annotation.get("points_source_px")])
+            if hole_key in hole_keys:
+                continue
+            hole_keys.add(hole_key)
+            holes.setdefault(parent, []).append(ring(annotation))
 
     seen: set[str] = set()
     polygons: list[list[Ring]] = []
@@ -230,29 +236,37 @@ def _ink_fraction(pixels: bytes, valid: int) -> float:
     return 0.0 if valid == 0 else sum(dark) / valid
 
 
-def page_infos(config: BuildConfig) -> tuple[list[PageInfo], list[JsonObject]]:
-    """Листы всех проектов и дубли: лист с тем же SHA-256 файла, что уже взятый, не берётся.
+@dataclass(slots=True)
+class MergedPage:
+    """Лист-владелец и то, что к нему прибавили листы с тем же растром из других проектов."""
 
-    Один и тот же проект, выгруженный дважды (или лист, повторённый в двух проектах одного здания),
-    иначе мог бы оказаться и в train, и в test. Берётся первое вхождение в порядке `datasets`.
+    dataset: DatasetRef
+    guid: str
+    image: JsonObject
+    tasks: set[str]
+    task_counts: Counter[str]
+    extra_annotations: list[JsonObject]
+
+
+def page_infos(
+    config: BuildConfig,
+) -> tuple[list[PageInfo], list[JsonObject], dict[str, MergedPage]]:
+    """Листы всех проектов; лист с тем же SHA-256 растра, что уже взятый, сливается с ним.
+
+    Один и тот же лист в двух проектах (дважды выгруженный проект, секции внутри общего проекта
+    здания) не входит в сборку дважды — иначе он мог бы оказаться и в train, и в test. Но и
+    разметка второго проекта не теряется: если проекты размечали разное, отброшенная разметка
+    сделала бы размеченные где-то стены фоном. Владелец — первое вхождение в порядке `datasets`.
     """
-    infos: list[PageInfo] = []
     duplicates: list[JsonObject] = []
     owner: dict[str, str] = {}
+    merged: dict[str, MergedPage] = {}
     for dataset in config.datasets:
         root = Path(dataset.dataset_dir)
-        weights: Counter[str] = Counter()
-        by_task: dict[str, Counter[str]] = {task: Counter() for task in dataset.tasks}
+        by_page: dict[str, list[JsonObject]] = {}
         for row in _jsonl(root / "annotations.jsonl"):
-            annotation = _obj(row.get("annotation"))
             guid = str(_obj(row.get("page")).get("page_guid"))
-            selected = [
-                task for task in dataset.tasks if _selected(annotation, config.targets[task])
-            ]
-            if selected:
-                weights[guid] += 1
-            for task in selected:
-                by_task[task][guid] += 1
+            by_page.setdefault(guid, []).append(_obj(row.get("annotation")))
         for page in _jsonl(root / "pages.jsonl"):
             image = page.get("image")
             if not isinstance(image, dict):
@@ -260,27 +274,42 @@ def page_infos(config: BuildConfig) -> tuple[list[PageInfo], list[JsonObject]]:
             guid = str(page["page_guid"])
             sha = str(image["sha256"])
             key = f"{dataset.project_key}|{guid}"
+            annotations = by_page.get(guid, [])
+            counts: Counter[str] = Counter()
+            for annotation in annotations:
+                for task in dataset.tasks:
+                    if _selected(annotation, config.targets[task]):
+                        counts[task] += 1
             if sha in owner:
                 duplicates.append({"page": key, "duplicate_of": owner[sha], "image_sha256": sha})
+                target = merged[owner[sha]]
+                target.extra_annotations.extend(annotations)
+                target.tasks.update(dataset.tasks)
+                target.task_counts.update(counts)
                 continue
             owner[sha] = key
-            with open_raster(
-                Path(dataset.source_root) / str(image["path"]),
-                pdf_dpi=config.pdf_render_dpi,
-                strip_cache=1,
-            ) as raster:
-                small = downscale(raster, max_side=256)
-            infos.append(
-                PageInfo(
-                    project_key=dataset.project_key,
-                    page_guid=guid,
-                    image_sha256=sha,
-                    phash=phash(small.pixels, small.width, small.height),
-                    weight=weights[guid],
-                    task_weights=tuple((task, by_task[task][guid]) for task in sorted(by_task)),
-                )
+            merged[key] = MergedPage(dataset, guid, image, set(dataset.tasks), counts, [])
+
+    infos: list[PageInfo] = []
+    for owned in merged.values():
+        with open_raster(
+            Path(owned.dataset.source_root) / str(owned.image["path"]),
+            pdf_dpi=config.pdf_render_dpi,
+            strip_cache=1,
+        ) as raster:
+            small = downscale(raster, max_side=256)
+        weight = sum(owned.task_counts.values())
+        infos.append(
+            PageInfo(
+                project_key=owned.dataset.project_key,
+                page_guid=owned.guid,
+                image_sha256=str(owned.image["sha256"]),
+                phash=phash(small.pixels, small.width, small.height),
+                weight=weight,
+                task_weights=tuple((task, owned.task_counts[task]) for task in sorted(owned.tasks)),
             )
-    return infos, duplicates
+        )
+    return infos, duplicates, merged
 
 
 def select_train_negatives(
@@ -299,7 +328,7 @@ def select_train_negatives(
 
 
 def build(config: BuildConfig, out: Path, *, refreeze: bool = False) -> JsonObject:
-    infos, duplicates = page_infos(config)
+    infos, duplicates, merged = page_infos(config)
     groups = clusters(infos, config.phash_hamming_threshold)
     family_of: dict[str, str] | None = None
     if config.holdout == "families":
@@ -330,7 +359,7 @@ def build(config: BuildConfig, out: Path, *, refreeze: bool = False) -> JsonObje
     counters: Counter[str] = Counter()
 
     for dataset in config.datasets:
-        _build_dataset(dataset, config, out, split_of, tile_rows, views, counters)
+        _build_dataset(dataset, config, out, split_of, merged, tile_rows, views, counters)
 
     (out / "tiles.jsonl").write_text(
         "".join(row + "\n" for row in sorted(tile_rows)), encoding="utf-8"
@@ -374,6 +403,7 @@ def _build_dataset(
     config: BuildConfig,
     out: Path,
     split_of: dict[str, str],
+    merged: dict[str, MergedPage],
     tile_rows: list[str],
     views: dict[str, list[str]],
     counters: Counter[str],
@@ -390,11 +420,16 @@ def _build_dataset(
         if not isinstance(image, dict):
             continue
         guid = str(page["page_guid"])
-        split = split_of.get(f"{dataset.project_key}|{guid}")
-        if split is None:
-            # Лист-дубль уже взят из другого проекта (page_infos): второй раз в сборку не входит.
-            counters["pages:duplicate_skipped"] += 1
+        page_key = f"{dataset.project_key}|{guid}"
+        split = split_of.get(page_key)
+        owned = merged.get(page_key)
+        if split is None or owned is None:
+            # Лист-дубль: его разметка уже слита с листом-владельцем (page_infos).
+            counters["pages:duplicate_merged"] += 1
             continue
+        tasks = tuple(sorted(owned.tasks)) if owned.extra_annotations else dataset.tasks
+        if owned.extra_annotations:
+            counters["pages:with_merged_duplicates"] += 1
         with open_raster(
             Path(dataset.source_root) / str(image["path"]),
             pdf_dpi=config.pdf_render_dpi,
@@ -404,16 +439,16 @@ def _build_dataset(
             # равен записанному в pages.jsonl, у PDF это рендер страницы с pdf_render_dpi.
             source = (raster.width, raster.height)
             work = working_page(raster, config.downsample)
-        shapes = _shapes(by_page.get(guid, []), config, source)
+        shapes = _shapes([*by_page.get(guid, []), *owned.extra_annotations], config, source)
 
         targets: dict[str, bytearray] = {}
-        if "slab" in dataset.tasks:
+        if "slab" in tasks:
             mask = bytearray(work.width * work.height)
             for rings in shapes.polygons:
                 fill_rings(mask, work.width, work.height, rings)
             targets["slab"] = mask
         for task in LINE_TASKS:
-            if task not in dataset.tasks:
+            if task not in tasks:
                 continue
             heat = bytearray(work.width * work.height)
             radius = config.targets[task].radius_px
@@ -504,7 +539,7 @@ def _build_dataset(
                 "page_guid": guid,
                 "split": split,
                 "crop_policy": policy,
-                "tasks": list(dataset.tasks),
+                "tasks": list(tasks),
                 "image": f"tiles/{identifier}.png",
                 "image_sha256": image_sha,
                 "transform": t.record(),
@@ -530,7 +565,7 @@ def _build_dataset(
                 "coordinate_range": config.qwen_coordinate_range,
                 "crop_policy": policy,
             }
-            if "slab" in dataset.tasks:
+            if "slab" in tasks:
                 localization = slab_localization(shapes, t, config)
                 views["qwen_slab_localization_v1"].append(
                     _dump(
@@ -542,7 +577,7 @@ def _build_dataset(
                         }
                     )
                 )
-            if "masonry" in dataset.tasks:
+            if "masonry" in tasks:
                 views["qwen_masonry_roi_v0"].append(
                     _dump(
                         {

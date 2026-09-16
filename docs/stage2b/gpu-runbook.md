@@ -222,6 +222,16 @@ cd tools\planswift_gt
    `pages_without_image`, `page_formats`, `task_annotations`, `in_build`; и `identical_projects`;
 2. сводку `qa` обоих PDF-проектов (совмещение) и словами — лежит ли разметка на чертеже.
 
+**3а. Правила изменились (2026-09-16)** — автостоянка в семействе Полковой. Перед сборкой обновить
+правила и перегенерировать `build-v2.json` (импорт весь берётся с диска, это быстро):
+
+```powershell
+cd ..\..
+Copy-Item tools\planswift_gt\configs\dataset-build-v2.rules.example.json "$R\rules-v2.json" -Force
+cd tools\planswift_gt
+..\..\vision\.venv-train\Scripts\python -m planswift_gt import-all "$R\archives-v2\Обводки Planswift" --work "$R\raw-v2" --out "$R\gt-v2" --rules "$R\rules-v2.json"
+```
+
 **4. Сборка** — только после ответа по пунктам 1–2:
 
 ```powershell
