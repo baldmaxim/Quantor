@@ -190,7 +190,7 @@ def _page(
     rows: list[JsonObject],
     predictions_dir: Path,
     expected: dict[str, str],
-    truth: TruthIndex,
+    truth_index: TruthIndex,
     config: VectorConfig,
     metrics: VectorMetrics,
 ) -> JsonObject:
@@ -222,7 +222,7 @@ def _page(
     scale_x, scale_y = source_width / frame.downsample, source_height / frame.downsample
     truth: list[Polygon] = [
         [[(x * scale_x, y * scale_y) for x, y in ring] for ring in polygon]
-        for polygon in truth.for_page(project, guid)
+        for polygon in truth_index.for_page(project, guid)
     ]
     report: JsonObject = {"project_key": project, "page_guid": guid, "tiles": len(tiles)}
     try:
