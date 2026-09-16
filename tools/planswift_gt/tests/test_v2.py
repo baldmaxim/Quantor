@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -285,8 +287,6 @@ class TestPdf:
     def test_missing_reader_is_a_page_rejection_not_a_crash(
         self, project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import importlib.util
-
         original = importlib.util.find_spec
         monkeypatch.setattr(
             importlib.util,
@@ -298,3 +298,14 @@ class TestPdf:
 
         assert result.pages[0].image is None
         assert result.pages[0].image_rejection == "image_pdf_reader_missing"
+
+
+def test_ci_really_runs_the_pdf_tests() -> None:
+    """В CI отсутствие pypdfium2 — ошибка, а не тихий пропуск тестов PDF.
+
+    `importorskip` удобен на машине без библиотеки, но в CI он превратил бы пропавшую зависимость
+    в зелёную сборку: BLOCKED не записывается как PASS.
+    """
+    if os.environ.get("CI") != "true":
+        pytest.skip("проверка только для CI")
+    assert importlib.util.find_spec("pypdfium2") is not None
