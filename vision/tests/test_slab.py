@@ -12,10 +12,18 @@ from pathlib import Path
 import pytest
 import torch
 
+from quantor_vision.slab import data as slab_data
 from quantor_vision.slab.data import SlabTiles, load_build, positive_fraction
 from quantor_vision.slab.metrics import MaskMetrics, boundary, page_area_errors
 from quantor_vision.slab.model import TinyUNet, parameter_count
-from quantor_vision.slab.train import TrainConfig, evaluate, train
+from quantor_vision.slab.train import (
+    THRESHOLDS,
+    IouSweep,
+    TrainConfig,
+    _select,
+    evaluate,
+    train,
+)
 from tests.synthetic_build import TILE, make_build
 
 
@@ -162,3 +170,76 @@ class TestTrainAndEvaluate:
 
         with pytest.raises(ValueError, match="веса"):
             evaluate(build_dir, run_dir, split="test", device_choice="cpu")
+
+
+class TestScale:
+    """Сборка v2 — тысячи тайлов: ничего не держится в памяти целиком."""
+
+    def test_iou_sweep_matches_direct_iou_at_every_threshold(self) -> None:
+        generator = torch.Generator().manual_seed(4)
+        sweep = IouSweep()
+        tiles = []
+        for _ in range(3):
+            probability = torch.rand(1, 16, 16, generator=generator)
+            target = (torch.rand(1, 16, 16, generator=generator) > 0.6).float()
+            valid = torch.ones(1, 16, 16, dtype=torch.bool)
+            valid[:, :, 12:] = False
+            sweep.update(probability, target, valid)
+            tiles.append((probability, target, valid))
+
+        result = sweep.iou()
+
+        for threshold in THRESHOLDS:
+            hits = union = 0
+            for probability, target, valid in tiles:
+                predicted = (probability >= threshold) & valid
+                truth = (target > 0.5) & valid
+                hits += int((predicted & truth).sum())
+                union += int((predicted | truth).sum())
+            assert result[threshold] == pytest.approx(hits / union)
+
+    def test_selection_is_even_and_deterministic(self, tmp_path: Path) -> None:
+        build = load_build(make_build(tmp_path / "build", per_split={"val": 10}))
+
+        chosen = _select(build.tiles, 4)
+
+        assert [tile.tile_id for tile in chosen] == ["val000", "val003", "val006", "val009"]
+        assert _select(build.tiles, 0) == build.tiles
+        assert _select(build.tiles, 50) == build.tiles
+
+    def test_large_sets_are_not_cached(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        build = load_build(make_build(tmp_path / "build", per_split={"train": 3}))
+        monkeypatch.setattr(slab_data, "CACHE_LIMIT_TILES", 2)
+
+        dataset = SlabTiles(build.tiles, augment=False, seed=1)
+        dataset[0]
+
+        assert dataset.cache is False
+        assert SlabTiles(build.tiles[:2], augment=False, seed=1).cache is True
+
+    def test_early_stopping_on_a_val_sample_still_sets_threshold_on_full_val(
+        self, tmp_path: Path
+    ) -> None:
+        build_dir = make_build(tmp_path / "build", per_split={"train": 4, "val": 5})
+        config = TrainConfig(
+            run_id="sample",
+            epochs=2,
+            patience=3,
+            batch_size=2,
+            base_width=4,
+            depth=2,
+            amp="off",
+            device="cpu",
+            val_select_tiles=2,
+        )
+
+        run_dir = train(build_dir, tmp_path / "runs", config)
+
+        metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+        assert metrics["val_select_tiles_used"] == 2
+        assert len(metrics["val_threshold_sweep_iou"]) == len(THRESHOLDS)
+        record = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+        assert record["training"]["val_tiles"] == 5
+        assert record["training"]["val_select_tiles"] == 2

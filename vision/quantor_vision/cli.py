@@ -191,6 +191,7 @@ def _train_slab(args: argparse.Namespace) -> int:
         architecture=args.arch,
         encoder=args.encoder,
         head_width=args.head_width,
+        val_select_tiles=args.val_select_tiles,
     )
     run_dir = train(Path(args.build), runs, config)
     metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
@@ -411,6 +412,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     slab.add_argument("--encoder", choices=("large", "base"), default="large")
     slab.add_argument("--head-width", type=int, default=256)
+    slab.add_argument(
+        "--val-select-tiles",
+        type=int,
+        default=0,
+        help="ранняя остановка по равномерной выборке из val (0 — весь val); порог — по всему val",
+    )
     slab.add_argument("--allow-cpu", action="store_true", help="разрешить обучение без GPU")
     slab.add_argument("--allow-inside-repo", action="store_true", help="только для тестов")
     slab.set_defaults(handler=_train_slab)

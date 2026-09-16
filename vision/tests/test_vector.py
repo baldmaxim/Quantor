@@ -20,7 +20,12 @@ from quantor_vision.vector.polygonize import (
     signed_area,
     vectorize_mask,
 )
-from quantor_vision.vector.run import VectorizeRefusedError, vectorize_run
+from quantor_vision.vector.run import (
+    SlabRule,
+    VectorizeRefusedError,
+    build_truth_index,
+    vectorize_run,
+)
 from quantor_vision.vector.stitch import TileMask, stitch
 from quantor_vision.vector.validity import validate_polygon
 
@@ -395,6 +400,13 @@ def _synthetic_run(tmp_path: Path) -> tuple[Path, Path, Path]:
     (truth_dir / "annotations.jsonl").write_text(
         "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in annotations), encoding="utf-8"
     )
+    (truth_dir / "pages.jsonl").write_text(
+        "".join(
+            json.dumps({"page_guid": guid, "image": {"sha256": f"image-{guid}"}}) + "\n"
+            for guid in ("page-val", "page-test")
+        ),
+        encoding="utf-8",
+    )
     config = tmp_path / "build-v1.json"
     config.write_text(
         json.dumps(
@@ -462,3 +474,62 @@ class TestRun:
         with pytest.raises(ValueError):
             VectorConfig.with_overrides({"threshold": "0.4"})
         assert VectorConfig.with_overrides({"min_hole_px": "8"}).min_hole_px == 8
+
+
+def _truth_project(
+    directory: Path, guid: str, image: str, polygons: list[tuple[str, str, list[list[float]]]]
+) -> Path:
+    directory.mkdir(parents=True)
+    (directory / "pages.jsonl").write_text(
+        json.dumps({"page_guid": guid, "image": {"sha256": image}}) + "\n", encoding="utf-8"
+    )
+    rows = [
+        {
+            "page": {"page_guid": guid},
+            "annotation": {
+                "id": identifier,
+                "kind": "polygon",
+                "label_raw": label,
+                "points_normalized": points,
+                "points_source_px": points,
+            },
+        }
+        for identifier, label, points in polygons
+    ]
+    (directory / "annotations.jsonl").write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8"
+    )
+    return directory
+
+
+class TestTruthIndex:
+    def test_projects_sharing_a_page_image_are_merged_and_patterns_select_slabs(
+        self, tmp_path: Path
+    ) -> None:
+        slab_a = [[0.1, 0.1], [0.4, 0.1], [0.4, 0.4], [0.1, 0.4]]
+        slab_b = [[0.5, 0.5], [0.9, 0.5], [0.9, 0.9], [0.5, 0.9]]
+        room = [[0.0, 0.0], [0.05, 0.0], [0.05, 0.05], [0.0, 0.05]]
+        owner = _truth_project(
+            tmp_path / "owner",
+            "guid-1",
+            "same-image",
+            [("a", "Плита Перекрытия [Толщина ПП]м", slab_a)],
+        )
+        # Другой проект того же здания: тот же растр под другим GUID, та же плита и ещё одна.
+        section = _truth_project(
+            tmp_path / "section",
+            "guid-2",
+            "same-image",
+            [
+                ("a2", "Плита Перекытия [Толщина ПП]м", slab_a),
+                ("b", "Плиты перекрытия", slab_b),
+                ("r", "Ресторан", room),
+            ],
+        )
+        rule = SlabRule(kinds=("polygon",), patterns=("^[Пп]лит[аы] [Пп]ерекр?ытия",))
+
+        truth = build_truth_index({"owner": owner, "section": section}, rule)
+
+        outers = sorted(polygon[0][0] for polygon in truth.for_page("owner", "guid-1"))
+        assert outers == [(0.1, 0.1), (0.5, 0.5)]
+        assert truth.for_page("owner", "missing") == []

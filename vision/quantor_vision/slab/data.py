@@ -16,6 +16,9 @@ import torch
 from quantor_vision.png import read_gray
 
 TASK = "slab"
+# Сколько тайлов держать в памяти целиком (~2 МиБ на тайл с маской). Сборка v1 — десятки тайлов,
+# v2 — тысячи: кэш всех тайлов v2 занял бы десятки гигабайт ОЗУ, поэтому выше предела — без кэша.
+CACHE_LIMIT_TILES = 256
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +34,12 @@ class TileRef:
     valid_height: int
     origin: tuple[int, int]
     working_size: tuple[int, int]
+    # Сборки v2 — десятки проектов: GUID листа уникален только внутри проекта.
+    project_key: str = ""
+
+    @property
+    def page_key(self) -> str:
+        return f"{self.project_key}|{self.page_guid}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +74,7 @@ def load_build(root: Path) -> BuildInfo:
                     int(transform["origin_working_px"][1]),
                 ),
                 working_size=(int(transform["working_size"][0]), int(transform["working_size"][1])),
+                project_key=str(row.get("project_key", "")),
             )
         )
     return BuildInfo(
@@ -87,19 +97,19 @@ def valid_mask(tile: TileRef) -> torch.Tensor:
 
 
 class SlabTiles:
-    """Тайлы части `split`. Кэш в памяти: при 1 024 px это ~2 МиБ на тайл.
+    """Тайлы части `split`. Кэш в памяти (~2 МиБ на тайл) — только для небольших наборов.
 
     Не наследует `torch.utils.data.Dataset`: батчи собирает обучение само, детерминированно
     по seed, без процессов-загрузчиков (на Windows они порождаются заново и медленны)."""
 
     def __init__(
-        self, tiles: list[TileRef], *, augment: bool, seed: int, cache: bool = True
+        self, tiles: list[TileRef], *, augment: bool, seed: int, cache: bool | None = None
     ) -> None:
         self.tiles = tiles
         self.augment = augment
         self.generator = torch.Generator().manual_seed(seed)
         self._cache: dict[int, tuple[torch.Tensor, torch.Tensor]] = {}
-        self.cache = cache
+        self.cache = len(tiles) <= CACHE_LIMIT_TILES if cache is None else cache
 
     def __len__(self) -> int:
         return len(self.tiles)

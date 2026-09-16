@@ -61,15 +61,34 @@ def evaluate_predictor(
     predictions_dir: Path,
 ) -> EvaluationOutput:
     metrics = MaskMetrics()
-    pages: dict[str, dict[str, torch.Tensor]] = {}
     predictions_dir.mkdir(parents=True, exist_ok=True)
     hashes: list[dict[str, str]] = []
     latencies: list[float] = []
+    areas: dict[str, tuple[float, float]] = {}
+    uncovered = 0
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
 
+    # Лист за листом: в памяти суммы одного листа, а не всех (у сборки v2 это десятки гигабайт).
+    order = sorted(
+        range(len(dataset.tiles)),
+        key=lambda index: (dataset.tiles[index].page_key, dataset.tiles[index].tile_id),
+    )
+    page_key: str | None = None
+    page: dict[str, torch.Tensor] = {}
+
+    def close_page() -> None:
+        nonlocal uncovered
+        if page_key is None:
+            return
+        covered = page["count"] > 0
+        uncovered += int((~covered).sum())
+        mask = (page["sum"] / page["count"].clamp(min=1)) >= threshold
+        areas[page_key] = (float((mask & covered).sum()), float((page["truth"] * covered).sum()))
+
     with torch.no_grad():
-        for index, tile in enumerate(dataset.tiles):
+        for index in order:
+            tile = dataset.tiles[index]
             x, y, valid = dataset[index]
             if device.type == "cuda":
                 torch.cuda.synchronize(device)
@@ -86,15 +105,15 @@ def evaluate_predictor(
             hashes.append({"tile_id": tile.tile_id, "sha256": runrecord.sha256_file(path)})
 
             # Сшивка листа: вероятности окон складываются и делятся на число покрытий.
-            height, width = tile.working_size[1], tile.working_size[0]
-            page = pages.setdefault(
-                tile.page_guid,
-                {
+            if tile.page_key != page_key:
+                close_page()
+                page_key = tile.page_key
+                height, width = tile.working_size[1], tile.working_size[0]
+                page = {
                     "sum": torch.zeros(height, width),
                     "count": torch.zeros(height, width),
                     "truth": torch.zeros(height, width),
-                },
-            )
+                }
             x0, y0 = tile.origin
             h, w = tile.valid_height, tile.valid_width
             page["sum"][y0 : y0 + h, x0 : x0 + w] += probability[0, :h, :w]
@@ -102,14 +121,8 @@ def evaluate_predictor(
             page["truth"][y0 : y0 + h, x0 : x0 + w] = torch.maximum(
                 page["truth"][y0 : y0 + h, x0 : x0 + w], y[0, :h, :w]
             )
-
-    areas: dict[str, tuple[float, float]] = {}
-    uncovered = 0
-    for guid, page in pages.items():
-        covered = page["count"] > 0
-        uncovered += int((~covered).sum())
-        mask = (page["sum"] / page["count"].clamp(min=1)) >= threshold
-        areas[guid] = (float((mask & covered).sum()), float((page["truth"] * covered).sum()))
+        close_page()
+    hashes.sort(key=lambda item: item["tile_id"])
 
     ordered = sorted(latencies)
     result: dict[str, object] = {

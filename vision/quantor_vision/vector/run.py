@@ -17,7 +17,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from dataclasses import asdict
+import re
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -47,23 +48,45 @@ def _dump(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
 
 
-def load_truth(
-    dataset_dir: Path, kinds: tuple[str, ...], labels: tuple[str, ...]
-) -> dict[str, list[list[list[tuple[float, float]]]]]:
+TruthPolygon = list[list[tuple[float, float]]]
+
+
+@dataclass(frozen=True, slots=True)
+class SlabRule:
+    """Отбор плит — как `TargetConfig.selects` сборщика: виды, точные метки, шаблоны меток."""
+
+    kinds: tuple[str, ...]
+    labels: tuple[str, ...] = ()
+    patterns: tuple[str, ...] = ()
+
+    def selects(self, kind: object, label: object) -> bool:
+        if kind not in self.kinds:
+            return False
+        if not self.labels and not self.patterns:
+            return True
+        text = label if isinstance(label, str) else ""
+        return text in self.labels or any(re.search(pattern, text) for pattern in self.patterns)
+
+
+def load_truth(dataset_dir: Path, rule: SlabRule) -> dict[str, list[TruthPolygon]]:
     """Плиты разметки `planswift-gt-v1` по листам: внешнее кольцо и отверстия, нормализованные.
 
-    Отбор и снятие дублей секций — те же, что у сборщика промта 08 (`_shapes`).
+    Отбор и снятие дублей секций и отверстий — те же, что у сборщика (`_shapes`).
     """
     rows = _jsonl(dataset_dir / "annotations.jsonl")
     holes: dict[str, list[list[tuple[float, float]]]] = {}
+    hole_keys: set[str] = set()
     for row in rows:
         annotation = row.get("annotation")
         if isinstance(annotation, dict) and annotation.get("kind") == "polygon_hole":
-            holes.setdefault(str(annotation.get("parent_annotation_id")), []).append(
-                _ring(annotation)
-            )
+            parent = str(annotation.get("parent_annotation_id"))
+            key = json.dumps([parent, annotation.get("points_source_px")])
+            if key in hole_keys:
+                continue
+            hole_keys.add(key)
+            holes.setdefault(parent, []).append(_ring(annotation))
     seen: set[str] = set()
-    pages: dict[str, list[list[list[tuple[float, float]]]]] = {}
+    pages: dict[str, list[TruthPolygon]] = {}
     for row in rows:
         annotation, page = row.get("annotation"), row.get("page")
         if not isinstance(annotation, dict) or not isinstance(page, dict):
@@ -72,14 +95,60 @@ def load_truth(
         if key in seen:
             continue
         seen.add(key)
-        if annotation.get("kind") not in kinds or (
-            labels and annotation.get("label_raw") not in labels
-        ):
+        if not rule.selects(annotation.get("kind"), annotation.get("label_raw")):
             continue
         pages.setdefault(str(page.get("page_guid")), []).append(
             [_ring(annotation), *holes.get(str(annotation.get("id")), [])]
         )
     return pages
+
+
+def page_images(dataset_dir: Path) -> dict[str, str]:
+    """GUID листа → SHA-256 его растра (по `pages.jsonl`)."""
+    images: dict[str, str] = {}
+    for row in _jsonl(dataset_dir / "pages.jsonl"):
+        image = row.get("image")
+        if isinstance(image, dict):
+            images[str(row.get("page_guid"))] = str(image.get("sha256"))
+    return images
+
+
+@dataclass(frozen=True, slots=True)
+class TruthIndex:
+    """Разметка плит всех проектов, сведённая по растру листа.
+
+    Сборка v2 берёт лист с одним растром один раз, но объединяет разметку всех проектов, где он
+    встречается: истина для метрик обязана совпадать с этой целью, иначе прогноз штрафовался бы
+    за плиты, которые были в цели обучения.
+    """
+
+    images: dict[str, dict[str, str]]
+    by_image: dict[str, list[TruthPolygon]]
+
+    def for_page(self, project: str, guid: str) -> list[TruthPolygon]:
+        sha = self.images.get(project, {}).get(guid)
+        return self.by_image.get(sha, []) if sha is not None else []
+
+
+def build_truth_index(datasets: dict[str, Path], rule: SlabRule) -> TruthIndex:
+    images: dict[str, dict[str, str]] = {}
+    by_image: dict[str, list[TruthPolygon]] = {}
+    seen: dict[str, set[str]] = {}
+    for project, path in sorted(datasets.items()):
+        project_images = page_images(path)
+        images[project] = project_images
+        for guid, polygons in load_truth(path, rule).items():
+            sha = project_images.get(guid)
+            if sha is None:
+                continue
+            keys = seen.setdefault(sha, set())
+            for polygon in polygons:
+                key = json.dumps(polygon[0])
+                if key in keys:
+                    continue
+                keys.add(key)
+                by_image.setdefault(sha, []).append(polygon)
+    return TruthIndex(images, by_image)
 
 
 def _ring(annotation: dict[str, object]) -> list[tuple[float, float]]:
@@ -93,7 +162,7 @@ def _ring(annotation: dict[str, object]) -> list[tuple[float, float]]:
     ]
 
 
-def _truth_sources(build_config: Path) -> tuple[dict[str, Path], tuple[str, ...], tuple[str, ...]]:
+def _truth_sources(build_config: Path) -> tuple[dict[str, Path], SlabRule]:
     config = json.loads(build_config.read_text(encoding="utf-8"))
     slab = config["targets"]["slab"]
     datasets = {
@@ -101,7 +170,12 @@ def _truth_sources(build_config: Path) -> tuple[dict[str, Path], tuple[str, ...]
         for item in config["datasets"]
         if "slab" in item["tasks"]
     }
-    return datasets, tuple(slab.get("kinds", ["polygon"])), tuple(slab.get("labels", []))
+    rule = SlabRule(
+        kinds=tuple(slab.get("kinds", ["polygon"])),
+        labels=tuple(slab.get("labels") or ()),
+        patterns=tuple(slab.get("label_patterns") or ()),
+    )
+    return datasets, rule
 
 
 def _pair(value: object) -> tuple[int, int]:
@@ -116,7 +190,7 @@ def _page(
     rows: list[JsonObject],
     predictions_dir: Path,
     expected: dict[str, str],
-    truth_by_project: dict[str, dict[str, list[list[list[tuple[float, float]]]]]],
+    truth: TruthIndex,
     config: VectorConfig,
     metrics: VectorMetrics,
 ) -> JsonObject:
@@ -148,7 +222,7 @@ def _page(
     scale_x, scale_y = source_width / frame.downsample, source_height / frame.downsample
     truth: list[Polygon] = [
         [[(x * scale_x, y * scale_y) for x, y in ring] for ring in polygon]
-        for polygon in truth_by_project.get(project, {}).get(guid, [])
+        for polygon in truth.for_page(project, guid)
     ]
     report: JsonObject = {"project_key": project, "page_guid": guid, "tiles": len(tiles)}
     try:
@@ -233,10 +307,8 @@ def vectorize_run(
         raise VectorizeRefusedError(f"нет масок прогноза {predictions_dir} или {manifest.name}")
     expected = {str(row["tile_id"]): str(row["sha256"]) for row in _jsonl(manifest)}
 
-    datasets, kinds, labels = _truth_sources(build_config)
-    truth_by_project = {
-        key: load_truth(path, kinds, labels) for key, path in sorted(datasets.items())
-    }
+    datasets, rule = _truth_sources(build_config)
+    truth = build_truth_index(datasets, rule)
 
     pages: dict[tuple[str, str], list[JsonObject]] = {}
     for row in _jsonl(build_dir / "tiles.jsonl"):
@@ -254,9 +326,7 @@ def vectorize_run(
     metrics = VectorMetrics(config)
     page_reports: list[JsonObject] = []
     for (project, guid), rows in sorted(pages.items()):
-        report = _page(
-            project, guid, rows, predictions_dir, expected, truth_by_project, config, metrics
-        )
+        report = _page(project, guid, rows, predictions_dir, expected, truth, config, metrics)
         (root / split / f"{project}__{guid}.json").write_text(
             _dump(report["vectors"]), encoding="utf-8"
         )

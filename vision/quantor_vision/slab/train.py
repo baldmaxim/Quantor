@@ -34,6 +34,8 @@ from quantor_vision.slab.model import TinyUNet, parameter_count
 ARCHITECTURES = ("tiny-unet", "dinov2-probe")
 
 THRESHOLDS = tuple(round(0.2 + 0.05 * step, 2) for step in range(13))
+# Признаки DINOv2 одного тайла в float16 — ~11 МБ: кэш val-признаков — только для малого набора.
+FEATURE_CACHE_LIMIT_TILES = 160
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +57,9 @@ class TrainConfig:
     architecture: str = "tiny-unet"
     encoder: str = "large"
     head_width: int = 256
+    # Ранняя остановка по детерминированной выборке из val (0 — весь val). Порог и итоговые
+    # метрики val всё равно считаются по всему val: выборка только экономит время эпохи.
+    val_select_tiles: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,22 +135,78 @@ def _logits(
     return model.decode(features, x.shape[2], x.shape[3])
 
 
-def _probabilities(
+class IouSweep:
+    """IoU для всех порогов `THRESHOLDS` за один проход — без хранения вероятностей тайлов.
+
+    Для каждого допустимого пикселя считается, сколько порогов не выше его вероятности, и копятся
+    гистограммы: всех пикселей и пикселей плиты. Пиксель положителен при пороге k, если его индекс
+    больше k, поэтому пересечение и прогноз при каждом пороге — хвостовые суммы гистограмм.
+    """
+
+    def __init__(self) -> None:
+        self.boundaries = torch.tensor(THRESHOLDS, dtype=torch.float32)
+        size = len(THRESHOLDS) + 1
+        self.predicted = torch.zeros(size, dtype=torch.int64)
+        self.hits = torch.zeros(size, dtype=torch.int64)
+        self.truth = 0
+
+    def update(self, probability: torch.Tensor, target: torch.Tensor, valid: torch.Tensor) -> None:
+        mask = valid.bool()
+        values = probability[mask].float()
+        truth = target[mask] > 0.5
+        index = torch.bucketize(values, self.boundaries, right=True)
+        size = len(THRESHOLDS) + 1
+        self.predicted += torch.bincount(index, minlength=size)
+        self.hits += torch.bincount(index[truth], minlength=size)
+        self.truth += int(truth.sum())
+
+    def iou(self) -> dict[float, float]:
+        result: dict[float, float] = {}
+        for position, threshold in enumerate(THRESHOLDS):
+            predicted = int(self.predicted[position + 1 :].sum())
+            hits = int(self.hits[position + 1 :].sum())
+            union = predicted + self.truth - hits
+            result[threshold] = hits / union if union else 1.0
+        return result
+
+
+def _passes(
     model: nn.Module,
     dataset: SlabTiles,
     device: torch.device,
     amp: str,
+    *,
+    threshold: float | None,
+    sweep: IouSweep | None = None,
     cache: list[torch.Tensor] | None = None,
-) -> list[torch.Tensor]:
+) -> dict[str, float | int | None]:
+    """Один проход по набору: полные метрики при `threshold` и/или IoU по всем порогам."""
+    metrics = MaskMetrics()
     model.eval()
-    outputs: list[torch.Tensor] = []
     with torch.no_grad():
         for index in range(len(dataset)):
-            x, _, _ = dataset[index]
+            x, y, valid = dataset[index]
             with _autocast(device, amp):
                 logits = _logits(model, x.unsqueeze(0).to(device), index, cache)
-            outputs.append(torch.sigmoid(logits.float()).cpu()[0])
-    return outputs
+            probability = torch.sigmoid(logits.float()).cpu()[0]
+            if sweep is not None:
+                sweep.update(probability, y, valid)
+            if threshold is not None:
+                metrics.update(
+                    (probability >= threshold).float().unsqueeze(0),
+                    y.unsqueeze(0),
+                    valid.unsqueeze(0),
+                )
+    return metrics.summary()
+
+
+def _select(tiles: list[TileRef], limit: int) -> list[TileRef]:
+    """Детерминированная равномерная выборка по порядку `tile_id`; 0 — все тайлы."""
+    if limit <= 0 or limit >= len(tiles):
+        return tiles
+    if limit == 1:
+        return tiles[:1]
+    return [tiles[round(index * (len(tiles) - 1) / (limit - 1))] for index in range(limit)]
 
 
 def _batches(
@@ -155,18 +216,6 @@ def _batches(
     for start in range(0, len(order), batch_size):
         items = [dataset[index] for index in order[start : start + batch_size]]
         yield tuple(torch.stack([item[part] for item in items]) for part in range(3))
-
-
-def _score(
-    probabilities: list[torch.Tensor], dataset: SlabTiles, threshold: float
-) -> dict[str, float | int | None]:
-    metrics = MaskMetrics()
-    for index, probability in enumerate(probabilities):
-        _, y, valid = dataset[index]
-        metrics.update(
-            (probability >= threshold).float().unsqueeze(0), y.unsqueeze(0), valid.unsqueeze(0)
-        )
-    return metrics.summary()
 
 
 def _split(build: BuildInfo, name: str, limit: int) -> list[TileRef]:
@@ -186,9 +235,16 @@ def train(
     train_set = SlabTiles(
         _split(build, "train", config.limit_tiles), augment=True, seed=config.seed
     )
-    val_set = SlabTiles(_split(build, "val", config.limit_tiles), augment=False, seed=config.seed)
+    val_tiles = _split(build, "val", config.limit_tiles)
+    val_set = SlabTiles(val_tiles, augment=False, seed=config.seed)
     if not len(train_set) or not len(val_set):
         raise ValueError("в сборке нет тайлов плиты в train или val")
+    select_tiles = _select(val_tiles, config.val_select_tiles)
+    select_set = (
+        val_set
+        if len(select_tiles) == len(val_tiles)
+        else SlabTiles(select_tiles, augment=False, seed=config.seed)
+    )
 
     fraction = positive_fraction(train_set)
     pos_weight = torch.tensor(
@@ -199,7 +255,11 @@ def train(
     optimizer = torch.optim.AdamW(
         built.trainable.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
     )
-    val_cache: list[torch.Tensor] | None = [] if isinstance(model, DinoProbe) else None
+    val_cache: list[torch.Tensor] | None = (
+        []
+        if isinstance(model, DinoProbe) and len(select_set) <= FEATURE_CACHE_LIMIT_TILES
+        else None
+    )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, config.epochs))
     shuffle = torch.Generator().manual_seed(config.seed)
 
@@ -225,7 +285,7 @@ def train(
             optimizer.step()
             total += float(loss.detach()) * x.shape[0]
         scheduler.step()
-        val = _score(_probabilities(model, val_set, device, config.amp, val_cache), val_set, 0.5)
+        val = _passes(model, select_set, device, config.amp, threshold=0.5, cache=val_cache)
         entry = {
             "epoch": epoch,
             "train_loss": total / len(train_set),
@@ -249,15 +309,19 @@ def train(
     built.trainable.load_state_dict(
         torch.load(run_dir / "best.pt", map_location=device, weights_only=True)
     )
-    probabilities = _probabilities(model, val_set, device, config.amp, val_cache)
-    sweep = {threshold: _score(probabilities, val_set, threshold) for threshold in THRESHOLDS}
-    threshold = max(
-        THRESHOLDS, key=lambda value: (float(sweep[value]["iou"] or 0.0), -abs(value - 0.5))
-    )
+    # Порог — по всему val: IoU для всех порогов одним проходом, затем полные метрики при
+    # выбранном пороге. Кэш признаков годится, только если выборка остановки и есть весь val.
+    full_cache = val_cache if select_set is val_set else None
+    sweep = IouSweep()
+    _passes(model, val_set, device, config.amp, threshold=None, sweep=sweep, cache=full_cache)
+    sweep_iou = sweep.iou()
+    threshold = max(THRESHOLDS, key=lambda value: (sweep_iou[value], -abs(value - 0.5)))
+    val_final = _passes(model, val_set, device, config.amp, threshold=threshold, cache=full_cache)
 
     metrics = {
-        "val": sweep[threshold],
-        "val_threshold_sweep_iou": {str(key): value["iou"] for key, value in sweep.items()},
+        "val": val_final,
+        "val_threshold_sweep_iou": {str(key): value for key, value in sweep_iou.items()},
+        "val_select_tiles_used": len(select_set),
         "best_epoch": best_epoch,
         "epochs_run": len(history),
         "train_seconds": round(elapsed, 1),
