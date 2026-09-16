@@ -215,3 +215,38 @@ $B = "$env:QUANTOR_DATASET_ROOT\planswift\build\planswift-build-v1"
 ```powershell
 .\.venv-train\Scripts\python -m quantor_vision evaluate slab --build $B --run "$env:QUANTOR_DATASET_ROOT\runs\slab-dinov2l-h256-v1" --split val
 ```
+
+## 10. Сборка v2: плиты на отложенных зданиях (Р-9, Р-10)
+
+Сборка v1 — один проект, holdout по листам; её числа (§ 7, промты 11 и 16) — история. На v2 все
+модели плит обучаются и оцениваются заново: test — здания, которых модель не видела.
+
+**Масштаб.** В v2 тысячи тайлов плиты, поэтому `vision` не держит набор в памяти: кэш тайлов — только
+до 256 тайлов, порог на val — одним потоковым проходом (гистограмма вероятностей), сшивка листов в
+оценке — лист за листом. `--val-select-tiles N` — ранняя остановка по равномерной выборке из N
+тайлов val; порог и итоговые метрики val всё равно по всему val.
+
+**Порядок и критерии — объявлены до запуска:**
+
+| #   | Прогон                                               | Зачем                                       | Критерий продолжения                                                                                                                  |
+| --- | ---------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `dataset verify` сборки v2                           | хеши и утечка                               | `"ok": true`                                                                                                                          |
+| 2   | `dino-smoke-v2`: DINOv2, 2 эпохи, `--limit-tiles 40` | время тайла и память на RTX 5050            | нет OOM; по времени выбираются эпохи основного прогона                                                                                |
+| 3   | `slab-tinyunet-b16-v2`: U-Net                        | нижняя граница на v2 и грубая маска для SAM | — (база сравнения)                                                                                                                    |
+| 4   | `slab-dinov2l-h256-v2`: DINOv2                       | главный кандидат                            | val IoU выше U-Net v2 **и** медиана ошибки площади листа по вектору (промт 16) ниже U-Net v2; иначе ветка DINOv2 закрывается без test |
+
+Test каждой модели — один раз, после разбора val, с замороженным порогом.
+
+```powershell
+cd vision
+$B = "$env:QUANTOR_DATASET_ROOT\planswift\build\planswift-build-v2"
+.\.venv-train\Scripts\python -m quantor_vision dataset verify $B
+# 2 — дымовой DINOv2
+.\.venv-train\Scripts\python -m quantor_vision train slab --build $B --arch dinov2-probe --run-id dino-smoke-v2 --epochs 2 --limit-tiles 40 --batch-size 2
+# 3 — U-Net v2 (ранняя остановка по 600 тайлам val)
+.\.venv-train\Scripts\python -m quantor_vision train slab --build $B --run-id slab-tinyunet-b16-v2 --epochs 60 --patience 10 --batch-size 4 --val-select-tiles 600
+```
+
+Прислать после шагов 1–3: вывод `dataset verify`; из `dino-smoke-v2` — `train_seconds`,
+`peak_memory_mib`, `train_tiles`, `val_tiles`; из U-Net v2 — `metrics.json` и хвост `train.log`.
+Команду основного прогона DINOv2 (шаг 4) дам по времени дымового.

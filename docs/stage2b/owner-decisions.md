@@ -159,6 +159,14 @@
 - **Изменено:** поле `family_splits` в конфиге сборки (входит в отпечаток разбиения, закреплённое
   семейство не переносится в пустую часть); правила v2 — `{"lsr_kladka": "train"}`. Метрики стен в
   отчётах — по семействам, монолит и кладка раздельно.
+- **Итог пересборки 2026-09-16 — сборка v2 заморожена:** `split_sha256 9a0e2429…d085802`,
+  `tiles_sha256 1d898300…cca2592`. Листов train / val / test — 427 / 150 / 221; семейства: train —
+  foriver_residence, lsr_kladka, polkovaya, seliger, zhk_sb5, zhk_siti_bey_4_shkola; val — korpus_22,
+  lsr_mzhbk_obemy, mosfilmovskaya_31a_planswift, zhk_wave_2och; test — paveletskaya, stories,
+  zhk_intelegent, zhk_primavera_gostini. Положительных тайлов плит / стен: train 4 563 / 4 876,
+  val 766 / 699, test 509 / 628. Все проверки утечки `true`; 178 листов-дублей слиты с владельцами.
+  Замечание: в val кладки нет — порог и остановка для стен подбираются на монолите, кладка
+  проверяется на test (Stories).
 
 ## Открытые вопросы
 
