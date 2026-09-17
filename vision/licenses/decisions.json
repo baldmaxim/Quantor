@@ -108,6 +108,12 @@
       "scope": "vision[qwen-unsloth]: 4-бит QLoRA; 0.50.2",
       "evidence": "https://raw.githubusercontent.com/bitsandbytes-foundation/bitsandbytes/main/LICENSE sha256:52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85; PyPI 0.50.2 License-Expression MIT",
       "condition": "4-бит — эксперимент экономии памяти: продвижение только по измеренному качеству QTO (QWEN_UNSLOTH_EXPERIMENTS.md)"
+    },
+    "pypdf": {
+      "spdx": "BSD-3-Clause",
+      "decision": "allow",
+      "scope": "vision[mep-discovery], pypdf==6.18.0; offline D0 text and metadata only, no rendering or OCR",
+      "evidence": "Installed pypdf 6.18.0 dist-info/licenses/LICENSE sha256:a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524; same pinned version as apps/api"
     }
   },
   "weights": {

@@ -137,3 +137,7 @@ Thinking-редакции не используются: нужен строги
 - https://raw.githubusercontent.com/QwenLM/Qwen3-VL/main/LICENSE
 - https://huggingface.co/api/models/Qwen/Qwen3-VL-2B-Instruct, -4B-, -8B-, facebook/sam2.1-hiera-small
 - https://pypi.org/pypi/pypdfium2/json, torch, ultralytics, unsloth, opencv-python-headless
+
+## MEP D0: чтение текстового слоя и метаданных
+
+`pypdf==6.18.0` — BSD-3-Clause, allow для `vision[mep-discovery]`. Версия совпадает с порталом; проверен установленный `dist-info/licenses/LICENSE`, SHA-256 `a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524`. Только офлайн-опись PDF без OCR/рендера. Новых зависимостей для CAD и BIM нет.

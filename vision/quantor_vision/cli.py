@@ -369,9 +369,43 @@ def _qwen_env(args: argparse.Namespace) -> int:
     return 0 if record["status"] == "OK" else BLOCKED_EXIT
 
 
+def _mep_discover(args: argparse.Namespace) -> int:
+    from quantor_vision.mep.discovery.common import DiscoveryRefusedError
+    from quantor_vision.mep.discovery.run import discover
+
+    archive_root = args.archive_root or os.environ.get("MEP_ARCHIVE_ROOT")
+    dataset_root = args.dataset_root or os.environ.get("QUANTOR_DATASET_ROOT")
+    if not archive_root or not dataset_root:
+        return _blocked("mep discover", ["MEP_ARCHIVE_ROOT and QUANTOR_DATASET_ROOT required"])
+    if missing_modules(("pypdf",)):
+        return _blocked("mep discover", ["install vision[mep-discovery]"])
+    try:
+        summary = discover(
+            Path(archive_root),
+            Path(dataset_root),
+            encoding=args.legacy_encoding,
+            pdf_timeout=args.pdf_timeout,
+        )
+    except DiscoveryRefusedError as error:
+        return _blocked("mep discover", [str(error)])
+    except Exception as error:
+        return _blocked("mep discover", ["unexpected_failure:" + type(error).__name__])
+    _print(summary)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vision", description="ML-контур Quantor Stage 2B")
     commands = parser.add_subparsers(dest="command", required=True)
+
+    mep = commands.add_parser("mep", help="изолированный офлайн-контур MEP")
+    mep_commands = mep.add_subparsers(dest="mep_command", required=True)
+    discovery = mep_commands.add_parser("discover", help="D0: опись архивов П/РД вне git")
+    discovery.add_argument("--archive-root", help="иначе MEP_ARCHIVE_ROOT")
+    discovery.add_argument("--dataset-root", help="иначе QUANTOR_DATASET_ROOT; новый mep/ вне git")
+    discovery.add_argument("--legacy-encoding", choices=("cp866", "cp1251"), default="cp866")
+    discovery.add_argument("--pdf-timeout", type=int, default=600)
+    discovery.set_defaults(handler=_mep_discover)
 
     dataset = commands.add_parser("dataset", help="операции над сборкой датасета")
     dataset_commands = dataset.add_subparsers(dest="dataset_command", required=True)

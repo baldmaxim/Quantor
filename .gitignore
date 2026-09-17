@@ -65,6 +65,7 @@ _prompts/stage2b_ai_geometry_qwen/fixtures/**
 /datasets/
 /dataset-root/
 /private/
+/PD RD/
 /planswift*/
 /vision/data/
 /vision/runs/
