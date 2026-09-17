@@ -10,6 +10,7 @@ dependencies = []
 
 [project.optional-dependencies]
 mep-discovery = ["pypdf==6.18.0"]
+mep-dxf = ["ezdxf==1.4.4"]
 # Промт 10: малая сегментация. Версии фиксируются при первом настоящем прогоне на GPU-хосте.
 train = ["torch", "torchvision"]
 # Промт 11: SAM 2.1 через transformers и официальные веса Meta. Пакет sam2 с PyPI — сторонний

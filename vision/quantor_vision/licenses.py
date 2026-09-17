@@ -18,6 +18,7 @@ from pathlib import Path
 # Пакеты, для которых решение обязательно. Любой из них в любом манифесте без строки
 # allow/conditional в decisions.json — нарушение.
 GUARDED = (
+    "ezdxf",
     "ultralytics",
     "unsloth",
     "unsloth-zoo",

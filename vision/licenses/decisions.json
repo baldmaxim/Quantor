@@ -1,6 +1,6 @@
 {
   "_note": "Машиночитаемая матрица лицензий Stage 2B (docs/stage2b/model-license-matrix.md). Проверено 2026-09-14. Не юридическое заключение. Пакет или вес без строки allow/conditional здесь не добавляется ни в один манифест репозитория: это проверяет `vision licenses-check` в CI.",
-  "checked": "2026-09-15",
+  "checked": "2026-09-17",
   "packages": {
     "torch": {
       "spdx": "BSD-3-Clause (дистрибутив PyPI: Apache-2.0 AND BSD-2/3-Clause AND MIT AND BSL-1.0 AND LLVM-exception)",
@@ -114,6 +114,21 @@
       "decision": "allow",
       "scope": "vision[mep-discovery], pypdf==6.18.0; offline D0 text and metadata only, no rendering or OCR",
       "evidence": "Installed pypdf 6.18.0 dist-info/licenses/LICENSE sha256:a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524; same pinned version as apps/api"
+    },
+    "ezdxf": {
+      "spdx": "MIT",
+      "decision": "allow",
+      "version": "1.4.4",
+      "scope": "vision[mep-dxf]; local DXF inventory only; no draw/dev extras, rendering, training or semantic mapping",
+      "evidence": "https://pypi.org/project/ezdxf/1.4.4/ ; https://raw.githubusercontent.com/mozman/ezdxf/v1.4.4/LICENSE ; checked 2026-09-17",
+      "notice": "Preserve MIT copyright and license notice when redistributing ezdxf. ODA is not part of this dependency.",
+      "required_dependencies": [
+        "pyparsing>=3.0.0",
+        "typing_extensions>=4.6.0",
+        "numpy",
+        "fonttools"
+      ],
+      "installation_status": "not installed for this task; DXF processing blocked before dependency installation"
     }
   },
   "weights": {
@@ -188,6 +203,25 @@
       },
       "evidence": "https://huggingface.co/api/models/facebook/dinov2-base cardData.license apache-2.0, не gated (проверено 2026-09-15)",
       "scope": "Р-8: запасной энкодер меньшего размера"
+    }
+  },
+  "external_tools": {
+    "oda-file-converter": {
+      "decision": "conditional",
+      "spdx": "LicenseRef-ODA-File-Converter-Proprietary",
+      "version": null,
+      "version_status": "BLOCKED_NOT_FOUND; exact installed version and its EULA must be recorded before execution",
+      "scope": "Owner-installed local DWG to DXF only; owner decision 2026-09-17 variant A",
+      "evidence": "https://www.opendesign.com/guestfiles/teighaFileConverter ; https://www.opendesign.com/faq/question/what-are-oda-viewer-and-oda-file-converter",
+      "conditions": [
+        "Owner installs the tool and accepts the terms for that installed version; public download availability is not a redistribution license.",
+        "Agent does not download, install, distribute or copy ODA binaries into repository or dataset.",
+        "Before execution: record executable path, actual FileVersion/ProductVersion, binary SHA-256 and installed-version license reference.",
+        "Only explicitly selected source DWG files; no recursive conversion; output outside git; no semantic interpretation."
+      ],
+      "redistributed": false,
+      "downloaded_by_agent": false,
+      "installed_by_agent": false
     }
   }
 }

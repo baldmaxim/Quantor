@@ -23,6 +23,20 @@ def _decisions(tmp_path: Path, packages: dict[str, str]) -> Path:
 
 
 class TestLicenseGate:
+    @pytest.mark.parametrize("decision", [None, "blocked", "allow", "conditional"])
+    def test_dxf_extra_requires_license_decision(
+        self, tmp_path: Path, decision: str | None
+    ) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\n[project.optional-dependencies]\nmep-dxf = ["ezdxf==1.4.4"]\n',
+            encoding="utf-8",
+        )
+        matrix = _decisions(tmp_path, {} if decision is None else {"ezdxf": decision})
+        violations = licenses.check(tmp_path, matrix)
+        assert [item.package for item in violations] == (
+            [] if decision in {"allow", "conditional"} else ["ezdxf"]
+        )
+
     def test_repository_manifests_pass_the_gate(self) -> None:
         assert licenses.check(REPO_ROOT, DECISIONS) == []
 
