@@ -1,6 +1,6 @@
 {
   "_note": "Машиночитаемая матрица лицензий Stage 2B (docs/stage2b/model-license-matrix.md). Проверено 2026-09-14. Не юридическое заключение. Пакет или вес без строки allow/conditional здесь не добавляется ни в один манифест репозитория: это проверяет `vision licenses-check` в CI.",
-  "checked": "2026-09-17",
+  "checked": "2026-09-18",
   "packages": {
     "torch": {
       "spdx": "BSD-3-Clause (дистрибутив PyPI: Apache-2.0 AND BSD-2/3-Clause AND MIT AND BSL-1.0 AND LLVM-exception)",
@@ -128,7 +128,51 @@
         "numpy",
         "fonttools"
       ],
-      "installation_status": "not installed for this task; DXF processing blocked before dependency installation"
+      "installation_status": "installed in isolated vision/.venv-mep-dxf; exact transitive versions recorded in dataset environment.json; pip check passed"
+    },
+    "numpy": {
+      "decision": "allow",
+      "spdx": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+      "scope": "vision[mep-dxf] transitive dependency",
+      "mep_dxf_review": {
+        "version": "2.5.3",
+        "spdx": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+        "evidence": "https://pypi.org/pypi/numpy/2.5.3/json",
+        "checked": "2026-09-18"
+      }
+    },
+    "pyparsing": {
+      "decision": "allow",
+      "spdx": "MIT",
+      "scope": "vision[mep-dxf] transitive dependency",
+      "mep_dxf_review": {
+        "version": "3.3.2",
+        "spdx": "MIT",
+        "evidence": "https://pypi.org/pypi/pyparsing/3.3.2/json",
+        "checked": "2026-09-18"
+      }
+    },
+    "typing_extensions": {
+      "decision": "allow",
+      "spdx": "PSF-2.0",
+      "scope": "vision[mep-dxf] transitive dependency",
+      "mep_dxf_review": {
+        "version": "4.16.0",
+        "spdx": "PSF-2.0",
+        "evidence": "https://pypi.org/pypi/typing_extensions/4.16.0/json",
+        "checked": "2026-09-18"
+      }
+    },
+    "fonttools": {
+      "decision": "allow",
+      "spdx": "MIT",
+      "scope": "vision[mep-dxf] transitive dependency",
+      "mep_dxf_review": {
+        "version": "4.65.0",
+        "spdx": "MIT",
+        "evidence": "https://pypi.org/pypi/fonttools/4.65.0/json",
+        "checked": "2026-09-18"
+      }
     }
   },
   "weights": {
@@ -209,19 +253,21 @@
     "oda-file-converter": {
       "decision": "conditional",
       "spdx": "LicenseRef-ODA-File-Converter-Proprietary",
-      "version": null,
-      "version_status": "BLOCKED_NOT_FOUND; exact installed version and its EULA must be recorded before execution",
+      "version": "27.1.0.0",
+      "version_status": "VERIFIED_INSTALLED",
       "scope": "Owner-installed local DWG to DXF only; owner decision 2026-09-17 variant A",
       "evidence": "https://www.opendesign.com/guestfiles/teighaFileConverter ; https://www.opendesign.com/faq/question/what-are-oda-viewer-and-oda-file-converter",
       "conditions": [
-        "Owner installs the tool and accepts the terms for that installed version; public download availability is not a redistribution license.",
-        "Agent does not download, install, distribute or copy ODA binaries into repository or dataset.",
+        "Owner explicitly accepted installed 27.1.0 terms; download and default installation authorized by owner on 2026-09-18.",
+        "Do not distribute or copy ODA binaries into repository or dataset. Official installer was downloaded to Windows TEMP under explicit owner authorization.",
         "Before execution: record executable path, actual FileVersion/ProductVersion, binary SHA-256 and installed-version license reference.",
         "Only explicitly selected source DWG files; no recursive conversion; output outside git; no semantic interpretation."
       ],
       "redistributed": false,
-      "downloaded_by_agent": false,
-      "installed_by_agent": false
+      "downloaded_by_agent": true,
+      "installed_by_agent": true,
+      "executable_sha256": "5889d64397a935dd7daa5f644c436706d2145d31e033cd2c1cf6a21c6702b9c2",
+      "owner_terms_accepted": "2026-09-18: owner explicitly confirms acceptance of installed version terms"
     }
   }
 }
