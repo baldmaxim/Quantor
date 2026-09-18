@@ -72,9 +72,11 @@ class SourceType(StrEnum):
 
     `base_region_text` — только тело TEXT-блока распознавалки. Описания IMAGE-блоков написаны её
     моделью и источником observed-evidence не являются, поэтому канала для них нет.
+    `pdf_vector_path` — векторные пути исходного PDF (линии, цвет, толщина), read-only (Р-MEP-19).
     """
 
     PDF_TEXT_LAYER = "pdf_text_layer"
+    PDF_VECTOR_PATH = "pdf_vector_path"
     PAGE_RASTER = "page_raster"
     BASE_REGION_TEXT = "base_region_text"
     HUMAN_ANNOTATION = "human_annotation"

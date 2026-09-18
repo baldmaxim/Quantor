@@ -304,3 +304,8 @@ cd apps/api && python -m app.contracts.mep.schemas ../../docs/mep/schemas && cd 
 Профиль получил правило количества класса: `ClassDef.quantity` (`length` у участка, `count` у узла,
 `none`) и `quantity_group_keys` ⊆ `attribute_keys`. Примеры переподписаны: хеш профиля, снимок калибровки,
 прогон и корпус.
+
+## 11. Дополнение 2026-09-18
+
+`SourceType.pdf_vector_path` — векторные пути исходного PDF как канал evidence (Р-MEP-19). Совместимое
+добавление значения перечисления; существующие графы и фикстуры A/B/C/D не меняются.

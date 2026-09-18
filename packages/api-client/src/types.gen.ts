@@ -3393,8 +3393,9 @@ export type SourceRef = {
  *
  * `base_region_text` — только тело TEXT-блока распознавалки. Описания IMAGE-блоков написаны её
  * моделью и источником observed-evidence не являются, поэтому канала для них нет.
+ * `pdf_vector_path` — векторные пути исходного PDF (линии, цвет, толщина), read-only (Р-MEP-19).
  */
-export type SourceType = 'pdf_text_layer' | 'page_raster' | 'base_region_text' | 'human_annotation';
+export type SourceType = 'pdf_text_layer' | 'pdf_vector_path' | 'page_raster' | 'base_region_text' | 'human_annotation';
 
 /**
  * SubjectKind

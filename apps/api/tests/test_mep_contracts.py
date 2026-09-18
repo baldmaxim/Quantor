@@ -155,6 +155,23 @@ class TestEvidenceSemantics:
 
         assert "SOURCE_UNAVAILABLE" in _errors(validate_evidence_graph(_evidence(data)))
 
+    def test_route_from_pdf_vector_paths(self) -> None:
+        """Р-MEP-19: трасса из векторных путей PDF — отдельный канал, а не текстовый слой."""
+        data = copy.deepcopy(EVIDENCE)
+        route = _element(data, "ev-route-1")
+        route["provenance"] = "deterministic_extracted"
+        route["sources"] = [
+            {"source_type": "pdf_vector_path", "ref_id": "path-p3-0001", "tool_id": "det"}
+        ]
+        data["source_availability"].append(
+            {"source_type": "pdf_vector_path", "sheet_id": "sheet-p3", "availability": "available"}
+        )
+
+        assert validate_evidence_graph(_evidence(data), _profile()) == []
+
+        data["source_availability"][-1]["availability"] = "unavailable"
+        assert "SOURCE_UNAVAILABLE" in _errors(validate_evidence_graph(_evidence(data)))
+
     def test_unavailable_text_layer_alone_is_not_an_error(self) -> None:
         data = copy.deepcopy(EVIDENCE)
         data["source_availability"][1]["availability"] = "unavailable"

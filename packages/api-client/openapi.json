@@ -6364,9 +6364,10 @@
         "type": "object"
       },
       "SourceType": {
-        "description": "Канал, из которого взят элемент.\n\n`base_region_text` — только тело TEXT-блока распознавалки. Описания IMAGE-блоков написаны её\nмоделью и источником observed-evidence не являются, поэтому канала для них нет.",
+        "description": "Канал, из которого взят элемент.\n\n`base_region_text` — только тело TEXT-блока распознавалки. Описания IMAGE-блоков написаны её\nмоделью и источником observed-evidence не являются, поэтому канала для них нет.\n`pdf_vector_path` — векторные пути исходного PDF (линии, цвет, толщина), read-only (Р-MEP-19).",
         "enum": [
           "pdf_text_layer",
+          "pdf_vector_path",
           "page_raster",
           "base_region_text",
           "human_annotation"
