@@ -85,7 +85,10 @@ export const TopBar = ({ crumbs, actions, status, summary }: ITopBarProps) => (
     </div>
 
     {actions && (
-      <div className="scroll-area flex items-center gap-[var(--s-4)] border-t border-border px-[var(--s-5)] py-[var(--s-4)] md:hidden">
+      // Перенос, а не прокрутка вбок: на 360px поиск и сортировка в одну строку
+      // не помещаются, и поле сжималось до «Поиск по», а вторая кнопка уезжала
+      // за край, где её никто не искал.
+      <div className="flex flex-wrap items-center gap-[var(--s-4)] border-t border-border px-[var(--s-5)] py-[var(--s-4)] md:hidden">
         {actions}
       </div>
     )}

@@ -3,10 +3,12 @@
 import { importTender, type TenderBriefRead } from '@quantor/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useState } from 'react';
+import { useState } from 'react';
 
 import {
   Button,
+  Dialog,
+  DialogActions,
   EmptyState,
   ErrorState,
   SearchInput,
@@ -15,7 +17,7 @@ import {
   cx,
 } from '@/components/ui';
 import { useListAnimation } from '@/lib/animate';
-import { errorMessage } from '@/lib/errors';
+import { errorMessage, extractCode } from '@/lib/errors';
 import { useTenders } from '@/lib/queries';
 
 /**
@@ -36,7 +38,6 @@ interface ITenderHubDialogProps {
 export const TenderHubDialog = ({ open, onClose }: ITenderHubDialogProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const titleId = useId();
 
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -44,18 +45,6 @@ export const TenderHubDialog = ({ open, onClose }: ITenderHubDialogProps) => {
 
   const tenders = useTenders(search, open);
   const list = useListAnimation<HTMLUListElement>(open);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busyId) onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, busyId, onClose]);
-
-  if (!open) return null;
 
   const connect = async (tender: TenderBriefRead) => {
     setFailure(null);
@@ -83,90 +72,81 @@ export const TenderHubDialog = ({ open, onClose }: ITenderHubDialogProps) => {
   const items = tenders.data ?? [];
 
   return (
-    <div
-      className="animate-scrim fixed inset-0 z-50 grid items-end justify-items-center bg-[var(--scrim)] sm:place-items-center sm:p-[var(--s-6)]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busyId) onClose();
+    <Dialog
+      open={open}
+      onClose={onClose}
+      size="lg"
+      busy={busyId !== null}
+      title="Проект из TenderHUB"
+      description="Портал возьмёт номер, название и заказчика. Позиции и сметные строки не переносятся — документацию нужно будет загрузить отдельно."
+      onExited={() => {
+        setSearch('');
+        setFailure(null);
       }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="animate-dialog safe-bottom flex max-h-[88dvh] w-full max-w-[720px] flex-col gap-[var(--s-5)] overflow-hidden rounded-t-[var(--radius-lg)] border border-border-strong bg-surface-raised p-[var(--s-6)] shadow-[var(--shadow-2)] sm:rounded-b-[var(--radius-lg)] sm:p-[var(--s-7)]"
-      >
-        <div className="flex flex-none flex-col gap-[var(--s-2)]">
-          <h2 id={titleId} className="text-lg font-semibold">
-            Проект из TenderHUB
-          </h2>
-          <p className="text-sm text-muted">
-            Портал возьмёт номер, название и заказчика. Позиции и сметные строки не переносятся —
-            документацию нужно будет загрузить отдельно.
-          </p>
-        </div>
-
+      // Поиск закреплён: список под ним длинный, и уехавшее вверх поле пришлось бы
+      // искать прокруткой обратно.
+      toolbar={
         <SearchInput
           label="Поиск по номеру, названию или заказчику"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           onClear={() => setSearch('')}
-          className="w-full flex-none"
+          className="w-full"
         />
-
-        {failure && (
-          <ErrorState title="Проект не создан" code={failure.code} description={failure.text} />
-        )}
-
-        <div className="scroll-area -mx-[var(--s-3)] min-h-0 flex-1 px-[var(--s-3)]">
-          {tenders.isPending && (
-            <div className="flex flex-col gap-[var(--s-4)]">
-              {[0, 1, 2, 3].map((row) => (
-                <Skeleton key={row} className="h-[52px] w-full" />
-              ))}
-            </div>
-          )}
-
-          {tenders.isError && (
-            <ErrorState
-              title="TenderHUB не ответил"
-              description={errorMessage(extractCode(tenders.error))}
-              onRetry={() => void tenders.refetch()}
-            />
-          )}
-
-          {tenders.data?.length === 0 && (
-            <EmptyState
-              compact
-              title={search ? 'Ничего не найдено' : 'Тендеров нет'}
-              description={
-                search
-                  ? 'Поиск идёт по номеру, названию и заказчику.'
-                  : 'Ключу доступа не видно ни одного активного тендера.'
-              }
-            />
-          )}
-
-          <ul ref={list} className="flex list-none flex-col">
-            {items.map((tender) => (
-              <TenderRow
-                key={tender.id}
-                tender={tender}
-                busy={busyId === tender.id}
-                disabled={busyId !== null}
-                onConnect={() => void connect(tender)}
-                onOpen={(projectId) => router.push(`/projects/${projectId}`)}
-              />
-            ))}
-          </ul>
-        </div>
-
-        <div className="flex flex-none justify-end">
+      }
+      footer={
+        <DialogActions>
           <Button onClick={onClose} disabled={busyId !== null}>
             Закрыть
           </Button>
+        </DialogActions>
+      }
+    >
+      {failure && (
+        <ErrorState title="Проект не создан" code={failure.code} description={failure.text} />
+      )}
+
+      {tenders.isPending && (
+        <div className="flex flex-col gap-[var(--s-4)]">
+          {[0, 1, 2, 3].map((row) => (
+            <Skeleton key={row} className="h-[52px] w-full" />
+          ))}
         </div>
-      </div>
-    </div>
+      )}
+
+      {tenders.isError && (
+        <ErrorState
+          title="TenderHUB не ответил"
+          description={errorMessage(extractCode(tenders.error))}
+          onRetry={() => void tenders.refetch()}
+        />
+      )}
+
+      {tenders.data?.length === 0 && (
+        <EmptyState
+          compact
+          title={search ? 'Ничего не найдено' : 'Тендеров нет'}
+          description={
+            search
+              ? 'Поиск идёт по номеру, названию и заказчику.'
+              : 'Ключу доступа не видно ни одного активного тендера.'
+          }
+        />
+      )}
+
+      <ul ref={list} className="flex list-none flex-col">
+        {items.map((tender) => (
+          <TenderRow
+            key={tender.id}
+            tender={tender}
+            busy={busyId === tender.id}
+            disabled={busyId !== null}
+            onConnect={() => void connect(tender)}
+            onOpen={(projectId) => router.push(`/projects/${projectId}`)}
+          />
+        ))}
+      </ul>
+    </Dialog>
   );
 };
 
@@ -207,20 +187,17 @@ const TenderRow = ({ tender, busy, disabled, onConnect, onOpen }: ITenderRowProp
           <Button onClick={() => onOpen(linked)}>Открыть</Button>
         </span>
       ) : (
-        <Button variant="primary" className="flex-none" disabled={disabled} onClick={onConnect}>
-          {busy ? 'Создаём…' : 'Создать проект'}
+        <Button
+          variant="primary"
+          className="flex-none"
+          disabled={disabled}
+          loading={busy}
+          loadingLabel="Создаём…"
+          onClick={onConnect}
+        >
+          Создать проект
         </Button>
       )}
     </li>
   );
-};
-
-const extractCode = (error: unknown): string => {
-  const detail = (error as { detail?: { code?: string } } | null)?.detail;
-  if (detail?.code) return detail.code;
-
-  const nested = (error as { error?: { detail?: { code?: string } } } | null)?.error?.detail;
-  if (nested?.code) return nested.code;
-
-  return 'NETWORK_ERROR';
 };

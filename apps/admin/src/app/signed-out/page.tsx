@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { buttonClassName } from '@quantor/ui';
+
 import { env } from '@/lib/env';
 
 /**
@@ -20,7 +22,7 @@ const SignedOutPage = () => (
       </p>
       <a
         href={`${env.apiBaseUrl}/api/v1/auth/login`}
-        className="press inline-flex h-[var(--h-ctl)] items-center justify-center rounded-[var(--radius-sm)] border border-accent bg-accent px-[var(--s-6)] text-sm font-medium text-accent-contrast"
+        className={buttonClassName({ variant: 'primary' })}
       >
         Войти
       </a>

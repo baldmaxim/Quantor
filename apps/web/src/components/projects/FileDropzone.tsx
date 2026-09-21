@@ -127,30 +127,38 @@ const PickedRow = ({ picked, disabled, onRemove }: IPickedRowProps) => {
   const capability = CAPABILITY[extension];
 
   return (
-    <li className="grid grid-cols-[20px_1fr_auto_auto] items-center gap-[var(--s-5)] border-b border-border px-[var(--s-6)] py-[var(--s-5)] last:border-b-0">
-      <Icon width={16} height={16} className="text-muted" />
+    // Имя файла важнее подписи о том, что с ним будет. Пока они делили строку,
+    // длинный бейдж («Сохранить, распознавание — на следующем этапе») забирал её
+    // половину, и от имени оставалось начало. Теперь имя занимает строку целиком,
+    // а размер и подпись возможности стоят под ним второй строкой.
+    <li className="flex items-start gap-[var(--s-5)] border-b border-border px-[var(--s-6)] py-[var(--s-5)] last:border-b-0">
+      {/* По верхнему краю: иконка относится к имени файла, а не к строке целиком. */}
+      <Icon width={16} height={16} className="mt-[2px] flex-none text-muted" />
 
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate text-sm">{picked.file.name}</span>
-        <span className="mono text-xs text-muted">{formatBytes(picked.file.size)}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-[var(--s-2)]">
+        <span className="truncate text-sm" title={picked.file.name}>
+          {picked.file.name}
+        </span>
+        <span className="flex flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
+          <span className="mono text-xs text-muted">{formatBytes(picked.file.size)}</span>
+          {picked.accepted && capability ? (
+            <StatusBadge tone={capability.tone} dot={false} wrap>
+              {capability.text}
+            </StatusBadge>
+          ) : (
+            <StatusBadge tone="danger" dot={false}>
+              Тип не поддерживается
+            </StatusBadge>
+          )}
+        </span>
       </span>
-
-      {picked.accepted && capability ? (
-        <StatusBadge tone={capability.tone} dot={false}>
-          {capability.text}
-        </StatusBadge>
-      ) : (
-        <StatusBadge tone="danger" dot={false}>
-          Тип не поддерживается
-        </StatusBadge>
-      )}
 
       <button
         type="button"
         onClick={onRemove}
         disabled={disabled}
         aria-label={`Убрать ${picked.file.name}`}
-        className="press grid h-[26px] w-[26px] place-items-center rounded-[var(--radius-sm)] text-base leading-none text-muted hover:bg-surface-muted hover:text-text disabled:opacity-40"
+        className="press grid h-[26px] w-[26px] flex-none place-items-center self-center rounded-[var(--radius-sm)] text-base leading-none text-muted hover:bg-surface-muted hover:text-text disabled:opacity-40 max-md:h-[44px] max-md:w-[44px]"
       >
         ×
       </button>

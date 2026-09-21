@@ -3,13 +3,13 @@
 import { createProject } from '@quantor/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 
 import { classifyFiles, FileDropzone, type PickedFile } from '@/components/projects/FileDropzone';
 import { useUploadQueue } from '@/components/projects/UploadQueue';
-import { Button, ErrorState, ProgressRow, StatusBadge } from '@/components/ui';
-import { errorMessage } from '@/lib/errors';
-import { formatBytes } from '@/lib/format';
+import { UploadQueueList } from '@/components/projects/UploadQueueList';
+import { Button, Dialog, DialogActions, ErrorState } from '@/components/ui';
+import { errorMessage, extractCode } from '@/lib/errors';
 
 /**
  * Создание проекта и загрузка первых файлов.
@@ -43,18 +43,6 @@ export const CreateProjectDialog = ({ open, onClose }: ICreateProjectDialogProps
   const busy = creating || queue.running;
   const canSubmit = name.trim().length > 0 && !busy;
 
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, busy, onClose]);
-
-  if (!open) return null;
-
   const submit = async () => {
     setFailure(null);
     setCreating(true);
@@ -81,129 +69,75 @@ export const CreateProjectDialog = ({ open, onClose }: ICreateProjectDialogProps
   };
 
   return (
-    <div
-      // На телефоне окно прижато к низу и во всю ширину: до кнопок внизу дотягивается
-      // большой палец, а центрированная карточка с полями по краям там только сужает
-      // поля ввода.
-      className="animate-scrim fixed inset-0 z-50 grid items-end justify-items-center bg-[var(--scrim)] sm:place-items-center sm:p-[var(--s-6)]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
+    <Dialog
+      open={open}
+      onClose={onClose}
+      busy={busy}
+      title="Новый проект"
+      // Окно живёт в разметке постоянно, поэтому введённое имя и прошлую очередь
+      // нужно обнулить явно: иначе они встретят пользователя при следующем открытии.
+      onExited={() => {
+        setName('');
+        setFiles([]);
+        setFailure(null);
+        queue.reset();
       }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${nameId}-title`}
-        className="animate-dialog safe-bottom flex max-h-[88dvh] w-full max-w-[620px] flex-col gap-[var(--s-6)] overflow-auto rounded-t-[var(--radius-lg)] border border-border-strong bg-surface-raised p-[var(--s-6)] shadow-[var(--shadow-2)] sm:rounded-b-[var(--radius-lg)] sm:p-[var(--s-7)]"
-      >
-        <h2 id={`${nameId}-title`} className="text-lg font-semibold">
-          Новый проект
-        </h2>
-
-        <label className="flex flex-col gap-[var(--s-3)]">
-          <span className="text-sm">Название проекта</span>
-          <input
-            autoFocus
-            value={name}
-            disabled={busy}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Например: ЖК «Северный», корпус 3 — АР"
-            className="h-[var(--h-ctl)] rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-5)] text-sm text-text placeholder:text-muted disabled:opacity-60"
-          />
-        </label>
-
-        <FileDropzone
-          files={files}
-          disabled={busy}
-          onAdd={(added) => setFiles((current) => [...current, ...classifyFiles(added)])}
-          onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))}
-        />
-
-        {rejected > 0 && (
-          <p className="text-xs text-danger">
-            {rejected === 1
-              ? 'Один файл не будет загружен'
-              : `${rejected} файла не будут загружены`}
-            : портал принимает только перечисленные типы.
-          </p>
-        )}
-
-        {queue.items.length > 0 && (
-          <ul className="flex flex-col gap-[var(--s-4)]">
-            {queue.items.map((item) => (
-              <li key={item.id} className="flex flex-col gap-[var(--s-2)]">
-                <div className="flex items-baseline gap-[var(--s-4)] text-xs">
-                  <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                  <span className="mono text-muted">{formatBytes(item.size)}</span>
-                  <UploadBadge stage={item.stage} duplicate={item.duplicate} />
-                </div>
-
-                {item.stage === 'загрузка' && (
-                  <ProgressRow value={item.fraction} label={`Загрузка ${item.name}`} />
-                )}
-
-                {item.errorText && (
-                  <p className="text-xs text-danger">
-                    {item.errorText}
-                    {item.errorCode && <span className="mono text-muted"> · {item.errorCode}</span>}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {failure && (
-          <ErrorState title="Проект не создан" code={failure.code} description={failure.text} />
-        )}
-
-        <div className="flex flex-wrap items-center gap-[var(--s-4)]">
+      footer={
+        <>
           {queue.running && (
             <Button variant="danger" onClick={queue.cancel}>
               Отменить загрузку
             </Button>
           )}
-          <div className="ml-auto flex gap-[var(--s-4)]">
+          <DialogActions>
             <Button onClick={onClose} disabled={busy}>
               Отмена
             </Button>
-            <Button variant="primary" onClick={() => void submit()} disabled={!canSubmit}>
-              {busy ? 'Создаём…' : 'Создать проект'}
+            <Button
+              variant="primary"
+              onClick={() => void submit()}
+              disabled={!canSubmit}
+              loading={busy}
+              loadingLabel="Создаём…"
+            >
+              Создать проект
             </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+          </DialogActions>
+        </>
+      }
+    >
+      <label className="flex flex-col gap-[var(--s-3)]">
+        <span className="text-sm">Название проекта</span>
+        <input
+          autoFocus
+          id={nameId}
+          value={name}
+          disabled={busy}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Например: ЖК «Северный», корпус 3 — АР"
+          className="h-[var(--h-ctl)] rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-5)] text-sm text-text placeholder:text-muted disabled:opacity-60"
+        />
+      </label>
+
+      <FileDropzone
+        files={files}
+        disabled={busy}
+        onAdd={(added) => setFiles((current) => [...current, ...classifyFiles(added)])}
+        onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))}
+      />
+
+      {rejected > 0 && (
+        <p className="text-xs text-danger">
+          {rejected === 1 ? 'Один файл не будет загружен' : `${rejected} файла не будут загружены`}:
+          портал принимает только перечисленные типы.
+        </p>
+      )}
+
+      <UploadQueueList items={queue.items} />
+
+      {failure && (
+        <ErrorState title="Проект не создан" code={failure.code} description={failure.text} />
+      )}
+    </Dialog>
   );
-};
-
-const STAGE_TONE = {
-  ожидание: 'neutral',
-  загрузка: 'accent',
-  готово: 'success',
-  ошибка: 'danger',
-  отменено: 'neutral',
-} as const;
-
-const UploadBadge = ({
-  stage,
-  duplicate,
-}: {
-  stage: keyof typeof STAGE_TONE;
-  duplicate: boolean;
-}) => (
-  <StatusBadge tone={STAGE_TONE[stage]} dot={false}>
-    {/* Повтор — не ошибка: файл уже был загружен, и вторая копия не создаётся. */}
-    {stage === 'готово' && duplicate ? 'уже был' : stage}
-  </StatusBadge>
-);
-
-const extractCode = (error: unknown): string => {
-  const detail = (error as { detail?: { code?: string } } | null)?.detail;
-  if (detail?.code) return detail.code;
-
-  const nested = (error as { error?: { detail?: { code?: string } } } | null)?.error?.detail;
-  if (nested?.code) return nested.code;
-
-  return 'NETWORK_ERROR';
 };

@@ -3,7 +3,7 @@
 import type { MepScenarioRead } from '@quantor/api-client';
 import { useCallback, useMemo, useState, type FC } from 'react';
 
-import { StatusBadge, cx } from '@/components/ui';
+import { SegmentedControl, StatusBadge } from '@/components/ui';
 import {
   evidenceShapes,
   networkShapes,
@@ -104,24 +104,15 @@ export const MepExperiment: FC<IMepExperimentProps> = ({ scenario }) => {
 
   return (
     <div className="flex flex-col gap-[var(--s-5)]">
-      <nav aria-label="Стадии эксперимента" className="flex flex-wrap gap-[var(--s-2)]">
-        {STEPS.map((item) => (
-          <button
-            key={item.step}
-            type="button"
-            aria-pressed={step === item.step}
-            onClick={() => setStep(item.step)}
-            className={cx(
-              'press rounded-[var(--radius-sm)] border px-[var(--s-4)] py-[var(--s-2)] text-sm',
-              step === item.step
-                ? 'border-accent bg-accent-soft text-accent'
-                : 'border-border hover:bg-surface-muted',
-            )}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      {/* Группа переключателей, а не навигация: стадии ничего не открывают,
+          они меняют показанное рядом. */}
+      <SegmentedControl
+        label="Стадии эксперимента"
+        layout="wrap"
+        value={step}
+        onChange={setStep}
+        options={STEPS.map((item) => ({ value: item.step, label: item.label }))}
+      />
 
       <div className="grid gap-[var(--s-5)] lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
         <section aria-label="Лист" className="flex min-w-0 flex-col gap-[var(--s-3)]">

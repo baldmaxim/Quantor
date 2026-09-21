@@ -61,7 +61,7 @@ export const ServiceWorkerBridge = () => {
       role="status"
       // Над нижней навигацией, а не поверх неё: на телефоне разделы прибиты к низу
       // экрана, и тост, лежащий на них, забирает себе нажатия по «Проектам».
-      className="animate-rise safe-bottom fixed inset-x-[var(--s-5)] bottom-[calc(var(--h-bottom-nav)+var(--s-5))] z-40 mx-auto flex max-w-[420px] flex-wrap items-center gap-[var(--s-4)] rounded-[var(--radius-md)] border border-border-strong bg-surface-raised px-[var(--s-5)] py-[var(--s-4)] shadow-[var(--shadow-2)] md:bottom-[var(--s-6)]"
+      className="animate-rise fixed inset-x-[var(--s-5)] bottom-[calc(var(--h-bottom-nav)+var(--s-5)+var(--safe-b))] z-40 mx-auto flex max-w-[420px] flex-wrap items-center gap-[var(--s-4)] rounded-[var(--radius-md)] border border-border-strong bg-surface-raised px-[var(--s-5)] py-[var(--s-4)] shadow-[var(--shadow-2)] md:bottom-[calc(var(--s-6)+var(--safe-b))]"
     >
       <p className="min-w-0 flex-1 text-sm">Доступна новая версия портала</p>
       {/* Отложить можно: обновление перезагружает страницу, а пользователь мог

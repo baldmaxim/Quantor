@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { buttonClassName } from '@quantor/ui';
+
 import { env } from '@/lib/env';
 
 /**
@@ -24,9 +26,11 @@ const SignedOutPage = () => (
         Проекты и документы доступны только участникам рабочего пространства. Войдите, чтобы
         продолжить.
       </p>
+      {/* Обычная ссылка, а не next/link: вход уходит на сервер API, и переход
+          обязан быть полным, с отдачей cookie. */}
       <a
         href={`${env.apiBaseUrl}/api/v1/auth/login?next=/projects`}
-        className="press inline-flex h-[var(--h-ctl)] items-center justify-center rounded-[var(--radius-sm)] border border-accent bg-accent px-[var(--s-6)] text-sm font-medium text-accent-contrast"
+        className={buttonClassName({ variant: 'primary' })}
       >
         Войти
       </a>

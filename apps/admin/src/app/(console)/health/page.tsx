@@ -46,10 +46,11 @@ const Page = () => {
       actions={
         <Button
           variant="primary"
-          disabled={diagnostics.isFetching}
+          loading={diagnostics.isFetching}
+          loadingLabel="Проверяем…"
           onClick={() => void diagnostics.refetch()}
         >
-          {diagnostics.isFetching ? 'Проверяем…' : 'Проверить снова'}
+          Проверить снова
         </Button>
       }
     >

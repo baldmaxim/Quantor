@@ -40,11 +40,13 @@ const Page = () => {
       actions={
         <Button
           variant="primary"
-          disabled={!configured || probe.isPending}
+          disabled={!configured}
+          loading={probe.isPending}
+          loadingLabel="Проверяем…"
           title={configured ? undefined : 'Нет ключа доступа: проверять нечего'}
           onClick={() => probe.mutate()}
         >
-          {probe.isPending ? 'Проверяем…' : 'Проверить связь'}
+          Проверить связь
         </Button>
       }
     >

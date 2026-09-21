@@ -6,5 +6,11 @@
  */
 
 export * from './primitives';
+export { Button, Spinner, buttonClassName } from './button';
+export type { ButtonVariant, IButtonLook } from './button';
+export { SegmentedControl } from './segmented';
+export type { ISegmentedOption, SegmentedLayout } from './segmented';
+export { Dialog, DialogActions } from './Dialog';
+export type { DialogSize } from './Dialog';
 export { ThemeToggle } from './ThemeToggle';
 export { ThemeScript } from './ThemeScript';

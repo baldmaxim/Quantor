@@ -37,3 +37,4 @@ ADR не переписываются задним числом. Если реш
 | [0026](0026-validnost-mnogougolnika-i-otverstiya.md)                          | Валидность многоугольника и отверстия: `points` + `holes`, отказ вместо починки | принято                |
 | [0027](0027-mep-gipoteza-p-rd-vor-izolirovannyj-eksperiment.md)               | MEP-гипотеза П → РД → ВОР — изолированный эксперимент                           | принято, дополнен 0028 |
 | [0028](0028-mep-semanticheskoe-raspoznavanie-v-scope.md)                      | MEP: базовое распознавание заморожено, семантическое — в scope                  | принято                |
+| [0029](0029-sloi-css-i-granica-sluzhebnyh-klassov.md)                         | Служебные классы в слое components и всегда проигрывают разметке                | принято                |

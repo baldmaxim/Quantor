@@ -1,7 +1,6 @@
 'use client';
 
 import type { DocumentRevisionRead, ProjectJobSummary } from '@quantor/api-client';
-import Link from 'next/link';
 import { use, useState, ViewTransition } from 'react';
 
 import { DocumentRow } from '@/components/projects/DocumentRow';
@@ -9,6 +8,7 @@ import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
 import { TopBar } from '@/components/shell/TopBar';
 import {
   Button,
+  ButtonLink,
   EmptyState,
   ErrorState,
   Field,
@@ -73,12 +73,9 @@ const ProjectPage = ({ params }: IPageProps) => {
           <>
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
             {target ? (
-              <Link
-                href={workspaceHref(projectId, target.revision.id)}
-                className="inline-flex h-[var(--h-ctl)] items-center rounded-[var(--radius-sm)] border border-accent bg-accent px-[var(--s-5)] text-sm font-medium text-accent-contrast hover:bg-accent-hover"
-              >
+              <ButtonLink href={workspaceHref(projectId, target.revision.id)} variant="primary">
                 Открыть рабочую область
-              </Link>
+              </ButtonLink>
             ) : (
               <Button variant="primary" disabled title={noTargetReason(states)}>
                 Открыть рабочую область

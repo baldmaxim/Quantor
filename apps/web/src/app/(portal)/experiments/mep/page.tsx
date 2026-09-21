@@ -4,7 +4,13 @@ import { useState } from 'react';
 
 import { MepExperiment } from '@/components/mep/MepExperiment';
 import { TopBar } from '@/components/shell/TopBar';
-import { EmptyState, ErrorState, SkeletonRows, StatusBadge, cx } from '@/components/ui';
+import {
+  EmptyState,
+  ErrorState,
+  SegmentedControl,
+  SkeletonRows,
+  StatusBadge,
+} from '@/components/ui';
 import { mepAccess } from '@/lib/mep/access';
 import { useMepScenario, useMepScenarios } from '@/lib/mep/queries';
 import { useFeatures, useMeta } from '@/lib/queries';
@@ -54,25 +60,17 @@ const MepExperimentPage = () => {
             подключены.
           </p>
 
-          <nav aria-label="Сценарии" className="flex flex-wrap gap-[var(--s-3)]">
-            {(scenarios.data ?? []).map((item) => (
-              <button
-                key={item.scenario_id}
-                type="button"
-                aria-pressed={item.scenario_id === scenarioId}
-                title={item.description}
-                onClick={() => setScenarioId(item.scenario_id)}
-                className={cx(
-                  'press rounded-[var(--radius-sm)] border px-[var(--s-4)] py-[var(--s-2)] text-sm',
-                  item.scenario_id === scenarioId
-                    ? 'border-accent bg-accent-soft text-accent'
-                    : 'border-border hover:bg-surface-muted',
-                )}
-              >
-                {item.title}
-              </button>
-            ))}
-          </nav>
+          <SegmentedControl
+            label="Сценарии"
+            layout="wrap"
+            value={scenarioId ?? ''}
+            onChange={setScenarioId}
+            options={(scenarios.data ?? []).map((item) => ({
+              value: item.scenario_id,
+              label: item.title,
+              hint: item.description,
+            }))}
+          />
 
           {scenario.isError ? (
             <ErrorState title="Сценарий не загрузился" onRetry={() => void scenario.refetch()} />

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FC } from 'react';
 
-import { Button, cx } from '@/components/ui';
+import { Button, SegmentedControl, type ISegmentedOption } from '@/components/ui';
 import type { NormalizedPoint } from '@/lib/viewer/coordinates';
 import {
   distancePdfPoints,
@@ -15,7 +15,7 @@ const UNITS = [
   { value: 'mm', label: 'мм' },
   { value: 'cm', label: 'см' },
   { value: 'm', label: 'м' },
-] as const;
+] as const satisfies readonly ISegmentedOption<'mm' | 'cm' | 'm'>[];
 
 export type ScaleUnit = (typeof UNITS)[number]['value'];
 
@@ -80,10 +80,10 @@ export const ScaleDialog: FC<IScaleDialogProps> = ({
     <div
       role="dialog"
       aria-label="Масштаб чертежа"
-      className="flex w-[280px] flex-col gap-[var(--s-4)] rounded-[var(--radius-md)] border border-line bg-surface p-[var(--s-5)] shadow-[var(--shadow-sheet)]"
+      className="flex w-[280px] flex-col gap-[var(--s-4)] rounded-[var(--radius-md)] border border-border-strong bg-surface p-[var(--s-5)] shadow-[var(--shadow-sheet)]"
     >
       <div className="flex flex-col gap-[var(--s-1)]">
-        <span className="text-body font-medium">Известный размер</span>
+        <span className="text-sm font-medium">Известный размер</span>
         <span className="text-micro text-muted">
           Введите размер, подписанный на чертеже между выбранными точками.
         </span>
@@ -101,28 +101,18 @@ export const ScaleDialog: FC<IScaleDialogProps> = ({
           }}
           aria-label="Известный размер"
           placeholder="6000"
-          // 16px минимум: меньше — и Safari зумит форму при фокусе.
-          //
           // Фон — `surface`, а не `canvas`. `canvas` это цвет бумаги чертежа: он остаётся
           // светлым и в тёмной теме, поэтому светлый текст на нём становится невидимым.
-          className="h-[var(--h-ctl)] min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-3)] text-body text-text tabular placeholder:text-muted"
+          className="h-[var(--h-ctl)] min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-3)] text-sm text-text tabular placeholder:text-muted"
         />
-        <div className="flex rounded-[var(--radius-sm)] border border-line">
-          {UNITS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setUnit(item.value)}
-              aria-pressed={unit === item.value}
-              className={cx(
-                'h-[var(--h-ctl)] px-[var(--s-3)] text-micro',
-                unit === item.value ? 'bg-accent-soft text-accent' : 'text-muted',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Единица измерения"
+          value={unit}
+          options={UNITS}
+          onChange={setUnit}
+          compact
+          className="flex-none"
+        />
       </div>
 
       <dl className="flex flex-col gap-[var(--s-1)] text-micro text-muted">
@@ -143,11 +133,18 @@ export const ScaleDialog: FC<IScaleDialogProps> = ({
       )}
 
       <div className="flex justify-end gap-[var(--s-2)]">
-        <Button variant="ghost" onClick={onCancel} disabled={pending}>
+        <Button variant="ghost" compact onClick={onCancel} disabled={pending}>
           Отмена
         </Button>
-        <Button variant="primary" onClick={submit} disabled={!valid || pending}>
-          {pending ? 'Сохранение…' : 'Сохранить'}
+        <Button
+          variant="primary"
+          compact
+          onClick={submit}
+          disabled={!valid}
+          loading={pending}
+          loadingLabel="Сохранение…"
+        >
+          Сохранить
         </Button>
       </div>
     </div>

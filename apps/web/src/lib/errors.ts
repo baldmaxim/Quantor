@@ -46,3 +46,20 @@ export const errorMessage = (code: string, fallback?: string): string =>
 
 /** Известен ли код порталу. Неизвестный стоит показать как есть — вместе с кодом. */
 export const isKnownError = (code: string): boolean => code in MESSAGES;
+
+/**
+ * Код ошибки из ответа клиента API.
+ *
+ * Обёрток две, потому что генерируемый клиент возвращает отказ то как `detail`,
+ * то вложенным в `error`. Незнакомая форма считается обрывом связи: это честнее,
+ * чем показать пустое сообщение.
+ */
+export const extractCode = (error: unknown): string => {
+  const detail = (error as { detail?: { code?: string } } | null)?.detail;
+  if (detail?.code) return detail.code;
+
+  const nested = (error as { error?: { detail?: { code?: string } } } | null)?.error?.detail;
+  if (nested?.code) return nested.code;
+
+  return 'NETWORK_ERROR';
+};

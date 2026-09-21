@@ -7,7 +7,14 @@ import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
 import { TenderHubDialog } from '@/components/projects/TenderHubDialog';
 import { ProjectsTable } from '@/components/projects/ProjectsTable';
 import { TopBar } from '@/components/shell/TopBar';
-import { Button, EmptyState, ErrorState, SearchInput, SkeletonRows, cx } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  SearchInput,
+  SegmentedControl,
+  SkeletonRows,
+} from '@/components/ui';
 import { DOCUMENTS_FORMS, PROJECTS_FORMS, countOf } from '@/lib/format';
 import { useFeatures, useProjects, type ProjectsParams } from '@/lib/queries';
 
@@ -51,7 +58,9 @@ const ProjectsPage = () => {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               onClear={() => setSearch('')}
-              className="min-w-0 flex-1 md:w-[240px] md:flex-none"
+              // Минимальная ширина, а не min-w-0: иначе поле сжимается до «Поиск по»,
+              // вместо того чтобы отправить сортировку на вторую строку.
+              className="min-w-[200px] flex-1 md:w-[240px] md:flex-none"
             />
             <SortToggle value={sort} onChange={setSort} />
           </>
@@ -150,36 +159,24 @@ interface ISortToggleProps {
   onChange: (value: ProjectsParams['sort']) => void;
 }
 
+const SORT_OPTIONS = [
+  { value: 'recent', label: 'По изменению' },
+  { value: 'name', label: 'По названию' },
+] as const;
+
+/**
+ * Порядок списка.
+ *
+ * Без рамки и дорожки: выбранный сегмент виден акцентом (6,4:1 к фону), и обводить
+ * группу контуром незачем — на тёмной теме он читался как белый прямоугольник.
+ */
 const SortToggle = ({ value, onChange }: ISortToggleProps) => (
-  <div
-    role="group"
-    aria-label="Сортировка"
-    // Без рамки и дорожки: выбранный сегмент виден акцентом (6,4:1 к фону), и обводить
-    // группу контуром незачем — на тёмной теме он читался как белый прямоугольник.
-    className="flex h-[var(--h-ctl)] flex-none items-center gap-[2px] rounded-[var(--radius-sm)] p-[2px]"
-  >
-    {(
-      [
-        ['recent', 'По изменению'],
-        ['name', 'По названию'],
-      ] as const
-    ).map(([key, label]) => (
-      <button
-        key={key}
-        type="button"
-        onClick={() => onChange(key)}
-        aria-pressed={value === key}
-        className={cx(
-          'press h-full rounded-[calc(var(--radius-sm)-2px)] px-[var(--s-5)] text-sm whitespace-nowrap',
-          value === key
-            ? 'bg-accent-soft font-medium text-accent'
-            : 'text-muted hover:bg-surface-muted hover:text-text',
-        )}
-      >
-        {label}
-      </button>
-    ))}
-  </div>
+  <SegmentedControl
+    label="Сортировка"
+    value={value === 'name' ? 'name' : 'recent'}
+    options={SORT_OPTIONS}
+    onChange={onChange}
+  />
 );
 
 /**

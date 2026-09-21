@@ -2,61 +2,19 @@
  * Примитивы интерфейса.
  *
  * Собраны в одном файле намеренно: их немного, они мелкие и меняются вместе.
- * Как только какой-то из них обрастёт логикой, он переедет в отдельный модуль.
+ * Кнопка и сегментированный переключатель уже переехали в свои модули — оба
+ * обросли состояниями и перестали быть мелкими.
  *
  * Цвета — только через токены. Хардкод здесь означает, что тёмная тема развалится
  * ровно в этом месте и никто этого не заметит до демонстрации.
  */
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type { InputHTMLAttributes, ReactNode } from 'react';
 
-export const cx = (...parts: (string | false | null | undefined)[]): string =>
-  parts.filter(Boolean).join(' ');
+import { Button } from './button';
+import { cx } from './cx';
 
-/* -------------------------------------------------------------------------- кнопка */
-
-type ButtonVariant = 'primary' | 'default' | 'ghost' | 'danger';
-
-interface IButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: ButtonVariant;
-  /** Компактный размер для панели инструментов рабочей области. */
-  compact?: boolean;
-  icon?: ReactNode;
-}
-
-const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary:
-    'bg-accent text-accent-contrast border-accent font-medium shadow-[var(--shadow-1)] hover:bg-accent-hover hover:border-accent-hover active:bg-accent-active active:shadow-none',
-  default:
-    'bg-surface text-text border-border-control hover:bg-surface-muted hover:border-border-strong active:bg-surface-sunken',
-  ghost: 'bg-transparent text-muted border-transparent hover:bg-surface-muted hover:text-text',
-  danger:
-    'bg-transparent text-danger border-border-control hover:bg-danger-soft hover:border-danger',
-};
-
-export const Button = ({
-  variant = 'default',
-  compact = false,
-  icon,
-  className,
-  children,
-  ...rest
-}: IButtonProps) => (
-  <button
-    type="button"
-    className={cx(
-      'press inline-flex items-center justify-center gap-[var(--s-3)] rounded-[var(--radius-sm)] border px-[var(--s-5)] whitespace-nowrap',
-      'text-sm select-none disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none',
-      compact ? 'h-[var(--h-ctl-ws)] px-[var(--s-4)] text-xs' : 'h-[var(--h-ctl)]',
-      BUTTON_VARIANTS[variant],
-      className,
-    )}
-    {...rest}
-  >
-    {icon}
-    {children}
-  </button>
-);
+export { cx };
 
 /* -------------------------------------------------------------------- поле поиска */
 
@@ -105,7 +63,9 @@ export const SearchInput = ({ label, className, onClear, ...rest }: ISearchInput
           // Граница подсвечивается акцентом при наведении и фокусе: поле должно
           // отзываться раньше, чем в него начали печатать.
           'transition-[border-color,box-shadow,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-          'hover:border-border-strong focus:border-accent focus:bg-surface-raised focus:outline-none',
+          // outline не гасим: кольцо фокуса из base.css — единственный
+          // индикатор, который видно при обходе с клавиатуры.
+          'hover:border-border-strong focus:border-accent focus:bg-surface-raised',
           'focus:shadow-[0_0_0_3px_var(--accent-soft)]',
         )}
         {...rest}
@@ -117,6 +77,9 @@ export const SearchInput = ({ label, className, onClear, ...rest }: ISearchInput
           aria-label={`Очистить: ${label}`}
           className={cx(
             'press absolute right-[var(--s-3)] grid h-[22px] w-[22px] place-items-center',
+            // Тап-цель телефона растягивает кнопку по высоте; без ширины она
+            // вылезала за поле сверху и снизу.
+            'max-md:h-[44px] max-md:w-[44px]',
             'rounded-[var(--radius-xs)] text-muted hover:bg-surface-muted hover:text-text',
           )}
         >
@@ -154,13 +117,27 @@ interface IStatusBadgeProps {
   children: ReactNode;
   /** Точка перед текстом. Убирается там, где бейдж и так один в строке. */
   dot?: boolean;
+  /**
+   * Разрешает перенос строки.
+   *
+   * По умолчанию бейдж — короткое слово состояния, и перенос ему вреден. Но там,
+   * где он несёт фразу («Сохранить, распознавание — на следующем этапе»), на
+   * 360px эта фраза растягивает страницу вбок.
+   */
+  wrap?: boolean;
 }
 
-export const StatusBadge = ({ tone = 'neutral', dot = true, children }: IStatusBadgeProps) => (
+export const StatusBadge = ({
+  tone = 'neutral',
+  dot = true,
+  wrap = false,
+  children,
+}: IStatusBadgeProps) => (
   <span
     className={cx(
       'inline-flex items-center gap-[var(--s-3)] rounded-full border px-[var(--s-4)] py-[1px]',
-      'text-micro font-medium whitespace-nowrap',
+      'text-micro font-medium',
+      wrap ? 'text-left' : 'whitespace-nowrap',
       // Состояние задания меняется на глазах: без перехода бейдж «моргает».
       'transition-colors duration-[var(--dur-base)] ease-[var(--ease-out)]',
       BADGE_TONES[tone],

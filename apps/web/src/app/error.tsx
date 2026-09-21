@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect } from 'react';
 
-import { Button, ErrorState } from '@/components/ui';
+import { Button, ButtonLink, ErrorState } from '@/components/ui';
 import { reportClientError } from '@/lib/report';
 
 /**
@@ -36,12 +35,7 @@ const RouteError = ({
           <Button variant="primary" onClick={reset}>
             Попробовать снова
           </Button>
-          <Link
-            href="/projects"
-            className="inline-flex h-[var(--h-ctl)] items-center rounded-[var(--radius-sm)] border border-border-control px-[var(--s-5)] text-sm"
-          >
-            К списку проектов
-          </Link>
+          <ButtonLink href="/projects">К списку проектов</ButtonLink>
         </div>
       </div>
     </main>

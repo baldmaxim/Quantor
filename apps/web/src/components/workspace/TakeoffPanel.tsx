@@ -2,7 +2,7 @@
 
 import { useState, type FC } from 'react';
 
-import { Button, EmptyState, cx } from '@/components/ui';
+import { Button, EmptyState, SegmentedControl, cx } from '@/components/ui';
 import type { TakeoffItemQuantityRead, TakeoffItemRead } from '@quantor/api-client';
 
 /** Типы, которые пользователь выбирает при создании строки. */
@@ -119,7 +119,7 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
                     aria-pressed={active}
                     className={cx(
                       'flex h-[var(--h-row-tree)] w-full items-center gap-[var(--s-3)]',
-                      'px-[var(--s-4)] text-left text-body',
+                      'px-[var(--s-4)] text-left text-xs',
                       active ? 'bg-accent-soft text-accent' : 'hover:bg-surface-muted',
                     )}
                   >
@@ -162,7 +162,7 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
       </div>
 
       {exportHref && (
-        <div className="border-t border-line px-[var(--s-4)] py-[var(--s-3)]">
+        <div className="border-t border-border px-[var(--s-4)] py-[var(--s-3)]">
           <a
             href={exportHref}
             className="text-micro text-muted underline-offset-2 hover:text-text hover:underline"
@@ -173,7 +173,7 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
       )}
 
       {canEdit && (
-        <div className="border-t border-line p-[var(--s-4)]">
+        <div className="border-t border-border p-[var(--s-4)]">
           {creating ? (
             <div className="flex flex-col gap-[var(--s-3)]">
               <input
@@ -187,28 +187,25 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
                 aria-label="Название строки"
                 placeholder="Например, Двери"
                 // `canvas` здесь был бы цветом бумаги чертежа — светлым и в тёмной теме.
-                className="h-[var(--h-ctl)] rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-3)] text-body text-text placeholder:text-muted"
+                className="h-[var(--h-ctl)] rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-3)] text-sm text-text placeholder:text-muted"
               />
-              <div className="grid grid-cols-2 gap-[var(--s-2)]">
-                {GEOMETRY_CHOICES.map((choice) => (
-                  <button
-                    key={choice.value}
-                    type="button"
-                    onClick={() => setGeometry(choice.value)}
-                    aria-pressed={geometry === choice.value}
-                    className={cx(
-                      'h-[var(--h-ctl-ws)] rounded-[var(--radius-sm)] border text-micro',
-                      geometry === choice.value
-                        ? 'border-accent bg-accent-soft text-accent'
-                        : 'border-line text-muted',
-                    )}
-                  >
-                    {choice.label}
-                    {/* Единица не выбирается: она следует из типа (ADR-0019). */}
-                    <span className="ml-[var(--s-2)] text-muted">{choice.unit}</span>
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                label="Что считает строка"
+                layout="grid"
+                compact
+                value={geometry}
+                onChange={setGeometry}
+                options={GEOMETRY_CHOICES.map((choice) => ({
+                  value: choice.value,
+                  label: (
+                    <>
+                      {choice.label}
+                      {/* Единица не выбирается: она следует из типа (ADR-0019). */}
+                      <span className="ml-[var(--s-2)] text-muted">{choice.unit}</span>
+                    </>
+                  ),
+                }))}
+              />
               <div className="flex justify-end gap-[var(--s-2)]">
                 <Button variant="ghost" compact onClick={() => setCreating(false)}>
                   Отмена

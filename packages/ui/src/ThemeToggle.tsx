@@ -24,6 +24,8 @@ export const ThemeToggle = ({ className }: { className?: string }) => {
       title={dark ? 'Светлая тема' : 'Тёмная тема'}
       className={cx(
         'press relative grid h-[var(--h-ctl)] w-[var(--h-ctl)] place-items-center',
+        // Тап-цель на телефоне — и по ширине тоже, иначе кнопка вытягивается.
+        'max-md:h-[44px] max-md:w-[44px]',
         'rounded-[var(--radius-sm)] border border-transparent text-muted',
         'hover:border-border-control hover:bg-surface-muted hover:text-text',
         className,

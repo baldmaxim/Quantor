@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { buttonClassName } from '@quantor/ui';
+
 import { env } from '@/lib/env';
 
 /**
@@ -19,10 +21,7 @@ const ForbiddenPage = () => (
         Управление платформой доступно только с правом <span className="mono">system.admin</span>.
         Если оно должно у вас быть — обратитесь к администратору установки.
       </p>
-      <a
-        href={env.portalUrl}
-        className="press inline-flex h-[var(--h-ctl)] items-center justify-center rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-6)] text-sm"
-      >
+      <a href={env.portalUrl} className={buttonClassName()}>
         Вернуться в портал
       </a>
     </div>

@@ -117,3 +117,77 @@ test.describe('телефон', () => {
     expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe(after);
   });
 });
+
+/**
+ * Телефон: форма и отступы контролов.
+ *
+ * Правило тап-целей из base.css тянет кнопку до 44px по высоте. Пока служебные
+ * классы лежали вне слоёв, явная ширина его не перебивала, и квадратные кнопки
+ * превращались в овалы, а нижний отступ окна обнулялся.
+ */
+test.describe('телефон: контролы', () => {
+  test('кнопки окна не прижаты к нижней границе', async ({ page }) => {
+    await page.goto('/projects?create=1');
+
+    const dialog = page.getByRole('dialog');
+    const submit = dialog.getByRole('button', { name: 'Создать проект' });
+    await expect(submit).toBeVisible();
+
+    const card = await dialog.boundingBox();
+    const button = await submit.boundingBox();
+
+    const gap = (card?.y ?? 0) + (card?.height ?? 0) - ((button?.y ?? 0) + (button?.height ?? 0));
+    expect(gap, 'между кнопкой и краем окна должен быть отступ').toBeGreaterThanOrEqual(12);
+  });
+
+  test('квадратная кнопка шапки не вытягивается в овал', async ({ page }) => {
+    await page.goto('/projects');
+
+    // Переключатель темы, а не кнопка учётной записи: сеанса в этом прогоне нет,
+    // и аватар не отрисовывается. Правило одно и то же — тап-цель тянет кнопку по
+    // высоте, и без такой же ширины квадрат превращается в овал.
+    const toggle = page.getByRole('button', { name: /Включить (тёмную|светлую) тему/ });
+    const box = await toggle.boundingBox();
+
+    expect(box).not.toBeNull();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(MIN_TAP);
+    expect(
+      Math.abs((box?.width ?? 0) - (box?.height ?? 0)),
+      'кнопка должна быть квадратной',
+    ).toBeLessThanOrEqual(1);
+  });
+
+  test('крестик удаления файла квадратный и не мельче тап-цели', async ({ page }) => {
+    await page.goto('/projects?create=1');
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Выбрать файлы').setInputFiles({
+      name: 'чертёж.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.7'),
+    });
+
+    const remove = dialog.getByRole('button', { name: /Убрать/ });
+    const box = await remove.boundingBox();
+
+    expect(box).not.toBeNull();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(MIN_TAP);
+    expect(
+      Math.abs((box?.width ?? 0) - (box?.height ?? 0)),
+      'крестик должен быть квадратным',
+    ).toBeLessThanOrEqual(1);
+    expect(await page.evaluate(horizontalOverflow)).toBeLessThanOrEqual(0);
+  });
+
+  test('сегменты сортировки не вылезают из дорожки', async ({ page }) => {
+    await page.goto('/projects');
+
+    const group = page.getByRole('group', { name: 'Сортировка' });
+    const track = await group.boundingBox();
+    const segment = await group.getByRole('button').first().boundingBox();
+
+    expect(track).not.toBeNull();
+    expect(segment).not.toBeNull();
+    expect((segment?.height ?? 0) <= (track?.height ?? 0) + 1, 'сегмент выше дорожки').toBe(true);
+  });
+});

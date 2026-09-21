@@ -340,3 +340,59 @@ test.describe('карточка проекта', () => {
     await expect(page.getByText('Нужен распознанный PDF')).toHaveCount(0);
   });
 });
+
+/**
+ * Геометрия модального окна.
+ *
+ * Отдельным блоком, потому что проверяется не поведение, а расстояния: ряд кнопок
+ * лежал вплотную к нижней границе окна — служебный класс безопасной зоны стоял вне
+ * слоёв CSS и обнулял нижний отступ, заданный разметкой.
+ *
+ * Пока окно открыто, фон помечен inert, поэтому искать в нём нечего: все запросы
+ * идут внутрь getByRole('dialog').
+ */
+test.describe('модальное окно', () => {
+  test('кнопки не прижаты к нижней границе', async ({ page }) => {
+    await page.goto('/projects?create=1');
+
+    const dialog = page.getByRole('dialog');
+    const submit = dialog.getByRole('button', { name: 'Создать проект' });
+    await expect(submit).toBeVisible();
+
+    const card = await dialog.boundingBox();
+    const button = await submit.boundingBox();
+    expect(card).not.toBeNull();
+    expect(button).not.toBeNull();
+
+    const gap = (card?.y ?? 0) + (card?.height ?? 0) - ((button?.y ?? 0) + (button?.height ?? 0));
+    // На десктопе безопасной зоны нет, поэтому это чистый отступ карточки.
+    expect(gap, 'между кнопкой и краем окна должен быть отступ').toBeGreaterThanOrEqual(16);
+  });
+
+  test('страница под окном недоступна с клавиатуры', async ({ page }) => {
+    await page.goto('/projects?create=1');
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    for (let step = 0; step < 12; step += 1) {
+      await page.keyboard.press('Tab');
+      const inside = await page.evaluate(
+        () => document.activeElement?.closest('[role="dialog"]') !== null,
+      );
+      expect(inside, `после ${step + 1} нажатий Tab фокус ушёл на страницу`).toBe(true);
+    }
+  });
+
+  test('фокус возвращается на кнопку, которой открыли окно', async ({ page }) => {
+    await page.goto('/projects');
+
+    const trigger = page.getByRole('button', { name: '+ Создать проект' });
+    await trigger.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+
+    // Иначе после закрытия обход начинается сначала, и место в интерфейсе теряется.
+    await expect(trigger).toBeFocused();
+  });
+});

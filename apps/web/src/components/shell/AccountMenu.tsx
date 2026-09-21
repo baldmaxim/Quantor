@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { cx } from '@/components/ui';
+import { Spinner, cx } from '@/components/ui';
 import { useLogout, useSession } from '@/lib/session';
 
 /**
@@ -62,6 +62,9 @@ export const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
         className={cx(
           'press grid place-items-center rounded-full border border-border-control bg-surface-muted text-xs font-semibold text-text',
           compact ? 'h-[28px] w-[28px]' : 'h-[32px] w-[32px]',
+          // На телефоне кнопку тянет до тап-цели 44px: без явной ширины круг
+          // растягивался в овал.
+          'max-md:h-[44px] max-md:w-[44px]',
           'hover:border-border-strong',
         )}
       >
@@ -126,8 +129,10 @@ export const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
             role="menuitem"
             onClick={() => logout.mutate()}
             disabled={logout.isPending}
-            className="press block w-full rounded-[var(--radius-xs)] px-[var(--s-3)] py-[var(--s-3)] text-left text-sm text-danger hover:bg-danger-soft disabled:opacity-45"
+            aria-busy={logout.isPending || undefined}
+            className="press flex w-full items-center gap-[var(--s-3)] rounded-[var(--radius-xs)] px-[var(--s-3)] py-[var(--s-3)] text-left text-sm text-danger hover:bg-danger-soft disabled:opacity-45"
           >
+            {logout.isPending && <Spinner />}
             {logout.isPending ? 'Выходим…' : 'Выйти'}
           </button>
         </div>

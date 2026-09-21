@@ -147,6 +147,16 @@
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+
+  /* --- вырез экрана ---
+     env() нельзя сложить внутри произвольного значения утилиты Tailwind, а
+     padding-bottom — одно свойство: класс его заменяет, а не дополняет. Через
+     переменную вырез складывается как обычная длина:
+     pb-[calc(var(--s-5)+var(--safe-b))]. */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
 }
 
 /* Системная тёмная тема, если пользователь не выбрал светлую явно. */
@@ -216,7 +226,10 @@
 
   --border: #2b323b;
   --border-strong: #3d4652;
-  --border-control: #767f8c;
+  /* То же значение, что в системной тёмной теме выше: 3,3:1 к --surface.
+     Разойдясь, эти два блока давали разные границы контролов в зависимости
+     от того, выбрана тема вручную или взята у системы. */
+  --border-control: #646d79;
 
   --accent: #5fa2e8;
   --accent-hover: #7ab5ee;
@@ -309,54 +322,88 @@
   --font-mono: var(--font-mono);
 }
 
+/* Минимальная тап-цель. Переменная, а не число: отдельный контрол может снизить
+   её осознанно и заметно для поиска ([--tap-min:26px] в разметке), но не молча —
+   случайной утилитой высоты. inherits: false, чтобы уменьшение на панели не
+   разошлось по всем кнопкам внутри неё. */
+@property --tap-min {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 44px;
+}
+
 /* ============================================================================
    Базовые стили
+
+   О слоях. Служебные классы этого файла живут в components. Вне слоёв они
+   выигрывали у любой утилиты Tailwind, и разметка переставала управлять своим
+   же оформлением: .safe-bottom затирал p-* и обнулял нижний отступ окна,
+   .scroll-area — overflow-*. В utilities они попали бы в один слой с утилитами
+   и выиграли бы по порядку записи. components объявлен раньше utilities,
+   поэтому класс задаёт умолчание, а разметка его уточняет.
    ============================================================================ */
 
-html,
-body {
-  min-height: 100dvh;
+@layer base {
+  html,
+  body {
+    min-height: 100dvh;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--fs-md);
+    line-height: var(--lh);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Видимый фокус обязателен: рабочей областью пользуются с клавиатуры.
+     Радиус не навязываем: outline и так повторяет форму элемента, а заданный
+     здесь --radius-xs превращал круглую кнопку при фокусе в квадратную. */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 }
 
-body {
-  margin: 0;
-  background-color: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  font-size: var(--fs-md);
-  line-height: var(--lh);
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-}
+@layer components {
+  /* Цифры в таблицах и статусной строке не должны прыгать при обновлении. */
+  .tabular,
+  .mono {
+    font-variant-numeric: tabular-nums;
+  }
 
-/* Цифры в таблицах и статусной строке не должны прыгать при обновлении. */
-.tabular,
-.mono {
-  font-variant-numeric: tabular-nums;
-}
+  .mono {
+    font-family: var(--font-mono);
+  }
 
-.mono {
-  font-family: var(--font-mono);
-}
+  /* Скрытый заголовок для программ чтения с экрана. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
 
-/* Видимый фокус обязателен: рабочей областью пользуются с клавиатуры. */
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-xs);
-}
-
-/* Скрытый заголовок для программ чтения с экрана. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--skeleton) 25%,
+      var(--skeleton-hi) 50%,
+      var(--skeleton) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s linear infinite;
+    border-radius: var(--radius-sm);
+  }
 }
 
 @keyframes skeleton-shimmer {
@@ -366,18 +413,6 @@ body {
   to {
     background-position: -200% 0;
   }
-}
-
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--skeleton) 25%,
-    var(--skeleton-hi) 50%,
-    var(--skeleton) 75%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s linear infinite;
-  border-radius: var(--radius-sm);
 }
 
 /* ============================================================================
@@ -483,8 +518,9 @@ body {
 }
 
 /* Появление и исчезновение модального окна.
-   allow-discrete нужен, чтобы display мог участвовать в переходе: без него
-   окно исчезает мгновенно, и закрытие выглядит как обрыв. */
+
+   Пары вход и выход: без анимации закрытия окно обрывается. До 640px окно —
+   лист снизу и уходит туда же, откуда пришло; выше — карточка по центру. */
 @keyframes dialog-in {
   from {
     opacity: 0;
@@ -492,8 +528,23 @@ body {
   }
 }
 
-.animate-dialog {
-  animation: dialog-in var(--dur-base) var(--ease-out) both;
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes sheet-out {
+  to {
+    transform: translateY(100%);
+  }
 }
 
 @keyframes scrim-in {
@@ -502,8 +553,10 @@ body {
   }
 }
 
-.animate-scrim {
-  animation: scrim-in var(--dur-fast) var(--ease-out) both;
+@keyframes scrim-out {
+  to {
+    opacity: 0;
+  }
 }
 
 /* Появление содержимого после загрузки: короткое, без сдвига раскладки. */
@@ -514,44 +567,121 @@ body {
   }
 }
 
-.animate-rise {
-  animation: rise-in var(--dur-base) var(--ease-out) both;
+/* Вращение индикатора работы. */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-/* Нажатие на контрол. Отдача под пальцем важнее, чем на мыши: на телефоне
-   без неё непонятно, засчиталось ли касание. */
-.press {
-  transition:
-    background-color var(--dur-instant) var(--ease-out),
-    border-color var(--dur-instant) var(--ease-out),
-    color var(--dur-instant) var(--ease-out),
-    transform var(--dur-instant) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
-}
+@layer components {
+  .dialog-scrim {
+    background-color: var(--scrim);
+  }
 
-.press:active:not(:disabled) {
-  transform: scale(0.97);
+  .dialog-scrim[data-state='open'] {
+    animation: scrim-in var(--dur-fast) var(--ease-out) both;
+  }
+
+  .dialog-scrim[data-state='closed'] {
+    animation: scrim-out var(--dur-fast) var(--ease-in) both;
+    /* Окно уже уходит: нажатия по исчезающей подложке ничего не значат. */
+    pointer-events: none;
+  }
+
+  .dialog-card[data-state='open'] {
+    animation: sheet-in var(--dur-base) var(--ease-out) both;
+  }
+
+  .dialog-card[data-state='closed'] {
+    animation: sheet-out var(--dur-base) var(--ease-in) both;
+  }
+
+  @media (min-width: 640px) {
+    .dialog-card[data-state='open'] {
+      animation: dialog-in var(--dur-base) var(--ease-out) both;
+    }
+
+    .dialog-card[data-state='closed'] {
+      animation: dialog-out var(--dur-base) var(--ease-in) both;
+    }
+  }
+
+  .animate-rise {
+    animation: rise-in var(--dur-base) var(--ease-out) both;
+  }
+
+  /* Индикатор работы: кольцо с разрывом. Размер следует за кеглем подписи,
+     цвет — за её цветом, поэтому отдельного токена не нужно. */
+  .spinner {
+    width: 1em;
+    height: 1em;
+    flex: none;
+    border: 2px solid currentColor;
+    border-inline-end-color: transparent;
+    border-radius: 9999px;
+    animation: spin 640ms linear infinite;
+  }
+
+  /* Нажатие на контрол. Отдача под пальцем важнее, чем на мыши: на телефоне
+     без неё непонятно, засчиталось ли касание. */
+  .press {
+    transition:
+      background-color var(--dur-instant) var(--ease-out),
+      border-color var(--dur-instant) var(--ease-out),
+      color var(--dur-instant) var(--ease-out),
+      transform var(--dur-instant) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+  }
+
+  .press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
 }
 
 /* ============================================================================
    Адаптивность
    ============================================================================ */
 
-/* Отступы под вырез и домашнюю полоску. Без них шапка уезжает под «чёлку»,
-   а нижняя навигация — под жест «домой». */
-.safe-top {
-  padding-top: env(safe-area-inset-top);
+@layer components {
+  /* Отступы под вырез и домашнюю полоску.
+
+     Только для элемента, у которого нет собственного padding по этой оси:
+     свойство одно, и класс его заменяет, а не дополняет. Где padding уже есть —
+     складываем явно в разметке: pb-[calc(var(--s-5)+var(--safe-b))]. */
+  .safe-top {
+    padding-top: var(--safe-t);
+  }
+
+  .safe-bottom {
+    padding-bottom: var(--safe-b);
+  }
+
+  .safe-x {
+    padding-left: var(--safe-l);
+    padding-right: var(--safe-r);
+  }
+
+  /* Инерционный скролл внутри панелей, без «протягивания» страницы за ними. */
+  .scroll-area {
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Длинные имена файлов и block_id не должны раздвигать раскладку на 360px. */
+  .wrap-anywhere {
+    overflow-wrap: anywhere;
+  }
 }
 
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
+/* Вне слоёв намеренно, как и блок уменьшенного движения ниже: это предохранители
+   телефона, и утилита в разметке не должна отменять их по недосмотру. В слое base
+   они проигрывали бы любой утилите: text-sm на поле ввода возвращал 13px, и Safari
+   снова зумил форму при фокусе.
 
-.safe-x {
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-}
-
+   Отменяются они не случайно, а намеренно и заметно: тап-цель — через --tap-min в
+   разметке, кегль поля — только правкой этого файла. */
 @media (max-width: 767px) {
   /* Шрифт меньше 16px заставляет Safari и Chrome зумить форму при фокусе,
      после чего страница остаётся увеличенной. */
@@ -561,26 +691,20 @@ body {
     font-size: 16px;
   }
 
-  /* Тап-цели: 44px — минимум Apple, 48px рекомендация Material. */
+  /* Тап-цели: 44px — минимум Apple, 48px рекомендация Material.
+     Запасное значение обязательно: без поддержки @property переменная без
+     него дала бы невалидную длину, и правило не применилось бы вовсе. */
   button,
+  .ctl,
   a[role='button'],
   [role='tab'] {
-    min-height: 44px;
+    min-height: var(--tap-min, 44px);
   }
 }
 
-/* Инерционный скролл внутри панелей, без «протягивания» страницы за ними. */
-.scroll-area {
-  overflow: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Длинные имена файлов и block_id не должны раздвигать раскладку на 360px. */
-.wrap-anywhere {
-  overflow-wrap: anywhere;
-}
-
+/* Вне слоёв намеренно: у правил ниже !important, а важные объявления
+   инвертируют порядок слоёв — важное вне слоя перебивает важное в любом
+   из них. Этот предохранитель обязан выигрывать всегда. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -589,6 +713,12 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Кольцо индикатора иначе замирает в случайном положении: длительность
+     сведена к 0,01 мс, но анимация формально продолжается. */
+  .spinner {
+    animation: none !important;
   }
 
   /* Переходы между страницами тоже отключаем: они самые заметные. */

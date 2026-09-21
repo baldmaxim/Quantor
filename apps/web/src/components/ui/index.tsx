@@ -6,9 +6,32 @@
  * ради переноса, не меняющего поведение.
  */
 
-import type { ReactNode } from 'react';
+import { buttonClassName, type IButtonLook } from '@quantor/ui';
+import Link from 'next/link';
+import type { ComponentProps, ReactNode } from 'react';
 
 export * from '@quantor/ui';
+
+/* ------------------------------------------------------------- кнопка-ссылка */
+
+type IButtonLinkProps = Omit<ComponentProps<typeof Link>, 'className'> & IButtonLook;
+
+/**
+ * Ссылка, выглядящая как кнопка.
+ *
+ * Живёт в портале, а не в пакете: `next/link` — зависимость приложения, и тащить
+ * её в общий пакет ради одного компонента неправильно. Элемент остаётся ссылкой,
+ * иначе теряются открытие в новой вкладке и переход по Enter.
+ */
+export const ButtonLink = ({
+  variant,
+  compact,
+  iconOnly,
+  className,
+  ...rest
+}: IButtonLinkProps) => (
+  <Link className={buttonClassName({ variant, compact, iconOnly, className })} {...rest} />
+);
 
 /* --------------------------------------------------------- секция инспектора */
 

@@ -107,7 +107,7 @@ export const ConsoleShell = ({ session, children }: IConsoleShellProps) => {
             onClick={() => setNavOpen((value) => !value)}
             aria-expanded={navOpen}
             aria-label="Разделы"
-            className="press grid h-[32px] w-[32px] place-items-center rounded-[var(--radius-sm)] border border-border-control text-muted lg:hidden"
+            className="press grid h-[44px] w-[44px] place-items-center rounded-[var(--radius-sm)] border border-border-control text-muted lg:hidden"
           >
             ☰
           </button>
@@ -126,7 +126,7 @@ export const ConsoleShell = ({ session, children }: IConsoleShellProps) => {
           <ThemeToggle />
         </header>
 
-        <main className="scroll-area safe-bottom min-h-0 flex-1 p-[var(--s-5)] lg:p-[var(--s-6)]">
+        <main className="scroll-area min-h-0 flex-1 p-[var(--s-5)] pb-[calc(var(--s-5)+var(--safe-b))] lg:p-[var(--s-6)] lg:pb-[calc(var(--s-6)+var(--safe-b))]">
           {children}
         </main>
       </div>

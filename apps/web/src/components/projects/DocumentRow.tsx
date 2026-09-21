@@ -1,10 +1,9 @@
 'use client';
 
 import type { DocumentRead, DocumentRevisionRead } from '@quantor/api-client';
-import Link from 'next/link';
 import type { FC } from 'react';
 
-import { Skeleton, StatusBadge } from '@/components/ui';
+import { ButtonLink, Skeleton, StatusBadge } from '@/components/ui';
 import { IconBim, IconPdf, IconZip } from '@/components/ui/icons';
 import { errorMessage } from '@/lib/errors';
 import { countOf, documentKind, formatBytes, geometryStatus, revisionStatus } from '@/lib/format';
@@ -83,13 +82,13 @@ export const DocumentRow: FC<IDocumentRowProps> = ({ projectId, document, revisi
         )}
 
         {openable && (
-          <Link
+          <ButtonLink
             href={`/projects/${projectId}/workspace?revision=${openable.id}`}
             aria-label={`Открыть ${document.display_name}`}
-            className="inline-flex h-[var(--h-ctl)] flex-none items-center rounded-[var(--radius-sm)] border border-border-control px-[var(--s-4)] text-xs hover:bg-surface-muted"
+            className="flex-none"
           >
             Открыть
-          </Link>
+          </ButtonLink>
         )}
       </div>
     </div>
