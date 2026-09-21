@@ -1072,6 +1072,18 @@ const RecognitionPanel = ({
   selectedId,
   onSelect,
 }: IRecognitionPanelProps) => {
+  // Распознавание — необязательный слой: у обычного PDF разметки нет и не должно быть.
+  // Это не ошибка и не повод требовать распознанный пакет, поэтому вместо пустых
+  // фильтров показываем одно честное объяснение.
+  if (regions.length === 0) {
+    return (
+      <p className="px-[var(--s-4)] py-[var(--s-5)] text-xs text-muted">
+        Для этого PDF нет импортированной разметки распознавания. Просмотр и ручной обмер работают и
+        без неё.
+      </p>
+    );
+  }
+
   const query = search.trim().toLowerCase();
   const filtered = query
     ? regions.filter(

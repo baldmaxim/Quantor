@@ -171,6 +171,10 @@ class TestUploadEndpoint:
         ).json()
 
         assert body["revision"]["processing_status"] == "unprocessed"
+        # Листов ещё нет: их создаст задание. Открывать такую ревизию нечем, и клиент
+        # видит это по счётчику, а не по догадке.
+        assert body["revision"]["sheet_count"] == 0
+        assert body["revision"]["geometry_status"] == "pending"
         assert body["job"] is not None
         assert body["job"]["job_type"] == "pdf_geometry_extract"
 

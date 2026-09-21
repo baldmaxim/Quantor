@@ -105,6 +105,8 @@ class UploadOutcome:
     job: Job | None
     # True, если такой файл уже был загружен и создана не новая, а найдена прежняя ревизия.
     is_duplicate: bool
+    # Листов у ревизии на момент ответа: у новой их ещё нет, у повторной загрузки — уже есть.
+    sheet_count: int = 0
 
 
 def classify(filename: str) -> FileKind:
@@ -218,7 +220,11 @@ async def receive_upload(
             session, idempotency_key=_import_key(project.id, stored.sha256)
         )
         return UploadOutcome(
-            document=existing_document, revision=existing, job=existing_job, is_duplicate=True
+            document=existing_document,
+            revision=existing,
+            job=existing_job,
+            is_duplicate=True,
+            sheet_count=await documents_service.count_sheets(session, revision_id=existing.id),
         )
 
     target = document or await documents_service.create_document(

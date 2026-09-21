@@ -75,7 +75,7 @@ async def list_document_revisions(
     )
     total = await documents_service.count_revisions(session, document_id=document.id)
     return Page(
-        items=[DocumentRevisionRead.model_validate(row) for row in rows],
+        items=[DocumentRevisionRead.of(row.revision, row.sheet_count) for row in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -96,7 +96,9 @@ async def read_revision(
     )
     if revision is None:
         raise not_found("Ревизия")
-    return DocumentRevisionRead.model_validate(revision)
+
+    sheet_count = await documents_service.count_sheets(session, revision_id=revision.id)
+    return DocumentRevisionRead.of(revision, sheet_count)
 
 
 @router.get(

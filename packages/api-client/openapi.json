@@ -1316,6 +1316,11 @@
             ],
             "title": "Revision Label"
           },
+          "sheet_count": {
+            "minimum": 0.0,
+            "title": "Sheet Count",
+            "type": "integer"
+          },
           "source_filename": {
             "title": "Source Filename",
             "type": "string"
@@ -1350,6 +1355,7 @@
           "processing_error_code",
           "geometry_status",
           "geometry_error_code",
+          "sheet_count",
           "source_metadata",
           "created_at"
         ],

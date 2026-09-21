@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Дымовые сценарии оболочки.
@@ -233,5 +233,110 @@ test.describe('рабочая область', () => {
 
     await expect(page.getByRole('heading', { name: 'Нужен экран шире' })).toBeVisible();
     expect(await page.evaluate(horizontalOverflow)).toBeLessThanOrEqual(0);
+  });
+});
+
+test.describe('карточка проекта', () => {
+  const PROJECT_ID = '22222222-2222-4222-8222-222222222222';
+  const DOCUMENT_ID = '33333333-3333-4333-8333-333333333333';
+  const REVISION_ID = '44444444-4444-4444-8444-444444444444';
+
+  /**
+   * Обычный PDF: распознавание к нему не применяли и не применят. До промта 01 карточка
+   * требовала `processing_status=ready`, и такой документ не открывался никогда.
+   */
+  const revision = (overrides: Record<string, unknown> = {}) => ({
+    id: REVISION_ID,
+    document_id: DOCUMENT_ID,
+    revision_label: null,
+    source_filename: 'План 3 этажа.pdf',
+    source_mime: 'application/pdf',
+    source_size: 2_400_000,
+    source_sha256: 'a'.repeat(64),
+    processing_status: 'unprocessed',
+    processing_error_code: null,
+    geometry_status: 'ready',
+    geometry_error_code: null,
+    sheet_count: 2,
+    source_metadata: {},
+    created_at: '2026-09-01T10:00:00Z',
+    ...overrides,
+  });
+
+  const mockProject = async (page: Page, revisions: Record<string, unknown>[]) => {
+    const json = (body: unknown) => ({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+
+    await page.route(`**/api/v1/projects/${PROJECT_ID}`, (route) =>
+      route.fulfill(
+        json({
+          id: PROJECT_ID,
+          name: 'Обычный PDF',
+          status: 'active',
+          source: 'manual',
+          external_ref: null,
+          created_at: '2026-09-01T10:00:00Z',
+          updated_at: '2026-09-01T10:00:00Z',
+          document_count: 1,
+          sheet_count: 2,
+          last_job: null,
+        }),
+      ),
+    );
+
+    await page.route(`**/api/v1/projects/${PROJECT_ID}/documents*`, (route) =>
+      route.fulfill(
+        json({
+          items: [
+            {
+              id: DOCUMENT_ID,
+              project_id: PROJECT_ID,
+              display_name: 'План 3 этажа.pdf',
+              discipline: null,
+              document_kind: 'pdf',
+              created_at: '2026-09-01T10:00:00Z',
+              updated_at: '2026-09-01T10:00:00Z',
+            },
+          ],
+          total: 1,
+          limit: 200,
+          offset: 0,
+        }),
+      ),
+    );
+
+    await page.route(`**/api/v1/documents/${DOCUMENT_ID}/revisions*`, (route) =>
+      route.fulfill(json({ items: revisions, total: revisions.length, limit: 50, offset: 0 })),
+    );
+  };
+
+  test('нераспознанный PDF с готовыми листами открывается', async ({ page }) => {
+    await mockProject(page, [revision()]);
+    await page.goto(`/projects/${PROJECT_ID}`);
+
+    const top = page.getByRole('link', { name: 'Открыть рабочую область' });
+    await expect(top).toHaveAttribute(
+      'href',
+      `/projects/${PROJECT_ID}/workspace?revision=${REVISION_ID}`,
+    );
+
+    // Действие есть и у самой строки документа: документов в проекте бывает несколько.
+    await expect(page.getByRole('link', { name: /Открыть План 3 этажа/ })).toBeVisible();
+    await expect(page.getByText('Листы готовы')).toBeVisible();
+    await expect(page.getByText('Не распознан')).toBeVisible();
+  });
+
+  test('пока листы готовятся, кнопка неактивна и объясняет почему', async ({ page }) => {
+    await mockProject(page, [revision({ geometry_status: 'pending', sheet_count: 0 })]);
+    await page.goto(`/projects/${PROJECT_ID}`);
+
+    const button = page.getByRole('button', { name: 'Открыть рабочую область' });
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveAttribute('title', /Готовим листы/);
+    // Распознанный пакет больше не требуется ни в одном тексте карточки.
+    await expect(page.getByText('Нужен распознанный PDF')).toHaveCount(0);
   });
 });

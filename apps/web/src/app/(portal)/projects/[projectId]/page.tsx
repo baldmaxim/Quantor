@@ -1,9 +1,10 @@
 'use client';
 
-import type { DocumentRead, ProjectJobSummary } from '@quantor/api-client';
+import type { DocumentRevisionRead, ProjectJobSummary } from '@quantor/api-client';
 import Link from 'next/link';
 import { use, useState, ViewTransition } from 'react';
 
+import { DocumentRow } from '@/components/projects/DocumentRow';
 import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
 import { TopBar } from '@/components/shell/TopBar';
 import {
@@ -15,30 +16,32 @@ import {
   Skeleton,
   StatusBadge,
 } from '@/components/ui';
-import { IconBim, IconPdf, IconZip } from '@/components/ui/icons';
 import { errorMessage } from '@/lib/errors';
+import { formatWhen, projectStatus } from '@/lib/format';
 import {
-  countOf,
-  documentKind,
-  formatBytes,
-  formatWhen,
-  projectStatus,
-  revisionStatus,
-  SHEETS_FORMS,
-} from '@/lib/format';
-import { isRenderable, useDocumentRevisions, useProject, useProjectDocuments } from '@/lib/queries';
+  chooseOpenTarget,
+  documentOpenState,
+  noTargetReason,
+  openTargets,
+  type OpenState,
+} from '@/lib/openability';
+import { useDocumentsRevisions, useProject, useProjectDocuments } from '@/lib/queries';
 
 /**
  * Карточка проекта.
  *
- * Отвечает на три вопроса: что загружено, что с этим происходит и можно ли уже открыть
- * рабочую область. Кнопка открытия остаётся неактивной, пока нет готовой ревизии PDF —
- * обещать открытие того, чего нет, нельзя.
+ * Отвечает на три вопроса: что загружено, что с этим происходит и что уже можно открыть.
+ * Открываемость считается по каждому документу отдельно (`lib/openability`), а не по
+ * первому попавшемуся PDF: проект с двумя чертежами не должен терять готовый из-за
+ * порядка выдачи.
  */
 
 interface IPageProps {
   params: Promise<{ projectId: string }>;
 }
+
+const workspaceHref = (projectId: string, revisionId: string): string =>
+  `/projects/${projectId}/workspace?revision=${revisionId}`;
 
 const ProjectPage = ({ params }: IPageProps) => {
   const { projectId } = use(params);
@@ -47,11 +50,17 @@ const ProjectPage = ({ params }: IPageProps) => {
   const project = useProject(projectId);
   const documents = useProjectDocuments(projectId);
 
-  // Открывать в рабочей области можно только распознанный PDF: пакет — это архив,
-  // а BIM-модель портал не разбирает.
-  const renderableDocument = documents.data?.items.find(isRenderable) ?? null;
-  const revisions = useDocumentRevisions(renderableDocument?.id ?? null);
-  const openable = revisions.data?.items.find((revision) => revision.processing_status === 'ready');
+  const items = documents.data?.items ?? [];
+  const revisions = useDocumentsRevisions(items.map((document) => document.id));
+  const revisionsOf = (documentId: string): readonly DocumentRevisionRead[] =>
+    revisions.byDocument.get(documentId)?.items ?? [];
+
+  // Верхняя кнопка ведёт в самый свежий открываемый документ проекта. Выбор не зависит
+  // от порядка списка — иначе он менялся бы вместе с сортировкой выдачи.
+  const target = chooseOpenTarget(openTargets(items, revisionsOf));
+  const states = items
+    .map((document) => documentOpenState(document, revisionsOf(document.id)))
+    .filter((state): state is OpenState => state !== null);
 
   const status = projectStatus(project.data?.last_job);
 
@@ -63,19 +72,15 @@ const ProjectPage = ({ params }: IPageProps) => {
         actions={
           <>
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
-            {openable ? (
+            {target ? (
               <Link
-                href={`/projects/${projectId}/workspace?revision=${openable.id}`}
+                href={workspaceHref(projectId, target.revision.id)}
                 className="inline-flex h-[var(--h-ctl)] items-center rounded-[var(--radius-sm)] border border-accent bg-accent px-[var(--s-5)] text-sm font-medium text-accent-contrast hover:bg-accent-hover"
               >
                 Открыть рабочую область
               </Link>
             ) : (
-              <Button
-                variant="primary"
-                disabled
-                title="Нужен распознанный PDF: загрузите пакет и дождитесь импорта"
-              >
+              <Button variant="primary" disabled title={noTargetReason(states)}>
                 Открыть рабочую область
               </Button>
             )}
@@ -110,14 +115,20 @@ const ProjectPage = ({ params }: IPageProps) => {
                   <EmptyState
                     compact
                     title="Документов пока нет"
-                    description="Загрузите распознанный пакет или PDF — они появятся здесь."
+                    description="Загрузите PDF или распознанный пакет — они появятся здесь."
                     action={<Button onClick={() => setUploading(true)}>Загрузить файл</Button>}
                   />
                 </div>
               )}
 
-              {documents.data?.items.map((document) => (
-                <DocumentRow key={document.id} document={document} />
+              {items.map((document) => (
+                <DocumentRow
+                  key={document.id}
+                  projectId={projectId}
+                  document={document}
+                  revisions={revisions.byDocument.get(document.id)?.items ?? null}
+                  total={revisions.byDocument.get(document.id)?.total ?? 0}
+                />
               ))}
             </div>
           </section>
@@ -135,7 +146,8 @@ const ProjectPage = ({ params }: IPageProps) => {
 
               {project.data && !project.data.last_job && (
                 <p className="text-sm text-muted">
-                  Заданий не было. Импорт запускается при загрузке распознанного пакета.
+                  Заданий не было. Импорт запускается при загрузке распознанного пакета; обычный PDF
+                  готовится к просмотру и без него.
                 </p>
               )}
 
@@ -151,49 +163,6 @@ const ProjectPage = ({ params }: IPageProps) => {
         onClose={() => setUploading(false)}
       />
     </>
-  );
-};
-
-const ICONS: Record<string, typeof IconPdf> = {
-  pdf: IconPdf,
-  recognized_package: IconZip,
-  revit: IconBim,
-  navisworks: IconBim,
-  ifc: IconBim,
-};
-
-const DocumentRow = ({ document }: { document: DocumentRead }) => {
-  const Icon = ICONS[document.document_kind] ?? IconPdf;
-  const revisions = useDocumentRevisions(document.id);
-  const latest = revisions.data?.items.at(-1);
-  const status = latest ? revisionStatus(latest.processing_status) : null;
-  const pageCount = latest?.source_metadata?.['page_count'];
-
-  return (
-    <div className="grid grid-cols-[22px_1fr_auto] items-center gap-[var(--s-5)] border-b border-border py-[var(--s-4)] last:border-b-0">
-      <Icon className="text-muted" />
-
-      <div className="min-w-0">
-        <p className="truncate text-sm">{document.display_name}</p>
-        <p className="mono text-xs text-muted">
-          {documentKind(document.document_kind)}
-          {latest && ` · ${formatBytes(latest.source_size)}`}
-          {typeof pageCount === 'number' && ` · ${countOf(pageCount, SHEETS_FORMS)}`}
-          {revisions.data && revisions.data.total > 1 && ` · ревизий: ${revisions.data.total}`}
-        </p>
-        {latest?.processing_error_code && (
-          <p className="mt-[var(--s-2)] text-xs text-danger">
-            {errorMessage(latest.processing_error_code)}
-          </p>
-        )}
-      </div>
-
-      {status ? (
-        <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-      ) : (
-        <Skeleton className="h-[16px] w-[90px]" />
-      )}
-    </div>
   );
 };
 

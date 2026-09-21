@@ -30,6 +30,19 @@ class SheetWithCount:
     region_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class RevisionWithCount:
+    """Ревизия со счётчиком листов.
+
+    Листы — предусловие открытия рабочей области: документ без них нечего показывать.
+    Счётчик едет вместе со списком ревизий, иначе клиенту пришлось бы запрашивать листы
+    каждой ревизии по очереди только ради того, чтобы нарисовать кнопку «Открыть».
+    """
+
+    revision: DocumentRevision
+    sheet_count: int
+
+
 # --------------------------------------------------------------------------- документы
 
 
@@ -155,16 +168,31 @@ async def find_revision_by_hash(
 
 async def list_revisions(
     session: AsyncSession, *, document_id: uuid.UUID, limit: int, offset: int
-) -> list[DocumentRevision]:
+) -> list[RevisionWithCount]:
+    """Ревизии со счётчиком листов, от старой к новой.
+
+    Порядок — часть контракта, а не подробность выборки: клиент выбирает «последнюю
+    открываемую ревизию» и обязан опираться на гарантию, а не на случайный порядок.
+    Вторичная сортировка по идентификатору делает результат однозначным и тогда, когда
+    две ревизии созданы в одну миллисекунду.
+    """
+    sheet_count = (
+        select(func.count(Sheet.id))
+        .where(Sheet.revision_id == DocumentRevision.id)
+        .correlate(DocumentRevision)
+        .scalar_subquery()
+    )
     query = (
-        select(DocumentRevision)
+        select(DocumentRevision, sheet_count)
         .where(DocumentRevision.document_id == document_id)
-        .order_by(DocumentRevision.created_at.asc())
+        .order_by(DocumentRevision.created_at.asc(), DocumentRevision.id.asc())
         .limit(limit)
         .offset(offset)
     )
     result = await session.execute(query)
-    return list(result.scalars().all())
+    return [
+        RevisionWithCount(revision=revision, sheet_count=count) for revision, count in result.all()
+    ]
 
 
 async def count_revisions(session: AsyncSession, *, document_id: uuid.UUID) -> int:

@@ -7,13 +7,19 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import COORDINATE_SPACE_NORMALIZED_TOP_LEFT, DocumentKind, ProcessingStatus
+from app.domain import (
+    COORDINATE_SPACE_NORMALIZED_TOP_LEFT,
+    DocumentKind,
+    GeometryStatus,
+    ProcessingStatus,
+)
 from app.models import Document, DocumentRevision, Project, Region, Sheet, Workspace
 from app.services import documents as documents_service
 from app.services import projects as projects_service
@@ -104,6 +110,41 @@ async def _build(session: AsyncSession, workspace_id: uuid.UUID) -> Fixture:
     return Fixture(project=project, document=document, revision=revision, sheet=sheet)
 
 
+async def _raw_pdf(
+    session: AsyncSession, *, project: Project, sheets: int
+) -> tuple[Document, DocumentRevision]:
+    """Обычный PDF: распознавание к нему не применялось и применяться не будет."""
+    document = await documents_service.create_document(
+        session,
+        project=project,
+        display_name="чертёж.pdf",
+        document_kind=DocumentKind.PDF,
+    )
+    revision = await _revision(session, document=document, index=1, sheets=sheets)
+    return document, revision
+
+
+async def _revision(
+    session: AsyncSession, *, document: Document, index: int, sheets: int
+) -> DocumentRevision:
+    revision_id = uuid.uuid4()
+    revision = await documents_service.create_revision(
+        session,
+        document=document,
+        revision_id=revision_id,
+        source_filename=f"чертёж-{index}.pdf",
+        source_mime="application/pdf",
+        source_size=1_024 * index,
+        source_sha256=f"{index:064d}",
+        storage_key=revision_key(revision_id, "чертёж.pdf"),
+        processing_status=ProcessingStatus.UNPROCESSED,
+        geometry_status=GeometryStatus.PENDING,
+    )
+    session.add_all([Sheet(revision_id=revision.id, page_index=page) for page in range(sheets)])
+    await session.commit()
+    return revision
+
+
 class TestDocuments:
     async def test_project_documents_are_listed(
         self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
@@ -176,6 +217,83 @@ class TestRevisions:
 
         assert found is not None
         assert found.id == data.revision.id
+
+
+class TestOpenability:
+    """То, по чему клиент решает, можно ли открыть ревизию в рабочей области.
+
+    Признаков три: вид документа, готовность геометрии и наличие листов. Распознавание в
+    их число не входит — у обычного PDF его не бывает вовсе (ADR-0016).
+    """
+
+    async def test_revision_carries_its_sheet_count(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        """Иначе решение «показывать ли кнопку» требовало бы запроса листов каждой ревизии."""
+        data = await _build(db_session, workspace_id)
+
+        listed = (await api.get(f"/api/v1/documents/{data.document.id}/revisions")).json()
+        single = (await api.get(f"/api/v1/revisions/{data.revision.id}")).json()
+
+        assert listed["items"][0]["sheet_count"] == 2
+        assert single["sheet_count"] == 2
+
+    async def test_raw_pdf_is_openable_while_still_unrecognised(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        """Главный сценарий промта: распознавания нет и не будет, а открыть надо."""
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Обычный PDF"
+        )
+        document, revision = await _raw_pdf(db_session, project=project, sheets=3)
+        revision.geometry_status = GeometryStatus.READY
+        await db_session.commit()
+
+        body = (await api.get(f"/api/v1/documents/{document.id}/revisions")).json()
+        item = body["items"][0]
+
+        assert item["processing_status"] == "unprocessed"
+        assert item["geometry_status"] == "ready"
+        assert item["sheet_count"] == 3
+
+    async def test_revision_without_geometry_has_no_sheets(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Ещё не готов"
+        )
+        document, _ = await _raw_pdf(db_session, project=project, sheets=0)
+
+        item = (await api.get(f"/api/v1/documents/{document.id}/revisions")).json()["items"][0]
+
+        assert item["geometry_status"] == "pending"
+        assert item["sheet_count"] == 0
+
+    async def test_revisions_are_listed_from_oldest_to_newest(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        """Гарантия порядка, на которую опирается клиент, выбирая последнюю открываемую.
+
+        Без неё «самая свежая ревизия» на карточке проекта зависела бы от порядка выдачи.
+        """
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Три ревизии"
+        )
+        document, first = await _raw_pdf(db_session, project=project, sheets=1)
+        second = await _revision(db_session, document=document, index=2, sheets=1)
+        third = await _revision(db_session, document=document, index=3, sheets=1)
+
+        # Порядок вставки нарочно нарушен относительно времени создания: выдача обязана
+        # опираться на created_at, а не на порядок строк в таблице.
+        first.created_at = datetime(2026, 9, 1, 10, 0, tzinfo=UTC)
+        second.created_at = datetime(2026, 9, 3, 10, 0, tzinfo=UTC)
+        third.created_at = datetime(2026, 9, 2, 10, 0, tzinfo=UTC)
+        await db_session.commit()
+
+        items = (await api.get(f"/api/v1/documents/{document.id}/revisions")).json()["items"]
+
+        assert [item["id"] for item in items] == [str(first.id), str(third.id), str(second.id)]
+        assert items[-1]["id"] == str(second.id)
 
 
 class TestContentUrl:

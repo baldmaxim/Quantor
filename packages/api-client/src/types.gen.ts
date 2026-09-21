@@ -682,6 +682,10 @@ export type DocumentRevisionRead = {
      */
     revision_label: string | null;
     /**
+     * Sheet Count
+     */
+    sheet_count: number;
+    /**
      * Source Filename
      */
     source_filename: string;

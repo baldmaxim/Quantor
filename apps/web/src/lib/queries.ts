@@ -23,15 +23,22 @@ import {
   readMeta,
   readProject,
   readRevisionContentUrl,
-  type DocumentRead,
+  type DocumentRevisionRead,
   type MetaResponse,
+  type PageDocumentRevisionRead,
   type ProjectSummary,
   type MeasurementRead,
   type ScaleCalibrationRead,
   type TakeoffItemRead,
   type TenderBriefRead,
 } from '@quantor/api-client';
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -157,18 +164,43 @@ export const useProjectDocuments = (projectId: string) =>
       ),
   });
 
-export const useDocumentRevisions = (documentId: string | null) =>
-  useQuery({
-    queryKey: queryKeys.revisions(documentId ?? ''),
-    enabled: documentId !== null,
-    queryFn: async () =>
-      unwrap(
-        await listDocumentRevisions({
-          throwOnError: true,
-          path: { document_id: documentId ?? '' },
-          query: { limit: 50 },
-        }),
+const revisionsQuery = (documentId: string) => ({
+  queryKey: queryKeys.revisions(documentId),
+  queryFn: async () =>
+    unwrap(
+      await listDocumentRevisions({
+        throwOnError: true,
+        path: { document_id: documentId },
+        query: { limit: 50 },
+      }),
+    ),
+  // Пока листы готовятся, страница должна сама дойти до готовности: иначе «Подготавливаем
+  // листы» висит до ручной перезагрузки, хотя задание давно завершилось.
+  refetchInterval: (query: { state: { data?: PageDocumentRevisionRead } }) =>
+    query.state.data?.items.some(isPreparing) ? JOB_POLL_INTERVAL : (false as const),
+});
+
+const isPreparing = (revision: DocumentRevisionRead): boolean =>
+  revision.geometry_status === 'pending' || revision.geometry_status === 'extracting';
+
+/**
+ * Ревизии сразу всех документов проекта.
+ *
+ * Карточка проекта спрашивала ревизии только у первого PDF и по нему решала, открывать ли
+ * рабочую область: второй, уже готовый документ при этом терялся. Теперь состояние
+ * известно по каждому документу, а ключи запросов те же — строка документа и заголовок
+ * страницы читают один и тот же кеш.
+ */
+export const useDocumentsRevisions = (documentIds: readonly string[]) =>
+  useQueries({
+    queries: documentIds.map(revisionsQuery),
+    combine: (results) => ({
+      byDocument: new Map(
+        documentIds.map((documentId, index) => [documentId, results[index]?.data ?? null]),
       ),
+      isPending: results.some((result) => result.isPending),
+      isError: results.some((result) => result.isError),
+    }),
   });
 
 export const useSheets = (revisionId: string | null) =>
@@ -242,9 +274,6 @@ const isRunning = (project: ProjectSummary | undefined): boolean => {
   const status = project?.last_job?.status;
   return status === 'queued' || status === 'running';
 };
-
-/** Документ, пригодный к открытию в рабочей области. */
-export const isRenderable = (document: DocumentRead): boolean => document.document_kind === 'pdf';
 
 /**
  * Тендеры TenderHUB, доступные ключу сервера.

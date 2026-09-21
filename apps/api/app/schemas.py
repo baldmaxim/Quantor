@@ -47,6 +47,7 @@ from app.domain import (
 from app.services.diagnostics import ProbeSource, ProbeStatus
 
 if TYPE_CHECKING:
+    from app.models import DocumentRevision
     from app.services.uploads import UploadOutcome
 
 # Пагинация обязательна: на одном листе бывают сотни областей, во всём документе — тысячи.
@@ -501,8 +502,35 @@ class DocumentRevisionRead(ApiModel):
     не извлекали, извлекаем, готово или не удалось — это разные экраны (ADR-0016).
     """
     geometry_error_code: str | None
+    sheet_count: int = Field(ge=0)
+    """Сколько листов уже создано у этой ревизии.
+
+    Открывать рабочую область нечем, пока листов нет, поэтому счётчик едет вместе с
+    ревизией: иначе клиент был бы вынужден спрашивать листы каждой ревизии по очереди,
+    только чтобы решить, показывать ли кнопку «Открыть».
+    """
     source_metadata: dict[str, Any]
     created_at: datetime
+
+    @classmethod
+    def of(cls, revision: DocumentRevision, sheet_count: int) -> DocumentRevisionRead:
+        """Собирает ответ из ревизии и посчитанного отдельно числа листов."""
+        return cls(
+            id=revision.id,
+            document_id=revision.document_id,
+            revision_label=revision.revision_label,
+            source_filename=revision.source_filename,
+            source_mime=revision.source_mime,
+            source_size=revision.source_size,
+            source_sha256=revision.source_sha256,
+            processing_status=revision.processing_status,
+            processing_error_code=revision.processing_error_code,
+            geometry_status=revision.geometry_status,
+            geometry_error_code=revision.geometry_error_code,
+            sheet_count=sheet_count,
+            source_metadata=revision.source_metadata,
+            created_at=revision.created_at,
+        )
 
 
 class RecognitionArtifactRead(ApiModel):
@@ -863,7 +891,7 @@ class UploadRead(BaseModel):
     def from_outcome(cls, outcome: UploadOutcome) -> UploadRead:
         return cls(
             document=DocumentRead.model_validate(outcome.document),
-            revision=DocumentRevisionRead.model_validate(outcome.revision),
+            revision=DocumentRevisionRead.of(outcome.revision, outcome.sheet_count),
             job=JobRead.model_validate(outcome.job) if outcome.job else None,
             is_duplicate=outcome.is_duplicate,
         )

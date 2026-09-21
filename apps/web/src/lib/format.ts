@@ -101,6 +101,23 @@ const PROCESSING_STATUS: Record<string, StatusView> = {
 export const revisionStatus = (status: string): StatusView =>
   PROCESSING_STATUS[status] ?? { label: status, tone: 'neutral' };
 
+/**
+ * Состояние подготовки листов.
+ *
+ * Отдельно от распознавания: именно оно решает, можно ли открыть чертёж. «Не применимо»
+ * — это архив или BIM-файл, у которых страниц нет и быть не может.
+ */
+const GEOMETRY_STATUS: Record<string, StatusView> = {
+  not_applicable: { label: 'Страниц нет', tone: 'neutral' },
+  pending: { label: 'Подготавливаем листы', tone: 'warning' },
+  extracting: { label: 'Подготавливаем листы', tone: 'accent' },
+  ready: { label: 'Листы готовы', tone: 'success' },
+  failed: { label: 'Листы не подготовлены', tone: 'danger' },
+};
+
+export const geometryStatus = (status: string): StatusView =>
+  GEOMETRY_STATUS[status] ?? { label: status, tone: 'neutral' };
+
 const DOCUMENT_KIND: Record<string, string> = {
   pdf: 'PDF',
   recognized_package: 'Распознанный пакет',
