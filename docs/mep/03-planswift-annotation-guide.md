@@ -11,35 +11,35 @@
 Точка Count означает один символ или якорь текста; Linear — ломаную видимой трассы.
 Новые классы по усмотрению аннотатора не создавать. Автоматический текст PDF не является HUMAN_GT.
 
-| class_id | Подпись | Инструмент | Атрибуты | Статус по умолчанию |
-| --- | --- | --- | --- | --- |
-| `route` | Трубопровод | Linear | system, diameter_label | AMBIGUOUS до ручной проверки |
-| `riser` | Стояк «Ст.В1 / Ст.Т3 / Ст.Т4» | Count | system, riser_mark | AMBIGUOUS до ручной проверки |
-| `shutoff_valve` | Шаровой кран, задвижка, вентиль, затвор с контролем положения; с электроприводом | Count | system, valve_type, actuated | AMBIGUOUS до ручной проверки |
-| `check_valve` | Обратный клапан | Count | system | AMBIGUOUS до ручной проверки |
-| `three_way_valve` | Кран 3-х ходовой | Count | system | AMBIGUOUS до ручной проверки |
-| `balancing_valve` | Балансировочный клапан | Count | system | AMBIGUOUS до ручной проверки |
-| `pressure_regulator` | Регулятор давления | Count | system | AMBIGUOUS до ручной проверки |
-| `water_hammer_arrester` | Компенсатор гидравлического удара | Count | system | AMBIGUOUS до ручной проверки |
-| `filter` | Фильтр | Count | system | AMBIGUOUS до ручной проверки |
-| `water_meter` | Счётчик воды | Count | system | AMBIGUOUS до ручной проверки |
-| `air_vent` | Автоматический воздухоотводчик | Count | system | AMBIGUOUS до ручной проверки |
-| `pressure_gauge` | Манометр | Count | system | AMBIGUOUS до ручной проверки |
-| `vibration_insert` | Вибровставка | Count | system | AMBIGUOUS до ручной проверки |
-| `bellows_compensator` | Сильфонный компенсатор | Count | system | AMBIGUOUS до ручной проверки |
-| `fixed_support` | Неподвижная опора | Count | system | AMBIGUOUS до ручной проверки |
-| `material_transition` | Переход с полимерных труб на металлические | Count | system | AMBIGUOUS до ручной проверки |
-| `household_fire_tap` | Пожарный кран бытовой | Count | system | AMBIGUOUS до ручной проверки |
-| `towel_dryer` | Электрический полотенцесушитель | Count | system | AMBIGUOUS до ручной проверки |
-| `hose_tap` | Поливочный кран | Count | system | AMBIGUOUS до ручной проверки |
-| `mixer` | Смеситель | Count | system, shower_head | AMBIGUOUS до ручной проверки |
-| `pump` | Насос | Count | system | IGNORE_FOR_TRAIN |
-| `membrane_tank` | Мембранный бак | Count | system | IGNORE_FOR_TRAIN |
-| `sprinkler` | Ороситель | Count | system | IGNORE_FOR_TRAIN |
-| `flow_switch` | Сигнализатор потока жидкости | Count | system | IGNORE_FOR_TRAIN |
-| `label_system` | Подпись системы | Count | нет; буквальный текст в журнале | AMBIGUOUS до ручной проверки |
-| `label_diameter` | Подпись диаметра | Count | нет; буквальный текст в журнале | AMBIGUOUS до ручной проверки |
-| `label_mark` | Подпись марки / отметки | Count | нет; буквальный текст в журнале | AMBIGUOUS до ручной проверки |
+| class_id                | Подпись                                                                          | Инструмент | Атрибуты                        | Статус по умолчанию          |
+| ----------------------- | -------------------------------------------------------------------------------- | ---------- | ------------------------------- | ---------------------------- |
+| `route`                 | Трубопровод                                                                      | Linear     | system, diameter_label          | AMBIGUOUS до ручной проверки |
+| `riser`                 | Стояк «Ст.В1 / Ст.Т3 / Ст.Т4»                                                    | Count      | system, riser_mark              | AMBIGUOUS до ручной проверки |
+| `shutoff_valve`         | Шаровой кран, задвижка, вентиль, затвор с контролем положения; с электроприводом | Count      | system, valve_type, actuated    | AMBIGUOUS до ручной проверки |
+| `check_valve`           | Обратный клапан                                                                  | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `three_way_valve`       | Кран 3-х ходовой                                                                 | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `balancing_valve`       | Балансировочный клапан                                                           | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `pressure_regulator`    | Регулятор давления                                                               | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `water_hammer_arrester` | Компенсатор гидравлического удара                                                | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `filter`                | Фильтр                                                                           | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `water_meter`           | Счётчик воды                                                                     | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `air_vent`              | Автоматический воздухоотводчик                                                   | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `pressure_gauge`        | Манометр                                                                         | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `vibration_insert`      | Вибровставка                                                                     | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `bellows_compensator`   | Сильфонный компенсатор                                                           | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `fixed_support`         | Неподвижная опора                                                                | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `material_transition`   | Переход с полимерных труб на металлические                                       | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `household_fire_tap`    | Пожарный кран бытовой                                                            | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `towel_dryer`           | Электрический полотенцесушитель                                                  | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `hose_tap`              | Поливочный кран                                                                  | Count      | system                          | AMBIGUOUS до ручной проверки |
+| `mixer`                 | Смеситель                                                                        | Count      | system, shower_head             | AMBIGUOUS до ручной проверки |
+| `pump`                  | Насос                                                                            | Count      | system                          | IGNORE_FOR_TRAIN             |
+| `membrane_tank`         | Мембранный бак                                                                   | Count      | system                          | IGNORE_FOR_TRAIN             |
+| `sprinkler`             | Ороситель                                                                        | Count      | system                          | IGNORE_FOR_TRAIN             |
+| `flow_switch`           | Сигнализатор потока жидкости                                                     | Count      | system                          | IGNORE_FOR_TRAIN             |
+| `label_system`          | Подпись системы                                                                  | Count      | нет; буквальный текст в журнале | AMBIGUOUS до ручной проверки |
+| `label_diameter`        | Подпись диаметра                                                                 | Count      | нет; буквальный текст в журнале | AMBIGUOUS до ручной проверки |
+| `label_mark`            | Подпись марки / отметки                                                          | Count      | нет; буквальный текст в журнале | AMBIGUOUS до ручной проверки |
 
 Для `shutoff_valve` профиль допускает point или bbox, но в этом PlanSwift-пилоте ставится
 точка Count. Рамку не подменять измерением площади. Для остальных символов — point;
@@ -110,13 +110,13 @@ e004|review=IGNORE_FOR_TRAIN
 
 `relations.csv`: `id,from_annotation_key,to_annotation_key,relation_type,review,reason,annotator,reviewed_at`.
 
-| relation_type | Разрешённые классы источника → назначения |
-| --- | --- |
-| `label_system_to_element` | label_system → route или riser |
-| `label_diameter_to_route` | label_diameter → route |
-| `label_mark_to_symbol` | label_mark → symbol |
-| `route_touches_symbol` | route → symbol |
-| `riser_connects_route` | riser → route |
+| relation_type             | Разрешённые классы источника → назначения |
+| ------------------------- | ----------------------------------------- |
+| `label_system_to_element` | label_system → route или riser            |
+| `label_diameter_to_route` | label_diameter → route                    |
+| `label_mark_to_symbol`    | label_mark → symbol                       |
+| `route_touches_symbol`    | route → symbol                            |
+| `riser_connects_route`    | riser → route                             |
 
 Выноска, марка или ручное подтверждение — основание связи; ближайшее расстояние не основание.
 Касание не превращается автоматически в гидравлическое соединение. Связи с исключёнными
