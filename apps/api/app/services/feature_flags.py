@@ -200,6 +200,17 @@ def _check(context: AuthContext, definition: FlagDefinition, scope: OverrideScop
         raise DomainError(ErrorCode.FLAG_SCOPE_INVALID, "Флаги не переопределяются на проекте")
 
 
+def actor_id(context: AuthContext) -> uuid.UUID | None:
+    """Кто поставил переопределение — или `None`, если личности нет в базе.
+
+    В dev-режиме контекст выдаётся без обращения к базе (`auth/dev.py`), поэтому строки в
+    `user_identities` у него нет. Внешний ключ такую запись не принимает, и без этой
+    проверки админка локально просто не работала: включить пилот на пространство было
+    нечем. Сведения при этом не теряются — кто и что менял, остаётся в журнале действий.
+    """
+    return None if context.is_dev_mode else context.principal.user_id
+
+
 async def set_override(
     session: AsyncSession,
     context: AuthContext,
@@ -240,13 +251,13 @@ async def set_override(
                 workspace_id=workspace_id,
                 enabled=enabled,
                 reason=reason,
-                updated_by_user_id=context.principal.user_id,
+                updated_by_user_id=actor_id(context),
             )
         )
     else:
         existing.enabled = enabled
         existing.reason = reason
-        existing.updated_by_user_id = context.principal.user_id
+        existing.updated_by_user_id = actor_id(context)
     await session.flush()
 
     await audit_service.record(

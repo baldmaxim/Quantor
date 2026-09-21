@@ -33,6 +33,7 @@ from app.domain import AuditAction, OverrideScope, ValueSource
 from app.errors import DomainError, ErrorCode
 from app.models import SettingOverride
 from app.services import audit as audit_service
+from app.services.feature_flags import actor_id
 
 log = get_logger(__name__)
 
@@ -205,12 +206,12 @@ async def set_override(
                 scope=scope,
                 workspace_id=workspace_id,
                 value=checked,
-                updated_by_user_id=context.principal.user_id,
+                updated_by_user_id=actor_id(context),
             )
         )
     else:
         existing.value = checked
-        existing.updated_by_user_id = context.principal.user_id
+        existing.updated_by_user_id = actor_id(context)
     await session.flush()
 
     await audit_service.record(

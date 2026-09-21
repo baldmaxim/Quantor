@@ -59,6 +59,13 @@ interface ITakeoffPanelProps {
   readonly onSelect: (itemId: string) => void;
   readonly onCreate: (name: string, geometryType: TakeoffGeometry) => void;
   readonly onArchive: (itemId: string) => void;
+  /**
+   * Ссылка на выгрузку открытого листа. `null`, когда выгружать нечего.
+   *
+   * Обычная ссылка, а не запрос из кода: файл отдаёт сервер вместе с заголовком вложения,
+   * и посредник в браузере тут ничего не добавляет, кроме places, где можно ошибиться.
+   */
+  readonly exportHref: string | null;
 }
 
 /**
@@ -78,6 +85,7 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
   onSelect,
   onCreate,
   onArchive,
+  exportHref,
 }) => {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -152,6 +160,17 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
           </ul>
         )}
       </div>
+
+      {exportHref && (
+        <div className="border-t border-line px-[var(--s-4)] py-[var(--s-3)]">
+          <a
+            href={exportHref}
+            className="text-micro text-muted underline-offset-2 hover:text-text hover:underline"
+          >
+            Выгрузить CSV по листу
+          </a>
+        </div>
+      )}
 
       {canEdit && (
         <div className="border-t border-line p-[var(--s-4)]">

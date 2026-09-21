@@ -10519,6 +10519,46 @@
         ]
       }
     },
+    "/api/v1/sheets/{sheet_id}/takeoff-export.csv": {
+      "get": {
+        "description": "CSV по открытому листу: строка на измерение вместе с происхождением величины.\n\nСчитает тот же движок, что и экран: выгрузка берёт готовые результаты и ничего не\nпересчитывает. Второе число, посчитанное иначе, невозможно было бы предъявить.\n\nЛист, а не проект: сложить измерения разных ревизий одного документа значило бы\nпосчитать одни и те же двери дважды (ADR-0019).",
+        "operationId": "export_sheet_takeoff",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sheet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {}
+            },
+            "description": "CSV обмера листа"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выгрузка обмера листа",
+        "tags": [
+          "takeoff"
+        ]
+      }
+    },
     "/api/v1/takeoff-items/{item_id}": {
       "patch": {
         "description": "Меняет описание строки.\n\nТипа геометрии в запросе нет: сменить его у строки с измерениями значило бы объявить\nпосчитанные точки площадями.",

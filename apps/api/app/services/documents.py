@@ -31,6 +31,20 @@ class SheetWithCount:
 
 
 @dataclass(frozen=True, slots=True)
+class SheetScope:
+    """Лист вместе со всей цепочкой владения.
+
+    Одним запросом: отчёт обязан назвать проект, документ и ревизию, а четыре обращения
+    ради четырёх имён — тот же N+1, только развёрнутый вручную.
+    """
+
+    project: Project
+    document: Document
+    revision: DocumentRevision
+    sheet: Sheet
+
+
+@dataclass(frozen=True, slots=True)
 class RevisionWithCount:
     """Ревизия со счётчиком листов.
 
@@ -262,6 +276,25 @@ async def count_sheets(session: AsyncSession, *, revision_id: uuid.UUID) -> int:
         select(func.count()).select_from(Sheet).where(Sheet.revision_id == revision_id)
     )
     return int(result.scalar_one())
+
+
+async def get_sheet_scope(
+    session: AsyncSession, *, workspace_id: uuid.UUID, sheet_id: uuid.UUID
+) -> SheetScope | None:
+    """Лист и всё, чему он принадлежит. Чужое пространство сюда не попадает."""
+    query = (
+        select(Project, Document, DocumentRevision, Sheet)
+        .join(Document, Document.project_id == Project.id)
+        .join(DocumentRevision, DocumentRevision.document_id == Document.id)
+        .join(Sheet, Sheet.revision_id == DocumentRevision.id)
+        .where(Sheet.id == sheet_id, Project.workspace_id == workspace_id)
+    )
+    row = (await session.execute(query)).first()
+    if row is None:
+        return None
+
+    project, document, revision, sheet = row
+    return SheetScope(project=project, document=document, revision=revision, sheet=sheet)
 
 
 async def get_sheet(

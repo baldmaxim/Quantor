@@ -5842,6 +5842,34 @@ export type CreateSheetCalibrationResponses = {
 
 export type CreateSheetCalibrationResponse = CreateSheetCalibrationResponses[keyof CreateSheetCalibrationResponses];
 
+export type ExportSheetTakeoffData = {
+    body?: never;
+    path: {
+        /**
+         * Sheet Id
+         */
+        sheet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/sheets/{sheet_id}/takeoff-export.csv';
+};
+
+export type ExportSheetTakeoffErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ExportSheetTakeoffError = ExportSheetTakeoffErrors[keyof ExportSheetTakeoffErrors];
+
+export type ExportSheetTakeoffResponses = {
+    /**
+     * CSV обмера листа
+     */
+    200: unknown;
+};
+
 export type UpdateTakeoffItemData = {
     body: TakeoffItemUpdate;
     path: {

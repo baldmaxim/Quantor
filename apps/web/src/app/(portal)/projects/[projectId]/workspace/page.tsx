@@ -37,13 +37,16 @@ import {
 } from '@/components/ui/icons';
 import { ToolButton, ToolDivider, ToolField } from '@/components/workspace/Toolbar';
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
+import { env } from '@/lib/env';
 import { errorMessage } from '@/lib/errors';
 import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
-import { REGIONS_FORMS, blockType, countOf } from '@/lib/format';
+import { REGIONS_FORMS, blockType, countOf, revisionTitle } from '@/lib/format';
 import {
   useContentUrl,
   useCreateCalibration,
+  useDocument,
   useProject,
+  useRevision,
   useRegions,
   useArchiveTakeoffItem,
   useCreateMeasurement,
@@ -91,6 +94,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const selectedRegionId = searchParams.get('region');
 
   const project = useProject(projectId);
+  // Какой документ и какая ревизия открыты. Из адреса известен только идентификатор
+  // ревизии, а обмер не того чертежа виден только по результату (ADR-0019).
+  const revision = useRevision(revisionId);
+  const openedDocument = useDocument(revision.data?.document_id ?? null);
   const sheets = useSheets(revisionId);
   const content = useContentUrl(revisionId);
   const { backend, loading, errorCode } = useDocumentBackend(content.data?.url ?? null);
@@ -183,6 +190,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const createMeasurement = useCreateMeasurement(sheetId ?? '');
   const updateMeasurement = useUpdateMeasurement(sheetId ?? '');
   const removeMeasurement = useDeleteMeasurement(sheetId ?? '');
+
+  // Выгрузка идёт по листу, а не по проекту: сложить измерения разных ревизий значило бы
+  // посчитать одни и те же двери дважды (ADR-0019). Пустой лист выгружать незачем.
+  const exportHref =
+    takeoff.enabled && sheetId && (measurements.data?.length ?? 0) > 0
+      ? `${env.apiBaseUrl}/api/v1/sheets/${sheetId}/takeoff-export.csv`
+      : null;
 
   // Мемоизация не косметика: без неё новый массив на каждый рендер пересчитывал бы
   // слой измерений и счётчики строк.
@@ -349,6 +363,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
     scaleDraft.cancel();
   }, [sheetId, scaleDraft]);
 
+  // То же самое для черновика обмера и выбранного измерения. Без этого начатая на одном
+  // листе ломаная доживала до другого, и Enter сохранял её туда — с координатами первого
+  // листа. Найдено живой приёмкой промта 02: измерение появлялось на чужом листе.
+  useEffect(() => {
+    tools.resetForSheetChange();
+  }, [sheetId, tools]);
+
   const setQuery = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(changes)) {
@@ -414,10 +435,28 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 </span>
                 <Link
                   href={`/projects/${projectId}`}
-                  className="max-w-[220px] truncate text-text transition-colors hover:text-accent"
+                  className="max-w-[180px] truncate text-text transition-colors hover:text-accent"
                 >
                   {project.data?.name ?? '…'}
                 </Link>
+                <span aria-hidden="true" className="opacity-60">
+                  /
+                </span>
+                <span
+                  className="max-w-[240px] truncate text-text"
+                  title={
+                    revision.data
+                      ? `${openedDocument.data?.display_name ?? revision.data.source_filename} · ревизия ${revisionTitle(revision.data)}`
+                      : undefined
+                  }
+                >
+                  {openedDocument.data?.display_name ?? revision.data?.source_filename ?? '…'}
+                </span>
+                {revision.data && (
+                  <span className="flex-none text-muted">
+                    ревизия {revisionTitle(revision.data)}
+                  </span>
+                )}
               </div>
 
               <div className="flex min-w-0 flex-1 items-stretch">
@@ -645,6 +684,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
                 {activeTab === 'takeoff' && (
                   <TakeoffPanel
+                    exportHref={exportHref}
                     items={items}
                     activeItemId={activeItemId}
                     counts={measurementCounts}

@@ -115,6 +115,18 @@ const GEOMETRY_STATUS: Record<string, StatusView> = {
   failed: { label: 'Листы не подготовлены', tone: 'danger' },
 };
 
+/**
+ * Как называется ревизия на экране.
+ *
+ * Метка, если её задали при импорте, иначе — время загрузки. Идентификатор для человека
+ * бесполезен, а обмер не той ревизии виден только по результату, поэтому подпись нужна
+ * всегда.
+ */
+export const revisionTitle = (
+  revision: { revision_label: string | null; created_at: string },
+  now: Date = new Date(),
+): string => revision.revision_label ?? `от ${formatWhen(revision.created_at, now)}`;
+
 export const geometryStatus = (status: string): StatusView =>
   GEOMETRY_STATUS[status] ?? { label: status, tone: 'neutral' };
 

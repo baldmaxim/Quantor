@@ -51,6 +51,18 @@ export class ToolController {
     this.handlers = handlers;
   }
 
+  /**
+   * Сбрасывает всё, что относилось к прежнему листу: черновик и выбранное измерение.
+   *
+   * Вершины нормализованы к своему листу, и на чужом те же доли означают другое место.
+   * Пока сброса не было, начатая на одном листе ломаная доживала до другого, и Enter
+   * сохранял её туда с координатами первого — измерение появлялось на чужом листе.
+   */
+  resetForSheetChange(): void {
+    this.send({ type: 'cancel' });
+    this.send({ type: 'selectMeasurement', measurementId: null });
+  }
+
   subscribe(listener: (state: ToolState) => void): () => void {
     this.listeners.add(listener);
     return () => {

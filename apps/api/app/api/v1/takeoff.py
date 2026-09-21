@@ -10,10 +10,11 @@
 
 from __future__ import annotations
 
+import urllib.parse
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 
 from app.api.v1.deps import AuthDep, SessionDep, WorkspaceDep, require, require_feature
 from app.auth.permissions import Permission
@@ -37,6 +38,7 @@ from app.services import documents as documents_service
 from app.services import projects as projects_service
 from app.services import scale as scale_service
 from app.services import takeoff as takeoff_service
+from app.services import takeoff_export
 
 # Весь ручной обмер закрыт пилотным флагом: выключен для пространства — возможности нет и в
 # API, а не только на экране (ADR-0023).
@@ -485,3 +487,75 @@ async def read_sheet_quantities(
             for total in computed.totals
         ],
     )
+
+
+@router.get(
+    "/sheets/{sheet_id}/takeoff-export.csv",
+    summary="Выгрузка обмера листа",
+    dependencies=[require(Permission.TAKEOFF_READ)],
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {}}, "description": "CSV обмера листа"}},
+)
+async def export_sheet_takeoff(
+    sheet_id: uuid.UUID,
+    session: SessionDep,
+    workspace: WorkspaceDep,
+) -> Response:
+    """CSV по открытому листу: строка на измерение вместе с происхождением величины.
+
+    Считает тот же движок, что и экран: выгрузка берёт готовые результаты и ничего не
+    пересчитывает. Второе число, посчитанное иначе, невозможно было бы предъявить.
+
+    Лист, а не проект: сложить измерения разных ревизий одного документа значило бы
+    посчитать одни и те же двери дважды (ADR-0019).
+    """
+    scope = await documents_service.get_sheet_scope(
+        session, workspace_id=workspace.tenant, sheet_id=sheet_id
+    )
+    if scope is None:
+        raise not_found("Лист")
+
+    computed = await takeoff_service.quantities_for_sheet(
+        session, workspace_id=workspace.tenant, sheet=scope.sheet
+    )
+    measurements = await takeoff_service.list_for_sheet(
+        session, workspace_id=workspace.tenant, sheet_id=scope.sheet.id
+    )
+    items = await takeoff_service.list_items(
+        session,
+        workspace_id=workspace.tenant,
+        project_id=scope.project.id,
+        # Архивная строка не исчезает из уже сделанных измерений: без её названия
+        # выгрузка молча потеряла бы, чего именно касается величина.
+        include_archived=True,
+    )
+
+    export_scope = takeoff_export.ExportScope(
+        project=scope.project,
+        document=scope.document,
+        revision=scope.revision,
+        sheet=scope.sheet,
+    )
+    body = takeoff_export.build_csv(
+        scope=export_scope,
+        measurements=measurements,
+        items={str(item.id): item for item in items},
+        results={result.measurement_id: result for result in computed.results},
+        totals={total.takeoff_item_id: total for total in computed.totals},
+    )
+
+    return Response(
+        content=body.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": _attachment(takeoff_export.filename(export_scope))},
+    )
+
+
+def _attachment(name: str) -> str:
+    """Заголовок вложения с кириллическим именем.
+
+    Голое имя в `filename=` часть браузеров читает как latin-1 и превращает кириллицу в
+    мусор, поэтому рядом едет ASCII-запасной вариант (RFC 5987).
+    """
+    quoted = urllib.parse.quote(name, safe="")
+    return f"attachment; filename=\"takeoff-sheet.csv\"; filename*=UTF-8''{quoted}"

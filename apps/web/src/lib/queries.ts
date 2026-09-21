@@ -12,6 +12,8 @@ import {
   listTakeoffItems,
   listDocumentRevisions,
   listProjectDocuments,
+  readDocument,
+  readRevision,
   listProjects,
   listRevisionSheets,
   listSheetCalibrations,
@@ -58,6 +60,8 @@ export const queryKeys = {
   sheets: (revisionId: string) => ['revision', revisionId, 'sheets'] as const,
   regions: (sheetId: string, blockType: string | null) =>
     ['sheet', sheetId, 'regions', blockType] as const,
+  revision: (revisionId: string) => ['revision', revisionId] as const,
+  document: (documentId: string) => ['document', documentId] as const,
   job: (jobId: string) => ['job', jobId] as const,
   contentUrl: (revisionId: string) => ['revision', revisionId, 'content-url'] as const,
   tenders: (search: string) => ['tenderhub', 'tenders', search] as const,
@@ -201,6 +205,33 @@ export const useDocumentsRevisions = (documentIds: readonly string[]) =>
       isPending: results.some((result) => result.isPending),
       isError: results.some((result) => result.isError),
     }),
+  });
+
+/**
+ * Открытая ревизия и её документ.
+ *
+ * Рабочая область получает из адреса только идентификатор ревизии, а инженер обязан
+ * видеть, какой документ и какую ревизию он обмеряет: обмер не того чертежа заметен
+ * только по результату.
+ *
+ * Неизменяемая ревизия не меняется — перезапрашивать её незачем (ADR-0003).
+ */
+export const useRevision = (revisionId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.revision(revisionId ?? ''),
+    enabled: revisionId !== null,
+    queryFn: async () =>
+      unwrap(await readRevision({ throwOnError: true, path: { revision_id: revisionId ?? '' } })),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+export const useDocument = (documentId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.document(documentId ?? ''),
+    enabled: documentId !== null,
+    queryFn: async () =>
+      unwrap(await readDocument({ throwOnError: true, path: { document_id: documentId ?? '' } })),
+    staleTime: Number.POSITIVE_INFINITY,
   });
 
 export const useSheets = (revisionId: string | null) =>
