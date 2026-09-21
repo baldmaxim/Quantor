@@ -625,7 +625,12 @@ class TakeoffItemRead(ApiModel):
 
 
 class TakeoffItemCreate(BaseModel):
-    name: Annotated[str, Field(min_length=1, max_length=200)]
+    name: Annotated[str | None, Field(default=None, min_length=1, max_length=200)] = None
+    """Пусто — название придумывает сервер: «Линия 1», «Площадь 2».
+
+    Клиент так не умеет: имена уникальны в проекте вместе с архивными строками, а их в
+    обычном списке нет — промах вернулся бы отказом базы, а не понятной ошибкой.
+    """
     geometry_type: GeometryType
     code: Annotated[str | None, Field(default=None, max_length=64)] = None
     color_key: Annotated[str | None, Field(default=None, max_length=32)] = None

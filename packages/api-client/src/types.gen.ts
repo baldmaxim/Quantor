@@ -3457,7 +3457,7 @@ export type TakeoffItemCreate = {
     /**
      * Name
      */
-    name: string;
+    name?: string | null;
 };
 
 /**

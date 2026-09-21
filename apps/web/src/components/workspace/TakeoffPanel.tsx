@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FC } from 'react';
+import { useRef, useState, type FC } from 'react';
 
 import { Button, EmptyState, SegmentedControl, cx } from '@/components/ui';
 import type { TakeoffItemQuantityRead, TakeoffItemRead } from '@quantor/api-client';
@@ -58,6 +58,11 @@ interface ITakeoffPanelProps {
   readonly pending: boolean;
   readonly onSelect: (itemId: string) => void;
   readonly onCreate: (name: string, geometryType: TakeoffGeometry) => void;
+  /**
+   * Переименование строки. Нужно потому, что строку заводит и инструмент на чертеже:
+   * «Линия 1» — это метка «переименуйте меня», и она уходит в выгрузку как есть.
+   */
+  readonly onRename: (itemId: string, name: string) => void;
   readonly onArchive: (itemId: string) => void;
   /**
    * Ссылка на выгрузку открытого листа. `null`, когда выгружать нечего.
@@ -84,12 +89,41 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
   pending,
   onSelect,
   onCreate,
+  onRename,
   onArchive,
   exportHref,
 }) => {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [geometry, setGeometry] = useState<TakeoffGeometry>('count');
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+
+  // Сторож поверх состояния: Enter и потеря фокуса приходят парой. Без него одно
+  // переименование ушло бы на сервер дважды, а Esc превратился бы в сохранение —
+  // состояние React к этому моменту ещё прежнее.
+  const openRename = useRef<string | null>(null);
+
+  const startRename = (item: TakeoffItemRead) => {
+    if (!canEdit) return;
+    openRename.current = item.id;
+    setRenamingId(item.id);
+    setRenameDraft(item.name);
+  };
+
+  const closeRename = () => {
+    openRename.current = null;
+    setRenamingId(null);
+  };
+
+  const commitRename = (item: TakeoffItemRead) => {
+    if (openRename.current !== item.id) return;
+    closeRename();
+
+    const cleaned = renameDraft.trim();
+    if (!cleaned || cleaned === item.name) return;
+    onRename(item.id, cleaned);
+  };
 
   const submit = () => {
     const cleaned = name.trim();
@@ -105,17 +139,52 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
         {items.length === 0 && !creating ? (
           <EmptyState
             title="Строк обмера нет"
-            description="Заведите строку и выберите, что она считает: количество, длину или площадь."
+            description="Выберите инструмент на панели сверху — строка заведётся сама. Или заведите её здесь и назовите сразу."
           />
         ) : (
           <ul className="flex flex-col">
             {items.map((item) => {
               const active = item.id === activeItemId;
+
+              // Поле ввода не может жить внутри кнопки, поэтому переименование заменяет
+              // строку целиком, а не вставляется в неё.
+              if (item.id === renamingId) {
+                return (
+                  <li key={item.id}>
+                    <div
+                      className={cx(
+                        'flex h-[var(--h-row-tree)] w-full items-center gap-[var(--s-3)]',
+                        'bg-accent-soft px-[var(--s-4)]',
+                      )}
+                    >
+                      <span
+                        aria-hidden
+                        className="size-[10px] shrink-0 rounded-[2px] bg-accent"
+                        data-color-key={item.color_key}
+                      />
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        onBlur={() => commitRename(item)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') commitRename(item);
+                          if (event.key === 'Escape') closeRename();
+                        }}
+                        aria-label={`Название строки «${item.name}»`}
+                        className="h-[var(--h-ctl-ws)] min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-2)] text-xs text-text"
+                      />
+                    </div>
+                  </li>
+                );
+              }
+
               return (
                 <li key={item.id}>
                   <button
                     type="button"
                     onClick={() => onSelect(item.id)}
+                    onDoubleClick={() => startRename(item)}
                     aria-pressed={active}
                     className={cx(
                       'flex h-[var(--h-row-tree)] w-full items-center gap-[var(--s-3)]',
@@ -128,7 +197,12 @@ export const TakeoffPanel: FC<ITakeoffPanelProps> = ({
                       className="size-[10px] shrink-0 rounded-[2px] bg-accent"
                       data-color-key={item.color_key}
                     />
-                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    <span
+                      className="min-w-0 flex-1 truncate"
+                      title={canEdit ? 'Двойной щелчок — переименовать' : undefined}
+                    >
+                      {item.name}
+                    </span>
                     <ItemTotal
                       total={totals[item.id] ?? null}
                       measurements={counts[item.id] ?? 0}

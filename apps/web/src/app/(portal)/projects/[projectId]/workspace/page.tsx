@@ -51,6 +51,7 @@ import {
   useArchiveTakeoffItem,
   useCreateMeasurement,
   useCreateTakeoffItem,
+  useRenameTakeoffItem,
   useDeleteMeasurement,
   useFeatures,
   useMeasurements,
@@ -187,6 +188,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const measurements = useMeasurements(takeoff.enabled ? sheetId : null);
   const createItem = useCreateTakeoffItem(projectId);
   const archiveItem = useArchiveTakeoffItem(projectId);
+  const renameItem = useRenameTakeoffItem(projectId);
   const createMeasurement = useCreateMeasurement(sheetId ?? '');
   const updateMeasurement = useUpdateMeasurement(sheetId ?? '');
   const removeMeasurement = useDeleteMeasurement(sheetId ?? '');
@@ -260,7 +262,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
   useEffect(() => {
     tools.setHandlers({
       onCompleted: (shape) => {
-        if (!sheetId || !activeItemId) return;
+        if (!sheetId) return;
+        if (!activeItemId) {
+          // Фигура нарисована, а положить её некуда. Молча забыть её нельзя: человек
+          // увидел бы, что обмер просто исчез.
+          setTakeoffError('Фигура не сохранена: строка обмера не выбрана.');
+          return;
+        }
         setTakeoffError(null);
         createMeasurement.mutate(
           {
@@ -579,36 +587,46 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 <ToolButton
                   key={mode}
                   label={label}
-                  // Когда рисовать некуда, подсказка говорит об этом, а не про два щелчка.
+                  // Когда подходящей строки нет, подсказка обещает её, а не требует.
                   hint={
                     takeoff.hint ??
-                    (!activeItem || activeItem.geometry_type !== mode
-                      ? `нужна строка обмера типа «${label}»`
-                      : hint)
+                    (activeItem?.geometry_type === mode
+                      ? hint
+                      : `${hint}; строка «${label}» заведётся сама`)
                   }
                   wide
                   active={toolMode === mode}
-                  disabled={!sheetId || !takeoff.enabled}
+                  // Пока строка заводится, вторая кнопка завела бы вторую строку.
+                  disabled={!sheetId || !takeoff.enabled || createItem.isPending}
                   onClick={() => {
-                    // Инструмент работает только под подходящую строку: рисовать площадь
-                    // в строке «Двери» нечем — там считают штуки (ADR-0019).
-                    //
-                    // Но выключенная кнопка об этом молчит: щелчок ничего не делает, а
-                    // почему — неизвестно. Поэтому кнопка живая и объясняет, чего не
-                    // хватает, вместо того чтобы притворяться сломанной.
-                    if (!activeItem || activeItem.geometry_type !== mode) {
-                      setLeftTab('takeoff');
-                      setTakeoffError(
-                        `Инструмент «${label}» рисует в строку того же типа.` +
-                          ' Создайте её на панели обмеров или выберите существующую.',
-                      );
+                    setTakeoffError(null);
+
+                    // Инструмент рисует только в строку своего типа: площадь в строке
+                    // «Двери» нечем измерить — там считают штуки (ADR-0019). Раньше
+                    // несовпадение было отказом с объяснением, и на каждую строку
+                    // приходился круг через левую панель. Теперь строка заводится сама,
+                    // а имя ей портал придумывает и человек переименовывает на месте.
+                    if (activeItem?.geometry_type === mode) {
+                      const next: ToolMode = toolMode === mode ? 'select' : mode;
+                      setToolMode(next);
+                      tools.send({ type: 'setMode', mode: next });
                       return;
                     }
 
-                    setTakeoffError(null);
-                    const next: ToolMode = toolMode === mode ? 'select' : mode;
-                    setToolMode(next);
-                    tools.send({ type: 'setMode', mode: next });
+                    createItem.mutate(
+                      { geometryType: mode },
+                      {
+                        onSuccess: (created) => {
+                          setActiveItemId(created.id);
+                          setToolMode(mode);
+                          tools.send({ type: 'setMode', mode });
+                        },
+                        onError: (error) => {
+                          setLeftTab('takeoff');
+                          setTakeoffError(describeTakeoffError(error));
+                        },
+                      },
+                    );
                   }}
                 >
                   {label}
@@ -697,6 +715,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       setToolMode('select');
                       tools.send({ type: 'setMode', mode: 'select' });
                     }}
+                    onRename={(itemId, name) => {
+                      setTakeoffError(null);
+                      renameItem.mutate(
+                        { itemId, name },
+                        { onError: (error) => setTakeoffError(describeTakeoffError(error)) },
+                      );
+                    }}
                     onCreate={(name, geometryType: TakeoffGeometry) => {
                       setTakeoffError(null);
                       createItem.mutate(
@@ -709,7 +734,12 @@ const WorkspacePage = ({ params }: IPageProps) => {
                     }}
                     onArchive={(id) => {
                       archiveItem.mutate(id);
-                      if (id === activeItemId) setActiveItemId(null);
+                      if (id !== activeItemId) return;
+                      // Вместе со строкой гаснет и инструмент: иначе кнопка осталась бы
+                      // нажатой, а рисовать было бы некуда.
+                      setActiveItemId(null);
+                      setToolMode('select');
+                      tools.send({ type: 'setMode', mode: 'select' });
                     }}
                   />
                 )}
@@ -937,6 +967,8 @@ const describeTakeoffError = (error: unknown): string => {
       const issue = geometryIssueOf(error);
       return `Контур не сохранён: ${issue ? GEOMETRY_ISSUE_LABELS[issue] : 'он не годится для площади'}.`;
     }
+    case 'TAKEOFF_NAME_TAKEN':
+      return 'Строка с таким названием в проекте уже есть — в том числе в архиве.';
     case 'PERMISSION_DENIED':
       return 'Недостаточно прав для обмера.';
     case 'NOT_FOUND':

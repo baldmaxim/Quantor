@@ -72,6 +72,9 @@ class ErrorCode(StrEnum):
 
     # --- ручной обмер (ADR-0019) ---
     MEASUREMENT_VERSION_CONFLICT = "MEASUREMENT_VERSION_CONFLICT"
+    # Имя строки обмера уникально в проекте. Без своего кода нарушение уникальности уходило
+    # наружу отказом базы (503): пользователь читал «база недоступна» там, где занято имя.
+    TAKEOFF_NAME_TAKEN = "TAKEOFF_NAME_TAKEN"
     # Контур не годится для площади: самопересечение, нулевое ребро, отверстие вне контура
     # (ADR-0026). Отдельный код, а не VALIDATION_FAILED: интерфейсу нужно показать, что именно
     # не так с фигурой, а не «данные некорректны».
@@ -147,6 +150,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SCALE_GEOMETRY_REQUIRED: "Масштаб нельзя задать до извлечения геометрии страницы",
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: "Отрезок калибровки слишком короткий",
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: "Измерение изменено другим пользователем",
+    ErrorCode.TAKEOFF_NAME_TAKEN: "Строка с таким названием в проекте уже есть",
     ErrorCode.GEOMETRY_INVALID: "Контур не годится для площади",
     ErrorCode.STORAGE_UNAVAILABLE: "Хранилище файлов недоступно",
     ErrorCode.DATABASE_UNAVAILABLE: "База данных недоступна",
@@ -220,6 +224,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.SCALE_GEOMETRY_REQUIRED: status.HTTP_409_CONFLICT,
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: status.HTTP_409_CONFLICT,
+    ErrorCode.TAKEOFF_NAME_TAKEN: status.HTTP_409_CONFLICT,
     ErrorCode.GEOMETRY_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,

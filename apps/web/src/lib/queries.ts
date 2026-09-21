@@ -22,6 +22,7 @@ import {
   makeCalibrationDefault,
   readJob,
   updateMeasurement,
+  updateTakeoffItem,
   readMeta,
   readProject,
   readRevisionContentUrl,
@@ -446,16 +447,42 @@ export const useSheetQuantities = (sheetId: string | null) =>
     enabled: Boolean(sheetId),
   });
 
+/**
+ * Заводит строку обмера.
+ *
+ * Имя необязательно: строку заводит и инструмент на чертеже, а там спрашивать название
+ * посреди обмера не о чем. Придумывает его сервер — только он видит и архивные строки,
+ * с которыми имя делит ограничение уникальности.
+ */
 export const useCreateTakeoffItem = (projectId: string) => {
   const client = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name: string; geometryType: TakeoffItemRead['geometry_type'] }) =>
+    mutationFn: async (input: { name?: string; geometryType: TakeoffItemRead['geometry_type'] }) =>
       unwrap(
         await createTakeoffItem({
           throwOnError: true,
           path: { project_id: projectId },
           body: { name: input.name, geometry_type: input.geometryType },
+        }),
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.takeoffItems(projectId) });
+    },
+  });
+};
+
+/** Переименование строки. Тип геометрии не меняется никогда — его в запросе нет. */
+export const useRenameTakeoffItem = (projectId: string) => {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { itemId: string; name: string }) =>
+      unwrap(
+        await updateTakeoffItem({
+          throwOnError: true,
+          path: { item_id: input.itemId },
+          body: { name: input.name },
         }),
       ),
     onSuccess: () => {

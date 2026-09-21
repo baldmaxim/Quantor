@@ -1,5 +1,6 @@
 import type { TakeoffItemQuantityRead, TakeoffItemRead } from '@quantor/api-client';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TakeoffPanel } from './TakeoffPanel';
@@ -50,6 +51,7 @@ const props = {
   pending: false,
   onSelect: vi.fn(),
   onCreate: vi.fn(),
+  onRename: vi.fn(),
   onArchive: vi.fn(),
 };
 
@@ -88,5 +90,34 @@ describe('панель обмеров', () => {
     );
 
     expect(screen.getByText(/\+2 без масштаба/)).toBeInTheDocument();
+  });
+
+  /**
+   * Строку заводит и инструмент на чертеже, а имя ей придумывает сервер: «Линия 1» уходит
+   * в выгрузку как есть, поэтому переименование должно быть под рукой — в самой строке.
+   */
+  it('двойной щелчок по имени открывает поле и сохраняет новое название', async () => {
+    const onRename = vi.fn();
+    const user = userEvent.setup();
+    render(<TakeoffPanel {...props} onRename={onRename} exportHref={null} />);
+
+    await user.dblClick(screen.getByText('Полы'));
+    const field = screen.getByRole('textbox', { name: /Название строки/ });
+    await user.clear(field);
+    await user.type(field, '  Перегородка ПГ-1  {Enter}');
+
+    expect(onRename).toHaveBeenCalledWith('item-1', 'Перегородка ПГ-1');
+  });
+
+  it('Esc закрывает поле, не трогая название', async () => {
+    const onRename = vi.fn();
+    const user = userEvent.setup();
+    render(<TakeoffPanel {...props} onRename={onRename} exportHref={null} />);
+
+    await user.dblClick(screen.getByText('Полы'));
+    await user.type(screen.getByRole('textbox', { name: /Название строки/ }), 'Другое{Escape}');
+
+    expect(onRename).not.toHaveBeenCalled();
+    expect(screen.getByText('Полы')).toBeInTheDocument();
   });
 });

@@ -8,11 +8,13 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import Select, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import (
@@ -48,6 +50,20 @@ from app.services.geometry.validity import validate_polygon
 # Цвет строки по умолчанию. Ключ палитры темы, а не значение: хардкод hex здесь
 # разъехался бы с тёмной темой.
 DEFAULT_COLOR_KEY = "accent"
+
+# Ограничение уникальности имени строки в проекте. Имя нужно здесь, чтобы отличить его
+# нарушение от чужого: см. `_flush_unique_name`.
+NAME_UNIQUE_CONSTRAINT = "uq_takeoff_items_project_name"
+
+# Название, которое портал придумывает сам, когда строку заводит инструмент на чертеже.
+# Это не классификатор: «Линия 1» — метка «переименуйте меня», а не строительная категория.
+# Категории по-прежнему называет человек (ADR-0019).
+DEFAULT_NAME_BY_GEOMETRY: dict[GeometryType, str] = {
+    GeometryType.COUNT: "Счёт",
+    GeometryType.LINE: "Линия",
+    GeometryType.POLYLINE: "Ломаная",
+    GeometryType.POLYGON: "Площадь",
+}
 
 
 def _canonical_ring(points: list[list[float]], label: str = "") -> list[list[float]]:
@@ -172,11 +188,71 @@ def _items_scoped(workspace_id: uuid.UUID) -> Select[tuple[TakeoffItem]]:
     )
 
 
+async def next_default_name(
+    session: AsyncSession, *, project_id: uuid.UUID, geometry_type: GeometryType
+) -> str:
+    """Следующее свободное «Линия 1», «Линия 2», …
+
+    Архивные строки тоже считаются: уникальность имени в проекте их учитывает, и номер
+    заархивированной строки второй раз не выдаётся.
+
+    Сканируются все имена проекта, а не только этого типа: ограничение уникальности одно
+    на проект, и строка «Линия 1» могла быть заведена руками под любым типом.
+    """
+    label = DEFAULT_NAME_BY_GEOMETRY[geometry_type]
+    pattern = re.compile(rf"^{re.escape(label)} (\d+)$")
+    names = await session.scalars(
+        select(TakeoffItem.name).where(TakeoffItem.project_id == project_id)
+    )
+    used = {int(match.group(1)) for name in names if (match := pattern.match(name))}
+    return f"{label} {max(used, default=0) + 1}"
+
+
+async def _ensure_name_free(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    name: str,
+    exclude_id: uuid.UUID | None = None,
+) -> None:
+    """Имя строки уникально в проекте — вместе с архивными.
+
+    Без этой проверки нарушение уникальности всплывало бы отказом базы: пользователь читал
+    «база недоступна» там, где занято название.
+    """
+    query = select(TakeoffItem.id).where(
+        TakeoffItem.project_id == project_id, TakeoffItem.name == name
+    )
+    if exclude_id is not None:
+        query = query.where(TakeoffItem.id != exclude_id)
+    if await session.scalar(query.limit(1)) is not None:
+        raise DomainError(ErrorCode.TAKEOFF_NAME_TAKEN)
+
+
+async def _flush_unique_name(session: AsyncSession) -> None:
+    """Записывает изменения, переводя нарушение уникальности имени в доменную ошибку.
+
+    Проверка перед записью снимает обычный случай, но не гонку двух вкладок. Точка сохранения
+    нужна, чтобы откатить только неудавшуюся запись: без неё внешняя транзакция осталась бы
+    сломанной и запрос завершился бы отказом базы.
+
+    Ограничение проверяется по имени: чужое нарушение целостности — это дефект, и выдавать
+    его за занятое название значило бы спрятать ошибку за понятным сообщением.
+    """
+    try:
+        async with session.begin_nested():
+            await session.flush()
+    except IntegrityError as error:
+        if NAME_UNIQUE_CONSTRAINT not in str(error.orig):
+            raise
+        raise DomainError(ErrorCode.TAKEOFF_NAME_TAKEN) from error
+
+
 async def create_item(
     session: AsyncSession,
     *,
     project: Project,
-    name: str,
+    name: str | None = None,
     geometry_type: GeometryType,
     code: str | None = None,
     color_key: str | None = None,
@@ -184,12 +260,22 @@ async def create_item(
 ) -> TakeoffItem:
     """Создаёт строку обмера.
 
+    Имя необязательно: строку заводит и инструмент на чертеже, и там спрашивать название
+    посреди обмера не о чем — портал ставит «Линия 1», а человек переименовывает.
+
     Единица показа выводится из типа, а не принимается снаружи: свободное поле однажды
     разошлось бы с типом и показало площадь в метрах.
     """
-    cleaned = name.strip()
-    if not cleaned:
-        raise DomainError(ErrorCode.VALIDATION_FAILED, "Название строки не может быть пустым")
+    if name is None:
+        cleaned = await next_default_name(
+            session, project_id=project.id, geometry_type=geometry_type
+        )
+    else:
+        cleaned = name.strip()
+        if not cleaned:
+            raise DomainError(ErrorCode.VALIDATION_FAILED, "Название строки не может быть пустым")
+
+    await _ensure_name_free(session, project_id=project.id, name=cleaned)
 
     ordinal = await session.scalar(
         select(func.coalesce(func.max(TakeoffItem.ordinal), -1) + 1).where(
@@ -209,7 +295,7 @@ async def create_item(
         updated_by=created_by,
     )
     session.add(item)
-    await session.flush()
+    await _flush_unique_name(session)
     await session.refresh(item)
     return item
 
@@ -485,6 +571,9 @@ async def update_item(
         cleaned = name.strip()
         if not cleaned:
             raise DomainError(ErrorCode.VALIDATION_FAILED, "Название строки не может быть пустым")
+        await _ensure_name_free(
+            session, project_id=item.project_id, name=cleaned, exclude_id=item.id
+        )
         item.name = cleaned
     if code is not None:
         item.code = code or None
@@ -494,7 +583,7 @@ async def update_item(
         item.ordinal = ordinal
 
     item.updated_by = actor
-    await session.flush()
+    await _flush_unique_name(session)
     return item
 
 

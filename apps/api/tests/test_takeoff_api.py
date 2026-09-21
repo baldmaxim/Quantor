@@ -137,6 +137,122 @@ class TestItemsApi:
         assert active.json() == []
         assert len(everything.json()) == 1
 
+    async def test_item_without_a_name_gets_one_from_the_server(
+        self,
+        db_session: AsyncSession,
+        build_api: Callable[..., AsyncClient],
+        workspace_id: uuid.UUID,
+    ) -> None:
+        """Строку заводит инструмент на чертеже, а не форма: имя придумывает сервер."""
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Без имени"
+        )
+        await db_session.commit()
+
+        async with build_api(_engineer(workspace_id)) as client:
+            first = await client.post(
+                f"/api/v1/projects/{project.id}/takeoff-items",
+                json={"geometry_type": "line"},
+            )
+            second = await client.post(
+                f"/api/v1/projects/{project.id}/takeoff-items",
+                json={"geometry_type": "line"},
+            )
+            other = await client.post(
+                f"/api/v1/projects/{project.id}/takeoff-items",
+                json={"geometry_type": "polygon"},
+            )
+
+        assert first.json()["name"] == "Линия 1"
+        assert second.json()["name"] == "Линия 2"
+        # Нумерация своя у каждого типа, а единица по-прежнему следует из типа.
+        assert other.json()["name"] == "Площадь 1"
+        assert other.json()["display_unit"] == "m2"
+
+    async def test_archived_item_keeps_its_number(
+        self,
+        db_session: AsyncSession,
+        build_api: Callable[..., AsyncClient],
+        workspace_id: uuid.UUID,
+    ) -> None:
+        """Уникальность имени учитывает архив — номер архивной строки не выдаётся снова."""
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Архив и номера"
+        )
+        item = await takeoff_service.create_item(
+            db_session, project=project, geometry_type=GeometryType.LINE
+        )
+        await takeoff_service.archive_item(db_session, item=item)
+        await db_session.commit()
+
+        async with build_api(_engineer(workspace_id)) as client:
+            created = await client.post(
+                f"/api/v1/projects/{project.id}/takeoff-items",
+                json={"geometry_type": "line"},
+            )
+
+        assert item.name == "Линия 1"
+        assert created.json()["name"] == "Линия 2"
+
+    async def test_duplicate_name_is_a_conflict(
+        self,
+        db_session: AsyncSession,
+        build_api: Callable[..., AsyncClient],
+        workspace_id: uuid.UUID,
+    ) -> None:
+        """Занятое имя — конфликт, а не отказ базы: 503 здесь нечего было бы объяснить."""
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Дубли"
+        )
+        first = await takeoff_service.create_item(
+            db_session, project=project, name="Двери", geometry_type=GeometryType.COUNT
+        )
+        second = await takeoff_service.create_item(
+            db_session, project=project, name="Окна", geometry_type=GeometryType.COUNT
+        )
+        await db_session.commit()
+
+        async with build_api(_engineer(workspace_id)) as client:
+            created = await client.post(
+                f"/api/v1/projects/{project.id}/takeoff-items",
+                json={"name": "Двери", "geometry_type": "count"},
+            )
+            renamed = await client.patch(
+                f"/api/v1/takeoff-items/{second.id}", json={"name": "Двери"}
+            )
+            itself = await client.patch(f"/api/v1/takeoff-items/{first.id}", json={"name": "Двери"})
+
+        assert created.status_code == 409
+        assert created.json()["detail"]["code"] == "TAKEOFF_NAME_TAKEN"
+        assert renamed.status_code == 409
+        # Собственное имя себе не мешает.
+        assert itself.status_code == 200
+
+    async def test_blank_name_is_refused(
+        self,
+        db_session: AsyncSession,
+        build_api: Callable[..., AsyncClient],
+        workspace_id: uuid.UUID,
+    ) -> None:
+        """Пусто и «имени нет» — разное: пробелы остаются ошибкой, а не поводом придумать имя."""
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Пустое имя"
+        )
+        await db_session.commit()
+
+        async with build_api(_engineer(workspace_id)) as client:
+            spaces = await client.post(
+                f"/api/v1/projects/{project.id}/takeoff-items",
+                json={"name": "   ", "geometry_type": "line"},
+            )
+            empty = await client.post(
+                f"/api/v1/projects/{project.id}/takeoff-items",
+                json={"name": "", "geometry_type": "line"},
+            )
+
+        assert spaces.status_code == 422
+        assert empty.status_code == 422
+
     async def test_geometry_type_cannot_be_changed(
         self,
         db_session: AsyncSession,

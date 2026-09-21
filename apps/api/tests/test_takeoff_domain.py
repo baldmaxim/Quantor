@@ -207,6 +207,71 @@ class TestItems:
 
         assert second.ordinal == first.ordinal + 1
 
+    async def test_default_name_counts_only_its_own_kind(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        """Имя по умолчанию нумеруется внутри типа и не спотыкается о чужие названия."""
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Имена"
+        )
+        await takeoff_service.create_item(
+            db_session, project=project, name="Перегородка ПГ-1", geometry_type=GeometryType.LINE
+        )
+
+        first = await takeoff_service.create_item(
+            db_session, project=project, geometry_type=GeometryType.LINE
+        )
+        polygon = await takeoff_service.create_item(
+            db_session, project=project, geometry_type=GeometryType.POLYGON
+        )
+        second = await takeoff_service.create_item(
+            db_session, project=project, geometry_type=GeometryType.LINE
+        )
+
+        assert [first.name, second.name] == ["Линия 1", "Линия 2"]
+        assert polygon.name == "Площадь 1"
+
+    async def test_default_name_steps_over_a_name_taken_by_hand(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        """«Линия 1» могла быть заведена руками — и под другим типом: имя одно на проект."""
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Ручная линия"
+        )
+        await takeoff_service.create_item(
+            db_session, project=project, name="Линия 1", geometry_type=GeometryType.COUNT
+        )
+
+        item = await takeoff_service.create_item(
+            db_session, project=project, geometry_type=GeometryType.LINE
+        )
+
+        assert item.name == "Линия 2"
+
+    async def test_taken_name_is_refused_with_its_own_code(
+        self, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        """Занятое имя — доменный конфликт, а не всплывший наружу отказ базы."""
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Занятое имя"
+        )
+        item = await takeoff_service.create_item(
+            db_session, project=project, name="Двери", geometry_type=GeometryType.COUNT
+        )
+
+        with pytest.raises(DomainError) as created:
+            await takeoff_service.create_item(
+                db_session, project=project, name="Двери", geometry_type=GeometryType.LINE
+            )
+        assert created.value.code is ErrorCode.TAKEOFF_NAME_TAKEN
+
+        # Архивная строка имя не освобождает: ограничение уникальности её учитывает.
+        await takeoff_service.archive_item(db_session, item=item)
+        with pytest.raises(DomainError):
+            await takeoff_service.create_item(
+                db_session, project=project, name="Двери", geometry_type=GeometryType.LINE
+            )
+
     async def test_blank_name_is_refused(
         self, db_session: AsyncSession, workspace_id: uuid.UUID
     ) -> None:

@@ -6486,14 +6486,20 @@
             "$ref": "#/components/schemas/GeometryType"
           },
           "name": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
         "required": [
-          "name",
           "geometry_type"
         ],
         "title": "TakeoffItemCreate",
