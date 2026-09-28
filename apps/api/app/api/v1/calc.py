@@ -44,7 +44,8 @@ from app.services.calc.facts.policy import POLICY_VERSION
 router = APIRouter(prefix="/calc", tags=["calc"], dependencies=[require_feature("calc.portal")])
 
 
-async def _project(session: SessionDep, context: AuthDep, project_id: uuid.UUID) -> Project:
+async def project_in_scope(session: SessionDep, context: AuthDep, project_id: uuid.UUID) -> Project:
+    """Проект пространства запроса; чужой — 404, а не 403: о его существовании не сообщаем."""
     project = await projects_service.get_project(
         session, workspace_id=context.tenant, project_id=project_id
     )
@@ -102,6 +103,10 @@ async def list_calc_fact_types() -> list[CalcFactTypeRead]:
                 CalcEnumOptionRead(value=option.value, title=option.title)
                 for option in definition.options
             ],
+            qualifier_options=[
+                CalcEnumOptionRead(value=option.value, title=option.title)
+                for option in definition.qualifier_options
+            ],
             customer_vor_admissible=definition.customer_vor_admissible,
         )
         for definition in FACT_TYPES.values()
@@ -121,7 +126,7 @@ async def list_calc_fact_types() -> list[CalcFactTypeRead]:
 async def create_calc_source(
     project_id: uuid.UUID, payload: CalcSourceCreate, session: SessionDep, context: AuthDep
 ) -> CalcSourceRead:
-    project = await _project(session, context, project_id)
+    project = await project_in_scope(session, context, project_id)
     source = await registry.create_source(
         session, project=project, payload=payload, created_by=context.principal.user_id
     )
@@ -150,7 +155,7 @@ async def create_calc_source(
 async def list_calc_sources(
     project_id: uuid.UUID, session: SessionDep, context: AuthDep
 ) -> list[CalcSourceRead]:
-    project = await _project(session, context, project_id)
+    project = await project_in_scope(session, context, project_id)
     rows = await registry.list_sources(session, project_id=project.id)
     return [CalcSourceRead.model_validate(row) for row in rows]
 
@@ -169,7 +174,7 @@ async def create_calc_fact(
     project_id: uuid.UUID, payload: CalcFactCreate, session: SessionDep, context: AuthDep
 ) -> CalcFactRead:
     """Новое утверждение. Прежнее утверждение того же источника по ключу заменяется версией."""
-    project = await _project(session, context, project_id)
+    project = await project_in_scope(session, context, project_id)
     fact = await registry.create_fact(
         session, project=project, payload=payload, author_id=context.principal.user_id
     )
@@ -205,7 +210,7 @@ async def list_calc_facts(
         CalcFactStatus | None, Query(alias="status", description="Статус утверждения")
     ] = None,
 ) -> list[CalcFactRead]:
-    project = await _project(session, context, project_id)
+    project = await project_in_scope(session, context, project_id)
     rows = await registry.list_facts(
         session, project_id=project.id, fact_type=fact_type, status=fact_status
     )
@@ -295,7 +300,7 @@ async def list_calc_conflicts(
         CalcConflictStatus | None, Query(alias="status", description="Состояние конфликта")
     ] = None,
 ) -> list[CalcConflictRead]:
-    project = await _project(session, context, project_id)
+    project = await project_in_scope(session, context, project_id)
     rows = await registry.list_conflicts(session, project_id=project.id, status=conflict_status)
     return [await _conflict_read(session, row) for row in rows]
 
@@ -315,7 +320,7 @@ async def decide_calc_conflict(
     )
     if conflict is None:
         raise not_found("Конфликт")
-    project = await _project(session, context, conflict.project_id)
+    project = await project_in_scope(session, context, conflict.project_id)
     decision = await registry.decide(
         session,
         project=project,
@@ -353,7 +358,7 @@ async def list_calc_fact_values(
     project_id: uuid.UUID, session: SessionDep, context: AuthDep
 ) -> list[CalcFactValueRead]:
     """Какое значение каждого ключа пойдёт в расчёт и почему. ВОР Заказчика — отдельно."""
-    project = await _project(session, context, project_id)
+    project = await project_in_scope(session, context, project_id)
     resolved = await registry.resolve_project(session, project_id=project.id)
     conflicts = await registry.conflict_ids_by_key(session, project_id=project.id)
     return [

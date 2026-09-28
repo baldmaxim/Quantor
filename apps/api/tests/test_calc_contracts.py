@@ -58,6 +58,22 @@ class TestSubject:
         with pytest.raises(ValidationError):
             CalcFactSubject(building="1|2")
 
+    def test_qualifier_is_part_of_the_key(self) -> None:
+        """Квартиры разных типов — разные ключи, а не спор источников."""
+        subject = CalcFactSubject(building="1", qualifier=" r2 ")
+        assert subject.qualifier == "R2"
+        assert subject.key() == "building=1|qualifier=R2"
+        with pytest.raises(ValidationError):
+            CalcFactSubject(building="1", qualifier="2-комн")
+
+    def test_qualifier_follows_the_fact_type(self) -> None:
+        by_type = REGISTRY["building.apartments_by_type"]
+        assert check_subject(by_type, CalcFactSubject(building="1", qualifier="R2")) is None
+        assert check_subject(by_type, CalcFactSubject(building="1")) is not None
+        assert check_subject(by_type, CalcFactSubject(building="1", qualifier="WC")) is not None
+        total = REGISTRY["building.apartments_total"]
+        assert check_subject(total, CalcFactSubject(building="1", qualifier="R2")) is not None
+
     def test_key_is_canonical(self) -> None:
         subject = CalcFactSubject(
             building=" 1 ", floor="12", discipline=CalcDiscipline.VK, system_code="b1"
@@ -80,6 +96,19 @@ class TestUnits:
 
     def test_length_and_area_do_not_mix(self) -> None:
         assert not compatible("m", "m2")
+
+    def test_pressure_and_flow_convert_exactly(self) -> None:
+        assert to_canonical(Decimal("25"), "m_h2o", "kPa") == Decimal("245.16625")
+        assert to_canonical(Decimal("0.25"), "MPa", "kPa") == Decimal("250")
+        assert to_canonical(Decimal("6.5"), "l_s", "m3_h") == Decimal("23.4")
+
+    def test_daily_volume_is_not_a_flow_rate(self) -> None:
+        """Суточный объём не переводится в часовой расход делением на 24."""
+        assert not compatible("m3_day", "m3_h")
+
+    def test_conversion_that_would_invent_precision_is_refused(self) -> None:
+        with pytest.raises(UnitError):
+            to_canonical(Decimal("10"), "m3_h", "l_s")
 
     def test_decimal_text_is_canonical(self) -> None:
         assert decimal_text(Decimal("3.300")) == "3.3"

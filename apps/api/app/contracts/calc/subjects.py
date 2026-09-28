@@ -8,6 +8,9 @@
 Обозначения систем нормализуются: латинские буквы, неотличимые от кириллических (B, T, K, P…),
 приводятся к кириллице. В распознанном тексте, в xlsx и в ВОР встречается то одно, то другое,
 и «B1» с латинской B иначе стал бы отдельной системой.
+
+Квалификатор уточняет, что именно считается, из закрытого перечня типа факта: тип квартиры
+«R2», вид прибора «WC». Он часть ключа: две квартиры разных типов — разные ключи, а не спор.
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ SUBJECT_FIELDS: Final[tuple[str, ...]] = (
     "room",
     "discipline",
     "system_code",
+    "qualifier",
 )
 
 # Символы-разделители ключа в кодах запрещены: иначе два разных субъекта могли бы дать
@@ -33,6 +37,7 @@ SUBJECT_FIELDS: Final[tuple[str, ...]] = (
 _FORBIDDEN = re.compile(r"[|=;@]")
 _SPACES = re.compile(r"\s+")
 _FLOOR = re.compile(r"^-?\d{1,3}(\.\.-?\d{1,3})?$")
+_QUALIFIER = re.compile(r"^[A-Z][A-Z0-9_]{0,31}$")
 
 _LOOKALIKES: Final[dict[str, str]] = {
     "A": "А",
@@ -96,6 +101,8 @@ class CalcFactSubject(BaseModel):
     """Раздел: без него «В1» водопровода не отличить от «В1» вытяжной вентиляции."""
     system_code: SubjectCode | None = None
     """Обозначение системы: «В1», «Т3», «К1», «П1»."""
+    qualifier: SubjectCode | None = None
+    """Значение из перечня квалификаторов типа факта: тип квартиры «R2», прибор «WC»."""
 
     @field_validator("building", "section", "room")
     @classmethod
@@ -111,6 +118,16 @@ class CalcFactSubject(BaseModel):
     @classmethod
     def _system(cls, value: str | None) -> str | None:
         return None if value is None else normalize_system_code(value)
+
+    @field_validator("qualifier")
+    @classmethod
+    def _qualifier(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = _clean(value).upper()
+        if not _QUALIFIER.match(cleaned):
+            raise ValueError("квалификатор — код из перечня типа факта: «R2», «WC»")
+        return cleaned
 
     @model_validator(mode="after")
     def _system_needs_discipline(self) -> CalcFactSubject:

@@ -136,6 +136,7 @@ class AuditAction(StrEnum):
     CALC_FACT_REVIEWED = "calc_fact_reviewed"
     CALC_FACT_WITHDRAWN = "calc_fact_withdrawn"
     CALC_CONFLICT_DECIDED = "calc_conflict_decided"
+    CALC_INSPECTION_COMPLETED = "calc_inspection_completed"
 
     JOB_RETRIED = "job_retried"
     JOB_CANCELLED = "job_cancelled"

@@ -96,6 +96,8 @@ class ErrorCode(StrEnum):
     CALC_FACT_NOT_ACTIVE = "CALC_FACT_NOT_ACTIVE"
     CALC_DECISION_INVALID = "CALC_DECISION_INVALID"
     CALC_CONFLICT_CLOSED = "CALC_CONFLICT_CLOSED"
+    CALC_DOCUMENT_NOT_RECOGNIZED = "CALC_DOCUMENT_NOT_RECOGNIZED"
+    CALC_REVISION_NOT_LATEST = "CALC_REVISION_NOT_LATEST"
 
     # --- инфраструктура ---
     STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
@@ -179,6 +181,12 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CALC_FACT_NOT_ACTIVE: "Утверждение уже заменено или отозвано",
     ErrorCode.CALC_DECISION_INVALID: "Решение должно выбрать действующее утверждение этого факта",
     ErrorCode.CALC_CONFLICT_CLOSED: "Расхождения больше нет — решать нечего",
+    ErrorCode.CALC_DOCUMENT_NOT_RECOGNIZED: (
+        "У ревизии нет распознанного текста: факты собираются только из распознанного пакета"
+    ),
+    ErrorCode.CALC_REVISION_NOT_LATEST: (
+        "У документа есть более новая ревизия — собирайте факты из неё"
+    ),
     ErrorCode.GEOMETRY_INVALID: "Контур не годится для площади",
     ErrorCode.STORAGE_UNAVAILABLE: "Хранилище файлов недоступно",
     ErrorCode.DATABASE_UNAVAILABLE: "База данных недоступна",
@@ -264,6 +272,8 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CALC_FACT_NOT_ACTIVE: status.HTTP_409_CONFLICT,
     ErrorCode.CALC_DECISION_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_CONFLICT_CLOSED: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_DOCUMENT_NOT_RECOGNIZED: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_REVISION_NOT_LATEST: status.HTTP_409_CONFLICT,
     ErrorCode.GEOMETRY_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,

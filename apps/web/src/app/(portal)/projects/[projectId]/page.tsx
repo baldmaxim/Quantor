@@ -25,7 +25,8 @@ import {
   openTargets,
   type OpenState,
 } from '@/lib/openability';
-import { useDocumentsRevisions, useProject, useProjectDocuments } from '@/lib/queries';
+import { CALC_FEATURE } from '@/lib/calc/access';
+import { useDocumentsRevisions, useFeatures, useProject, useProjectDocuments } from '@/lib/queries';
 
 /**
  * Карточка проекта.
@@ -49,6 +50,7 @@ const ProjectPage = ({ params }: IPageProps) => {
 
   const project = useProject(projectId);
   const documents = useProjectDocuments(projectId);
+  const features = useFeatures();
 
   const items = documents.data?.items ?? [];
   const revisions = useDocumentsRevisions(items.map((document) => document.id));
@@ -71,6 +73,11 @@ const ProjectPage = ({ params }: IPageProps) => {
         status={status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : null}
         actions={
           <>
+            {features[CALC_FEATURE] === true && (
+              <ButtonLink href={`/projects/${projectId}/calc`} transitionTypes={['nav-forward']}>
+                Расчёты
+              </ButtonLink>
+            )}
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
             {target ? (
               <ButtonLink href={workspaceHref(projectId, target.revision.id)} variant="primary">

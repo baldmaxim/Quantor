@@ -62,6 +62,8 @@ class ClaimView:
     status: CalcFactStatus
     calculation_eligible: bool
     created_at: datetime
+    source_id: uuid.UUID | None = None
+    """Источник утверждения — чтобы показать, откуда взято значение."""
 
 
 @dataclass(frozen=True, slots=True)

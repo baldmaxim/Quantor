@@ -8,6 +8,7 @@ from app.models.calc import (
     CalcFactEvidence,
     CalcManualOverride,
     CalcSource,
+    CalcSourceInspection,
 )
 from app.models.control_plane import FeatureFlagOverride, SettingOverride
 from app.models.document import Document, DocumentRevision
@@ -28,6 +29,7 @@ __all__ = [
     "CalcFactEvidence",
     "CalcManualOverride",
     "CalcSource",
+    "CalcSourceInspection",
     "Document",
     "DocumentRevision",
     "FeatureFlagOverride",

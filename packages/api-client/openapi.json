@@ -741,6 +741,16 @@
         "title": "CalcAssumptionEvidence",
         "type": "object"
       },
+      "CalcAssumptionPolicy": {
+        "description": "Можно ли временно заменить отсутствующее значение допущением.",
+        "enum": [
+          "NOT_ALLOWED",
+          "MANUAL",
+          "REGISTERED_RULE"
+        ],
+        "title": "CalcAssumptionPolicy",
+        "type": "string"
+      },
       "CalcBooleanValue": {
         "additionalProperties": false,
         "properties": {
@@ -759,6 +769,109 @@
           "value"
         ],
         "title": "CalcBooleanValue",
+        "type": "object"
+      },
+      "CalcCollectableDocumentRead": {
+        "description": "Ревизия документа проекта глазами сбора фактов.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_revision_id": {
+            "format": "uuid",
+            "title": "Document Revision Id",
+            "type": "string"
+          },
+          "inspection_current": {
+            "title": "Inspection Current",
+            "type": "boolean"
+          },
+          "last_inspection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcInspectionRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest": {
+            "title": "Latest",
+            "type": "boolean"
+          },
+          "recognized": {
+            "title": "Recognized",
+            "type": "boolean"
+          },
+          "regions_count": {
+            "minimum": 0.0,
+            "title": "Regions Count",
+            "type": "integer"
+          },
+          "stamp_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stamp Section"
+          },
+          "stamp_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcDocumentStage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suggested_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcSourceClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suggested_discipline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcDiscipline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "document_revision_id",
+          "title",
+          "recognized",
+          "latest",
+          "regions_count",
+          "stamp_stage",
+          "stamp_section",
+          "suggested_class",
+          "suggested_discipline",
+          "last_inspection",
+          "inspection_current"
+        ],
+        "title": "CalcCollectableDocumentRead",
         "type": "object"
       },
       "CalcConfidence": {
@@ -1054,6 +1167,35 @@
         "title": "CalcDiscipline",
         "type": "string"
       },
+      "CalcDocumentCoverageRead": {
+        "description": "Документы проекта с точки зрения сбора фактов (последние ревизии).",
+        "properties": {
+          "inspected": {
+            "title": "Inspected",
+            "type": "integer"
+          },
+          "not_inspected": {
+            "title": "Not Inspected",
+            "type": "integer"
+          },
+          "recognized": {
+            "title": "Recognized",
+            "type": "integer"
+          },
+          "without_recognition": {
+            "title": "Without Recognition",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "recognized",
+          "inspected",
+          "not_inspected",
+          "without_recognition"
+        ],
+        "title": "CalcDocumentCoverageRead",
+        "type": "object"
+      },
       "CalcDocumentFragmentEvidence": {
         "additionalProperties": false,
         "description": "Место в документе проекта, где прочитано значение.",
@@ -1194,11 +1336,13 @@
         "type": "object"
       },
       "CalcEvidenceKind": {
-        "description": "Вид свидетельства.\n\nЯчейки таблиц распознанного пакета, ячейки файлов и обмеры появятся вместе с\nадаптерами источников (PROMPT 02) — вместе со своими колонками.",
+        "description": "Вид свидетельства.\n\nЯчейки файлов xlsx и обмеры появятся вместе со своими адаптерами и своими колонками.",
         "enum": [
           "MANUAL_ENTRY",
           "DOCUMENT_FRAGMENT",
-          "ASSUMPTION_BASIS"
+          "ASSUMPTION_BASIS",
+          "REGION_TABLE",
+          "REGION_TEXT"
         ],
         "title": "CalcEvidenceKind",
         "type": "string"
@@ -1307,6 +1451,54 @@
             ],
             "title": "Page Index"
           },
+          "region_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Id"
+          },
+          "region_locator": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "TABLE": "#/components/schemas/CalcRegionTableLocator",
+                    "TEXT": "#/components/schemas/CalcRegionTextLocator"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CalcRegionTableLocator"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcRegionTextLocator"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Locator"
+          },
+          "region_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Sha256"
+          },
           "sheet_id": {
             "anyOf": [
               {
@@ -1332,6 +1524,9 @@
           "basis",
           "alternatives",
           "author_id",
+          "region_id",
+          "region_sha256",
+          "region_locator",
           "created_at"
         ],
         "title": "CalcEvidenceRead",
@@ -1452,6 +1647,7 @@
         "enum": [
           "DOCUMENT_EXPLICIT",
           "TABLE_EXPLICIT",
+          "TABLE_COUNTED",
           "GEOMETRY_MEASURED",
           "CALCULATED",
           "INFERRED",
@@ -1508,6 +1704,18 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "inspection_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inspection Id"
           },
           "method": {
             "$ref": "#/components/schemas/CalcFactMethod"
@@ -1716,6 +1924,7 @@
           "withdrawn_reason",
           "withdrawn_at",
           "note",
+          "inspection_id",
           "created_by",
           "created_at",
           "evidence"
@@ -1804,6 +2013,19 @@
             ],
             "title": "Floor"
           },
+          "qualifier": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifier"
+          },
           "room": {
             "anyOf": [
               {
@@ -1847,6 +2069,24 @@
         "title": "CalcFactSubject",
         "type": "object"
       },
+      "CalcFactTypeCountRead": {
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "fact_type": {
+            "title": "Fact Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fact_type",
+          "accepted"
+        ],
+        "title": "CalcFactTypeCountRead",
+        "type": "object"
+      },
       "CalcFactTypeRead": {
         "description": "Тип факта для форм ввода: что ждать и где.",
         "properties": {
@@ -1874,6 +2114,13 @@
               "$ref": "#/components/schemas/CalcEnumOptionRead"
             },
             "title": "Options",
+            "type": "array"
+          },
+          "qualifier_options": {
+            "items": {
+              "$ref": "#/components/schemas/CalcEnumOptionRead"
+            },
+            "title": "Qualifier Options",
             "type": "array"
           },
           "required_subject": {
@@ -1923,10 +2170,24 @@
           "required_subject",
           "allowed_subject",
           "options",
+          "qualifier_options",
           "customer_vor_admissible"
         ],
         "title": "CalcFactTypeRead",
         "type": "object"
+      },
+      "CalcFactUsage": {
+        "description": "Идёт ли утверждение в расчёт — отвечает сервер, интерфейс не вычисляет.",
+        "enum": [
+          "USED",
+          "AGREES",
+          "NOT_CHOSEN",
+          "CONFLICT",
+          "EXCLUDED_VOR",
+          "REJECTED"
+        ],
+        "title": "CalcFactUsage",
+        "type": "string"
       },
       "CalcFactValueRead": {
         "description": "Действующее значение ключа и то, как оно получено.\n\nСчитается только по утверждениям, допущенным к расчёту. Утверждения из ВОР Заказчика\nперечислены отдельно и на значение не влияют.",
@@ -2070,6 +2331,382 @@
         "title": "CalcFactWithdraw",
         "type": "object"
       },
+      "CalcInputFactPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalcInputFactRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "CalcInputFactPage",
+        "type": "object"
+      },
+      "CalcInputFactRead": {
+        "description": "Строка таблицы фактов: утверждение и ответ, идёт ли оно в расчёт.",
+        "properties": {
+          "fact": {
+            "$ref": "#/components/schemas/CalcFactRead"
+          },
+          "fact_type_title": {
+            "title": "Fact Type Title",
+            "type": "string"
+          },
+          "source_title": {
+            "title": "Source Title",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/CalcFactUsage"
+          }
+        },
+        "required": [
+          "fact",
+          "fact_type_title",
+          "source_title",
+          "usage"
+        ],
+        "title": "CalcInputFactRead",
+        "type": "object"
+      },
+      "CalcInspectionCreate": {
+        "additionalProperties": false,
+        "description": "Заявление документа перед сбором: что это за документ, какой стадии, какого корпуса.\n\nИмя файла доказательством не считается. Штамп подсказывает стадию и раздел, но решает\nчеловек: заявленное расходится со штампом — это видно в сводке сбора.",
+        "properties": {
+          "building": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Building",
+            "type": "string"
+          },
+          "discipline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcDiscipline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "document_revision_id": {
+            "format": "uuid",
+            "title": "Document Revision Id",
+            "type": "string"
+          },
+          "document_stage": {
+            "$ref": "#/components/schemas/CalcDocumentStage"
+          },
+          "source_class": {
+            "$ref": "#/components/schemas/CalcSourceClass"
+          }
+        },
+        "required": [
+          "document_revision_id",
+          "source_class",
+          "document_stage",
+          "building"
+        ],
+        "title": "CalcInspectionCreate",
+        "type": "object"
+      },
+      "CalcInspectionIssueCode": {
+        "description": "Почему кандидат не стал утверждением или что осталось непроверенным. Видно пользователю.",
+        "enum": [
+          "UNSCOPED",
+          "UNIT_MISSING",
+          "UNIT_MISMATCH",
+          "VALUE_INVALID",
+          "APPROXIMATE",
+          "SELF_CONTRADICTION",
+          "SCOPE_MISMATCH",
+          "TABLE_NOT_EXTRACTED",
+          "ROW_NOT_UNDERSTOOD",
+          "UNMAPPED_LABEL",
+          "VOR_QUANTITY_IGNORED",
+          "VOR_DIAMETER_IGNORED",
+          "VOR_NOT_ADMISSIBLE",
+          "DISCIPLINE_MISSING"
+        ],
+        "title": "CalcInspectionIssueCode",
+        "type": "string"
+      },
+      "CalcInspectionIssueRead": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/CalcInspectionIssueCode"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "fact_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Type"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "fact_type",
+          "message",
+          "count"
+        ],
+        "title": "CalcInspectionIssueRead",
+        "type": "object"
+      },
+      "CalcInspectionRead": {
+        "properties": {
+          "building": {
+            "title": "Building",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "discipline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcDiscipline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "document_revision_id": {
+            "format": "uuid",
+            "title": "Document Revision Id",
+            "type": "string"
+          },
+          "document_stage": {
+            "$ref": "#/components/schemas/CalcDocumentStage"
+          },
+          "extractor_version": {
+            "title": "Extractor Version",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "inspected_fact_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inspected Fact Types",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "source_class": {
+            "$ref": "#/components/schemas/CalcSourceClass"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CalcInspectionSummary"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "document_revision_id",
+          "source_class",
+          "document_stage",
+          "building",
+          "discipline",
+          "extractor_version",
+          "inspected_fact_types",
+          "summary",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CalcInspectionRead",
+        "type": "object"
+      },
+      "CalcInspectionSummary": {
+        "description": "Итог сбора: хранится вместе с записью о сборе и показывается пользователю.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "by_fact_type": {
+            "items": {
+              "$ref": "#/components/schemas/CalcFactTypeCountRead"
+            },
+            "title": "By Fact Type",
+            "type": "array"
+          },
+          "candidates": {
+            "title": "Candidates",
+            "type": "integer"
+          },
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "image_regions": {
+            "title": "Image Regions",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/CalcInspectionIssueRead"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "regions_total": {
+            "title": "Regions Total",
+            "type": "integer"
+          },
+          "rejected": {
+            "title": "Rejected",
+            "type": "integer"
+          },
+          "stage_basis": {
+            "$ref": "#/components/schemas/CalcStageBasis"
+          },
+          "stamp_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stamp Section"
+          },
+          "stamp_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcDocumentStage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "superseded": {
+            "title": "Superseded",
+            "type": "integer"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/CalcTableCountRead"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "tables_total": {
+            "title": "Tables Total",
+            "type": "integer"
+          },
+          "text_regions": {
+            "title": "Text Regions",
+            "type": "integer"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "withdrawn": {
+            "title": "Withdrawn",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "regions_total",
+          "text_regions",
+          "image_regions",
+          "tables_total",
+          "tables",
+          "candidates",
+          "accepted",
+          "rejected",
+          "created",
+          "unchanged",
+          "superseded",
+          "withdrawn",
+          "by_fact_type",
+          "issues",
+          "stamp_stage",
+          "stamp_section",
+          "stage_basis",
+          "limitations"
+        ],
+        "title": "CalcInspectionSummary",
+        "type": "object"
+      },
+      "CalcLevelCountRead": {
+        "description": "Сколько требований уровня закрыто: найдено или выводимо.",
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/CalcRequirementLevel"
+          },
+          "satisfied": {
+            "title": "Satisfied",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "level",
+          "satisfied",
+          "total"
+        ],
+        "title": "CalcLevelCountRead",
+        "type": "object"
+      },
       "CalcNumberValue": {
         "additionalProperties": false,
         "description": "Число с единицей: длина, высота, площадь.",
@@ -2148,6 +2785,471 @@
         ],
         "title": "CalcRangeValue",
         "type": "object"
+      },
+      "CalcReadinessRead": {
+        "properties": {
+          "documents": {
+            "$ref": "#/components/schemas/CalcDocumentCoverageRead"
+          },
+          "fact_types_version": {
+            "title": "Fact Types Version",
+            "type": "string"
+          },
+          "requirements_version": {
+            "title": "Requirements Version",
+            "type": "string"
+          },
+          "systems": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSystemReadinessRead"
+            },
+            "title": "Systems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requirements_version",
+          "fact_types_version",
+          "systems",
+          "documents"
+        ],
+        "title": "CalcReadinessRead",
+        "type": "object"
+      },
+      "CalcReadinessRowRead": {
+        "properties": {
+          "assumption": {
+            "$ref": "#/components/schemas/CalcAssumptionPolicy"
+          },
+          "derivable_from": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Derivable From",
+            "type": "array"
+          },
+          "excluded_count": {
+            "title": "Excluded Count",
+            "type": "integer"
+          },
+          "fact_type": {
+            "title": "Fact Type",
+            "type": "string"
+          },
+          "group": {
+            "$ref": "#/components/schemas/CalcRequirementGroup"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CalcRequirementLevel"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requirement_id": {
+            "title": "Requirement Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcReadinessStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/CalcReadinessValueRead"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requirement_id",
+          "title",
+          "group",
+          "fact_type",
+          "level",
+          "assumption",
+          "status",
+          "reason",
+          "values",
+          "excluded_count",
+          "derivable_from"
+        ],
+        "title": "CalcReadinessRowRead",
+        "type": "object"
+      },
+      "CalcReadinessStatus": {
+        "description": "Состояние исходного данного в матрице готовности. MISSING — не ноль.",
+        "enum": [
+          "FOUND",
+          "CONFLICTED",
+          "DERIVABLE",
+          "MANUAL_REQUIRED",
+          "NOT_INSPECTED",
+          "UNKNOWN",
+          "MISSING"
+        ],
+        "title": "CalcReadinessStatus",
+        "type": "string"
+      },
+      "CalcReadinessValueRead": {
+        "description": "Действующее значение одного ключа, закрывающего требование.",
+        "properties": {
+          "chosen_fact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Fact Id"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcConfidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflict_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Id"
+          },
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcFactMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcSourceClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Title"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CalcResolutionState"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                    "COUNT": "#/components/schemas/CalcCountValue",
+                    "ENUM": "#/components/schemas/CalcEnumValue",
+                    "NUMBER": "#/components/schemas/CalcNumberValue",
+                    "RANGE": "#/components/schemas/CalcRangeValue",
+                    "TEXT": "#/components/schemas/CalcTextValue"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CalcNumberValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcCountValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcBooleanValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcEnumValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcTextValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcRangeValue"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "fact_key",
+          "subject",
+          "state",
+          "value",
+          "chosen_fact_id",
+          "source_title",
+          "source_class",
+          "method",
+          "confidence",
+          "conflict_id"
+        ],
+        "title": "CalcReadinessValueRead",
+        "type": "object"
+      },
+      "CalcRegionTableLocator": {
+        "additionalProperties": false,
+        "description": "Где в тексте блока распознанного пакета стоит таблица и какие её строки использованы.\n\nНомера — с нуля: таблица по порядку в тексте блока, строки — после шапки. Текст блока\nзакреплён отпечатком `region_sha256`, поэтому номера не «уплывают».",
+        "properties": {
+          "column": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "kind": {
+            "const": "TABLE",
+            "default": "TABLE",
+            "title": "Kind",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Rows",
+            "type": "array"
+          },
+          "table_index": {
+            "minimum": 0.0,
+            "title": "Table Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "table_index",
+          "rows"
+        ],
+        "title": "CalcRegionTableLocator",
+        "type": "object"
+      },
+      "CalcRegionTextLocator": {
+        "additionalProperties": false,
+        "description": "Фрагмент текста блока: смещения в символах от начала текста блока.",
+        "properties": {
+          "end": {
+            "minimum": 1.0,
+            "title": "End",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "TEXT",
+            "default": "TEXT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0.0,
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "CalcRegionTextLocator",
+        "type": "object"
+      },
+      "CalcRequirementCatalogRead": {
+        "description": "Каталог требований калькулятора с его версией.",
+        "properties": {
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRequirementRead"
+            },
+            "title": "Requirements",
+            "type": "array"
+          },
+          "systems": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSystemRead"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "discipline",
+          "systems",
+          "requirements"
+        ],
+        "title": "CalcRequirementCatalogRead",
+        "type": "object"
+      },
+      "CalcRequirementGroup": {
+        "description": "Группа исходных данных в каталоге требований.",
+        "enum": [
+          "GEOMETRY",
+          "APARTMENTS",
+          "NONRESIDENTIAL",
+          "WATER_SUPPLY",
+          "SEWERAGE",
+          "OTHER"
+        ],
+        "title": "CalcRequirementGroup",
+        "type": "string"
+      },
+      "CalcRequirementLevel": {
+        "description": "Насколько исходное данное нужно расчёту. Не уверенность — другое понятие.",
+        "enum": [
+          "REQUIRED",
+          "DESIRABLE",
+          "OPTIONAL",
+          "DERIVABLE"
+        ],
+        "title": "CalcRequirementLevel",
+        "type": "string"
+      },
+      "CalcRequirementRead": {
+        "properties": {
+          "assumption": {
+            "$ref": "#/components/schemas/CalcAssumptionPolicy"
+          },
+          "derivable_from": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Derivable From",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "expected_sources": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSourceClass"
+            },
+            "title": "Expected Sources",
+            "type": "array"
+          },
+          "fact_type": {
+            "title": "Fact Type",
+            "type": "string"
+          },
+          "fact_type_title": {
+            "title": "Fact Type Title",
+            "type": "string"
+          },
+          "group": {
+            "$ref": "#/components/schemas/CalcRequirementGroup"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CalcRequirementLevel"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcRequirementScope"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "group",
+          "fact_type",
+          "fact_type_title",
+          "scope",
+          "level",
+          "assumption",
+          "description",
+          "systems",
+          "derivable_from",
+          "expected_sources"
+        ],
+        "title": "CalcRequirementRead",
+        "type": "object"
+      },
+      "CalcRequirementScope": {
+        "description": "К чему относится требование: к корпусу, этажу или системе.",
+        "enum": [
+          "BUILDING",
+          "FLOOR",
+          "SYSTEM"
+        ],
+        "title": "CalcRequirementScope",
+        "type": "string"
       },
       "CalcResolutionState": {
         "description": "Как получено действующее значение ключа. Ни одно состояние не выбирает молча.",
@@ -2384,6 +3486,114 @@
         ],
         "title": "CalcSourceRead",
         "type": "object"
+      },
+      "CalcStageBasis": {
+        "description": "Откуда известна стадия документа.",
+        "enum": [
+          "DECLARED",
+          "DECLARED_OVER_STAMP"
+        ],
+        "title": "CalcStageBasis",
+        "type": "string"
+      },
+      "CalcSystemRead": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "discipline",
+          "code",
+          "title"
+        ],
+        "title": "CalcSystemRead",
+        "type": "object"
+      },
+      "CalcSystemReadinessRead": {
+        "properties": {
+          "counts": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLevelCountRead"
+            },
+            "title": "Counts",
+            "type": "array"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CalcReadinessRowRead"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "system_code": {
+            "title": "System Code",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "discipline",
+          "system_code",
+          "title",
+          "counts",
+          "rows"
+        ],
+        "title": "CalcSystemReadinessRead",
+        "type": "object"
+      },
+      "CalcTableCountRead": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "extracted": {
+            "title": "Extracted",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcTableKind"
+          }
+        },
+        "required": [
+          "kind",
+          "count",
+          "extracted"
+        ],
+        "title": "CalcTableCountRead",
+        "type": "object"
+      },
+      "CalcTableKind": {
+        "description": "Смысл распознанной таблицы — по заголовкам и названию, а не по имени файла.",
+        "enum": [
+          "APARTMENT_EXPLICATION",
+          "ROOM_EXPLICATION",
+          "PARKING_STORAGE",
+          "APARTMENT_SUMMARY",
+          "SANITARY_FIXTURES",
+          "WATER_CONSUMERS",
+          "LOADS",
+          "AIR_EXCHANGE",
+          "EQUIPMENT_SPEC",
+          "UNKNOWN"
+        ],
+        "title": "CalcTableKind",
+        "type": "string"
       },
       "CalcTextValue": {
         "additionalProperties": false,
@@ -10716,6 +11926,54 @@
         ]
       }
     },
+    "/api/v1/calc/projects/{project_id}/documents": {
+      "get": {
+        "description": "Ревизии с распознанным текстом и без, подсказка по штампу, последний сбор.",
+        "operationId": "list_calc_documents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcCollectableDocumentRead"
+                  },
+                  "title": "Response List Calc Documents",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Документы проекта для сбора фактов",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
     "/api/v1/calc/projects/{project_id}/fact-values": {
       "get": {
         "description": "Какое значение каждого ключа пойдёт в расчёт и почему. ВОР Заказчика — отдельно.",
@@ -10900,6 +12158,296 @@
         ]
       }
     },
+    "/api/v1/calc/projects/{project_id}/input-facts": {
+      "get": {
+        "description": "Действующие утверждения и ответ сервера, идёт ли каждое в расчёт.",
+        "operationId": "list_calc_input_facts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Тип факта",
+            "in": "query",
+            "name": "fact_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Тип факта",
+              "title": "Fact Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcInputFactPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Факты проекта для экрана «Исходные данные»",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/inspections": {
+      "get": {
+        "operationId": "list_calc_inspections",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcInspectionRead"
+                  },
+                  "title": "Response List Calc Inspections",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сборы фактов проекта",
+        "tags": [
+          "calc"
+        ]
+      },
+      "post": {
+        "description": "Адаптеры читают готовый текст блоков; распознавание не повторяется и не меняется.",
+        "operationId": "create_calc_inspection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcInspectionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcInspectionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Собрать факты из распознанного документа",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/readiness": {
+      "get": {
+        "description": "Что известно для расчёта и чего не хватает; фильтры сужают строки, но не счётчики.",
+        "operationId": "read_calc_readiness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Система: «В1»",
+            "in": "query",
+            "name": "system",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 8,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Система: «В1»",
+              "title": "System"
+            }
+          },
+          {
+            "description": "Уровни",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcRequirementLevel"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Уровни",
+              "title": "Level"
+            }
+          },
+          {
+            "description": "Состояния",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcReadinessStatus"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Состояния",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcReadinessRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Готовность исходных данных к расчёту",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
     "/api/v1/calc/projects/{project_id}/sources": {
       "get": {
         "operationId": "list_calc_sources",
@@ -10993,6 +12541,28 @@
           }
         },
         "summary": "Завести источник фактов",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/requirements": {
+      "get": {
+        "description": "Что понадобится калькулятору В1, Т3, Т4, К1: уровень, область, можно ли вывести.",
+        "operationId": "list_calc_requirements",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRequirementCatalogRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Каталог исходных данных ВК стадии П",
         "tags": [
           "calc"
         ]

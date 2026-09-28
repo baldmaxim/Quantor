@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends
 from app.api.v1 import (
     auth,
     calc,
+    calc_inputs,
     documents,
     integrations,
     jobs,
@@ -56,6 +57,7 @@ protected_router.include_router(integrations.router)
 protected_router.include_router(mep.router)
 # Расчётный контур стадии П: объявлен и закрыт флагом до инженерного гейта (ADR-0030).
 protected_router.include_router(calc.router)
+protected_router.include_router(calc_inputs.router)
 
 api_v1_router.include_router(protected_router)
 

@@ -122,6 +122,43 @@ CalcEvidenceCreate = Annotated[
 ]
 
 
+class CalcRegionTableLocator(BaseModel):
+    """Где в тексте блока распознанного пакета стоит таблица и какие её строки использованы.
+
+    Номера — с нуля: таблица по порядку в тексте блока, строки — после шапки. Текст блока
+    закреплён отпечатком `region_sha256`, поэтому номера не «уплывают».
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["TABLE"] = "TABLE"
+    table_index: Annotated[int, Field(ge=0)]
+    rows: Annotated[list[Annotated[int, Field(ge=0)]], Field(min_length=1, max_length=500)]
+    column: Annotated[int | None, Field(default=None, ge=0)] = None
+    """Столбец, если значение взято из ячейки; пусто — строки подсчитаны целиком."""
+
+
+class CalcRegionTextLocator(BaseModel):
+    """Фрагмент текста блока: смещения в символах от начала текста блока."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["TEXT"] = "TEXT"
+    start: Annotated[int, Field(ge=0)]
+    end: Annotated[int, Field(ge=1)]
+
+    @model_validator(mode="after")
+    def _ordered(self) -> CalcRegionTextLocator:
+        if self.end <= self.start:
+            raise ValueError("конец фрагмента должен быть после начала")
+        return self
+
+
+CalcRegionLocator = Annotated[
+    CalcRegionTableLocator | CalcRegionTextLocator, Field(discriminator="kind")
+]
+
+
 class CalcEvidenceRead(_Read):
     id: uuid.UUID
     kind: CalcEvidenceKind
@@ -134,6 +171,11 @@ class CalcEvidenceRead(_Read):
     basis: str | None
     alternatives: list[str]
     author_id: uuid.UUID | None
+    region_id: uuid.UUID | None
+    """Блок распознанного пакета, из текста которого извлечено значение."""
+    region_sha256: str | None
+    """Отпечаток текста блока в момент извлечения."""
+    region_locator: CalcRegionLocator | None
     created_at: datetime
 
 
@@ -184,6 +226,9 @@ class CalcFactRead(_Read):
     withdrawn_reason: str | None
     withdrawn_at: datetime | None
     note: str | None
+    """У ручного ввода — основание автора; у собранного адаптером — как извлечено значение."""
+    inspection_id: uuid.UUID | None
+    """Сбор фактов, записавший утверждение; пусто — ручной ввод или решение."""
     created_by: uuid.UUID | None
     created_at: datetime
     evidence: list[CalcEvidenceRead]
@@ -303,4 +348,6 @@ class CalcFactTypeRead(BaseModel):
     required_subject: list[str]
     allowed_subject: list[str]
     options: list[CalcEnumOptionRead]
+    qualifier_options: list[CalcEnumOptionRead]
+    """Перечень квалификаторов места: тип квартиры, вид прибора. Пусто — квалификатора нет."""
     customer_vor_admissible: bool

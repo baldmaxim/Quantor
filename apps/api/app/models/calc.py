@@ -6,6 +6,7 @@ CalcSource              откуда факты: класс, заявленна�
         └── CalcFactEvidence × N   где прочитано или почему принято
 CalcFactConflict        расхождение по ключу: какие утверждения, в каком состоянии
 CalcManualOverride      решение человека по ключу: какое утверждение выбрано и почему
+CalcSourceInspection    сбор фактов из ревизии: что заявлено, что проверено, что не удалось
 ```
 
 Ссылки на ревизии и листы документов — значения без внешнего ключа: свидетельство — это
@@ -60,6 +61,14 @@ from app.models.mixins import CreatedAtMixin, TimestampMixin, str_enum, uuid_pk
 # пользователя, проверка здесь — ошибку программиста.
 _VOR_NEVER_ELIGIBLE = "source_class <> 'CUSTOMER_VOR' or calculation_eligible = false"
 
+_EVIDENCE_HAS_CONTENT = (
+    "(kind = 'DOCUMENT_FRAGMENT' and document_revision_id is not null)"
+    " or (kind = 'ASSUMPTION_BASIS' and basis is not null)"
+    " or (kind = 'MANUAL_ENTRY' and author_id is not null)"
+    " or (kind in ('REGION_TABLE', 'REGION_TEXT') and document_revision_id is not null"
+    " and region_id is not null and region_sha256 is not null and region_locator is not null)"
+)
+
 
 class CalcSource(CreatedAtMixin, Base):
     """Источник фактов. Неизменяем: исправление — новый источник той же серии."""
@@ -92,6 +101,18 @@ class CalcSource(CreatedAtMixin, Base):
         CheckConstraint(_VOR_NEVER_ELIGIBLE, name="vor_never_eligible"),
         CheckConstraint("length(btrim(title)) > 0", name="title_not_blank"),
         Index("ix_calc_sources_project_id", "project_id"),
+        # Источник адаптера один на ревизию, класс, стадию и серию: повторный сбор пишет в
+        # тот же источник, и версии утверждений идут подряд.
+        Index(
+            "uq_calc_sources_adapter",
+            "project_id",
+            "document_revision_id",
+            "source_class",
+            "document_stage",
+            "series_key",
+            unique=True,
+            postgresql_where=text("series_key like 'calc:recognized:%'"),
+        ),
     )
 
 
@@ -128,6 +149,7 @@ class CalcFact(CreatedAtMixin, Base):
         str_enum(CalcDiscipline, name="calc_discipline", length=8)
     )
     system_code: Mapped[str | None] = mapped_column(String(64))
+    qualifier: Mapped[str | None] = mapped_column(String(64))
     subject_key: Mapped[str] = mapped_column(String(480), nullable=False)
     fact_key: Mapped[str] = mapped_column(String(560), nullable=False)
 
@@ -170,6 +192,10 @@ class CalcFact(CreatedAtMixin, Base):
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     withdrawn_by: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
     note: Mapped[str | None] = mapped_column(Text)
+    inspection_id: Mapped[uuid.UUID | None] = mapped_column(
+        pg.UUID(as_uuid=True), ForeignKey("calc_source_inspections.id", ondelete="NO ACTION")
+    )
+    """Сбор, записавший утверждение; пусто — ручной ввод или решение."""
     created_by: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
 
     source: Mapped[CalcSource] = relationship()
@@ -211,6 +237,7 @@ class CalcFact(CreatedAtMixin, Base):
             room=self.room,
             discipline=self.discipline,
             system_code=self.system_code,
+            qualifier=self.qualifier,
         )
 
 
@@ -237,17 +264,16 @@ class CalcFactEvidence(CreatedAtMixin, Base):
         pg.JSONB, nullable=False, default=list, server_default="[]"
     )
     author_id: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
+    region_id: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
+    """Блок распознанного пакета. Без внешнего ключа: свидетельство — снимок."""
+    region_sha256: Mapped[str | None] = mapped_column(String(64))
+    region_locator: Mapped[dict[str, Any] | None] = mapped_column(pg.JSONB)
 
     fact: Mapped[CalcFact] = relationship(back_populates="evidence")
 
     __table_args__ = (
         # Свидетельство без содержания — не свидетельство.
-        CheckConstraint(
-            "(kind = 'DOCUMENT_FRAGMENT' and document_revision_id is not null)"
-            " or (kind = 'ASSUMPTION_BASIS' and basis is not null)"
-            " or (kind = 'MANUAL_ENTRY' and author_id is not null)",
-            name="kind_has_content",
-        ),
+        CheckConstraint(_EVIDENCE_HAS_CONTENT, name="kind_has_content"),
         Index("ix_calc_fact_evidence_fact_id", "fact_id"),
     )
 
@@ -308,5 +334,48 @@ class CalcManualOverride(CreatedAtMixin, Base):
             "fact_key",
             unique=True,
             postgresql_where=text("revoked_at is null"),
+        ),
+    )
+
+
+class CalcSourceInspection(CreatedAtMixin, Base):
+    """Сбор фактов из ревизии документа: заявление, версия адаптеров, что проверено, итог.
+
+    Без этой записи «документ проверен, значения нет» не отличить от «документ ещё не
+    смотрели». Итог хранится целиком: что найдено, что отклонено и почему.
+    """
+
+    __tablename__ = "calc_source_inspections"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        pg.UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    document_revision_id: Mapped[uuid.UUID] = mapped_column(pg.UUID(as_uuid=True), nullable=False)
+    source_class: Mapped[CalcSourceClass] = mapped_column(
+        str_enum(CalcSourceClass, name="calc_source_class"), nullable=False
+    )
+    document_stage: Mapped[CalcDocumentStage] = mapped_column(
+        str_enum(CalcDocumentStage, name="calc_document_stage", length=16), nullable=False
+    )
+    building: Mapped[str] = mapped_column(String(64), nullable=False)
+    discipline: Mapped[CalcDiscipline | None] = mapped_column(
+        str_enum(CalcDiscipline, name="calc_discipline", length=8)
+    )
+    extractor_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    inspected_fact_types: Mapped[list[str]] = mapped_column(
+        pg.JSONB, nullable=False, default=list, server_default="[]"
+    )
+    summary: Mapped[dict[str, Any]] = mapped_column(pg.JSONB, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
+
+    __table_args__ = (
+        CheckConstraint("source_class <> 'MANUAL'", name="not_manual"),
+        CheckConstraint("length(btrim(building)) > 0", name="building_not_blank"),
+        Index(
+            "ix_calc_source_inspections_revision",
+            "project_id",
+            "document_revision_id",
+            "created_at",
         ),
     )

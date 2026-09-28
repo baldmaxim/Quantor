@@ -13,14 +13,16 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Final
 
 from pydantic import TypeAdapter
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -53,6 +55,7 @@ from app.contracts.calc.facts import (
     CalcFactCreate,
     CalcSourceCreate,
 )
+from app.contracts.calc.subjects import CalcFactSubject
 from app.contracts.calc.values import CalcFactValue
 from app.errors import DomainError, ErrorCode, InvariantError
 from app.models import Document, DocumentRevision, Project, Sheet
@@ -77,7 +80,8 @@ from app.services.calc.facts.resolution import (
 # Методы, которым в ручном вводе нет места: у каждого свой производитель, и он появится в
 # своём промте. Ручная запись «вычислено» без запуска расчёта была бы подделкой происхождения.
 _METHOD_LATER: Final[dict[CalcFactMethod, str]] = {
-    CalcFactMethod.GEOMETRY_MEASURED: "адаптером обмеров (PROMPT 02)",
+    CalcFactMethod.GEOMETRY_MEASURED: "адаптером обмеров (ещё не реализован)",
+    CalcFactMethod.TABLE_COUNTED: "сбором фактов из распознанных таблиц",
     CalcFactMethod.INFERRED: "правилом реестра (PROMPT 03)",
     CalcFactMethod.NORMATIVE: "правилом реестра (PROMPT 03)",
     CalcFactMethod.MANUFACTURER_RULE: "правилом реестра (PROMPT 03)",
@@ -93,6 +97,9 @@ _DEFAULT_CONFIDENCE: Final[dict[CalcFactMethod, CalcConfidence]] = {
 
 # Источник, от имени которого человек вводит своё значение при решении конфликта.
 DECISIONS_SERIES: Final = "calc:decisions"
+# Источники сбора из распознанного пакета: одна серия на адаптер.
+ADAPTER_SERIES_PREFIX: Final = "calc:recognized:"
+_KEY_CHUNK: Final = 1000
 # Серии с этим префиксом ведёт сам реестр; пользователь их не заводит.
 _SYSTEM_SERIES_PREFIX: Final = "calc:"
 
@@ -101,12 +108,29 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def _lock_id(project_id: uuid.UUID, name: str) -> int:
+    digest = hashlib.sha256(f"{project_id}|{name}".encode()).digest()
+    return int.from_bytes(digest[:8], "big", signed=True)
+
+
 async def _lock(session: AsyncSession, project_id: uuid.UUID, name: str) -> None:
     """Транзакционная блокировка имени внутри проекта; снимается при фиксации или откате."""
-    digest = hashlib.sha256(f"{project_id}|{name}".encode()).digest()
-    await session.execute(
-        select(func.pg_advisory_xact_lock(int.from_bytes(digest[:8], "big", signed=True)))
-    )
+    await session.execute(select(func.pg_advisory_xact_lock(_lock_id(project_id, name))))
+
+
+async def lock_name(session: AsyncSession, project_id: uuid.UUID, name: str) -> None:
+    await _lock(session, project_id, name)
+
+
+async def lock_keys(session: AsyncSession, project_id: uuid.UUID, keys: Iterable[str]) -> None:
+    """Блокировки многих ключей одним запросом, по возрастанию номера: два пакетных сбора
+    берут их в одном порядке и не ждут друг друга по кругу."""
+    ids = sorted({_lock_id(project_id, key) for key in keys})
+    if ids:
+        await session.execute(
+            text("select pg_advisory_xact_lock(k) from unnest(cast(:ids as bigint[])) as t(k)"),
+            {"ids": ids},
+        )
 
 
 def _scoped_facts(workspace_id: uuid.UUID) -> Select[tuple[CalcFact]]:
@@ -332,6 +356,12 @@ async def create_fact(
             ErrorCode.CALC_SOURCE_NOT_ALLOWED,
             "Источник решений пополняется только решением по конфликту",
         )
+    if (source.series_key or "").startswith(_SYSTEM_SERIES_PREFIX):
+        # Иначе ручное значение выдало бы себя за найденное в документе.
+        raise DomainError(
+            ErrorCode.CALC_SOURCE_NOT_ALLOWED,
+            "Источник сбора пополняется только сбором фактов из документа",
+        )
     return await _record_fact(
         session,
         project_id=project.id,
@@ -415,6 +445,7 @@ async def _record_fact(
         room=subject.room,
         discipline=subject.discipline,
         system_code=subject.system_code,
+        qualifier=subject.qualifier,
         subject_key=subject.key(),
         fact_key=key,
         value_kind=definition.value_kind,
@@ -536,6 +567,7 @@ def _claim_view(fact: CalcFact, source: CalcSource) -> ClaimView:
         source_class=fact.source_class,
         document_stage=source.document_stage,
         source_content_sha256=source.content_sha256,
+        source_id=source.id,
         review_status=fact.review_status,
         status=fact.status,
         calculation_eligible=fact.calculation_eligible,
@@ -604,56 +636,114 @@ def _conflict_status(resolution: Resolution) -> CalcConflictStatus:
     return CalcConflictStatus.OPEN
 
 
+async def refresh_keys(
+    session: AsyncSession, *, project_id: uuid.UUID, keys: Iterable[str]
+) -> dict[str, CalcFactConflict]:
+    """Пересчитывает конфликты ключей после изменения их утверждений или решений.
+
+    Вызывающий уже держит блокировки ключей (`_lock`, `lock_keys`): утверждения читаются под
+    ними. Возвращает записи конфликтов тех ключей, у которых они есть.
+    """
+    result: dict[str, CalcFactConflict] = {}
+    ordered = sorted(set(keys))
+    for start in range(0, len(ordered), _KEY_CHUNK):
+        chunk = ordered[start : start + _KEY_CHUNK]
+        rows = (
+            await session.execute(
+                select(CalcFact, CalcSource)
+                .join(CalcSource, CalcSource.id == CalcFact.source_id)
+                .where(
+                    CalcFact.project_id == project_id,
+                    CalcFact.fact_key.in_(chunk),
+                    CalcFact.status == CalcFactStatus.ACTIVE,
+                )
+            )
+        ).all()
+        grouped: dict[str, list[tuple[CalcFact, CalcSource]]] = defaultdict(list)
+        for fact, source in rows:
+            grouped[fact.fact_key].append((fact, source))
+        decisions = {
+            item.fact_key: item
+            for item in await session.scalars(
+                select(CalcManualOverride).where(
+                    CalcManualOverride.project_id == project_id,
+                    CalcManualOverride.fact_key.in_(chunk),
+                    CalcManualOverride.revoked_at.is_(None),
+                )
+            )
+        }
+        conflicts = {
+            item.fact_key: item
+            for item in await session.scalars(
+                select(CalcFactConflict)
+                .where(
+                    CalcFactConflict.project_id == project_id,
+                    CalcFactConflict.fact_key.in_(chunk),
+                )
+                .with_for_update()
+            )
+        }
+        for key in chunk:
+            pairs = grouped.get(key, [])
+            resolution: Resolution | None = None
+            if pairs:
+                sample = pairs[0][0]
+                definition = fact_type_def(sample.fact_type)
+                if definition is None:
+                    raise InvariantError(
+                        f"в реестре утверждение неизвестного типа {sample.fact_type}"
+                    )
+                resolution = resolve(
+                    definition,
+                    [_claim_view(fact, source) for fact, source in pairs],
+                    _decision_view(decisions.get(key)),
+                    policy_for(definition.key),
+                )
+            conflict = conflicts.get(key)
+            if conflict is None:
+                if resolution is None or not resolution.disagreement:
+                    continue
+                sample = pairs[0][0]
+                # Страховка на случай вызова без блокировки ключа: вставка не падает, а уступает.
+                await session.execute(
+                    pg_insert(CalcFactConflict)
+                    .values(
+                        id=uuid.uuid4(),
+                        project_id=project_id,
+                        fact_key=key,
+                        fact_type=sample.fact_type,
+                        subject_key=sample.subject_key,
+                        status=_conflict_status(resolution),
+                        claim_ids=[str(item) for item in resolution.claim_ids],
+                        claim_set_hash=resolution.claim_set_hash,
+                    )
+                    .on_conflict_do_nothing(constraint="uq_calc_fact_conflicts_key")
+                )
+                conflict = await session.scalar(
+                    select(CalcFactConflict).where(
+                        CalcFactConflict.project_id == project_id, CalcFactConflict.fact_key == key
+                    )
+                )
+                if conflict is None:
+                    raise InvariantError("конфликт ключа не записан")
+            if resolution is None:
+                conflict.status = CalcConflictStatus.OBSOLETE
+                conflict.claim_ids = []
+            else:
+                conflict.status = _conflict_status(resolution)
+                conflict.claim_ids = [str(item) for item in resolution.claim_ids]
+                conflict.claim_set_hash = resolution.claim_set_hash
+            result[key] = conflict
+    await session.flush()
+    return result
+
+
 async def refresh_key(
     session: AsyncSession, *, project_id: uuid.UUID, key: str
 ) -> CalcFactConflict | None:
-    """Пересчитывает конфликт ключа после любого изменения его утверждений или решения.
-
-    Вызывающий уже держит блокировку ключа (`_lock`): утверждения читаются под ней.
-    """
-    resolved = await _resolve_key(session, project_id, key)
-    conflict = await session.scalar(
-        select(CalcFactConflict)
-        .where(CalcFactConflict.project_id == project_id, CalcFactConflict.fact_key == key)
-        .with_for_update()
-    )
-    disagreement = resolved is not None and resolved[0].disagreement
-    if conflict is None and not disagreement:
-        return None
-    if conflict is None and resolved is not None:
-        resolution, sample = resolved
-        # Страховка на случай вызова без блокировки ключа: вставка не падает, а уступает.
-        await session.execute(
-            pg_insert(CalcFactConflict)
-            .values(
-                id=uuid.uuid4(),
-                project_id=project_id,
-                fact_key=key,
-                fact_type=sample.fact_type,
-                subject_key=sample.subject_key,
-                status=_conflict_status(resolution),
-                claim_ids=[str(item) for item in resolution.claim_ids],
-                claim_set_hash=resolution.claim_set_hash,
-            )
-            .on_conflict_do_nothing(constraint="uq_calc_fact_conflicts_key")
-        )
-        conflict = await session.scalar(
-            select(CalcFactConflict).where(
-                CalcFactConflict.project_id == project_id, CalcFactConflict.fact_key == key
-            )
-        )
-    if conflict is None:
-        raise InvariantError("конфликт ключа не записан")
-    if resolved is None:
-        conflict.status = CalcConflictStatus.OBSOLETE
-        conflict.claim_ids = []
-    else:
-        resolution = resolved[0]
-        conflict.status = _conflict_status(resolution)
-        conflict.claim_ids = [str(item) for item in resolution.claim_ids]
-        conflict.claim_set_hash = resolution.claim_set_hash
-    await session.flush()
-    return conflict
+    """Пересчитывает конфликт одного ключа. Вызывающий держит его блокировку."""
+    refreshed = await refresh_keys(session, project_id=project_id, keys=[key])
+    return refreshed.get(key)
 
 
 async def get_conflict(
@@ -853,3 +943,169 @@ async def calculation_snapshot(session: AsyncSession, *, project_id: uuid.UUID) 
     """
     resolved = await resolve_project(session, project_id=project_id)
     return build_snapshot([entry for entry, _ in resolved])
+
+
+# ------------------------------------------------------------------ запись сбора из документа
+
+
+@dataclass(frozen=True, slots=True)
+class AdapterClaim:
+    """Проверенный кандидат адаптера, готовый к записи в свой источник."""
+
+    source: CalcSource
+    fact_type: str
+    subject: CalcFactSubject
+    fact_key: str
+    stated: CalcFactValue
+    canonical: CalcFactValue
+    method: CalcFactMethod
+    confidence: CalcConfidence
+    note: str
+    evidence: tuple[CalcFactEvidence, ...]
+
+
+@dataclass(slots=True)
+class AdapterWriteStats:
+    created: int = 0
+    unchanged: int = 0
+    superseded: int = 0
+    withdrawn: int = 0
+    keys: set[str] = field(default_factory=set)
+
+
+def _evidence_signature(rows: Iterable[CalcFactEvidence]) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        sorted(
+            (str(row.region_id), json.dumps(row.region_locator, sort_keys=True))
+            for row in rows
+            if row.region_id is not None
+        )
+    )
+
+
+async def _active_in_sources(
+    session: AsyncSession, project_id: uuid.UUID, source_ids: Sequence[uuid.UUID]
+) -> list[CalcFact]:
+    if not source_ids:
+        return []
+    return list(
+        (
+            await session.scalars(
+                select(CalcFact)
+                .where(
+                    CalcFact.project_id == project_id,
+                    CalcFact.source_id.in_(source_ids),
+                    CalcFact.status == CalcFactStatus.ACTIVE,
+                )
+                .options(selectinload(CalcFact.evidence))
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+    )
+
+
+async def record_adapter_claims(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    inspection_id: uuid.UUID,
+    claims: Sequence[AdapterClaim],
+    retire: dict[uuid.UUID, str],
+    author_id: uuid.UUID | None,
+) -> AdapterWriteStats:
+    """Записывает результат сбора: новые утверждения, версии изменившихся, отзыв исчезнувших.
+
+    Повторный сбор того же документа идемпотентен: утверждение с тем же значением и теми же
+    свидетельствами не получает новой версии. Действующие утверждения источников из `retire`,
+    которых в этом сборе нет, отзываются с указанной причиной — не удаляются.
+    """
+    stats = AdapterWriteStats()
+    targets = {claim.source.id for claim in claims}
+    source_ids = sorted(targets | set(retire), key=str)
+
+    # Сначала — какие ключи затронуты; затем их блокировки; затем чтение под блокировками.
+    before = await _active_in_sources(session, project_id, source_ids)
+    keys = {claim.fact_key for claim in claims} | {fact.fact_key for fact in before}
+    await lock_keys(session, project_id, keys)
+    active = {
+        (fact.source_id, fact.fact_key): fact
+        for fact in await _active_in_sources(session, project_id, source_ids)
+    }
+    keys |= {key for _, key in active}
+    last_versions: dict[tuple[uuid.UUID, str], int] = {}
+    if source_ids:
+        rows = await session.execute(
+            select(CalcFact.source_id, CalcFact.fact_key, func.max(CalcFact.version))
+            .where(CalcFact.project_id == project_id, CalcFact.source_id.in_(source_ids))
+            .group_by(CalcFact.source_id, CalcFact.fact_key)
+        )
+        last_versions = {(source_id, key): version for source_id, key, version in rows.tuples()}
+
+    now = _now()
+    produced: set[tuple[uuid.UUID, str]] = set()
+    fresh: list[CalcFact] = []
+    for claim in claims:
+        slot = (claim.source.id, claim.fact_key)
+        produced.add(slot)
+        current = active.get(slot)
+        if (
+            current is not None
+            and current.value == claim.canonical.model_dump(mode="json")
+            and _evidence_signature(current.evidence) == _evidence_signature(claim.evidence)
+        ):
+            stats.unchanged += 1
+            continue
+        definition = fact_type_def(claim.fact_type)
+        if definition is None:
+            raise InvariantError(f"сбор записывает неизвестный тип факта {claim.fact_type}")
+        if current is not None:
+            current.status = CalcFactStatus.SUPERSEDED
+            stats.superseded += 1
+        subject = claim.subject
+        fresh.append(
+            CalcFact(
+                project_id=project_id,
+                source_id=claim.source.id,
+                source_class=claim.source.source_class,
+                fact_type=claim.fact_type,
+                building=subject.building,
+                section=subject.section,
+                floor=subject.floor,
+                room=subject.room,
+                discipline=subject.discipline,
+                system_code=subject.system_code,
+                qualifier=subject.qualifier,
+                subject_key=subject.key(),
+                fact_key=claim.fact_key,
+                value_kind=definition.value_kind,
+                value=claim.canonical.model_dump(mode="json"),
+                stated_value=claim.stated.model_dump(mode="json"),
+                value_number=canonical_number(claim.canonical),
+                unit=definition.unit,
+                method=claim.method,
+                confidence=claim.confidence,
+                version=last_versions.get(slot, 0) + 1,
+                supersedes_id=None if current is None else current.id,
+                calculation_eligible=claim.source.calculation_eligible,
+                note=claim.note,
+                inspection_id=inspection_id,
+                created_by=author_id,
+                evidence=list(claim.evidence),
+            )
+        )
+        stats.created += 1
+    for slot, fact in active.items():
+        if slot in produced or fact.source_id not in retire:
+            continue
+        fact.status = CalcFactStatus.WITHDRAWN
+        fact.withdrawn_reason = retire[fact.source_id]
+        fact.withdrawn_at = now
+        fact.withdrawn_by = author_id
+        stats.withdrawn += 1
+    # Прежние версии уходят из «действующих» до вставки новых: уникальный индекс не даст двух.
+    await session.flush()
+    session.add_all(fresh)
+    await session.flush()
+    await refresh_keys(session, project_id=project_id, keys=keys)
+    stats.keys = keys
+    return stats
