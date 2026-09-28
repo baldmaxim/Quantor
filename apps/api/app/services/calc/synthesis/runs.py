@@ -111,8 +111,8 @@ def _calculation_problem(
 ) -> CalcBlockingReason | None:
     if calculation.project_id != project_id:
         message = "запуск расчёта другого проекта"
-    elif calculation.status is not CalcRunStatus.SUCCEEDED:
-        message = f"запуск расчёта не успешный ({calculation.status.value})"
+    elif calculation.status not in (CalcRunStatus.SUCCEEDED, CalcRunStatus.PARTIAL):
+        message = f"запуск расчёта без результатов ({calculation.status.value})"
     elif (calculation.calculator_id, calculation.calculator_version) != (
         definition.calculator_id,
         definition.calculator_version,

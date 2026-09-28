@@ -214,7 +214,6 @@ class TestFactTypes:
 
 class TestDraftContracts:
     ENTITIES = (
-        "CalcExpectedQuantity",
         "CalcCustomerVorItem",
         "CalcVorMatch",
         "CalcProjectQuestion",
@@ -227,5 +226,8 @@ class TestDraftContracts:
         for name in self.ENTITIES:
             assert hasattr(draft, name), name
         tables = set(Base.metadata.tables)
-        for forbidden in ("calc_expected_quantities", "calc_vor_items", "calc_questions"):
+        for forbidden in ("calc_vor_items", "calc_questions", "calc_vor_matches"):
             assert forbidden not in tables
+        # Ожидаемые количества реализованы в PROMPT 06 — уже не черновик.
+        assert "calc_expected_quantities" in tables
+        assert not hasattr(draft, "CalcExpectedQuantity")

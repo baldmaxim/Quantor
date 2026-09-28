@@ -1,13 +1,15 @@
 """Типы плана запуска и разбор области — общие для планировщика, исполнителя и слоя запусков.
 
 Исход по факту — значение из снимка или причина отсутствия; исход по правилу — точная версия
-или причина. Требования к фактам выводятся из привязок калькулятора и области запуска.
+или причина. Требования к фактам выводятся из привязок калькулятора и области запуска; члены
+набора (PROMPT 06) — все ключи реестра, чьё место совпадает с общей частью и отличается полем
+члена.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 
 from app.contracts.calc.engine import (
@@ -21,7 +23,7 @@ from app.contracts.calc.rules import CalcRuleContent
 from app.contracts.calc.subjects import CalcFactSubject
 from app.contracts.calc.units import UnitError, compatible
 from app.contracts.calc.values import CalcCountValue, CalcNumberValue
-from app.services.calc.engine.calculators import CalculatorDef, StepDef
+from app.services.calc.engine.calculators import CalculatorDef, SeriesBinding, StepDef
 from app.services.calc.engine.handlers import HandlerSpec
 
 
@@ -60,6 +62,25 @@ class FactRequirement:
 
 
 @dataclass(frozen=True, slots=True)
+class SeriesRequirement:
+    """Какие ключи реестра — члены набора шага: общая часть места и поле члена."""
+
+    step_key: str
+    input: str
+    fact_type: str
+    fixed: CalcFactSubject
+    member_field: str
+
+    def matches(self, fact_type: str, subject: CalcFactSubject) -> bool:
+        if fact_type != self.fact_type:
+            return False
+        fixed = self.fixed.present_fields()
+        if subject.present_fields() != fixed | {self.member_field}:
+            return False
+        return all(getattr(subject, name) == getattr(self.fixed, name) for name in fixed)
+
+
+@dataclass(frozen=True, slots=True)
 class OutputContract:
     unit: str | None
     quantity: str | None
@@ -75,6 +96,9 @@ class PlannedStep:
     handler: HandlerSpec | None
     facts: Mapping[str, CalcSnapshotItem]
     outputs: Mapping[str, OutputContract]
+    series: Mapping[str, tuple[CalcSnapshotItem, ...]] = field(default_factory=dict)
+    primitive: bool = False
+    """Шаг-примитив: реализация из реестра примитивов, правила нет."""
 
 
 @dataclass(frozen=True)
@@ -91,6 +115,11 @@ class Plan:
     @property
     def valid(self) -> bool:
         return not self.reasons
+
+    @property
+    def runnable(self) -> bool:
+        """Есть что исполнять: план без причин или частичный план рабочего калькулятора."""
+        return bool(self.steps)
 
 
 def reason(
@@ -176,6 +205,63 @@ def fact_requirements(
                 )
             )
     return found, reasons
+
+
+def split_fact_key(fact_key: str) -> tuple[str, CalcFactSubject] | None:
+    """Ключ факта → тип и место. Разделители в кодах запрещены, поэтому разбор однозначен."""
+    fact_type, _, subject_key = fact_key.partition("@")
+    if not subject_key:
+        return None
+    if subject_key == "project":
+        return fact_type, CalcFactSubject()
+    try:
+        values = dict(part.split("=", 1) for part in subject_key.split("|"))
+        return fact_type, CalcFactSubject.model_validate(values)
+    except ValueError:
+        return None
+
+
+def series_members(requirement: SeriesRequirement, keys: Iterable[str]) -> tuple[str, ...]:
+    """Члены набора среди известных ключей — упорядочены по ключу."""
+    found: list[str] = []
+    for key in keys:
+        parsed = split_fact_key(key)
+        if parsed is not None and requirement.matches(*parsed):
+            found.append(key)
+    return tuple(sorted(found))
+
+
+def series_requirements(
+    definition: CalculatorDef, scope: CalcFactSubject
+) -> tuple[list[SeriesRequirement], list[CalcBlockingReason]]:
+    """Наборы калькулятора для области: общая часть места каждого набора."""
+    found: list[SeriesRequirement] = []
+    reasons: list[CalcBlockingReason] = []
+    for step in definition.steps:
+        for name, binding in step.series.items():
+            requirement = _series_requirement(step.step_key, name, binding, scope)
+            if isinstance(requirement, CalcBlockingReason):
+                reasons.append(requirement)
+            else:
+                found.append(requirement)
+    return found, reasons
+
+
+def _series_requirement(
+    step_key: str, name: str, binding: SeriesBinding, scope: CalcFactSubject
+) -> SeriesRequirement | CalcBlockingReason:
+    values = {field_name: getattr(scope, field_name) for field_name in binding.subject_fields}
+    try:
+        fixed = CalcFactSubject.model_validate(values)
+    except ValueError as error:
+        return reason(CalcBlockCode.SCOPE_INVALID, str(error), step_key=step_key)
+    return SeriesRequirement(
+        step_key=step_key,
+        input=name,
+        fact_type=binding.fact_type,
+        fixed=fixed,
+        member_field=binding.member_field,
+    )
 
 
 def numeric_unit(item: CalcSnapshotItem) -> str | None:

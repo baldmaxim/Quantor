@@ -7,11 +7,11 @@
 
 Реализованы и вынесены: правила — `rules.py` (PROMPT 03); запуск, шаг, результат, снимок
 входов, допущение и ссылка запуска на версию правила — `engine.py` (PROMPT 04); происхождение
-элемента и граф системы — `synthesis.py` (PROMPT 05).
+элемента и граф системы — `synthesis.py` (PROMPT 05); ожидаемые количества и Расчётный паспорт —
+`passport.py` (PROMPT 06).
 
 | Сущность            | Промт реализации |
 | ------------------- | ---------------- |
-| ExpectedQuantity    | 05–06            |
 | CustomerVorItem     | 09               |
 | VorMatch            | 09               |
 | ProjectQuestion     | 10               |
@@ -26,7 +26,7 @@ from typing import Final
 
 from pydantic import BaseModel, ConfigDict
 
-from app.contracts.calc.enums import CalcConfidence, CalcDiscipline, CalcScenario
+from app.contracts.calc.enums import CalcDiscipline
 from app.contracts.calc.subjects import CalcFactSubject
 from app.contracts.calc.values import DecimalText
 
@@ -40,45 +40,19 @@ class _Draft(BaseModel):
 # ------------------------------------------------------------------------------ расчёт
 
 
-class CalcResultStatus(StrEnum):
-    """Статус позиции паспорта в сценарии (PROMPT 06)."""
-
-    DETERMINED = "DETERMINED"
-    NOT_DETERMINED = "NOT_DETERMINED"
-    NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
-    NOT_APPLICABLE = "NOT_APPLICABLE"
-    BLOCKED_BY_CONFLICT = "BLOCKED_BY_CONFLICT"
-
-
 class CalcItemDescriptor(_Draft):
     """Описатель позиции: по нему идёт сверка с ВОР, а не по названию."""
 
     discipline: CalcDiscipline
     system_code: str
     group: str
-    """Группа PROMPT 06: A–L."""
+    """Категория позиции паспорта (PROMPT 06): PIPE, FITTING, VALVE…"""
     functional_type: str
     material: str | None
     size: str | None
     """Типоразмер с видом: «DN 32», «Ø110×3,4»."""
     scope: CalcFactSubject
     unit: str
-
-
-class CalcExpectedQuantity(_Draft):
-    """Позиция Расчётного паспорта с тремя сценариями и долей значения на допущениях."""
-
-    run_id: uuid.UUID
-    result_key: str
-    descriptor: CalcItemDescriptor
-    minimum: DecimalText | None
-    expected: DecimalText | None
-    tender_safe: DecimalText | None
-    status: dict[CalcScenario, CalcResultStatus]
-    step_keys: list[str]
-    assumption_share: DecimalText
-    confidence: CalcConfidence
-    warnings: list[str]
 
 
 # --------------------------------------------------------------------------- сверка с ВОР

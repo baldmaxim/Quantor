@@ -475,10 +475,16 @@ class TestBlocked:
 
 
 def test_t28_demo_synthesizer_hidden_by_default() -> None:
-    assert list_synthesizers() == []
-    assert [item.synthesizer_id for item in list_synthesizers(include_demo=True)] == [
+    assert {item.synthesizer_id for item in list_synthesizers()} == {
+        "vk.b1.structure",
+        "vk.t3.structure",
+        "vk.t4.structure",
+        "vk.k1.structure",
+    }
+    debug = {item.synthesizer_id for item in list_synthesizers(include_demo=True)}
+    assert debug == {"vk.b1.structure", "vk.t3.structure", "vk.t4.structure", "vk.k1.structure"} | {
         "test.riser_structure"
-    ]
+    }
 
 
 def test_t32_calc_portal_stays_off() -> None:

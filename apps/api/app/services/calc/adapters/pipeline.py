@@ -50,6 +50,7 @@ from app.services.calc.adapters.recognized import (
     StampSummary,
     summarize_stamps,
 )
+from app.services.calc.adapters.system_semantics import extract_system_functions
 from app.services.calc.adapters.table_kinds import (
     EXTRACTED_KINDS,
     TABLE_KINDS_VERSION,
@@ -77,6 +78,7 @@ DOCUMENT_FACT_TYPES: Final = frozenset(
         "system.inlet_pressure",
         "system.supply_temperature",
         "system.present",
+        "system.function",
     }
 )
 """Что адаптеры версии v1 ищут в документе. Документ, прошедший сбор, проверен на эти факты."""
@@ -225,6 +227,7 @@ def collect(document: RecognizedDocument, declaration: CollectionDeclaration) ->
         extraction.extend(extract_apartment_summary(parsed, declaration))
         extraction.extend(extract_sheet_titles(parsed, declaration))
         extraction.extend(extract_text_values(parsed, declaration))
+        extraction.extend(extract_system_functions(parsed, declaration))
 
     kinds: Counter[CalcTableKind] = Counter(
         table.classification.kind for region in parsed for table in region.tables

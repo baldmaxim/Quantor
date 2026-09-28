@@ -708,6 +708,53 @@
         "title": "BoxGeometry",
         "type": "object"
       },
+      "CalcAmount": {
+        "additionalProperties": false,
+        "description": "Значение или диапазон. Диапазон не превращается в середину.",
+        "properties": {
+          "high": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "title": "CalcAmount",
+        "type": "object"
+      },
       "CalcAssumptionEvidence": {
         "additionalProperties": false,
         "description": "Основание инженерного допущения.",
@@ -873,7 +920,8 @@
           "IMPLEMENTATION_MISSING",
           "UNIT_INCOMPATIBLE",
           "CALCULATION_NOT_USABLE",
-          "CALCULATION_RESULT_MISSING"
+          "CALCULATION_RESULT_MISSING",
+          "INPUT_INCOMPLETE"
         ],
         "title": "CalcBlockCode",
         "type": "string"
@@ -959,6 +1007,17 @@
             "title": "Input",
             "type": "string"
           },
+          "member_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Field"
+          },
           "step_key": {
             "title": "Step Key",
             "type": "string"
@@ -983,7 +1042,7 @@
       "CalcCalculatorKind": {
         "enum": [
           "DEMO",
-          "ENGINEERING"
+          "PRODUCTION"
         ],
         "title": "CalcCalculatorKind",
         "type": "string"
@@ -1010,6 +1069,11 @@
           },
           "kind": {
             "$ref": "#/components/schemas/CalcCalculatorKind"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
           },
           "results": {
             "items": {
@@ -1147,9 +1211,27 @@
             "title": "Depends On",
             "type": "array"
           },
+          "primitive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primitive"
+          },
           "rule_key": {
-            "title": "Rule Key",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Key"
           },
           "step_key": {
             "title": "Step Key",
@@ -1317,6 +1399,18 @@
         ],
         "title": "CalcCollectableDocumentRead",
         "type": "object"
+      },
+      "CalcCompleteness": {
+        "description": "Насколько позиция определена. Не процент.",
+        "enum": [
+          "COMPLETE",
+          "RANGE",
+          "PARTIAL",
+          "UNRESOLVED_BREAKDOWN",
+          "BLOCKED"
+        ],
+        "title": "CalcCompleteness",
+        "type": "string"
       },
       "CalcConfidence": {
         "description": "Уверенность в значении. Категория, а не число: дробь из ручного ввода декоративна.",
@@ -2349,6 +2443,251 @@
           "region_sha256"
         ],
         "title": "CalcEvidenceRef",
+        "type": "object"
+      },
+      "CalcExpectedQuantityRead": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregate": {
+            "default": false,
+            "title": "Aggregate",
+            "type": "boolean"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/CalcAmount"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "attributes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Attributes",
+            "type": "object"
+          },
+          "base": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcAmount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blocked_by": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocked By",
+            "type": "array"
+          },
+          "calculation_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calculation Run Id"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CalcQuantityCategory"
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/CalcCompleteness"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/CalcQuantityComponent"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/CalcQuantityDerivation"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "element_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Element Ids",
+            "type": "array"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "function": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_type": {
+            "pattern": "^[A-Z][A-Z0-9_]{1,40}$",
+            "title": "Item Type",
+            "type": "string"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
+          },
+          "passport_id": {
+            "format": "uuid",
+            "title": "Passport Id",
+            "type": "string"
+          },
+          "quantity_key": {
+            "maxLength": 120,
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+){1,5}$",
+            "title": "Quantity Key",
+            "type": "string"
+          },
+          "reserve": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcQuantityReserve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Result Keys",
+            "type": "array"
+          },
+          "rule_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rule Refs",
+            "type": "array"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "synthesis_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synthesis Run Id"
+          },
+          "system_code": {
+            "title": "System Code",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "quantity_key",
+          "system_code",
+          "discipline",
+          "scope",
+          "scenario",
+          "category",
+          "item_type",
+          "title",
+          "function",
+          "attributes",
+          "material",
+          "size",
+          "amount",
+          "unit",
+          "completeness",
+          "derivation",
+          "calculation_run_id",
+          "synthesis_run_id",
+          "element_ids",
+          "result_keys",
+          "rule_refs",
+          "assumptions",
+          "warnings",
+          "blocked_by",
+          "components",
+          "notice",
+          "explanation",
+          "id",
+          "passport_id"
+        ],
+        "title": "CalcExpectedQuantityRead",
         "type": "object"
       },
       "CalcFactCreate": {
@@ -3393,6 +3732,56 @@
         "title": "CalcHazardResolution",
         "type": "object"
       },
+      "CalcInputCounts": {
+        "additionalProperties": false,
+        "description": "«Для В1 нужно 22 параметра: найдено 17, выводится 3, нужен человек 2».",
+        "properties": {
+          "derivable": {
+            "title": "Derivable",
+            "type": "integer"
+          },
+          "found_auto": {
+            "title": "Found Auto",
+            "type": "integer"
+          },
+          "found_manual": {
+            "title": "Found Manual",
+            "type": "integer"
+          },
+          "needs_human": {
+            "title": "Needs Human",
+            "type": "integer"
+          },
+          "not_inspected": {
+            "title": "Not Inspected",
+            "type": "integer"
+          },
+          "required_satisfied": {
+            "title": "Required Satisfied",
+            "type": "integer"
+          },
+          "required_total": {
+            "title": "Required Total",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "found_auto",
+          "found_manual",
+          "derivable",
+          "needs_human",
+          "not_inspected",
+          "required_total",
+          "required_satisfied"
+        ],
+        "title": "CalcInputCounts",
+        "type": "object"
+      },
       "CalcInputFactPage": {
         "properties": {
           "items": {
@@ -4405,6 +4794,820 @@
         "title": "CalcOtherSource",
         "type": "object"
       },
+      "CalcPassportBody": {
+        "additionalProperties": false,
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "calculation": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportResult"
+            },
+            "title": "Calculation",
+            "type": "array"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "completeness": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Completeness",
+            "type": "object"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportConflict"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "function": {
+            "title": "Function",
+            "type": "string"
+          },
+          "highlights": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Highlights",
+            "type": "array"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/CalcInputCounts"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportMissing"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportRule"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "semantics": {
+            "$ref": "#/components/schemas/CalcSemanticsStatus"
+          },
+          "semantics_note": {
+            "title": "Semantics Note",
+            "type": "string"
+          },
+          "structure": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportElement"
+            },
+            "title": "Structure",
+            "type": "array"
+          },
+          "system_title": {
+            "title": "System Title",
+            "type": "string"
+          },
+          "unresolved": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportIssue"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          },
+          "used_facts": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportFact"
+            },
+            "title": "Used Facts",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "system_title",
+          "function",
+          "semantics",
+          "semantics_note",
+          "highlights",
+          "problems",
+          "inputs",
+          "used_facts",
+          "missing",
+          "conflicts",
+          "calculation",
+          "checks",
+          "structure",
+          "assumptions",
+          "unresolved",
+          "rules",
+          "warnings",
+          "completeness"
+        ],
+        "title": "CalcPassportBody",
+        "type": "object"
+      },
+      "CalcPassportCheck": {
+        "additionalProperties": false,
+        "description": "Документальное значение и независимая проверка — раздельно, расхождение видно.",
+        "properties": {
+          "check_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Value"
+          },
+          "discrepancy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discrepancy"
+          },
+          "document_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Value"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "document_value",
+          "check_value",
+          "discrepancy",
+          "status"
+        ],
+        "title": "CalcPassportCheck",
+        "type": "object"
+      },
+      "CalcPassportConflict": {
+        "additionalProperties": false,
+        "properties": {
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fact_key",
+          "message"
+        ],
+        "title": "CalcPassportConflict",
+        "type": "object"
+      },
+      "CalcPassportElement": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "string"
+          },
+          "element_id": {
+            "title": "Element Id",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/CalcElementProvenance"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "element_id",
+          "title",
+          "provenance",
+          "count"
+        ],
+        "title": "CalcPassportElement",
+        "type": "object"
+      },
+      "CalcPassportFact": {
+        "additionalProperties": false,
+        "properties": {
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fact_key",
+          "title",
+          "value",
+          "source",
+          "method"
+        ],
+        "title": "CalcPassportFact",
+        "type": "object"
+      },
+      "CalcPassportIssue": {
+        "additionalProperties": false,
+        "properties": {
+          "blocks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcUnresolvedKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "known": {
+            "title": "Known",
+            "type": "string"
+          },
+          "needed": {
+            "title": "Needed",
+            "type": "string"
+          },
+          "not_blocks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not Blocks",
+            "type": "array"
+          },
+          "structural": {
+            "title": "Structural",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "kind",
+          "known",
+          "needed",
+          "structural",
+          "blocks",
+          "not_blocks"
+        ],
+        "title": "CalcPassportIssue",
+        "type": "object"
+      },
+      "CalcPassportMissing": {
+        "additionalProperties": false,
+        "properties": {
+          "blocks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CalcRequirementLevel"
+          },
+          "not_blocks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not Blocks",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requirement_id": {
+            "title": "Requirement Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcReadinessStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requirement_id",
+          "title",
+          "level",
+          "status",
+          "reason",
+          "blocks",
+          "not_blocks"
+        ],
+        "title": "CalcPassportMissing",
+        "type": "object"
+      },
+      "CalcPassportRead": {
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "body": {
+            "$ref": "#/components/schemas/CalcPassportBody"
+          },
+          "calculator_id": {
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_version": {
+            "title": "Calculator Version",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "highlights": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Highlights",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "passport_sha256": {
+            "title": "Passport Sha256",
+            "type": "string"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "quantities_count": {
+            "title": "Quantities Count",
+            "type": "integer"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportRun"
+            },
+            "title": "Runs",
+            "type": "array"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcPassportStatus"
+          },
+          "synthesizer_id": {
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "synthesizer_version": {
+            "title": "Synthesizer Version",
+            "type": "integer"
+          },
+          "system_code": {
+            "title": "System Code",
+            "type": "string"
+          },
+          "system_title": {
+            "title": "System Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "batch_id",
+          "project_id",
+          "system_code",
+          "system_title",
+          "scope",
+          "status",
+          "calculator_id",
+          "calculator_version",
+          "synthesizer_id",
+          "synthesizer_version",
+          "quantities_count",
+          "highlights",
+          "problems",
+          "passport_sha256",
+          "created_by",
+          "created_at",
+          "runs",
+          "body"
+        ],
+        "title": "CalcPassportRead",
+        "type": "object"
+      },
+      "CalcPassportResult": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/CalcAmount"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "layer",
+          "amount",
+          "unit",
+          "explanation"
+        ],
+        "title": "CalcPassportResult",
+        "type": "object"
+      },
+      "CalcPassportRule": {
+        "additionalProperties": false,
+        "properties": {
+          "blocks": {
+            "title": "Blocks",
+            "type": "string"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "boolean"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "string"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcRuleType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcRuleReadiness"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "rule_key",
+          "title",
+          "layer",
+          "status",
+          "version",
+          "rule_type",
+          "blocks",
+          "gate"
+        ],
+        "title": "CalcPassportRule",
+        "type": "object"
+      },
+      "CalcPassportRun": {
+        "additionalProperties": false,
+        "properties": {
+          "calculation_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calculation Run Id"
+          },
+          "calculation_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcRunStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "synthesis_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synthesis Run Id"
+          },
+          "synthesis_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcSynthesisStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "scenario",
+          "calculation_run_id",
+          "calculation_status",
+          "synthesis_run_id",
+          "synthesis_status"
+        ],
+        "title": "CalcPassportRun",
+        "type": "object"
+      },
+      "CalcPassportStatus": {
+        "enum": [
+          "READY",
+          "PARTIAL",
+          "BLOCKED"
+        ],
+        "title": "CalcPassportStatus",
+        "type": "string"
+      },
+      "CalcPassportSummaryRead": {
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "calculator_id": {
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_version": {
+            "title": "Calculator Version",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "highlights": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Highlights",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "passport_sha256": {
+            "title": "Passport Sha256",
+            "type": "string"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "quantities_count": {
+            "title": "Quantities Count",
+            "type": "integer"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcPassportStatus"
+          },
+          "synthesizer_id": {
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "synthesizer_version": {
+            "title": "Synthesizer Version",
+            "type": "integer"
+          },
+          "system_code": {
+            "title": "System Code",
+            "type": "string"
+          },
+          "system_title": {
+            "title": "System Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "batch_id",
+          "project_id",
+          "system_code",
+          "system_title",
+          "scope",
+          "status",
+          "calculator_id",
+          "calculator_version",
+          "synthesizer_id",
+          "synthesizer_version",
+          "quantities_count",
+          "highlights",
+          "problems",
+          "passport_sha256",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CalcPassportSummaryRead",
+        "type": "object"
+      },
+      "CalcPrimitiveRef": {
+        "description": "Вычислительный примитив шага: арифметика по фактам, не инженерное правило.",
+        "properties": {
+          "implementation_key": {
+            "title": "Implementation Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "implementation_key",
+          "title"
+        ],
+        "title": "CalcPrimitiveRef",
+        "type": "object"
+      },
       "CalcQuantityAttr": {
         "additionalProperties": false,
         "description": "Количественный атрибут: значение или диапазон и его смысл — на экземпляр или итог.",
@@ -4495,6 +5698,159 @@
         ],
         "title": "CalcQuantityBasis",
         "type": "string"
+      },
+      "CalcQuantityCategory": {
+        "description": "Категория позиции паспорта ВК. Не классификатор ВОР: сверка — PROMPT 09.",
+        "enum": [
+          "PIPE",
+          "INSULATION",
+          "FITTING",
+          "VALVE",
+          "EQUIPMENT",
+          "SUPPORT",
+          "SLEEVE",
+          "CONNECTION",
+          "OTHER"
+        ],
+        "title": "CalcQuantityCategory",
+        "type": "string"
+      },
+      "CalcQuantityComponent": {
+        "additionalProperties": false,
+        "description": "Составляющая позиции: «198 м — вертикали», «подключения — не определено».",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/CalcAmount"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "known": {
+            "title": "Known",
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "amount",
+          "unit",
+          "known"
+        ],
+        "title": "CalcQuantityComponent",
+        "type": "object"
+      },
+      "CalcQuantityDerivation": {
+        "description": "Откуда позиция: наблюдена, рассчитана, выведена из топологии, резервным методом.",
+        "enum": [
+          "OBSERVED",
+          "CALCULATED",
+          "TOPOLOGY",
+          "RULE",
+          "FALLBACK",
+          "AGGREGATE",
+          "NOT_DETERMINED"
+        ],
+        "title": "CalcQuantityDerivation",
+        "type": "string"
+      },
+      "CalcQuantityReserve": {
+        "additionalProperties": false,
+        "description": "Тендерный резерв — отдельно от базы; только утверждённое допущение, только TENDER_SAFE.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/CalcAmount"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule_key",
+          "version",
+          "amount",
+          "unit",
+          "reason",
+          "impact"
+        ],
+        "title": "CalcQuantityReserve",
+        "type": "object"
+      },
+      "CalcQuantityTraceRead": {
+        "properties": {
+          "quantity_id": {
+            "format": "uuid",
+            "title": "Quantity Id",
+            "type": "string"
+          },
+          "quantity_key": {
+            "title": "Quantity Key",
+            "type": "string"
+          },
+          "root": {
+            "$ref": "#/components/schemas/CalcSynthesisTraceNode"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quantity_id",
+          "quantity_key",
+          "scenario",
+          "text",
+          "root"
+        ],
+        "title": "CalcQuantityTraceRead",
+        "type": "object"
       },
       "CalcRangeValue": {
         "additionalProperties": false,
@@ -6027,6 +7383,17 @@
         "title": "CalcRuleRead",
         "type": "object"
       },
+      "CalcRuleReadiness": {
+        "description": "Готовность инженерного решения калькулятора в реестре правил пространства.",
+        "enum": [
+          "READY",
+          "DRAFT",
+          "SOURCE_REQUIRED",
+          "IMPLEMENTATION_REQUIRED"
+        ],
+        "title": "CalcRuleReadiness",
+        "type": "string"
+      },
       "CalcRuleRef": {
         "properties": {
           "content_sha256": {
@@ -6204,6 +7571,48 @@
           "notice"
         ],
         "title": "CalcRuleSummaryRead",
+        "type": "object"
+      },
+      "CalcRuleTermRead": {
+        "properties": {
+          "meaning": {
+            "title": "Meaning",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "name",
+          "unit",
+          "meaning",
+          "quantity"
+        ],
+        "title": "CalcRuleTermRead",
         "type": "object"
       },
       "CalcRuleType": {
@@ -6842,6 +8251,7 @@
         "description": "Итог запуска. Запуск исполняется синхронно одной транзакцией: промежуточных\nсостояний («проверяется», «считается») снаружи не видно, записывается только итог.",
         "enum": [
           "BLOCKED",
+          "PARTIAL",
           "SUCCEEDED",
           "FAILED"
         ],
@@ -7114,6 +8524,17 @@
           "HUMAN_DECISION"
         ],
         "title": "CalcSelectionSource",
+        "type": "string"
+      },
+      "CalcSemanticsStatus": {
+        "description": "Подтверждено ли назначение обозначения системы документацией проекта.",
+        "enum": [
+          "CONFIRMED",
+          "MISSING",
+          "MISMATCH",
+          "CONFLICT"
+        ],
+        "title": "CalcSemanticsStatus",
         "type": "string"
       },
       "CalcSnapshot": {
@@ -7605,6 +9026,17 @@
             ],
             "title": "Fact Key"
           },
+          "member": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -7619,6 +9051,17 @@
               }
             ],
             "title": "Output"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
           },
           "source": {
             "$ref": "#/components/schemas/CalcInputSource"
@@ -7748,6 +9191,16 @@
           "position": {
             "title": "Position",
             "type": "integer"
+          },
+          "primitive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcPrimitiveRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "reused_from_run_id": {
             "anyOf": [
@@ -8539,6 +9992,8 @@
       },
       "CalcSynthesisTraceKind": {
         "enum": [
+          "QUANTITY",
+          "COMPONENT",
           "ELEMENT",
           "DECISION",
           "RULE",
@@ -9226,7 +10681,8 @@
           "FACT",
           "EVIDENCE",
           "PARAMETER",
-          "CONVERSION"
+          "CONVERSION",
+          "PRIMITIVE"
         ],
         "title": "CalcTraceKind",
         "type": "string"
@@ -9359,7 +10815,8 @@
           "CHOICE",
           "PLACEMENT",
           "MISSING_RULE",
-          "ROUTE"
+          "ROUTE",
+          "MISSING_INPUT"
         ],
         "title": "CalcUnresolvedKind",
         "type": "string"
@@ -9396,6 +10853,332 @@
           "count"
         ],
         "title": "CalcVariantSelection",
+        "type": "object"
+      },
+      "CalcVkBatchRead": {
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "passports": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportSummaryRead"
+            },
+            "title": "Passports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id",
+          "created",
+          "passports"
+        ],
+        "title": "CalcVkBatchRead",
+        "type": "object"
+      },
+      "CalcVkCalculatorRead": {
+        "properties": {
+          "calculator": {
+            "$ref": "#/components/schemas/CalcCalculatorRead"
+          },
+          "function": {
+            "title": "Function",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/CalcVkRuleNeedRead"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "synthesizer": {
+            "$ref": "#/components/schemas/CalcSynthesizerRead"
+          },
+          "system_code": {
+            "title": "System Code",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "system_code",
+          "title",
+          "function",
+          "calculator",
+          "synthesizer",
+          "rules"
+        ],
+        "title": "CalcVkCalculatorRead",
+        "type": "object"
+      },
+      "CalcVkReadinessRead": {
+        "properties": {
+          "building": {
+            "title": "Building",
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "systems": {
+            "items": {
+              "$ref": "#/components/schemas/CalcVkSystemReadinessRead"
+            },
+            "title": "Systems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "building",
+          "section",
+          "systems"
+        ],
+        "title": "CalcVkReadinessRead",
+        "type": "object"
+      },
+      "CalcVkRuleNeedRead": {
+        "description": "Инженерное решение калькулятора: контракт реализации, что без него не определяется.",
+        "properties": {
+          "affects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affects",
+            "type": "array"
+          },
+          "blocks": {
+            "title": "Blocks",
+            "type": "string"
+          },
+          "example": {
+            "title": "Example",
+            "type": "string"
+          },
+          "formula": {
+            "title": "Formula",
+            "type": "string"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "boolean"
+          },
+          "implementation_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implementation Key"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleTermRead"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleTermRead"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleTermRead"
+            },
+            "title": "Parameters",
+            "type": "array"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_types": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleType"
+            },
+            "title": "Rule Types",
+            "type": "array"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "used_in": {
+            "title": "Used In",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_key",
+          "title",
+          "systems",
+          "layer",
+          "rule_types",
+          "implementation_key",
+          "formula",
+          "inputs",
+          "parameters",
+          "outputs",
+          "used_in",
+          "blocks",
+          "affects",
+          "gate",
+          "example"
+        ],
+        "title": "CalcVkRuleNeedRead",
+        "type": "object"
+      },
+      "CalcVkRunCreate": {
+        "additionalProperties": false,
+        "description": "Расчёт комплекта ВК: корпус (и секция), системы. Три сценария — всегда вместе.",
+        "properties": {
+          "building": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Building",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._:-]{8,100}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Systems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "building"
+        ],
+        "title": "CalcVkRunCreate",
+        "type": "object"
+      },
+      "CalcVkSystemReadinessRead": {
+        "properties": {
+          "calculator_id": {
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_version": {
+            "title": "Calculator Version",
+            "type": "integer"
+          },
+          "function": {
+            "title": "Function",
+            "type": "string"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/CalcInputCounts"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportMissing"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPassportRule"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "semantics": {
+            "$ref": "#/components/schemas/CalcSemanticsStatus"
+          },
+          "semantics_note": {
+            "title": "Semantics Note",
+            "type": "string"
+          },
+          "synthesizer_id": {
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "system_code": {
+            "title": "System Code",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "system_code",
+          "title",
+          "calculator_id",
+          "calculator_version",
+          "synthesizer_id",
+          "function",
+          "semantics",
+          "semantics_note",
+          "inputs",
+          "missing",
+          "rules"
+        ],
+        "title": "CalcVkSystemReadinessRead",
         "type": "object"
       },
       "CalibrationSnapshot": {
@@ -18877,6 +20660,177 @@
         ]
       }
     },
+    "/api/v1/calc/projects/{project_id}/vk/passports": {
+      "get": {
+        "operationId": "list_calc_vk_passports",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcPassportSummaryRead"
+                  },
+                  "title": "Response List Calc Vk Passports",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "История паспортов ВК проекта",
+        "tags": [
+          "calc"
+        ]
+      },
+      "post": {
+        "description": "BLOCKED и PARTIAL — не ошибки, а записанные паспорта. Повтор по ключу — тот же комплект.",
+        "operationId": "create_calc_vk_passports",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcVkRunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcVkBatchRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Рассчитать комплект ВК: паспорта систем",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/vk/readiness": {
+      "get": {
+        "operationId": "get_calc_vk_readiness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "building",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Building",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcVkReadinessRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Готовность ВК: назначение систем, исходные данные, правила",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
     "/api/v1/calc/requirements": {
       "get": {
         "description": "Что понадобится калькулятору В1, Т3, Т4, К1: уровень, область, можно ли вывести.",
@@ -20105,6 +22059,326 @@
           }
         },
         "summary": "Синтезаторы структуры системы",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/vk/calculators": {
+      "get": {
+        "operationId": "list_calc_vk_calculators",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcVkCalculatorRead"
+                  },
+                  "title": "Response List Calc Vk Calculators",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Рабочие калькуляторы ВК стадии П",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/vk/passports/{passport_id}": {
+      "get": {
+        "operationId": "get_calc_vk_passport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "passport_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Passport Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcPassportRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Расчётный паспорт системы",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/vk/passports/{passport_id}/assumptions": {
+      "get": {
+        "operationId": "list_calc_vk_assumptions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "passport_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Passport Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcAssumptionRecord"
+                  },
+                  "title": "Response List Calc Vk Assumptions",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Допущения паспорта: применённые и нет, с причиной",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/vk/passports/{passport_id}/structure": {
+      "get": {
+        "operationId": "get_calc_vk_structure",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "passport_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Passport Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenario",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CalcScenario",
+              "default": "EXPECTED"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSystemGraph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Структура системы паспорта",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/vk/passports/{passport_id}/unresolved": {
+      "get": {
+        "operationId": "list_calc_vk_unresolved",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "passport_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Passport Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcPassportIssue"
+                  },
+                  "title": "Response List Calc Vk Unresolved",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Что Quantor пока не может определить",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/vk/passports/{passport_id}/volumes": {
+      "get": {
+        "operationId": "list_calc_vk_volumes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "passport_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Passport Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenario",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcScenario"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenario"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcExpectedQuantityRead"
+                  },
+                  "title": "Response List Calc Vk Volumes",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ожидаемые количества паспорта",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/vk/volumes/{quantity_id}/trace": {
+      "get": {
+        "operationId": "get_calc_vk_volume_trace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quantity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quantity Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcQuantityTraceRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Почему количество такое",
         "tags": [
           "calc"
         ]

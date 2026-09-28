@@ -15,6 +15,9 @@
 Правило для нового запуска — только утверждённая версия, действующая на дату запуска.
 Черновик, отклонённая и устаревшая версии не выбираются; правил старого портала в таблицах
 реестра нет вовсе.
+
+Члены набора (PROMPT 06) — все ключи реестра, чьё место подходит набору, с тем же строгим
+допуском: конфликт одного этажа блокирует шаг набора, а не превращается в «среднее».
 """
 
 from __future__ import annotations
@@ -38,7 +41,14 @@ from app.contracts.calc.enums import (
 from app.errors import InvariantError
 from app.models import CalcFact, CalcRuleDefinition
 from app.services.calc.engine.hashing import canonical_sha256
-from app.services.calc.engine.plan_types import Absence, FactOutcome, ResolvedRule, RuleOutcome
+from app.services.calc.engine.plan_types import (
+    Absence,
+    FactOutcome,
+    ResolvedRule,
+    RuleOutcome,
+    SeriesRequirement,
+    split_fact_key,
+)
 from app.services.calc.facts.registry import parse_value, resolve_project
 from app.services.calc.facts.resolution import KeyResolution
 from app.services.calc.rules import registry as rules_registry
@@ -140,22 +150,29 @@ def _item(entry: KeyResolution, fact: CalcFact) -> CalcSnapshotItem:
 
 
 async def fact_outcomes(
-    session: AsyncSession, *, project_id: uuid.UUID, keys: Iterable[str]
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    keys: Iterable[str],
+    series: Iterable[SeriesRequirement] = (),
 ) -> dict[str, FactOutcome]:
-    """Для каждого нужного ключа — значение из реестра фактов или причина его отсутствия."""
+    """Для каждого нужного ключа и члена набора — значение или причина его отсутствия."""
     wanted = set(keys)
-    resolved = {
-        entry.fact_key: entry
-        for entry, _ in await resolve_project(session, project_id=project_id)
-        if entry.fact_key in wanted
-    }
+    requirements = tuple(series)
+    resolved: dict[str, KeyResolution] = {}
+    for found, _ in await resolve_project(session, project_id=project_id):
+        parsed = split_fact_key(found.fact_key) if requirements else None
+        member = parsed is not None and any(item.matches(*parsed) for item in requirements)
+        if found.fact_key in wanted or member:
+            resolved[found.fact_key] = found
+    wanted |= set(resolved)
     outcomes: dict[str, FactOutcome] = {}
     chosen: dict[uuid.UUID, KeyResolution] = {}
     for key in sorted(wanted):
-        entry = resolved.get(key)
-        if entry is None:
+        if key not in resolved:
             outcomes[key] = Absence(CalcBlockCode.FACT_MISSING, "в реестре фактов значения нет")
             continue
+        entry = resolved[key]
         absence = _absence(entry)
         if absence is not None:
             outcomes[key] = absence

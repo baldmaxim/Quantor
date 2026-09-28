@@ -18,6 +18,8 @@ const KIND_TITLES: Record<CalcSynthesisTraceNode['kind'], string> = {
   EVIDENCE: 'Свидетельство',
   ASSUMPTION: 'Допущение',
   HUMAN_DECISION: 'Решение инженера',
+  QUANTITY: 'Позиция паспорта',
+  COMPONENT: 'Составляющая',
 };
 
 const TraceItem = ({ node }: { node: CalcSynthesisTraceNode }) => (
@@ -40,8 +42,13 @@ const TraceItem = ({ node }: { node: CalcSynthesisTraceNode }) => (
   </li>
 );
 
-export const SynthesisTrace = ({ trace }: { trace: CalcSynthesisTraceRead }) => (
+/** Дерево объяснения: общее для элемента графа и позиции паспорта (PROMPT 06). */
+export const TraceTree = ({ root }: { root: CalcSynthesisTraceNode }) => (
   <ul className="flex list-none flex-col gap-[var(--s-2)]">
-    <TraceItem node={trace.root} />
+    <TraceItem node={root} />
   </ul>
+);
+
+export const SynthesisTrace = ({ trace }: { trace: CalcSynthesisTraceRead }) => (
+  <TraceTree root={trace.root} />
 );

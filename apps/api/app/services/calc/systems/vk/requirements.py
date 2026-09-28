@@ -6,6 +6,11 @@
 
 Требования с областью SYSTEM относятся к той системе, для которой строится матрица: один и тот
 же «материал трубопроводов» — свой у В1 и свой у К1.
+
+Версия v2 (PROMPT 06) сверена с рабочим калькулятором: REQUIRED — только то, без чего расчёт
+системы не идёт (этажность, квартиры по этажам, высоты или отметки, назначение системы).
+Остальное — DESIRABLE или OPTIONAL: без него часть позиций паспорта «не определено», но
+определённое считается и показывается.
 """
 
 from __future__ import annotations
@@ -22,7 +27,7 @@ from app.contracts.calc.enums import (
 )
 from app.contracts.calc.requirements import CalcInputRequirement, CalcSystemDef
 
-VK_REQUIREMENTS_VERSION: Final = "calc.requirements.vk.v1"
+VK_REQUIREMENTS_VERSION: Final = "calc.requirements.vk.v2"
 
 VK_SYSTEMS: Final[tuple[CalcSystemDef, ...]] = (
     CalcSystemDef(CalcDiscipline.VK, "В1", "Хозяйственно-питьевой водопровод"),
@@ -82,7 +87,7 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         _G.GEOMETRY,
         "building.sections_count",
         _S.BUILDING,
-        _L.REQUIRED,
+        _L.DESIRABLE,
         _A.NOT_ALLOWED,
         "Секции задают группы стояков и вводов: без них стояки не распределить по дому.",
         _ALL,
@@ -204,7 +209,7 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         _G.GEOMETRY,
         "floor.function",
         _S.FLOOR,
-        _L.REQUIRED,
+        _L.OPTIONAL,
         _A.MANUAL,
         "Где квартиры, где коммерция и технические этажи — от этого зависят подключения.",
         _ALL,
@@ -254,7 +259,7 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         _G.APARTMENTS,
         "building.apartments_total",
         _S.BUILDING,
-        _L.REQUIRED,
+        _L.DESIRABLE,
         _A.NOT_ALLOWED,
         "Квартиры — потребители и поквартирные узлы учёта.",
         _ALL,
@@ -304,7 +309,7 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         _G.APARTMENTS,
         "floor.bathrooms_count",
         _S.FLOOR,
-        _L.REQUIRED,
+        _L.DESIRABLE,
         _A.REGISTERED_RULE,
         "Основная доля приборов и стояков К1; полотенцесушители Т3 и Т4.",
         _ALL,
@@ -369,7 +374,7 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         _G.WATER_SUPPLY,
         "system.present",
         _S.SYSTEM,
-        _L.REQUIRED,
+        _L.OPTIONAL,
         _A.NOT_ALLOWED,
         "Предусмотрена ли система проектом П: без этого систему не считают.",
         _WATER,
@@ -381,7 +386,7 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         _G.WATER_SUPPLY,
         "system.inlet_pressure",
         _S.SYSTEM,
-        _L.REQUIRED,
+        _L.DESIRABLE,
         _A.MANUAL,
         "Напор в точке подключения по ТУ: нужны ли насосы и сколько зон по давлению.",
         ("В1",),
@@ -505,7 +510,7 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         _G.WATER_SUPPLY,
         "system.hot_water_source",
         _S.SYSTEM,
-        _L.REQUIRED,
+        _L.DESIRABLE,
         _A.MANUAL,
         "Где начинаются Т3 и Т4: ИТП, ЦТП, котельная или водонагреватели.",
         ("Т3",),
@@ -566,7 +571,7 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         _G.SEWERAGE,
         "system.present",
         _S.SYSTEM,
-        _L.REQUIRED,
+        _L.OPTIONAL,
         _A.NOT_ALLOWED,
         "Предусмотрена ли система проектом П: без этого систему не считают.",
         ("К1",),
@@ -668,6 +673,33 @@ VK_REQUIREMENTS: Final[tuple[CalcInputRequirement, ...]] = (
         "Технические требования и ограничения Заказчика к системе.",
         _ALL,
         sources=(_C.TECHNICAL_REQUIREMENTS,),
+    ),
+    # ---- PROMPT 06 ----------------------------------------------------------------------
+    _req(
+        "vk.system.function",
+        "Назначение системы",
+        _G.OTHER,
+        "system.function",
+        _S.SYSTEM,
+        _L.REQUIRED,
+        _A.MANUAL,
+        "Что означает обозначение в этом проекте: по легенде или записке. Без него калькулятор "
+        "не решает по названию, что Т3 — подающий, а Т4 — циркуляционный.",
+        _ALL,
+        sources=(_C.MEP_DESIGN, _C.EXPLANATORY_NOTE),
+    ),
+    _req(
+        "vk.system.main_length",
+        "Длина магистрали",
+        _G.OTHER,
+        "system.main_length",
+        _S.SYSTEM,
+        _L.DESIRABLE,
+        _A.MANUAL,
+        "Горизонтальная часть трассы: из документа или обмера. Без неё длина магистрали остаётся "
+        "неопределённой, а не выводится из коридора.",
+        _ALL,
+        sources=(_C.MEP_DESIGN,),
     ),
 )
 

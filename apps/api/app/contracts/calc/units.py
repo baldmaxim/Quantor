@@ -89,6 +89,10 @@ UNITS: Final[MappingProxyType[str, CalcUnitDef]] = MappingProxyType(
             _count("room", "пом."),
             _count("meter", "узел учёта"),
             _count("fixture", "приб."),
+            # PROMPT 06: перекрытия, которые пересекает стояк, и штучные позиции паспорта.
+            _count("slab", "перекр."),
+            _count("piece", "шт."),
+            _count("set", "компл."),
         )
     }
 )

@@ -106,6 +106,16 @@ class _Tracer:
                     ref=str(binding.rule_version_id),
                 )
             )
+        if step.primitive is not None:
+            children.append(
+                CalcTraceNode(
+                    kind=CalcTraceKind.PRIMITIVE,
+                    key=step.primitive.implementation_key,
+                    title=step.primitive.title,
+                    text="Вычислительный примитив: арифметика по фактам без констант, не "
+                    "инженерное правило и не норматив",
+                )
+            )
         if step.assumption is not None:
             record = step.assumption
             children.append(

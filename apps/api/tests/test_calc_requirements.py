@@ -301,8 +301,13 @@ class TestReadiness:
         required = next(
             count for count in matrix.counts if count.level is CalcRequirementLevel.REQUIRED
         )
-        # Квартиры на этажах найдены, всего квартир — выводимо: два закрытых обязательных.
-        assert required.satisfied == 2
+        # Квартиры на этажах найдены — одно закрытое обязательное. Всего квартир в каталоге v2
+        # (PROMPT 06) желательное: оно выводимо и нужно только для сверки с итогом документа.
+        assert required.satisfied == 1
         assert required.total == sum(
             1 for item in requirements_for(system) if item.level is CalcRequirementLevel.REQUIRED
         )
+        desirable = next(
+            count for count in matrix.counts if count.level is CalcRequirementLevel.DESIRABLE
+        )
+        assert desirable.satisfied >= 1

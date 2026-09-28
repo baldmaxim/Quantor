@@ -229,8 +229,8 @@ class TestAccess:
             hidden = (await client.get(f"{API}/synthesizers")).json()
             debug = (await client.get(f"{API}/synthesizers", params={"include_demo": True})).json()
             calculators = (await client.get(f"{API}/calculators")).json()
-        assert hidden == [] and calculators == []
-        [synthesizer] = debug
+        assert all(item["kind"] == "PRODUCTION" for item in (*hidden, *calculators))
+        [synthesizer] = [item for item in debug if item["kind"] == "DEMO"]
         assert synthesizer["kind"] == "DEMO"
         assert "не синтез ВК" in synthesizer["title"]
         assert synthesizer["calculator_id"] == "test.riser_demand"

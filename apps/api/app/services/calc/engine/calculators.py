@@ -10,6 +10,15 @@
 Граф проверяется до инженерного расчёта: уникальность ключей, ссылки на существующие шаги и
 выходы, отсутствие циклов, порядок исполнения — топологическая сортировка, при равенстве —
 порядок объявления, поэтому порядок детерминирован.
+
+Расширение PROMPT 06:
+
+- шаг-примитив (`primitive`) — счёт, сумма, разность по фактам без версии правила: это
+  арифметика, а не инженерное решение, и она не выдаёт себя за норматив. Примитивы — закрытый
+  реестр кода (`primitives.py`) без параметров: константы в примитив не спрятать;
+- набор (`SeriesBinding`) — вход «все факты типа по этажам области»; принимают только примитивы;
+- частичный результат (`partial`) — рабочий калькулятор не блокируется целиком из-за одного
+  неизвестного: заблокированы только зависимые шаги, остальные результаты считаются.
 """
 
 from __future__ import annotations
@@ -32,9 +41,12 @@ from app.contracts.calc.enums import (
 from app.contracts.calc.fact_types import fact_type_def
 from app.contracts.calc.subjects import SUBJECT_FIELDS
 from app.services.calc.engine.hashing import canonical_sha256
+from app.services.calc.engine.primitives import PRIMITIVES
 
 _CALCULATOR_ID: Final = re.compile(CALCULATOR_ID_PATTERN)
 _STEP_KEY: Final = re.compile(STEP_KEY_PATTERN)
+_OPTIONAL_SCOPE: Final = frozenset({"section"})
+"""Поле области, которое может быть пустым: запуск по корпусу или по секции (PROMPT 06)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +66,19 @@ class StepBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class SeriesBinding:
+    """Набор фактов одного типа: общие поля места берутся из области, члены различаются одним.
+
+    «Высоты всех этажей корпуса»: тип `floor.height`, общие поля (`building`, `section`), член —
+    `floor`. Других полей у членов нет: высота этажа секции не смешивается с высотой корпуса.
+    """
+
+    fact_type: str
+    subject_fields: tuple[str, ...]
+    member_field: str
+
+
+@dataclass(frozen=True, slots=True)
 class AssumptionSpec:
     """Шаг тендерного допущения: применяется только в TENDER_SAFE.
 
@@ -68,17 +93,57 @@ class AssumptionSpec:
 class StepDef:
     step_key: str
     title: str
-    rule_key: str
-    allowed_rule_types: frozenset[CalcRuleType]
     outputs: tuple[str, ...]
-    """Выходы правила, которые калькулятор использует."""
+    """Выходы правила или примитива, которые калькулятор использует."""
+    rule_key: str | None = None
+    allowed_rule_types: frozenset[CalcRuleType] = frozenset()
+    primitive: str | None = None
+    """Ключ вычислительного примитива — вместо правила, никогда вместе с ним."""
     facts: Mapping[str, FactBinding] = field(default_factory=dict)
     steps: Mapping[str, StepBinding] = field(default_factory=dict)
+    series: Mapping[str, SeriesBinding] = field(default_factory=dict)
     assumption: AssumptionSpec | None = None
 
     @property
     def depends_on(self) -> tuple[str, ...]:
         return tuple(sorted({binding.step_key for binding in self.steps.values()}))
+
+    def canonical(self) -> dict[str, object]:
+        """Описание шага для отпечатка. Поля PROMPT 06 — только если заданы: отпечатки
+        прежних калькуляторов не меняются."""
+        body: dict[str, object] = {
+            "step_key": self.step_key,
+            "rule_key": self.rule_key,
+            "allowed_rule_types": sorted(item.value for item in self.allowed_rule_types),
+            "outputs": list(self.outputs),
+            "facts": {
+                name: {"fact_type": b.fact_type, "subject_fields": list(b.subject_fields)}
+                for name, b in sorted(self.facts.items())
+            },
+            "steps": {
+                name: {"step_key": b.step_key, "output": b.output}
+                for name, b in sorted(self.steps.items())
+            },
+            "assumption": None
+            if self.assumption is None
+            else {"base_input": self.assumption.base_input},
+        }
+        if self.primitive is not None:
+            spec = PRIMITIVES.get(self.primitive)
+            body["primitive"] = {
+                "key": self.primitive,
+                "semantics_sha256": None if spec is None else spec.semantics_sha256,
+            }
+        if self.series:
+            body["series"] = {
+                name: {
+                    "fact_type": b.fact_type,
+                    "subject_fields": list(b.subject_fields),
+                    "member_field": b.member_field,
+                }
+                for name, b in sorted(self.series.items())
+            }
+        return body
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,17 +171,19 @@ class CalculatorDef:
     """Поля области запуска, без которых калькулятор не запускается."""
     steps: tuple[StepDef, ...]
     results: tuple[ResultDef, ...]
+    partial: bool = False
+    """Частичный результат: заблокированный шаг не останавливает независимые (PROMPT 06)."""
 
     @property
     def rule_keys(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(step.rule_key for step in self.steps))
+        return tuple(dict.fromkeys(step.rule_key for step in self.steps if step.rule_key))
 
     def step(self, step_key: str) -> StepDef:
         return next(item for item in self.steps if item.step_key == step_key)
 
     def canonical(self) -> dict[str, object]:
         """Каноническое описание — основа отпечатка определения."""
-        return {
+        body: dict[str, object] = {
             "calculator_id": self.calculator_id,
             "version": self.version,
             "kind": self.kind.value,
@@ -125,26 +192,7 @@ class CalculatorDef:
             "stage": self.stage.value,
             "scenarios": sorted(item.value for item in self.scenarios),
             "scope_fields": list(self.scope_fields),
-            "steps": [
-                {
-                    "step_key": step.step_key,
-                    "rule_key": step.rule_key,
-                    "allowed_rule_types": sorted(item.value for item in step.allowed_rule_types),
-                    "outputs": list(step.outputs),
-                    "facts": {
-                        name: {"fact_type": b.fact_type, "subject_fields": list(b.subject_fields)}
-                        for name, b in sorted(step.facts.items())
-                    },
-                    "steps": {
-                        name: {"step_key": b.step_key, "output": b.output}
-                        for name, b in sorted(step.steps.items())
-                    },
-                    "assumption": None
-                    if step.assumption is None
-                    else {"base_input": step.assumption.base_input},
-                }
-                for step in self.steps
-            ],
+            "steps": [step.canonical() for step in self.steps],
             "results": [
                 {
                     "result_key": result.result_key,
@@ -158,6 +206,9 @@ class CalculatorDef:
                 for result in self.results
             ],
         }
+        if self.partial:
+            body["partial"] = True
+        return body
 
     @property
     def sha256(self) -> str:
@@ -238,6 +289,26 @@ def definition_problems(definition: CalculatorDef) -> list[str]:
     return problems
 
 
+def _primitive_problems(step: StepDef, where: str) -> list[str]:
+    """Шаг-примитив: без правила и допущения, привязки совпадают с контрактом примитива."""
+    problems: list[str] = []
+    spec = PRIMITIVES.get(step.primitive or "")
+    if spec is None:
+        return [f"{where}: неизвестный примитив «{step.primitive}»"]
+    if step.rule_key is not None or step.allowed_rule_types or step.assumption is not None:
+        problems.append(f"{where}: примитив не ссылается на правило и не бывает допущением")
+    if set(step.facts) | set(step.steps) != set(spec.inputs):
+        problems.append(
+            f"{where}: входы примитива ({', '.join(sorted(spec.inputs)) or '—'}) не совпадают "
+            f"с привязками ({', '.join(sorted(set(step.facts) | set(step.steps))) or '—'})"
+        )
+    if set(step.series) != set(spec.series):
+        problems.append(f"{where}: наборы примитива не совпадают с привязками")
+    if not set(step.outputs) <= set(spec.outputs):
+        problems.append(f"{where}: у примитива нет выходов " + ", ".join(step.outputs))
+    return problems
+
+
 def _step_problems(
     definition: CalculatorDef, step: StepDef, outputs: Mapping[str, set[str]]
 ) -> list[str]:
@@ -245,19 +316,34 @@ def _step_problems(
     where = f"шаг «{step.step_key}»"
     if not step.outputs:
         problems.append(f"{where}: не указаны выходы")
-    overlap = set(step.facts) & set(step.steps)
+    if (step.rule_key is None) == (step.primitive is None):
+        problems.append(f"{where}: шаг считается либо правилом, либо примитивом")
+    elif step.primitive is not None:
+        problems.extend(_primitive_problems(step, where))
+    elif step.series:
+        problems.append(f"{where}: набор фактов принимает только примитив")
+    overlap = set(step.facts) & set(step.steps) | (set(step.facts) | set(step.steps)) & set(
+        step.series
+    )
     if overlap:
         problems.append(f"{where}: вход привязан дважды: " + ", ".join(sorted(overlap)))
-    for name, binding in step.facts.items():
-        definition_of_fact = fact_type_def(binding.fact_type)
+    bound_facts = [(name, b.fact_type, b.subject_fields) for name, b in step.facts.items()]
+    bound_facts += [(name, b.fact_type, b.subject_fields) for name, b in step.series.items()]
+    for name, fact_type, subject_fields in bound_facts:
+        definition_of_fact = fact_type_def(fact_type)
         if definition_of_fact is None:
-            problems.append(f"{where}: неизвестный тип факта «{binding.fact_type}»")
-        missing = set(binding.subject_fields) - set(definition.scope_fields)
+            problems.append(f"{where}: неизвестный тип факта «{fact_type}»")
+        missing = set(subject_fields) - set(definition.scope_fields) - _OPTIONAL_SCOPE
         if missing:
             problems.append(
                 f"{where}: вход «{name}» берёт из области поля, которых калькулятор не требует: "
                 + ", ".join(sorted(missing))
             )
+    for name, series in step.series.items():
+        if series.member_field in series.subject_fields or series.member_field not in (
+            SUBJECT_FIELDS
+        ):
+            problems.append(f"{where}: набор «{name}» — неверное поле члена")
     for name, link in step.steps.items():
         if link.step_key in outputs and link.output not in outputs[link.step_key]:
             problems.append(

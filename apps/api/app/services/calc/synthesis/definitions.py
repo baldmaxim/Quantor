@@ -115,6 +115,9 @@ class SynthesizerDef:
     golden: tuple[tuple[str, str], ...] = ()
     """Контрольные примеры: имя → ожидаемый отпечаток графа."""
     golden_contexts: GoldenFn | None = field(default=None, repr=False, compare=False)
+    optional_results: tuple[str, ...] = ()
+    """Результаты, которые рабочий синтезатор использует, если они есть (PROMPT 06): их
+    отсутствие — неопределённость в графе, а не блокировка всего запуска."""
 
     def canonical(self) -> dict[str, object]:
         return {
@@ -142,7 +145,7 @@ class SynthesizerDef:
                 }
                 for name, spec in sorted(self.rules.items())
             },
-        }
+        } | ({"optional_results": list(self.optional_results)} if self.optional_results else {})
 
     @property
     def sha256(self) -> str:

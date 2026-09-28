@@ -34,11 +34,30 @@ _KEY = re.compile(IMPLEMENTATION_KEY_PATTERN)
 
 
 @dataclass(frozen=True, slots=True)
+class SeriesMember:
+    """Член набора: код места («2..24») и значение в рабочей единице набора."""
+
+    member: str
+    value: Quantity
+
+
+@dataclass(frozen=True, slots=True)
 class HandlerContext:
     """Всё, что видит обработчик: входы и параметры версии правила. Больше ничего."""
 
     inputs: Mapping[str, Quantity]
     parameters: Mapping[str, Quantity]
+    series: Mapping[str, tuple[SeriesMember, ...]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    """Наборы — только у примитивов; члены упорядочены по коду места."""
+
+
+class InsufficientInputError(Exception):
+    """Данных набора недостаточно, чтобы выполнить шаг: пробел или перекрытие этажей.
+
+    Не ошибка программы: шаг не определён, причина записывается в запуск.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +90,8 @@ class GoldenCase:
     inputs: Mapping[str, str]
     parameters: Mapping[str, str]
     outputs: Mapping[str, str]
+    series: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+    """Наборы примера: имя → код места → значение."""
 
 
 @dataclass(frozen=True)
@@ -83,14 +104,19 @@ class HandlerSpec:
     outputs: Mapping[str, str | None]
     compute: HandlerFn = field(repr=False)
     golden: tuple[GoldenCase, ...]
+    series: Mapping[str, str | None] = field(default_factory=dict)
+    """Наборы: имя → рабочая единица членов. Только у примитивов."""
 
     def contract(self) -> dict[str, object]:
-        return {
+        contract: dict[str, object] = {
             "implementation_key": self.implementation_key,
             "inputs": dict(sorted(self.inputs.items())),
             "parameters": dict(sorted(self.parameters.items())),
             "outputs": dict(sorted(self.outputs.items())),
         }
+        if self.series:
+            contract["series"] = dict(sorted(self.series.items()))
+        return contract
 
     @property
     def semantics_sha256(self) -> str:
@@ -98,16 +124,22 @@ class HandlerSpec:
         return canonical_sha256(
             {
                 "contract": self.contract(),
-                "golden": [
-                    {
-                        "inputs": dict(sorted(case.inputs.items())),
-                        "parameters": dict(sorted(case.parameters.items())),
-                        "outputs": dict(sorted(case.outputs.items())),
-                    }
-                    for case in self.golden
-                ],
+                "golden": [_golden_canonical(case) for case in self.golden],
             }
         )
+
+
+def _golden_canonical(case: GoldenCase) -> dict[str, object]:
+    canonical: dict[str, object] = {
+        "inputs": dict(sorted(case.inputs.items())),
+        "parameters": dict(sorted(case.parameters.items())),
+        "outputs": dict(sorted(case.outputs.items())),
+    }
+    if case.series:
+        canonical["series"] = {
+            name: dict(sorted(members.items())) for name, members in sorted(case.series.items())
+        }
+    return canonical
 
 
 def run_handler(spec: HandlerSpec, context: HandlerContext) -> HandlerResult:
@@ -133,8 +165,27 @@ def check_golden(spec: HandlerSpec) -> list[str]:
                     for name, value in case.parameters.items()
                 }
             ),
+            series=MappingProxyType(
+                {
+                    name: tuple(
+                        SeriesMember(member, Quantity.of(parse_exact(value), spec.series[name]))
+                        for member, value in sorted(members.items())
+                    )
+                    for name, members in case.series.items()
+                }
+            ),
         )
-        result = run_handler(spec, context)
+        try:
+            result = run_handler(spec, context)
+        except InsufficientInputError as error:
+            if case.outputs:
+                problems.append(f"{spec.implementation_key}: пример {number}: {error}")
+            continue
+        if not case.outputs:
+            problems.append(
+                f"{spec.implementation_key}: пример {number} должен был не определиться"
+            )
+            continue
         for name, expected in case.outputs.items():
             actual = result.outputs[name].in_unit(spec.outputs[name])
             if actual != parse_exact(expected):
@@ -149,7 +200,7 @@ def _check_spec(spec: HandlerSpec) -> list[str]:
     problems: list[str] = []
     if not _KEY.match(spec.implementation_key):
         problems.append(f"ключ «{spec.implementation_key}» не по шаблону реестра правил")
-    for group in (spec.inputs, spec.parameters, spec.outputs):
+    for group in (spec.inputs, spec.parameters, spec.outputs, spec.series):
         for name, unit in group.items():
             if not is_working_unit(unit):
                 problems.append(

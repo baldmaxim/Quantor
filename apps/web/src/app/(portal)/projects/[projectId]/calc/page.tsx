@@ -49,9 +49,12 @@ const CalcPage = ({ params }: IPageProps) => {
           { label: project.data?.name ?? '…', href: `/projects/${projectId}` },
           { label: 'Расчёты' },
         ]}
-        status={<StatusBadge tone="warning">разработка · расчёта ещё нет</StatusBadge>}
+        status={<StatusBadge tone="warning">разработка · до инженерного гейта</StatusBadge>}
         actions={
           <>
+            <ButtonLink href={`/projects/${projectId}/calc/vk`} transitionTypes={['nav-forward']}>
+              ВК
+            </ButtonLink>
             <ButtonLink href={`/projects/${projectId}/calc/runs`} transitionTypes={['nav-forward']}>
               Запуски
             </ButtonLink>

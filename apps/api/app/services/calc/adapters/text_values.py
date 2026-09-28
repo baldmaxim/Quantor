@@ -281,7 +281,7 @@ def _text_candidate(
     )
 
 
-def _vk_allowed(declaration: CollectionDeclaration) -> bool:
+def vk_allowed(declaration: CollectionDeclaration) -> bool:
     if declaration.source_class is CalcSourceClass.MEP_DESIGN:
         return declaration.discipline is CalcDiscipline.VK
     return declaration.source_class in (
@@ -466,7 +466,7 @@ def _systems(
     codes = vk_codes(line.text)
     if not codes or not VK_KEYWORDS.search(line.text):
         return
-    if not _vk_allowed(declaration):
+    if not vk_allowed(declaration):
         if (
             declaration.source_class is CalcSourceClass.MEP_DESIGN
             and declaration.discipline is None

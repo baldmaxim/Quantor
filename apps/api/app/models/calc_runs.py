@@ -8,9 +8,9 @@ CalcRun                  запуск: калькулятор@версия, сц
 ```
 
 Запуск исполняется синхронно одной транзакцией и записывается сразу в итоговом состоянии —
-BLOCKED, SUCCEEDED или FAILED. Поэтому обновлений в штатной работе нет вовсе, и все три
-таблицы только дописываются: триггер запрещает UPDATE и DELETE. Удалить запуск можно только
-вместе с проектом — каскадом внешнего ключа (глубина триггера больше единицы).
+BLOCKED, PARTIAL (PROMPT 06), SUCCEEDED или FAILED. Поэтому обновлений в штатной работе нет
+вовсе, и все три таблицы только дописываются: триггер запрещает UPDATE и DELETE. Удалить запуск
+можно только вместе с проектом — каскадом внешнего ключа (глубина триггера больше единицы).
 
 Снимок фактов и версии правил хранятся в самом запуске (JSONB по контрактам Pydantic): после
 запуска изменения реестра фактов и реестра правил его не меняют. Отдельных таблиц для входов и
@@ -108,11 +108,13 @@ class CalcRun(CreatedAtMixin, Base):
 
     __table_args__ = (
         CheckConstraint("calculator_version >= 1", name="calculator_version_positive"),
+        # PARTIAL (PROMPT 06): есть и результаты, и причины блокировки части шагов.
         CheckConstraint(
-            "(status = 'SUCCEEDED') = (result_sha256 is not null)", name="result_on_success"
+            "(status in ('SUCCEEDED', 'PARTIAL')) = (result_sha256 is not null)",
+            name="result_on_success",
         ),
         CheckConstraint(
-            "(status = 'BLOCKED') = (jsonb_array_length(blocking_reasons) > 0)",
+            "(status in ('BLOCKED', 'PARTIAL')) = (jsonb_array_length(blocking_reasons) > 0)",
             name="reasons_on_block",
         ),
         CheckConstraint("(status = 'FAILED') = (failure is not null)", name="failure_on_fail"),

@@ -445,7 +445,15 @@ class TestGraph:
         assert any("неизвестного" in item for item in definition_problems(dangling))
 
     def test_catalog_answers_what_exists(self) -> None:
-        assert set(CALCULATORS) == {("test.vertical_length", 1), ("test.riser_demand", 1)}
+        demos = {key for key, item in CALCULATORS.items() if item.kind is CalcCalculatorKind.DEMO}
+        assert demos == {("test.vertical_length", 1), ("test.riser_demand", 1)}
+        # Рабочие калькуляторы ВК стадии П — PROMPT 06.
+        assert {key[0] for key in set(CALCULATORS) - demos} == {
+            "vk.b1.stage_p",
+            "vk.t3.stage_p",
+            "vk.t4.stage_p",
+            "vk.k1.stage_p",
+        }
         demo = CALCULATORS[("test.vertical_length", 1)]
         assert demo.kind is CalcCalculatorKind.DEMO
         assert "не расчёт ВК" in demo.title
@@ -678,7 +686,7 @@ class TestHandlers:
             for module in _imports(ENGINE / name):
                 assert not module.startswith(forbidden), f"{name}: {module}"
         fields = set(HandlerContext.__dataclass_fields__)
-        assert fields == {"inputs", "parameters"}
+        assert fields == {"inputs", "parameters", "series"}
         execution_inputs = _plan().steps[0]
         assert execution_inputs.handler is not None
 

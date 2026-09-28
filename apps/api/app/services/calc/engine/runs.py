@@ -52,11 +52,14 @@ from app.services.calc.engine.inputs import (
     snapshot_of,
 )
 from app.services.calc.engine.plan_types import (
+    Absence,
     FactOutcome,
     Plan,
     ResolvedRule,
     RuleOutcome,
     fact_requirements,
+    series_requirements,
+    split_fact_key,
 )
 from app.services.calc.engine.policy import SCENARIO_POLICY_VERSION
 from app.services.calc.engine.reads import run_read
@@ -102,8 +105,12 @@ async def prepare(
     if definition is None:
         raise LookupError(f"{payload.calculator_id}@{payload.calculator_version}")
     requirements, _ = fact_requirements(definition, payload.scope)
+    series, _ = series_requirements(definition, payload.scope)
     facts = await fact_outcomes(
-        session, project_id=project_id, keys=[item.fact_key for item in requirements]
+        session,
+        project_id=project_id,
+        keys=[item.fact_key for item in requirements],
+        series=series,
     )
     rules = await rule_outcomes(
         session, workspace_id=workspace_id, rule_keys=definition.rule_keys, on=on
@@ -192,7 +199,7 @@ async def _prior_steps(
             CalcRun.project_id == project_id,
             CalcRun.calculator_id == definition.calculator_id,
             CalcRun.calculator_version == definition.version,
-            CalcRun.status == CalcRunStatus.SUCCEEDED,
+            CalcRun.status.in_((CalcRunStatus.SUCCEEDED, CalcRunStatus.PARTIAL)),
         )
         .order_by(CalcRun.created_at.desc(), CalcRun.id)
         .limit(1)
@@ -242,7 +249,7 @@ async def start_run(
     snapshot = snapshot_of(plan.snapshot_items)
     execution: Execution | None = None
     failure: CalcRunFailure | None = None
-    if plan.valid:
+    if plan.runnable:
         reuse = await _prior_steps(session, project_id, definition)
         try:
             execution = execute(plan, run_id, reuse)
@@ -250,14 +257,10 @@ async def start_run(
             failure = CalcRunFailure(
                 step_key=error.step_key, error=error.error, message=error.message
             )
-
-    status = (
-        CalcRunStatus.BLOCKED
-        if not plan.valid
-        else CalcRunStatus.FAILED
-        if failure is not None
-        else CalcRunStatus.SUCCEEDED
-    )
+    reasons = list(plan.reasons) + ([] if execution is None else list(execution.gaps))
+    if execution is not None and execution.gaps and not definition.partial:
+        execution = None  # калькулятор без частичного результата: неполный набор — блокировка
+    status = _status(execution, failure, bool(reasons))
     run = CalcRun(
         id=run_id,
         workspace_id=workspace_id,
@@ -275,7 +278,7 @@ async def start_run(
         snapshot_sha256=snapshot.sha256,
         rule_bindings=[item.model_dump(mode="json") for item in plan.bindings],
         rule_bindings_sha256=_bindings_sha256(plan.bindings),
-        blocking_reasons=[item.model_dump(mode="json") for item in plan.reasons],
+        blocking_reasons=[item.model_dump(mode="json") for item in reasons],
         failure=None if failure is None else failure.model_dump(mode="json"),
         assumptions=[]
         if execution is None
@@ -299,6 +302,16 @@ async def start_run(
     return run, True
 
 
+def _status(
+    execution: Execution | None, failure: CalcRunFailure | None, blocked: bool
+) -> CalcRunStatus:
+    if failure is not None:
+        return CalcRunStatus.FAILED
+    if execution is None:
+        return CalcRunStatus.BLOCKED
+    return CalcRunStatus.PARTIAL if blocked else CalcRunStatus.SUCCEEDED
+
+
 def _step_row(run_id: uuid.UUID, step: CalcStepRead) -> CalcRunStep:
     return CalcRunStep(
         run_id=run_id,
@@ -310,7 +323,11 @@ def _step_row(run_id: uuid.UUID, step: CalcStepRead) -> CalcRunStep:
         rule_version=None if step.rule is None else step.rule.version,
         rule_type=None if step.rule is None else step.rule.rule_type,
         rule_content_sha256=None if step.rule is None else step.rule.content_sha256,
-        implementation_key=None if step.rule is None else step.rule.implementation_key,
+        implementation_key=step.rule.implementation_key
+        if step.rule is not None
+        else step.primitive.implementation_key
+        if step.primitive is not None
+        else None,
         inputs=[item.model_dump(mode="json") for item in step.inputs],
         parameters=[item.model_dump(mode="json") for item in step.parameters],
         outputs=[item.model_dump(mode="json") for item in step.outputs],
@@ -383,8 +400,8 @@ async def replay(session: AsyncSession, run: CalcRun) -> CalcRunReplayRead:
             problems=list(problems),
         )
 
-    if run.status is not CalcRunStatus.SUCCEEDED:
-        return refused("повторяется только успешный запуск")
+    if run.status not in (CalcRunStatus.SUCCEEDED, CalcRunStatus.PARTIAL):
+        return refused("повторяется только успешный или частичный запуск")
     definition = calculator(run.calculator_id, run.calculator_version)
     if definition is None:
         return refused(
@@ -421,8 +438,12 @@ async def replay(session: AsyncSession, run: CalcRun) -> CalcRunReplayRead:
         return refused(*problems)
 
     facts: dict[str, FactOutcome] = {item.fact_key: item for item in stored.snapshot.items}
+    for blocked in stored.blocking_reasons:
+        # Член набора, заблокированный при запуске, остаётся заблокированным и при повторе.
+        if blocked.fact_key is not None and split_fact_key(blocked.fact_key) is not None:
+            facts.setdefault(blocked.fact_key, Absence(blocked.code, blocked.message))
     plan = planner.plan(definition, run.scenario, stored.scope, facts, rules, HANDLERS)
-    if not plan.valid:
+    if not plan.runnable:
         return refused(*(reason.message for reason in plan.reasons))
     try:
         execution = execute(plan, run.id, {})

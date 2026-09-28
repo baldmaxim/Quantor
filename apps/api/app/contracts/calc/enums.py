@@ -482,6 +482,9 @@ class CalcRunStatus(StrEnum):
 
     BLOCKED = "BLOCKED"
     """Расчёт нельзя корректно начать: нет факта, открыт конфликт, нет утверждённого правила."""
+    PARTIAL = "PARTIAL"
+    """Часть шагов выполнена, часть заблокирована своими причинами (PROMPT 06). Только у
+    калькулятора, который объявил частичный результат; причины блокировки записаны."""
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     """Проверка прошла, но исполнение упало — ошибка программы, а не нехватка данных."""
@@ -521,6 +524,8 @@ class CalcBlockCode(StrEnum):
     """Синтез: запуск расчёта не успешный, другого проекта, калькулятора или сценария."""
     CALCULATION_RESULT_MISSING = "CALCULATION_RESULT_MISSING"
     """Синтез: в запуске расчёта нет нужного результата."""
+    INPUT_INCOMPLETE = "INPUT_INCOMPLETE"
+    """Примитив: набор фактов неполон или противоречив — нет высоты этажа, этажи перекрываются."""
 
 
 class CalcInputSource(StrEnum):
@@ -545,7 +550,8 @@ class CalcRoundingMode(StrEnum):
 class CalcCalculatorKind(StrEnum):
     DEMO = "DEMO"
     """Доказывает архитектуру ядра на синтетике — не инженерный расчёт."""
-    ENGINEERING = "ENGINEERING"
+    PRODUCTION = "PRODUCTION"
+    """Рабочий калькулятор или синтезатор (PROMPT 06). Флаг `calc.portal` его не включает."""
 
 
 class CalcTraceKind(StrEnum):
@@ -558,6 +564,8 @@ class CalcTraceKind(StrEnum):
     EVIDENCE = "EVIDENCE"
     PARAMETER = "PARAMETER"
     CONVERSION = "CONVERSION"
+    PRIMITIVE = "PRIMITIVE"
+    """Вычислительный примитив (сумма, счёт, разность) — не инженерное правило."""
 
 
 # ------------------------------------------------------------- синтез структуры (PROMPT 05)
@@ -613,6 +621,8 @@ class CalcUnresolvedKind(StrEnum):
     MISSING_RULE = "MISSING_RULE"
     ROUTE = "ROUTE"
     """Физическая трасса не определена — для стадии П нормально, структуру не делает неполной."""
+    MISSING_INPUT = "MISSING_INPUT"
+    """Нет исходного данного объекта: не найдено в документах и не выводится (PROMPT 06)."""
 
 
 class CalcSynthesisStatus(StrEnum):
@@ -637,6 +647,10 @@ class CalcSynthesisRuleRole(StrEnum):
 
 
 class CalcSynthesisTraceKind(StrEnum):
+    QUANTITY = "QUANTITY"
+    """Позиция Расчётного паспорта (PROMPT 06)."""
+    COMPONENT = "COMPONENT"
+    """Составляющая позиции: вертикаль, подключения, магистраль — известна или нет."""
     ELEMENT = "ELEMENT"
     DECISION = "DECISION"
     RULE = "RULE"
@@ -645,3 +659,81 @@ class CalcSynthesisTraceKind(StrEnum):
     EVIDENCE = "EVIDENCE"
     ASSUMPTION = "ASSUMPTION"
     HUMAN_DECISION = "HUMAN_DECISION"
+
+
+# ------------------------------------------------ ожидаемые количества и паспорт (PROMPT 06)
+
+
+class CalcQuantityCategory(StrEnum):
+    """Категория позиции паспорта ВК. Не классификатор ВОР: сверка — PROMPT 09."""
+
+    PIPE = "PIPE"
+    INSULATION = "INSULATION"
+    FITTING = "FITTING"
+    VALVE = "VALVE"
+    EQUIPMENT = "EQUIPMENT"
+    SUPPORT = "SUPPORT"
+    SLEEVE = "SLEEVE"
+    CONNECTION = "CONNECTION"
+    OTHER = "OTHER"
+
+
+class CalcCompleteness(StrEnum):
+    """Насколько позиция определена. Не процент."""
+
+    COMPLETE = "COMPLETE"
+    """Значение определено полностью."""
+    RANGE = "RANGE"
+    """Определено диапазоном: середина не выбирается."""
+    PARTIAL = "PARTIAL"
+    """Определена подтверждаемая часть; остальное — «не определено», не спрятано в итог."""
+    UNRESOLVED_BREAKDOWN = "UNRESOLVED_BREAKDOWN"
+    """Итог определён, разбивка (по диаметрам) — нет."""
+    BLOCKED = "BLOCKED"
+    """Не определено: значения нет, названа причина."""
+
+
+class CalcQuantityDerivation(StrEnum):
+    """Откуда позиция: наблюдена, рассчитана, выведена из топологии, резервным методом."""
+
+    OBSERVED = "OBSERVED"
+    CALCULATED = "CALCULATED"
+    TOPOLOGY = "TOPOLOGY"
+    RULE = "RULE"
+    """По утверждённому правилу (шаг креплений, изоляция)."""
+    FALLBACK = "FALLBACK"
+    """Резервный метод утверждённым правилом — явно помечен, не маскируется под топологию."""
+    AGGREGATE = "AGGREGATE"
+    """Итог по составляющим."""
+    NOT_DETERMINED = "NOT_DETERMINED"
+
+
+class CalcPassportStatus(StrEnum):
+    READY = "READY"
+    """Расчёт, структура и все позиции определены (диапазоны допустимы)."""
+    PARTIAL = "PARTIAL"
+    """Часть результата определена надёжно, часть — нет: показывается, а не прячется."""
+    BLOCKED = "BLOCKED"
+    """Расчёт системы нельзя корректно начать: назначение не подтверждено, нет этажности."""
+
+
+class CalcRuleReadiness(StrEnum):
+    """Готовность инженерного решения калькулятора в реестре правил пространства."""
+
+    READY = "READY"
+    """Есть утверждённая действующая версия."""
+    DRAFT = "DRAFT"
+    """Есть черновик: ждёт утверждения вторым инженером — блокер гейта."""
+    SOURCE_REQUIRED = "SOURCE_REQUIRED"
+    """Версии нет: нужен проверенный источник; память модели источником не считается."""
+    IMPLEMENTATION_REQUIRED = "IMPLEMENTATION_REQUIRED"
+    """Методика не реализована в коде — версию правила создать нельзя."""
+
+
+class CalcSemanticsStatus(StrEnum):
+    """Подтверждено ли назначение обозначения системы документацией проекта."""
+
+    CONFIRMED = "CONFIRMED"
+    MISSING = "MISSING"
+    MISMATCH = "MISMATCH"
+    CONFLICT = "CONFLICT"

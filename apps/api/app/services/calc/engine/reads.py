@@ -9,6 +9,7 @@ from app.contracts.calc.engine import (
     CalcCalculatorRead,
     CalcCalculatorResultRead,
     CalcCalculatorStepRead,
+    CalcPrimitiveRef,
     CalcResultRead,
     CalcRoundingRecord,
     CalcRuleBinding,
@@ -27,6 +28,7 @@ from app.contracts.calc.subjects import CalcFactSubject
 from app.models import CalcRun, CalcRunResult, CalcRunStep
 from app.services.calc.engine.calculators import CalculatorDef
 from app.services.calc.engine.catalog import CALCULATORS
+from app.services.calc.engine.primitives import PRIMITIVES
 
 
 def calculator_read(definition: CalculatorDef) -> CalcCalculatorRead:
@@ -35,6 +37,7 @@ def calculator_read(definition: CalculatorDef) -> CalcCalculatorRead:
         version=definition.version,
         title=definition.title,
         kind=definition.kind,
+        partial=definition.partial,
         discipline=definition.discipline,
         systems=list(definition.systems),
         stage=definition.stage,
@@ -50,6 +53,17 @@ def calculator_read(definition: CalculatorDef) -> CalcCalculatorRead:
             )
             for step in definition.steps
             for name, binding in step.facts.items()
+        ]
+        + [
+            CalcCalculatorFactRead(
+                step_key=step.step_key,
+                input=name,
+                fact_type=series.fact_type,
+                subject_fields=list(series.subject_fields),
+                member_field=series.member_field,
+            )
+            for step in definition.steps
+            for name, series in step.series.items()
         ],
         rules=list(definition.rule_keys),
         steps=[
@@ -57,6 +71,7 @@ def calculator_read(definition: CalculatorDef) -> CalcCalculatorRead:
                 step_key=step.step_key,
                 title=step.title,
                 rule_key=step.rule_key,
+                primitive=step.primitive,
                 allowed_rule_types=sorted(step.allowed_rule_types, key=lambda item: item.value),
                 depends_on=list(step.depends_on),
                 assumption=step.assumption is not None,
@@ -123,12 +138,22 @@ def step_read(row: CalcRunStep) -> CalcStepRead:
             implementation_key=row.implementation_key or "",
         )
     )
+    spec = PRIMITIVES.get(row.implementation_key or "") if row.rule_key is None else None
+    primitive = (
+        None
+        if row.rule_key is not None or row.implementation_key is None
+        else CalcPrimitiveRef(
+            implementation_key=row.implementation_key,
+            title=row.implementation_key if spec is None else spec.title,
+        )
+    )
     return CalcStepRead(
         step_key=row.step_key,
         position=row.position,
         title=row.title,
         status=row.status,
         rule=rule,
+        primitive=primitive,
         inputs=[CalcStepInput.model_validate(item) for item in row.inputs],
         parameters=[CalcStepInput.model_validate(item) for item in row.parameters],
         outputs=[CalcStepOutput.model_validate(item) for item in row.outputs],

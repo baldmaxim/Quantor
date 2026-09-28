@@ -9,7 +9,11 @@
 - Отпечаток шага — калькулятор, реализация и её семантика, точная версия правила, входы в
   рабочих единицах, параметры, сценарий и отпечатки шагов-источников. Совпал с шагом прежнего
   успешного запуска того же проекта — результат берётся оттуда, и это видно (`REUSED`).
-- Любая ошибка обработчика — `StepExecutionError`: запуск станет FAILED, а не «примерно так».
+- Шаг-примитив (PROMPT 06) исполняется так же, но без правила: члены набора записываются
+  входами шага. Если набор неполон (`InsufficientInputError`), шаг не определён — причина
+  записывается, зависимые шаги не исполняются, независимые идут дальше.
+- Любая другая ошибка обработчика — `StepExecutionError`: запуск станет FAILED, а не «примерно
+  так».
 """
 
 from __future__ import annotations
@@ -22,7 +26,8 @@ from types import MappingProxyType
 
 from app.contracts.calc.engine import (
     CalcAssumptionRecord,
-    CalcConversion,
+    CalcBlockingReason,
+    CalcPrimitiveRef,
     CalcResultRead,
     CalcRoundingRecord,
     CalcRuleRef,
@@ -30,15 +35,26 @@ from app.contracts.calc.engine import (
     CalcStepOutput,
     CalcStepRead,
 )
-from app.contracts.calc.enums import CalcInputSource, CalcScenario, CalcStepStatus
-from app.contracts.calc.units import UNITS, to_canonical
-from app.contracts.calc.values import CalcCountValue, CalcNumberValue
-from app.services.calc.engine.calculators import CalculatorDef
-from app.services.calc.engine.handlers import HandlerContext, run_handler
-from app.services.calc.engine.hashing import canonical_sha256
+from app.contracts.calc.enums import CalcBlockCode, CalcInputSource, CalcStepStatus
+from app.contracts.calc.units import UNITS
+from app.services.calc.engine.handlers import (
+    HandlerContext,
+    HandlerSpec,
+    InsufficientInputError,
+    SeriesMember,
+    run_handler,
+)
 from app.services.calc.engine.numbers import apply_rounding, exact_text, parse_exact, ru_number
-from app.services.calc.engine.plan_types import Plan, PlannedStep, numeric_unit
+from app.services.calc.engine.plan_types import Plan, PlannedStep, reason
 from app.services.calc.engine.quantity import Quantity
+from app.services.calc.engine.step_inputs import (
+    convert,
+    fact_input,
+    result_sha256,
+    step_fingerprint,
+)
+
+__all__ = ["Execution", "PriorStep", "StepExecutionError", "execute", "result_sha256"]
 
 
 class StepExecutionError(Exception):
@@ -68,46 +84,14 @@ class Execution:
     results: tuple[CalcResultRead, ...]
     assumptions: tuple[CalcAssumptionRecord, ...]
     result_sha256: str
+    gaps: tuple[CalcBlockingReason, ...] = ()
+    """Шаги, которые не определились: набор фактов неполон или противоречив."""
 
 
 @dataclass(frozen=True, slots=True)
 class _Value:
     value: Decimal
     unit: str | None
-
-
-def _convert(
-    value: Decimal, unit: str | None, target: str | None
-) -> tuple[Decimal, CalcConversion | None]:
-    if unit == target or unit is None or target is None:
-        return value, None
-    converted = to_canonical(value, unit, target)
-    return converted, CalcConversion(
-        from_value=exact_text(value),
-        from_unit=unit,
-        to_value=exact_text(converted),
-        to_unit=target,
-    )
-
-
-def result_sha256(
-    definition: CalculatorDef, scenario: CalcScenario, results: tuple[CalcResultRead, ...]
-) -> str:
-    """Отпечаток набора результатов: только значения, без времени и служебных полей."""
-    return canonical_sha256(
-        {
-            "calculator": definition.calculator_id,
-            "version": definition.version,
-            "scenario": scenario.value,
-            "results": sorted(
-                [
-                    {"result_key": item.result_key, "value": item.value, "unit": item.unit}
-                    for item in results
-                ],
-                key=lambda item: str(item["result_key"]),
-            ),
-        }
-    )
 
 
 class _Executor:
@@ -119,85 +103,32 @@ class _Executor:
         self.fingerprints: dict[str, str] = {}
         self.records: list[CalcStepRead] = []
         self.assumptions: list[CalcAssumptionRecord] = []
-
-    def fingerprint(
-        self,
-        planned: PlannedStep,
-        inputs: list[CalcStepInput],
-        parameters: list[CalcStepInput],
-    ) -> str:
-        definition = self.plan.definition
-        binding = planned.rule
-        handler = planned.handler
-        return canonical_sha256(
-            {
-                "calculator": definition.calculator_id,
-                "calculator_version": definition.version,
-                "calculator_sha256": definition.sha256,
-                "step_key": planned.step.step_key,
-                "scenario": self.plan.scenario.value,
-                "applied": planned.applied,
-                "rule": None
-                if binding is None
-                else {
-                    "rule_key": binding.rule_key,
-                    "version": binding.version,
-                    "content_sha256": binding.content_sha256,
-                },
-                "implementation": None
-                if handler is None
-                else {
-                    "key": handler.implementation_key,
-                    "semantics_sha256": handler.semantics_sha256,
-                },
-                "inputs": [[item.name, item.value, item.unit] for item in inputs],
-                "parameters": [[item.name, item.value, item.unit] for item in parameters],
-                "upstream": {key: self.fingerprints[key] for key in planned.step.depends_on},
-            }
-        )
+        self.gaps: list[CalcBlockingReason] = []
+        self.undetermined: set[str] = set()
 
     def gather_inputs(self, planned: PlannedStep) -> list[CalcStepInput]:
         handler = planned.handler
         rule = planned.rule
         inputs: list[CalcStepInput] = []
-        names = (
-            [item.name for item in rule.content.inputs]
-            if rule is not None and handler is not None
-            else sorted(planned.step.steps)
-        )
+        if planned.primitive and handler is not None:
+            names = sorted(handler.inputs)
+        elif rule is not None and handler is not None:
+            names = [item.name for item in rule.content.inputs]
+        else:
+            names = sorted(planned.step.steps)
         for name in names:
             target = handler.inputs[name] if handler is not None else None
             if name in planned.facts:
-                item = planned.facts[name]
-                fact_value = item.value
-                raw = (
-                    parse_exact(fact_value.value)
-                    if isinstance(fact_value, CalcNumberValue)
-                    else Decimal(fact_value.value)
-                    if isinstance(fact_value, CalcCountValue)
-                    else None
-                )
-                if raw is None:
+                try:
+                    inputs.append(fact_input(name, planned.facts[name], target))
+                except ValueError as error:
                     raise StepExecutionError(
-                        planned.step.step_key, "FactNotNumeric", f"факт {item.fact_key} не число"
-                    )
-                unit = numeric_unit(item)
-                value, conversion = _convert(raw, unit, target)
-                inputs.append(
-                    CalcStepInput(
-                        name=name,
-                        source=CalcInputSource.FACT,
-                        fact_key=item.fact_key,
-                        fact_id=item.fact_id,
-                        value=exact_text(value),
-                        unit=target or unit,
-                        conversion=conversion,
-                    )
-                )
+                        planned.step.step_key, "FactNotNumeric", str(error)
+                    ) from error
                 continue
             link = planned.step.steps[name]
             upstream = self.values[(link.step_key, link.output)]
-            value, conversion = _convert(upstream.value, upstream.unit, target or upstream.unit)
+            value, conversion = convert(upstream.value, upstream.unit, target or upstream.unit)
             inputs.append(
                 CalcStepInput(
                     name=name,
@@ -209,6 +140,16 @@ class _Executor:
                     conversion=conversion,
                 )
             )
+        if handler is not None:
+            for series_name, members in sorted(planned.series.items()):
+                target = handler.series[series_name]
+                binding = planned.step.series[series_name]
+                for item in members:
+                    member = str(getattr(item.subject, binding.member_field))
+                    recorded = fact_input(f"{series_name}[{member}]", item, target)
+                    inputs.append(
+                        recorded.model_copy(update={"series": series_name, "member": member})
+                    )
         return inputs
 
     def gather_parameters(self, planned: PlannedStep) -> list[CalcStepInput]:
@@ -217,7 +158,7 @@ class _Executor:
         parameters: list[CalcStepInput] = []
         for item in planned.rule.content.parameters:
             target = planned.handler.parameters[item.name]
-            value, conversion = _convert(parse_exact(item.value), item.unit, target)
+            value, conversion = convert(parse_exact(item.value), item.unit, target)
             parameters.append(
                 CalcStepInput(
                     name=item.name,
@@ -247,30 +188,22 @@ class _Executor:
         parameters: list[CalcStepInput],
     ) -> tuple[list[CalcStepOutput], str, list[CalcRoundingRecord]]:
         handler = planned.handler
-        rule = planned.rule
         step_key = planned.step.step_key
-        if handler is None or rule is None:
+        if handler is None or (planned.rule is None and not planned.primitive):
             raise StepExecutionError(step_key, "NotPlanned", "шаг без правила или реализации")
+        units = (
+            dict(handler.outputs)
+            if planned.rule is None
+            else {item.name: item.unit for item in planned.rule.content.outputs}
+        )
         try:
-            context = HandlerContext(
-                inputs=MappingProxyType(
-                    {item.name: Quantity.of(parse_exact(item.value), item.unit) for item in inputs}
-                ),
-                parameters=MappingProxyType(
-                    {
-                        item.name: Quantity.of(parse_exact(item.value), item.unit)
-                        for item in parameters
-                    }
-                ),
-            )
-            result = run_handler(handler, context)
+            result = run_handler(handler, _context(handler, inputs, parameters))
             if set(result.outputs) != set(handler.outputs):
                 raise ValueError("обработчик вернул не те выходы, что объявил")
-            units = {item.name: item.unit for item in rule.content.outputs}
             outputs: list[CalcStepOutput] = []
             for name in sorted(handler.outputs):
                 raw = result.outputs[name].in_unit(handler.outputs[name])
-                value, conversion = _convert(raw, handler.outputs[name], units[name])
+                value, conversion = convert(raw, handler.outputs[name], units[name])
                 outputs.append(
                     CalcStepOutput(
                         name=name,
@@ -291,6 +224,8 @@ class _Executor:
                 )
                 for item in result.roundings
             ]
+        except InsufficientInputError:
+            raise
         except Inexact as error:
             raise StepExecutionError(
                 step_key,
@@ -318,7 +253,7 @@ class _Executor:
         planned: PlannedStep,
         inputs: list[CalcStepInput],
         outputs: list[CalcStepOutput],
-        reason: str,
+        reason_text: str,
     ) -> CalcAssumptionRecord | None:
         spec = planned.step.assumption
         if spec is None:
@@ -333,7 +268,7 @@ class _Executor:
             rule_key=None if rule is None else rule.rule_key,
             version=None if rule is None else rule.version,
             applied=planned.applied,
-            reason=reason,
+            reason=reason_text,
             impact=None if rule is None else rule.content.impact,
             base_value=exact_text(base_value),
             value=exact_text(value),
@@ -344,9 +279,12 @@ class _Executor:
 
     def run_step(self, planned: PlannedStep) -> None:
         step = planned.step
+        if set(step.depends_on) & self.undetermined:
+            self.undetermined.add(step.step_key)
+            return
         inputs = self.gather_inputs(planned)
         parameters = self.gather_parameters(planned)
-        fingerprint = self.fingerprint(planned, inputs, parameters)
+        fingerprint = step_fingerprint(self.plan, planned, inputs, parameters, self.fingerprints)
         reused_from: uuid.UUID | None = None
         roundings: list[CalcRoundingRecord] = []
 
@@ -361,7 +299,7 @@ class _Executor:
             unit_title = UNITS[base.unit].title if base.unit is not None else ""
             shown = f"{ru_number(parse_exact(base.value))} {unit_title}".rstrip()
             explanation = f"{planned.not_applied_reason}: {shown}"
-            reason = planned.not_applied_reason or ""
+            reason_text = planned.not_applied_reason or ""
         else:
             prior = self.reuse.get(fingerprint)
             if prior is not None:
@@ -369,13 +307,24 @@ class _Executor:
                 roundings = list(prior.roundings)
                 status, reused_from = CalcStepStatus.REUSED, prior.run_id
             else:
-                outputs, explanation, roundings = self.compute(planned, inputs, parameters)
+                try:
+                    outputs, explanation, roundings = self.compute(planned, inputs, parameters)
+                except InsufficientInputError as error:
+                    self.undetermined.add(step.step_key)
+                    self.gaps.append(
+                        reason(
+                            CalcBlockCode.INPUT_INCOMPLETE,
+                            f"«{step.title}» не определён: {error}",
+                            step_key=step.step_key,
+                        )
+                    )
+                    return
                 status = CalcStepStatus.EXECUTED
-            reason = (
+            reason_text = (
                 f"Сценарий {self.plan.scenario.value} допускает тендерные допущения, шаг "
                 f"«{step.title}» допускает допущение, версия правила утверждена"
             )
-        assumption = self.assumption_record(planned, inputs, outputs, reason)
+        assumption = self.assumption_record(planned, inputs, outputs, reason_text)
         if assumption is not None:
             self.assumptions.append(assumption)
         for output in outputs:
@@ -383,6 +332,7 @@ class _Executor:
                 parse_exact(output.value), output.unit
             )
         self.fingerprints[step.step_key] = fingerprint
+        handler = planned.handler
         self.records.append(
             CalcStepRead(
                 step_key=step.step_key,
@@ -390,6 +340,11 @@ class _Executor:
                 title=step.title,
                 status=status,
                 rule=self.rule_ref(planned),
+                primitive=CalcPrimitiveRef(
+                    implementation_key=handler.implementation_key, title=handler.title
+                )
+                if planned.primitive and handler is not None
+                else None,
                 inputs=inputs,
                 parameters=parameters,
                 outputs=outputs,
@@ -405,7 +360,9 @@ class _Executor:
         definition = self.plan.definition
         found: list[CalcResultRead] = []
         for item in definition.results:
-            source = self.values[(item.step_key, item.output)]
+            source = self.values.get((item.step_key, item.output))
+            if source is None:
+                continue  # шаг заблокирован или не определён — результата нет, а не ноль
             value = source.value
             rounding: CalcRoundingRecord | None = None
             if item.rounding is not None:
@@ -439,10 +396,30 @@ class _Executor:
         return tuple(found)
 
 
+def _context(
+    handler: HandlerSpec, inputs: list[CalcStepInput], parameters: list[CalcStepInput]
+) -> HandlerContext:
+    series: dict[str, list[SeriesMember]] = {name: [] for name in handler.series}
+    scalars: dict[str, Quantity] = {}
+    for item in inputs:
+        quantity = Quantity.of(parse_exact(item.value), item.unit)
+        if item.series is not None and item.member is not None:
+            series[item.series].append(SeriesMember(item.member, quantity))
+        else:
+            scalars[item.name] = quantity
+    return HandlerContext(
+        inputs=MappingProxyType(scalars),
+        parameters=MappingProxyType(
+            {item.name: Quantity.of(parse_exact(item.value), item.unit) for item in parameters}
+        ),
+        series=MappingProxyType({name: tuple(members) for name, members in series.items()}),
+    )
+
+
 def execute(plan: Plan, run_id: uuid.UUID, reuse: Mapping[str, PriorStep]) -> Execution:
-    """Исполнение действительного плана. План с причинами блокировки сюда не приходит."""
-    if not plan.valid:
-        raise ValueError("исполнять можно только действительный план")
+    """Исполнение плана, в котором есть что исполнять. Заблокированные шаги в план не входят."""
+    if not plan.runnable:
+        raise ValueError("исполнять можно только действительный план — план с шагами")
     executor = _Executor(plan, run_id, reuse)
     for planned in plan.steps:
         executor.run_step(planned)
@@ -452,4 +429,5 @@ def execute(plan: Plan, run_id: uuid.UUID, reuse: Mapping[str, PriorStep]) -> Ex
         results=results,
         assumptions=tuple(executor.assumptions),
         result_sha256=result_sha256(plan.definition, plan.scenario, results),
+        gaps=tuple(executor.gaps),
     )

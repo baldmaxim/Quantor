@@ -9,6 +9,7 @@ import type { BadgeTone } from '@/components/ui';
 
 export const RUN_STATUS: Record<CalcRunStatus, { label: string; tone: BadgeTone }> = {
   SUCCEEDED: { label: 'рассчитано', tone: 'success' },
+  PARTIAL: { label: 'частично', tone: 'accent' },
   BLOCKED: { label: 'заблокировано', tone: 'warning' },
   FAILED: { label: 'ошибка', tone: 'danger' },
 };

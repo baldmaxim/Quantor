@@ -20,6 +20,7 @@ const KIND_TITLES: Record<CalcTraceNode['kind'], string> = {
   EVIDENCE: 'Свидетельство',
   PARAMETER: 'Параметр',
   CONVERSION: 'Перевод единиц',
+  PRIMITIVE: 'Вычислительный примитив',
 };
 
 const TraceNode = ({ node }: { node: CalcTraceNode }) => (

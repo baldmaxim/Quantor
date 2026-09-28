@@ -33,7 +33,7 @@ from app.contracts.calc.values import (
     parse_decimal,
 )
 
-FACT_TYPES_VERSION: Final = "calc.fact_types.v2"
+FACT_TYPES_VERSION: Final = "calc.fact_types.v3"
 
 _BUILDING = frozenset({"building"})
 _FLOOR = frozenset({"building", "floor"})
@@ -194,6 +194,14 @@ FIXTURE_TYPES: Final = _options(
     ("WASHING_MACHINE", "стиральная машина"),
     ("DISHWASHER", "посудомоечная машина"),
     ("CLEANING_SINK", "раковина или трап ПУИ"),
+)
+
+SYSTEM_FUNCTIONS: Final = _options(
+    ("COLD_WATER", "хозяйственно-питьевой водопровод"),
+    ("HOT_WATER_SUPPLY", "горячее водоснабжение, подающий"),
+    ("HOT_WATER_CIRCULATION", "горячее водоснабжение, циркуляционный"),
+    ("DOMESTIC_SEWER", "бытовая канализация"),
+    ("OTHER", "иное назначение"),
 )
 
 REGISTRY: Final[MappingProxyType[str, CalcFactTypeDef]] = MappingProxyType(
@@ -595,6 +603,26 @@ REGISTRY: Final[MappingProxyType[str, CalcFactTypeDef]] = MappingProxyType(
                 "Требования Заказчика",
                 "Технические требования и ограничения Заказчика к системе.",
                 "system",
+            ),
+            # ---- PROMPT 06: семантика обозначения и известная часть трасс ------------------
+            _enum(
+                "system.function",
+                "Назначение системы по документации",
+                "Что означает обозначение системы в этом проекте — по легенде, пояснительной "
+                "записке или схеме. Без него калькулятор не считает Т3 подающим, а Т4 — "
+                "циркуляционным только по названию.",
+                "system",
+                SYSTEM_FUNCTIONS,
+            ),
+            _number(
+                "system.main_length",
+                "Длина магистрали",
+                "Длина горизонтальной магистрали системы по документу или обмеру. Трасса не "
+                "выдумывается и не выводится из длины коридора.",
+                "m",
+                "system",
+                abs_tolerance="0.1",
+                rel_tolerance="0.01",
             ),
         )
     }

@@ -10,6 +10,7 @@ from app.models.calc import (
     CalcSource,
     CalcSourceInspection,
 )
+from app.models.calc_passports import CalcExpectedQuantity, CalcPassport
 from app.models.calc_rules import CalcRuleDefinition, CalcRuleReview, CalcRuleVersion
 from app.models.calc_runs import CalcRun, CalcRunResult, CalcRunStep
 from app.models.calc_synthesis import CalcSynthesisDecision, CalcSynthesisRun
@@ -27,10 +28,12 @@ from app.models.worker import Worker
 __all__ = [
     "AuditEvent",
     "AuthSession",
+    "CalcExpectedQuantity",
     "CalcFact",
     "CalcFactConflict",
     "CalcFactEvidence",
     "CalcManualOverride",
+    "CalcPassport",
     "CalcRuleDefinition",
     "CalcRuleReview",
     "CalcRuleVersion",

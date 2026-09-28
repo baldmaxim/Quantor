@@ -205,6 +205,10 @@ class CalcStepInput(_Stored):
     unit: str | None
     """Единица, в которой значение получил обработчик."""
     conversion: CalcConversion | None = None
+    series: str | None = None
+    """Набор, членом которого вход является (PROMPT 06): «heights»."""
+    member: str | None = None
+    """Код места члена набора: этаж «2..24», вид прибора «WC»."""
 
 
 class CalcStepOutput(_Stored):
@@ -240,12 +244,21 @@ class CalcRuleRef(BaseModel):
     implementation_key: str
 
 
+class CalcPrimitiveRef(BaseModel):
+    """Вычислительный примитив шага: арифметика по фактам, не инженерное правило."""
+
+    implementation_key: str
+    title: str
+
+
 class CalcStepRead(BaseModel):
     step_key: str
     position: int
     title: str
     status: CalcStepStatus
     rule: CalcRuleRef | None
+    primitive: CalcPrimitiveRef | None = None
+    """Шаг считается примитивом, а не правилом (PROMPT 06)."""
     inputs: list[CalcStepInput]
     parameters: list[CalcStepInput]
     outputs: list[CalcStepOutput]
@@ -425,12 +438,16 @@ class CalcCalculatorFactRead(BaseModel):
     input: str
     fact_type: str
     subject_fields: list[str]
+    member_field: str | None = None
+    """Для набора — поле, которым различаются члены: «floor»."""
 
 
 class CalcCalculatorStepRead(BaseModel):
     step_key: str
     title: str
-    rule_key: str
+    rule_key: str | None
+    """Ключ правила; пусто — шаг-примитив."""
+    primitive: str | None = None
     allowed_rule_types: list[CalcRuleType]
     depends_on: list[str]
     assumption: bool
@@ -451,6 +468,8 @@ class CalcCalculatorRead(BaseModel):
     version: int
     title: str
     kind: CalcCalculatorKind
+    partial: bool = False
+    """Частичный результат: заблокированный шаг не останавливает независимые."""
     discipline: CalcDiscipline
     systems: list[str]
     stage: CalcDocumentStage

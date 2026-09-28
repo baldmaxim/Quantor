@@ -338,6 +338,26 @@ export type BoxGeometry = {
 };
 
 /**
+ * CalcAmount
+ *
+ * Значение или диапазон. Диапазон не превращается в середину.
+ */
+export type CalcAmount = {
+    /**
+     * High
+     */
+    high?: string | null;
+    /**
+     * Low
+     */
+    low?: string | null;
+    /**
+     * Value
+     */
+    value?: string | null;
+};
+
+/**
  * CalcAssumptionEvidence
  *
  * Основание инженерного допущения.
@@ -427,7 +447,7 @@ export type CalcAssumptionRecord = {
  *
  * Почему запуск заблокирован. Ни одна причина не заменяется нулём или умолчанием.
  */
-export type CalcBlockCode = 'CALCULATOR_INVALID' | 'SCENARIO_NOT_SUPPORTED' | 'SCOPE_INVALID' | 'FACT_MISSING' | 'FACT_EXCLUDED' | 'FACT_CONFLICT' | 'FACT_DECISION_STALE' | 'FACT_NOT_EXACT' | 'RULE_NOT_FOUND' | 'RULE_NOT_APPROVED' | 'RULE_NOT_EFFECTIVE' | 'RULE_NOT_APPLICABLE' | 'RULE_TYPE_NOT_ALLOWED' | 'RULE_CONTRACT_MISMATCH' | 'IMPLEMENTATION_MISSING' | 'UNIT_INCOMPATIBLE' | 'CALCULATION_NOT_USABLE' | 'CALCULATION_RESULT_MISSING';
+export type CalcBlockCode = 'CALCULATOR_INVALID' | 'SCENARIO_NOT_SUPPORTED' | 'SCOPE_INVALID' | 'FACT_MISSING' | 'FACT_EXCLUDED' | 'FACT_CONFLICT' | 'FACT_DECISION_STALE' | 'FACT_NOT_EXACT' | 'RULE_NOT_FOUND' | 'RULE_NOT_APPROVED' | 'RULE_NOT_EFFECTIVE' | 'RULE_NOT_APPLICABLE' | 'RULE_TYPE_NOT_ALLOWED' | 'RULE_CONTRACT_MISMATCH' | 'IMPLEMENTATION_MISSING' | 'UNIT_INCOMPATIBLE' | 'CALCULATION_NOT_USABLE' | 'CALCULATION_RESULT_MISSING' | 'INPUT_INCOMPLETE';
 
 /**
  * CalcBlockingReason
@@ -479,6 +499,10 @@ export type CalcCalculatorFactRead = {
      */
     input: string;
     /**
+     * Member Field
+     */
+    member_field?: string | null;
+    /**
      * Step Key
      */
     step_key: string;
@@ -491,7 +515,7 @@ export type CalcCalculatorFactRead = {
 /**
  * CalcCalculatorKind
  */
-export type CalcCalculatorKind = 'DEMO' | 'ENGINEERING';
+export type CalcCalculatorKind = 'DEMO' | 'PRODUCTION';
 
 /**
  * CalcCalculatorRead
@@ -511,6 +535,10 @@ export type CalcCalculatorRead = {
      */
     facts: Array<CalcCalculatorFactRead>;
     kind: CalcCalculatorKind;
+    /**
+     * Partial
+     */
+    partial?: boolean;
     /**
      * Results
      */
@@ -587,9 +615,13 @@ export type CalcCalculatorStepRead = {
      */
     depends_on: Array<string>;
     /**
+     * Primitive
+     */
+    primitive?: string | null;
+    /**
      * Rule Key
      */
-    rule_key: string;
+    rule_key: string | null;
     /**
      * Step Key
      */
@@ -664,6 +696,13 @@ export type CalcCollectableDocumentRead = {
      */
     title: string;
 };
+
+/**
+ * CalcCompleteness
+ *
+ * Насколько позиция определена. Не процент.
+ */
+export type CalcCompleteness = 'COMPLETE' | 'RANGE' | 'PARTIAL' | 'UNRESOLVED_BREAKDOWN' | 'BLOCKED';
 
 /**
  * CalcConfidence
@@ -1208,6 +1247,115 @@ export type CalcEvidenceRef = {
 };
 
 /**
+ * CalcExpectedQuantityRead
+ */
+export type CalcExpectedQuantityRead = {
+    /**
+     * Aggregate
+     */
+    aggregate?: boolean;
+    amount: CalcAmount;
+    /**
+     * Assumptions
+     */
+    assumptions: Array<string>;
+    /**
+     * Attributes
+     */
+    attributes: {
+        [key: string]: string;
+    };
+    base?: CalcAmount | null;
+    /**
+     * Blocked By
+     */
+    blocked_by: Array<string>;
+    /**
+     * Calculation Run Id
+     */
+    calculation_run_id: string | null;
+    category: CalcQuantityCategory;
+    completeness: CalcCompleteness;
+    /**
+     * Components
+     */
+    components: Array<CalcQuantityComponent>;
+    derivation: CalcQuantityDerivation;
+    discipline: CalcDiscipline;
+    /**
+     * Element Ids
+     */
+    element_ids: Array<string>;
+    /**
+     * Explanation
+     */
+    explanation: string;
+    /**
+     * Function
+     */
+    function: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Item Type
+     */
+    item_type: string;
+    /**
+     * Material
+     */
+    material: string | null;
+    /**
+     * Notice
+     */
+    notice: string | null;
+    /**
+     * Passport Id
+     */
+    passport_id: string;
+    /**
+     * Quantity Key
+     */
+    quantity_key: string;
+    reserve?: CalcQuantityReserve | null;
+    /**
+     * Result Keys
+     */
+    result_keys: Array<string>;
+    /**
+     * Rule Refs
+     */
+    rule_refs: Array<string>;
+    scenario: CalcScenario;
+    scope: CalcFactSubject;
+    /**
+     * Size
+     */
+    size: string | null;
+    /**
+     * Synthesis Run Id
+     */
+    synthesis_run_id: string | null;
+    /**
+     * System Code
+     */
+    system_code: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Unit
+     */
+    unit: string;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
  * CalcFactCreate
  *
  * Новое утверждение. Если у источника уже есть действующее по этому ключу — оно заменяется.
@@ -1681,6 +1829,46 @@ export type CalcHazardResolution = {
     comment: string;
     hazard: CalcLegacyHazard;
     outcome: CalcHazardOutcome;
+};
+
+/**
+ * CalcInputCounts
+ *
+ * «Для В1 нужно 22 параметра: найдено 17, выводится 3, нужен человек 2».
+ */
+export type CalcInputCounts = {
+    /**
+     * Derivable
+     */
+    derivable: number;
+    /**
+     * Found Auto
+     */
+    found_auto: number;
+    /**
+     * Found Manual
+     */
+    found_manual: number;
+    /**
+     * Needs Human
+     */
+    needs_human: number;
+    /**
+     * Not Inspected
+     */
+    not_inspected: number;
+    /**
+     * Required Satisfied
+     */
+    required_satisfied: number;
+    /**
+     * Required Total
+     */
+    required_total: number;
+    /**
+     * Total
+     */
+    total: number;
 };
 
 /**
@@ -2282,6 +2470,468 @@ export type CalcOtherSource = {
 };
 
 /**
+ * CalcPassportBody
+ */
+export type CalcPassportBody = {
+    /**
+     * Assumptions
+     */
+    assumptions: Array<string>;
+    /**
+     * Calculation
+     */
+    calculation: Array<CalcPassportResult>;
+    /**
+     * Checks
+     */
+    checks: Array<CalcPassportCheck>;
+    /**
+     * Completeness
+     */
+    completeness: {
+        [key: string]: number;
+    };
+    /**
+     * Conflicts
+     */
+    conflicts: Array<CalcPassportConflict>;
+    /**
+     * Function
+     */
+    function: string;
+    /**
+     * Highlights
+     */
+    highlights: Array<string>;
+    inputs: CalcInputCounts;
+    /**
+     * Missing
+     */
+    missing: Array<CalcPassportMissing>;
+    /**
+     * Problems
+     */
+    problems: Array<string>;
+    /**
+     * Rules
+     */
+    rules: Array<CalcPassportRule>;
+    semantics: CalcSemanticsStatus;
+    /**
+     * Semantics Note
+     */
+    semantics_note: string;
+    /**
+     * Structure
+     */
+    structure: Array<CalcPassportElement>;
+    /**
+     * System Title
+     */
+    system_title: string;
+    /**
+     * Unresolved
+     */
+    unresolved: Array<CalcPassportIssue>;
+    /**
+     * Used Facts
+     */
+    used_facts: Array<CalcPassportFact>;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * CalcPassportCheck
+ *
+ * Документальное значение и независимая проверка — раздельно, расхождение видно.
+ */
+export type CalcPassportCheck = {
+    /**
+     * Check Value
+     */
+    check_value: string | null;
+    /**
+     * Discrepancy
+     */
+    discrepancy: string | null;
+    /**
+     * Document Value
+     */
+    document_value: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcPassportConflict
+ */
+export type CalcPassportConflict = {
+    /**
+     * Fact Key
+     */
+    fact_key: string;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
+ * CalcPassportElement
+ */
+export type CalcPassportElement = {
+    /**
+     * Count
+     */
+    count: string;
+    /**
+     * Element Id
+     */
+    element_id: string;
+    provenance: CalcElementProvenance;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcPassportFact
+ */
+export type CalcPassportFact = {
+    /**
+     * Fact Key
+     */
+    fact_key: string;
+    /**
+     * Method
+     */
+    method: string;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Value
+     */
+    value: string;
+};
+
+/**
+ * CalcPassportIssue
+ */
+export type CalcPassportIssue = {
+    /**
+     * Blocks
+     */
+    blocks: Array<string>;
+    /**
+     * Key
+     */
+    key: string;
+    kind: CalcUnresolvedKind | null;
+    /**
+     * Known
+     */
+    known: string;
+    /**
+     * Needed
+     */
+    needed: string;
+    /**
+     * Not Blocks
+     */
+    not_blocks: Array<string>;
+    /**
+     * Structural
+     */
+    structural: boolean;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcPassportMissing
+ */
+export type CalcPassportMissing = {
+    /**
+     * Blocks
+     */
+    blocks: Array<string>;
+    level: CalcRequirementLevel;
+    /**
+     * Not Blocks
+     */
+    not_blocks: Array<string>;
+    /**
+     * Reason
+     */
+    reason: string | null;
+    /**
+     * Requirement Id
+     */
+    requirement_id: string;
+    status: CalcReadinessStatus;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcPassportRead
+ */
+export type CalcPassportRead = {
+    /**
+     * Batch Id
+     */
+    batch_id: string;
+    body: CalcPassportBody;
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Version
+     */
+    calculator_version: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Highlights
+     */
+    highlights: Array<string>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Passport Sha256
+     */
+    passport_sha256: string;
+    /**
+     * Problems
+     */
+    problems: Array<string>;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Quantities Count
+     */
+    quantities_count: number;
+    /**
+     * Runs
+     */
+    runs: Array<CalcPassportRun>;
+    scope: CalcFactSubject;
+    status: CalcPassportStatus;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * Synthesizer Version
+     */
+    synthesizer_version: number;
+    /**
+     * System Code
+     */
+    system_code: string;
+    /**
+     * System Title
+     */
+    system_title: string;
+};
+
+/**
+ * CalcPassportResult
+ */
+export type CalcPassportResult = {
+    amount: CalcAmount;
+    /**
+     * Explanation
+     */
+    explanation: string;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Unit
+     */
+    unit: string | null;
+};
+
+/**
+ * CalcPassportRule
+ */
+export type CalcPassportRule = {
+    /**
+     * Blocks
+     */
+    blocks: string;
+    /**
+     * Gate
+     */
+    gate: boolean;
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    rule_type: CalcRuleType | null;
+    status: CalcRuleReadiness;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Version
+     */
+    version: number | null;
+};
+
+/**
+ * CalcPassportRun
+ */
+export type CalcPassportRun = {
+    /**
+     * Calculation Run Id
+     */
+    calculation_run_id: string | null;
+    calculation_status: CalcRunStatus | null;
+    scenario: CalcScenario;
+    /**
+     * Synthesis Run Id
+     */
+    synthesis_run_id: string | null;
+    synthesis_status: CalcSynthesisStatus | null;
+};
+
+/**
+ * CalcPassportStatus
+ */
+export type CalcPassportStatus = 'READY' | 'PARTIAL' | 'BLOCKED';
+
+/**
+ * CalcPassportSummaryRead
+ */
+export type CalcPassportSummaryRead = {
+    /**
+     * Batch Id
+     */
+    batch_id: string;
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Version
+     */
+    calculator_version: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Highlights
+     */
+    highlights: Array<string>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Passport Sha256
+     */
+    passport_sha256: string;
+    /**
+     * Problems
+     */
+    problems: Array<string>;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Quantities Count
+     */
+    quantities_count: number;
+    scope: CalcFactSubject;
+    status: CalcPassportStatus;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * Synthesizer Version
+     */
+    synthesizer_version: number;
+    /**
+     * System Code
+     */
+    system_code: string;
+    /**
+     * System Title
+     */
+    system_title: string;
+};
+
+/**
+ * CalcPrimitiveRef
+ *
+ * Вычислительный примитив шага: арифметика по фактам, не инженерное правило.
+ */
+export type CalcPrimitiveRef = {
+    /**
+     * Implementation Key
+     */
+    implementation_key: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * CalcQuantityAttr
  *
  * Количественный атрибут: значение или диапазон и его смысл — на экземпляр или итог.
@@ -2320,6 +2970,98 @@ export type CalcQuantityAttr = {
  * Смысл количественного атрибута: на один экземпляр или уже итог по всем.
  */
 export type CalcQuantityBasis = 'PER_INSTANCE' | 'TOTAL';
+
+/**
+ * CalcQuantityCategory
+ *
+ * Категория позиции паспорта ВК. Не классификатор ВОР: сверка — PROMPT 09.
+ */
+export type CalcQuantityCategory = 'PIPE' | 'INSULATION' | 'FITTING' | 'VALVE' | 'EQUIPMENT' | 'SUPPORT' | 'SLEEVE' | 'CONNECTION' | 'OTHER';
+
+/**
+ * CalcQuantityComponent
+ *
+ * Составляющая позиции: «198 м — вертикали», «подключения — не определено».
+ */
+export type CalcQuantityComponent = {
+    amount: CalcAmount;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Known
+     */
+    known: boolean;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Unit
+     */
+    unit: string;
+};
+
+/**
+ * CalcQuantityDerivation
+ *
+ * Откуда позиция: наблюдена, рассчитана, выведена из топологии, резервным методом.
+ */
+export type CalcQuantityDerivation = 'OBSERVED' | 'CALCULATED' | 'TOPOLOGY' | 'RULE' | 'FALLBACK' | 'AGGREGATE' | 'NOT_DETERMINED';
+
+/**
+ * CalcQuantityReserve
+ *
+ * Тендерный резерв — отдельно от базы; только утверждённое допущение, только TENDER_SAFE.
+ */
+export type CalcQuantityReserve = {
+    amount: CalcAmount;
+    /**
+     * Impact
+     */
+    impact: string | null;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    /**
+     * Unit
+     */
+    unit: string;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * CalcQuantityTraceRead
+ */
+export type CalcQuantityTraceRead = {
+    /**
+     * Quantity Id
+     */
+    quantity_id: string;
+    /**
+     * Quantity Key
+     */
+    quantity_key: string;
+    root: CalcSynthesisTraceNode;
+    scenario: CalcScenario;
+    /**
+     * Text
+     */
+    text: string;
+};
 
 /**
  * CalcRangeValue
@@ -3118,6 +3860,13 @@ export type CalcRuleRead = {
 };
 
 /**
+ * CalcRuleReadiness
+ *
+ * Готовность инженерного решения калькулятора в реестре правил пространства.
+ */
+export type CalcRuleReadiness = 'READY' | 'DRAFT' | 'SOURCE_REQUIRED' | 'IMPLEMENTATION_REQUIRED';
+
+/**
  * CalcRuleRef
  */
 export type CalcRuleRef = {
@@ -3216,6 +3965,28 @@ export type CalcRuleSummaryRead = {
      * Title
      */
     title: string;
+};
+
+/**
+ * CalcRuleTermRead
+ */
+export type CalcRuleTermRead = {
+    /**
+     * Meaning
+     */
+    meaning: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Quantity
+     */
+    quantity: string | null;
+    /**
+     * Unit
+     */
+    unit: string | null;
 };
 
 /**
@@ -3527,7 +4298,7 @@ export type CalcRunReplayRead = {
  * Итог запуска. Запуск исполняется синхронно одной транзакцией: промежуточных
  * состояний («проверяется», «считается») снаружи не видно, записывается только итог.
  */
-export type CalcRunStatus = 'BLOCKED' | 'SUCCEEDED' | 'FAILED';
+export type CalcRunStatus = 'BLOCKED' | 'PARTIAL' | 'SUCCEEDED' | 'FAILED';
 
 /**
  * CalcRunSummaryRead
@@ -3688,6 +4459,13 @@ export type CalcSelection = {
  * Кто выбрал кратность из диапазона. Совпавшим границам выбор не нужен.
  */
 export type CalcSelectionSource = 'RULE' | 'HUMAN_DECISION';
+
+/**
+ * CalcSemanticsStatus
+ *
+ * Подтверждено ли назначение обозначения системы документацией проекта.
+ */
+export type CalcSemanticsStatus = 'CONFIRMED' | 'MISSING' | 'MISMATCH' | 'CONFLICT';
 
 /**
  * CalcSnapshot
@@ -3928,6 +4706,10 @@ export type CalcStepInput = {
      */
     fact_key?: string | null;
     /**
+     * Member
+     */
+    member?: string | null;
+    /**
      * Name
      */
     name: string;
@@ -3935,6 +4717,10 @@ export type CalcStepInput = {
      * Output
      */
     output?: string | null;
+    /**
+     * Series
+     */
+    series?: string | null;
     source: CalcInputSource;
     /**
      * Step Key
@@ -4002,6 +4788,7 @@ export type CalcStepRead = {
      * Position
      */
     position: number;
+    primitive?: CalcPrimitiveRef | null;
     /**
      * Reused From Run Id
      */
@@ -4430,7 +5217,7 @@ export type CalcSynthesisStatus = 'BLOCKED' | 'PARTIAL' | 'SUCCEEDED' | 'FAILED'
 /**
  * CalcSynthesisTraceKind
  */
-export type CalcSynthesisTraceKind = 'ELEMENT' | 'DECISION' | 'RULE' | 'CALCULATION_RESULT' | 'FACT' | 'EVIDENCE' | 'ASSUMPTION' | 'HUMAN_DECISION';
+export type CalcSynthesisTraceKind = 'QUANTITY' | 'COMPONENT' | 'ELEMENT' | 'DECISION' | 'RULE' | 'CALCULATION_RESULT' | 'FACT' | 'EVIDENCE' | 'ASSUMPTION' | 'HUMAN_DECISION';
 
 /**
  * CalcSynthesisTraceNode
@@ -4813,7 +5600,7 @@ export type CalcTextValue = {
 /**
  * CalcTraceKind
  */
-export type CalcTraceKind = 'RESULT' | 'ROUNDING' | 'STEP' | 'RULE' | 'ASSUMPTION' | 'FACT' | 'EVIDENCE' | 'PARAMETER' | 'CONVERSION';
+export type CalcTraceKind = 'RESULT' | 'ROUNDING' | 'STEP' | 'RULE' | 'ASSUMPTION' | 'FACT' | 'EVIDENCE' | 'PARAMETER' | 'CONVERSION' | 'PRIMITIVE';
 
 /**
  * CalcTraceNode
@@ -4888,7 +5675,7 @@ export type CalcUnresolvedItem = {
 /**
  * CalcUnresolvedKind
  */
-export type CalcUnresolvedKind = 'COUNT_RANGE' | 'CHOICE' | 'PLACEMENT' | 'MISSING_RULE' | 'ROUTE';
+export type CalcUnresolvedKind = 'COUNT_RANGE' | 'CHOICE' | 'PLACEMENT' | 'MISSING_RULE' | 'ROUTE' | 'MISSING_INPUT';
 
 /**
  * CalcValueKind
@@ -4909,6 +5696,202 @@ export type CalcVariantSelection = {
      * Node Id
      */
     node_id: string;
+};
+
+/**
+ * CalcVkBatchRead
+ */
+export type CalcVkBatchRead = {
+    /**
+     * Batch Id
+     */
+    batch_id: string;
+    /**
+     * Created
+     */
+    created: boolean;
+    /**
+     * Passports
+     */
+    passports: Array<CalcPassportSummaryRead>;
+};
+
+/**
+ * CalcVkCalculatorRead
+ */
+export type CalcVkCalculatorRead = {
+    calculator: CalcCalculatorRead;
+    /**
+     * Function
+     */
+    function: string;
+    /**
+     * Rules
+     */
+    rules: Array<CalcVkRuleNeedRead>;
+    synthesizer: CalcSynthesizerRead;
+    /**
+     * System Code
+     */
+    system_code: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcVkReadinessRead
+ */
+export type CalcVkReadinessRead = {
+    /**
+     * Building
+     */
+    building: string;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Systems
+     */
+    systems: Array<CalcVkSystemReadinessRead>;
+};
+
+/**
+ * CalcVkRuleNeedRead
+ *
+ * Инженерное решение калькулятора: контракт реализации, что без него не определяется.
+ */
+export type CalcVkRuleNeedRead = {
+    /**
+     * Affects
+     */
+    affects: Array<string>;
+    /**
+     * Blocks
+     */
+    blocks: string;
+    /**
+     * Example
+     */
+    example: string;
+    /**
+     * Formula
+     */
+    formula: string;
+    /**
+     * Gate
+     */
+    gate: boolean;
+    /**
+     * Implementation Key
+     */
+    implementation_key: string | null;
+    /**
+     * Inputs
+     */
+    inputs: Array<CalcRuleTermRead>;
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Outputs
+     */
+    outputs: Array<CalcRuleTermRead>;
+    /**
+     * Parameters
+     */
+    parameters: Array<CalcRuleTermRead>;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    /**
+     * Rule Types
+     */
+    rule_types: Array<CalcRuleType>;
+    /**
+     * Systems
+     */
+    systems: Array<string>;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Used In
+     */
+    used_in: string;
+};
+
+/**
+ * CalcVkRunCreate
+ *
+ * Расчёт комплекта ВК: корпус (и секция), системы. Три сценария — всегда вместе.
+ */
+export type CalcVkRunCreate = {
+    /**
+     * Building
+     */
+    building: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key?: string | null;
+    /**
+     * Section
+     */
+    section?: string | null;
+    /**
+     * Systems
+     */
+    systems?: Array<string>;
+};
+
+/**
+ * CalcVkSystemReadinessRead
+ */
+export type CalcVkSystemReadinessRead = {
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Version
+     */
+    calculator_version: number;
+    /**
+     * Function
+     */
+    function: string;
+    inputs: CalcInputCounts;
+    /**
+     * Missing
+     */
+    missing: Array<CalcPassportMissing>;
+    /**
+     * Rules
+     */
+    rules: Array<CalcPassportRule>;
+    semantics: CalcSemanticsStatus;
+    /**
+     * Semantics Note
+     */
+    semantics_note: string;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * System Code
+     */
+    system_code: string;
+    /**
+     * Title
+     */
+    title: string;
 };
 
 /**
@@ -10140,6 +11123,107 @@ export type ValidateCalcSynthesisResponses = {
 
 export type ValidateCalcSynthesisResponse = ValidateCalcSynthesisResponses[keyof ValidateCalcSynthesisResponses];
 
+export type ListCalcVkPassportsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/vk/passports';
+};
+
+export type ListCalcVkPassportsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcVkPassportsError = ListCalcVkPassportsErrors[keyof ListCalcVkPassportsErrors];
+
+export type ListCalcVkPassportsResponses = {
+    /**
+     * Response List Calc Vk Passports
+     *
+     * Successful Response
+     */
+    200: Array<CalcPassportSummaryRead>;
+};
+
+export type ListCalcVkPassportsResponse = ListCalcVkPassportsResponses[keyof ListCalcVkPassportsResponses];
+
+export type CreateCalcVkPassportsData = {
+    body: CalcVkRunCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/vk/passports';
+};
+
+export type CreateCalcVkPassportsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcVkPassportsError = CreateCalcVkPassportsErrors[keyof CreateCalcVkPassportsErrors];
+
+export type CreateCalcVkPassportsResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcVkBatchRead;
+};
+
+export type CreateCalcVkPassportsResponse = CreateCalcVkPassportsResponses[keyof CreateCalcVkPassportsResponses];
+
+export type GetCalcVkReadinessData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Building
+         */
+        building: string;
+        /**
+         * Section
+         */
+        section?: string | null;
+    };
+    url: '/api/v1/calc/projects/{project_id}/vk/readiness';
+};
+
+export type GetCalcVkReadinessErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcVkReadinessError = GetCalcVkReadinessErrors[keyof GetCalcVkReadinessErrors];
+
+export type GetCalcVkReadinessResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcVkReadinessRead;
+};
+
+export type GetCalcVkReadinessResponse = GetCalcVkReadinessResponses[keyof GetCalcVkReadinessResponses];
+
 export type ListCalcRequirementsData = {
     body?: never;
     path?: never;
@@ -10901,6 +11985,217 @@ export type ListCalcSynthesizersResponses = {
 };
 
 export type ListCalcSynthesizersResponse = ListCalcSynthesizersResponses[keyof ListCalcSynthesizersResponses];
+
+export type ListCalcVkCalculatorsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/calc/vk/calculators';
+};
+
+export type ListCalcVkCalculatorsResponses = {
+    /**
+     * Response List Calc Vk Calculators
+     *
+     * Successful Response
+     */
+    200: Array<CalcVkCalculatorRead>;
+};
+
+export type ListCalcVkCalculatorsResponse = ListCalcVkCalculatorsResponses[keyof ListCalcVkCalculatorsResponses];
+
+export type GetCalcVkPassportData = {
+    body?: never;
+    path: {
+        /**
+         * Passport Id
+         */
+        passport_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/vk/passports/{passport_id}';
+};
+
+export type GetCalcVkPassportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcVkPassportError = GetCalcVkPassportErrors[keyof GetCalcVkPassportErrors];
+
+export type GetCalcVkPassportResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcPassportRead;
+};
+
+export type GetCalcVkPassportResponse = GetCalcVkPassportResponses[keyof GetCalcVkPassportResponses];
+
+export type ListCalcVkAssumptionsData = {
+    body?: never;
+    path: {
+        /**
+         * Passport Id
+         */
+        passport_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/vk/passports/{passport_id}/assumptions';
+};
+
+export type ListCalcVkAssumptionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcVkAssumptionsError = ListCalcVkAssumptionsErrors[keyof ListCalcVkAssumptionsErrors];
+
+export type ListCalcVkAssumptionsResponses = {
+    /**
+     * Response List Calc Vk Assumptions
+     *
+     * Successful Response
+     */
+    200: Array<CalcAssumptionRecord>;
+};
+
+export type ListCalcVkAssumptionsResponse = ListCalcVkAssumptionsResponses[keyof ListCalcVkAssumptionsResponses];
+
+export type GetCalcVkStructureData = {
+    body?: never;
+    path: {
+        /**
+         * Passport Id
+         */
+        passport_id: string;
+    };
+    query?: {
+        scenario?: CalcScenario;
+    };
+    url: '/api/v1/calc/vk/passports/{passport_id}/structure';
+};
+
+export type GetCalcVkStructureErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcVkStructureError = GetCalcVkStructureErrors[keyof GetCalcVkStructureErrors];
+
+export type GetCalcVkStructureResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcSystemGraph;
+};
+
+export type GetCalcVkStructureResponse = GetCalcVkStructureResponses[keyof GetCalcVkStructureResponses];
+
+export type ListCalcVkUnresolvedData = {
+    body?: never;
+    path: {
+        /**
+         * Passport Id
+         */
+        passport_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/vk/passports/{passport_id}/unresolved';
+};
+
+export type ListCalcVkUnresolvedErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcVkUnresolvedError = ListCalcVkUnresolvedErrors[keyof ListCalcVkUnresolvedErrors];
+
+export type ListCalcVkUnresolvedResponses = {
+    /**
+     * Response List Calc Vk Unresolved
+     *
+     * Successful Response
+     */
+    200: Array<CalcPassportIssue>;
+};
+
+export type ListCalcVkUnresolvedResponse = ListCalcVkUnresolvedResponses[keyof ListCalcVkUnresolvedResponses];
+
+export type ListCalcVkVolumesData = {
+    body?: never;
+    path: {
+        /**
+         * Passport Id
+         */
+        passport_id: string;
+    };
+    query?: {
+        /**
+         * Scenario
+         */
+        scenario?: CalcScenario | null;
+    };
+    url: '/api/v1/calc/vk/passports/{passport_id}/volumes';
+};
+
+export type ListCalcVkVolumesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcVkVolumesError = ListCalcVkVolumesErrors[keyof ListCalcVkVolumesErrors];
+
+export type ListCalcVkVolumesResponses = {
+    /**
+     * Response List Calc Vk Volumes
+     *
+     * Successful Response
+     */
+    200: Array<CalcExpectedQuantityRead>;
+};
+
+export type ListCalcVkVolumesResponse = ListCalcVkVolumesResponses[keyof ListCalcVkVolumesResponses];
+
+export type GetCalcVkVolumeTraceData = {
+    body?: never;
+    path: {
+        /**
+         * Quantity Id
+         */
+        quantity_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/vk/volumes/{quantity_id}/trace';
+};
+
+export type GetCalcVkVolumeTraceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcVkVolumeTraceError = GetCalcVkVolumeTraceErrors[keyof GetCalcVkVolumeTraceErrors];
+
+export type GetCalcVkVolumeTraceResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcQuantityTraceRead;
+};
+
+export type GetCalcVkVolumeTraceResponse = GetCalcVkVolumeTraceResponses[keyof GetCalcVkVolumeTraceResponses];
 
 export type ReadDocumentData = {
     body?: never;

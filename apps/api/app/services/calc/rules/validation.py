@@ -117,11 +117,20 @@ def _unit_problem(unit: str | None, where: str) -> str | None:
     return None
 
 
+_PRIMITIVE_PREFIX: Final = "primitive."
+"""Префикс реестра примитивов ядра (PROMPT 06): правило на примитив не ссылается."""
+
+
 def content_problems(content: CalcRuleContent, legacy: LegacyCatalog) -> list[str]:
     """Ошибки содержания версии. Пустой список — черновик можно сохранить."""
     problems: list[str] = []
     units: dict[str, str | None] = {}
     numeric: set[str] = set()
+    if (content.implementation_key or "").startswith(_PRIMITIVE_PREFIX):
+        problems.append(
+            "реализация правила не может быть вычислительным примитивом: примитив — арифметика "
+            "без инженерного решения"
+        )
 
     for item in content.inputs:
         units[item.name] = item.unit

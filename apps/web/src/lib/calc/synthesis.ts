@@ -32,6 +32,7 @@ export const UNRESOLVED_TITLES: Record<CalcUnresolvedKind, string> = {
   PLACEMENT: 'размещение',
   MISSING_RULE: 'нет правила',
   ROUTE: 'трасса',
+  MISSING_INPUT: 'нет данных',
 };
 
 /** Кратность словами: «4–5», «выбрано 5 из 4–5», «24 раза». Сервер знает, экран называет. */

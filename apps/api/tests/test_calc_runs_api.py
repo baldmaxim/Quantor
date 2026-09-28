@@ -266,8 +266,15 @@ class TestAccess:
             listed = (
                 await client.get(f"{API}/calculators", params={"include_demo": "true"})
             ).json()
-        # Демонстрационные калькуляторы в пользовательском списке скрыты (решение владельца).
-        assert hidden == []
+        # Демонстрационные калькуляторы в пользовательском списке скрыты (решение владельца);
+        # видны только рабочие калькуляторы ВК стадии П (PROMPT 06).
+        assert {item["calculator_id"] for item in hidden} == {
+            "vk.b1.stage_p",
+            "vk.t3.stage_p",
+            "vk.t4.stage_p",
+            "vk.k1.stage_p",
+        }
+        assert all(item["kind"] == "PRODUCTION" for item in hidden)
         demo = next(item for item in listed if item["calculator_id"] == "test.vertical_length")
         assert (demo["calculator_id"], demo["version"], demo["kind"]) == (
             "test.vertical_length",

@@ -146,6 +146,7 @@ class AuditAction(StrEnum):
     CALC_RUN_CREATED = "calc_run_created"
     CALC_SYNTHESIS_RUN_CREATED = "calc_synthesis_run_created"
     CALC_SYNTHESIS_DECIDED = "calc_synthesis_decided"
+    CALC_PASSPORT_CREATED = "calc_passport_created"
 
     JOB_RETRIED = "job_retried"
     JOB_CANCELLED = "job_cancelled"
