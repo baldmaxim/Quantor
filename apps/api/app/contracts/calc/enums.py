@@ -339,3 +339,127 @@ class CalcStageBasis(StrEnum):
     """Заявлена пользователем и совпадает со штампом или штампа нет."""
     DECLARED_OVER_STAMP = "DECLARED_OVER_STAMP"
     """Заявлена пользователем вопреки штампу — расхождение записано в сводке."""
+
+
+# -------------------------------------------------------------------- реестр правил (PROMPT 03)
+
+
+class CalcRuleType(StrEnum):
+    """Тип правила. Тип не повышает статус: эвристика не становится нормой от смены типа."""
+
+    PHYSICS = "PHYSICS"
+    """Физическая или математическая зависимость."""
+    GEOMETRY = "GEOMETRY"
+    """Геометрическое правило."""
+    NORMATIVE = "NORMATIVE"
+    """По нормативному документу: только с документом, редакцией и пунктом."""
+    MANUFACTURER = "MANUFACTURER"
+    """Правило конкретного производителя и линейки — к другим не применяется."""
+    ENGINEERING = "ENGINEERING"
+    """Воспроизводимая инженерная методика с основанием и областью применения."""
+    TENDER_ASSUMPTION = "TENDER_ASSUMPTION"
+    """Явное тендерное допущение стадии П: не норматив и не факт документации."""
+
+
+class CalcRuleStatus(StrEnum):
+    """Жизненный цикл версии правила. В расчёт идёт только APPROVED — это вычисляется."""
+
+    DRAFT = "DRAFT"
+    """Черновик: редактируется, в расчёт не идёт."""
+    UNVERIFIED_LEGACY = "UNVERIFIED_LEGACY"
+    """Правило старого портала в карантинном каталоге: не проверено и не используется в расчёте."""
+    APPROVED = "APPROVED"
+    """Утверждено инженером; содержание неизменно."""
+    DEPRECATED = "DEPRECATED"
+    """Устарело: для нового расчёта не выбирается, для воспроизведения старого доступно."""
+    REJECTED = "REJECTED"
+    """Отклонено при проверке."""
+
+
+class CalcRuleSourceKind(StrEnum):
+    """Вид источника правила. ВОР Заказчика источником правила не бывает."""
+
+    NORMATIVE_DOCUMENT = "NORMATIVE_DOCUMENT"
+    MANUFACTURER_DOCUMENT = "MANUFACTURER_DOCUMENT"
+    ENGINEERING_METHOD = "ENGINEERING_METHOD"
+    OWNER_DECISION = "OWNER_DECISION"
+    REVIEWER_DECISION = "REVIEWER_DECISION"
+    LEGACY_CODE = "LEGACY_CODE"
+    """Код старого портала — происхождение, но не основание для утверждения."""
+    OTHER = "OTHER"
+
+
+class CalcRuleInputKind(StrEnum):
+    """Откуда правило берёт вход."""
+
+    FACT = "FACT"
+    """Факт реестра фактов по типу: снимок подготовит расчётное ядро."""
+    QUANTITY = "QUANTITY"
+    """Величина, которую выдаёт другой шаг расчёта; связывание — PROMPT 04."""
+
+
+class CalcLegacyCatalog(StrEnum):
+    """Каталог разбора старого портала (PROMPT 00)."""
+
+    VK = "VK"
+    K = "K"
+    OV = "OV"
+    VRF = "VRF"
+    FIRE = "FIRE"
+
+
+class CalcLegacyClass(StrEnum):
+    """Класс правила старого портала по разбору PROMPT 00."""
+
+    PHYSICS = "PHYSICS"
+    NORMATIVE = "NORMATIVE"
+    MANUFACTURER = "MANUFACTURER"
+    GEOMETRY = "GEOMETRY"
+    HEURISTIC = "HEURISTIC"
+    TENDER = "TENDER"
+    UNKNOWN_ORIGIN = "UNKNOWN_ORIGIN"
+    ERROR = "ERROR"
+    NONE = "NONE"
+    """Строка каталога без правила: заглушка интерфейса."""
+
+
+class CalcLegacyAction(StrEnum):
+    """Предложенное аудитом действие."""
+
+    KEEP_AS_LEGACY = "KEEP_AS_LEGACY"
+    """UL: только объявленный резерв с предупреждением."""
+    REPLACE = "REPLACE"
+    """ЗАМЕНА: нормативным или физическим методом после проверки инженером."""
+    MAKE_INPUT = "MAKE_INPUT"
+    """ВВОД: сделать явным входом."""
+    REJECT = "REJECT"
+    """ОТКАЗ: не переносить."""
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"
+    """Вне контура: цены, НДС, импорт счетов."""
+    IDEA = "IDEA"
+    """Идея для нового контура: правило не переносится, переносится подход."""
+
+
+class CalcLegacyHazard(StrEnum):
+    """Известная опасность правила старого портала — её нельзя утвердить молча."""
+
+    DOUBLE_MULTIPLICATION = "DOUBLE_MULTIPLICATION"
+    CONFLICTING_CONSTANTS = "CONFLICTING_CONSTANTS"
+    HIDDEN_DEFAULT = "HIDDEN_DEFAULT"
+    SUBSTITUTED_VALUES = "SUBSTITUTED_VALUES"
+    UNIT_ERROR = "UNIT_ERROR"
+    DEFECT = "DEFECT"
+    """Класс «ошибочное» в разборе."""
+
+
+class CalcHazardOutcome(StrEnum):
+    """Итог разбора одной известной опасности правила старого портала."""
+
+    CONFIRMED_SAFE = "CONFIRMED_SAFE"
+    """Проверено: в новой версии опасность не проявляется."""
+    FIXED = "FIXED"
+    """Опасность была и устранена в новой версии."""
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+    """Часть старого правила, к которой относится опасность, в новую версию не взята."""
+    REJECTED = "REJECTED"
+    """Опасность подтверждена и не устранена: версию утверждать нельзя."""

@@ -25,6 +25,7 @@ from app.api.v1 import (
     auth,
     calc,
     calc_inputs,
+    calc_rules,
     documents,
     integrations,
     jobs,
@@ -58,6 +59,7 @@ protected_router.include_router(mep.router)
 # Расчётный контур стадии П: объявлен и закрыт флагом до инженерного гейта (ADR-0030).
 protected_router.include_router(calc.router)
 protected_router.include_router(calc_inputs.router)
+protected_router.include_router(calc_rules.router)
 
 api_v1_router.include_router(protected_router)
 

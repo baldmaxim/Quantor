@@ -5,6 +5,8 @@ import {
   listCalcDocuments,
   listCalcFactTypes,
   listCalcInputFacts,
+  listCalcLegacyRules,
+  listCalcRules,
   readCalcReadiness,
   type CalcInspectionCreate,
 } from '@quantor/api-client';
@@ -25,6 +27,8 @@ export const calcQueryKeys = {
   inputFacts: (projectId: string, limit: number) =>
     ['project', projectId, 'calc', 'input-facts', limit] as const,
   factTypes: ['calc', 'fact-types'] as const,
+  rules: ['calc', 'rules'] as const,
+  legacyRules: ['calc', 'legacy-rules'] as const,
 };
 
 export const useCalcDocuments = (projectId: string, enabled: boolean) =>
@@ -80,3 +84,20 @@ export const useStartInspection = (projectId: string) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: calcQueryKeys.project(projectId) }),
   });
 };
+
+/** Правила рабочего пространства — не проекта: реестр общий для всех проектов пространства. */
+export const useCalcRules = (enabled: boolean) =>
+  useQuery({
+    queryKey: calcQueryKeys.rules,
+    enabled,
+    queryFn: async () => unwrap(await listCalcRules({ throwOnError: true })),
+  });
+
+/** Карантин старого портала — данные развёртывания: меняются только новой версией каталога. */
+export const useCalcLegacyRules = (enabled: boolean) =>
+  useQuery({
+    queryKey: calcQueryKeys.legacyRules,
+    enabled,
+    queryFn: async () => unwrap(await listCalcLegacyRules({ throwOnError: true })),
+    staleTime: Number.POSITIVE_INFINITY,
+  });

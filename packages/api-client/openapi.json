@@ -1155,6 +1155,94 @@
         "title": "CalcDecisionRead",
         "type": "object"
       },
+      "CalcDecisionSource": {
+        "additionalProperties": false,
+        "description": "Решение ответственного лица: владельца или проверяющего инженера.",
+        "properties": {
+          "basis": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Basis",
+            "type": "string"
+          },
+          "decided_at": {
+            "format": "date",
+            "title": "Decided At",
+            "type": "string"
+          },
+          "decided_by": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Decided By",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "OWNER_DECISION",
+              "REVIEWER_DECISION"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reference": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "decided_by",
+          "decided_at",
+          "reference",
+          "basis"
+        ],
+        "title": "CalcDecisionSource",
+        "type": "object"
+      },
+      "CalcDimensionFactor": {
+        "additionalProperties": false,
+        "properties": {
+          "exponent": {
+            "default": 1,
+            "maximum": 3.0,
+            "minimum": -3.0,
+            "title": "Exponent",
+            "type": "integer"
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CalcDimensionFactor",
+        "type": "object"
+      },
+      "CalcDimensionTerm": {
+        "additionalProperties": false,
+        "description": "Член суммы: произведение входов и параметров в степенях.",
+        "properties": {
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/CalcDimensionFactor"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Factors",
+            "type": "array"
+          }
+        },
+        "required": [
+          "factors"
+        ],
+        "title": "CalcDimensionTerm",
+        "type": "object"
+      },
       "CalcDiscipline": {
         "description": "Раздел проекта, к которому относится инженерная система.",
         "enum": [
@@ -1293,6 +1381,49 @@
         ],
         "title": "CalcDocumentStage",
         "type": "string"
+      },
+      "CalcEngineeringSource": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Author",
+            "type": "string"
+          },
+          "kind": {
+            "const": "ENGINEERING_METHOD",
+            "default": "ENGINEERING_METHOD",
+            "title": "Kind",
+            "type": "string"
+          },
+          "reference": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reference",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "author",
+          "reference",
+          "summary"
+        ],
+        "title": "CalcEngineeringSource",
+        "type": "object"
       },
       "CalcEnumOptionRead": {
         "properties": {
@@ -2331,6 +2462,42 @@
         "title": "CalcFactWithdraw",
         "type": "object"
       },
+      "CalcHazardOutcome": {
+        "description": "Итог разбора одной известной опасности правила старого портала.",
+        "enum": [
+          "CONFIRMED_SAFE",
+          "FIXED",
+          "NOT_APPLICABLE",
+          "REJECTED"
+        ],
+        "title": "CalcHazardOutcome",
+        "type": "string"
+      },
+      "CalcHazardResolution": {
+        "additionalProperties": false,
+        "description": "Решение проверяющего по одной известной опасности: итог и почему.",
+        "properties": {
+          "comment": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Comment",
+            "type": "string"
+          },
+          "hazard": {
+            "$ref": "#/components/schemas/CalcLegacyHazard"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/CalcHazardOutcome"
+          }
+        },
+        "required": [
+          "hazard",
+          "outcome",
+          "comment"
+        ],
+        "title": "CalcHazardResolution",
+        "type": "object"
+      },
       "CalcInputFactPage": {
         "properties": {
           "items": {
@@ -2684,6 +2851,436 @@
         "title": "CalcInspectionSummary",
         "type": "object"
       },
+      "CalcLegacyAction": {
+        "description": "Предложенное аудитом действие.",
+        "enum": [
+          "KEEP_AS_LEGACY",
+          "REPLACE",
+          "MAKE_INPUT",
+          "REJECT",
+          "OUT_OF_SCOPE",
+          "IDEA"
+        ],
+        "title": "CalcLegacyAction",
+        "type": "string"
+      },
+      "CalcLegacyCatalog": {
+        "description": "Каталог разбора старого портала (PROMPT 00).",
+        "enum": [
+          "VK",
+          "K",
+          "OV",
+          "VRF",
+          "FIRE"
+        ],
+        "title": "CalcLegacyCatalog",
+        "type": "string"
+      },
+      "CalcLegacyCatalogRead": {
+        "properties": {
+          "by_catalog": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyCountRead"
+            },
+            "title": "By Catalog",
+            "type": "array"
+          },
+          "by_class": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyCountRead"
+            },
+            "title": "By Class",
+            "type": "array"
+          },
+          "catalog_version": {
+            "title": "Catalog Version",
+            "type": "string"
+          },
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "entry_count": {
+            "title": "Entry Count",
+            "type": "integer"
+          },
+          "generator_version": {
+            "title": "Generator Version",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyGroupRead"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyRuleRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "source_sha256": {
+            "title": "Source Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog_version",
+          "generator_version",
+          "entry_count",
+          "source_sha256",
+          "content_sha256",
+          "by_catalog",
+          "by_class",
+          "groups",
+          "items"
+        ],
+        "title": "CalcLegacyCatalogRead",
+        "type": "object"
+      },
+      "CalcLegacyClass": {
+        "description": "Класс правила старого портала по разбору PROMPT 00.",
+        "enum": [
+          "PHYSICS",
+          "NORMATIVE",
+          "MANUFACTURER",
+          "GEOMETRY",
+          "HEURISTIC",
+          "TENDER",
+          "UNKNOWN_ORIGIN",
+          "ERROR",
+          "NONE"
+        ],
+        "title": "CalcLegacyClass",
+        "type": "string"
+      },
+      "CalcLegacyCodeRef": {
+        "properties": {
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "lines": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lines"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "file",
+          "lines",
+          "symbol"
+        ],
+        "title": "CalcLegacyCodeRef",
+        "type": "object"
+      },
+      "CalcLegacyCountRead": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "count"
+        ],
+        "title": "CalcLegacyCountRead",
+        "type": "object"
+      },
+      "CalcLegacyGroupRead": {
+        "description": "Группа одинаковой логики с разными реализациями: оригиналы не схлопываются.",
+        "properties": {
+          "finding": {
+            "title": "Finding",
+            "type": "string"
+          },
+          "group_id": {
+            "title": "Group Id",
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "title",
+          "finding",
+          "members"
+        ],
+        "title": "CalcLegacyGroupRead",
+        "type": "object"
+      },
+      "CalcLegacyHazard": {
+        "description": "Известная опасность правила старого портала — её нельзя утвердить молча.",
+        "enum": [
+          "DOUBLE_MULTIPLICATION",
+          "CONFLICTING_CONSTANTS",
+          "HIDDEN_DEFAULT",
+          "SUBSTITUTED_VALUES",
+          "UNIT_ERROR",
+          "DEFECT"
+        ],
+        "title": "CalcLegacyHazard",
+        "type": "string"
+      },
+      "CalcLegacyProvenanceRead": {
+        "description": "Правило старого портала, от которого версия происходит, и его известные опасности.\n\nСнимок каталога на момент сохранения версии: у утверждённой версии не меняется.",
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyAction"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "catalog_version": {
+            "title": "Catalog Version",
+            "type": "string"
+          },
+          "class_primary": {
+            "$ref": "#/components/schemas/CalcLegacyClass"
+          },
+          "group_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "hazards": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyHazard"
+            },
+            "title": "Hazards",
+            "type": "array"
+          },
+          "legacy_id": {
+            "title": "Legacy Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "legacy_id",
+          "catalog_version",
+          "class_primary",
+          "actions",
+          "hazards",
+          "group_ids"
+        ],
+        "title": "CalcLegacyProvenanceRead",
+        "type": "object"
+      },
+      "CalcLegacyResolution": {
+        "additionalProperties": false,
+        "description": "Разбор правила старого портала при утверждении версии, которая от него происходит.\n\nОтметки «проверено» недостаточно: по каждой известной опасности — свой итог и комментарий.",
+        "properties": {
+          "hazards": {
+            "items": {
+              "$ref": "#/components/schemas/CalcHazardResolution"
+            },
+            "maxItems": 10,
+            "title": "Hazards",
+            "type": "array"
+          },
+          "legacy_id": {
+            "pattern": "^LEG-[A-Z0-9]+-\\d{3}$",
+            "title": "Legacy Id",
+            "type": "string"
+          },
+          "resolution": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Resolution",
+            "type": "string"
+          }
+        },
+        "required": [
+          "legacy_id",
+          "resolution"
+        ],
+        "title": "CalcLegacyResolution",
+        "type": "object"
+      },
+      "CalcLegacyRuleRead": {
+        "description": "Правило старого портала в карантинном каталоге — только для чтения.",
+        "properties": {
+          "action_raw": {
+            "title": "Action Raw",
+            "type": "string"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyAction"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "assumptions": {
+            "title": "Assumptions",
+            "type": "string"
+          },
+          "calculation_eligible": {
+            "title": "Calculation Eligible",
+            "type": "boolean"
+          },
+          "catalog": {
+            "$ref": "#/components/schemas/CalcLegacyCatalog"
+          },
+          "class_primary": {
+            "$ref": "#/components/schemas/CalcLegacyClass"
+          },
+          "class_raw": {
+            "title": "Class Raw",
+            "type": "string"
+          },
+          "class_secondary": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyClass"
+            },
+            "title": "Class Secondary",
+            "type": "array"
+          },
+          "code_refs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyCodeRef"
+            },
+            "title": "Code Refs",
+            "type": "array"
+          },
+          "group_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "hazards": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyHazard"
+            },
+            "title": "Hazards",
+            "type": "array"
+          },
+          "legacy_id": {
+            "title": "Legacy Id",
+            "type": "string"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "notice": {
+            "title": "Notice",
+            "type": "string"
+          },
+          "rule_text": {
+            "title": "Rule Text",
+            "type": "string"
+          },
+          "section": {
+            "title": "Section",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcRuleStatus"
+          }
+        },
+        "required": [
+          "legacy_id",
+          "catalog",
+          "section",
+          "location",
+          "code_refs",
+          "rule_text",
+          "class_primary",
+          "class_secondary",
+          "class_raw",
+          "assumptions",
+          "action_raw",
+          "actions",
+          "hazards",
+          "group_ids",
+          "status",
+          "calculation_eligible",
+          "notice"
+        ],
+        "title": "CalcLegacyRuleRead",
+        "type": "object"
+      },
+      "CalcLegacySource": {
+        "additionalProperties": false,
+        "description": "Правила старого портала, от которых версия происходит. Происхождение, не основание.",
+        "properties": {
+          "kind": {
+            "const": "LEGACY_CODE",
+            "default": "LEGACY_CODE",
+            "title": "Kind",
+            "type": "string"
+          },
+          "legacy_ids": {
+            "items": {
+              "pattern": "^LEG-[A-Z0-9]+-\\d{3}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Legacy Ids",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "legacy_ids"
+        ],
+        "title": "CalcLegacySource",
+        "type": "object"
+      },
       "CalcLevelCountRead": {
         "description": "Сколько требований уровня закрыто: найдено или выводимо.",
         "properties": {
@@ -2705,6 +3302,151 @@
           "total"
         ],
         "title": "CalcLevelCountRead",
+        "type": "object"
+      },
+      "CalcManufacturerSource": {
+        "additionalProperties": false,
+        "properties": {
+          "document_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Date"
+          },
+          "document_title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Document Title",
+            "type": "string"
+          },
+          "document_version": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Document Version",
+            "type": "string"
+          },
+          "kind": {
+            "const": "MANUFACTURER_DOCUMENT",
+            "default": "MANUFACTURER_DOCUMENT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "location": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Location",
+            "type": "string"
+          },
+          "manufacturer": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Manufacturer",
+            "type": "string"
+          },
+          "product_line": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Product Line",
+            "type": "string"
+          },
+          "scope": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "manufacturer",
+          "product_line",
+          "document_title",
+          "document_version",
+          "location",
+          "scope"
+        ],
+        "title": "CalcManufacturerSource",
+        "type": "object"
+      },
+      "CalcNormativeSource": {
+        "additionalProperties": false,
+        "description": "Нормативный документ: без обозначения, редакции, пункта и даты нормы нет.",
+        "properties": {
+          "artifact": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact"
+          },
+          "clause": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Clause",
+            "type": "string"
+          },
+          "designation": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Designation",
+            "type": "string"
+          },
+          "document_title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Document Title",
+            "type": "string"
+          },
+          "edition": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Edition",
+            "type": "string"
+          },
+          "edition_date": {
+            "format": "date",
+            "title": "Edition Date",
+            "type": "string"
+          },
+          "kind": {
+            "const": "NORMATIVE_DOCUMENT",
+            "default": "NORMATIVE_DOCUMENT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          }
+        },
+        "required": [
+          "document_title",
+          "designation",
+          "edition",
+          "clause",
+          "edition_date"
+        ],
+        "title": "CalcNormativeSource",
         "type": "object"
       },
       "CalcNumberValue": {
@@ -2735,6 +3477,28 @@
           "unit"
         ],
         "title": "CalcNumberValue",
+        "type": "object"
+      },
+      "CalcOtherSource": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "const": "OTHER",
+            "default": "OTHER",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "CalcOtherSource",
         "type": "object"
       },
       "CalcRangeValue": {
@@ -3274,6 +4038,1011 @@
         ],
         "title": "CalcReviewStatus",
         "type": "string"
+      },
+      "CalcRuleApplicability": {
+        "additionalProperties": false,
+        "properties": {
+          "limitations": {
+            "items": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "product_line": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Line"
+          },
+          "scope": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Scope",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/CalcDocumentStage"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Stages",
+            "type": "array"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Systems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "systems",
+          "stages",
+          "scope"
+        ],
+        "title": "CalcRuleApplicability",
+        "type": "object"
+      },
+      "CalcRuleApprove": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Comment",
+            "type": "string"
+          },
+          "legacy_review": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyResolution"
+            },
+            "maxItems": 20,
+            "title": "Legacy Review",
+            "type": "array"
+          }
+        },
+        "required": [
+          "comment"
+        ],
+        "title": "CalcRuleApprove",
+        "type": "object"
+      },
+      "CalcRuleContent": {
+        "additionalProperties": false,
+        "description": "Содержание версии правила — то, что утверждается, хешируется и больше не меняется.",
+        "properties": {
+          "applicability": {
+            "$ref": "#/components/schemas/CalcRuleApplicability"
+          },
+          "description": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "dimension_checks": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleDimensionCheck"
+            },
+            "maxItems": 10,
+            "title": "Dimension Checks",
+            "type": "array"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "explanation": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Explanation",
+            "type": "string"
+          },
+          "formula": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Formula",
+            "type": "string"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "implementation_key": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*\\.v[1-9][0-9]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implementation Key"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleInput"
+            },
+            "maxItems": 30,
+            "title": "Inputs",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleOutput"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Outputs",
+            "type": "array"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleParameter"
+            },
+            "maxItems": 30,
+            "title": "Parameters",
+            "type": "array"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/CalcRuleType"
+          },
+          "sources": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "ENGINEERING_METHOD": "#/components/schemas/CalcEngineeringSource",
+                  "LEGACY_CODE": "#/components/schemas/CalcLegacySource",
+                  "MANUFACTURER_DOCUMENT": "#/components/schemas/CalcManufacturerSource",
+                  "NORMATIVE_DOCUMENT": "#/components/schemas/CalcNormativeSource",
+                  "OTHER": "#/components/schemas/CalcOtherSource",
+                  "OWNER_DECISION": "#/components/schemas/CalcDecisionSource",
+                  "REVIEWER_DECISION": "#/components/schemas/CalcDecisionSource"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/CalcNormativeSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcManufacturerSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcEngineeringSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcDecisionSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcLegacySource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcOtherSource"
+                }
+              ]
+            },
+            "maxItems": 10,
+            "title": "Sources",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "rule_type",
+          "discipline",
+          "applicability",
+          "outputs",
+          "formula",
+          "explanation"
+        ],
+        "title": "CalcRuleContent",
+        "type": "object"
+      },
+      "CalcRuleCreate": {
+        "additionalProperties": false,
+        "description": "Новое правило: ключ и содержание версии 1 в статусе DRAFT.",
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/CalcRuleContent"
+          },
+          "rule_key": {
+            "maxLength": 120,
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,5}$",
+            "title": "Rule Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_key",
+          "content"
+        ],
+        "title": "CalcRuleCreate",
+        "type": "object"
+      },
+      "CalcRuleDecision": {
+        "additionalProperties": false,
+        "description": "Отклонение или вывод из действия — всегда с причиной.",
+        "properties": {
+          "comment": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Comment",
+            "type": "string"
+          }
+        },
+        "required": [
+          "comment"
+        ],
+        "title": "CalcRuleDecision",
+        "type": "object"
+      },
+      "CalcRuleDimensionCheck": {
+        "additionalProperties": false,
+        "description": "Проверка размерности выхода: каждый член суммы должен иметь размерность выхода.\n\nЭто не формула и не исполняется: только объявленная структура, по которой реестр ловит\n«метры × давление = метры» до утверждения.",
+        "properties": {
+          "output": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Output",
+            "type": "string"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/CalcDimensionTerm"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Terms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "output",
+          "terms"
+        ],
+        "title": "CalcRuleDimensionCheck",
+        "type": "object"
+      },
+      "CalcRuleDraftUpdate": {
+        "additionalProperties": false,
+        "description": "Новое содержание черновика. Утверждённую версию так не изменить.",
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/CalcRuleContent"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "CalcRuleDraftUpdate",
+        "type": "object"
+      },
+      "CalcRuleFromLegacy": {
+        "additionalProperties": false,
+        "description": "Новое правило-черновик по мотивам правила старого портала.\n\nТип, раздел, область применения и выходы задаёт человек: класс из разбора не переносится —\nэвристика не становится методикой от переноса. Текст старого правила попадает в черновик\nтолько как исходный материал, а само старое правило остаётся в карантине неизменным.",
+        "properties": {
+          "applicability": {
+            "$ref": "#/components/schemas/CalcRuleApplicability"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleOutput"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Outputs",
+            "type": "array"
+          },
+          "rule_key": {
+            "maxLength": 120,
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,5}$",
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/CalcRuleType"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "rule_key",
+          "rule_type",
+          "discipline",
+          "applicability",
+          "outputs"
+        ],
+        "title": "CalcRuleFromLegacy",
+        "type": "object"
+      },
+      "CalcRuleInput": {
+        "additionalProperties": false,
+        "description": "Что правилу нужно на входе. Значение приходит из снимка фактов или от другого шага.",
+        "properties": {
+          "description": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "fact_type": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Type"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcRuleInputKind"
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "description"
+        ],
+        "title": "CalcRuleInput",
+        "type": "object"
+      },
+      "CalcRuleInputKind": {
+        "description": "Откуда правило берёт вход.",
+        "enum": [
+          "FACT",
+          "QUANTITY"
+        ],
+        "title": "CalcRuleInputKind",
+        "type": "string"
+      },
+      "CalcRuleOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,3}$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "name",
+          "quantity",
+          "description"
+        ],
+        "title": "CalcRuleOutput",
+        "type": "object"
+      },
+      "CalcRuleParameter": {
+        "additionalProperties": false,
+        "description": "Константа версии правила. Меняется только новой версией.",
+        "properties": {
+          "description": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "description": "Десятичное число строкой: «12.5», «-1», «0.035».",
+            "pattern": "^-?\\d{1,12}(\\.\\d{1,9})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value",
+          "description"
+        ],
+        "title": "CalcRuleParameter",
+        "type": "object"
+      },
+      "CalcRuleRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleVersionRead"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rule_key",
+          "discipline",
+          "created_by",
+          "created_at",
+          "versions"
+        ],
+        "title": "CalcRuleRead",
+        "type": "object"
+      },
+      "CalcRuleReviewRead": {
+        "properties": {
+          "comment": {
+            "title": "Comment",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "from_status": {
+            "$ref": "#/components/schemas/CalcRuleStatus"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "legacy_review": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyResolution"
+            },
+            "title": "Legacy Review",
+            "type": "array"
+          },
+          "reviewer_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
+          },
+          "to_status": {
+            "$ref": "#/components/schemas/CalcRuleStatus"
+          }
+        },
+        "required": [
+          "id",
+          "from_status",
+          "to_status",
+          "reviewer_id",
+          "comment",
+          "legacy_review",
+          "created_at"
+        ],
+        "title": "CalcRuleReviewRead",
+        "type": "object"
+      },
+      "CalcRuleStatus": {
+        "description": "Жизненный цикл версии правила. В расчёт идёт только APPROVED — это вычисляется.",
+        "enum": [
+          "DRAFT",
+          "UNVERIFIED_LEGACY",
+          "APPROVED",
+          "DEPRECATED",
+          "REJECTED"
+        ],
+        "title": "CalcRuleStatus",
+        "type": "string"
+      },
+      "CalcRuleSummaryRead": {
+        "description": "Строка списка правил: последняя версия и то, что можно использовать в расчёте.",
+        "properties": {
+          "approved_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Version"
+          },
+          "calculation_eligible": {
+            "title": "Calculation Eligible",
+            "type": "boolean"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "latest_status": {
+            "$ref": "#/components/schemas/CalcRuleStatus"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/CalcRuleType"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_key",
+          "discipline",
+          "title",
+          "rule_type",
+          "systems",
+          "latest_version",
+          "latest_status",
+          "approved_version",
+          "calculation_eligible",
+          "sources",
+          "notice"
+        ],
+        "title": "CalcRuleSummaryRead",
+        "type": "object"
+      },
+      "CalcRuleType": {
+        "description": "Тип правила. Тип не повышает статус: эвристика не становится нормой от смены типа.",
+        "enum": [
+          "PHYSICS",
+          "GEOMETRY",
+          "NORMATIVE",
+          "MANUFACTURER",
+          "ENGINEERING",
+          "TENDER_ASSUMPTION"
+        ],
+        "title": "CalcRuleType",
+        "type": "string"
+      },
+      "CalcRuleVersionCreate": {
+        "additionalProperties": false,
+        "description": "Новая версия: всегда с основанием изменения. Пустое содержание — копия последней.",
+        "properties": {
+          "change_reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Change Reason",
+            "type": "string"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcRuleContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "change_reason"
+        ],
+        "title": "CalcRuleVersionCreate",
+        "type": "object"
+      },
+      "CalcRuleVersionRead": {
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
+          "calculation_eligible": {
+            "title": "Calculation Eligible",
+            "type": "boolean"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "content": {
+            "$ref": "#/components/schemas/CalcRuleContent"
+          },
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "deprecated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deprecated At"
+          },
+          "deprecated_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deprecated By"
+          },
+          "deprecation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deprecation Reason"
+          },
+          "edited_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By"
+          },
+          "legacy_provenance": {
+            "items": {
+              "$ref": "#/components/schemas/CalcLegacyProvenanceRead"
+            },
+            "title": "Legacy Provenance",
+            "type": "array"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
+          },
+          "rejected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected At"
+          },
+          "rejected_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected By"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleReviewRead"
+            },
+            "title": "Reviews",
+            "type": "array"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/CalcRuleType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcRuleStatus"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule_key",
+          "version",
+          "status",
+          "rule_type",
+          "content",
+          "content_sha256",
+          "calculation_eligible",
+          "notice",
+          "change_reason",
+          "created_by",
+          "edited_by",
+          "created_at",
+          "approved_by",
+          "approved_at",
+          "deprecated_by",
+          "deprecated_at",
+          "deprecation_reason",
+          "rejected_by",
+          "rejected_at",
+          "rejection_reason",
+          "legacy_provenance",
+          "reviews"
+        ],
+        "title": "CalcRuleVersionRead",
+        "type": "object"
       },
       "CalcSourceClass": {
         "description": "Класс источника. От него зависит приоритет, но не «глобальная истина».",
@@ -11861,6 +13630,216 @@
         ]
       }
     },
+    "/api/v1/calc/legacy-rules": {
+      "get": {
+        "description": "Все 365 записей: не проверены и в расчёте не используются. Только чтение.",
+        "operationId": "list_calc_legacy_rules",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "catalog",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcLegacyCatalog"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Catalog"
+            }
+          },
+          {
+            "in": "query",
+            "name": "legacy_class",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcLegacyClass"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Legacy Class"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hazard",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcLegacyHazard"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hazard"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcLegacyAction"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcLegacyCatalogRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Правила старого портала — карантин",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/legacy-rules/{legacy_id}": {
+      "get": {
+        "operationId": "get_calc_legacy_rule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "legacy_id",
+            "required": true,
+            "schema": {
+              "title": "Legacy Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcLegacyRuleRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Правило старого портала",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/legacy-rules/{legacy_id}/drafts": {
+      "post": {
+        "description": "Новое правило со своим ключом и версией 1 в статусе DRAFT; старое остаётся как было.",
+        "operationId": "create_calc_rule_from_legacy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "legacy_id",
+            "required": true,
+            "schema": {
+              "title": "Legacy Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRuleFromLegacy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Завести черновик по правилу старого портала",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
     "/api/v1/calc/projects/{project_id}/conflicts": {
       "get": {
         "operationId": "list_calc_conflicts",
@@ -12563,6 +14542,539 @@
           }
         },
         "summary": "Каталог исходных данных ВК стадии П",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/rules": {
+      "get": {
+        "description": "По строке на правило: последняя версия, действующая утверждённая, разрешено ли в расчёте.",
+        "operationId": "list_calc_rules",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "discipline",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcDiscipline"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Discipline"
+            }
+          },
+          {
+            "in": "query",
+            "name": "system",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "System"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rule_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcRuleType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcRuleStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcRuleSummaryRead"
+                  },
+                  "title": "Response List Calc Rules",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Правила реестра",
+        "tags": [
+          "calc"
+        ]
+      },
+      "post": {
+        "operationId": "create_calc_rule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRuleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Завести правило-черновик",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/rules/{rule_key}": {
+      "get": {
+        "operationId": "get_calc_rule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_key",
+            "required": true,
+            "schema": {
+              "title": "Rule Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Правило и все его версии",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/rules/{rule_key}/versions": {
+      "post": {
+        "operationId": "create_calc_rule_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_key",
+            "required": true,
+            "schema": {
+              "title": "Rule Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRuleVersionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Новая версия правила",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/rules/{rule_key}/versions/{version}": {
+      "get": {
+        "description": "Любая версия по номеру — и устаревшая: по ней воспроизводится старый расчёт.",
+        "operationId": "get_calc_rule_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_key",
+            "required": true,
+            "schema": {
+              "title": "Rule Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версия правила",
+        "tags": [
+          "calc"
+        ]
+      },
+      "put": {
+        "description": "Только черновик. Утверждённую версию на месте не изменить — 409, нужна новая версия.",
+        "operationId": "update_calc_rule_draft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_key",
+            "required": true,
+            "schema": {
+              "title": "Rule Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRuleDraftUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Изменить черновик",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/rules/{rule_key}/versions/{version}/approve": {
+      "post": {
+        "description": "Основание по типу правила и разбор каждой опасности старых правил — обязательны.",
+        "operationId": "approve_calc_rule_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_key",
+            "required": true,
+            "schema": {
+              "title": "Rule Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRuleApprove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Утвердить версию правила",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/rules/{rule_key}/versions/{version}/deprecate": {
+      "post": {
+        "description": "Версия остаётся доступной по номеру, но для нового расчёта не выбирается.",
+        "operationId": "deprecate_calc_rule_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_key",
+            "required": true,
+            "schema": {
+              "title": "Rule Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRuleDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Вывести утверждённую версию из действия",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/rules/{rule_key}/versions/{version}/reject": {
+      "post": {
+        "operationId": "reject_calc_rule_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_key",
+            "required": true,
+            "schema": {
+              "title": "Rule Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRuleDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отклонить черновик правила",
         "tags": [
           "calc"
         ]

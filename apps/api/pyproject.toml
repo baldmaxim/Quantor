@@ -44,6 +44,9 @@ include = ["app*"]
 [tool.setuptools.package-data]
 # Синтетические сценарии MEP-эксперимента (PROMPT 11): данные пакета, не клиентские чертежи.
 "app.services.mep" = ["fixtures/*.json"]
+# Карантинный каталог правил старого портала (PROMPT 03): читается реестром правил через
+# importlib.resources — после установки колеса так же, как из рабочей копии.
+"app.services.calc.rules" = ["data/*.json"]
 
 [tool.ruff]
 line-length = 100

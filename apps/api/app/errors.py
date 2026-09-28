@@ -99,6 +99,18 @@ class ErrorCode(StrEnum):
     CALC_DOCUMENT_NOT_RECOGNIZED = "CALC_DOCUMENT_NOT_RECOGNIZED"
     CALC_REVISION_NOT_LATEST = "CALC_REVISION_NOT_LATEST"
 
+    # --- расчётный контур: реестр правил (ADR-0030, PROMPT 03) ---
+    CALC_RULE_KEY_TAKEN = "CALC_RULE_KEY_TAKEN"
+    CALC_RULE_CONTENT_INVALID = "CALC_RULE_CONTENT_INVALID"
+    # Утверждённая версия неизменна: правка — только новой версией.
+    CALC_RULE_NOT_DRAFT = "CALC_RULE_NOT_DRAFT"
+    CALC_RULE_DRAFT_EXISTS = "CALC_RULE_DRAFT_EXISTS"
+    CALC_RULE_TRANSITION_INVALID = "CALC_RULE_TRANSITION_INVALID"
+    CALC_RULE_APPROVAL_BLOCKED = "CALC_RULE_APPROVAL_BLOCKED"
+    # Версию утверждает не её автор и не последний редактор: инженерная проверка — второй человек.
+    CALC_RULE_SELF_APPROVAL = "CALC_RULE_SELF_APPROVAL"
+    CALC_LEGACY_OUT_OF_SCOPE = "CALC_LEGACY_OUT_OF_SCOPE"
+
     # --- инфраструктура ---
     STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
@@ -183,6 +195,20 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CALC_CONFLICT_CLOSED: "Расхождения больше нет — решать нечего",
     ErrorCode.CALC_DOCUMENT_NOT_RECOGNIZED: (
         "У ревизии нет распознанного текста: факты собираются только из распознанного пакета"
+    ),
+    ErrorCode.CALC_RULE_KEY_TAKEN: "Правило с таким ключом уже есть",
+    ErrorCode.CALC_RULE_CONTENT_INVALID: "Содержание правила не прошло проверку",
+    ErrorCode.CALC_RULE_NOT_DRAFT: (
+        "Версия уже не черновик: её содержание не меняется — создайте новую версию"
+    ),
+    ErrorCode.CALC_RULE_DRAFT_EXISTS: "У правила уже есть черновик — сначала решите его",
+    ErrorCode.CALC_RULE_TRANSITION_INVALID: "Такой переход статуса версии правила запрещён",
+    ErrorCode.CALC_RULE_APPROVAL_BLOCKED: "Версию нельзя утвердить: не хватает основания",
+    ErrorCode.CALC_RULE_SELF_APPROVAL: (
+        "Автор или последний редактор версии не может сам её утвердить"
+    ),
+    ErrorCode.CALC_LEGACY_OUT_OF_SCOPE: (
+        "Правило старого портала вне расчётного контура: цены, НДС и импорт счетов не переносятся"
     ),
     ErrorCode.CALC_REVISION_NOT_LATEST: (
         "У документа есть более новая ревизия — собирайте факты из неё"
@@ -274,6 +300,14 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CALC_CONFLICT_CLOSED: status.HTTP_409_CONFLICT,
     ErrorCode.CALC_DOCUMENT_NOT_RECOGNIZED: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_REVISION_NOT_LATEST: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_RULE_KEY_TAKEN: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_RULE_CONTENT_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_RULE_NOT_DRAFT: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_RULE_DRAFT_EXISTS: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_RULE_TRANSITION_INVALID: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_RULE_APPROVAL_BLOCKED: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_RULE_SELF_APPROVAL: status.HTTP_403_FORBIDDEN,
+    ErrorCode.CALC_LEGACY_OUT_OF_SCOPE: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.GEOMETRY_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,

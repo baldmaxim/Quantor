@@ -578,6 +578,60 @@ export type CalcDecisionRead = {
 };
 
 /**
+ * CalcDecisionSource
+ *
+ * Решение ответственного лица: владельца или проверяющего инженера.
+ */
+export type CalcDecisionSource = {
+    /**
+     * Basis
+     */
+    basis: string;
+    /**
+     * Decided At
+     */
+    decided_at: string;
+    /**
+     * Decided By
+     */
+    decided_by: string;
+    /**
+     * Kind
+     */
+    kind: 'OWNER_DECISION' | 'REVIEWER_DECISION';
+    /**
+     * Reference
+     */
+    reference: string;
+};
+
+/**
+ * CalcDimensionFactor
+ */
+export type CalcDimensionFactor = {
+    /**
+     * Exponent
+     */
+    exponent?: number;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * CalcDimensionTerm
+ *
+ * Член суммы: произведение входов и параметров в степенях.
+ */
+export type CalcDimensionTerm = {
+    /**
+     * Factors
+     */
+    factors: Array<CalcDimensionFactor>;
+};
+
+/**
  * CalcDiscipline
  *
  * Раздел проекта, к которому относится инженерная система.
@@ -655,6 +709,32 @@ export type CalcDocumentFragmentEvidence = {
  * Заявленная стадия документа. Задаётся при заведении источника, в ревизию не пишется.
  */
 export type CalcDocumentStage = 'P' | 'RD' | 'UNKNOWN';
+
+/**
+ * CalcEngineeringSource
+ */
+export type CalcEngineeringSource = {
+    /**
+     * Author
+     */
+    author: string;
+    /**
+     * Kind
+     */
+    kind?: 'ENGINEERING_METHOD';
+    /**
+     * Reference
+     */
+    reference: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Title
+     */
+    title: string;
+};
 
 /**
  * CalcEnumOptionRead
@@ -1130,6 +1210,27 @@ export type CalcFactWithdraw = {
 };
 
 /**
+ * CalcHazardOutcome
+ *
+ * Итог разбора одной известной опасности правила старого портала.
+ */
+export type CalcHazardOutcome = 'CONFIRMED_SAFE' | 'FIXED' | 'NOT_APPLICABLE' | 'REJECTED';
+
+/**
+ * CalcHazardResolution
+ *
+ * Решение проверяющего по одной известной опасности: итог и почему.
+ */
+export type CalcHazardResolution = {
+    /**
+     * Comment
+     */
+    comment: string;
+    hazard: CalcLegacyHazard;
+    outcome: CalcHazardOutcome;
+};
+
+/**
  * CalcInputFactPage
  */
 export type CalcInputFactPage = {
@@ -1326,6 +1427,272 @@ export type CalcInspectionSummary = {
 };
 
 /**
+ * CalcLegacyAction
+ *
+ * Предложенное аудитом действие.
+ */
+export type CalcLegacyAction = 'KEEP_AS_LEGACY' | 'REPLACE' | 'MAKE_INPUT' | 'REJECT' | 'OUT_OF_SCOPE' | 'IDEA';
+
+/**
+ * CalcLegacyCatalog
+ *
+ * Каталог разбора старого портала (PROMPT 00).
+ */
+export type CalcLegacyCatalog = 'VK' | 'K' | 'OV' | 'VRF' | 'FIRE';
+
+/**
+ * CalcLegacyCatalogRead
+ */
+export type CalcLegacyCatalogRead = {
+    /**
+     * By Catalog
+     */
+    by_catalog: Array<CalcLegacyCountRead>;
+    /**
+     * By Class
+     */
+    by_class: Array<CalcLegacyCountRead>;
+    /**
+     * Catalog Version
+     */
+    catalog_version: string;
+    /**
+     * Content Sha256
+     */
+    content_sha256: string;
+    /**
+     * Entry Count
+     */
+    entry_count: number;
+    /**
+     * Generator Version
+     */
+    generator_version: string;
+    /**
+     * Groups
+     */
+    groups: Array<CalcLegacyGroupRead>;
+    /**
+     * Items
+     */
+    items: Array<CalcLegacyRuleRead>;
+    /**
+     * Source Sha256
+     */
+    source_sha256: string;
+};
+
+/**
+ * CalcLegacyClass
+ *
+ * Класс правила старого портала по разбору PROMPT 00.
+ */
+export type CalcLegacyClass = 'PHYSICS' | 'NORMATIVE' | 'MANUFACTURER' | 'GEOMETRY' | 'HEURISTIC' | 'TENDER' | 'UNKNOWN_ORIGIN' | 'ERROR' | 'NONE';
+
+/**
+ * CalcLegacyCodeRef
+ */
+export type CalcLegacyCodeRef = {
+    /**
+     * File
+     */
+    file: string;
+    /**
+     * Lines
+     */
+    lines: string | null;
+    /**
+     * Symbol
+     */
+    symbol: string | null;
+};
+
+/**
+ * CalcLegacyCountRead
+ */
+export type CalcLegacyCountRead = {
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Key
+     */
+    key: string;
+};
+
+/**
+ * CalcLegacyGroupRead
+ *
+ * Группа одинаковой логики с разными реализациями: оригиналы не схлопываются.
+ */
+export type CalcLegacyGroupRead = {
+    /**
+     * Finding
+     */
+    finding: string;
+    /**
+     * Group Id
+     */
+    group_id: string;
+    /**
+     * Members
+     */
+    members: Array<string>;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcLegacyHazard
+ *
+ * Известная опасность правила старого портала — её нельзя утвердить молча.
+ */
+export type CalcLegacyHazard = 'DOUBLE_MULTIPLICATION' | 'CONFLICTING_CONSTANTS' | 'HIDDEN_DEFAULT' | 'SUBSTITUTED_VALUES' | 'UNIT_ERROR' | 'DEFECT';
+
+/**
+ * CalcLegacyProvenanceRead
+ *
+ * Правило старого портала, от которого версия происходит, и его известные опасности.
+ *
+ * Снимок каталога на момент сохранения версии: у утверждённой версии не меняется.
+ */
+export type CalcLegacyProvenanceRead = {
+    /**
+     * Actions
+     */
+    actions: Array<CalcLegacyAction>;
+    /**
+     * Catalog Version
+     */
+    catalog_version: string;
+    class_primary: CalcLegacyClass;
+    /**
+     * Group Ids
+     */
+    group_ids: Array<string>;
+    /**
+     * Hazards
+     */
+    hazards: Array<CalcLegacyHazard>;
+    /**
+     * Legacy Id
+     */
+    legacy_id: string;
+};
+
+/**
+ * CalcLegacyResolution
+ *
+ * Разбор правила старого портала при утверждении версии, которая от него происходит.
+ *
+ * Отметки «проверено» недостаточно: по каждой известной опасности — свой итог и комментарий.
+ */
+export type CalcLegacyResolution = {
+    /**
+     * Hazards
+     */
+    hazards?: Array<CalcHazardResolution>;
+    /**
+     * Legacy Id
+     */
+    legacy_id: string;
+    /**
+     * Resolution
+     */
+    resolution: string;
+};
+
+/**
+ * CalcLegacyRuleRead
+ *
+ * Правило старого портала в карантинном каталоге — только для чтения.
+ */
+export type CalcLegacyRuleRead = {
+    /**
+     * Action Raw
+     */
+    action_raw: string;
+    /**
+     * Actions
+     */
+    actions: Array<CalcLegacyAction>;
+    /**
+     * Assumptions
+     */
+    assumptions: string;
+    /**
+     * Calculation Eligible
+     */
+    calculation_eligible: boolean;
+    catalog: CalcLegacyCatalog;
+    class_primary: CalcLegacyClass;
+    /**
+     * Class Raw
+     */
+    class_raw: string;
+    /**
+     * Class Secondary
+     */
+    class_secondary: Array<CalcLegacyClass>;
+    /**
+     * Code Refs
+     */
+    code_refs: Array<CalcLegacyCodeRef>;
+    /**
+     * Group Ids
+     */
+    group_ids: Array<string>;
+    /**
+     * Hazards
+     */
+    hazards: Array<CalcLegacyHazard>;
+    /**
+     * Legacy Id
+     */
+    legacy_id: string;
+    /**
+     * Location
+     */
+    location: string;
+    /**
+     * Notice
+     */
+    notice: string;
+    /**
+     * Rule Text
+     */
+    rule_text: string;
+    /**
+     * Section
+     */
+    section: string;
+    status: CalcRuleStatus;
+};
+
+/**
+ * CalcLegacySource
+ *
+ * Правила старого портала, от которых версия происходит. Происхождение, не основание.
+ */
+export type CalcLegacySource = {
+    /**
+     * Kind
+     */
+    kind?: 'LEGACY_CODE';
+    /**
+     * Legacy Ids
+     */
+    legacy_ids: Array<string>;
+    /**
+     * Note
+     */
+    note?: string | null;
+};
+
+/**
  * CalcLevelCountRead
  *
  * Сколько требований уровня закрыто: найдено или выводимо.
@@ -1340,6 +1707,84 @@ export type CalcLevelCountRead = {
      * Total
      */
     total: number;
+};
+
+/**
+ * CalcManufacturerSource
+ */
+export type CalcManufacturerSource = {
+    /**
+     * Document Date
+     */
+    document_date?: string | null;
+    /**
+     * Document Title
+     */
+    document_title: string;
+    /**
+     * Document Version
+     */
+    document_version: string;
+    /**
+     * Kind
+     */
+    kind?: 'MANUFACTURER_DOCUMENT';
+    /**
+     * Location
+     */
+    location: string;
+    /**
+     * Manufacturer
+     */
+    manufacturer: string;
+    /**
+     * Product Line
+     */
+    product_line: string;
+    /**
+     * Scope
+     */
+    scope: string;
+};
+
+/**
+ * CalcNormativeSource
+ *
+ * Нормативный документ: без обозначения, редакции, пункта и даты нормы нет.
+ */
+export type CalcNormativeSource = {
+    /**
+     * Artifact
+     */
+    artifact?: string | null;
+    /**
+     * Clause
+     */
+    clause: string;
+    /**
+     * Designation
+     */
+    designation: string;
+    /**
+     * Document Title
+     */
+    document_title: string;
+    /**
+     * Edition
+     */
+    edition: string;
+    /**
+     * Edition Date
+     */
+    edition_date: string;
+    /**
+     * Kind
+     */
+    kind?: 'NORMATIVE_DOCUMENT';
+    /**
+     * Page
+     */
+    page?: string | null;
 };
 
 /**
@@ -1362,6 +1807,20 @@ export type CalcNumberValue = {
      * Десятичное число строкой: «12.5», «-1», «0.035».
      */
     value: string;
+};
+
+/**
+ * CalcOtherSource
+ */
+export type CalcOtherSource = {
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Kind
+     */
+    kind?: 'OTHER';
 };
 
 /**
@@ -1641,6 +2100,487 @@ export type CalcResolutionState = 'MISSING' | 'SINGLE' | 'CORROBORATED' | 'DECID
  * Проверка человеком.
  */
 export type CalcReviewStatus = 'UNREVIEWED' | 'CONFIRMED' | 'REJECTED';
+
+/**
+ * CalcRuleApplicability
+ */
+export type CalcRuleApplicability = {
+    /**
+     * Limitations
+     */
+    limitations?: Array<string>;
+    /**
+     * Manufacturer
+     */
+    manufacturer?: string | null;
+    /**
+     * Product Line
+     */
+    product_line?: string | null;
+    /**
+     * Scope
+     */
+    scope: string;
+    /**
+     * Stages
+     */
+    stages: Array<CalcDocumentStage>;
+    /**
+     * Systems
+     */
+    systems: Array<string>;
+};
+
+/**
+ * CalcRuleApprove
+ */
+export type CalcRuleApprove = {
+    /**
+     * Comment
+     */
+    comment: string;
+    /**
+     * Legacy Review
+     */
+    legacy_review?: Array<CalcLegacyResolution>;
+};
+
+/**
+ * CalcRuleContent
+ *
+ * Содержание версии правила — то, что утверждается, хешируется и больше не меняется.
+ */
+export type CalcRuleContent = {
+    applicability: CalcRuleApplicability;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Dimension Checks
+     */
+    dimension_checks?: Array<CalcRuleDimensionCheck>;
+    discipline: CalcDiscipline;
+    /**
+     * Explanation
+     */
+    explanation: string;
+    /**
+     * Formula
+     */
+    formula: string;
+    /**
+     * Impact
+     */
+    impact?: string | null;
+    /**
+     * Implementation Key
+     */
+    implementation_key?: string | null;
+    /**
+     * Inputs
+     */
+    inputs?: Array<CalcRuleInput>;
+    /**
+     * Outputs
+     */
+    outputs: Array<CalcRuleOutput>;
+    /**
+     * Parameters
+     */
+    parameters?: Array<CalcRuleParameter>;
+    rule_type: CalcRuleType;
+    /**
+     * Sources
+     */
+    sources?: Array<CalcNormativeSource | CalcManufacturerSource | CalcEngineeringSource | CalcDecisionSource | CalcLegacySource | CalcOtherSource>;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Valid From
+     */
+    valid_from?: string | null;
+    /**
+     * Valid To
+     */
+    valid_to?: string | null;
+};
+
+/**
+ * CalcRuleCreate
+ *
+ * Новое правило: ключ и содержание версии 1 в статусе DRAFT.
+ */
+export type CalcRuleCreate = {
+    content: CalcRuleContent;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+};
+
+/**
+ * CalcRuleDecision
+ *
+ * Отклонение или вывод из действия — всегда с причиной.
+ */
+export type CalcRuleDecision = {
+    /**
+     * Comment
+     */
+    comment: string;
+};
+
+/**
+ * CalcRuleDimensionCheck
+ *
+ * Проверка размерности выхода: каждый член суммы должен иметь размерность выхода.
+ *
+ * Это не формула и не исполняется: только объявленная структура, по которой реестр ловит
+ * «метры × давление = метры» до утверждения.
+ */
+export type CalcRuleDimensionCheck = {
+    /**
+     * Output
+     */
+    output: string;
+    /**
+     * Terms
+     */
+    terms: Array<CalcDimensionTerm>;
+};
+
+/**
+ * CalcRuleDraftUpdate
+ *
+ * Новое содержание черновика. Утверждённую версию так не изменить.
+ */
+export type CalcRuleDraftUpdate = {
+    content: CalcRuleContent;
+};
+
+/**
+ * CalcRuleFromLegacy
+ *
+ * Новое правило-черновик по мотивам правила старого портала.
+ *
+ * Тип, раздел, область применения и выходы задаёт человек: класс из разбора не переносится —
+ * эвристика не становится методикой от переноса. Текст старого правила попадает в черновик
+ * только как исходный материал, а само старое правило остаётся в карантине неизменным.
+ */
+export type CalcRuleFromLegacy = {
+    applicability: CalcRuleApplicability;
+    discipline: CalcDiscipline;
+    /**
+     * Outputs
+     */
+    outputs: Array<CalcRuleOutput>;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    rule_type: CalcRuleType;
+    /**
+     * Title
+     */
+    title?: string | null;
+};
+
+/**
+ * CalcRuleInput
+ *
+ * Что правилу нужно на входе. Значение приходит из снимка фактов или от другого шага.
+ */
+export type CalcRuleInput = {
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Fact Type
+     */
+    fact_type?: string | null;
+    kind: CalcRuleInputKind;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Quantity
+     */
+    quantity?: string | null;
+    /**
+     * Required
+     */
+    required?: boolean;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+};
+
+/**
+ * CalcRuleInputKind
+ *
+ * Откуда правило берёт вход.
+ */
+export type CalcRuleInputKind = 'FACT' | 'QUANTITY';
+
+/**
+ * CalcRuleOutput
+ */
+export type CalcRuleOutput = {
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Quantity
+     */
+    quantity: string;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+};
+
+/**
+ * CalcRuleParameter
+ *
+ * Константа версии правила. Меняется только новой версией.
+ */
+export type CalcRuleParameter = {
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+    /**
+     * Value
+     *
+     * Десятичное число строкой: «12.5», «-1», «0.035».
+     */
+    value: string;
+};
+
+/**
+ * CalcRuleRead
+ */
+export type CalcRuleRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    discipline: CalcDiscipline;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    /**
+     * Versions
+     */
+    versions: Array<CalcRuleVersionRead>;
+};
+
+/**
+ * CalcRuleReviewRead
+ */
+export type CalcRuleReviewRead = {
+    /**
+     * Comment
+     */
+    comment: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    from_status: CalcRuleStatus;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Legacy Review
+     */
+    legacy_review: Array<CalcLegacyResolution>;
+    /**
+     * Reviewer Id
+     */
+    reviewer_id: string | null;
+    to_status: CalcRuleStatus;
+};
+
+/**
+ * CalcRuleStatus
+ *
+ * Жизненный цикл версии правила. В расчёт идёт только APPROVED — это вычисляется.
+ */
+export type CalcRuleStatus = 'DRAFT' | 'UNVERIFIED_LEGACY' | 'APPROVED' | 'DEPRECATED' | 'REJECTED';
+
+/**
+ * CalcRuleSummaryRead
+ *
+ * Строка списка правил: последняя версия и то, что можно использовать в расчёте.
+ */
+export type CalcRuleSummaryRead = {
+    /**
+     * Approved Version
+     */
+    approved_version: number | null;
+    /**
+     * Calculation Eligible
+     */
+    calculation_eligible: boolean;
+    discipline: CalcDiscipline;
+    latest_status: CalcRuleStatus;
+    /**
+     * Latest Version
+     */
+    latest_version: number;
+    /**
+     * Notice
+     */
+    notice: string | null;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    rule_type: CalcRuleType;
+    /**
+     * Sources
+     */
+    sources: Array<string>;
+    /**
+     * Systems
+     */
+    systems: Array<string>;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcRuleType
+ *
+ * Тип правила. Тип не повышает статус: эвристика не становится нормой от смены типа.
+ */
+export type CalcRuleType = 'PHYSICS' | 'GEOMETRY' | 'NORMATIVE' | 'MANUFACTURER' | 'ENGINEERING' | 'TENDER_ASSUMPTION';
+
+/**
+ * CalcRuleVersionCreate
+ *
+ * Новая версия: всегда с основанием изменения. Пустое содержание — копия последней.
+ */
+export type CalcRuleVersionCreate = {
+    /**
+     * Change Reason
+     */
+    change_reason: string;
+    content?: CalcRuleContent | null;
+};
+
+/**
+ * CalcRuleVersionRead
+ */
+export type CalcRuleVersionRead = {
+    /**
+     * Approved At
+     */
+    approved_at: string | null;
+    /**
+     * Approved By
+     */
+    approved_by: string | null;
+    /**
+     * Calculation Eligible
+     */
+    calculation_eligible: boolean;
+    /**
+     * Change Reason
+     */
+    change_reason: string | null;
+    content: CalcRuleContent;
+    /**
+     * Content Sha256
+     */
+    content_sha256: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Deprecated At
+     */
+    deprecated_at: string | null;
+    /**
+     * Deprecated By
+     */
+    deprecated_by: string | null;
+    /**
+     * Deprecation Reason
+     */
+    deprecation_reason: string | null;
+    /**
+     * Edited By
+     */
+    edited_by: string | null;
+    /**
+     * Legacy Provenance
+     */
+    legacy_provenance: Array<CalcLegacyProvenanceRead>;
+    /**
+     * Notice
+     */
+    notice: string | null;
+    /**
+     * Rejected At
+     */
+    rejected_at: string | null;
+    /**
+     * Rejected By
+     */
+    rejected_by: string | null;
+    /**
+     * Rejection Reason
+     */
+    rejection_reason: string | null;
+    /**
+     * Reviews
+     */
+    reviews: Array<CalcRuleReviewRead>;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    rule_type: CalcRuleType;
+    status: CalcRuleStatus;
+    /**
+     * Version
+     */
+    version: number;
+};
 
 /**
  * CalcSourceClass
@@ -6333,6 +7273,112 @@ export type WithdrawCalcFactResponses = {
 
 export type WithdrawCalcFactResponse = WithdrawCalcFactResponses[keyof WithdrawCalcFactResponses];
 
+export type ListCalcLegacyRulesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Catalog
+         */
+        catalog?: CalcLegacyCatalog | null;
+        /**
+         * Legacy Class
+         */
+        legacy_class?: CalcLegacyClass | null;
+        /**
+         * Hazard
+         */
+        hazard?: CalcLegacyHazard | null;
+        /**
+         * Action
+         */
+        action?: CalcLegacyAction | null;
+        /**
+         * Group Id
+         */
+        group_id?: string | null;
+    };
+    url: '/api/v1/calc/legacy-rules';
+};
+
+export type ListCalcLegacyRulesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcLegacyRulesError = ListCalcLegacyRulesErrors[keyof ListCalcLegacyRulesErrors];
+
+export type ListCalcLegacyRulesResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcLegacyCatalogRead;
+};
+
+export type ListCalcLegacyRulesResponse = ListCalcLegacyRulesResponses[keyof ListCalcLegacyRulesResponses];
+
+export type GetCalcLegacyRuleData = {
+    body?: never;
+    path: {
+        /**
+         * Legacy Id
+         */
+        legacy_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/legacy-rules/{legacy_id}';
+};
+
+export type GetCalcLegacyRuleErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcLegacyRuleError = GetCalcLegacyRuleErrors[keyof GetCalcLegacyRuleErrors];
+
+export type GetCalcLegacyRuleResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcLegacyRuleRead;
+};
+
+export type GetCalcLegacyRuleResponse = GetCalcLegacyRuleResponses[keyof GetCalcLegacyRuleResponses];
+
+export type CreateCalcRuleFromLegacyData = {
+    body: CalcRuleFromLegacy;
+    path: {
+        /**
+         * Legacy Id
+         */
+        legacy_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/legacy-rules/{legacy_id}/drafts';
+};
+
+export type CreateCalcRuleFromLegacyErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcRuleFromLegacyError = CreateCalcRuleFromLegacyErrors[keyof CreateCalcRuleFromLegacyErrors];
+
+export type CreateCalcRuleFromLegacyResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcRuleVersionRead;
+};
+
+export type CreateCalcRuleFromLegacyResponse = CreateCalcRuleFromLegacyResponses[keyof CreateCalcRuleFromLegacyResponses];
+
 export type ListCalcConflictsData = {
     body?: never;
     path: {
@@ -6744,6 +7790,305 @@ export type ListCalcRequirementsResponses = {
 };
 
 export type ListCalcRequirementsResponse = ListCalcRequirementsResponses[keyof ListCalcRequirementsResponses];
+
+export type ListCalcRulesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Discipline
+         */
+        discipline?: CalcDiscipline | null;
+        /**
+         * System
+         */
+        system?: string | null;
+        /**
+         * Rule Type
+         */
+        rule_type?: CalcRuleType | null;
+        /**
+         * Status
+         */
+        status?: CalcRuleStatus | null;
+    };
+    url: '/api/v1/calc/rules';
+};
+
+export type ListCalcRulesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcRulesError = ListCalcRulesErrors[keyof ListCalcRulesErrors];
+
+export type ListCalcRulesResponses = {
+    /**
+     * Response List Calc Rules
+     *
+     * Successful Response
+     */
+    200: Array<CalcRuleSummaryRead>;
+};
+
+export type ListCalcRulesResponse = ListCalcRulesResponses[keyof ListCalcRulesResponses];
+
+export type CreateCalcRuleData = {
+    body: CalcRuleCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/calc/rules';
+};
+
+export type CreateCalcRuleErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcRuleError = CreateCalcRuleErrors[keyof CreateCalcRuleErrors];
+
+export type CreateCalcRuleResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcRuleVersionRead;
+};
+
+export type CreateCalcRuleResponse = CreateCalcRuleResponses[keyof CreateCalcRuleResponses];
+
+export type GetCalcRuleData = {
+    body?: never;
+    path: {
+        /**
+         * Rule Key
+         */
+        rule_key: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/rules/{rule_key}';
+};
+
+export type GetCalcRuleErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcRuleError = GetCalcRuleErrors[keyof GetCalcRuleErrors];
+
+export type GetCalcRuleResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRuleRead;
+};
+
+export type GetCalcRuleResponse = GetCalcRuleResponses[keyof GetCalcRuleResponses];
+
+export type CreateCalcRuleVersionData = {
+    body: CalcRuleVersionCreate;
+    path: {
+        /**
+         * Rule Key
+         */
+        rule_key: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/rules/{rule_key}/versions';
+};
+
+export type CreateCalcRuleVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcRuleVersionError = CreateCalcRuleVersionErrors[keyof CreateCalcRuleVersionErrors];
+
+export type CreateCalcRuleVersionResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcRuleVersionRead;
+};
+
+export type CreateCalcRuleVersionResponse = CreateCalcRuleVersionResponses[keyof CreateCalcRuleVersionResponses];
+
+export type GetCalcRuleVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Rule Key
+         */
+        rule_key: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: never;
+    url: '/api/v1/calc/rules/{rule_key}/versions/{version}';
+};
+
+export type GetCalcRuleVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcRuleVersionError = GetCalcRuleVersionErrors[keyof GetCalcRuleVersionErrors];
+
+export type GetCalcRuleVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRuleVersionRead;
+};
+
+export type GetCalcRuleVersionResponse = GetCalcRuleVersionResponses[keyof GetCalcRuleVersionResponses];
+
+export type UpdateCalcRuleDraftData = {
+    body: CalcRuleDraftUpdate;
+    path: {
+        /**
+         * Rule Key
+         */
+        rule_key: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: never;
+    url: '/api/v1/calc/rules/{rule_key}/versions/{version}';
+};
+
+export type UpdateCalcRuleDraftErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateCalcRuleDraftError = UpdateCalcRuleDraftErrors[keyof UpdateCalcRuleDraftErrors];
+
+export type UpdateCalcRuleDraftResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRuleVersionRead;
+};
+
+export type UpdateCalcRuleDraftResponse = UpdateCalcRuleDraftResponses[keyof UpdateCalcRuleDraftResponses];
+
+export type ApproveCalcRuleVersionData = {
+    body: CalcRuleApprove;
+    path: {
+        /**
+         * Rule Key
+         */
+        rule_key: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: never;
+    url: '/api/v1/calc/rules/{rule_key}/versions/{version}/approve';
+};
+
+export type ApproveCalcRuleVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ApproveCalcRuleVersionError = ApproveCalcRuleVersionErrors[keyof ApproveCalcRuleVersionErrors];
+
+export type ApproveCalcRuleVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRuleVersionRead;
+};
+
+export type ApproveCalcRuleVersionResponse = ApproveCalcRuleVersionResponses[keyof ApproveCalcRuleVersionResponses];
+
+export type DeprecateCalcRuleVersionData = {
+    body: CalcRuleDecision;
+    path: {
+        /**
+         * Rule Key
+         */
+        rule_key: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: never;
+    url: '/api/v1/calc/rules/{rule_key}/versions/{version}/deprecate';
+};
+
+export type DeprecateCalcRuleVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeprecateCalcRuleVersionError = DeprecateCalcRuleVersionErrors[keyof DeprecateCalcRuleVersionErrors];
+
+export type DeprecateCalcRuleVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRuleVersionRead;
+};
+
+export type DeprecateCalcRuleVersionResponse = DeprecateCalcRuleVersionResponses[keyof DeprecateCalcRuleVersionResponses];
+
+export type RejectCalcRuleVersionData = {
+    body: CalcRuleDecision;
+    path: {
+        /**
+         * Rule Key
+         */
+        rule_key: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: never;
+    url: '/api/v1/calc/rules/{rule_key}/versions/{version}/reject';
+};
+
+export type RejectCalcRuleVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RejectCalcRuleVersionError = RejectCalcRuleVersionErrors[keyof RejectCalcRuleVersionErrors];
+
+export type RejectCalcRuleVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRuleVersionRead;
+};
+
+export type RejectCalcRuleVersionResponse = RejectCalcRuleVersionResponses[keyof RejectCalcRuleVersionResponses];
 
 export type ReadDocumentData = {
     body?: never;

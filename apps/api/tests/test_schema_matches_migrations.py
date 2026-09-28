@@ -65,6 +65,19 @@ select table_name, column_name, data_type, is_nullable, column_default
  order by table_name, column_name
 """
 
+# Триггеры защиты (журнал аудита, неизменяемость утверждённых правил) пишутся дважды — в модели
+# и в миграции. Сравнивается определение триггера и тело функции без различий в пробелах.
+TRIGGERS_SQL = """
+select t.relname, g.tgname, pg_get_triggerdef(g.oid),
+       btrim(regexp_replace(p.prosrc, '\\s+', ' ', 'g'))
+  from pg_trigger g
+  join pg_class t on t.oid = g.tgrelid
+  join pg_namespace n on n.oid = t.relnamespace
+  join pg_proc p on p.oid = g.tgfoid
+ where n.nspname = 'public' and not g.tgisinternal and t.relname = any(:tables)
+ order by t.relname, g.tgname
+"""
+
 
 def _migrated_name() -> str:
     _, _, name = _test_database_url()
@@ -104,6 +117,7 @@ async def _snapshot(engine: AsyncEngine, tables: list[str]) -> dict[str, list[tu
             ("constraints", CONSTRAINTS_SQL),
             ("indexes", INDEXES_SQL),
             ("columns", COLUMNS_SQL),
+            ("triggers", TRIGGERS_SQL),
         ):
             rows = await connection.execute(text(query), {"tables": tables})
             snapshot[key] = [tuple(str(value) for value in row) for row in rows.all()]
@@ -168,6 +182,8 @@ async def test_migrations_build_the_same_schema_as_the_models(
     assert from_migrations["columns"] == from_models["columns"]
     assert from_migrations["constraints"] == from_models["constraints"]
     assert from_migrations["indexes"] == from_models["indexes"]
+    assert from_migrations["triggers"] == from_models["triggers"]
+    assert from_models["triggers"], "триггеры защиты не установлены"
 
 
 async def test_migration_backfills_the_workspace_of_existing_jobs(

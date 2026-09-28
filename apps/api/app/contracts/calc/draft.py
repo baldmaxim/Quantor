@@ -7,7 +7,7 @@
 
 | Сущность            | Промт реализации |
 | ------------------- | ---------------- |
-| RuleReference       | 03               |
+| RuleReference       | 04 (ссылка запуска на версию реестра правил PROMPT 03) |
 | CalculationInput    | 04               |
 | Assumption          | 04               |
 | CalculationRun      | 04               |
@@ -28,7 +28,12 @@ from typing import Annotated, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.contracts.calc.enums import CalcConfidence, CalcDiscipline
+from app.contracts.calc.enums import (
+    CalcConfidence,
+    CalcDiscipline,
+    CalcRuleStatus,
+    CalcRuleType,
+)
 from app.contracts.calc.subjects import CalcFactSubject
 from app.contracts.calc.values import CalcFactValue, DecimalText
 
@@ -42,35 +47,14 @@ class _Draft(BaseModel):
 # ------------------------------------------------------------------------------ правила
 
 
-class CalcRuleType(StrEnum):
-    PHYSICS = "PHYSICS"
-    GEOMETRY = "GEOMETRY"
-    NORMATIVE = "NORMATIVE"
-    MANUFACTURER = "MANUFACTURER"
-    ENGINEERING = "ENGINEERING"
-    TENDER_ASSUMPTION = "TENDER_ASSUMPTION"
-
-
-class CalcRuleReviewStatus(StrEnum):
-    """Статус инженерной проверки — отдельно от содержимого правила и вне его хеша."""
-
-    DRAFT = "DRAFT"
-    UNVERIFIED_LEGACY = "UNVERIFIED_LEGACY"
-    SOURCED = "SOURCED"
-    VERIFIED = "VERIFIED"
-    REJECTED = "REJECTED"
-    REJECTED_LEGACY = "REJECTED_LEGACY"
-    DEPRECATED = "DEPRECATED"
-
-
 class CalcRuleReference(_Draft):
-    """Ссылка на правило реестра так, как её запоминает запуск: версия и хеш содержимого."""
+    """Ссылка на версию реестра правил так, как её запоминает запуск: ключ, версия, хеш."""
 
-    rule_id: Annotated[str, Field(min_length=1, max_length=100)]
+    rule_key: Annotated[str, Field(min_length=1, max_length=120)]
     version: Annotated[int, Field(ge=1)]
     content_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
     rule_type: CalcRuleType
-    review_status: CalcRuleReviewStatus
+    status: CalcRuleStatus
     """Статус на момент запуска."""
 
 

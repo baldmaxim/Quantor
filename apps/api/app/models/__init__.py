@@ -10,6 +10,7 @@ from app.models.calc import (
     CalcSource,
     CalcSourceInspection,
 )
+from app.models.calc_rules import CalcRuleDefinition, CalcRuleReview, CalcRuleVersion
 from app.models.control_plane import FeatureFlagOverride, SettingOverride
 from app.models.document import Document, DocumentRevision
 from app.models.identity import AuthSession, UserIdentity, Workspace, WorkspaceMembership
@@ -28,6 +29,9 @@ __all__ = [
     "CalcFactConflict",
     "CalcFactEvidence",
     "CalcManualOverride",
+    "CalcRuleDefinition",
+    "CalcRuleReview",
+    "CalcRuleVersion",
     "CalcSource",
     "CalcSourceInspection",
     "Document",

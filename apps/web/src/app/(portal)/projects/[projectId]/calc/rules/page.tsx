@@ -2,24 +2,24 @@
 
 import { use } from 'react';
 
-import { CalcInputs } from '@/components/calc/CalcInputs';
+import { CalcRules } from '@/components/calc/CalcRules';
 import { TopBar } from '@/components/shell/TopBar';
-import { ButtonLink, EmptyState, SkeletonRows, StatusBadge } from '@/components/ui';
+import { EmptyState, SkeletonRows, StatusBadge } from '@/components/ui';
 import { calcAccess } from '@/lib/calc/access';
 import { useFeatures, useMeta, useProject } from '@/lib/queries';
 
 /**
- * Расчёты → Исходные данные (ADR-0030, PROMPT 02).
+ * Расчёты → Правила (ADR-0030, PROMPT 03).
  *
- * Закрыто флагом `calc.portal`: при выключенном флаге страницы нет. Расчёта систем здесь ещё
- * нет — только то, что известно для него, и то, чего не хватает.
+ * Закрыто флагом `calc.portal`. Реестр правил — общий для пространства; вход — из расчётов
+ * проекта, чтобы путь «Расчёты → Правила» был один.
  */
 
 interface IPageProps {
   params: Promise<{ projectId: string }>;
 }
 
-const CalcPage = ({ params }: IPageProps) => {
+const CalcRulesPage = ({ params }: IPageProps) => {
   const { projectId } = use(params);
   const meta = useMeta();
   const access = calcAccess(meta.isSuccess, useFeatures());
@@ -47,28 +47,24 @@ const CalcPage = ({ params }: IPageProps) => {
         crumbs={[
           { label: 'Проекты', href: '/projects' },
           { label: project.data?.name ?? '…', href: `/projects/${projectId}` },
-          { label: 'Расчёты' },
+          { label: 'Расчёты', href: `/projects/${projectId}/calc` },
+          { label: 'Правила' },
         ]}
-        status={<StatusBadge tone="warning">разработка · расчёта ещё нет</StatusBadge>}
-        actions={
-          <ButtonLink href={`/projects/${projectId}/calc/rules`} transitionTypes={['nav-forward']}>
-            Правила
-          </ButtonLink>
-        }
+        status={<StatusBadge tone="warning">разработка · только чтение</StatusBadge>}
       />
       <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-[var(--s-5)]">
-          <h1 className="text-lg font-medium">Исходные данные</h1>
+          <h1 className="text-lg font-medium">Правила</h1>
           <p className="max-w-[80ch] text-sm text-muted">
-            Что известно для расчёта систем ВК стадии П и чего не хватает. «Не найдено» — все
-            распознанные документы проверены; «не проверено» — документ ещё не смотрели. ВОР
-            Заказчика в расчёт не идёт.
+            Реестр инженерных правил рабочего пространства. В расчёт идёт только утверждённая
+            действующая версия; утверждённая версия не меняется — изменение оформляется новой
+            версией.
           </p>
-          <CalcInputs projectId={projectId} />
+          <CalcRules />
         </div>
       </main>
     </>
   );
 };
 
-export default CalcPage;
+export default CalcRulesPage;

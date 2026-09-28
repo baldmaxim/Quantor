@@ -137,6 +137,12 @@ class AuditAction(StrEnum):
     CALC_FACT_WITHDRAWN = "calc_fact_withdrawn"
     CALC_CONFLICT_DECIDED = "calc_conflict_decided"
     CALC_INSPECTION_COMPLETED = "calc_inspection_completed"
+    CALC_RULE_CREATED = "calc_rule_created"
+    CALC_RULE_DRAFT_UPDATED = "calc_rule_draft_updated"
+    CALC_RULE_VERSION_CREATED = "calc_rule_version_created"
+    CALC_RULE_APPROVED = "calc_rule_approved"
+    CALC_RULE_REJECTED = "calc_rule_rejected"
+    CALC_RULE_DEPRECATED = "calc_rule_deprecated"
 
     JOB_RETRIED = "job_retried"
     JOB_CANCELLED = "job_cancelled"

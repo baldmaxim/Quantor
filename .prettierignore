@@ -18,3 +18,5 @@ docs/stage2a/benchmark-results.json
 # создаётся командой pnpm benchmark:viewer — правится только генератором
 docs/stage2b/viewer-benchmark-report.md
 docs/stage2b/viewer-benchmark-results.json
+# создаётся командой python -m app.services.calc.rules.legacy_build — правится только генератором
+apps/api/app/services/calc/rules/data/legacy_catalog.json
