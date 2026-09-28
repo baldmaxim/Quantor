@@ -751,6 +751,182 @@
         "title": "CalcAssumptionPolicy",
         "type": "string"
       },
+      "CalcAssumptionRecord": {
+        "additionalProperties": false,
+        "description": "Использованное или не применённое допущение — никогда не скрытое.",
+        "properties": {
+          "affected_results": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affected Results",
+            "type": "array"
+          },
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "base_value": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "Base Value",
+            "type": "string"
+          },
+          "delta": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "Delta",
+            "type": "string"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "rule_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Key"
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "Value",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "step_key",
+          "rule_key",
+          "version",
+          "applied",
+          "reason",
+          "impact",
+          "base_value",
+          "value",
+          "unit",
+          "delta",
+          "affected_results"
+        ],
+        "title": "CalcAssumptionRecord",
+        "type": "object"
+      },
+      "CalcBlockCode": {
+        "description": "Почему запуск заблокирован. Ни одна причина не заменяется нулём или умолчанием.",
+        "enum": [
+          "CALCULATOR_INVALID",
+          "SCENARIO_NOT_SUPPORTED",
+          "SCOPE_INVALID",
+          "FACT_MISSING",
+          "FACT_EXCLUDED",
+          "FACT_CONFLICT",
+          "FACT_DECISION_STALE",
+          "FACT_NOT_EXACT",
+          "RULE_NOT_FOUND",
+          "RULE_NOT_APPROVED",
+          "RULE_NOT_EFFECTIVE",
+          "RULE_NOT_APPLICABLE",
+          "RULE_TYPE_NOT_ALLOWED",
+          "RULE_CONTRACT_MISMATCH",
+          "IMPLEMENTATION_MISSING",
+          "UNIT_INCOMPATIBLE"
+        ],
+        "title": "CalcBlockCode",
+        "type": "string"
+      },
+      "CalcBlockingReason": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/CalcBlockCode"
+          },
+          "fact_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Key"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "rule_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Key"
+          },
+          "step_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Key"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "CalcBlockingReason",
+        "type": "object"
+      },
       "CalcBooleanValue": {
         "additionalProperties": false,
         "properties": {
@@ -769,6 +945,228 @@
           "value"
         ],
         "title": "CalcBooleanValue",
+        "type": "object"
+      },
+      "CalcCalculatorFactRead": {
+        "properties": {
+          "fact_type": {
+            "title": "Fact Type",
+            "type": "string"
+          },
+          "input": {
+            "title": "Input",
+            "type": "string"
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          },
+          "subject_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subject Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "step_key",
+          "input",
+          "fact_type",
+          "subject_fields"
+        ],
+        "title": "CalcCalculatorFactRead",
+        "type": "object"
+      },
+      "CalcCalculatorKind": {
+        "enum": [
+          "DEMO",
+          "ENGINEERING"
+        ],
+        "title": "CalcCalculatorKind",
+        "type": "string"
+      },
+      "CalcCalculatorRead": {
+        "properties": {
+          "calculator_id": {
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_sha256": {
+            "title": "Calculator Sha256",
+            "type": "string"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/CalcCalculatorFactRead"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcCalculatorKind"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CalcCalculatorResultRead"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/CalcScenario"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "scope_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scope Fields",
+            "type": "array"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/CalcDocumentStage"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/CalcCalculatorStepRead"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "calculator_id",
+          "version",
+          "title",
+          "kind",
+          "discipline",
+          "systems",
+          "stage",
+          "scenarios",
+          "scope_fields",
+          "calculator_sha256",
+          "facts",
+          "rules",
+          "steps",
+          "results"
+        ],
+        "title": "CalcCalculatorRead",
+        "type": "object"
+      },
+      "CalcCalculatorResultRead": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CalcResultCategory"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          },
+          "result_key": {
+            "title": "Result Key",
+            "type": "string"
+          },
+          "rounding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcRoundingPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result_key",
+          "title",
+          "step_key",
+          "output",
+          "category",
+          "rounding"
+        ],
+        "title": "CalcCalculatorResultRead",
+        "type": "object"
+      },
+      "CalcCalculatorStepRead": {
+        "properties": {
+          "allowed_rule_types": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleType"
+            },
+            "title": "Allowed Rule Types",
+            "type": "array"
+          },
+          "assumption": {
+            "title": "Assumption",
+            "type": "boolean"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_key",
+          "title",
+          "rule_key",
+          "allowed_rule_types",
+          "depends_on",
+          "assumption"
+        ],
+        "title": "CalcCalculatorStepRead",
         "type": "object"
       },
       "CalcCollectableDocumentRead": {
@@ -969,6 +1367,40 @@
         ],
         "title": "CalcConflictStatus",
         "type": "string"
+      },
+      "CalcConversion": {
+        "additionalProperties": false,
+        "description": "Перевод единиц внутри ядра — всегда виден в цепочке расчёта.",
+        "properties": {
+          "from_unit": {
+            "title": "From Unit",
+            "type": "string"
+          },
+          "from_value": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "From Value",
+            "type": "string"
+          },
+          "to_unit": {
+            "title": "To Unit",
+            "type": "string"
+          },
+          "to_value": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "To Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_value",
+          "from_unit",
+          "to_value",
+          "to_unit"
+        ],
+        "title": "CalcConversion",
+        "type": "object"
       },
       "CalcCountValue": {
         "additionalProperties": false,
@@ -1663,6 +2095,101 @@
         "title": "CalcEvidenceRead",
         "type": "object"
       },
+      "CalcEvidenceRef": {
+        "additionalProperties": false,
+        "description": "Ссылка на свидетельство утверждения — достаточно, чтобы дойти до места в документе.",
+        "properties": {
+          "document_revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Revision Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcEvidenceKind"
+          },
+          "locator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locator"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "region_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Id"
+          },
+          "region_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Sha256"
+          },
+          "sheet_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Id"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "document_revision_id",
+          "page_index",
+          "sheet_id",
+          "locator",
+          "region_id",
+          "region_sha256"
+        ],
+        "title": "CalcEvidenceRef",
+        "type": "object"
+      },
       "CalcFactCreate": {
         "additionalProperties": false,
         "description": "Новое утверждение. Если у источника уже есть действующее по этому ключу — оно заменяется.",
@@ -1771,6 +2298,129 @@
           "method"
         ],
         "title": "CalcFactCreate",
+        "type": "object"
+      },
+      "CalcFactDiff": {
+        "properties": {
+          "base_fact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Fact Id"
+          },
+          "base_value": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                    "COUNT": "#/components/schemas/CalcCountValue",
+                    "ENUM": "#/components/schemas/CalcEnumValue",
+                    "NUMBER": "#/components/schemas/CalcNumberValue",
+                    "RANGE": "#/components/schemas/CalcRangeValue",
+                    "TEXT": "#/components/schemas/CalcTextValue"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CalcNumberValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcCountValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcBooleanValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcEnumValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcTextValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcRangeValue"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Value"
+          },
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "other_fact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Fact Id"
+          },
+          "other_value": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                    "COUNT": "#/components/schemas/CalcCountValue",
+                    "ENUM": "#/components/schemas/CalcEnumValue",
+                    "NUMBER": "#/components/schemas/CalcNumberValue",
+                    "RANGE": "#/components/schemas/CalcRangeValue",
+                    "TEXT": "#/components/schemas/CalcTextValue"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CalcNumberValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcCountValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcBooleanValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcEnumValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcTextValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcRangeValue"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Value"
+          }
+        },
+        "required": [
+          "fact_key",
+          "base_value",
+          "other_value",
+          "base_fact_id",
+          "other_fact_id"
+        ],
+        "title": "CalcFactDiff",
         "type": "object"
       },
       "CalcFactMethod": {
@@ -2545,6 +3195,15 @@
         ],
         "title": "CalcInputFactRead",
         "type": "object"
+      },
+      "CalcInputSource": {
+        "enum": [
+          "FACT",
+          "STEP",
+          "PARAMETER"
+        ],
+        "title": "CalcInputSource",
+        "type": "string"
       },
       "CalcInspectionCreate": {
         "additionalProperties": false,
@@ -4029,6 +4688,185 @@
         "title": "CalcResolutionState",
         "type": "string"
       },
+      "CalcResultCategory": {
+        "description": "Инженерная величина запуска. Это ещё не позиция Расчётного паспорта (PROMPT 06).",
+        "enum": [
+          "INTERMEDIATE",
+          "ENGINEERING"
+        ],
+        "title": "CalcResultCategory",
+        "type": "string"
+      },
+      "CalcResultDiff": {
+        "properties": {
+          "base_value": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Value"
+          },
+          "other_value": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Value"
+          },
+          "result_key": {
+            "title": "Result Key",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "result_key",
+          "base_value",
+          "other_value",
+          "unit"
+        ],
+        "title": "CalcResultDiff",
+        "type": "object"
+      },
+      "CalcResultRead": {
+        "description": "Инженерная величина запуска — ещё не позиция Расчётного паспорта.",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CalcResultCategory"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          },
+          "result_key": {
+            "title": "Result Key",
+            "type": "string"
+          },
+          "rounding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcRoundingRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          },
+          "system_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Code"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "result_key",
+          "title",
+          "value",
+          "unit",
+          "category",
+          "discipline",
+          "system_code",
+          "scenario",
+          "step_key",
+          "output",
+          "rounding"
+        ],
+        "title": "CalcResultRead",
+        "type": "object"
+      },
+      "CalcResultTraceRead": {
+        "properties": {
+          "result_key": {
+            "title": "Result Key",
+            "type": "string"
+          },
+          "root": {
+            "$ref": "#/components/schemas/CalcTraceNode"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "result_key",
+          "text",
+          "root"
+        ],
+        "title": "CalcResultTraceRead",
+        "type": "object"
+      },
       "CalcReviewStatus": {
         "description": "Проверка человеком.",
         "enum": [
@@ -4038,6 +4876,92 @@
         ],
         "title": "CalcReviewStatus",
         "type": "string"
+      },
+      "CalcRoundingMode": {
+        "enum": [
+          "HALF_UP",
+          "CEILING",
+          "FLOOR"
+        ],
+        "title": "CalcRoundingMode",
+        "type": "string"
+      },
+      "CalcRoundingPolicy": {
+        "additionalProperties": false,
+        "description": "Явное округление: способ и шаг. Без него ядро не округляет ничего.",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/CalcRoundingMode"
+          },
+          "quantum": {
+            "description": "Десятичное число строкой: «12.5», «-1», «0.035».",
+            "pattern": "^-?\\d{1,12}(\\.\\d{1,9})?$",
+            "title": "Quantum",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "quantum"
+        ],
+        "title": "CalcRoundingPolicy",
+        "type": "object"
+      },
+      "CalcRoundingRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "After",
+            "type": "string"
+          },
+          "before": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "Before",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/CalcRoundingMode"
+          },
+          "quantum": {
+            "description": "Десятичное число строкой: «12.5», «-1», «0.035».",
+            "pattern": "^-?\\d{1,12}(\\.\\d{1,9})?$",
+            "title": "Quantum",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "target",
+          "before",
+          "after",
+          "unit",
+          "mode",
+          "quantum",
+          "reason"
+        ],
+        "title": "CalcRoundingRecord",
+        "type": "object"
       },
       "CalcRuleApplicability": {
         "additionalProperties": false,
@@ -4133,6 +5057,64 @@
           "comment"
         ],
         "title": "CalcRuleApprove",
+        "type": "object"
+      },
+      "CalcRuleBinding": {
+        "additionalProperties": false,
+        "description": "Точная версия правила, на которой шаг считался, — вместе с содержанием.",
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/CalcRuleContent"
+          },
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "handler_semantics_sha256": {
+            "title": "Handler Semantics Sha256",
+            "type": "string"
+          },
+          "implementation_key": {
+            "title": "Implementation Key",
+            "type": "string"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/CalcRuleType"
+          },
+          "rule_version_id": {
+            "format": "uuid",
+            "title": "Rule Version Id",
+            "type": "string"
+          },
+          "status_at_run": {
+            "$ref": "#/components/schemas/CalcRuleStatus"
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "step_key",
+          "rule_key",
+          "rule_version_id",
+          "version",
+          "status_at_run",
+          "rule_type",
+          "content_sha256",
+          "implementation_key",
+          "handler_semantics_sha256",
+          "content"
+        ],
+        "title": "CalcRuleBinding",
         "type": "object"
       },
       "CalcRuleContent": {
@@ -4344,6 +5326,72 @@
           "comment"
         ],
         "title": "CalcRuleDecision",
+        "type": "object"
+      },
+      "CalcRuleDiff": {
+        "properties": {
+          "base_content_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Content Sha256"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "other_content_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Content Sha256"
+          },
+          "other_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Version"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_key",
+          "rule_key",
+          "base_version",
+          "other_version",
+          "base_content_sha256",
+          "other_content_sha256"
+        ],
+        "title": "CalcRuleDiff",
         "type": "object"
       },
       "CalcRuleDimensionCheck": {
@@ -4641,6 +5689,38 @@
           "versions"
         ],
         "title": "CalcRuleRead",
+        "type": "object"
+      },
+      "CalcRuleRef": {
+        "properties": {
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "implementation_key": {
+            "title": "Implementation Key",
+            "type": "string"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/CalcRuleType"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule_key",
+          "version",
+          "rule_type",
+          "content_sha256",
+          "implementation_key"
+        ],
+        "title": "CalcRuleRef",
         "type": "object"
       },
       "CalcRuleReviewRead": {
@@ -5044,6 +6124,771 @@
         "title": "CalcRuleVersionRead",
         "type": "object"
       },
+      "CalcRunCompareRead": {
+        "properties": {
+          "base_run_id": {
+            "format": "uuid",
+            "title": "Base Run Id",
+            "type": "string"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/CalcFactDiff"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "invalidated_steps": {
+            "items": {
+              "$ref": "#/components/schemas/CalcStepDiff"
+            },
+            "title": "Invalidated Steps",
+            "type": "array"
+          },
+          "other_run_id": {
+            "format": "uuid",
+            "title": "Other Run Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CalcResultDiff"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleDiff"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "same_calculator": {
+            "title": "Same Calculator",
+            "type": "boolean"
+          },
+          "same_scenario": {
+            "title": "Same Scenario",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "base_run_id",
+          "other_run_id",
+          "same_calculator",
+          "same_scenario",
+          "facts",
+          "rules",
+          "invalidated_steps",
+          "results"
+        ],
+        "title": "CalcRunCompareRead",
+        "type": "object"
+      },
+      "CalcRunCreate": {
+        "additionalProperties": false,
+        "description": "Запуск калькулятора. Область — какой корпус, этаж, система считаются.",
+        "properties": {
+          "calculator_id": {
+            "maxLength": 100,
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,4}$",
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_version": {
+            "minimum": 1.0,
+            "title": "Calculator Version",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._:-]{8,100}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          }
+        },
+        "required": [
+          "calculator_id",
+          "calculator_version",
+          "scenario",
+          "scope"
+        ],
+        "title": "CalcRunCreate",
+        "type": "object"
+      },
+      "CalcRunFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "step_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Key"
+          }
+        },
+        "required": [
+          "step_key",
+          "error",
+          "message"
+        ],
+        "title": "CalcRunFailure",
+        "type": "object"
+      },
+      "CalcRunRead": {
+        "properties": {
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/CalcAssumptionRecord"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "blocking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocking"
+          },
+          "blocking_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/CalcBlockingReason"
+            },
+            "title": "Blocking Reasons",
+            "type": "array"
+          },
+          "calculator_id": {
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_sha256": {
+            "title": "Calculator Sha256",
+            "type": "string"
+          },
+          "calculator_title": {
+            "title": "Calculator Title",
+            "type": "string"
+          },
+          "calculator_version": {
+            "title": "Calculator Version",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "effective_on": {
+            "format": "date",
+            "title": "Effective On",
+            "type": "string"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcRunFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "result_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Sha256"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/CalcResultRead"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "results_count": {
+            "title": "Results Count",
+            "type": "integer"
+          },
+          "rule_bindings": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleBinding"
+            },
+            "title": "Rule Bindings",
+            "type": "array"
+          },
+          "rule_bindings_sha256": {
+            "title": "Rule Bindings Sha256",
+            "type": "string"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/CalcSnapshot"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcRunStatus"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/CalcStepRead"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/CalcRunVersions"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "calculator_id",
+          "calculator_version",
+          "calculator_title",
+          "scenario",
+          "status",
+          "results_count",
+          "blocking",
+          "result_sha256",
+          "created_by",
+          "created_at",
+          "scope",
+          "effective_on",
+          "idempotency_key",
+          "calculator_sha256",
+          "versions",
+          "snapshot",
+          "rule_bindings",
+          "rule_bindings_sha256",
+          "blocking_reasons",
+          "failure",
+          "assumptions",
+          "warnings",
+          "steps",
+          "results"
+        ],
+        "title": "CalcRunRead",
+        "type": "object"
+      },
+      "CalcRunReplayRead": {
+        "description": "Повтор исторического запуска из его снимка и его версий правил.",
+        "properties": {
+          "original_result_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Result Sha256"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "replay_result_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replay Result Sha256"
+          },
+          "reproducible": {
+            "title": "Reproducible",
+            "type": "boolean"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "reproducible",
+          "original_result_sha256",
+          "replay_result_sha256",
+          "problems"
+        ],
+        "title": "CalcRunReplayRead",
+        "type": "object"
+      },
+      "CalcRunStatus": {
+        "description": "Итог запуска. Запуск исполняется синхронно одной транзакцией: промежуточных\nсостояний («проверяется», «считается») снаружи не видно, записывается только итог.",
+        "enum": [
+          "BLOCKED",
+          "SUCCEEDED",
+          "FAILED"
+        ],
+        "title": "CalcRunStatus",
+        "type": "string"
+      },
+      "CalcRunSummaryRead": {
+        "properties": {
+          "blocking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocking"
+          },
+          "calculator_id": {
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_title": {
+            "title": "Calculator Title",
+            "type": "string"
+          },
+          "calculator_version": {
+            "title": "Calculator Version",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "result_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Sha256"
+          },
+          "results_count": {
+            "title": "Results Count",
+            "type": "integer"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcRunStatus"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "calculator_id",
+          "calculator_version",
+          "calculator_title",
+          "scenario",
+          "status",
+          "results_count",
+          "blocking",
+          "result_sha256",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CalcRunSummaryRead",
+        "type": "object"
+      },
+      "CalcRunValidateRead": {
+        "description": "Проверка запроса без запуска: что будет использовано и что мешает.",
+        "properties": {
+          "blocking_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/CalcBlockingReason"
+            },
+            "title": "Blocking Reasons",
+            "type": "array"
+          },
+          "calculator_id": {
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_version": {
+            "title": "Calculator Version",
+            "type": "integer"
+          },
+          "rule_bindings": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleBinding"
+            },
+            "title": "Rule Bindings",
+            "type": "array"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/CalcSnapshot"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "calculator_id",
+          "calculator_version",
+          "scenario",
+          "valid",
+          "blocking_reasons",
+          "warnings",
+          "snapshot",
+          "rule_bindings"
+        ],
+        "title": "CalcRunValidateRead",
+        "type": "object"
+      },
+      "CalcRunVersions": {
+        "additionalProperties": false,
+        "description": "Версии всего, что определяет результат, кроме калькулятора и правил.",
+        "properties": {
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "fact_types": {
+            "title": "Fact Types",
+            "type": "string"
+          },
+          "facts_policy": {
+            "title": "Facts Policy",
+            "type": "string"
+          },
+          "scenario_policy": {
+            "title": "Scenario Policy",
+            "type": "string"
+          },
+          "snapshot": {
+            "title": "Snapshot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine",
+          "scenario_policy",
+          "facts_policy",
+          "fact_types",
+          "snapshot"
+        ],
+        "title": "CalcRunVersions",
+        "type": "object"
+      },
+      "CalcScenario": {
+        "description": "Сценарий стадии П. Какие классы правил допустимы — решает политика сценариев.",
+        "enum": [
+          "MINIMUM",
+          "EXPECTED",
+          "TENDER_SAFE"
+        ],
+        "title": "CalcScenario",
+        "type": "string"
+      },
+      "CalcSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSnapshotItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "items",
+          "sha256"
+        ],
+        "title": "CalcSnapshot",
+        "type": "object"
+      },
+      "CalcSnapshotItem": {
+        "additionalProperties": false,
+        "description": "Факт, как его увидело ядро: значение, носитель, способ выбора и происхождение.",
+        "properties": {
+          "calculation_eligible": {
+            "title": "Calculation Eligible",
+            "type": "boolean"
+          },
+          "claim_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Claim Ids",
+            "type": "array"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/CalcConfidence"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/CalcEvidenceRef"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "fact_id": {
+            "format": "uuid",
+            "title": "Fact Id",
+            "type": "string"
+          },
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "fact_type": {
+            "title": "Fact Type",
+            "type": "string"
+          },
+          "fact_version": {
+            "title": "Fact Version",
+            "type": "integer"
+          },
+          "item_sha256": {
+            "title": "Item Sha256",
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/CalcFactMethod"
+          },
+          "resolution_state": {
+            "$ref": "#/components/schemas/CalcResolutionState"
+          },
+          "review_status": {
+            "$ref": "#/components/schemas/CalcReviewStatus"
+          },
+          "source_class": {
+            "$ref": "#/components/schemas/CalcSourceClass"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "stated_value": {
+            "discriminator": {
+              "mapping": {
+                "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                "COUNT": "#/components/schemas/CalcCountValue",
+                "ENUM": "#/components/schemas/CalcEnumValue",
+                "NUMBER": "#/components/schemas/CalcNumberValue",
+                "RANGE": "#/components/schemas/CalcRangeValue",
+                "TEXT": "#/components/schemas/CalcTextValue"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalcNumberValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcCountValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcBooleanValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcEnumValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcTextValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcRangeValue"
+              }
+            ],
+            "title": "Stated Value"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "value": {
+            "discriminator": {
+              "mapping": {
+                "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                "COUNT": "#/components/schemas/CalcCountValue",
+                "ENUM": "#/components/schemas/CalcEnumValue",
+                "NUMBER": "#/components/schemas/CalcNumberValue",
+                "RANGE": "#/components/schemas/CalcRangeValue",
+                "TEXT": "#/components/schemas/CalcTextValue"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalcNumberValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcCountValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcBooleanValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcEnumValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcTextValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcRangeValue"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "fact_key",
+          "fact_type",
+          "subject",
+          "fact_id",
+          "fact_version",
+          "value",
+          "stated_value",
+          "method",
+          "confidence",
+          "review_status",
+          "resolution_state",
+          "source_id",
+          "source_class",
+          "claim_ids",
+          "evidence",
+          "calculation_eligible",
+          "item_sha256"
+        ],
+        "title": "CalcSnapshotItem",
+        "type": "object"
+      },
       "CalcSourceClass": {
         "description": "Класс источника. От него зависит приоритет, но не «глобальная истина».",
         "enum": [
@@ -5265,6 +7110,301 @@
         "title": "CalcStageBasis",
         "type": "string"
       },
+      "CalcStepDiff": {
+        "description": "Шаг, который пересчитывается: его отпечаток изменился, и названо почему.",
+        "properties": {
+          "base_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Fingerprint"
+          },
+          "causes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Causes",
+            "type": "array"
+          },
+          "other_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Fingerprint"
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_key",
+          "base_fingerprint",
+          "other_fingerprint",
+          "causes"
+        ],
+        "title": "CalcStepDiff",
+        "type": "object"
+      },
+      "CalcStepInput": {
+        "additionalProperties": false,
+        "description": "Вход шага: откуда взят, какое значение, какой перевод единиц.",
+        "properties": {
+          "conversion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcConversion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "fact_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Key"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CalcInputSource"
+          },
+          "step_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Key"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "source",
+          "value",
+          "unit"
+        ],
+        "title": "CalcStepInput",
+        "type": "object"
+      },
+      "CalcStepOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "conversion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcConversion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value",
+          "unit"
+        ],
+        "title": "CalcStepOutput",
+        "type": "object"
+      },
+      "CalcStepRead": {
+        "properties": {
+          "assumption": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcAssumptionRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcStepInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/CalcStepOutput"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/CalcStepInput"
+            },
+            "title": "Parameters",
+            "type": "array"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "reused_from_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reused From Run Id"
+          },
+          "roundings": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRoundingRecord"
+            },
+            "title": "Roundings",
+            "type": "array"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcRuleRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcStepStatus"
+          },
+          "step_key": {
+            "title": "Step Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_key",
+          "position",
+          "title",
+          "status",
+          "rule",
+          "inputs",
+          "parameters",
+          "outputs",
+          "roundings",
+          "explanation",
+          "fingerprint",
+          "reused_from_run_id",
+          "assumption"
+        ],
+        "title": "CalcStepRead",
+        "type": "object"
+      },
+      "CalcStepStatus": {
+        "enum": [
+          "EXECUTED",
+          "REUSED",
+          "NOT_APPLIED"
+        ],
+        "title": "CalcStepStatus",
+        "type": "string"
+      },
       "CalcSystemRead": {
         "properties": {
           "code": {
@@ -5384,6 +7524,91 @@
           "value"
         ],
         "title": "CalcTextValue",
+        "type": "object"
+      },
+      "CalcTraceKind": {
+        "enum": [
+          "RESULT",
+          "ROUNDING",
+          "STEP",
+          "RULE",
+          "ASSUMPTION",
+          "FACT",
+          "EVIDENCE",
+          "PARAMETER",
+          "CONVERSION"
+        ],
+        "title": "CalcTraceKind",
+        "type": "string"
+      },
+      "CalcTraceNode": {
+        "description": "Узел цепочки объяснения: результат → шаг → правило, входы → факт → свидетельство.",
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/CalcTraceNode"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcTraceKind"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "title",
+          "text"
+        ],
+        "title": "CalcTraceNode",
         "type": "object"
       },
       "CalcValueKind": {
@@ -13402,6 +15627,32 @@
         ]
       }
     },
+    "/api/v1/calc/calculators": {
+      "get": {
+        "description": "Что можно запустить: версии, система, стадия, сценарии, нужные факты и правила.",
+        "operationId": "list_calc_calculators",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcCalculatorRead"
+                  },
+                  "title": "Response List Calc Calculators",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Калькуляторы расчётного ядра",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
     "/api/v1/calc/conflicts/{conflict_id}/decision": {
       "post": {
         "operationId": "decide_calc_conflict",
@@ -14427,6 +16678,159 @@
         ]
       }
     },
+    "/api/v1/calc/projects/{project_id}/runs": {
+      "get": {
+        "operationId": "list_calc_runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcRunSummaryRead"
+                  },
+                  "title": "Response List Calc Runs",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запуски расчёта проекта",
+        "tags": [
+          "calc"
+        ]
+      },
+      "post": {
+        "description": "Нехватка данных — запуск BLOCKED с причинами, а не ошибка. Повтор с тем же ключом\nидемпотентности возвращает уже созданный запуск (200).",
+        "operationId": "create_calc_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRunRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить расчёт",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/runs/validate": {
+      "post": {
+        "description": "Какие факты и версии правил будут использованы и что блокирует расчёт. Ничего не пишет.",
+        "operationId": "validate_calc_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcRunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRunValidateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Проверить запрос расчёта без запуска",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
     "/api/v1/calc/projects/{project_id}/sources": {
       "get": {
         "operationId": "list_calc_sources",
@@ -15075,6 +17479,253 @@
           }
         },
         "summary": "Отклонить черновик правила",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/runs/compare": {
+      "get": {
+        "description": "Что изменилось: факты, версии правил, шаги с новым отпечатком и почему, результаты.",
+        "operationId": "compare_calc_runs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "base",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Base",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "other",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Other",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRunCompareRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сравнить два запуска",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/runs/{run_id}": {
+      "get": {
+        "description": "Запуск целиком: снимок, версии правил, шаги, результаты, причины блокировки.",
+        "operationId": "get_calc_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRunRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запуск расчёта",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/runs/{run_id}/replay": {
+      "post": {
+        "description": "Пересчёт из снимка и версий правил самого запуска; ничего не пишет.",
+        "operationId": "replay_calc_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRunReplayRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Повторить исторический запуск",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/runs/{run_id}/results/{result_key}": {
+      "get": {
+        "operationId": "get_calc_run_result",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "result_key",
+            "required": true,
+            "schema": {
+              "title": "Result Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcResultRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Результат запуска",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/runs/{run_id}/results/{result_key}/trace": {
+      "get": {
+        "description": "Цепочка: результат → шаг → версия правила, входы → факт → свидетельство.",
+        "operationId": "get_calc_run_trace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "result_key",
+            "required": true,
+            "schema": {
+              "title": "Result Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcResultTraceRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Почему такое значение",
         "tags": [
           "calc"
         ]

@@ -2,11 +2,14 @@
 
 import {
   createCalcInspection,
+  getCalcRun,
+  getCalcRunTrace,
   listCalcDocuments,
   listCalcFactTypes,
   listCalcInputFacts,
   listCalcLegacyRules,
   listCalcRules,
+  listCalcRuns,
   readCalcReadiness,
   type CalcInspectionCreate,
 } from '@quantor/api-client';
@@ -28,6 +31,9 @@ export const calcQueryKeys = {
     ['project', projectId, 'calc', 'input-facts', limit] as const,
   factTypes: ['calc', 'fact-types'] as const,
   rules: ['calc', 'rules'] as const,
+  runs: (projectId: string) => ['project', projectId, 'calc', 'runs'] as const,
+  run: (runId: string) => ['calc', 'run', runId] as const,
+  trace: (runId: string, resultKey: string) => ['calc', 'run', runId, 'trace', resultKey] as const,
   legacyRules: ['calc', 'legacy-rules'] as const,
 };
 
@@ -99,5 +105,37 @@ export const useCalcLegacyRules = (enabled: boolean) =>
     queryKey: calcQueryKeys.legacyRules,
     enabled,
     queryFn: async () => unwrap(await listCalcLegacyRules({ throwOnError: true })),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+export const useCalcRuns = (projectId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: calcQueryKeys.runs(projectId),
+    enabled,
+    queryFn: async () =>
+      unwrap(await listCalcRuns({ throwOnError: true, path: { project_id: projectId } })),
+  });
+
+/** Запуск неизменяем — однажды загруженный не устаревает. */
+export const useCalcRun = (runId: string | null) =>
+  useQuery({
+    queryKey: calcQueryKeys.run(runId ?? ''),
+    enabled: runId !== null,
+    queryFn: async () =>
+      unwrap(await getCalcRun({ throwOnError: true, path: { run_id: runId ?? '' } })),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+export const useCalcRunTrace = (runId: string, resultKey: string | null) =>
+  useQuery({
+    queryKey: calcQueryKeys.trace(runId, resultKey ?? ''),
+    enabled: resultKey !== null,
+    queryFn: async () =>
+      unwrap(
+        await getCalcRunTrace({
+          throwOnError: true,
+          path: { run_id: runId, result_key: resultKey ?? '' },
+        }),
+      ),
     staleTime: Number.POSITIVE_INFINITY,
   });

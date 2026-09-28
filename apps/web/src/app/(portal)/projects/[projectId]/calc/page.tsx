@@ -51,9 +51,17 @@ const CalcPage = ({ params }: IPageProps) => {
         ]}
         status={<StatusBadge tone="warning">разработка · расчёта ещё нет</StatusBadge>}
         actions={
-          <ButtonLink href={`/projects/${projectId}/calc/rules`} transitionTypes={['nav-forward']}>
-            Правила
-          </ButtonLink>
+          <>
+            <ButtonLink href={`/projects/${projectId}/calc/runs`} transitionTypes={['nav-forward']}>
+              Запуски
+            </ButtonLink>
+            <ButtonLink
+              href={`/projects/${projectId}/calc/rules`}
+              transitionTypes={['nav-forward']}
+            >
+              Правила
+            </ButtonLink>
+          </>
         }
       />
       <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">

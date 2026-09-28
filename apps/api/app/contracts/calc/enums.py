@@ -463,3 +463,94 @@ class CalcHazardOutcome(StrEnum):
     """Часть старого правила, к которой относится опасность, в новую версию не взята."""
     REJECTED = "REJECTED"
     """Опасность подтверждена и не устранена: версию утверждать нельзя."""
+
+
+# ------------------------------------------------------------------ расчётное ядро (PROMPT 04)
+
+
+class CalcScenario(StrEnum):
+    """Сценарий стадии П. Какие классы правил допустимы — решает политика сценариев."""
+
+    MINIMUM = "MINIMUM"
+    EXPECTED = "EXPECTED"
+    TENDER_SAFE = "TENDER_SAFE"
+
+
+class CalcRunStatus(StrEnum):
+    """Итог запуска. Запуск исполняется синхронно одной транзакцией: промежуточных
+    состояний («проверяется», «считается») снаружи не видно, записывается только итог."""
+
+    BLOCKED = "BLOCKED"
+    """Расчёт нельзя корректно начать: нет факта, открыт конфликт, нет утверждённого правила."""
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    """Проверка прошла, но исполнение упало — ошибка программы, а не нехватка данных."""
+
+
+class CalcStepStatus(StrEnum):
+    EXECUTED = "EXECUTED"
+    REUSED = "REUSED"
+    """Отпечаток шага совпал с шагом прежнего запуска — результат взят оттуда, источник записан."""
+    NOT_APPLIED = "NOT_APPLIED"
+    """Допущение не применено сценарием: значение передано без изменения, причина записана."""
+
+
+class CalcBlockCode(StrEnum):
+    """Почему запуск заблокирован. Ни одна причина не заменяется нулём или умолчанием."""
+
+    CALCULATOR_INVALID = "CALCULATOR_INVALID"
+    SCENARIO_NOT_SUPPORTED = "SCENARIO_NOT_SUPPORTED"
+    SCOPE_INVALID = "SCOPE_INVALID"
+    FACT_MISSING = "FACT_MISSING"
+    FACT_EXCLUDED = "FACT_EXCLUDED"
+    """Есть только утверждения, не допущенные к расчёту (ВОР Заказчика, отклонённые)."""
+    FACT_CONFLICT = "FACT_CONFLICT"
+    FACT_DECISION_STALE = "FACT_DECISION_STALE"
+    FACT_NOT_EXACT = "FACT_NOT_EXACT"
+    """Значение не точное число: диапазон, текст, «не определено»."""
+    RULE_NOT_FOUND = "RULE_NOT_FOUND"
+    RULE_NOT_APPROVED = "RULE_NOT_APPROVED"
+    RULE_NOT_EFFECTIVE = "RULE_NOT_EFFECTIVE"
+    RULE_NOT_APPLICABLE = "RULE_NOT_APPLICABLE"
+    RULE_TYPE_NOT_ALLOWED = "RULE_TYPE_NOT_ALLOWED"
+    """Тип правила не допускается шагом или сценарием — например, тендерное допущение."""
+    RULE_CONTRACT_MISMATCH = "RULE_CONTRACT_MISMATCH"
+    IMPLEMENTATION_MISSING = "IMPLEMENTATION_MISSING"
+    UNIT_INCOMPATIBLE = "UNIT_INCOMPATIBLE"
+
+
+class CalcInputSource(StrEnum):
+    FACT = "FACT"
+    STEP = "STEP"
+    PARAMETER = "PARAMETER"
+
+
+class CalcResultCategory(StrEnum):
+    """Инженерная величина запуска. Это ещё не позиция Расчётного паспорта (PROMPT 06)."""
+
+    INTERMEDIATE = "INTERMEDIATE"
+    ENGINEERING = "ENGINEERING"
+
+
+class CalcRoundingMode(StrEnum):
+    HALF_UP = "HALF_UP"
+    CEILING = "CEILING"
+    FLOOR = "FLOOR"
+
+
+class CalcCalculatorKind(StrEnum):
+    DEMO = "DEMO"
+    """Доказывает архитектуру ядра на синтетике — не инженерный расчёт."""
+    ENGINEERING = "ENGINEERING"
+
+
+class CalcTraceKind(StrEnum):
+    RESULT = "RESULT"
+    ROUNDING = "ROUNDING"
+    STEP = "STEP"
+    RULE = "RULE"
+    ASSUMPTION = "ASSUMPTION"
+    FACT = "FACT"
+    EVIDENCE = "EVIDENCE"
+    PARAMETER = "PARAMETER"
+    CONVERSION = "CONVERSION"

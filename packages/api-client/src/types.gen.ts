@@ -365,6 +365,94 @@ export type CalcAssumptionEvidence = {
 export type CalcAssumptionPolicy = 'NOT_ALLOWED' | 'MANUAL' | 'REGISTERED_RULE';
 
 /**
+ * CalcAssumptionRecord
+ *
+ * Использованное или не применённое допущение — никогда не скрытое.
+ */
+export type CalcAssumptionRecord = {
+    /**
+     * Affected Results
+     */
+    affected_results: Array<string>;
+    /**
+     * Applied
+     */
+    applied: boolean;
+    /**
+     * Base Value
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    base_value: string;
+    /**
+     * Delta
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    delta: string;
+    /**
+     * Impact
+     */
+    impact: string | null;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Rule Key
+     */
+    rule_key: string | null;
+    /**
+     * Step Key
+     */
+    step_key: string;
+    /**
+     * Unit
+     */
+    unit: string | null;
+    /**
+     * Value
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    value: string;
+    /**
+     * Version
+     */
+    version: number | null;
+};
+
+/**
+ * CalcBlockCode
+ *
+ * Почему запуск заблокирован. Ни одна причина не заменяется нулём или умолчанием.
+ */
+export type CalcBlockCode = 'CALCULATOR_INVALID' | 'SCENARIO_NOT_SUPPORTED' | 'SCOPE_INVALID' | 'FACT_MISSING' | 'FACT_EXCLUDED' | 'FACT_CONFLICT' | 'FACT_DECISION_STALE' | 'FACT_NOT_EXACT' | 'RULE_NOT_FOUND' | 'RULE_NOT_APPROVED' | 'RULE_NOT_EFFECTIVE' | 'RULE_NOT_APPLICABLE' | 'RULE_TYPE_NOT_ALLOWED' | 'RULE_CONTRACT_MISMATCH' | 'IMPLEMENTATION_MISSING' | 'UNIT_INCOMPATIBLE';
+
+/**
+ * CalcBlockingReason
+ */
+export type CalcBlockingReason = {
+    code: CalcBlockCode;
+    /**
+     * Fact Key
+     */
+    fact_key?: string | null;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Rule Key
+     */
+    rule_key?: string | null;
+    /**
+     * Step Key
+     */
+    step_key?: string | null;
+};
+
+/**
  * CalcBooleanValue
  */
 export type CalcBooleanValue = {
@@ -376,6 +464,140 @@ export type CalcBooleanValue = {
      * Value
      */
     value: boolean;
+};
+
+/**
+ * CalcCalculatorFactRead
+ */
+export type CalcCalculatorFactRead = {
+    /**
+     * Fact Type
+     */
+    fact_type: string;
+    /**
+     * Input
+     */
+    input: string;
+    /**
+     * Step Key
+     */
+    step_key: string;
+    /**
+     * Subject Fields
+     */
+    subject_fields: Array<string>;
+};
+
+/**
+ * CalcCalculatorKind
+ */
+export type CalcCalculatorKind = 'DEMO' | 'ENGINEERING';
+
+/**
+ * CalcCalculatorRead
+ */
+export type CalcCalculatorRead = {
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Sha256
+     */
+    calculator_sha256: string;
+    discipline: CalcDiscipline;
+    /**
+     * Facts
+     */
+    facts: Array<CalcCalculatorFactRead>;
+    kind: CalcCalculatorKind;
+    /**
+     * Results
+     */
+    results: Array<CalcCalculatorResultRead>;
+    /**
+     * Rules
+     */
+    rules: Array<string>;
+    /**
+     * Scenarios
+     */
+    scenarios: Array<CalcScenario>;
+    /**
+     * Scope Fields
+     */
+    scope_fields: Array<string>;
+    stage: CalcDocumentStage;
+    /**
+     * Steps
+     */
+    steps: Array<CalcCalculatorStepRead>;
+    /**
+     * Systems
+     */
+    systems: Array<string>;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * CalcCalculatorResultRead
+ */
+export type CalcCalculatorResultRead = {
+    category: CalcResultCategory;
+    /**
+     * Output
+     */
+    output: string;
+    /**
+     * Result Key
+     */
+    result_key: string;
+    rounding: CalcRoundingPolicy | null;
+    /**
+     * Step Key
+     */
+    step_key: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcCalculatorStepRead
+ */
+export type CalcCalculatorStepRead = {
+    /**
+     * Allowed Rule Types
+     */
+    allowed_rule_types: Array<CalcRuleType>;
+    /**
+     * Assumption
+     */
+    assumption: boolean;
+    /**
+     * Depends On
+     */
+    depends_on: Array<string>;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    /**
+     * Step Key
+     */
+    step_key: string;
+    /**
+     * Title
+     */
+    title: string;
 };
 
 /**
@@ -479,6 +701,34 @@ export type CalcConflictRead = {
  * Состояние конфликта ключа факта.
  */
 export type CalcConflictStatus = 'OPEN' | 'RESOLVED' | 'REOPENED' | 'OBSOLETE';
+
+/**
+ * CalcConversion
+ *
+ * Перевод единиц внутри ядра — всегда виден в цепочке расчёта.
+ */
+export type CalcConversion = {
+    /**
+     * From Unit
+     */
+    from_unit: string;
+    /**
+     * From Value
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    from_value: string;
+    /**
+     * To Unit
+     */
+    to_unit: string;
+    /**
+     * To Value
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    to_value: string;
+};
 
 /**
  * CalcCountValue
@@ -843,6 +1093,43 @@ export type CalcEvidenceRead = {
 };
 
 /**
+ * CalcEvidenceRef
+ *
+ * Ссылка на свидетельство утверждения — достаточно, чтобы дойти до места в документе.
+ */
+export type CalcEvidenceRef = {
+    /**
+     * Document Revision Id
+     */
+    document_revision_id: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    kind: CalcEvidenceKind;
+    /**
+     * Locator
+     */
+    locator: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+    /**
+     * Region Id
+     */
+    region_id: string | null;
+    /**
+     * Region Sha256
+     */
+    region_sha256: string | null;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string | null;
+};
+
+/**
  * CalcFactCreate
  *
  * Новое утверждение. Если у источника уже есть действующее по этому ключу — оно заменяется.
@@ -883,6 +1170,56 @@ export type CalcFactCreate = {
     } & CalcTextValue) | ({
         kind: 'RANGE';
     } & CalcRangeValue);
+};
+
+/**
+ * CalcFactDiff
+ */
+export type CalcFactDiff = {
+    /**
+     * Base Fact Id
+     */
+    base_fact_id: string | null;
+    /**
+     * Base Value
+     */
+    base_value: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue) | null;
+    /**
+     * Fact Key
+     */
+    fact_key: string;
+    /**
+     * Other Fact Id
+     */
+    other_fact_id: string | null;
+    /**
+     * Other Value
+     */
+    other_value: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue) | null;
 };
 
 /**
@@ -1261,6 +1598,11 @@ export type CalcInputFactRead = {
     source_title: string;
     usage: CalcFactUsage;
 };
+
+/**
+ * CalcInputSource
+ */
+export type CalcInputSource = 'FACT' | 'STEP' | 'PARAMETER';
 
 /**
  * CalcInspectionCreate
@@ -2095,11 +2437,162 @@ export type CalcRequirementScope = 'BUILDING' | 'FLOOR' | 'SYSTEM';
 export type CalcResolutionState = 'MISSING' | 'SINGLE' | 'CORROBORATED' | 'DECIDED' | 'DECIDED_STALE' | 'AUTO_PREFERRED' | 'UNRESOLVED';
 
 /**
+ * CalcResultCategory
+ *
+ * Инженерная величина запуска. Это ещё не позиция Расчётного паспорта (PROMPT 06).
+ */
+export type CalcResultCategory = 'INTERMEDIATE' | 'ENGINEERING';
+
+/**
+ * CalcResultDiff
+ */
+export type CalcResultDiff = {
+    /**
+     * Base Value
+     */
+    base_value: string | null;
+    /**
+     * Other Value
+     */
+    other_value: string | null;
+    /**
+     * Result Key
+     */
+    result_key: string;
+    /**
+     * Unit
+     */
+    unit: string | null;
+};
+
+/**
+ * CalcResultRead
+ *
+ * Инженерная величина запуска — ещё не позиция Расчётного паспорта.
+ */
+export type CalcResultRead = {
+    category: CalcResultCategory;
+    discipline: CalcDiscipline;
+    /**
+     * Output
+     */
+    output: string;
+    /**
+     * Result Key
+     */
+    result_key: string;
+    rounding: CalcRoundingRecord | null;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    scenario: CalcScenario;
+    /**
+     * Step Key
+     */
+    step_key: string;
+    /**
+     * System Code
+     */
+    system_code: string | null;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Unit
+     */
+    unit: string | null;
+    /**
+     * Value
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    value: string;
+};
+
+/**
+ * CalcResultTraceRead
+ */
+export type CalcResultTraceRead = {
+    /**
+     * Result Key
+     */
+    result_key: string;
+    root: CalcTraceNode;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
  * CalcReviewStatus
  *
  * Проверка человеком.
  */
 export type CalcReviewStatus = 'UNREVIEWED' | 'CONFIRMED' | 'REJECTED';
+
+/**
+ * CalcRoundingMode
+ */
+export type CalcRoundingMode = 'HALF_UP' | 'CEILING' | 'FLOOR';
+
+/**
+ * CalcRoundingPolicy
+ *
+ * Явное округление: способ и шаг. Без него ядро не округляет ничего.
+ */
+export type CalcRoundingPolicy = {
+    mode: CalcRoundingMode;
+    /**
+     * Quantum
+     *
+     * Десятичное число строкой: «12.5», «-1», «0.035».
+     */
+    quantum: string;
+};
+
+/**
+ * CalcRoundingRecord
+ */
+export type CalcRoundingRecord = {
+    /**
+     * After
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    after: string;
+    /**
+     * Before
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    before: string;
+    mode: CalcRoundingMode;
+    /**
+     * Quantum
+     *
+     * Десятичное число строкой: «12.5», «-1», «0.035».
+     */
+    quantum: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Target
+     */
+    target: string;
+    /**
+     * Unit
+     */
+    unit: string | null;
+};
 
 /**
  * CalcRuleApplicability
@@ -2143,6 +2636,45 @@ export type CalcRuleApprove = {
      * Legacy Review
      */
     legacy_review?: Array<CalcLegacyResolution>;
+};
+
+/**
+ * CalcRuleBinding
+ *
+ * Точная версия правила, на которой шаг считался, — вместе с содержанием.
+ */
+export type CalcRuleBinding = {
+    content: CalcRuleContent;
+    /**
+     * Content Sha256
+     */
+    content_sha256: string;
+    /**
+     * Handler Semantics Sha256
+     */
+    handler_semantics_sha256: string;
+    /**
+     * Implementation Key
+     */
+    implementation_key: string;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    rule_type: CalcRuleType;
+    /**
+     * Rule Version Id
+     */
+    rule_version_id: string;
+    status_at_run: CalcRuleStatus;
+    /**
+     * Step Key
+     */
+    step_key: string;
+    /**
+     * Version
+     */
+    version: number;
 };
 
 /**
@@ -2231,6 +2763,36 @@ export type CalcRuleDecision = {
      * Comment
      */
     comment: string;
+};
+
+/**
+ * CalcRuleDiff
+ */
+export type CalcRuleDiff = {
+    /**
+     * Base Content Sha256
+     */
+    base_content_sha256: string | null;
+    /**
+     * Base Version
+     */
+    base_version: number | null;
+    /**
+     * Other Content Sha256
+     */
+    other_content_sha256: string | null;
+    /**
+     * Other Version
+     */
+    other_version: number | null;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    /**
+     * Step Key
+     */
+    step_key: string;
 };
 
 /**
@@ -2397,6 +2959,29 @@ export type CalcRuleRead = {
      * Versions
      */
     versions: Array<CalcRuleVersionRead>;
+};
+
+/**
+ * CalcRuleRef
+ */
+export type CalcRuleRef = {
+    /**
+     * Content Sha256
+     */
+    content_sha256: string;
+    /**
+     * Implementation Key
+     */
+    implementation_key: string;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    rule_type: CalcRuleType;
+    /**
+     * Version
+     */
+    version: number;
 };
 
 /**
@@ -2583,6 +3168,429 @@ export type CalcRuleVersionRead = {
 };
 
 /**
+ * CalcRunCompareRead
+ */
+export type CalcRunCompareRead = {
+    /**
+     * Base Run Id
+     */
+    base_run_id: string;
+    /**
+     * Facts
+     */
+    facts: Array<CalcFactDiff>;
+    /**
+     * Invalidated Steps
+     */
+    invalidated_steps: Array<CalcStepDiff>;
+    /**
+     * Other Run Id
+     */
+    other_run_id: string;
+    /**
+     * Results
+     */
+    results: Array<CalcResultDiff>;
+    /**
+     * Rules
+     */
+    rules: Array<CalcRuleDiff>;
+    /**
+     * Same Calculator
+     */
+    same_calculator: boolean;
+    /**
+     * Same Scenario
+     */
+    same_scenario: boolean;
+};
+
+/**
+ * CalcRunCreate
+ *
+ * Запуск калькулятора. Область — какой корпус, этаж, система считаются.
+ */
+export type CalcRunCreate = {
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Version
+     */
+    calculator_version: number;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key?: string | null;
+    scenario: CalcScenario;
+    scope: CalcFactSubject;
+};
+
+/**
+ * CalcRunFailure
+ */
+export type CalcRunFailure = {
+    /**
+     * Error
+     */
+    error: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Step Key
+     */
+    step_key: string | null;
+};
+
+/**
+ * CalcRunRead
+ */
+export type CalcRunRead = {
+    /**
+     * Assumptions
+     */
+    assumptions: Array<CalcAssumptionRecord>;
+    /**
+     * Blocking
+     */
+    blocking: string | null;
+    /**
+     * Blocking Reasons
+     */
+    blocking_reasons: Array<CalcBlockingReason>;
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Sha256
+     */
+    calculator_sha256: string;
+    /**
+     * Calculator Title
+     */
+    calculator_title: string;
+    /**
+     * Calculator Version
+     */
+    calculator_version: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Effective On
+     */
+    effective_on: string;
+    failure: CalcRunFailure | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key: string | null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Result Sha256
+     */
+    result_sha256: string | null;
+    /**
+     * Results
+     */
+    results: Array<CalcResultRead>;
+    /**
+     * Results Count
+     */
+    results_count: number;
+    /**
+     * Rule Bindings
+     */
+    rule_bindings: Array<CalcRuleBinding>;
+    /**
+     * Rule Bindings Sha256
+     */
+    rule_bindings_sha256: string;
+    scenario: CalcScenario;
+    scope: CalcFactSubject;
+    snapshot: CalcSnapshot;
+    status: CalcRunStatus;
+    /**
+     * Steps
+     */
+    steps: Array<CalcStepRead>;
+    versions: CalcRunVersions;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * CalcRunReplayRead
+ *
+ * Повтор исторического запуска из его снимка и его версий правил.
+ */
+export type CalcRunReplayRead = {
+    /**
+     * Original Result Sha256
+     */
+    original_result_sha256: string | null;
+    /**
+     * Problems
+     */
+    problems: Array<string>;
+    /**
+     * Replay Result Sha256
+     */
+    replay_result_sha256: string | null;
+    /**
+     * Reproducible
+     */
+    reproducible: boolean;
+    /**
+     * Run Id
+     */
+    run_id: string;
+};
+
+/**
+ * CalcRunStatus
+ *
+ * Итог запуска. Запуск исполняется синхронно одной транзакцией: промежуточных
+ * состояний («проверяется», «считается») снаружи не видно, записывается только итог.
+ */
+export type CalcRunStatus = 'BLOCKED' | 'SUCCEEDED' | 'FAILED';
+
+/**
+ * CalcRunSummaryRead
+ */
+export type CalcRunSummaryRead = {
+    /**
+     * Blocking
+     */
+    blocking: string | null;
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Title
+     */
+    calculator_title: string;
+    /**
+     * Calculator Version
+     */
+    calculator_version: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Result Sha256
+     */
+    result_sha256: string | null;
+    /**
+     * Results Count
+     */
+    results_count: number;
+    scenario: CalcScenario;
+    status: CalcRunStatus;
+};
+
+/**
+ * CalcRunValidateRead
+ *
+ * Проверка запроса без запуска: что будет использовано и что мешает.
+ */
+export type CalcRunValidateRead = {
+    /**
+     * Blocking Reasons
+     */
+    blocking_reasons: Array<CalcBlockingReason>;
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Version
+     */
+    calculator_version: number;
+    /**
+     * Rule Bindings
+     */
+    rule_bindings: Array<CalcRuleBinding>;
+    scenario: CalcScenario;
+    snapshot: CalcSnapshot;
+    /**
+     * Valid
+     */
+    valid: boolean;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * CalcRunVersions
+ *
+ * Версии всего, что определяет результат, кроме калькулятора и правил.
+ */
+export type CalcRunVersions = {
+    /**
+     * Engine
+     */
+    engine: string;
+    /**
+     * Fact Types
+     */
+    fact_types: string;
+    /**
+     * Facts Policy
+     */
+    facts_policy: string;
+    /**
+     * Scenario Policy
+     */
+    scenario_policy: string;
+    /**
+     * Snapshot
+     */
+    snapshot: string;
+};
+
+/**
+ * CalcScenario
+ *
+ * Сценарий стадии П. Какие классы правил допустимы — решает политика сценариев.
+ */
+export type CalcScenario = 'MINIMUM' | 'EXPECTED' | 'TENDER_SAFE';
+
+/**
+ * CalcSnapshot
+ */
+export type CalcSnapshot = {
+    /**
+     * Items
+     */
+    items: Array<CalcSnapshotItem>;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Version
+     */
+    version: string;
+};
+
+/**
+ * CalcSnapshotItem
+ *
+ * Факт, как его увидело ядро: значение, носитель, способ выбора и происхождение.
+ */
+export type CalcSnapshotItem = {
+    /**
+     * Calculation Eligible
+     */
+    calculation_eligible: boolean;
+    /**
+     * Claim Ids
+     */
+    claim_ids: Array<string>;
+    confidence: CalcConfidence;
+    /**
+     * Evidence
+     */
+    evidence: Array<CalcEvidenceRef>;
+    /**
+     * Fact Id
+     */
+    fact_id: string;
+    /**
+     * Fact Key
+     */
+    fact_key: string;
+    /**
+     * Fact Type
+     */
+    fact_type: string;
+    /**
+     * Fact Version
+     */
+    fact_version: number;
+    /**
+     * Item Sha256
+     */
+    item_sha256: string;
+    method: CalcFactMethod;
+    resolution_state: CalcResolutionState;
+    review_status: CalcReviewStatus;
+    source_class: CalcSourceClass;
+    /**
+     * Source Id
+     */
+    source_id: string;
+    /**
+     * Stated Value
+     */
+    stated_value: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue);
+    subject: CalcFactSubject;
+    /**
+     * Value
+     */
+    value: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue);
+};
+
+/**
  * CalcSourceClass
  *
  * Класс источника. От него зависит приоритет, но не «глобальная истина».
@@ -2682,6 +3690,145 @@ export type CalcSourceRead = {
 export type CalcStageBasis = 'DECLARED' | 'DECLARED_OVER_STAMP';
 
 /**
+ * CalcStepDiff
+ *
+ * Шаг, который пересчитывается: его отпечаток изменился, и названо почему.
+ */
+export type CalcStepDiff = {
+    /**
+     * Base Fingerprint
+     */
+    base_fingerprint: string | null;
+    /**
+     * Causes
+     */
+    causes: Array<string>;
+    /**
+     * Other Fingerprint
+     */
+    other_fingerprint: string | null;
+    /**
+     * Step Key
+     */
+    step_key: string;
+};
+
+/**
+ * CalcStepInput
+ *
+ * Вход шага: откуда взят, какое значение, какой перевод единиц.
+ */
+export type CalcStepInput = {
+    conversion?: CalcConversion | null;
+    /**
+     * Fact Id
+     */
+    fact_id?: string | null;
+    /**
+     * Fact Key
+     */
+    fact_key?: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Output
+     */
+    output?: string | null;
+    source: CalcInputSource;
+    /**
+     * Step Key
+     */
+    step_key?: string | null;
+    /**
+     * Unit
+     */
+    unit: string | null;
+    /**
+     * Value
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    value: string;
+};
+
+/**
+ * CalcStepOutput
+ */
+export type CalcStepOutput = {
+    conversion?: CalcConversion | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Unit
+     */
+    unit: string | null;
+    /**
+     * Value
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    value: string;
+};
+
+/**
+ * CalcStepRead
+ */
+export type CalcStepRead = {
+    assumption: CalcAssumptionRecord | null;
+    /**
+     * Explanation
+     */
+    explanation: string;
+    /**
+     * Fingerprint
+     */
+    fingerprint: string;
+    /**
+     * Inputs
+     */
+    inputs: Array<CalcStepInput>;
+    /**
+     * Outputs
+     */
+    outputs: Array<CalcStepOutput>;
+    /**
+     * Parameters
+     */
+    parameters: Array<CalcStepInput>;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Reused From Run Id
+     */
+    reused_from_run_id: string | null;
+    /**
+     * Roundings
+     */
+    roundings: Array<CalcRoundingRecord>;
+    rule: CalcRuleRef | null;
+    status: CalcStepStatus;
+    /**
+     * Step Key
+     */
+    step_key: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcStepStatus
+ */
+export type CalcStepStatus = 'EXECUTED' | 'REUSED' | 'NOT_APPLIED';
+
+/**
  * CalcSystemRead
  */
 export type CalcSystemRead = {
@@ -2753,6 +3900,48 @@ export type CalcTextValue = {
      * Value
      */
     value: string;
+};
+
+/**
+ * CalcTraceKind
+ */
+export type CalcTraceKind = 'RESULT' | 'ROUNDING' | 'STEP' | 'RULE' | 'ASSUMPTION' | 'FACT' | 'EVIDENCE' | 'PARAMETER' | 'CONVERSION';
+
+/**
+ * CalcTraceNode
+ *
+ * Узел цепочки объяснения: результат → шаг → правило, входы → факт → свидетельство.
+ */
+export type CalcTraceNode = {
+    /**
+     * Children
+     */
+    children?: Array<CalcTraceNode>;
+    /**
+     * Key
+     */
+    key: string;
+    kind: CalcTraceKind;
+    /**
+     * Ref
+     */
+    ref?: string | null;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+    /**
+     * Value
+     */
+    value?: string | null;
 };
 
 /**
@@ -7135,6 +8324,24 @@ export type ReadSessionResponses = {
 
 export type ReadSessionResponse = ReadSessionResponses[keyof ReadSessionResponses];
 
+export type ListCalcCalculatorsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/calc/calculators';
+};
+
+export type ListCalcCalculatorsResponses = {
+    /**
+     * Response List Calc Calculators
+     *
+     * Successful Response
+     */
+    200: Array<CalcCalculatorRead>;
+};
+
+export type ListCalcCalculatorsResponse = ListCalcCalculatorsResponses[keyof ListCalcCalculatorsResponses];
+
 export type DecideCalcConflictData = {
     body: CalcDecisionCreate;
     path: {
@@ -7713,6 +8920,98 @@ export type ReadCalcReadinessResponses = {
 
 export type ReadCalcReadinessResponse = ReadCalcReadinessResponses[keyof ReadCalcReadinessResponses];
 
+export type ListCalcRunsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/runs';
+};
+
+export type ListCalcRunsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcRunsError = ListCalcRunsErrors[keyof ListCalcRunsErrors];
+
+export type ListCalcRunsResponses = {
+    /**
+     * Response List Calc Runs
+     *
+     * Successful Response
+     */
+    200: Array<CalcRunSummaryRead>;
+};
+
+export type ListCalcRunsResponse = ListCalcRunsResponses[keyof ListCalcRunsResponses];
+
+export type CreateCalcRunData = {
+    body: CalcRunCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/runs';
+};
+
+export type CreateCalcRunErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcRunError = CreateCalcRunErrors[keyof CreateCalcRunErrors];
+
+export type CreateCalcRunResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcRunRead;
+};
+
+export type CreateCalcRunResponse = CreateCalcRunResponses[keyof CreateCalcRunResponses];
+
+export type ValidateCalcRunData = {
+    body: CalcRunCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/runs/validate';
+};
+
+export type ValidateCalcRunErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ValidateCalcRunError = ValidateCalcRunErrors[keyof ValidateCalcRunErrors];
+
+export type ValidateCalcRunResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRunValidateRead;
+};
+
+export type ValidateCalcRunResponse = ValidateCalcRunResponses[keyof ValidateCalcRunResponses];
+
 export type ListCalcSourcesData = {
     body?: never;
     path: {
@@ -8089,6 +9388,168 @@ export type RejectCalcRuleVersionResponses = {
 };
 
 export type RejectCalcRuleVersionResponse = RejectCalcRuleVersionResponses[keyof RejectCalcRuleVersionResponses];
+
+export type CompareCalcRunsData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Base
+         */
+        base: string;
+        /**
+         * Other
+         */
+        other: string;
+    };
+    url: '/api/v1/calc/runs/compare';
+};
+
+export type CompareCalcRunsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CompareCalcRunsError = CompareCalcRunsErrors[keyof CompareCalcRunsErrors];
+
+export type CompareCalcRunsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRunCompareRead;
+};
+
+export type CompareCalcRunsResponse = CompareCalcRunsResponses[keyof CompareCalcRunsResponses];
+
+export type GetCalcRunData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/runs/{run_id}';
+};
+
+export type GetCalcRunErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcRunError = GetCalcRunErrors[keyof GetCalcRunErrors];
+
+export type GetCalcRunResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRunRead;
+};
+
+export type GetCalcRunResponse = GetCalcRunResponses[keyof GetCalcRunResponses];
+
+export type ReplayCalcRunData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/runs/{run_id}/replay';
+};
+
+export type ReplayCalcRunErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReplayCalcRunError = ReplayCalcRunErrors[keyof ReplayCalcRunErrors];
+
+export type ReplayCalcRunResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcRunReplayRead;
+};
+
+export type ReplayCalcRunResponse = ReplayCalcRunResponses[keyof ReplayCalcRunResponses];
+
+export type GetCalcRunResultData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+        /**
+         * Result Key
+         */
+        result_key: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/runs/{run_id}/results/{result_key}';
+};
+
+export type GetCalcRunResultErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcRunResultError = GetCalcRunResultErrors[keyof GetCalcRunResultErrors];
+
+export type GetCalcRunResultResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcResultRead;
+};
+
+export type GetCalcRunResultResponse = GetCalcRunResultResponses[keyof GetCalcRunResultResponses];
+
+export type GetCalcRunTraceData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+        /**
+         * Result Key
+         */
+        result_key: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/runs/{run_id}/results/{result_key}/trace';
+};
+
+export type GetCalcRunTraceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcRunTraceError = GetCalcRunTraceErrors[keyof GetCalcRunTraceErrors];
+
+export type GetCalcRunTraceResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcResultTraceRead;
+};
+
+export type GetCalcRunTraceResponse = GetCalcRunTraceResponses[keyof GetCalcRunTraceResponses];
 
 export type ReadDocumentData = {
     body?: never;

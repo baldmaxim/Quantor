@@ -143,6 +143,7 @@ class AuditAction(StrEnum):
     CALC_RULE_APPROVED = "calc_rule_approved"
     CALC_RULE_REJECTED = "calc_rule_rejected"
     CALC_RULE_DEPRECATED = "calc_rule_deprecated"
+    CALC_RUN_CREATED = "calc_run_created"
 
     JOB_RETRIED = "job_retried"
     JOB_CANCELLED = "job_cancelled"

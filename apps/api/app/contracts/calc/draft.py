@@ -5,15 +5,12 @@
 (`contracts/quantities.py`). Контракт уточняется до этапа реализации; в OpenAPI он не попадает,
 пока на него не сослался маршрут.
 
+Реализованы и вынесены: правила — `rules.py` (PROMPT 03); запуск, шаг, результат, снимок
+входов, допущение и ссылка запуска на версию правила — `engine.py` (PROMPT 04).
+
 | Сущность            | Промт реализации |
 | ------------------- | ---------------- |
-| RuleReference       | 04 (ссылка запуска на версию реестра правил PROMPT 03) |
-| CalculationInput    | 04               |
-| Assumption          | 04               |
-| CalculationRun      | 04               |
-| CalculationStep     | 04               |
-| CalculationResult   | 04               |
-| ExpectedQuantity    | 04–06            |
+| ExpectedQuantity    | 05–06            |
 | CustomerVorItem     | 09               |
 | VorMatch            | 09               |
 | ProjectQuestion     | 10               |
@@ -22,20 +19,15 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from enum import StrEnum
-from typing import Annotated, Final
+from typing import Final
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-from app.contracts.calc.enums import (
-    CalcConfidence,
-    CalcDiscipline,
-    CalcRuleStatus,
-    CalcRuleType,
-)
+from app.contracts.calc.enums import CalcConfidence, CalcDiscipline, CalcScenario
 from app.contracts.calc.subjects import CalcFactSubject
-from app.contracts.calc.values import CalcFactValue, DecimalText
+from app.contracts.calc.values import DecimalText
 
 DRAFT_CONTRACTS_VERSION: Final = "calc.draft.v0"
 
@@ -44,30 +36,12 @@ class _Draft(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-# ------------------------------------------------------------------------------ правила
-
-
-class CalcRuleReference(_Draft):
-    """Ссылка на версию реестра правил так, как её запоминает запуск: ключ, версия, хеш."""
-
-    rule_key: Annotated[str, Field(min_length=1, max_length=120)]
-    version: Annotated[int, Field(ge=1)]
-    content_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-    rule_type: CalcRuleType
-    status: CalcRuleStatus
-    """Статус на момент запуска."""
-
-
 # ------------------------------------------------------------------------------ расчёт
 
 
-class CalcScenario(StrEnum):
-    MINIMUM = "MINIMUM"
-    EXPECTED = "EXPECTED"
-    TENDER_SAFE = "TENDER_SAFE"
-
-
 class CalcResultStatus(StrEnum):
+    """Статус позиции паспорта в сценарии (PROMPT 06)."""
+
     DETERMINED = "DETERMINED"
     NOT_DETERMINED = "NOT_DETERMINED"
     NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
@@ -75,85 +49,11 @@ class CalcResultStatus(StrEnum):
     BLOCKED_BY_CONFLICT = "BLOCKED_BY_CONFLICT"
 
 
-class CalcRunStatus(StrEnum):
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-
-
 class CalcElementProvenance(StrEnum):
     OBSERVED = "OBSERVED"
     CALCULATED = "CALCULATED"
     SYNTHESIZED = "SYNTHESIZED"
     ASSUMED = "ASSUMED"
-
-
-class CalcCalculationInput(_Draft):
-    """Вход запуска: действующее значение факта на момент расчёта — копия, а не ссылка."""
-
-    fact_key: str
-    subject: CalcFactSubject
-    value: CalcFactValue
-    chosen_fact_id: uuid.UUID
-    """Утверждение-носитель. Только допущенное к расчёту: ВОР Заказчика сюда не попадает."""
-
-
-class CalcAssumption(_Draft):
-    """Зарегистрированное допущение: что принято, на каком основании и какие были альтернативы."""
-
-    key: str
-    subject: CalcFactSubject
-    value: CalcFactValue
-    basis: str
-    rule: CalcRuleReference | None
-    alternatives: list[CalcFactValue]
-
-
-class CalcCalculationRun(_Draft):
-    id: uuid.UUID
-    project_id: uuid.UUID
-    calculator: str
-    """Калькулятор с версией: «vk.passport.v1»."""
-    engine_version: str
-    status: CalcRunStatus
-    parent_run_id: uuid.UUID | None
-    facts_snapshot_sha256: str
-    rules: list[CalcRuleReference]
-    started_at: datetime
-    finished_at: datetime | None
-
-
-class CalcStepInputRef(_Draft):
-    """Вход шага: факт или результат другого шага, со значением на момент расчёта."""
-
-    fact_key: str | None
-    step_key: str | None
-    value: CalcFactValue
-
-
-class CalcCalculationStep(_Draft):
-    run_id: uuid.UUID
-    step_key: str
-    """Стабильный ключ шага: «vk.v1/K1/sec:2/zone:1/riser:3/length»."""
-    scenario: CalcScenario
-    inputs: list[CalcStepInputRef]
-    rule: CalcRuleReference | None
-    formula: str | None
-    """Русский шаблон формулы для раскрытия цифры."""
-    output: CalcFactValue | None
-    status: CalcResultStatus
-    assumptions: list[str]
-
-
-class CalcCalculationResult(_Draft):
-    """Инженерная величина — расход, зона, DN, число стояков. Не позиция паспорта."""
-
-    run_id: uuid.UUID
-    result_key: str
-    subject: CalcFactSubject
-    values: dict[CalcScenario, CalcFactValue | None]
-    status: dict[CalcScenario, CalcResultStatus]
-    step_keys: list[str]
 
 
 class CalcItemDescriptor(_Draft):

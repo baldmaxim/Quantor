@@ -214,12 +214,6 @@ class TestFactTypes:
 
 class TestDraftContracts:
     ENTITIES = (
-        "CalcCalculationInput",
-        "CalcAssumption",
-        "CalcRuleReference",
-        "CalcCalculationRun",
-        "CalcCalculationStep",
-        "CalcCalculationResult",
         "CalcExpectedQuantity",
         "CalcCustomerVorItem",
         "CalcVorMatch",
@@ -233,5 +227,5 @@ class TestDraftContracts:
         for name in self.ENTITIES:
             assert hasattr(draft, name), name
         tables = set(Base.metadata.tables)
-        for forbidden in ("calc_runs", "calc_steps", "calc_results", "calc_vor_items"):
+        for forbidden in ("calc_expected_quantities", "calc_vor_items", "calc_questions"):
             assert forbidden not in tables

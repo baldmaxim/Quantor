@@ -111,6 +111,11 @@ class ErrorCode(StrEnum):
     CALC_RULE_SELF_APPROVAL = "CALC_RULE_SELF_APPROVAL"
     CALC_LEGACY_OUT_OF_SCOPE = "CALC_LEGACY_OUT_OF_SCOPE"
 
+    # --- расчётный контур: расчётное ядро (ADR-0030, PROMPT 04) ---
+    # Тот же ключ идемпотентности с другим запросом: вернуть чужой запуск было бы подменой.
+    CALC_RUN_IDEMPOTENCY_CONFLICT = "CALC_RUN_IDEMPOTENCY_CONFLICT"
+    CALC_RUN_COMPARE_INVALID = "CALC_RUN_COMPARE_INVALID"
+
     # --- инфраструктура ---
     STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
@@ -210,6 +215,10 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CALC_LEGACY_OUT_OF_SCOPE: (
         "Правило старого портала вне расчётного контура: цены, НДС и импорт счетов не переносятся"
     ),
+    ErrorCode.CALC_RUN_IDEMPOTENCY_CONFLICT: (
+        "Ключ идемпотентности уже использован для другого запроса расчёта"
+    ),
+    ErrorCode.CALC_RUN_COMPARE_INVALID: "Сравнивать можно только запуски одного проекта",
     ErrorCode.CALC_REVISION_NOT_LATEST: (
         "У документа есть более новая ревизия — собирайте факты из неё"
     ),
@@ -308,6 +317,8 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CALC_RULE_APPROVAL_BLOCKED: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_RULE_SELF_APPROVAL: status.HTTP_403_FORBIDDEN,
     ErrorCode.CALC_LEGACY_OUT_OF_SCOPE: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_RUN_IDEMPOTENCY_CONFLICT: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_RUN_COMPARE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.GEOMETRY_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,

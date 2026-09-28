@@ -11,6 +11,7 @@ from app.models.calc import (
     CalcSourceInspection,
 )
 from app.models.calc_rules import CalcRuleDefinition, CalcRuleReview, CalcRuleVersion
+from app.models.calc_runs import CalcRun, CalcRunResult, CalcRunStep
 from app.models.control_plane import FeatureFlagOverride, SettingOverride
 from app.models.document import Document, DocumentRevision
 from app.models.identity import AuthSession, UserIdentity, Workspace, WorkspaceMembership
@@ -32,6 +33,9 @@ __all__ = [
     "CalcRuleDefinition",
     "CalcRuleReview",
     "CalcRuleVersion",
+    "CalcRun",
+    "CalcRunResult",
+    "CalcRunStep",
     "CalcSource",
     "CalcSourceInspection",
     "Document",

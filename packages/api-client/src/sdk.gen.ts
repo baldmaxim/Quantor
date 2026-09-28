@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApproveCalcRuleVersionData, ApproveCalcRuleVersionErrors, ApproveCalcRuleVersionResponses, ArchiveTakeoffItemData, ArchiveTakeoffItemErrors, ArchiveTakeoffItemResponses, BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompleteLoginData, CompleteLoginErrors, CreateCalcFactData, CreateCalcFactErrors, CreateCalcFactResponses, CreateCalcInspectionData, CreateCalcInspectionErrors, CreateCalcInspectionResponses, CreateCalcRuleData, CreateCalcRuleErrors, CreateCalcRuleFromLegacyData, CreateCalcRuleFromLegacyErrors, CreateCalcRuleFromLegacyResponses, CreateCalcRuleResponses, CreateCalcRuleVersionData, CreateCalcRuleVersionErrors, CreateCalcRuleVersionResponses, CreateCalcSourceData, CreateCalcSourceErrors, CreateCalcSourceResponses, CreateMeasurementData, CreateMeasurementErrors, CreateMeasurementResponses, CreateMeasurementsBatchData, CreateMeasurementsBatchErrors, CreateMeasurementsBatchResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateSheetCalibrationData, CreateSheetCalibrationErrors, CreateSheetCalibrationResponses, CreateTakeoffItemData, CreateTakeoffItemErrors, CreateTakeoffItemResponses, DecideCalcConflictData, DecideCalcConflictErrors, DecideCalcConflictResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteMeasurementData, DeleteMeasurementErrors, DeleteMeasurementResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, DeprecateCalcRuleVersionData, DeprecateCalcRuleVersionErrors, DeprecateCalcRuleVersionResponses, ExportSheetTakeoffData, ExportSheetTakeoffErrors, ExportSheetTakeoffResponses, GetCalcFactData, GetCalcFactErrors, GetCalcFactResponses, GetCalcLegacyRuleData, GetCalcLegacyRuleErrors, GetCalcLegacyRuleResponses, GetCalcRuleData, GetCalcRuleErrors, GetCalcRuleResponses, GetCalcRuleVersionData, GetCalcRuleVersionErrors, GetCalcRuleVersionResponses, GetMepScenarioData, GetMepScenarioErrors, GetMepScenarioResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListCalcConflictsData, ListCalcConflictsErrors, ListCalcConflictsResponses, ListCalcDocumentsData, ListCalcDocumentsErrors, ListCalcDocumentsResponses, ListCalcFactsData, ListCalcFactsErrors, ListCalcFactsResponses, ListCalcFactTypesData, ListCalcFactTypesResponses, ListCalcFactValuesData, ListCalcFactValuesErrors, ListCalcFactValuesResponses, ListCalcInputFactsData, ListCalcInputFactsErrors, ListCalcInputFactsResponses, ListCalcInspectionsData, ListCalcInspectionsErrors, ListCalcInspectionsResponses, ListCalcLegacyRulesData, ListCalcLegacyRulesErrors, ListCalcLegacyRulesResponses, ListCalcRequirementsData, ListCalcRequirementsResponses, ListCalcRulesData, ListCalcRulesErrors, ListCalcRulesResponses, ListCalcSourcesData, ListCalcSourcesErrors, ListCalcSourcesResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListMepScenariosData, ListMepScenariosResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetCalibrationsData, ListSheetCalibrationsErrors, ListSheetCalibrationsResponses, ListSheetMeasurementsData, ListSheetMeasurementsErrors, ListSheetMeasurementsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTakeoffItemsData, ListTakeoffItemsErrors, ListTakeoffItemsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, MakeCalibrationDefaultData, MakeCalibrationDefaultErrors, MakeCalibrationDefaultResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadCalcReadinessData, ReadCalcReadinessErrors, ReadCalcReadinessResponses, ReadCalibrationData, ReadCalibrationErrors, ReadCalibrationResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadSheetGeometryData, ReadSheetGeometryErrors, ReadSheetGeometryResponses, ReadSheetQuantitiesData, ReadSheetQuantitiesErrors, ReadSheetQuantitiesResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RejectCalcRuleVersionData, RejectCalcRuleVersionErrors, RejectCalcRuleVersionResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, ReviewCalcFactData, ReviewCalcFactErrors, ReviewCalcFactResponses, SetCalibrationVerificationData, SetCalibrationVerificationErrors, SetCalibrationVerificationResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateCalcRuleDraftData, UpdateCalcRuleDraftErrors, UpdateCalcRuleDraftResponses, UpdateMeasurementData, UpdateMeasurementErrors, UpdateMeasurementResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UpdateTakeoffItemData, UpdateTakeoffItemErrors, UpdateTakeoffItemResponses, UploadFileData, UploadFileErrors, UploadFileResponses, WithdrawCalcFactData, WithdrawCalcFactErrors, WithdrawCalcFactResponses } from './types.gen';
+import type { ApproveCalcRuleVersionData, ApproveCalcRuleVersionErrors, ApproveCalcRuleVersionResponses, ArchiveTakeoffItemData, ArchiveTakeoffItemErrors, ArchiveTakeoffItemResponses, BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompareCalcRunsData, CompareCalcRunsErrors, CompareCalcRunsResponses, CompleteLoginData, CompleteLoginErrors, CreateCalcFactData, CreateCalcFactErrors, CreateCalcFactResponses, CreateCalcInspectionData, CreateCalcInspectionErrors, CreateCalcInspectionResponses, CreateCalcRuleData, CreateCalcRuleErrors, CreateCalcRuleFromLegacyData, CreateCalcRuleFromLegacyErrors, CreateCalcRuleFromLegacyResponses, CreateCalcRuleResponses, CreateCalcRuleVersionData, CreateCalcRuleVersionErrors, CreateCalcRuleVersionResponses, CreateCalcRunData, CreateCalcRunErrors, CreateCalcRunResponses, CreateCalcSourceData, CreateCalcSourceErrors, CreateCalcSourceResponses, CreateMeasurementData, CreateMeasurementErrors, CreateMeasurementResponses, CreateMeasurementsBatchData, CreateMeasurementsBatchErrors, CreateMeasurementsBatchResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateSheetCalibrationData, CreateSheetCalibrationErrors, CreateSheetCalibrationResponses, CreateTakeoffItemData, CreateTakeoffItemErrors, CreateTakeoffItemResponses, DecideCalcConflictData, DecideCalcConflictErrors, DecideCalcConflictResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteMeasurementData, DeleteMeasurementErrors, DeleteMeasurementResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, DeprecateCalcRuleVersionData, DeprecateCalcRuleVersionErrors, DeprecateCalcRuleVersionResponses, ExportSheetTakeoffData, ExportSheetTakeoffErrors, ExportSheetTakeoffResponses, GetCalcFactData, GetCalcFactErrors, GetCalcFactResponses, GetCalcLegacyRuleData, GetCalcLegacyRuleErrors, GetCalcLegacyRuleResponses, GetCalcRuleData, GetCalcRuleErrors, GetCalcRuleResponses, GetCalcRuleVersionData, GetCalcRuleVersionErrors, GetCalcRuleVersionResponses, GetCalcRunData, GetCalcRunErrors, GetCalcRunResponses, GetCalcRunResultData, GetCalcRunResultErrors, GetCalcRunResultResponses, GetCalcRunTraceData, GetCalcRunTraceErrors, GetCalcRunTraceResponses, GetMepScenarioData, GetMepScenarioErrors, GetMepScenarioResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListCalcCalculatorsData, ListCalcCalculatorsResponses, ListCalcConflictsData, ListCalcConflictsErrors, ListCalcConflictsResponses, ListCalcDocumentsData, ListCalcDocumentsErrors, ListCalcDocumentsResponses, ListCalcFactsData, ListCalcFactsErrors, ListCalcFactsResponses, ListCalcFactTypesData, ListCalcFactTypesResponses, ListCalcFactValuesData, ListCalcFactValuesErrors, ListCalcFactValuesResponses, ListCalcInputFactsData, ListCalcInputFactsErrors, ListCalcInputFactsResponses, ListCalcInspectionsData, ListCalcInspectionsErrors, ListCalcInspectionsResponses, ListCalcLegacyRulesData, ListCalcLegacyRulesErrors, ListCalcLegacyRulesResponses, ListCalcRequirementsData, ListCalcRequirementsResponses, ListCalcRulesData, ListCalcRulesErrors, ListCalcRulesResponses, ListCalcRunsData, ListCalcRunsErrors, ListCalcRunsResponses, ListCalcSourcesData, ListCalcSourcesErrors, ListCalcSourcesResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListMepScenariosData, ListMepScenariosResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetCalibrationsData, ListSheetCalibrationsErrors, ListSheetCalibrationsResponses, ListSheetMeasurementsData, ListSheetMeasurementsErrors, ListSheetMeasurementsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTakeoffItemsData, ListTakeoffItemsErrors, ListTakeoffItemsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, MakeCalibrationDefaultData, MakeCalibrationDefaultErrors, MakeCalibrationDefaultResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadCalcReadinessData, ReadCalcReadinessErrors, ReadCalcReadinessResponses, ReadCalibrationData, ReadCalibrationErrors, ReadCalibrationResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadSheetGeometryData, ReadSheetGeometryErrors, ReadSheetGeometryResponses, ReadSheetQuantitiesData, ReadSheetQuantitiesErrors, ReadSheetQuantitiesResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RejectCalcRuleVersionData, RejectCalcRuleVersionErrors, RejectCalcRuleVersionResponses, ReplayCalcRunData, ReplayCalcRunErrors, ReplayCalcRunResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, ReviewCalcFactData, ReviewCalcFactErrors, ReviewCalcFactResponses, SetCalibrationVerificationData, SetCalibrationVerificationErrors, SetCalibrationVerificationResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateCalcRuleDraftData, UpdateCalcRuleDraftErrors, UpdateCalcRuleDraftResponses, UpdateMeasurementData, UpdateMeasurementErrors, UpdateMeasurementResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UpdateTakeoffItemData, UpdateTakeoffItemErrors, UpdateTakeoffItemResponses, UploadFileData, UploadFileErrors, UploadFileResponses, ValidateCalcRunData, ValidateCalcRunErrors, ValidateCalcRunResponses, WithdrawCalcFactData, WithdrawCalcFactErrors, WithdrawCalcFactResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -258,6 +258,13 @@ export const logout = <ThrowOnError extends boolean = false>(options?: Options<L
 export const readSession = <ThrowOnError extends boolean = false>(options?: Options<ReadSessionData, ThrowOnError>): RequestResult<ReadSessionResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ReadSessionResponses, unknown, ThrowOnError>({ url: '/api/v1/auth/session', ...options });
 
 /**
+ * Калькуляторы расчётного ядра
+ *
+ * Что можно запустить: версии, система, стадия, сценарии, нужные факты и правила.
+ */
+export const listCalcCalculators = <ThrowOnError extends boolean = false>(options?: Options<ListCalcCalculatorsData, ThrowOnError>): RequestResult<ListCalcCalculatorsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListCalcCalculatorsResponses, unknown, ThrowOnError>({ url: '/api/v1/calc/calculators', ...options });
+
+/**
  * Решить конфликт источников
  */
 export const decideCalcConflict = <ThrowOnError extends boolean = false>(options: Options<DecideCalcConflictData, ThrowOnError>): RequestResult<DecideCalcConflictResponses, DecideCalcConflictErrors, ThrowOnError> => (options.client ?? client).post<DecideCalcConflictResponses, DecideCalcConflictErrors, ThrowOnError>({
@@ -403,6 +410,40 @@ export const createCalcInspection = <ThrowOnError extends boolean = false>(optio
 export const readCalcReadiness = <ThrowOnError extends boolean = false>(options: Options<ReadCalcReadinessData, ThrowOnError>): RequestResult<ReadCalcReadinessResponses, ReadCalcReadinessErrors, ThrowOnError> => (options.client ?? client).get<ReadCalcReadinessResponses, ReadCalcReadinessErrors, ThrowOnError>({ url: '/api/v1/calc/projects/{project_id}/readiness', ...options });
 
 /**
+ * Запуски расчёта проекта
+ */
+export const listCalcRuns = <ThrowOnError extends boolean = false>(options: Options<ListCalcRunsData, ThrowOnError>): RequestResult<ListCalcRunsResponses, ListCalcRunsErrors, ThrowOnError> => (options.client ?? client).get<ListCalcRunsResponses, ListCalcRunsErrors, ThrowOnError>({ url: '/api/v1/calc/projects/{project_id}/runs', ...options });
+
+/**
+ * Запустить расчёт
+ *
+ * Нехватка данных — запуск BLOCKED с причинами, а не ошибка. Повтор с тем же ключом
+ * идемпотентности возвращает уже созданный запуск (200).
+ */
+export const createCalcRun = <ThrowOnError extends boolean = false>(options: Options<CreateCalcRunData, ThrowOnError>): RequestResult<CreateCalcRunResponses, CreateCalcRunErrors, ThrowOnError> => (options.client ?? client).post<CreateCalcRunResponses, CreateCalcRunErrors, ThrowOnError>({
+    url: '/api/v1/calc/projects/{project_id}/runs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Проверить запрос расчёта без запуска
+ *
+ * Какие факты и версии правил будут использованы и что блокирует расчёт. Ничего не пишет.
+ */
+export const validateCalcRun = <ThrowOnError extends boolean = false>(options: Options<ValidateCalcRunData, ThrowOnError>): RequestResult<ValidateCalcRunResponses, ValidateCalcRunErrors, ThrowOnError> => (options.client ?? client).post<ValidateCalcRunResponses, ValidateCalcRunErrors, ThrowOnError>({
+    url: '/api/v1/calc/projects/{project_id}/runs/validate',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Источники фактов проекта
  */
 export const listCalcSources = <ThrowOnError extends boolean = false>(options: Options<ListCalcSourcesData, ThrowOnError>): RequestResult<ListCalcSourcesResponses, ListCalcSourcesErrors, ThrowOnError> => (options.client ?? client).get<ListCalcSourcesResponses, ListCalcSourcesErrors, ThrowOnError>({ url: '/api/v1/calc/projects/{project_id}/sources', ...options });
@@ -522,6 +563,39 @@ export const rejectCalcRuleVersion = <ThrowOnError extends boolean = false>(opti
         ...options.headers
     }
 });
+
+/**
+ * Сравнить два запуска
+ *
+ * Что изменилось: факты, версии правил, шаги с новым отпечатком и почему, результаты.
+ */
+export const compareCalcRuns = <ThrowOnError extends boolean = false>(options: Options<CompareCalcRunsData, ThrowOnError>): RequestResult<CompareCalcRunsResponses, CompareCalcRunsErrors, ThrowOnError> => (options.client ?? client).get<CompareCalcRunsResponses, CompareCalcRunsErrors, ThrowOnError>({ url: '/api/v1/calc/runs/compare', ...options });
+
+/**
+ * Запуск расчёта
+ *
+ * Запуск целиком: снимок, версии правил, шаги, результаты, причины блокировки.
+ */
+export const getCalcRun = <ThrowOnError extends boolean = false>(options: Options<GetCalcRunData, ThrowOnError>): RequestResult<GetCalcRunResponses, GetCalcRunErrors, ThrowOnError> => (options.client ?? client).get<GetCalcRunResponses, GetCalcRunErrors, ThrowOnError>({ url: '/api/v1/calc/runs/{run_id}', ...options });
+
+/**
+ * Повторить исторический запуск
+ *
+ * Пересчёт из снимка и версий правил самого запуска; ничего не пишет.
+ */
+export const replayCalcRun = <ThrowOnError extends boolean = false>(options: Options<ReplayCalcRunData, ThrowOnError>): RequestResult<ReplayCalcRunResponses, ReplayCalcRunErrors, ThrowOnError> => (options.client ?? client).post<ReplayCalcRunResponses, ReplayCalcRunErrors, ThrowOnError>({ url: '/api/v1/calc/runs/{run_id}/replay', ...options });
+
+/**
+ * Результат запуска
+ */
+export const getCalcRunResult = <ThrowOnError extends boolean = false>(options: Options<GetCalcRunResultData, ThrowOnError>): RequestResult<GetCalcRunResultResponses, GetCalcRunResultErrors, ThrowOnError> => (options.client ?? client).get<GetCalcRunResultResponses, GetCalcRunResultErrors, ThrowOnError>({ url: '/api/v1/calc/runs/{run_id}/results/{result_key}', ...options });
+
+/**
+ * Почему такое значение
+ *
+ * Цепочка: результат → шаг → версия правила, входы → факт → свидетельство.
+ */
+export const getCalcRunTrace = <ThrowOnError extends boolean = false>(options: Options<GetCalcRunTraceData, ThrowOnError>): RequestResult<GetCalcRunTraceResponses, GetCalcRunTraceErrors, ThrowOnError> => (options.client ?? client).get<GetCalcRunTraceResponses, GetCalcRunTraceErrors, ThrowOnError>({ url: '/api/v1/calc/runs/{run_id}/results/{result_key}/trace', ...options });
 
 /**
  * Документ
