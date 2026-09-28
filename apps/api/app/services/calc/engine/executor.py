@@ -59,6 +59,7 @@ class PriorStep:
     fingerprint: str
     outputs: tuple[CalcStepOutput, ...]
     explanation: str
+    roundings: tuple[CalcRoundingRecord, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -244,7 +245,7 @@ class _Executor:
         planned: PlannedStep,
         inputs: list[CalcStepInput],
         parameters: list[CalcStepInput],
-    ) -> tuple[list[CalcStepOutput], str]:
+    ) -> tuple[list[CalcStepOutput], str, list[CalcRoundingRecord]]:
         handler = planned.handler
         rule = planned.rule
         step_key = planned.step.step_key
@@ -278,6 +279,18 @@ class _Executor:
                         conversion=conversion,
                     )
                 )
+            roundings = [
+                CalcRoundingRecord(
+                    target=item.target,
+                    before=exact_text(item.before),
+                    after=exact_text(item.after),
+                    unit=item.unit,
+                    mode=item.policy.mode,
+                    quantum=item.policy.quantum,
+                    reason=item.reason,
+                )
+                for item in result.roundings
+            ]
         except Inexact as error:
             raise StepExecutionError(
                 step_key,
@@ -286,7 +299,7 @@ class _Executor:
             ) from error
         except Exception as error:
             raise StepExecutionError(step_key, type(error).__name__, str(error)) from error
-        return outputs, result.explanation
+        return outputs, result.explanation, roundings
 
     def affected_results(self, step_key: str) -> list[str]:
         definition = self.plan.definition
@@ -335,6 +348,7 @@ class _Executor:
         parameters = self.gather_parameters(planned)
         fingerprint = self.fingerprint(planned, inputs, parameters)
         reused_from: uuid.UUID | None = None
+        roundings: list[CalcRoundingRecord] = []
 
         if not planned.applied:
             base = next(
@@ -352,9 +366,10 @@ class _Executor:
             prior = self.reuse.get(fingerprint)
             if prior is not None:
                 outputs, explanation = list(prior.outputs), prior.explanation
+                roundings = list(prior.roundings)
                 status, reused_from = CalcStepStatus.REUSED, prior.run_id
             else:
-                outputs, explanation = self.compute(planned, inputs, parameters)
+                outputs, explanation, roundings = self.compute(planned, inputs, parameters)
                 status = CalcStepStatus.EXECUTED
             reason = (
                 f"Сценарий {self.plan.scenario.value} допускает тендерные допущения, шаг "
@@ -378,7 +393,7 @@ class _Executor:
                 inputs=inputs,
                 parameters=parameters,
                 outputs=outputs,
-                roundings=[],
+                roundings=roundings,
                 explanation=explanation,
                 fingerprint=fingerprint,
                 reused_from_run_id=reused_from,

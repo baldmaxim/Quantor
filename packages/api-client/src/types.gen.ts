@@ -427,7 +427,7 @@ export type CalcAssumptionRecord = {
  *
  * Почему запуск заблокирован. Ни одна причина не заменяется нулём или умолчанием.
  */
-export type CalcBlockCode = 'CALCULATOR_INVALID' | 'SCENARIO_NOT_SUPPORTED' | 'SCOPE_INVALID' | 'FACT_MISSING' | 'FACT_EXCLUDED' | 'FACT_CONFLICT' | 'FACT_DECISION_STALE' | 'FACT_NOT_EXACT' | 'RULE_NOT_FOUND' | 'RULE_NOT_APPROVED' | 'RULE_NOT_EFFECTIVE' | 'RULE_NOT_APPLICABLE' | 'RULE_TYPE_NOT_ALLOWED' | 'RULE_CONTRACT_MISMATCH' | 'IMPLEMENTATION_MISSING' | 'UNIT_INCOMPATIBLE';
+export type CalcBlockCode = 'CALCULATOR_INVALID' | 'SCENARIO_NOT_SUPPORTED' | 'SCOPE_INVALID' | 'FACT_MISSING' | 'FACT_EXCLUDED' | 'FACT_CONFLICT' | 'FACT_DECISION_STALE' | 'FACT_NOT_EXACT' | 'RULE_NOT_FOUND' | 'RULE_NOT_APPROVED' | 'RULE_NOT_EFFECTIVE' | 'RULE_NOT_APPLICABLE' | 'RULE_TYPE_NOT_ALLOWED' | 'RULE_CONTRACT_MISMATCH' | 'IMPLEMENTATION_MISSING' | 'UNIT_INCOMPATIBLE' | 'CALCULATION_NOT_USABLE' | 'CALCULATION_RESULT_MISSING';
 
 /**
  * CalcBlockingReason
@@ -598,6 +598,27 @@ export type CalcCalculatorStepRead = {
      * Title
      */
     title: string;
+};
+
+/**
+ * CalcCardinality
+ *
+ * Сколько экземпляров представляет элемент — точно или диапазоном.
+ */
+export type CalcCardinality = {
+    /**
+     * Max
+     */
+    max: number;
+    /**
+     * Min
+     */
+    min: number;
+    /**
+     * Selected
+     */
+    selected?: number | null;
+    selection?: CalcSelection | null;
 };
 
 /**
@@ -959,6 +980,63 @@ export type CalcDocumentFragmentEvidence = {
  * Заявленная стадия документа. Задаётся при заведении источника, в ревизию не пишется.
  */
 export type CalcDocumentStage = 'P' | 'RD' | 'UNKNOWN';
+
+/**
+ * CalcElementDiff
+ */
+export type CalcElementDiff = {
+    /**
+     * Change
+     */
+    change: 'ADDED' | 'REMOVED' | 'CHANGED';
+    /**
+     * Element Id
+     */
+    element_id: string;
+    /**
+     * Fields
+     */
+    fields: Array<string>;
+};
+
+/**
+ * CalcElementProvenance
+ *
+ * Откуда взялся элемент графа системы. Без одного из этих состояний элемент не хранится.
+ */
+export type CalcElementProvenance = 'OBSERVED' | 'CALCULATED' | 'SYNTHESIZED' | 'ASSUMED';
+
+/**
+ * CalcElementSource
+ *
+ * Основание элемента: результат расчёта, факт объекта или решение инженера.
+ */
+export type CalcElementSource = {
+    /**
+     * Fact Id
+     */
+    fact_id?: string | null;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Kind
+     */
+    kind: 'CALCULATION_RESULT' | 'FACT' | 'HUMAN_DECISION';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Unit
+     */
+    unit?: string | null;
+    /**
+     * Value
+     */
+    value?: string | null;
+};
 
 /**
  * CalcEngineeringSource
@@ -1545,6 +1623,44 @@ export type CalcFactWithdraw = {
      */
     reason: string;
 };
+
+/**
+ * CalcGeometry
+ *
+ * Что известно о геометрии. Точные координаты — только из источника.
+ */
+export type CalcGeometry = {
+    /**
+     * Anchor
+     */
+    anchor?: string | null;
+    /**
+     * Bbox
+     */
+    bbox?: [
+        number,
+        number,
+        number,
+        number
+    ] | null;
+    length?: CalcQuantityAttr | null;
+    /**
+     * Rule Key
+     */
+    rule_key?: string | null;
+    /**
+     * Source Fact Key
+     */
+    source_fact_key?: string | null;
+    state?: CalcGeometryState;
+};
+
+/**
+ * CalcGeometryState
+ *
+ * Что известно о геометрии элемента — отдельно от того, что элемент существует.
+ */
+export type CalcGeometryState = 'NONE' | 'ANCHOR_ONLY' | 'RANGE' | 'ESTIMATED' | 'OBSERVED';
 
 /**
  * CalcHazardOutcome
@@ -2164,6 +2280,46 @@ export type CalcOtherSource = {
      */
     kind?: 'OTHER';
 };
+
+/**
+ * CalcQuantityAttr
+ *
+ * Количественный атрибут: значение или диапазон и его смысл — на экземпляр или итог.
+ */
+export type CalcQuantityAttr = {
+    basis: CalcQuantityBasis;
+    /**
+     * High
+     */
+    high?: string | null;
+    /**
+     * Low
+     */
+    low?: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Unit
+     */
+    unit: string | null;
+    /**
+     * Value
+     */
+    value?: string | null;
+};
+
+/**
+ * CalcQuantityBasis
+ *
+ * Смысл количественного атрибута: на один экземпляр или уже итог по всем.
+ */
+export type CalcQuantityBasis = 'PER_INSTANCE' | 'TOTAL';
 
 /**
  * CalcRangeValue
@@ -3491,6 +3647,49 @@ export type CalcRunVersions = {
 export type CalcScenario = 'MINIMUM' | 'EXPECTED' | 'TENDER_SAFE';
 
 /**
+ * CalcScenarioEstimate
+ *
+ * Оценка сценария для кратности — например, нижняя граница в MINIMUM.
+ */
+export type CalcScenarioEstimate = {
+    /**
+     * Meaning
+     */
+    meaning: 'LOWER_BOUND';
+    /**
+     * Note
+     */
+    note: string;
+    /**
+     * Value
+     */
+    value: number;
+};
+
+/**
+ * CalcSelection
+ */
+export type CalcSelection = {
+    /**
+     * Decision Id
+     */
+    decision_id?: string | null;
+    /**
+     * Explanation
+     */
+    explanation: string;
+    rule?: CalcSynthesisRuleRef | null;
+    source: CalcSelectionSource;
+};
+
+/**
+ * CalcSelectionSource
+ *
+ * Кто выбрал кратность из диапазона. Совпавшим границам выбор не нужен.
+ */
+export type CalcSelectionSource = 'RULE' | 'HUMAN_DECISION';
+
+/**
  * CalcSnapshot
  */
 export type CalcSnapshot = {
@@ -3829,6 +4028,715 @@ export type CalcStepRead = {
 export type CalcStepStatus = 'EXECUTED' | 'REUSED' | 'NOT_APPLIED';
 
 /**
+ * CalcSynthesisAssumption
+ */
+export type CalcSynthesisAssumption = {
+    /**
+     * Element Ids
+     */
+    element_ids: Array<string>;
+    /**
+     * Impact
+     */
+    impact: string | null;
+    /**
+     * Notice
+     */
+    notice: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    rule: CalcSynthesisRuleRef;
+    /**
+     * Unit
+     */
+    unit: string | null;
+    /**
+     * Value
+     *
+     * Точное десятичное число строкой, без экспоненты и без скрытого округления.
+     */
+    value: string;
+};
+
+/**
+ * CalcSynthesisCompareRead
+ */
+export type CalcSynthesisCompareRead = {
+    /**
+     * Base Run Id
+     */
+    base_run_id: string;
+    /**
+     * Edges
+     */
+    edges: Array<CalcElementDiff>;
+    /**
+     * Nodes
+     */
+    nodes: Array<CalcElementDiff>;
+    /**
+     * Other Run Id
+     */
+    other_run_id: string;
+    /**
+     * Same Calculation
+     */
+    same_calculation: boolean;
+    /**
+     * Same Synthesizer
+     */
+    same_synthesizer: boolean;
+    /**
+     * Unresolved Added
+     */
+    unresolved_added: Array<string>;
+    /**
+     * Unresolved Removed
+     */
+    unresolved_removed: Array<string>;
+};
+
+/**
+ * CalcSynthesisDecisionCreate
+ *
+ * Решение инженера по нерешённой кратности. Вход следующего запуска, не факт объекта.
+ */
+export type CalcSynthesisDecisionCreate = {
+    /**
+     * Comment
+     */
+    comment: string;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Selected Count
+     */
+    selected_count: number;
+    /**
+     * Variant Key
+     */
+    variant_key?: string | null;
+};
+
+/**
+ * CalcSynthesisDecisionRead
+ */
+export type CalcSynthesisDecisionRead = {
+    /**
+     * Alternatives
+     */
+    alternatives: Array<number>;
+    /**
+     * Comment
+     */
+    comment: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Decided By
+     */
+    decided_by: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Selected Count
+     */
+    selected_count: number;
+    /**
+     * Synthesis Run Id
+     */
+    synthesis_run_id: string;
+    /**
+     * Variant Key
+     */
+    variant_key: string | null;
+};
+
+/**
+ * CalcSynthesisReplayRead
+ */
+export type CalcSynthesisReplayRead = {
+    /**
+     * Original Graph Sha256
+     */
+    original_graph_sha256: string | null;
+    /**
+     * Problems
+     */
+    problems: Array<string>;
+    /**
+     * Replay Graph Sha256
+     */
+    replay_graph_sha256: string | null;
+    /**
+     * Reproducible
+     */
+    reproducible: boolean;
+    /**
+     * Run Id
+     */
+    run_id: string;
+};
+
+/**
+ * CalcSynthesisRuleRef
+ */
+export type CalcSynthesisRuleRef = {
+    /**
+     * Content Sha256
+     */
+    content_sha256: string;
+    /**
+     * Implementation Key
+     */
+    implementation_key: string;
+    role: CalcSynthesisRuleRole;
+    /**
+     * Rule Key
+     */
+    rule_key: string;
+    rule_type: CalcRuleType;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * CalcSynthesisRuleRole
+ *
+ * Для чего синтезатор применяет правило.
+ */
+export type CalcSynthesisRuleRole = 'TOPOLOGY' | 'SELECTION' | 'ASSUMPTION';
+
+/**
+ * CalcSynthesisRunCreate
+ */
+export type CalcSynthesisRunCreate = {
+    /**
+     * Calculation Run Id
+     */
+    calculation_run_id: string;
+    /**
+     * Decision Ids
+     */
+    decision_ids?: Array<string>;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key?: string | null;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * Synthesizer Version
+     */
+    synthesizer_version: number;
+};
+
+/**
+ * CalcSynthesisRunRead
+ *
+ * Запуск без графа: граф — отдельной операцией.
+ */
+export type CalcSynthesisRunRead = {
+    /**
+     * Applied Decisions
+     */
+    applied_decisions: Array<CalcSynthesisDecisionRead>;
+    /**
+     * Assumptions
+     */
+    assumptions: Array<CalcSynthesisAssumption>;
+    /**
+     * Blocking
+     */
+    blocking: string | null;
+    /**
+     * Blocking Reasons
+     */
+    blocking_reasons: Array<CalcBlockingReason>;
+    /**
+     * Calculation Result Sha256
+     */
+    calculation_result_sha256: string;
+    /**
+     * Calculation Run Id
+     */
+    calculation_run_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Decisions
+     */
+    decisions: Array<CalcSynthesisDecisionRead>;
+    failure: CalcRunFailure | null;
+    /**
+     * Graph Sha256
+     */
+    graph_sha256: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Idempotency Key
+     */
+    idempotency_key: string | null;
+    /**
+     * Implementation Sha256
+     */
+    implementation_sha256: string;
+    /**
+     * Nodes Count
+     */
+    nodes_count: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Rule Bindings
+     */
+    rule_bindings: Array<CalcRuleBinding>;
+    /**
+     * Rule Bindings Sha256
+     */
+    rule_bindings_sha256: string;
+    scenario: CalcScenario;
+    scope: CalcFactSubject;
+    snapshot: CalcSnapshot;
+    status: CalcSynthesisStatus;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * Synthesizer Sha256
+     */
+    synthesizer_sha256: string;
+    /**
+     * Synthesizer Title
+     */
+    synthesizer_title: string;
+    /**
+     * Synthesizer Version
+     */
+    synthesizer_version: number;
+    /**
+     * Unresolved
+     */
+    unresolved: Array<CalcUnresolvedItem>;
+    /**
+     * Unresolved Count
+     */
+    unresolved_count: number;
+    /**
+     * Variants
+     */
+    variants: Array<CalcSynthesisVariant>;
+    versions: CalcRunVersions;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * CalcSynthesisRunSummaryRead
+ */
+export type CalcSynthesisRunSummaryRead = {
+    /**
+     * Blocking
+     */
+    blocking: string | null;
+    /**
+     * Calculation Run Id
+     */
+    calculation_run_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Graph Sha256
+     */
+    graph_sha256: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Nodes Count
+     */
+    nodes_count: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    scenario: CalcScenario;
+    status: CalcSynthesisStatus;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * Synthesizer Title
+     */
+    synthesizer_title: string;
+    /**
+     * Synthesizer Version
+     */
+    synthesizer_version: number;
+    /**
+     * Unresolved Count
+     */
+    unresolved_count: number;
+};
+
+/**
+ * CalcSynthesisStatus
+ *
+ * Итог запуска синтеза.
+ *
+ * PARTIAL — не ошибка: полезная структура есть, но часть структурных решений остаётся
+ * диапазоном или не решена. Неизвестная физическая трасса запуск неполным не делает.
+ */
+export type CalcSynthesisStatus = 'BLOCKED' | 'PARTIAL' | 'SUCCEEDED' | 'FAILED';
+
+/**
+ * CalcSynthesisTraceKind
+ */
+export type CalcSynthesisTraceKind = 'ELEMENT' | 'DECISION' | 'RULE' | 'CALCULATION_RESULT' | 'FACT' | 'EVIDENCE' | 'ASSUMPTION' | 'HUMAN_DECISION';
+
+/**
+ * CalcSynthesisTraceNode
+ */
+export type CalcSynthesisTraceNode = {
+    calculation?: CalcResultTraceRead | null;
+    /**
+     * Children
+     */
+    children?: Array<CalcSynthesisTraceNode>;
+    /**
+     * Key
+     */
+    key: string;
+    kind: CalcSynthesisTraceKind;
+    /**
+     * Ref
+     */
+    ref?: string | null;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcSynthesisTraceRead
+ */
+export type CalcSynthesisTraceRead = {
+    /**
+     * Element Id
+     */
+    element_id: string;
+    provenance: CalcElementProvenance;
+    root: CalcSynthesisTraceNode;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
+ * CalcSynthesisValidateRead
+ */
+export type CalcSynthesisValidateRead = {
+    /**
+     * Blocking Reasons
+     */
+    blocking_reasons: Array<CalcBlockingReason>;
+    scenario: CalcScenario | null;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * Synthesizer Version
+     */
+    synthesizer_version: number;
+    /**
+     * Valid
+     */
+    valid: boolean;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * CalcSynthesisVariant
+ *
+ * Допустимый вариант схемы. Без вероятностей: статистической модели нет.
+ */
+export type CalcSynthesisVariant = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Open Questions
+     */
+    open_questions: Array<string>;
+    /**
+     * Reasons
+     */
+    reasons: Array<string>;
+    /**
+     * Selections
+     */
+    selections: Array<CalcVariantSelection>;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcSynthesizerRead
+ */
+export type CalcSynthesizerRead = {
+    /**
+     * Calculator Id
+     */
+    calculator_id: string;
+    /**
+     * Calculator Version
+     */
+    calculator_version: number;
+    discipline: CalcDiscipline;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    /**
+     * Graph Type
+     */
+    graph_type: string;
+    /**
+     * Implementation Sha256
+     */
+    implementation_sha256: string;
+    kind: CalcCalculatorKind;
+    /**
+     * Results
+     */
+    results: Array<string>;
+    /**
+     * Rules
+     */
+    rules: Array<string>;
+    /**
+     * Scenarios
+     */
+    scenarios: Array<CalcScenario>;
+    stage: CalcDocumentStage;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * Synthesizer Sha256
+     */
+    synthesizer_sha256: string;
+    /**
+     * Systems
+     */
+    systems: Array<string>;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * CalcSystemEdge
+ */
+export type CalcSystemEdge = {
+    /**
+     * Attributes
+     */
+    attributes?: Array<CalcQuantityAttr>;
+    geometry?: CalcGeometry;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Multipliers
+     */
+    multipliers?: Array<string>;
+    provenance: CalcElementProvenance;
+    /**
+     * Rules
+     */
+    rules?: Array<CalcSynthesisRuleRef>;
+    /**
+     * Semantic Type
+     */
+    semantic_type: string;
+    /**
+     * Source Node
+     */
+    source_node: string;
+    /**
+     * Sources
+     */
+    sources?: Array<CalcElementSource>;
+    /**
+     * Support
+     */
+    support: string;
+    /**
+     * Target Node
+     */
+    target_node: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcSystemGraph
+ */
+export type CalcSystemGraph = {
+    /**
+     * Assumptions
+     */
+    assumptions: Array<CalcSynthesisAssumption>;
+    discipline: CalcDiscipline;
+    /**
+     * Edges
+     */
+    edges: Array<CalcSystemEdge>;
+    /**
+     * Graph Type
+     */
+    graph_type: string;
+    /**
+     * Nodes
+     */
+    nodes: Array<CalcSystemNode>;
+    scenario: CalcScenario;
+    scope: CalcFactSubject;
+    /**
+     * Synthesizer Id
+     */
+    synthesizer_id: string;
+    /**
+     * Synthesizer Version
+     */
+    synthesizer_version: number;
+    /**
+     * System Code
+     */
+    system_code: string | null;
+    /**
+     * Unresolved
+     */
+    unresolved: Array<CalcUnresolvedItem>;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * CalcSystemNode
+ */
+export type CalcSystemNode = {
+    /**
+     * Attributes
+     */
+    attributes?: Array<CalcQuantityAttr>;
+    cardinality: CalcCardinality;
+    estimate?: CalcScenarioEstimate | null;
+    geometry?: CalcGeometry;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Multiplicity
+     */
+    multiplicity?: number;
+    /**
+     * Multipliers
+     */
+    multipliers?: Array<string>;
+    provenance: CalcElementProvenance;
+    /**
+     * Rules
+     */
+    rules?: Array<CalcSynthesisRuleRef>;
+    scope: CalcFactSubject;
+    /**
+     * Semantic Type
+     */
+    semantic_type: string;
+    /**
+     * Sources
+     */
+    sources?: Array<CalcElementSource>;
+    /**
+     * Support
+     */
+    support: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * CalcSystemRead
  */
 export type CalcSystemRead = {
@@ -3945,11 +4853,63 @@ export type CalcTraceNode = {
 };
 
 /**
+ * CalcUnresolvedItem
+ *
+ * Что Quantor пока не знает — и что нужно, чтобы узнать.
+ */
+export type CalcUnresolvedItem = {
+    /**
+     * Element Id
+     */
+    element_id?: string | null;
+    /**
+     * Key
+     */
+    key: string;
+    kind: CalcUnresolvedKind;
+    /**
+     * Known
+     */
+    known: string;
+    /**
+     * Needed
+     */
+    needed: string;
+    /**
+     * Structural
+     */
+    structural: boolean;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcUnresolvedKind
+ */
+export type CalcUnresolvedKind = 'COUNT_RANGE' | 'CHOICE' | 'PLACEMENT' | 'MISSING_RULE' | 'ROUTE';
+
+/**
  * CalcValueKind
  *
  * Вид значения факта.
  */
 export type CalcValueKind = 'NUMBER' | 'COUNT' | 'BOOLEAN' | 'ENUM' | 'TEXT' | 'RANGE';
+
+/**
+ * CalcVariantSelection
+ */
+export type CalcVariantSelection = {
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Node Id
+     */
+    node_id: string;
+};
 
 /**
  * CalibrationSnapshot
@@ -8327,9 +9287,23 @@ export type ReadSessionResponse = ReadSessionResponses[keyof ReadSessionResponse
 export type ListCalcCalculatorsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Include Demo
+         */
+        include_demo?: boolean;
+    };
     url: '/api/v1/calc/calculators';
 };
+
+export type ListCalcCalculatorsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcCalculatorsError = ListCalcCalculatorsErrors[keyof ListCalcCalculatorsErrors];
 
 export type ListCalcCalculatorsResponses = {
     /**
@@ -9074,6 +10048,98 @@ export type CreateCalcSourceResponses = {
 
 export type CreateCalcSourceResponse = CreateCalcSourceResponses[keyof CreateCalcSourceResponses];
 
+export type ListCalcSynthesisRunsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/synthesis-runs';
+};
+
+export type ListCalcSynthesisRunsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcSynthesisRunsError = ListCalcSynthesisRunsErrors[keyof ListCalcSynthesisRunsErrors];
+
+export type ListCalcSynthesisRunsResponses = {
+    /**
+     * Response List Calc Synthesis Runs
+     *
+     * Successful Response
+     */
+    200: Array<CalcSynthesisRunSummaryRead>;
+};
+
+export type ListCalcSynthesisRunsResponse = ListCalcSynthesisRunsResponses[keyof ListCalcSynthesisRunsResponses];
+
+export type CreateCalcSynthesisRunData = {
+    body: CalcSynthesisRunCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/synthesis-runs';
+};
+
+export type CreateCalcSynthesisRunErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcSynthesisRunError = CreateCalcSynthesisRunErrors[keyof CreateCalcSynthesisRunErrors];
+
+export type CreateCalcSynthesisRunResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcSynthesisRunRead;
+};
+
+export type CreateCalcSynthesisRunResponse = CreateCalcSynthesisRunResponses[keyof CreateCalcSynthesisRunResponses];
+
+export type ValidateCalcSynthesisData = {
+    body: CalcSynthesisRunCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/synthesis-runs/validate';
+};
+
+export type ValidateCalcSynthesisErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ValidateCalcSynthesisError = ValidateCalcSynthesisErrors[keyof ValidateCalcSynthesisErrors];
+
+export type ValidateCalcSynthesisResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcSynthesisValidateRead;
+};
+
+export type ValidateCalcSynthesisResponse = ValidateCalcSynthesisResponses[keyof ValidateCalcSynthesisResponses];
+
 export type ListCalcRequirementsData = {
     body?: never;
     path?: never;
@@ -9550,6 +10616,291 @@ export type GetCalcRunTraceResponses = {
 };
 
 export type GetCalcRunTraceResponse = GetCalcRunTraceResponses[keyof GetCalcRunTraceResponses];
+
+export type CompareCalcSynthesisRunsData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Base
+         */
+        base: string;
+        /**
+         * Other
+         */
+        other: string;
+    };
+    url: '/api/v1/calc/synthesis-runs/compare';
+};
+
+export type CompareCalcSynthesisRunsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CompareCalcSynthesisRunsError = CompareCalcSynthesisRunsErrors[keyof CompareCalcSynthesisRunsErrors];
+
+export type CompareCalcSynthesisRunsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcSynthesisCompareRead;
+};
+
+export type CompareCalcSynthesisRunsResponse = CompareCalcSynthesisRunsResponses[keyof CompareCalcSynthesisRunsResponses];
+
+export type GetCalcSynthesisRunData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/synthesis-runs/{run_id}';
+};
+
+export type GetCalcSynthesisRunErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcSynthesisRunError = GetCalcSynthesisRunErrors[keyof GetCalcSynthesisRunErrors];
+
+export type GetCalcSynthesisRunResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcSynthesisRunRead;
+};
+
+export type GetCalcSynthesisRunResponse = GetCalcSynthesisRunResponses[keyof GetCalcSynthesisRunResponses];
+
+export type CreateCalcSynthesisDecisionData = {
+    body: CalcSynthesisDecisionCreate;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/synthesis-runs/{run_id}/decisions';
+};
+
+export type CreateCalcSynthesisDecisionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcSynthesisDecisionError = CreateCalcSynthesisDecisionErrors[keyof CreateCalcSynthesisDecisionErrors];
+
+export type CreateCalcSynthesisDecisionResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcSynthesisDecisionRead;
+};
+
+export type CreateCalcSynthesisDecisionResponse = CreateCalcSynthesisDecisionResponses[keyof CreateCalcSynthesisDecisionResponses];
+
+export type GetCalcSynthesisGraphData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/synthesis-runs/{run_id}/graph';
+};
+
+export type GetCalcSynthesisGraphErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcSynthesisGraphError = GetCalcSynthesisGraphErrors[keyof GetCalcSynthesisGraphErrors];
+
+export type GetCalcSynthesisGraphResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcSystemGraph;
+};
+
+export type GetCalcSynthesisGraphResponse = GetCalcSynthesisGraphResponses[keyof GetCalcSynthesisGraphResponses];
+
+export type ReplayCalcSynthesisRunData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/synthesis-runs/{run_id}/replay';
+};
+
+export type ReplayCalcSynthesisRunErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReplayCalcSynthesisRunError = ReplayCalcSynthesisRunErrors[keyof ReplayCalcSynthesisRunErrors];
+
+export type ReplayCalcSynthesisRunResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcSynthesisReplayRead;
+};
+
+export type ReplayCalcSynthesisRunResponse = ReplayCalcSynthesisRunResponses[keyof ReplayCalcSynthesisRunResponses];
+
+export type GetCalcSynthesisTraceData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query: {
+        /**
+         * Element Id
+         */
+        element_id: string;
+    };
+    url: '/api/v1/calc/synthesis-runs/{run_id}/trace';
+};
+
+export type GetCalcSynthesisTraceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcSynthesisTraceError = GetCalcSynthesisTraceErrors[keyof GetCalcSynthesisTraceErrors];
+
+export type GetCalcSynthesisTraceResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcSynthesisTraceRead;
+};
+
+export type GetCalcSynthesisTraceResponse = GetCalcSynthesisTraceResponses[keyof GetCalcSynthesisTraceResponses];
+
+export type ListCalcSynthesisUnresolvedData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/synthesis-runs/{run_id}/unresolved';
+};
+
+export type ListCalcSynthesisUnresolvedErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcSynthesisUnresolvedError = ListCalcSynthesisUnresolvedErrors[keyof ListCalcSynthesisUnresolvedErrors];
+
+export type ListCalcSynthesisUnresolvedResponses = {
+    /**
+     * Response List Calc Synthesis Unresolved
+     *
+     * Successful Response
+     */
+    200: Array<CalcUnresolvedItem>;
+};
+
+export type ListCalcSynthesisUnresolvedResponse = ListCalcSynthesisUnresolvedResponses[keyof ListCalcSynthesisUnresolvedResponses];
+
+export type ListCalcSynthesisVariantsData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/synthesis-runs/{run_id}/variants';
+};
+
+export type ListCalcSynthesisVariantsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcSynthesisVariantsError = ListCalcSynthesisVariantsErrors[keyof ListCalcSynthesisVariantsErrors];
+
+export type ListCalcSynthesisVariantsResponses = {
+    /**
+     * Response List Calc Synthesis Variants
+     *
+     * Successful Response
+     */
+    200: Array<CalcSynthesisVariant>;
+};
+
+export type ListCalcSynthesisVariantsResponse = ListCalcSynthesisVariantsResponses[keyof ListCalcSynthesisVariantsResponses];
+
+export type ListCalcSynthesizersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Include Demo
+         */
+        include_demo?: boolean;
+    };
+    url: '/api/v1/calc/synthesizers';
+};
+
+export type ListCalcSynthesizersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcSynthesizersError = ListCalcSynthesizersErrors[keyof ListCalcSynthesizersErrors];
+
+export type ListCalcSynthesizersResponses = {
+    /**
+     * Response List Calc Synthesizers
+     *
+     * Successful Response
+     */
+    200: Array<CalcSynthesizerRead>;
+};
+
+export type ListCalcSynthesizersResponse = ListCalcSynthesizersResponses[keyof ListCalcSynthesizersResponses];
 
 export type ReadDocumentData = {
     body?: never;

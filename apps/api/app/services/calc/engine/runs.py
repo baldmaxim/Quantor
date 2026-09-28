@@ -26,6 +26,7 @@ from sqlalchemy.orm import selectinload
 
 from app.contracts.calc.engine import (
     CalcResultRead,
+    CalcRoundingRecord,
     CalcRuleBinding,
     CalcRunCreate,
     CalcRunFailure,
@@ -205,6 +206,7 @@ async def _prior_steps(
             fingerprint=row.fingerprint,
             outputs=tuple(CalcStepOutput.model_validate(item) for item in row.outputs),
             explanation=row.explanation,
+            roundings=tuple(CalcRoundingRecord.model_validate(item) for item in row.roundings),
         )
         for row in prior.steps
         if row.status is not CalcStepStatus.NOT_APPLIED

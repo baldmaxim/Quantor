@@ -115,6 +115,8 @@ class ErrorCode(StrEnum):
     # Тот же ключ идемпотентности с другим запросом: вернуть чужой запуск было бы подменой.
     CALC_RUN_IDEMPOTENCY_CONFLICT = "CALC_RUN_IDEMPOTENCY_CONFLICT"
     CALC_RUN_COMPARE_INVALID = "CALC_RUN_COMPARE_INVALID"
+    # Решение инженера — только по кратности-диапазону узла запуска синтеза и внутри диапазона.
+    CALC_SYNTHESIS_DECISION_INVALID = "CALC_SYNTHESIS_DECISION_INVALID"
 
     # --- инфраструктура ---
     STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
@@ -219,6 +221,9 @@ MESSAGES: dict[ErrorCode, str] = {
         "Ключ идемпотентности уже использован для другого запроса расчёта"
     ),
     ErrorCode.CALC_RUN_COMPARE_INVALID: "Сравнивать можно только запуски одного проекта",
+    ErrorCode.CALC_SYNTHESIS_DECISION_INVALID: (
+        "Решение возможно только по диапазону кратности узла и внутри этого диапазона"
+    ),
     ErrorCode.CALC_REVISION_NOT_LATEST: (
         "У документа есть более новая ревизия — собирайте факты из неё"
     ),
@@ -319,6 +324,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CALC_LEGACY_OUT_OF_SCOPE: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_RUN_IDEMPOTENCY_CONFLICT: status.HTTP_409_CONFLICT,
     ErrorCode.CALC_RUN_COMPARE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_SYNTHESIS_DECISION_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.GEOMETRY_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,

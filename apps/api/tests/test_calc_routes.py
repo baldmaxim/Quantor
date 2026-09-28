@@ -28,10 +28,10 @@ CALC_FLAG = "calc.portal"
 CALC_PERMISSIONS = {Permission.CALC_READ, Permission.CALC_EDIT, Permission.CALC_VERIFY}
 FOREIGN_MARKERS = ("takeoff-items", "measurements", "quantities", "scale-calibrations", "/mep/")
 
-# Операции PROMPT 01 (11), PROMPT 02 (6), PROMPT 03 (12) и PROMPT 04 (9). Число сверяется
-# точно: маршрут «на будущее» должен ломать тест, а не проходить мимо (решение владельца: API
-# будущих сущностей до их промта не заводится).
-EXPECTED_OPERATIONS = 38
+# Операции PROMPT 01 (11), PROMPT 02 (6), PROMPT 03 (12), PROMPT 04 (9) и PROMPT 05 (12).
+# Число сверяется точно: маршрут «на будущее» должен ломать тест, а не проходить мимо (решение
+# владельца: API будущих сущностей до их промта не заводится).
+EXPECTED_OPERATIONS = 50
 
 
 def _routes() -> list[APIRoute]:

@@ -4,12 +4,16 @@ import {
   createCalcInspection,
   getCalcRun,
   getCalcRunTrace,
+  getCalcSynthesisGraph,
+  getCalcSynthesisRun,
+  getCalcSynthesisTrace,
   listCalcDocuments,
   listCalcFactTypes,
   listCalcInputFacts,
   listCalcLegacyRules,
   listCalcRules,
   listCalcRuns,
+  listCalcSynthesisRuns,
   readCalcReadiness,
   type CalcInspectionCreate,
 } from '@quantor/api-client';
@@ -34,6 +38,10 @@ export const calcQueryKeys = {
   runs: (projectId: string) => ['project', projectId, 'calc', 'runs'] as const,
   run: (runId: string) => ['calc', 'run', runId] as const,
   trace: (runId: string, resultKey: string) => ['calc', 'run', runId, 'trace', resultKey] as const,
+  synthesisRuns: (projectId: string) => ['project', projectId, 'calc', 'synthesis'] as const,
+  synthesisRun: (runId: string) => ['calc', 'synthesis', runId] as const,
+  synthesisTrace: (runId: string, elementId: string) =>
+    ['calc', 'synthesis', runId, 'trace', elementId] as const,
   legacyRules: ['calc', 'legacy-rules'] as const,
 };
 
@@ -138,4 +146,42 @@ export const useCalcRunTrace = (runId: string, resultKey: string | null) =>
         }),
       ),
     staleTime: Number.POSITIVE_INFINITY,
+  });
+
+export const useCalcSynthesisRuns = (projectId: string) =>
+  useQuery({
+    queryKey: calcQueryKeys.synthesisRuns(projectId),
+    queryFn: async () =>
+      unwrap(await listCalcSynthesisRuns({ throwOnError: true, path: { project_id: projectId } })),
+  });
+
+/** Запуск синтеза неизменяем: однажды загруженный — не устаревает. */
+export const useCalcSynthesisRun = (runId: string | null) =>
+  useQuery({
+    queryKey: calcQueryKeys.synthesisRun(runId ?? ''),
+    enabled: runId !== null,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async () => {
+      const path = { run_id: runId ?? '' };
+      const run = unwrap(await getCalcSynthesisRun({ throwOnError: true, path }));
+      const graph = run.graph_sha256
+        ? unwrap(await getCalcSynthesisGraph({ throwOnError: true, path }))
+        : null;
+      return { run, graph };
+    },
+  });
+
+export const useCalcSynthesisTrace = (runId: string, elementId: string | null) =>
+  useQuery({
+    queryKey: calcQueryKeys.synthesisTrace(runId, elementId ?? ''),
+    enabled: elementId !== null,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async () =>
+      unwrap(
+        await getCalcSynthesisTrace({
+          throwOnError: true,
+          path: { run_id: runId },
+          query: { element_id: elementId ?? '' },
+        }),
+      ),
   });

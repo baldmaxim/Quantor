@@ -262,7 +262,13 @@ class TestAccess:
         self, build_api: Callable[..., AsyncClient], workspace_id: uuid.UUID
     ) -> None:
         async with build_api(_as(Role.VIEWER, workspace_id)) as client:
-            [demo] = (await client.get(f"{API}/calculators")).json()
+            hidden = (await client.get(f"{API}/calculators")).json()
+            listed = (
+                await client.get(f"{API}/calculators", params={"include_demo": "true"})
+            ).json()
+        # Демонстрационные калькуляторы в пользовательском списке скрыты (решение владельца).
+        assert hidden == []
+        demo = next(item for item in listed if item["calculator_id"] == "test.vertical_length")
         assert (demo["calculator_id"], demo["version"], demo["kind"]) == (
             "test.vertical_length",
             1,

@@ -6,7 +6,8 @@
 пока на него не сослался маршрут.
 
 Реализованы и вынесены: правила — `rules.py` (PROMPT 03); запуск, шаг, результат, снимок
-входов, допущение и ссылка запуска на версию правила — `engine.py` (PROMPT 04).
+входов, допущение и ссылка запуска на версию правила — `engine.py` (PROMPT 04); происхождение
+элемента и граф системы — `synthesis.py` (PROMPT 05).
 
 | Сущность            | Промт реализации |
 | ------------------- | ---------------- |
@@ -47,13 +48,6 @@ class CalcResultStatus(StrEnum):
     NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
     NOT_APPLICABLE = "NOT_APPLICABLE"
     BLOCKED_BY_CONFLICT = "BLOCKED_BY_CONFLICT"
-
-
-class CalcElementProvenance(StrEnum):
-    OBSERVED = "OBSERVED"
-    CALCULATED = "CALCULATED"
-    SYNTHESIZED = "SYNTHESIZED"
-    ASSUMED = "ASSUMED"
 
 
 class CalcItemDescriptor(_Draft):

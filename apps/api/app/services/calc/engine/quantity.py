@@ -14,8 +14,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal, localcontext
 
+from app.contracts.calc.engine import CalcRoundingPolicy
 from app.contracts.calc.units import CANONICAL_UNIT, CalcDimension, UnitError, unit_def
-from app.services.calc.engine.numbers import ENGINE_CONTEXT
+from app.services.calc.engine.numbers import ENGINE_CONTEXT, divide_rounded
 from app.services.calc.rules.dimensions import describe, unit_vector
 
 Vector = tuple[tuple[str, int], ...]
@@ -68,6 +69,13 @@ class Quantity:
         # Деление с бесконечной дробью — исключение контекста: округляют только явно.
         with localcontext(ENGINE_CONTEXT):
             return Quantity(self.value / other.value, _combine(self.dims, other.dims, -1))
+
+    def divided_rounded(
+        self, other: Quantity, policy: CalcRoundingPolicy
+    ) -> tuple[Quantity, Decimal]:
+        """Деление с явным округлением: результат и частное до округления — для записи в шаг."""
+        quotient, rounded = divide_rounded(self.value, other.value, policy)
+        return Quantity(rounded, _combine(self.dims, other.dims, -1)), quotient
 
     def __add__(self, other: Quantity) -> Quantity:
         self._same(other, "сложить")

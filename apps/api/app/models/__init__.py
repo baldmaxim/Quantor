@@ -12,6 +12,7 @@ from app.models.calc import (
 )
 from app.models.calc_rules import CalcRuleDefinition, CalcRuleReview, CalcRuleVersion
 from app.models.calc_runs import CalcRun, CalcRunResult, CalcRunStep
+from app.models.calc_synthesis import CalcSynthesisDecision, CalcSynthesisRun
 from app.models.control_plane import FeatureFlagOverride, SettingOverride
 from app.models.document import Document, DocumentRevision
 from app.models.identity import AuthSession, UserIdentity, Workspace, WorkspaceMembership
@@ -38,6 +39,8 @@ __all__ = [
     "CalcRunStep",
     "CalcSource",
     "CalcSourceInspection",
+    "CalcSynthesisDecision",
+    "CalcSynthesisRun",
     "Document",
     "DocumentRevision",
     "FeatureFlagOverride",

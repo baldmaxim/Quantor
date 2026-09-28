@@ -517,6 +517,10 @@ class CalcBlockCode(StrEnum):
     RULE_CONTRACT_MISMATCH = "RULE_CONTRACT_MISMATCH"
     IMPLEMENTATION_MISSING = "IMPLEMENTATION_MISSING"
     UNIT_INCOMPATIBLE = "UNIT_INCOMPATIBLE"
+    CALCULATION_NOT_USABLE = "CALCULATION_NOT_USABLE"
+    """Синтез: запуск расчёта не успешный, другого проекта, калькулятора или сценария."""
+    CALCULATION_RESULT_MISSING = "CALCULATION_RESULT_MISSING"
+    """Синтез: в запуске расчёта нет нужного результата."""
 
 
 class CalcInputSource(StrEnum):
@@ -554,3 +558,90 @@ class CalcTraceKind(StrEnum):
     EVIDENCE = "EVIDENCE"
     PARAMETER = "PARAMETER"
     CONVERSION = "CONVERSION"
+
+
+# ------------------------------------------------------------- синтез структуры (PROMPT 05)
+
+
+class CalcElementProvenance(StrEnum):
+    """Откуда взялся элемент графа системы. Без одного из этих состояний элемент не хранится."""
+
+    OBSERVED = "OBSERVED"
+    """Непосредственно подтверждён документацией: есть факт и свидетельство."""
+    CALCULATED = "CALCULATED"
+    """Необходимость следует из результата расчётного ядра."""
+    SYNTHESIZED = "SYNTHESIZED"
+    """Структура предложена синтезатором по утверждённому правилу."""
+    ASSUMED = "ASSUMED"
+    """Появился только из-за утверждённого тендерного допущения."""
+
+
+class CalcGeometryState(StrEnum):
+    """Что известно о геометрии элемента — отдельно от того, что элемент существует."""
+
+    NONE = "NONE"
+    ANCHOR_ONLY = "ANCHOR_ONLY"
+    """Известна зона или элемент привязки («шахта Ш-1»), но не точка."""
+    RANGE = "RANGE"
+    """Известен диапазон (например, длины), но не трасса."""
+    ESTIMATED = "ESTIMATED"
+    """Оценено по утверждённому правилу — не измерено."""
+    OBSERVED = "OBSERVED"
+    """Непосредственно подтверждено источником."""
+
+
+class CalcQuantityBasis(StrEnum):
+    """Смысл количественного атрибута: на один экземпляр или уже итог по всем."""
+
+    PER_INSTANCE = "PER_INSTANCE"
+    TOTAL = "TOTAL"
+
+
+class CalcSelectionSource(StrEnum):
+    """Кто выбрал кратность из диапазона. Совпавшим границам выбор не нужен."""
+
+    RULE = "RULE"
+    """Утверждённое инженерное правило выбора."""
+    HUMAN_DECISION = "HUMAN_DECISION"
+    """Решение инженера по варианту — вход нового запуска, не факт объекта."""
+
+
+class CalcUnresolvedKind(StrEnum):
+    COUNT_RANGE = "COUNT_RANGE"
+    CHOICE = "CHOICE"
+    PLACEMENT = "PLACEMENT"
+    MISSING_RULE = "MISSING_RULE"
+    ROUTE = "ROUTE"
+    """Физическая трасса не определена — для стадии П нормально, структуру не делает неполной."""
+
+
+class CalcSynthesisStatus(StrEnum):
+    """Итог запуска синтеза.
+
+    PARTIAL — не ошибка: полезная структура есть, но часть структурных решений остаётся
+    диапазоном или не решена. Неизвестная физическая трасса запуск неполным не делает.
+    """
+
+    BLOCKED = "BLOCKED"
+    PARTIAL = "PARTIAL"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+
+class CalcSynthesisRuleRole(StrEnum):
+    """Для чего синтезатор применяет правило."""
+
+    TOPOLOGY = "TOPOLOGY"
+    SELECTION = "SELECTION"
+    ASSUMPTION = "ASSUMPTION"
+
+
+class CalcSynthesisTraceKind(StrEnum):
+    ELEMENT = "ELEMENT"
+    DECISION = "DECISION"
+    RULE = "RULE"
+    CALCULATION_RESULT = "CALCULATION_RESULT"
+    FACT = "FACT"
+    EVIDENCE = "EVIDENCE"
+    ASSUMPTION = "ASSUMPTION"
+    HUMAN_DECISION = "HUMAN_DECISION"

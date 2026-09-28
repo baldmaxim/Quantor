@@ -202,7 +202,7 @@ class CalcRunResult(CreatedAtMixin, Base):
 # проекта — новый запуск. Удаление — только каскадом при удалении проекта: тогда триггер
 # вызывается изнутри ссылочного действия, и pg_trigger_depth() больше единицы. Тот же текст — в
 # миграции 0015; совпадение проверяет test_schema_matches_migrations.
-_APPEND_ONLY_FUNCTION = """
+APPEND_ONLY_FUNCTION = """
 create or replace function calc_runs_append_only() returns trigger
 language plpgsql as $$
 begin
@@ -216,24 +216,24 @@ $$
 """
 
 
-def _trigger(table: str) -> str:
+def append_only_trigger(table: str) -> str:
     return (
         f"create trigger trg_{table}_append_only before update or delete on {table} "
         "for each row execute function calc_runs_append_only()"
     )
 
 
-def _install(table: str) -> Callable[..., None]:
+def install_append_only(table: str) -> Callable[..., None]:
     """Обработчик `after_create`: функция и триггер — отдельными вызовами (asyncpg)."""
 
     def listener(target: Table, connection: Connection, **kwargs: object) -> None:
         if connection.dialect.name != "postgresql":
             return
-        connection.exec_driver_sql(_APPEND_ONLY_FUNCTION)
-        connection.exec_driver_sql(_trigger(table))
+        connection.exec_driver_sql(APPEND_ONLY_FUNCTION)
+        connection.exec_driver_sql(append_only_trigger(table))
 
     return listener
 
 
 for _model in (CalcRun, CalcRunStep, CalcRunResult):
-    event.listen(_model.__table__, "after_create", _install(_model.__tablename__))
+    event.listen(_model.__table__, "after_create", install_append_only(_model.__tablename__))

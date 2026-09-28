@@ -445,7 +445,7 @@ class TestGraph:
         assert any("неизвестного" in item for item in definition_problems(dangling))
 
     def test_catalog_answers_what_exists(self) -> None:
-        assert set(CALCULATORS) == {("test.vertical_length", 1)}
+        assert set(CALCULATORS) == {("test.vertical_length", 1), ("test.riser_demand", 1)}
         demo = CALCULATORS[("test.vertical_length", 1)]
         assert demo.kind is CalcCalculatorKind.DEMO
         assert "не расчёт ВК" in demo.title

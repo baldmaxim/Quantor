@@ -22,6 +22,7 @@ from app.contracts.calc.engine import (
     CalcStepOutput,
     CalcStepRead,
 )
+from app.contracts.calc.enums import CalcCalculatorKind
 from app.contracts.calc.subjects import CalcFactSubject
 from app.models import CalcRun, CalcRunResult, CalcRunStep
 from app.services.calc.engine.calculators import CalculatorDef
@@ -76,8 +77,13 @@ def calculator_read(definition: CalculatorDef) -> CalcCalculatorRead:
     )
 
 
-def list_calculators() -> list[CalcCalculatorRead]:
-    return [calculator_read(item) for _, item in sorted(CALCULATORS.items())]
+def list_calculators(*, include_demo: bool = False) -> list[CalcCalculatorRead]:
+    """Демонстрационные калькуляторы в пользовательском списке скрыты (решение владельца)."""
+    return [
+        calculator_read(item)
+        for _, item in sorted(CALCULATORS.items())
+        if include_demo or item.kind is not CalcCalculatorKind.DEMO
+    ]
 
 
 def _blocking(run: CalcRun) -> str | None:

@@ -871,7 +871,9 @@
           "RULE_TYPE_NOT_ALLOWED",
           "RULE_CONTRACT_MISMATCH",
           "IMPLEMENTATION_MISSING",
-          "UNIT_INCOMPATIBLE"
+          "UNIT_INCOMPATIBLE",
+          "CALCULATION_NOT_USABLE",
+          "CALCULATION_RESULT_MISSING"
         ],
         "title": "CalcBlockCode",
         "type": "string"
@@ -1167,6 +1169,50 @@
           "assumption"
         ],
         "title": "CalcCalculatorStepRead",
+        "type": "object"
+      },
+      "CalcCardinality": {
+        "additionalProperties": false,
+        "description": "Сколько экземпляров представляет элемент — точно или диапазоном.",
+        "properties": {
+          "max": {
+            "minimum": 0.0,
+            "title": "Max",
+            "type": "integer"
+          },
+          "min": {
+            "minimum": 0.0,
+            "title": "Min",
+            "type": "integer"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "min",
+          "max"
+        ],
+        "title": "CalcCardinality",
         "type": "object"
       },
       "CalcCollectableDocumentRead": {
@@ -1813,6 +1859,121 @@
         ],
         "title": "CalcDocumentStage",
         "type": "string"
+      },
+      "CalcElementDiff": {
+        "properties": {
+          "change": {
+            "enum": [
+              "ADDED",
+              "REMOVED",
+              "CHANGED"
+            ],
+            "title": "Change",
+            "type": "string"
+          },
+          "element_id": {
+            "title": "Element Id",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "element_id",
+          "change",
+          "fields"
+        ],
+        "title": "CalcElementDiff",
+        "type": "object"
+      },
+      "CalcElementProvenance": {
+        "description": "Откуда взялся элемент графа системы. Без одного из этих состояний элемент не хранится.",
+        "enum": [
+          "OBSERVED",
+          "CALCULATED",
+          "SYNTHESIZED",
+          "ASSUMED"
+        ],
+        "title": "CalcElementProvenance",
+        "type": "string"
+      },
+      "CalcElementSource": {
+        "additionalProperties": false,
+        "description": "Основание элемента: результат расчёта, факт объекта или решение инженера.",
+        "properties": {
+          "fact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "CALCULATION_RESULT",
+              "FACT",
+              "HUMAN_DECISION"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "kind",
+          "key"
+        ],
+        "title": "CalcElementSource",
+        "type": "object"
       },
       "CalcEngineeringSource": {
         "additionalProperties": false,
@@ -3112,6 +3273,90 @@
         "title": "CalcFactWithdraw",
         "type": "object"
       },
+      "CalcGeometry": {
+        "additionalProperties": false,
+        "description": "Что известно о геометрии. Точные координаты — только из источника.",
+        "properties": {
+          "anchor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 4,
+                "minItems": 4,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcQuantityAttr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rule_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Key"
+          },
+          "source_fact_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Fact Key"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CalcGeometryState",
+            "default": "NONE"
+          }
+        },
+        "title": "CalcGeometry",
+        "type": "object"
+      },
+      "CalcGeometryState": {
+        "description": "Что известно о геометрии элемента — отдельно от того, что элемент существует.",
+        "enum": [
+          "NONE",
+          "ANCHOR_ONLY",
+          "RANGE",
+          "ESTIMATED",
+          "OBSERVED"
+        ],
+        "title": "CalcGeometryState",
+        "type": "string"
+      },
       "CalcHazardOutcome": {
         "description": "Итог разбора одной известной опасности правила старого портала.",
         "enum": [
@@ -4159,6 +4404,97 @@
         ],
         "title": "CalcOtherSource",
         "type": "object"
+      },
+      "CalcQuantityAttr": {
+        "additionalProperties": false,
+        "description": "Количественный атрибут: значение или диапазон и его смысл — на экземпляр или итог.",
+        "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/CalcQuantityBasis"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+                "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "name",
+          "unit",
+          "basis"
+        ],
+        "title": "CalcQuantityAttr",
+        "type": "object"
+      },
+      "CalcQuantityBasis": {
+        "description": "Смысл количественного атрибута: на один экземпляр или уже итог по всем.",
+        "enum": [
+          "PER_INSTANCE",
+          "TOTAL"
+        ],
+        "title": "CalcQuantityBasis",
+        "type": "string"
       },
       "CalcRangeValue": {
         "additionalProperties": false,
@@ -6704,6 +7040,82 @@
         "title": "CalcScenario",
         "type": "string"
       },
+      "CalcScenarioEstimate": {
+        "additionalProperties": false,
+        "description": "Оценка сценария для кратности — например, нижняя граница в MINIMUM.",
+        "properties": {
+          "meaning": {
+            "const": "LOWER_BOUND",
+            "title": "Meaning",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "value": {
+            "minimum": 0.0,
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value",
+          "meaning",
+          "note"
+        ],
+        "title": "CalcScenarioEstimate",
+        "type": "object"
+      },
+      "CalcSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcSynthesisRuleRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/CalcSelectionSource"
+          }
+        },
+        "required": [
+          "source",
+          "explanation"
+        ],
+        "title": "CalcSelection",
+        "type": "object"
+      },
+      "CalcSelectionSource": {
+        "description": "Кто выбрал кратность из диапазона. Совпавшим границам выбор не нужен.",
+        "enum": [
+          "RULE",
+          "HUMAN_DECISION"
+        ],
+        "title": "CalcSelectionSource",
+        "type": "string"
+      },
       "CalcSnapshot": {
         "additionalProperties": false,
         "properties": {
@@ -7405,6 +7817,1284 @@
         "title": "CalcStepStatus",
         "type": "string"
       },
+      "CalcSynthesisAssumption": {
+        "additionalProperties": false,
+        "properties": {
+          "element_ids": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "title": "Element Ids",
+            "type": "array"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "notice": {
+            "title": "Notice",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/CalcSynthesisRuleRef"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "description": "Точное десятичное число строкой, без экспоненты и без скрытого округления.",
+            "pattern": "^-?\\d{1,40}(\\.\\d{1,40})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "element_ids",
+          "rule",
+          "reason",
+          "impact",
+          "notice",
+          "value",
+          "unit"
+        ],
+        "title": "CalcSynthesisAssumption",
+        "type": "object"
+      },
+      "CalcSynthesisCompareRead": {
+        "properties": {
+          "base_run_id": {
+            "format": "uuid",
+            "title": "Base Run Id",
+            "type": "string"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/CalcElementDiff"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/CalcElementDiff"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "other_run_id": {
+            "format": "uuid",
+            "title": "Other Run Id",
+            "type": "string"
+          },
+          "same_calculation": {
+            "title": "Same Calculation",
+            "type": "boolean"
+          },
+          "same_synthesizer": {
+            "title": "Same Synthesizer",
+            "type": "boolean"
+          },
+          "unresolved_added": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unresolved Added",
+            "type": "array"
+          },
+          "unresolved_removed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unresolved Removed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_run_id",
+          "other_run_id",
+          "same_synthesizer",
+          "same_calculation",
+          "nodes",
+          "edges",
+          "unresolved_added",
+          "unresolved_removed"
+        ],
+        "title": "CalcSynthesisCompareRead",
+        "type": "object"
+      },
+      "CalcSynthesisDecisionCreate": {
+        "additionalProperties": false,
+        "description": "Решение инженера по нерешённой кратности. Вход следующего запуска, не факт объекта.",
+        "properties": {
+          "comment": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Comment",
+            "type": "string"
+          },
+          "node_id": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "selected_count": {
+            "minimum": 0.0,
+            "title": "Selected Count",
+            "type": "integer"
+          },
+          "variant_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Key"
+          }
+        },
+        "required": [
+          "node_id",
+          "selected_count",
+          "comment"
+        ],
+        "title": "CalcSynthesisDecisionCreate",
+        "type": "object"
+      },
+      "CalcSynthesisDecisionRead": {
+        "properties": {
+          "alternatives": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "comment": {
+            "title": "Comment",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "selected_count": {
+            "title": "Selected Count",
+            "type": "integer"
+          },
+          "synthesis_run_id": {
+            "format": "uuid",
+            "title": "Synthesis Run Id",
+            "type": "string"
+          },
+          "variant_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Key"
+          }
+        },
+        "required": [
+          "id",
+          "synthesis_run_id",
+          "node_id",
+          "selected_count",
+          "variant_key",
+          "alternatives",
+          "comment",
+          "decided_by",
+          "created_at"
+        ],
+        "title": "CalcSynthesisDecisionRead",
+        "type": "object"
+      },
+      "CalcSynthesisReplayRead": {
+        "properties": {
+          "original_graph_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Graph Sha256"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "replay_graph_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replay Graph Sha256"
+          },
+          "reproducible": {
+            "title": "Reproducible",
+            "type": "boolean"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "reproducible",
+          "original_graph_sha256",
+          "replay_graph_sha256",
+          "problems"
+        ],
+        "title": "CalcSynthesisReplayRead",
+        "type": "object"
+      },
+      "CalcSynthesisRuleRef": {
+        "additionalProperties": false,
+        "properties": {
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "implementation_key": {
+            "title": "Implementation Key",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/CalcSynthesisRuleRole"
+          },
+          "rule_key": {
+            "title": "Rule Key",
+            "type": "string"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/CalcRuleType"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule_key",
+          "version",
+          "rule_type",
+          "content_sha256",
+          "implementation_key",
+          "role"
+        ],
+        "title": "CalcSynthesisRuleRef",
+        "type": "object"
+      },
+      "CalcSynthesisRuleRole": {
+        "description": "Для чего синтезатор применяет правило.",
+        "enum": [
+          "TOPOLOGY",
+          "SELECTION",
+          "ASSUMPTION"
+        ],
+        "title": "CalcSynthesisRuleRole",
+        "type": "string"
+      },
+      "CalcSynthesisRunCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "calculation_run_id": {
+            "format": "uuid",
+            "title": "Calculation Run Id",
+            "type": "string"
+          },
+          "decision_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Decision Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._:-]{8,100}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "synthesizer_id": {
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,4}$",
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "synthesizer_version": {
+            "minimum": 1.0,
+            "title": "Synthesizer Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "calculation_run_id",
+          "synthesizer_id",
+          "synthesizer_version"
+        ],
+        "title": "CalcSynthesisRunCreate",
+        "type": "object"
+      },
+      "CalcSynthesisRunRead": {
+        "description": "Запуск без графа: граф — отдельной операцией.",
+        "properties": {
+          "applied_decisions": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSynthesisDecisionRead"
+            },
+            "title": "Applied Decisions",
+            "type": "array"
+          },
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSynthesisAssumption"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "blocking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocking"
+          },
+          "blocking_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/CalcBlockingReason"
+            },
+            "title": "Blocking Reasons",
+            "type": "array"
+          },
+          "calculation_result_sha256": {
+            "title": "Calculation Result Sha256",
+            "type": "string"
+          },
+          "calculation_run_id": {
+            "format": "uuid",
+            "title": "Calculation Run Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSynthesisDecisionRead"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcRunFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "graph_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Sha256"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "implementation_sha256": {
+            "title": "Implementation Sha256",
+            "type": "string"
+          },
+          "nodes_count": {
+            "title": "Nodes Count",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "rule_bindings": {
+            "items": {
+              "$ref": "#/components/schemas/CalcRuleBinding"
+            },
+            "title": "Rule Bindings",
+            "type": "array"
+          },
+          "rule_bindings_sha256": {
+            "title": "Rule Bindings Sha256",
+            "type": "string"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/CalcSnapshot"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcSynthesisStatus"
+          },
+          "synthesizer_id": {
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "synthesizer_sha256": {
+            "title": "Synthesizer Sha256",
+            "type": "string"
+          },
+          "synthesizer_title": {
+            "title": "Synthesizer Title",
+            "type": "string"
+          },
+          "synthesizer_version": {
+            "title": "Synthesizer Version",
+            "type": "integer"
+          },
+          "unresolved": {
+            "items": {
+              "$ref": "#/components/schemas/CalcUnresolvedItem"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          },
+          "unresolved_count": {
+            "title": "Unresolved Count",
+            "type": "integer"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSynthesisVariant"
+            },
+            "title": "Variants",
+            "type": "array"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/CalcRunVersions"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "calculation_run_id",
+          "synthesizer_id",
+          "synthesizer_version",
+          "synthesizer_title",
+          "scenario",
+          "status",
+          "nodes_count",
+          "unresolved_count",
+          "blocking",
+          "graph_sha256",
+          "created_by",
+          "created_at",
+          "scope",
+          "idempotency_key",
+          "synthesizer_sha256",
+          "implementation_sha256",
+          "versions",
+          "calculation_result_sha256",
+          "snapshot",
+          "rule_bindings",
+          "rule_bindings_sha256",
+          "applied_decisions",
+          "blocking_reasons",
+          "failure",
+          "unresolved",
+          "variants",
+          "assumptions",
+          "warnings",
+          "decisions"
+        ],
+        "title": "CalcSynthesisRunRead",
+        "type": "object"
+      },
+      "CalcSynthesisRunSummaryRead": {
+        "properties": {
+          "blocking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocking"
+          },
+          "calculation_run_id": {
+            "format": "uuid",
+            "title": "Calculation Run Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "graph_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Sha256"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nodes_count": {
+            "title": "Nodes Count",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcSynthesisStatus"
+          },
+          "synthesizer_id": {
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "synthesizer_title": {
+            "title": "Synthesizer Title",
+            "type": "string"
+          },
+          "synthesizer_version": {
+            "title": "Synthesizer Version",
+            "type": "integer"
+          },
+          "unresolved_count": {
+            "title": "Unresolved Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "calculation_run_id",
+          "synthesizer_id",
+          "synthesizer_version",
+          "synthesizer_title",
+          "scenario",
+          "status",
+          "nodes_count",
+          "unresolved_count",
+          "blocking",
+          "graph_sha256",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CalcSynthesisRunSummaryRead",
+        "type": "object"
+      },
+      "CalcSynthesisStatus": {
+        "description": "Итог запуска синтеза.\n\nPARTIAL — не ошибка: полезная структура есть, но часть структурных решений остаётся\nдиапазоном или не решена. Неизвестная физическая трасса запуск неполным не делает.",
+        "enum": [
+          "BLOCKED",
+          "PARTIAL",
+          "SUCCEEDED",
+          "FAILED"
+        ],
+        "title": "CalcSynthesisStatus",
+        "type": "string"
+      },
+      "CalcSynthesisTraceKind": {
+        "enum": [
+          "ELEMENT",
+          "DECISION",
+          "RULE",
+          "CALCULATION_RESULT",
+          "FACT",
+          "EVIDENCE",
+          "ASSUMPTION",
+          "HUMAN_DECISION"
+        ],
+        "title": "CalcSynthesisTraceKind",
+        "type": "string"
+      },
+      "CalcSynthesisTraceNode": {
+        "properties": {
+          "calculation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcResultTraceRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSynthesisTraceNode"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcSynthesisTraceKind"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "title",
+          "text"
+        ],
+        "title": "CalcSynthesisTraceNode",
+        "type": "object"
+      },
+      "CalcSynthesisTraceRead": {
+        "properties": {
+          "element_id": {
+            "title": "Element Id",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/CalcElementProvenance"
+          },
+          "root": {
+            "$ref": "#/components/schemas/CalcSynthesisTraceNode"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "element_id",
+          "provenance",
+          "text",
+          "root"
+        ],
+        "title": "CalcSynthesisTraceRead",
+        "type": "object"
+      },
+      "CalcSynthesisValidateRead": {
+        "properties": {
+          "blocking_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/CalcBlockingReason"
+            },
+            "title": "Blocking Reasons",
+            "type": "array"
+          },
+          "scenario": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcScenario"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "synthesizer_id": {
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "synthesizer_version": {
+            "title": "Synthesizer Version",
+            "type": "integer"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "synthesizer_id",
+          "synthesizer_version",
+          "scenario",
+          "valid",
+          "blocking_reasons",
+          "warnings"
+        ],
+        "title": "CalcSynthesisValidateRead",
+        "type": "object"
+      },
+      "CalcSynthesisVariant": {
+        "additionalProperties": false,
+        "description": "Допустимый вариант схемы. Без вероятностей: статистической модели нет.",
+        "properties": {
+          "key": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "open_questions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/CalcVariantSelection"
+            },
+            "title": "Selections",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "selections",
+          "reasons",
+          "open_questions"
+        ],
+        "title": "CalcSynthesisVariant",
+        "type": "object"
+      },
+      "CalcSynthesizerRead": {
+        "properties": {
+          "calculator_id": {
+            "title": "Calculator Id",
+            "type": "string"
+          },
+          "calculator_version": {
+            "title": "Calculator Version",
+            "type": "integer"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "graph_type": {
+            "title": "Graph Type",
+            "type": "string"
+          },
+          "implementation_sha256": {
+            "title": "Implementation Sha256",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcCalculatorKind"
+          },
+          "results": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/CalcScenario"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/CalcDocumentStage"
+          },
+          "synthesizer_id": {
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "synthesizer_sha256": {
+            "title": "Synthesizer Sha256",
+            "type": "string"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "synthesizer_id",
+          "version",
+          "title",
+          "kind",
+          "discipline",
+          "systems",
+          "stage",
+          "scenarios",
+          "graph_type",
+          "calculator_id",
+          "calculator_version",
+          "results",
+          "facts",
+          "rules",
+          "synthesizer_sha256",
+          "implementation_sha256"
+        ],
+        "title": "CalcSynthesizerRead",
+        "type": "object"
+      },
+      "CalcSystemEdge": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/CalcQuantityAttr"
+            },
+            "title": "Attributes",
+            "type": "array"
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/CalcGeometry"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "multipliers": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "title": "Multipliers",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/CalcElementProvenance"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSynthesisRuleRef"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "semantic_type": {
+            "pattern": "^[A-Z][A-Z0-9_]{1,40}$",
+            "title": "Semantic Type",
+            "type": "string"
+          },
+          "source_node": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Source Node",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/CalcElementSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "support": {
+            "title": "Support",
+            "type": "string"
+          },
+          "target_node": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Target Node",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "semantic_type",
+          "title",
+          "provenance",
+          "support",
+          "source_node",
+          "target_node"
+        ],
+        "title": "CalcSystemEdge",
+        "type": "object"
+      },
+      "CalcSystemGraph": {
+        "additionalProperties": false,
+        "properties": {
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSynthesisAssumption"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "discipline": {
+            "$ref": "#/components/schemas/CalcDiscipline"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSystemEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "graph_type": {
+            "title": "Graph Type",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSystemNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/CalcScenario"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "synthesizer_id": {
+            "title": "Synthesizer Id",
+            "type": "string"
+          },
+          "synthesizer_version": {
+            "title": "Synthesizer Version",
+            "type": "integer"
+          },
+          "system_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Code"
+          },
+          "unresolved": {
+            "items": {
+              "$ref": "#/components/schemas/CalcUnresolvedItem"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "graph_type",
+          "discipline",
+          "system_code",
+          "scope",
+          "scenario",
+          "synthesizer_id",
+          "synthesizer_version",
+          "nodes",
+          "edges",
+          "unresolved",
+          "assumptions",
+          "warnings"
+        ],
+        "title": "CalcSystemGraph",
+        "type": "object"
+      },
+      "CalcSystemNode": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/CalcQuantityAttr"
+            },
+            "title": "Attributes",
+            "type": "array"
+          },
+          "cardinality": {
+            "$ref": "#/components/schemas/CalcCardinality"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcScenarioEstimate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/CalcGeometry"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "multiplicity": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Multiplicity",
+            "type": "integer"
+          },
+          "multipliers": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "title": "Multipliers",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/CalcElementProvenance"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/CalcSynthesisRuleRef"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "semantic_type": {
+            "pattern": "^[A-Z][A-Z0-9_]{1,40}$",
+            "title": "Semantic Type",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/CalcElementSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "support": {
+            "title": "Support",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "semantic_type",
+          "title",
+          "provenance",
+          "support",
+          "scope",
+          "cardinality"
+        ],
+        "title": "CalcSystemNode",
+        "type": "object"
+      },
       "CalcSystemRead": {
         "properties": {
           "code": {
@@ -7611,6 +9301,69 @@
         "title": "CalcTraceNode",
         "type": "object"
       },
+      "CalcUnresolvedItem": {
+        "additionalProperties": false,
+        "description": "Что Quantor пока не знает — и что нужно, чтобы узнать.",
+        "properties": {
+          "element_id": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Element Id"
+          },
+          "key": {
+            "pattern": "^[a-z][a-z0-9_.]{0,79}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcUnresolvedKind"
+          },
+          "known": {
+            "title": "Known",
+            "type": "string"
+          },
+          "needed": {
+            "title": "Needed",
+            "type": "string"
+          },
+          "structural": {
+            "title": "Structural",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "title",
+          "known",
+          "needed",
+          "structural"
+        ],
+        "title": "CalcUnresolvedItem",
+        "type": "object"
+      },
+      "CalcUnresolvedKind": {
+        "enum": [
+          "COUNT_RANGE",
+          "CHOICE",
+          "PLACEMENT",
+          "MISSING_RULE",
+          "ROUTE"
+        ],
+        "title": "CalcUnresolvedKind",
+        "type": "string"
+      },
       "CalcValueKind": {
         "description": "Вид значения факта.",
         "enum": [
@@ -7623,6 +9376,27 @@
         ],
         "title": "CalcValueKind",
         "type": "string"
+      },
+      "CalcVariantSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "node_id": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "count"
+        ],
+        "title": "CalcVariantSelection",
+        "type": "object"
       },
       "CalibrationSnapshot": {
         "additionalProperties": false,
@@ -15629,8 +17403,20 @@
     },
     "/api/v1/calc/calculators": {
       "get": {
-        "description": "Что можно запустить: версии, система, стадия, сценарии, нужные факты и правила.",
+        "description": "Что можно запустить: версии, система, стадия, сценарии, нужные факты и правила.\n\nДемонстрационные калькуляторы скрыты; `include_demo=true` — отладочный режим.",
         "operationId": "list_calc_calculators",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_demo",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Demo",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -15645,6 +17431,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Калькуляторы расчётного ядра",
@@ -16929,6 +18725,158 @@
         ]
       }
     },
+    "/api/v1/calc/projects/{project_id}/synthesis-runs": {
+      "get": {
+        "operationId": "list_calc_synthesis_runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcSynthesisRunSummaryRead"
+                  },
+                  "title": "Response List Calc Synthesis Runs",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запуски синтеза проекта",
+        "tags": [
+          "calc"
+        ]
+      },
+      "post": {
+        "description": "BLOCKED и PARTIAL — не ошибки, а записанные итоги. Повтор по ключу возвращает тот же.",
+        "operationId": "create_calc_synthesis_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcSynthesisRunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSynthesisRunRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить синтез структуры",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/synthesis-runs/validate": {
+      "post": {
+        "operationId": "validate_calc_synthesis",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcSynthesisRunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSynthesisValidateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Проверить запрос синтеза без запуска",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
     "/api/v1/calc/requirements": {
       "get": {
         "description": "Что понадобится калькулятору В1, Т3, Т4, К1: уровень, область, можно ли вывести.",
@@ -17726,6 +19674,437 @@
           }
         },
         "summary": "Почему такое значение",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesis-runs/compare": {
+      "get": {
+        "operationId": "compare_calc_synthesis_runs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "base",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Base",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "other",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Other",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSynthesisCompareRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сравнить два запуска синтеза",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesis-runs/{run_id}": {
+      "get": {
+        "operationId": "get_calc_synthesis_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSynthesisRunRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запуск синтеза",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesis-runs/{run_id}/decisions": {
+      "post": {
+        "description": "Запуск не меняется: решение — вход следующего запуска, а не факт объекта.",
+        "operationId": "create_calc_synthesis_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcSynthesisDecisionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSynthesisDecisionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Решение инженера по варианту",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesis-runs/{run_id}/graph": {
+      "get": {
+        "operationId": "get_calc_synthesis_graph",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSystemGraph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Граф системы запуска",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesis-runs/{run_id}/replay": {
+      "post": {
+        "operationId": "replay_calc_synthesis_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSynthesisReplayRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Повторить исторический запуск синтеза",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesis-runs/{run_id}/trace": {
+      "get": {
+        "operationId": "get_calc_synthesis_trace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "element_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "title": "Element Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSynthesisTraceRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Почему этот элемент нужен",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesis-runs/{run_id}/unresolved": {
+      "get": {
+        "operationId": "list_calc_synthesis_unresolved",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcUnresolvedItem"
+                  },
+                  "title": "Response List Calc Synthesis Unresolved",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Что Quantor пока не знает",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesis-runs/{run_id}/variants": {
+      "get": {
+        "operationId": "list_calc_synthesis_variants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcSynthesisVariant"
+                  },
+                  "title": "Response List Calc Synthesis Variants",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Допустимые варианты схемы",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/synthesizers": {
+      "get": {
+        "description": "Демонстрационные синтезаторы скрыты; `include_demo=true` — отладочный режим.",
+        "operationId": "list_calc_synthesizers",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_demo",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Demo",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcSynthesizerRead"
+                  },
+                  "title": "Response List Calc Synthesizers",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Синтезаторы структуры системы",
         "tags": [
           "calc"
         ]

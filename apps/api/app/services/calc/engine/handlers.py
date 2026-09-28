@@ -21,9 +21,10 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from decimal import localcontext
+from decimal import Decimal, localcontext
 from types import MappingProxyType
 
+from app.contracts.calc.engine import CalcRoundingPolicy
 from app.contracts.calc.rules import IMPLEMENTATION_KEY_PATTERN
 from app.services.calc.engine.hashing import canonical_sha256
 from app.services.calc.engine.numbers import ENGINE_CONTEXT, exact_text, parse_exact
@@ -41,10 +42,23 @@ class HandlerContext:
 
 
 @dataclass(frozen=True, slots=True)
+class HandlerRounding:
+    """Округление внутри обработчика, которого требует правило: видно в шаге, а не спрятано."""
+
+    target: str
+    before: Decimal
+    after: Decimal
+    unit: str | None
+    policy: CalcRoundingPolicy
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class HandlerResult:
     outputs: Mapping[str, Quantity]
     explanation: str
     """Пояснение для человека, собранное из чисел шага: «3,3 м × 24 эт. = 79,2 м»."""
+    roundings: tuple[HandlerRounding, ...] = ()
 
 
 HandlerFn = Callable[[HandlerContext], HandlerResult]

@@ -249,7 +249,8 @@ def explain(run: CalcRunRead, result_key: str) -> CalcResultTraceRead:
     return CalcResultTraceRead(
         run_id=run.id,
         result_key=result.result_key,
-        text=f"{root.text}. " + "; ".join(lines),
+        # Единица вида «ст.» уже заканчивается точкой — вторая не нужна.
+        text=root.text + (" " if root.text.endswith(".") else ". ") + "; ".join(lines),
         root=root,
     )
 

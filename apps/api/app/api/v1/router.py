@@ -27,6 +27,7 @@ from app.api.v1 import (
     calc_inputs,
     calc_rules,
     calc_runs,
+    calc_synthesis,
     documents,
     integrations,
     jobs,
@@ -62,6 +63,7 @@ protected_router.include_router(calc.router)
 protected_router.include_router(calc_inputs.router)
 protected_router.include_router(calc_rules.router)
 protected_router.include_router(calc_runs.router)
+protected_router.include_router(calc_synthesis.router)
 
 api_v1_router.include_router(protected_router)
 

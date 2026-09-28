@@ -58,6 +58,18 @@ def apply_rounding(value: Decimal, policy: CalcRoundingPolicy) -> Decimal:
     return value.quantize(quantum, rounding=_MODES[policy.mode], context=_ROUNDING_CONTEXT)
 
 
+def divide_rounded(
+    dividend: Decimal, divisor: Decimal, policy: CalcRoundingPolicy
+) -> tuple[Decimal, Decimal]:
+    """Деление с явным округлением: частное (40 значащих цифр) и округлённое значение.
+
+    Для округления до шага частное с 40 цифрами достаточно: дробная часть частного целых
+    чисел до 10¹² не меньше 10⁻¹², и погрешность 40-й цифры не переносит его через границу шага.
+    """
+    quotient = _ROUNDING_CONTEXT.divide(dividend, divisor)
+    return quotient, apply_rounding(quotient, policy)
+
+
 def ru_number(value: Decimal) -> str:
     """Число для человека: «79,2». Только отображение — значение не меняется."""
     return exact_text(value).replace(".", ",")

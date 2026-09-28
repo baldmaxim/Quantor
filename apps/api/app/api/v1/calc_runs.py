@@ -54,9 +54,14 @@ async def _run(session: SessionDep, context: AuthDep, run_id: uuid.UUID) -> Calc
     summary="Калькуляторы расчётного ядра",
     dependencies=[require(Permission.CALC_READ)],
 )
-async def list_calc_calculators() -> list[CalcCalculatorRead]:
-    """Что можно запустить: версии, система, стадия, сценарии, нужные факты и правила."""
-    return reads.list_calculators()
+async def list_calc_calculators(
+    include_demo: Annotated[bool, Query()] = False,
+) -> list[CalcCalculatorRead]:
+    """Что можно запустить: версии, система, стадия, сценарии, нужные факты и правила.
+
+    Демонстрационные калькуляторы скрыты; `include_demo=true` — отладочный режим.
+    """
+    return reads.list_calculators(include_demo=include_demo)
 
 
 @router.post(

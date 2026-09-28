@@ -56,6 +56,12 @@ const CalcPage = ({ params }: IPageProps) => {
               Запуски
             </ButtonLink>
             <ButtonLink
+              href={`/projects/${projectId}/calc/structure`}
+              transitionTypes={['nav-forward']}
+            >
+              Структура
+            </ButtonLink>
+            <ButtonLink
               href={`/projects/${projectId}/calc/rules`}
               transitionTypes={['nav-forward']}
             >
