@@ -17,6 +17,7 @@ STAGE2_FEATURES = (
     "bim.import",
     "drawing.compare",
     "mep_rd_hypothesis_v1",
+    "calc.portal",
 )
 
 

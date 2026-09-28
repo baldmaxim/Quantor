@@ -62,6 +62,13 @@ class Permission(StrEnum):
     TAKEOFF_EDIT = "takeoff.edit"
     TAKEOFF_VERIFY = "takeoff.verify"
 
+    # Расчётный контур (ADR-0030). `verify` отдельно от `edit` по той же причине, что у
+    # обмера: подтвердить факт или решить конфликт источников — ответственность за число,
+    # и она не обязана совпадать с правом это число внести.
+    CALC_READ = "calc.read"
+    CALC_EDIT = "calc.edit"
+    CALC_VERIFY = "calc.verify"
+
 
 # Читатель: видит проекты и документы своего пространства, не меняет ничего.
 _VIEWER: Final[frozenset[Permission]] = frozenset(
@@ -73,6 +80,7 @@ _VIEWER: Final[frozenset[Permission]] = frozenset(
         # Читатель видит обмеры и масштаб: величина без основания непроверяема, а
         # основание — это и есть калибровка с измерениями.
         Permission.TAKEOFF_READ,
+        Permission.CALC_READ,
     }
 )
 
@@ -86,6 +94,7 @@ _REVIEWER: Final[frozenset[Permission]] = _VIEWER | {
     # Подтверждать обмер, но не вносить его: разделение автора и проверяющего —
     # смысл роли, а не формальность.
     Permission.TAKEOFF_VERIFY,
+    Permission.CALC_VERIFY,
 }
 
 # Инженер: рабочие действия с проектами. Удаления здесь намеренно нет — удалённый проект
@@ -95,6 +104,7 @@ _ENGINEER: Final[frozenset[Permission]] = _REVIEWER | {
     Permission.PROJECT_UPDATE,
     Permission.DOCUMENT_UPLOAD,
     Permission.TAKEOFF_EDIT,
+    Permission.CALC_EDIT,
 }
 
 # Администратор пространства: управляет своим пространством целиком, но не платформой.

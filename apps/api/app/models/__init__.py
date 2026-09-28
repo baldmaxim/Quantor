@@ -2,6 +2,13 @@
 
 from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
+from app.models.calc import (
+    CalcFact,
+    CalcFactConflict,
+    CalcFactEvidence,
+    CalcManualOverride,
+    CalcSource,
+)
 from app.models.control_plane import FeatureFlagOverride, SettingOverride
 from app.models.document import Document, DocumentRevision
 from app.models.identity import AuthSession, UserIdentity, Workspace, WorkspaceMembership
@@ -16,6 +23,11 @@ from app.models.worker import Worker
 __all__ = [
     "AuditEvent",
     "AuthSession",
+    "CalcFact",
+    "CalcFactConflict",
+    "CalcFactEvidence",
+    "CalcManualOverride",
+    "CalcSource",
     "Document",
     "DocumentRevision",
     "FeatureFlagOverride",

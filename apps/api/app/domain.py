@@ -131,6 +131,12 @@ class AuditAction(StrEnum):
     SCALE_CALIBRATION_DEFAULT_SET = "scale_calibration_default_set"
     SCALE_CALIBRATION_VERIFIED = "scale_calibration_verified"
 
+    CALC_SOURCE_CREATED = "calc_source_created"
+    CALC_FACT_CREATED = "calc_fact_created"
+    CALC_FACT_REVIEWED = "calc_fact_reviewed"
+    CALC_FACT_WITHDRAWN = "calc_fact_withdrawn"
+    CALC_CONFLICT_DECIDED = "calc_conflict_decided"
+
     JOB_RETRIED = "job_retried"
     JOB_CANCELLED = "job_cancelled"
 

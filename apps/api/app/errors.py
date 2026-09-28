@@ -80,6 +80,23 @@ class ErrorCode(StrEnum):
     # не так с фигурой, а не «данные некорректны».
     GEOMETRY_INVALID = "GEOMETRY_INVALID"
 
+    # --- расчётный контур: реестр фактов (ADR-0030) ---
+    CALC_FACT_TYPE_UNKNOWN = "CALC_FACT_TYPE_UNKNOWN"
+    CALC_SUBJECT_INVALID = "CALC_SUBJECT_INVALID"
+    CALC_VALUE_INVALID = "CALC_VALUE_INVALID"
+    CALC_UNIT_MISMATCH = "CALC_UNIT_MISMATCH"
+    # Метод получения есть, но пишет его не человек: «вычислено» без запуска расчёта или
+    # «измерено» без обмера было бы подделкой происхождения.
+    CALC_METHOD_NOT_AVAILABLE = "CALC_METHOD_NOT_AVAILABLE"
+    CALC_EVIDENCE_REQUIRED = "CALC_EVIDENCE_REQUIRED"
+    CALC_EVIDENCE_INVALID = "CALC_EVIDENCE_INVALID"
+    # Источник не годится для факта: ручной ввод от имени документа, количество из ВОР
+    # Заказчика. ВОР — объект сверки, а не эталон.
+    CALC_SOURCE_NOT_ALLOWED = "CALC_SOURCE_NOT_ALLOWED"
+    CALC_FACT_NOT_ACTIVE = "CALC_FACT_NOT_ACTIVE"
+    CALC_DECISION_INVALID = "CALC_DECISION_INVALID"
+    CALC_CONFLICT_CLOSED = "CALC_CONFLICT_CLOSED"
+
     # --- инфраструктура ---
     STORAGE_UNAVAILABLE = "STORAGE_UNAVAILABLE"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
@@ -151,6 +168,17 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: "Отрезок калибровки слишком короткий",
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: "Измерение изменено другим пользователем",
     ErrorCode.TAKEOFF_NAME_TAKEN: "Строка с таким названием в проекте уже есть",
+    ErrorCode.CALC_FACT_TYPE_UNKNOWN: "Неизвестный тип факта",
+    ErrorCode.CALC_SUBJECT_INVALID: "Место или система факта указаны не так, как требует тип",
+    ErrorCode.CALC_VALUE_INVALID: "Значение не подходит типу факта",
+    ErrorCode.CALC_UNIT_MISMATCH: "Единица измерения не подходит типу факта",
+    ErrorCode.CALC_METHOD_NOT_AVAILABLE: "Этот метод получения не записывается вручную",
+    ErrorCode.CALC_EVIDENCE_REQUIRED: "Для этого метода нужно свидетельство",
+    ErrorCode.CALC_EVIDENCE_INVALID: "Свидетельство ссылается на документ или лист вне проекта",
+    ErrorCode.CALC_SOURCE_NOT_ALLOWED: "Источник не подходит для этого факта",
+    ErrorCode.CALC_FACT_NOT_ACTIVE: "Утверждение уже заменено или отозвано",
+    ErrorCode.CALC_DECISION_INVALID: "Решение должно выбрать действующее утверждение этого факта",
+    ErrorCode.CALC_CONFLICT_CLOSED: "Расхождения больше нет — решать нечего",
     ErrorCode.GEOMETRY_INVALID: "Контур не годится для площади",
     ErrorCode.STORAGE_UNAVAILABLE: "Хранилище файлов недоступно",
     ErrorCode.DATABASE_UNAVAILABLE: "База данных недоступна",
@@ -225,6 +253,17 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: status.HTTP_409_CONFLICT,
     ErrorCode.TAKEOFF_NAME_TAKEN: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_FACT_TYPE_UNKNOWN: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_SUBJECT_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_VALUE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_UNIT_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_METHOD_NOT_AVAILABLE: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_EVIDENCE_REQUIRED: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_EVIDENCE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_SOURCE_NOT_ALLOWED: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_FACT_NOT_ACTIVE: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_DECISION_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CALC_CONFLICT_CLOSED: status.HTTP_409_CONFLICT,
     ErrorCode.GEOMETRY_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.STORAGE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.DATABASE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,

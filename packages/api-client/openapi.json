@@ -708,6 +708,1718 @@
         "title": "BoxGeometry",
         "type": "object"
       },
+      "CalcAssumptionEvidence": {
+        "additionalProperties": false,
+        "description": "Основание инженерного допущения.",
+        "properties": {
+          "alternatives": {
+            "items": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "basis": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Basis",
+            "type": "string"
+          },
+          "kind": {
+            "const": "ASSUMPTION_BASIS",
+            "default": "ASSUMPTION_BASIS",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "basis"
+        ],
+        "title": "CalcAssumptionEvidence",
+        "type": "object"
+      },
+      "CalcBooleanValue": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "BOOLEAN",
+            "default": "BOOLEAN",
+            "title": "Kind",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "CalcBooleanValue",
+        "type": "object"
+      },
+      "CalcConfidence": {
+        "description": "Уверенность в значении. Категория, а не число: дробь из ручного ввода декоративна.",
+        "enum": [
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ],
+        "title": "CalcConfidence",
+        "type": "string"
+      },
+      "CalcConflictRead": {
+        "properties": {
+          "claim_set_hash": {
+            "title": "Claim Set Hash",
+            "type": "string"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/CalcFactRead"
+            },
+            "title": "Claims",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcDecisionRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "fact_type": {
+            "title": "Fact Type",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcConflictStatus"
+          },
+          "subject_key": {
+            "title": "Subject Key",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "fact_key",
+          "fact_type",
+          "subject_key",
+          "status",
+          "claim_set_hash",
+          "claims",
+          "decision",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CalcConflictRead",
+        "type": "object"
+      },
+      "CalcConflictStatus": {
+        "description": "Состояние конфликта ключа факта.",
+        "enum": [
+          "OPEN",
+          "RESOLVED",
+          "REOPENED",
+          "OBSOLETE"
+        ],
+        "title": "CalcConflictStatus",
+        "type": "string"
+      },
+      "CalcCountValue": {
+        "additionalProperties": false,
+        "description": "Целое число сущностей: квартир, этажей, стояков. Единица говорит, что именно считается.",
+        "properties": {
+          "kind": {
+            "const": "COUNT",
+            "default": "COUNT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "CalcCountValue",
+        "type": "object"
+      },
+      "CalcDecisionCreate": {
+        "additionalProperties": false,
+        "description": "Решение конфликта человеком: выбрать утверждение или ввести своё значение.\n\nСвоё значение становится обычным утверждением ручного ввода с основанием — и решение\nвыбирает его. Так у любого действующего значения остаётся утверждение-носитель.",
+        "properties": {
+          "chosen_fact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Fact Id"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                    "COUNT": "#/components/schemas/CalcCountValue",
+                    "ENUM": "#/components/schemas/CalcEnumValue",
+                    "NUMBER": "#/components/schemas/CalcNumberValue",
+                    "RANGE": "#/components/schemas/CalcRangeValue",
+                    "TEXT": "#/components/schemas/CalcTextValue"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CalcNumberValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcCountValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcBooleanValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcEnumValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcTextValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcRangeValue"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "CalcDecisionCreate",
+        "type": "object"
+      },
+      "CalcDecisionRead": {
+        "properties": {
+          "chosen_fact_id": {
+            "format": "uuid",
+            "title": "Chosen Fact Id",
+            "type": "string"
+          },
+          "claim_set_hash": {
+            "title": "Claim Set Hash",
+            "type": "string"
+          },
+          "conflict_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "required": [
+          "id",
+          "fact_key",
+          "conflict_id",
+          "chosen_fact_id",
+          "reason",
+          "claim_set_hash",
+          "decided_by",
+          "created_at",
+          "revoked_at"
+        ],
+        "title": "CalcDecisionRead",
+        "type": "object"
+      },
+      "CalcDiscipline": {
+        "description": "Раздел проекта, к которому относится инженерная система.",
+        "enum": [
+          "VK",
+          "OV",
+          "EOM",
+          "SS",
+          "APT"
+        ],
+        "title": "CalcDiscipline",
+        "type": "string"
+      },
+      "CalcDocumentFragmentEvidence": {
+        "additionalProperties": false,
+        "description": "Место в документе проекта, где прочитано значение.",
+        "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "maxItems": 4,
+                "minItems": 4,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "document_revision_id": {
+            "format": "uuid",
+            "title": "Document Revision Id",
+            "type": "string"
+          },
+          "excerpt": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt"
+          },
+          "kind": {
+            "const": "DOCUMENT_FRAGMENT",
+            "default": "DOCUMENT_FRAGMENT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "locator": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locator"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "sheet_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Id"
+          }
+        },
+        "required": [
+          "document_revision_id"
+        ],
+        "title": "CalcDocumentFragmentEvidence",
+        "type": "object"
+      },
+      "CalcDocumentStage": {
+        "description": "Заявленная стадия документа. Задаётся при заведении источника, в ревизию не пишется.",
+        "enum": [
+          "P",
+          "RD",
+          "UNKNOWN"
+        ],
+        "title": "CalcDocumentStage",
+        "type": "string"
+      },
+      "CalcEnumOptionRead": {
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "title"
+        ],
+        "title": "CalcEnumOptionRead",
+        "type": "object"
+      },
+      "CalcEnumValue": {
+        "additionalProperties": false,
+        "description": "Одно из значений, объявленных типом факта.",
+        "properties": {
+          "kind": {
+            "const": "ENUM",
+            "default": "ENUM",
+            "title": "Kind",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "CalcEnumValue",
+        "type": "object"
+      },
+      "CalcEvidenceKind": {
+        "description": "Вид свидетельства.\n\nЯчейки таблиц распознанного пакета, ячейки файлов и обмеры появятся вместе с\nадаптерами источников (PROMPT 02) — вместе со своими колонками.",
+        "enum": [
+          "MANUAL_ENTRY",
+          "DOCUMENT_FRAGMENT",
+          "ASSUMPTION_BASIS"
+        ],
+        "title": "CalcEvidenceKind",
+        "type": "string"
+      },
+      "CalcEvidenceRead": {
+        "properties": {
+          "alternatives": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "author_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Id"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Revision Id"
+          },
+          "excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalcEvidenceKind"
+          },
+          "locator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locator"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "sheet_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Id"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "document_revision_id",
+          "page_index",
+          "sheet_id",
+          "bbox",
+          "locator",
+          "excerpt",
+          "basis",
+          "alternatives",
+          "author_id",
+          "created_at"
+        ],
+        "title": "CalcEvidenceRead",
+        "type": "object"
+      },
+      "CalcFactCreate": {
+        "additionalProperties": false,
+        "description": "Новое утверждение. Если у источника уже есть действующее по этому ключу — оно заменяется.",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcConfidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "ASSUMPTION_BASIS": "#/components/schemas/CalcAssumptionEvidence",
+                  "DOCUMENT_FRAGMENT": "#/components/schemas/CalcDocumentFragmentEvidence"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/CalcDocumentFragmentEvidence"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcAssumptionEvidence"
+                }
+              ]
+            },
+            "maxItems": 10,
+            "title": "Evidence",
+            "type": "array"
+          },
+          "fact_type": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Fact Type",
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/CalcFactMethod"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "value": {
+            "discriminator": {
+              "mapping": {
+                "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                "COUNT": "#/components/schemas/CalcCountValue",
+                "ENUM": "#/components/schemas/CalcEnumValue",
+                "NUMBER": "#/components/schemas/CalcNumberValue",
+                "RANGE": "#/components/schemas/CalcRangeValue",
+                "TEXT": "#/components/schemas/CalcTextValue"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalcNumberValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcCountValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcBooleanValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcEnumValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcTextValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcRangeValue"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "source_id",
+          "fact_type",
+          "subject",
+          "value",
+          "method"
+        ],
+        "title": "CalcFactCreate",
+        "type": "object"
+      },
+      "CalcFactMethod": {
+        "description": "Как получено значение факта.",
+        "enum": [
+          "DOCUMENT_EXPLICIT",
+          "TABLE_EXPLICIT",
+          "GEOMETRY_MEASURED",
+          "CALCULATED",
+          "INFERRED",
+          "NORMATIVE",
+          "MANUFACTURER_RULE",
+          "ASSUMPTION",
+          "MANUAL"
+        ],
+        "title": "CalcFactMethod",
+        "type": "string"
+      },
+      "CalcFactRead": {
+        "properties": {
+          "calculation_eligible": {
+            "title": "Calculation Eligible",
+            "type": "boolean"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/CalcConfidence"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/CalcEvidenceRead"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "fact_type": {
+            "title": "Fact Type",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/CalcFactMethod"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "review_comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Comment"
+          },
+          "review_status": {
+            "$ref": "#/components/schemas/CalcReviewStatus"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "source_class": {
+            "$ref": "#/components/schemas/CalcSourceClass"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "stated_value": {
+            "discriminator": {
+              "mapping": {
+                "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                "COUNT": "#/components/schemas/CalcCountValue",
+                "ENUM": "#/components/schemas/CalcEnumValue",
+                "NUMBER": "#/components/schemas/CalcNumberValue",
+                "RANGE": "#/components/schemas/CalcRangeValue",
+                "TEXT": "#/components/schemas/CalcTextValue"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalcNumberValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcCountValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcBooleanValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcEnumValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcTextValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcRangeValue"
+              }
+            ],
+            "title": "Stated Value"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalcFactStatus"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "subject_key": {
+            "title": "Subject Key",
+            "type": "string"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "value": {
+            "discriminator": {
+              "mapping": {
+                "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                "COUNT": "#/components/schemas/CalcCountValue",
+                "ENUM": "#/components/schemas/CalcEnumValue",
+                "NUMBER": "#/components/schemas/CalcNumberValue",
+                "RANGE": "#/components/schemas/CalcRangeValue",
+                "TEXT": "#/components/schemas/CalcTextValue"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalcNumberValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcCountValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcBooleanValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcEnumValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcTextValue"
+              },
+              {
+                "$ref": "#/components/schemas/CalcRangeValue"
+              }
+            ],
+            "title": "Value"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "withdrawn_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn Reason"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "source_id",
+          "source_class",
+          "fact_type",
+          "subject",
+          "subject_key",
+          "fact_key",
+          "value",
+          "stated_value",
+          "method",
+          "confidence",
+          "review_status",
+          "reviewed_by",
+          "reviewed_at",
+          "review_comment",
+          "status",
+          "version",
+          "supersedes_id",
+          "calculation_eligible",
+          "withdrawn_reason",
+          "withdrawn_at",
+          "note",
+          "created_by",
+          "created_at",
+          "evidence"
+        ],
+        "title": "CalcFactRead",
+        "type": "object"
+      },
+      "CalcFactReview": {
+        "additionalProperties": false,
+        "description": "Проверка утверждения человеком.",
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "status": {
+            "enum": [
+              "CONFIRMED",
+              "REJECTED"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "CalcFactReview",
+        "type": "object"
+      },
+      "CalcFactStatus": {
+        "description": "Жизненный цикл утверждения. Значение не меняется никогда — меняется только статус.",
+        "enum": [
+          "ACTIVE",
+          "SUPERSEDED",
+          "WITHDRAWN"
+        ],
+        "title": "CalcFactStatus",
+        "type": "string"
+      },
+      "CalcFactSubject": {
+        "additionalProperties": false,
+        "description": "К чему относится факт: место в здании и, если нужно, инженерная система.",
+        "properties": {
+          "building": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "discipline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalcDiscipline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor"
+          },
+          "room": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "system_code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Code"
+          }
+        },
+        "title": "CalcFactSubject",
+        "type": "object"
+      },
+      "CalcFactTypeRead": {
+        "description": "Тип факта для форм ввода: что ждать и где.",
+        "properties": {
+          "allowed_subject": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Subject",
+            "type": "array"
+          },
+          "customer_vor_admissible": {
+            "title": "Customer Vor Admissible",
+            "type": "boolean"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/CalcEnumOptionRead"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "required_subject": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required Subject",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "unit_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Title"
+          },
+          "value_kind": {
+            "$ref": "#/components/schemas/CalcValueKind"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "description",
+          "value_kind",
+          "unit",
+          "unit_title",
+          "required_subject",
+          "allowed_subject",
+          "options",
+          "customer_vor_admissible"
+        ],
+        "title": "CalcFactTypeRead",
+        "type": "object"
+      },
+      "CalcFactValueRead": {
+        "description": "Действующее значение ключа и то, как оно получено.\n\nСчитается только по утверждениям, допущенным к расчёту. Утверждения из ВОР Заказчика\nперечислены отдельно и на значение не влияют.",
+        "properties": {
+          "chosen_fact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Fact Id"
+          },
+          "claim_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Claim Ids",
+            "type": "array"
+          },
+          "conflict_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Id"
+          },
+          "excluded_claim_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Excluded Claim Ids",
+            "type": "array"
+          },
+          "fact_key": {
+            "title": "Fact Key",
+            "type": "string"
+          },
+          "fact_type": {
+            "title": "Fact Type",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CalcResolutionState"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/CalcFactSubject"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "BOOLEAN": "#/components/schemas/CalcBooleanValue",
+                    "COUNT": "#/components/schemas/CalcCountValue",
+                    "ENUM": "#/components/schemas/CalcEnumValue",
+                    "NUMBER": "#/components/schemas/CalcNumberValue",
+                    "RANGE": "#/components/schemas/CalcRangeValue",
+                    "TEXT": "#/components/schemas/CalcTextValue"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CalcNumberValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcCountValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcBooleanValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcEnumValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcTextValue"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CalcRangeValue"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fact_key",
+          "fact_type",
+          "subject",
+          "state",
+          "value",
+          "chosen_fact_id",
+          "claim_ids",
+          "excluded_claim_ids",
+          "conflict_id",
+          "policy_version",
+          "warnings"
+        ],
+        "title": "CalcFactValueRead",
+        "type": "object"
+      },
+      "CalcFactWithdraw": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "CalcFactWithdraw",
+        "type": "object"
+      },
+      "CalcNumberValue": {
+        "additionalProperties": false,
+        "description": "Число с единицей: длина, высота, площадь.",
+        "properties": {
+          "kind": {
+            "const": "NUMBER",
+            "default": "NUMBER",
+            "title": "Kind",
+            "type": "string"
+          },
+          "unit": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "description": "Десятичное число строкой: «12.5», «-1», «0.035».",
+            "pattern": "^-?\\d{1,12}(\\.\\d{1,9})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "unit"
+        ],
+        "title": "CalcNumberValue",
+        "type": "object"
+      },
+      "CalcRangeValue": {
+        "additionalProperties": false,
+        "description": "Диапазон: «17–25 этажей», «до 25». Хотя бы одна граница обязательна.",
+        "properties": {
+          "high": {
+            "anyOf": [
+              {
+                "description": "Десятичное число строкой: «12.5», «-1», «0.035».",
+                "pattern": "^-?\\d{1,12}(\\.\\d{1,9})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "kind": {
+            "const": "RANGE",
+            "default": "RANGE",
+            "title": "Kind",
+            "type": "string"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "description": "Десятичное число строкой: «12.5», «-1», «0.035».",
+                "pattern": "^-?\\d{1,12}(\\.\\d{1,9})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "unit": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit"
+        ],
+        "title": "CalcRangeValue",
+        "type": "object"
+      },
+      "CalcResolutionState": {
+        "description": "Как получено действующее значение ключа. Ни одно состояние не выбирает молча.",
+        "enum": [
+          "MISSING",
+          "SINGLE",
+          "CORROBORATED",
+          "DECIDED",
+          "DECIDED_STALE",
+          "AUTO_PREFERRED",
+          "UNRESOLVED"
+        ],
+        "title": "CalcResolutionState",
+        "type": "string"
+      },
+      "CalcReviewStatus": {
+        "description": "Проверка человеком.",
+        "enum": [
+          "UNREVIEWED",
+          "CONFIRMED",
+          "REJECTED"
+        ],
+        "title": "CalcReviewStatus",
+        "type": "string"
+      },
+      "CalcSourceClass": {
+        "description": "Класс источника. От него зависит приоритет, но не «глобальная истина».",
+        "enum": [
+          "ARCHITECTURE",
+          "APARTMENT_SCHEDULE",
+          "ROOM_SCHEDULE",
+          "MEP_DESIGN",
+          "CONSUMER_TABLE",
+          "AIR_EXCHANGE_TABLE",
+          "FIXTURE_TABLE",
+          "EXPLANATORY_NOTE",
+          "TECHNICAL_CONDITIONS",
+          "ADJACENT_TASK",
+          "BRAND_LIST",
+          "TECHNICAL_REQUIREMENTS",
+          "CUSTOMER_VOR",
+          "MANUAL"
+        ],
+        "title": "CalcSourceClass",
+        "type": "string"
+      },
+      "CalcSourceCreate": {
+        "additionalProperties": false,
+        "description": "Заявление источника: откуда берутся факты.\n\nСтадия документа — заявление пользователя, а не свойство ревизии: ревизии неизменяемы\n(ADR-0003), и стадию в них не пишут.",
+        "properties": {
+          "document_revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Revision Id"
+          },
+          "document_stage": {
+            "$ref": "#/components/schemas/CalcDocumentStage",
+            "default": "UNKNOWN"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "section_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Code"
+          },
+          "series_key": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Key"
+          },
+          "source_class": {
+            "$ref": "#/components/schemas/CalcSourceClass"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_class",
+          "title"
+        ],
+        "title": "CalcSourceCreate",
+        "type": "object"
+      },
+      "CalcSourceRead": {
+        "properties": {
+          "calculation_eligible": {
+            "title": "Calculation Eligible",
+            "type": "boolean"
+          },
+          "content_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Sha256"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "document_revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Revision Id"
+          },
+          "document_stage": {
+            "$ref": "#/components/schemas/CalcDocumentStage"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "section_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Code"
+          },
+          "series_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Key"
+          },
+          "source_class": {
+            "$ref": "#/components/schemas/CalcSourceClass"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "source_class",
+          "title",
+          "document_stage",
+          "section_code",
+          "series_key",
+          "document_revision_id",
+          "content_sha256",
+          "calculation_eligible",
+          "note",
+          "created_by",
+          "created_at"
+        ],
+        "title": "CalcSourceRead",
+        "type": "object"
+      },
+      "CalcTextValue": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "TEXT",
+            "default": "TEXT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "CalcTextValue",
+        "type": "object"
+      },
+      "CalcValueKind": {
+        "description": "Вид значения факта.",
+        "enum": [
+          "NUMBER",
+          "COUNT",
+          "BOOLEAN",
+          "ENUM",
+          "TEXT",
+          "RANGE"
+        ],
+        "title": "CalcValueKind",
+        "type": "string"
+      },
       "CalibrationSnapshot": {
         "additionalProperties": false,
         "description": "Неизменяемый снимок калибровки и геометрии страницы, по которому считаются метры.\n\nКопия значений, а не только ссылка: граф должен считаться одинаково и после того, как в\nпортале появится новая калибровка листа (ADR-0018 — калибровка не правится, а заменяется).",
@@ -8708,6 +10420,581 @@
         "summary": "Текущий сеанс",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/calc/conflicts/{conflict_id}/decision": {
+      "post": {
+        "operationId": "decide_calc_conflict",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conflict_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conflict Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcDecisionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcConflictRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Решить конфликт источников",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/fact-types": {
+      "get": {
+        "description": "Что можно записать в реестр: вид значения, единица, какое место указать.",
+        "operationId": "list_calc_fact_types",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcFactTypeRead"
+                  },
+                  "title": "Response List Calc Fact Types",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Типы фактов реестра",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/facts/{fact_id}": {
+      "get": {
+        "operationId": "get_calc_fact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcFactRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Утверждение со свидетельствами",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/facts/{fact_id}/review": {
+      "post": {
+        "operationId": "review_calc_fact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcFactReview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcFactRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Подтвердить или отклонить утверждение",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/facts/{fact_id}/withdraw": {
+      "post": {
+        "operationId": "withdraw_calc_fact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcFactWithdraw"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcFactRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отозвать утверждение",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/conflicts": {
+      "get": {
+        "operationId": "list_calc_conflicts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Состояние конфликта",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcConflictStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Состояние конфликта",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcConflictRead"
+                  },
+                  "title": "Response List Calc Conflicts",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Конфликты источников",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/fact-values": {
+      "get": {
+        "description": "Какое значение каждого ключа пойдёт в расчёт и почему. ВОР Заказчика — отдельно.",
+        "operationId": "list_calc_fact_values",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcFactValueRead"
+                  },
+                  "title": "Response List Calc Fact Values",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Действующие значения фактов",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/facts": {
+      "get": {
+        "operationId": "list_calc_facts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Тип факта",
+            "in": "query",
+            "name": "fact_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Тип факта",
+              "title": "Fact Type"
+            }
+          },
+          {
+            "description": "Статус утверждения",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CalcFactStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Статус утверждения",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcFactRead"
+                  },
+                  "title": "Response List Calc Facts",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Утверждения проекта",
+        "tags": [
+          "calc"
+        ]
+      },
+      "post": {
+        "description": "Новое утверждение. Прежнее утверждение того же источника по ключу заменяется версией.",
+        "operationId": "create_calc_fact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcFactCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcFactRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Записать утверждение о факте",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/projects/{project_id}/sources": {
+      "get": {
+        "operationId": "list_calc_sources",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalcSourceRead"
+                  },
+                  "title": "Response List Calc Sources",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Источники фактов проекта",
+        "tags": [
+          "calc"
+        ]
+      },
+      "post": {
+        "operationId": "create_calc_source",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcSourceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcSourceRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Завести источник фактов",
+        "tags": [
+          "calc"
         ]
       }
     },

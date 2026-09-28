@@ -221,6 +221,7 @@ def test_every_stage1_flag_key_survived() -> None:
         "bim.import",
         "drawing.compare",
         "mep_rd_hypothesis_v1",
+        "calc.portal",
     }
     assert set(FLAG_REGISTRY) == expected
 
@@ -230,6 +231,8 @@ def test_unfinished_features_cannot_be_enabled_from_the_console() -> None:
 
     `takeoff.manual` отсюда ушёл осознанно: после закрытия Stage 2A это пилотная возможность,
     которую владелец включает на пространство (ADR-0023). Проверки пилота — test_pilot_flag.py.
+
+    `calc.portal` здесь до PASS инженерного гейта стадии П после PROMPT 06 (ADR-0030).
     """
     for key in (
         "takeoff.ai",
@@ -237,6 +240,7 @@ def test_unfinished_features_cannot_be_enabled_from_the_console() -> None:
         "reports",
         "bim.import",
         "drawing.compare",
+        "calc.portal",
     ):
         assert not FLAG_REGISTRY[key].admin_editable, key
 

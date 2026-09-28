@@ -338,6 +338,848 @@ export type BoxGeometry = {
 };
 
 /**
+ * CalcAssumptionEvidence
+ *
+ * Основание инженерного допущения.
+ */
+export type CalcAssumptionEvidence = {
+    /**
+     * Alternatives
+     */
+    alternatives?: Array<string>;
+    /**
+     * Basis
+     */
+    basis: string;
+    /**
+     * Kind
+     */
+    kind?: 'ASSUMPTION_BASIS';
+};
+
+/**
+ * CalcBooleanValue
+ */
+export type CalcBooleanValue = {
+    /**
+     * Kind
+     */
+    kind?: 'BOOLEAN';
+    /**
+     * Value
+     */
+    value: boolean;
+};
+
+/**
+ * CalcConfidence
+ *
+ * Уверенность в значении. Категория, а не число: дробь из ручного ввода декоративна.
+ */
+export type CalcConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+
+/**
+ * CalcConflictRead
+ */
+export type CalcConflictRead = {
+    /**
+     * Claim Set Hash
+     */
+    claim_set_hash: string;
+    /**
+     * Claims
+     */
+    claims: Array<CalcFactRead>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    decision: CalcDecisionRead | null;
+    /**
+     * Fact Key
+     */
+    fact_key: string;
+    /**
+     * Fact Type
+     */
+    fact_type: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    status: CalcConflictStatus;
+    /**
+     * Subject Key
+     */
+    subject_key: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * CalcConflictStatus
+ *
+ * Состояние конфликта ключа факта.
+ */
+export type CalcConflictStatus = 'OPEN' | 'RESOLVED' | 'REOPENED' | 'OBSOLETE';
+
+/**
+ * CalcCountValue
+ *
+ * Целое число сущностей: квартир, этажей, стояков. Единица говорит, что именно считается.
+ */
+export type CalcCountValue = {
+    /**
+     * Kind
+     */
+    kind?: 'COUNT';
+    /**
+     * Unit
+     */
+    unit?: string | null;
+    /**
+     * Value
+     */
+    value: number;
+};
+
+/**
+ * CalcDecisionCreate
+ *
+ * Решение конфликта человеком: выбрать утверждение или ввести своё значение.
+ *
+ * Своё значение становится обычным утверждением ручного ввода с основанием — и решение
+ * выбирает его. Так у любого действующего значения остаётся утверждение-носитель.
+ */
+export type CalcDecisionCreate = {
+    /**
+     * Chosen Fact Id
+     */
+    chosen_fact_id?: string | null;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Value
+     */
+    value?: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue) | null;
+};
+
+/**
+ * CalcDecisionRead
+ */
+export type CalcDecisionRead = {
+    /**
+     * Chosen Fact Id
+     */
+    chosen_fact_id: string;
+    /**
+     * Claim Set Hash
+     */
+    claim_set_hash: string;
+    /**
+     * Conflict Id
+     */
+    conflict_id: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Decided By
+     */
+    decided_by: string | null;
+    /**
+     * Fact Key
+     */
+    fact_key: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+};
+
+/**
+ * CalcDiscipline
+ *
+ * Раздел проекта, к которому относится инженерная система.
+ */
+export type CalcDiscipline = 'VK' | 'OV' | 'EOM' | 'SS' | 'APT';
+
+/**
+ * CalcDocumentFragmentEvidence
+ *
+ * Место в документе проекта, где прочитано значение.
+ */
+export type CalcDocumentFragmentEvidence = {
+    /**
+     * Bbox
+     */
+    bbox?: [
+        number,
+        number,
+        number,
+        number
+    ] | null;
+    /**
+     * Document Revision Id
+     */
+    document_revision_id: string;
+    /**
+     * Excerpt
+     */
+    excerpt?: string | null;
+    /**
+     * Kind
+     */
+    kind?: 'DOCUMENT_FRAGMENT';
+    /**
+     * Locator
+     */
+    locator?: string | null;
+    /**
+     * Page Index
+     */
+    page_index?: number | null;
+    /**
+     * Sheet Id
+     */
+    sheet_id?: string | null;
+};
+
+/**
+ * CalcDocumentStage
+ *
+ * Заявленная стадия документа. Задаётся при заведении источника, в ревизию не пишется.
+ */
+export type CalcDocumentStage = 'P' | 'RD' | 'UNKNOWN';
+
+/**
+ * CalcEnumOptionRead
+ */
+export type CalcEnumOptionRead = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Value
+     */
+    value: string;
+};
+
+/**
+ * CalcEnumValue
+ *
+ * Одно из значений, объявленных типом факта.
+ */
+export type CalcEnumValue = {
+    /**
+     * Kind
+     */
+    kind?: 'ENUM';
+    /**
+     * Value
+     */
+    value: string;
+};
+
+/**
+ * CalcEvidenceKind
+ *
+ * Вид свидетельства.
+ *
+ * Ячейки таблиц распознанного пакета, ячейки файлов и обмеры появятся вместе с
+ * адаптерами источников (PROMPT 02) — вместе со своими колонками.
+ */
+export type CalcEvidenceKind = 'MANUAL_ENTRY' | 'DOCUMENT_FRAGMENT' | 'ASSUMPTION_BASIS';
+
+/**
+ * CalcEvidenceRead
+ */
+export type CalcEvidenceRead = {
+    /**
+     * Alternatives
+     */
+    alternatives: Array<string>;
+    /**
+     * Author Id
+     */
+    author_id: string | null;
+    /**
+     * Basis
+     */
+    basis: string | null;
+    /**
+     * Bbox
+     */
+    bbox: Array<number> | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Document Revision Id
+     */
+    document_revision_id: string | null;
+    /**
+     * Excerpt
+     */
+    excerpt: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    kind: CalcEvidenceKind;
+    /**
+     * Locator
+     */
+    locator: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+    /**
+     * Sheet Id
+     */
+    sheet_id: string | null;
+};
+
+/**
+ * CalcFactCreate
+ *
+ * Новое утверждение. Если у источника уже есть действующее по этому ключу — оно заменяется.
+ */
+export type CalcFactCreate = {
+    confidence?: CalcConfidence | null;
+    /**
+     * Evidence
+     */
+    evidence?: Array<CalcDocumentFragmentEvidence | CalcAssumptionEvidence>;
+    /**
+     * Fact Type
+     */
+    fact_type: string;
+    method: CalcFactMethod;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Source Id
+     */
+    source_id: string;
+    subject: CalcFactSubject;
+    /**
+     * Value
+     */
+    value: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue);
+};
+
+/**
+ * CalcFactMethod
+ *
+ * Как получено значение факта.
+ */
+export type CalcFactMethod = 'DOCUMENT_EXPLICIT' | 'TABLE_EXPLICIT' | 'GEOMETRY_MEASURED' | 'CALCULATED' | 'INFERRED' | 'NORMATIVE' | 'MANUFACTURER_RULE' | 'ASSUMPTION' | 'MANUAL';
+
+/**
+ * CalcFactRead
+ */
+export type CalcFactRead = {
+    /**
+     * Calculation Eligible
+     */
+    calculation_eligible: boolean;
+    confidence: CalcConfidence;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Evidence
+     */
+    evidence: Array<CalcEvidenceRead>;
+    /**
+     * Fact Key
+     */
+    fact_key: string;
+    /**
+     * Fact Type
+     */
+    fact_type: string;
+    /**
+     * Id
+     */
+    id: string;
+    method: CalcFactMethod;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Review Comment
+     */
+    review_comment: string | null;
+    review_status: CalcReviewStatus;
+    /**
+     * Reviewed At
+     */
+    reviewed_at: string | null;
+    /**
+     * Reviewed By
+     */
+    reviewed_by: string | null;
+    source_class: CalcSourceClass;
+    /**
+     * Source Id
+     */
+    source_id: string;
+    /**
+     * Stated Value
+     */
+    stated_value: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue);
+    status: CalcFactStatus;
+    subject: CalcFactSubject;
+    /**
+     * Subject Key
+     */
+    subject_key: string;
+    /**
+     * Supersedes Id
+     */
+    supersedes_id: string | null;
+    /**
+     * Value
+     */
+    value: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue);
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Withdrawn At
+     */
+    withdrawn_at: string | null;
+    /**
+     * Withdrawn Reason
+     */
+    withdrawn_reason: string | null;
+};
+
+/**
+ * CalcFactReview
+ *
+ * Проверка утверждения человеком.
+ */
+export type CalcFactReview = {
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Status
+     */
+    status: 'CONFIRMED' | 'REJECTED';
+};
+
+/**
+ * CalcFactStatus
+ *
+ * Жизненный цикл утверждения. Значение не меняется никогда — меняется только статус.
+ */
+export type CalcFactStatus = 'ACTIVE' | 'SUPERSEDED' | 'WITHDRAWN';
+
+/**
+ * CalcFactSubject
+ *
+ * К чему относится факт: место в здании и, если нужно, инженерная система.
+ */
+export type CalcFactSubject = {
+    /**
+     * Building
+     */
+    building?: string | null;
+    discipline?: CalcDiscipline | null;
+    /**
+     * Floor
+     */
+    floor?: string | null;
+    /**
+     * Room
+     */
+    room?: string | null;
+    /**
+     * Section
+     */
+    section?: string | null;
+    /**
+     * System Code
+     */
+    system_code?: string | null;
+};
+
+/**
+ * CalcFactTypeRead
+ *
+ * Тип факта для форм ввода: что ждать и где.
+ */
+export type CalcFactTypeRead = {
+    /**
+     * Allowed Subject
+     */
+    allowed_subject: Array<string>;
+    /**
+     * Customer Vor Admissible
+     */
+    customer_vor_admissible: boolean;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Options
+     */
+    options: Array<CalcEnumOptionRead>;
+    /**
+     * Required Subject
+     */
+    required_subject: Array<string>;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Unit
+     */
+    unit: string | null;
+    /**
+     * Unit Title
+     */
+    unit_title: string | null;
+    value_kind: CalcValueKind;
+};
+
+/**
+ * CalcFactValueRead
+ *
+ * Действующее значение ключа и то, как оно получено.
+ *
+ * Считается только по утверждениям, допущенным к расчёту. Утверждения из ВОР Заказчика
+ * перечислены отдельно и на значение не влияют.
+ */
+export type CalcFactValueRead = {
+    /**
+     * Chosen Fact Id
+     */
+    chosen_fact_id: string | null;
+    /**
+     * Claim Ids
+     */
+    claim_ids: Array<string>;
+    /**
+     * Conflict Id
+     */
+    conflict_id: string | null;
+    /**
+     * Excluded Claim Ids
+     */
+    excluded_claim_ids: Array<string>;
+    /**
+     * Fact Key
+     */
+    fact_key: string;
+    /**
+     * Fact Type
+     */
+    fact_type: string;
+    /**
+     * Policy Version
+     */
+    policy_version: string;
+    state: CalcResolutionState;
+    subject: CalcFactSubject;
+    /**
+     * Value
+     */
+    value: ({
+        kind: 'NUMBER';
+    } & CalcNumberValue) | ({
+        kind: 'COUNT';
+    } & CalcCountValue) | ({
+        kind: 'BOOLEAN';
+    } & CalcBooleanValue) | ({
+        kind: 'ENUM';
+    } & CalcEnumValue) | ({
+        kind: 'TEXT';
+    } & CalcTextValue) | ({
+        kind: 'RANGE';
+    } & CalcRangeValue) | null;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * CalcFactWithdraw
+ */
+export type CalcFactWithdraw = {
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
+ * CalcNumberValue
+ *
+ * Число с единицей: длина, высота, площадь.
+ */
+export type CalcNumberValue = {
+    /**
+     * Kind
+     */
+    kind?: 'NUMBER';
+    /**
+     * Unit
+     */
+    unit: string;
+    /**
+     * Value
+     *
+     * Десятичное число строкой: «12.5», «-1», «0.035».
+     */
+    value: string;
+};
+
+/**
+ * CalcRangeValue
+ *
+ * Диапазон: «17–25 этажей», «до 25». Хотя бы одна граница обязательна.
+ */
+export type CalcRangeValue = {
+    /**
+     * High
+     */
+    high?: string | null;
+    /**
+     * Kind
+     */
+    kind?: 'RANGE';
+    /**
+     * Low
+     */
+    low?: string | null;
+    /**
+     * Unit
+     */
+    unit: string;
+};
+
+/**
+ * CalcResolutionState
+ *
+ * Как получено действующее значение ключа. Ни одно состояние не выбирает молча.
+ */
+export type CalcResolutionState = 'MISSING' | 'SINGLE' | 'CORROBORATED' | 'DECIDED' | 'DECIDED_STALE' | 'AUTO_PREFERRED' | 'UNRESOLVED';
+
+/**
+ * CalcReviewStatus
+ *
+ * Проверка человеком.
+ */
+export type CalcReviewStatus = 'UNREVIEWED' | 'CONFIRMED' | 'REJECTED';
+
+/**
+ * CalcSourceClass
+ *
+ * Класс источника. От него зависит приоритет, но не «глобальная истина».
+ */
+export type CalcSourceClass = 'ARCHITECTURE' | 'APARTMENT_SCHEDULE' | 'ROOM_SCHEDULE' | 'MEP_DESIGN' | 'CONSUMER_TABLE' | 'AIR_EXCHANGE_TABLE' | 'FIXTURE_TABLE' | 'EXPLANATORY_NOTE' | 'TECHNICAL_CONDITIONS' | 'ADJACENT_TASK' | 'BRAND_LIST' | 'TECHNICAL_REQUIREMENTS' | 'CUSTOMER_VOR' | 'MANUAL';
+
+/**
+ * CalcSourceCreate
+ *
+ * Заявление источника: откуда берутся факты.
+ *
+ * Стадия документа — заявление пользователя, а не свойство ревизии: ревизии неизменяемы
+ * (ADR-0003), и стадию в них не пишут.
+ */
+export type CalcSourceCreate = {
+    /**
+     * Document Revision Id
+     */
+    document_revision_id?: string | null;
+    document_stage?: CalcDocumentStage;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Section Code
+     */
+    section_code?: string | null;
+    /**
+     * Series Key
+     */
+    series_key?: string | null;
+    source_class: CalcSourceClass;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcSourceRead
+ */
+export type CalcSourceRead = {
+    /**
+     * Calculation Eligible
+     */
+    calculation_eligible: boolean;
+    /**
+     * Content Sha256
+     */
+    content_sha256: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Document Revision Id
+     */
+    document_revision_id: string | null;
+    document_stage: CalcDocumentStage;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Section Code
+     */
+    section_code: string | null;
+    /**
+     * Series Key
+     */
+    series_key: string | null;
+    source_class: CalcSourceClass;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CalcTextValue
+ */
+export type CalcTextValue = {
+    /**
+     * Kind
+     */
+    kind?: 'TEXT';
+    /**
+     * Value
+     */
+    value: string;
+};
+
+/**
+ * CalcValueKind
+ *
+ * Вид значения факта.
+ */
+export type CalcValueKind = 'NUMBER' | 'COUNT' | 'BOOLEAN' | 'ENUM' | 'TEXT' | 'RANGE';
+
+/**
  * CalibrationSnapshot
  *
  * Неизменяемый снимок калибровки и геометрии страницы, по которому считаются метры.
@@ -4709,6 +5551,352 @@ export type ReadSessionResponses = {
 };
 
 export type ReadSessionResponse = ReadSessionResponses[keyof ReadSessionResponses];
+
+export type DecideCalcConflictData = {
+    body: CalcDecisionCreate;
+    path: {
+        /**
+         * Conflict Id
+         */
+        conflict_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/conflicts/{conflict_id}/decision';
+};
+
+export type DecideCalcConflictErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DecideCalcConflictError = DecideCalcConflictErrors[keyof DecideCalcConflictErrors];
+
+export type DecideCalcConflictResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcConflictRead;
+};
+
+export type DecideCalcConflictResponse = DecideCalcConflictResponses[keyof DecideCalcConflictResponses];
+
+export type ListCalcFactTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/calc/fact-types';
+};
+
+export type ListCalcFactTypesResponses = {
+    /**
+     * Response List Calc Fact Types
+     *
+     * Successful Response
+     */
+    200: Array<CalcFactTypeRead>;
+};
+
+export type ListCalcFactTypesResponse = ListCalcFactTypesResponses[keyof ListCalcFactTypesResponses];
+
+export type GetCalcFactData = {
+    body?: never;
+    path: {
+        /**
+         * Fact Id
+         */
+        fact_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/facts/{fact_id}';
+};
+
+export type GetCalcFactErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCalcFactError = GetCalcFactErrors[keyof GetCalcFactErrors];
+
+export type GetCalcFactResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcFactRead;
+};
+
+export type GetCalcFactResponse = GetCalcFactResponses[keyof GetCalcFactResponses];
+
+export type ReviewCalcFactData = {
+    body: CalcFactReview;
+    path: {
+        /**
+         * Fact Id
+         */
+        fact_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/facts/{fact_id}/review';
+};
+
+export type ReviewCalcFactErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReviewCalcFactError = ReviewCalcFactErrors[keyof ReviewCalcFactErrors];
+
+export type ReviewCalcFactResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcFactRead;
+};
+
+export type ReviewCalcFactResponse = ReviewCalcFactResponses[keyof ReviewCalcFactResponses];
+
+export type WithdrawCalcFactData = {
+    body: CalcFactWithdraw;
+    path: {
+        /**
+         * Fact Id
+         */
+        fact_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/facts/{fact_id}/withdraw';
+};
+
+export type WithdrawCalcFactErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type WithdrawCalcFactError = WithdrawCalcFactErrors[keyof WithdrawCalcFactErrors];
+
+export type WithdrawCalcFactResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalcFactRead;
+};
+
+export type WithdrawCalcFactResponse = WithdrawCalcFactResponses[keyof WithdrawCalcFactResponses];
+
+export type ListCalcConflictsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Status
+         *
+         * Состояние конфликта
+         */
+        status?: CalcConflictStatus | null;
+    };
+    url: '/api/v1/calc/projects/{project_id}/conflicts';
+};
+
+export type ListCalcConflictsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcConflictsError = ListCalcConflictsErrors[keyof ListCalcConflictsErrors];
+
+export type ListCalcConflictsResponses = {
+    /**
+     * Response List Calc Conflicts
+     *
+     * Successful Response
+     */
+    200: Array<CalcConflictRead>;
+};
+
+export type ListCalcConflictsResponse = ListCalcConflictsResponses[keyof ListCalcConflictsResponses];
+
+export type ListCalcFactValuesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/fact-values';
+};
+
+export type ListCalcFactValuesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcFactValuesError = ListCalcFactValuesErrors[keyof ListCalcFactValuesErrors];
+
+export type ListCalcFactValuesResponses = {
+    /**
+     * Response List Calc Fact Values
+     *
+     * Successful Response
+     */
+    200: Array<CalcFactValueRead>;
+};
+
+export type ListCalcFactValuesResponse = ListCalcFactValuesResponses[keyof ListCalcFactValuesResponses];
+
+export type ListCalcFactsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Fact Type
+         *
+         * Тип факта
+         */
+        fact_type?: string | null;
+        /**
+         * Status
+         *
+         * Статус утверждения
+         */
+        status?: CalcFactStatus | null;
+    };
+    url: '/api/v1/calc/projects/{project_id}/facts';
+};
+
+export type ListCalcFactsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcFactsError = ListCalcFactsErrors[keyof ListCalcFactsErrors];
+
+export type ListCalcFactsResponses = {
+    /**
+     * Response List Calc Facts
+     *
+     * Successful Response
+     */
+    200: Array<CalcFactRead>;
+};
+
+export type ListCalcFactsResponse = ListCalcFactsResponses[keyof ListCalcFactsResponses];
+
+export type CreateCalcFactData = {
+    body: CalcFactCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/facts';
+};
+
+export type CreateCalcFactErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcFactError = CreateCalcFactErrors[keyof CreateCalcFactErrors];
+
+export type CreateCalcFactResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcFactRead;
+};
+
+export type CreateCalcFactResponse = CreateCalcFactResponses[keyof CreateCalcFactResponses];
+
+export type ListCalcSourcesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/sources';
+};
+
+export type ListCalcSourcesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCalcSourcesError = ListCalcSourcesErrors[keyof ListCalcSourcesErrors];
+
+export type ListCalcSourcesResponses = {
+    /**
+     * Response List Calc Sources
+     *
+     * Successful Response
+     */
+    200: Array<CalcSourceRead>;
+};
+
+export type ListCalcSourcesResponse = ListCalcSourcesResponses[keyof ListCalcSourcesResponses];
+
+export type CreateCalcSourceData = {
+    body: CalcSourceCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/projects/{project_id}/sources';
+};
+
+export type CreateCalcSourceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCalcSourceError = CreateCalcSourceErrors[keyof CreateCalcSourceErrors];
+
+export type CreateCalcSourceResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcSourceRead;
+};
+
+export type CreateCalcSourceResponse = CreateCalcSourceResponses[keyof CreateCalcSourceResponses];
 
 export type ReadDocumentData = {
     body?: never;

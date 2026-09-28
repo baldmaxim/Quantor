@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.v1 import (
     auth,
+    calc,
     documents,
     integrations,
     jobs,
@@ -53,6 +54,8 @@ protected_router.include_router(jobs.router)
 protected_router.include_router(integrations.router)
 # MEP-эксперимент: только синтетика, закрыт флагом (ADR-0027).
 protected_router.include_router(mep.router)
+# Расчётный контур стадии П: объявлен и закрыт флагом до инженерного гейта (ADR-0030).
+protected_router.include_router(calc.router)
 
 api_v1_router.include_router(protected_router)
 
