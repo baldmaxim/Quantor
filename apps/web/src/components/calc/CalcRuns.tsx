@@ -77,6 +77,22 @@ const RunDetails = ({ run }: { run: CalcRunRead }) => {
           {warning}
         </p>
       ))}
+      {run.assumptions.length > 0 && (
+        <ul className="flex list-none flex-col gap-[var(--s-1)] text-sm">
+          {run.assumptions.map((item) => (
+            <li key={item.step_key} className="wrap-anywhere">
+              <StatusBadge tone={item.applied ? 'warning' : 'neutral'}>
+                {item.applied ? 'допущение применено' : 'допущение не применено'}
+              </StatusBadge>{' '}
+              <span className="font-mono text-xs text-muted">
+                {item.rule_key ?? item.step_key}
+                {item.version !== null ? `@${item.version}` : ''}
+              </span>{' '}
+              {item.reason}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {run.results.length > 0 && (
         <ul className="flex list-none flex-col gap-[var(--s-2)]">

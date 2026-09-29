@@ -504,7 +504,7 @@ class TestRules:
             }
             forged = await client.post(
                 f"{API}/projects/{project.id}/facts",
-                json={**body, "source_id": adapter["id"], "method": "MANUAL"},
+                json={**body, "source_id": adapter["id"], "method": "MANUAL", "note": "по листу"},
             )
             counted = await client.post(
                 f"{API}/projects/{project.id}/facts",
@@ -537,6 +537,7 @@ class TestRules:
                     "subject": {"building": "1", "floor": "3"},
                     "value": {"kind": "COUNT", "value": 3},
                     "method": "MANUAL",
+                    "note": "по листу проекта",
                 },
             )
             page = (

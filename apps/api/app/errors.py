@@ -94,6 +94,8 @@ class ErrorCode(StrEnum):
     # Заказчика. ВОР — объект сверки, а не эталон.
     CALC_SOURCE_NOT_ALLOWED = "CALC_SOURCE_NOT_ALLOWED"
     CALC_FACT_NOT_ACTIVE = "CALC_FACT_NOT_ACTIVE"
+    # Проверяющий подтверждает, но не вносит: своё утверждение автор не подтверждает и не отклоняет.
+    CALC_FACT_SELF_REVIEW = "CALC_FACT_SELF_REVIEW"
     CALC_DECISION_INVALID = "CALC_DECISION_INVALID"
     CALC_CONFLICT_CLOSED = "CALC_CONFLICT_CLOSED"
     CALC_DOCUMENT_NOT_RECOGNIZED = "CALC_DOCUMENT_NOT_RECOGNIZED"
@@ -198,6 +200,10 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CALC_EVIDENCE_INVALID: "Свидетельство ссылается на документ или лист вне проекта",
     ErrorCode.CALC_SOURCE_NOT_ALLOWED: "Источник не подходит для этого факта",
     ErrorCode.CALC_FACT_NOT_ACTIVE: "Утверждение уже заменено или отозвано",
+    ErrorCode.CALC_FACT_SELF_REVIEW: (
+        "Своё утверждение автор не проверяет: подтверждает или отклоняет другой человек, "
+        "а ошибочное ручное значение автор отзывает"
+    ),
     ErrorCode.CALC_DECISION_INVALID: "Решение должно выбрать действующее утверждение этого факта",
     ErrorCode.CALC_CONFLICT_CLOSED: "Расхождения больше нет — решать нечего",
     ErrorCode.CALC_DOCUMENT_NOT_RECOGNIZED: (
@@ -310,6 +316,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CALC_EVIDENCE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_SOURCE_NOT_ALLOWED: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_FACT_NOT_ACTIVE: status.HTTP_409_CONFLICT,
+    ErrorCode.CALC_FACT_SELF_REVIEW: status.HTTP_403_FORBIDDEN,
     ErrorCode.CALC_DECISION_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_CONFLICT_CLOSED: status.HTTP_409_CONFLICT,
     ErrorCode.CALC_DOCUMENT_NOT_RECOGNIZED: status.HTTP_422_UNPROCESSABLE_CONTENT,

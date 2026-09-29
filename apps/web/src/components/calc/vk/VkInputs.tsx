@@ -1,21 +1,25 @@
 'use client';
 
 import type { CalcPassportRead, CalcVkSystemReadinessRead } from '@quantor/api-client';
+import Link from 'next/link';
 
 import { EmptyState, StatusBadge } from '@/components/ui';
+import { LEVEL_TITLES, READINESS_STATUS } from '@/lib/calc/format';
 import { SEMANTICS } from '@/lib/calc/vk';
 
 /**
  * Исходные данные системы: что найдено автоматически и использовано, чего нет и что именно без
- * этого не определяется. Анкеты нет: человек работает только с недостающим.
+ * этого не определяется. Анкеты нет: человек работает только с недостающим — вводит значение,
+ * подтверждает назначение системы или решает расхождение на экране «Исходные данные».
  */
 
 interface IVkInputsProps {
+  projectId: string;
   system: CalcVkSystemReadinessRead | undefined;
   passport: CalcPassportRead | undefined;
 }
 
-export const VkInputs = ({ system, passport }: IVkInputsProps) => {
+export const VkInputs = ({ projectId, system, passport }: IVkInputsProps) => {
   if (!system) return <EmptyState compact title="Готовность не загрузилась" />;
   const used = passport?.body.used_facts ?? [];
   return (
@@ -30,15 +34,25 @@ export const VkInputs = ({ system, passport }: IVkInputsProps) => {
         <span className="text-muted">{system.semantics_note}</span>
       </p>
       <section className="flex flex-col gap-[var(--s-2)]">
-        <h3 className="text-sm font-medium">Не хватает — и что без этого не определяется</h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-[var(--s-3)]">
+          <h3 className="text-sm font-medium">Не хватает — и что без этого не определяется</h3>
+          <Link
+            href={`/projects/${projectId}/calc`}
+            className="inline-flex min-h-[44px] items-center text-sm text-accent underline-offset-2 hover:underline md:min-h-0"
+          >
+            Ввести или решить в «Исходных данных»
+          </Link>
+        </div>
         {system.missing.length === 0 ? (
           <p className="text-sm text-muted">Всё нужное найдено или выводится.</p>
         ) : (
           <ul className="flex list-none flex-col gap-[var(--s-2)]">
             {system.missing.map((item) => {
-              const blocks =
-                passport?.body.missing.find((row) => row.requirement_id === item.requirement_id)
-                  ?.blocks ?? item.blocks;
+              const known = passport?.body.missing.find(
+                (row) => row.requirement_id === item.requirement_id,
+              );
+              const blocks = known?.blocks ?? item.blocks;
+              const notBlocks = known?.not_blocks ?? item.not_blocks;
               return (
                 <li
                   key={item.requirement_id}
@@ -47,12 +61,17 @@ export const VkInputs = ({ system, passport }: IVkInputsProps) => {
                   <span className="font-medium wrap-anywhere">
                     {item.title}{' '}
                     <span className="text-xs text-muted">
-                      {item.level} · {item.status}
+                      {LEVEL_TITLES[item.level]} · {READINESS_STATUS[item.status].label}
                     </span>
                   </span>
                   {item.reason && <span className="text-muted wrap-anywhere">{item.reason}</span>}
                   {blocks.length > 0 && (
                     <span className="wrap-anywhere">Влияет на: {blocks.join(', ')}</span>
+                  )}
+                  {notBlocks.length > 0 && (
+                    <span className="text-muted wrap-anywhere">
+                      Не влияет на: {notBlocks.join(', ')}
+                    </span>
                   )}
                 </li>
               );

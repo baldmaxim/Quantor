@@ -220,6 +220,15 @@ class TestRanges:
         assert any("вне диапазона" in item for item in outcome.warnings)
         assert outcome.applied_decisions == ()
 
+    def test_unapplied_decision_is_not_lost_silently(self) -> None:
+        """Решение по узлу, который синтезатор не выбирает, — предупреждение, а не тишина."""
+        decision = DecisionInput(uuid.uuid4(), "supply_main", 2, "Две магистрали.")
+        outcome = _run(decisions=(decision,))
+        assert outcome.applied_decisions == ()
+        assert any(
+            "«supply_main»" in item and "не применяется" in item for item in outcome.warnings
+        )
+
 
 # ----------------------------------------------------------- сценарии и допущения (E, T20)
 
@@ -464,7 +473,9 @@ class TestBlocked:
             "app.services.calc.facts.registry",
             "app.services.calc.rules.registry",
         )
-        for path in SYNTHESIS.glob("*.py"):
+        # Рабочие синтезаторы ВК (PROMPT 06) живут в systems/ — запреты те же.
+        structures = (SYNTHESIS.parent / "systems").rglob("structure*.py")
+        for path in [*SYNTHESIS.glob("*.py"), *structures]:
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module:

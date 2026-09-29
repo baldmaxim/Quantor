@@ -651,6 +651,16 @@ class TestLegacy:
         assert "нет основания" in message
         assert "LEG-VK-001: нет разбора" in message
 
+        # Ссылку на старое правило правкой не убрать: иначе пропал бы и обязательный разбор.
+        without_legacy = {**draft["content"], "sources": geometry_content()["sources"]}
+        async with build_api(_as(Role.ENGINEER, workspace_id)) as client:
+            edited = await client.put(
+                f"{API}/rules/test.floor.height_rule/versions/1",
+                json={"content": without_legacy},
+            )
+        assert edited.status_code == 422, edited.text
+        assert "LEG-VK-001" in edited.json()["detail"]["message"]
+
     async def test_out_of_scope_legacy_is_not_a_draft(
         self, build_api: Callable[..., AsyncClient], workspace_id: uuid.UUID
     ) -> None:
@@ -755,6 +765,7 @@ async def test_t15_rules_do_not_touch_facts(
                 "subject": {"building": "1", "floor": "2"},
                 "value": {"kind": "NUMBER", "value": "3.3", "unit": "m"},
                 "method": "MANUAL",
+                "note": "по листу проекта",
             },
         )
         assert fact.status_code == 201, fact.text

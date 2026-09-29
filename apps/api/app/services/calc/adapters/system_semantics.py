@@ -56,7 +56,7 @@ def function_of(text: str) -> tuple[str, CalcConfidence] | None:
     return value, CalcConfidence.HIGH
 
 
-def _pairs(line: str) -> list[tuple[str, str]]:
+def legend_pairs(line: str) -> list[tuple[str, str]]:
     """Пары «обозначение — описание» строки легенды или строки таблицы."""
     stripped = line.strip()
     if stripped.startswith("|"):
@@ -87,7 +87,7 @@ def extract_system_functions(
             offset += len(line)
             if is_metadata_line(text):
                 continue
-            for raw_code, description in _pairs(text):
+            for raw_code, description in legend_pairs(text):
                 codes = vk_codes(raw_code)
                 meaning = function_of(description)
                 if len(codes) != 1 or meaning is None:

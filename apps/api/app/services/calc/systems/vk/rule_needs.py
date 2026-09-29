@@ -446,7 +446,8 @@ VK_RULE_NEEDS: Final[tuple[VkRuleNeed, ...]] = (
         used_in="длина магистрали, если её нет в документе или обмере",
         blocks="длина магистрали и зависящие от неё изоляция, крепления, фитинги трассы",
         affects=("pipe.main",),
-        gate=True,
+        # На гейте длина магистрали берётся из документа или обмера (gate-06-engineer-review).
+        gate=False,
         example="—",
     ),
 )

@@ -163,7 +163,7 @@ export const CalcVk = ({ projectId }: { projectId: string }) => {
             )}
           </div>
           {tab === 'inputs' ? (
-            <VkInputs system={systemReadiness} passport={passport.data} />
+            <VkInputs projectId={projectId} system={systemReadiness} passport={passport.data} />
           ) : !selected ? (
             <EmptyState compact title={`Паспорта ${system} для этого корпуса ещё нет`} />
           ) : passport.isError ? (
@@ -188,7 +188,7 @@ export const CalcVk = ({ projectId }: { projectId: string }) => {
               onRetry={() => void assumptions.refetch()}
             />
           ) : (
-            <VkUnresolved passport={passport.data} />
+            <VkUnresolved body={passport.data.body} />
           )}
         </div>
       )}

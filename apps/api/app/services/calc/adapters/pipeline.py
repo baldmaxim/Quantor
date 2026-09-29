@@ -88,6 +88,9 @@ DOCUMENT_FACT_TYPES: Final = frozenset(
 )
 """Что адаптеры версии v1 ищут в документе. Документ, прошедший сбор, проверен на эти факты."""
 
+VOR_FACT_TYPES: Final = frozenset({"system.present"})
+"""Что ищет адаптер ВОР Заказчика: в ВОР документ проверяется только на это."""
+
 _ADAPTER_METHODS: Final = frozenset(
     {CalcFactMethod.TABLE_EXPLICIT, CalcFactMethod.TABLE_COUNTED, CalcFactMethod.DOCUMENT_EXPLICIT}
 )
@@ -279,7 +282,9 @@ def collect(document: RecognizedDocument, declaration: CollectionDeclaration) ->
         candidates_total=len(extraction.candidates),
         rejected=rejected,
         stamp=summarize_stamps([region.stamp for region in parsed if region.stamp is not None]),
-        inspected_fact_types=frozenset() if composition else DOCUMENT_FACT_TYPES,
+        inspected_fact_types=(
+            frozenset() if composition else VOR_FACT_TYPES if vor else DOCUMENT_FACT_TYPES
+        ),
         regions_total=len(document.regions),
         text_regions=sum(1 for region in document.regions if region.block_type == TEXT_BLOCK),
         image_regions=sum(1 for region in document.regions if region.block_type == IMAGE_BLOCK),

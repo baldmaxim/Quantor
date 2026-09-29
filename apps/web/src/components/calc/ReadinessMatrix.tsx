@@ -1,6 +1,11 @@
 'use client';
 
-import type { CalcFactTypeRead, CalcReadinessRead } from '@quantor/api-client';
+import type {
+  CalcFactTypeRead,
+  CalcReadinessRead,
+  CalcReadinessRowRead,
+  CalcSystemReadinessRead,
+} from '@quantor/api-client';
 import { useState } from 'react';
 
 import { ReadinessTable } from '@/components/calc/ReadinessTable';
@@ -14,13 +19,24 @@ import { LEVEL_TITLES } from '@/lib/calc/format';
  * маскировать незакрытые обязательные. «Закрыто» — найдено или выводимо из найденного.
  */
 
+const openRequired = (row: CalcReadinessRowRead): boolean =>
+  row.level === 'REQUIRED' && row.status !== 'FOUND' && row.status !== 'DERIVABLE';
+
 interface IReadinessMatrixProps {
   readiness: CalcReadinessRead;
   factTypes: ReadonlyMap<string, CalcFactTypeRead>;
+  onEnter?: (row: CalcReadinessRowRead, system: CalcSystemReadinessRead) => void;
+  onResolve?: (conflictId: string) => void;
 }
 
-export const ReadinessMatrix = ({ readiness, factTypes }: IReadinessMatrixProps) => {
+export const ReadinessMatrix = ({
+  readiness,
+  factTypes,
+  onEnter,
+  onResolve,
+}: IReadinessMatrixProps) => {
   const [selected, setSelected] = useState(readiness.systems[0]?.system_code ?? '');
+  const [onlyOpen, setOnlyOpen] = useState(false);
   const current =
     readiness.systems.find((item) => item.system_code === selected) ?? readiness.systems[0];
   const documents = readiness.documents;
@@ -71,7 +87,26 @@ export const ReadinessMatrix = ({ readiness, factTypes }: IReadinessMatrixProps)
         })}
       </div>
 
-      {current && <ReadinessTable rows={current.rows} factTypes={factTypes} />}
+      {current && (
+        <label className="flex min-h-[44px] items-center gap-[var(--s-3)] self-start text-sm">
+          <input
+            type="checkbox"
+            checked={onlyOpen}
+            onChange={(event) => setOnlyOpen(event.target.checked)}
+            className="size-5"
+          />
+          Только незакрытые обязательные
+        </label>
+      )}
+
+      {current && (
+        <ReadinessTable
+          rows={onlyOpen ? current.rows.filter(openRequired) : current.rows}
+          factTypes={factTypes}
+          onEnter={onEnter ? (row) => onEnter(row, current) : undefined}
+          onResolve={onResolve}
+        />
+      )}
     </div>
   );
 };

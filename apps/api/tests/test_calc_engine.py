@@ -74,6 +74,7 @@ from tests.calc_engine_fixtures import (
 )
 
 ENGINE = Path(__file__).resolve().parents[1] / "app" / "services" / "calc" / "engine"
+SYSTEMS = ENGINE.parent / "systems"
 PURE_MODULES = (
     "numbers.py",
     "hashing.py",
@@ -86,7 +87,13 @@ PURE_MODULES = (
     "executor.py",
     "trace.py",
     "demo.py",
+    "demo_structure.py",
+    "primitives.py",
+    "step_inputs.py",
 )
+# Рабочие обработчики и шаги калькуляторов систем (PROMPT 06) зарегистрированы в ядре —
+# на них те же запреты, что и на чистые модули ядра.
+PURE_SYSTEM_MODULES = ("vk/handlers.py", "vk/steps.py", "vk/spec.py")
 HEIGHT_KEY = "floor.height@building=1|floor=2..24"
 
 
@@ -685,6 +692,9 @@ class TestHandlers:
         for name in PURE_MODULES:
             for module in _imports(ENGINE / name):
                 assert not module.startswith(forbidden), f"{name}: {module}"
+        for name in PURE_SYSTEM_MODULES:
+            for module in _imports(SYSTEMS / name):
+                assert not module.startswith(forbidden), f"{name}: {module}"
         fields = set(HandlerContext.__dataclass_fields__)
         assert fields == {"inputs", "parameters", "series"}
         execution_inputs = _plan().steps[0]
@@ -692,7 +702,7 @@ class TestHandlers:
 
     def test_t30_no_legacy_or_executable_path(self) -> None:
         """Сценарий D: коэффициенту старого портала неоткуда попасть в обработчик."""
-        for path in ENGINE.glob("*.py"):
+        for path in [*ENGINE.glob("*.py"), *SYSTEMS.rglob("*.py")]:
             text = path.read_text(encoding="utf-8")
             assert "legacy" not in _imports(path).__repr__(), path.name
             tree = ast.parse(text)

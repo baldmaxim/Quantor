@@ -172,6 +172,7 @@ class TestInputs:
                     "subject": {"building": "1", "floor": "2..24"},
                     "value": {"kind": "NUMBER", "value": "3.3", "unit": "m"},
                     "method": "MANUAL",
+                    "note": "по листу проекта",
                 },
             )
         assert response.status_code == 201, response.text

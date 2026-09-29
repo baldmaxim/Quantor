@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 
 import { factType, readinessRow } from './__fixtures__/calc';
 
@@ -51,5 +52,42 @@ describe('матрица требований системы', () => {
     const vor = readinessRow({ status: 'MISSING', values: [], excluded_count: 1 });
     render(<ReadinessTable rows={[vor]} factTypes={TYPES} />);
     expect(screen.getByText('В ВОР Заказчика: 1 — только сверка')).toBeInTheDocument();
+  });
+
+  it('ручной ввод предлагается там, где значения нет, а не поверх найденного', async () => {
+    const onEnter = vi.fn();
+    const missing = readinessRow({ requirement_id: 'r-2', status: 'MISSING', values: [] });
+    render(<ReadinessTable rows={[readinessRow(), missing]} factTypes={TYPES} onEnter={onEnter} />);
+    const [button] = screen.getAllByRole('button', { name: 'Ввести значение' });
+    expect(screen.getAllByRole('button', { name: 'Ввести значение' })).toHaveLength(1);
+    await userEvent.click(button as HTMLElement);
+    expect(onEnter).toHaveBeenCalledWith(missing);
+  });
+
+  it('без права ввода кнопки нет', () => {
+    render(
+      <ReadinessTable rows={[readinessRow({ status: 'MISSING', values: [] })]} factTypes={TYPES} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Ввести значение' })).toBeNull();
+  });
+
+  it('расхождение открывает варианты по идентификатору конфликта', async () => {
+    const onResolve = vi.fn();
+    const [value] = readinessRow().values;
+    const conflicted = readinessRow({
+      status: 'CONFLICTED',
+      values: [
+        {
+          ...(value as NonNullable<typeof value>),
+          state: 'UNRESOLVED',
+          value: null,
+          conflict_id: 'c-1',
+        },
+      ],
+    });
+    render(<ReadinessTable rows={[conflicted]} factTypes={TYPES} onResolve={onResolve} />);
+    expect(screen.queryByRole('button', { name: 'Ввести значение' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Варианты' }));
+    expect(onResolve).toHaveBeenCalledWith('c-1');
   });
 });

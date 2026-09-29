@@ -6,7 +6,7 @@ import type {
   CalcReadinessValueRead,
 } from '@quantor/api-client';
 
-import { StatusBadge, cx } from '@/components/ui';
+import { Button, StatusBadge, cx } from '@/components/ui';
 import {
   LEVEL_SHORT,
   READINESS_STATUS,
@@ -27,12 +27,27 @@ import {
 const COLUMNS = 'minmax(220px,1.6fr) 140px minmax(200px,1.6fr) minmax(200px,1.4fr)';
 const SHOWN_VALUES = 3;
 
-interface IReadinessTableProps {
+/** Где ручной ввод уместен: значения нет или оно не определено. Расхождение решают, а не дописывают. */
+const ENTERABLE: ReadonlySet<CalcReadinessRowRead['status']> = new Set([
+  'MISSING',
+  'UNKNOWN',
+  'MANUAL_REQUIRED',
+  'NOT_INSPECTED',
+]);
+
+interface IReadinessActions {
+  /** Ввести значение вручную — последний путь; нет права — кнопки нет. */
+  onEnter?: (row: CalcReadinessRowRead) => void;
+  /** Расхождение источников: варианты видят все, решает проверяющий. */
+  onResolve?: (conflictId: string) => void;
+}
+
+interface IReadinessTableProps extends IReadinessActions {
   rows: readonly CalcReadinessRowRead[];
   factTypes: ReadonlyMap<string, CalcFactTypeRead>;
 }
 
-export const ReadinessTable = ({ rows, factTypes }: IReadinessTableProps) => (
+export const ReadinessTable = ({ rows, factTypes, onEnter, onResolve }: IReadinessTableProps) => (
   <div className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
     <div
       role="row"
@@ -46,7 +61,13 @@ export const ReadinessTable = ({ rows, factTypes }: IReadinessTableProps) => (
     </div>
     <ul className="list-none">
       {rows.map((row) => (
-        <ReadinessRow key={row.requirement_id} row={row} type={factTypes.get(row.fact_type)} />
+        <ReadinessRow
+          key={row.requirement_id}
+          row={row}
+          type={factTypes.get(row.fact_type)}
+          onEnter={onEnter}
+          onResolve={onResolve}
+        />
       ))}
     </ul>
   </div>
@@ -64,7 +85,9 @@ const valueText = (item: CalcReadinessValueRead, type: CalcFactTypeRead | undefi
 const ReadinessRow = ({
   row,
   type,
-}: {
+  onEnter,
+  onResolve,
+}: IReadinessActions & {
   row: CalcReadinessRowRead;
   type: CalcFactTypeRead | undefined;
 }) => {
@@ -96,8 +119,13 @@ const ReadinessRow = ({
         <span className="text-xs text-muted">{LEVEL_SHORT[row.level]}</span>
       </span>
 
-      <span>
+      <span className="flex flex-col items-start gap-[var(--s-2)]">
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+        {onEnter && type && ENTERABLE.has(row.status) && (
+          <Button compact onClick={() => onEnter(row)}>
+            Ввести значение
+          </Button>
+        )}
       </span>
 
       <span className="flex min-w-0 basis-full flex-col text-sm md:basis-auto">
@@ -105,8 +133,13 @@ const ReadinessRow = ({
           <span className="text-muted">—</span>
         ) : (
           shown.map((item) => (
-            <span key={item.fact_key} className="tabular wrap-anywhere">
-              {valueText(item, type)}
+            <span key={item.fact_key} className="flex flex-wrap items-center gap-x-[var(--s-3)]">
+              <span className="tabular wrap-anywhere">{valueText(item, type)}</span>
+              {onResolve && item.conflict_id && (
+                <Button compact onClick={() => onResolve(item.conflict_id ?? '')}>
+                  Варианты
+                </Button>
+              )}
             </span>
           ))
         )}

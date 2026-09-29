@@ -107,11 +107,12 @@ def _claim(
     *,
     source_class: CalcSourceClass = CalcSourceClass.APARTMENT_SCHEDULE,
     eligible: bool = True,
+    method: CalcFactMethod = CalcFactMethod.TABLE_COUNTED,
 ) -> ClaimView:
     return ClaimView(
         id=uuid.uuid4(),
         value=value,
-        method=CalcFactMethod.TABLE_COUNTED,
+        method=method,
         confidence=CalcConfidence.MEDIUM,
         source_class=source_class,
         document_stage=CalcDocumentStage.P,
@@ -219,6 +220,57 @@ class TestReadiness:
         status, reason, _ = _status("vk.apartments.per_floor", [], [_document(issues=(issue,))])
         assert status is CalcReadinessStatus.UNKNOWN
         assert reason is not None and "типового этажа" in reason
+
+    def test_customer_vor_is_not_a_checked_document(self) -> None:
+        """ВОР Заказчика — объект сверки: его проверка не делает исходное «не найденным»."""
+        documents = [_document(), _document(declared=CalcSourceClass.CUSTOMER_VOR)]
+        status, reason, _ = _status("vk.apartments.per_floor", [], documents)
+        assert (status, reason) == (
+            CalcReadinessStatus.MISSING,
+            "Проверено документов: 1 — не найдено",
+        )
+        only_vor = [_document(declared=CalcSourceClass.CUSTOMER_VOR)]
+        status, reason, _ = _status("vk.apartments.per_floor", [], only_vor)
+        assert status is CalcReadinessStatus.UNKNOWN
+        assert reason is not None and "ВОР Заказчика" in reason
+
+    def test_missing_names_unrecognized_pdfs(self) -> None:
+        """PDF без распознавания сбор не видит: «не найдено» по нему не доказано."""
+        raw = DocumentState(
+            recognized=False,
+            latest=True,
+            inspected_fact_types=None,
+            declared_class=None,
+            issues=(),
+            raw_pdf=True,
+        )
+        status, reason, _ = _status("vk.apartments.per_floor", [], [_document(), raw])
+        assert status is CalcReadinessStatus.MISSING
+        assert reason == (
+            "Проверено документов: 1 — не найдено; PDF без распознавания не проверялись: 1"
+        )
+
+    def test_found_but_unextracted_table_is_unknown_not_manual(self) -> None:
+        """Таблица санприборов найдена, но не разобрана: «не определено», а не «нет в проекте»."""
+        issue = CalcInspectionIssueRead(
+            code=CalcInspectionIssueCode.TABLE_NOT_EXTRACTED,
+            fact_type="building.fixtures_count",
+            message="Найдена таблица вида SANITARY_FIXTURES: извлечение ещё не реализовано",
+            count=1,
+        )
+        status, reason, _ = _status("vk.apartments.fixtures", [], [_document(issues=(issue,))])
+        assert status is CalcReadinessStatus.UNKNOWN
+        assert reason is not None and reason.endswith("введите значение по этой таблице")
+
+    def test_assumption_does_not_close_a_requirement_that_forbids_it(self) -> None:
+        subject = CalcFactSubject(building="1")
+        assumed = _claim(CalcCountValue(value=25), method=CalcFactMethod.ASSUMPTION)
+        keys = [_key("building.floors_above_ground", subject, assumed)]
+        status, reason, values = _status("vk.building.floors_above", keys, [_document()])
+        assert status is CalcReadinessStatus.MANUAL_REQUIRED
+        assert reason is not None and "Допущение не принимается" in reason
+        # Значение видно — но требование им не закрыто.
+        assert values == 1
 
     def test_disagreeing_sources_are_conflicted(self) -> None:
         keys = [

@@ -151,7 +151,7 @@ async def _fact(
             "fact_type": fact_type,
             "subject": subject,
             "value": value,
-            **{"method": "MANUAL", **extra},
+            **{"method": "MANUAL", "note": "по листу проекта", **extra},
         },
     )
     assert response.status_code == 201, response.text

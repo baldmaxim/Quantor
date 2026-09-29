@@ -18,28 +18,23 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.contracts.calc.enums import (
-    CalcFactStatus,
-    CalcFactUsage,
+    CalcAssumptionPolicy,
+    CalcFactMethod,
     CalcInspectionIssueCode,
     CalcReadinessStatus,
     CalcRequirementLevel,
     CalcRequirementScope,
     CalcResolutionState,
-    CalcReviewStatus,
     CalcSourceClass,
 )
-from app.contracts.calc.fact_types import FACT_TYPES_VERSION, fact_type_def, values_agree
-from app.contracts.calc.facts import CalcFactRead
+from app.contracts.calc.fact_types import FACT_TYPES_VERSION, fact_type_def
 from app.contracts.calc.inspections import CalcInspectionIssueRead, CalcInspectionSummary
 from app.contracts.calc.readiness import (
     CalcDocumentCoverageRead,
-    CalcInputFactPage,
-    CalcInputFactRead,
     CalcLevelCountRead,
     CalcReadinessRead,
     CalcReadinessRowRead,
@@ -48,9 +43,9 @@ from app.contracts.calc.readiness import (
 )
 from app.contracts.calc.requirements import CalcInputRequirement, CalcSystemDef
 from app.contracts.calc.subjects import CalcFactSubject
-from app.errors import InvariantError
+from app.domain import DocumentKind
 from app.models import Project
-from app.models.calc import CalcFact, CalcSource
+from app.models.calc import CalcSource
 from app.services.calc import inspections
 from app.services.calc.adapters.pipeline import DOCUMENT_FACT_TYPES
 from app.services.calc.facts import registry
@@ -81,6 +76,7 @@ _UNDETERMINED: Final = frozenset(
     }
 )
 _SATISFIED: Final = frozenset({CalcReadinessStatus.FOUND, CalcReadinessStatus.DERIVABLE})
+_NOT_SOURCES: Final = frozenset({CalcSourceClass.CUSTOMER_VOR, CalcSourceClass.PROJECT_COMPOSITION})
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +102,8 @@ class DocumentState:
     """Пусто — сбора не было."""
     declared_class: CalcSourceClass | None
     issues: tuple[CalcInspectionIssueRead, ...]
+    raw_pdf: bool = False
+    """PDF без распознанного текста: сбор его не видит, «не найдено» по нему не доказано."""
 
 
 def _matches(requirement: CalcInputRequirement, system_code: str, key: KeyState) -> bool:
@@ -130,6 +128,24 @@ def _value_read(key: KeyState) -> CalcReadinessValueRead:
         confidence=None if chosen is None else chosen.confidence,
         conflict_id=key.conflict_id,
     )
+
+
+def _by_assumption(key: KeyState) -> bool:
+    chosen = key.resolution.chosen
+    return chosen is not None and chosen.method is CalcFactMethod.ASSUMPTION
+
+
+def _collectable(documents: Sequence[DocumentState]) -> list[DocumentState]:
+    """Документы, по которым сбор отвечает «найдено / не найдено».
+
+    ВОР Заказчика — только объект сверки, состав проекта — только перечень документов: их проверка
+    не делает исходное данное «не найденным».
+    """
+    return [
+        document
+        for document in documents
+        if document.recognized and document.latest and document.declared_class not in _NOT_SOURCES
+    ]
 
 
 def _titles(fact_types: Sequence[str]) -> str:
@@ -177,9 +193,25 @@ def evaluate(
     open_keys = [key for key in shown if key.resolution.state in _OPEN]
     reason: str | None = None
 
+    assumed = [key for key in shown if _by_assumption(key)]
+    untaken = [
+        issue
+        for document in _collectable(documents)
+        for issue in document.issues
+        if issue.fact_type == requirement.fact_type
+        and issue.code is CalcInspectionIssueCode.TABLE_NOT_EXTRACTED
+    ]
+
     if open_keys:
         status = CalcReadinessStatus.CONFLICTED
         reason = f"Источники расходятся: {len(open_keys)} из {len(shown)}"
+    elif assumed and requirement.assumption is CalcAssumptionPolicy.NOT_ALLOWED:
+        # Допущение записано, но для этого параметра оно не закрывает требование.
+        status = CalcReadinessStatus.MANUAL_REQUIRED
+        reason = (
+            f"Допущение не принимается для этого параметра ({len(assumed)} из {len(shown)}): "
+            "нужен факт документа или ручной ввод по документу"
+        )
     elif shown:
         status = CalcReadinessStatus.FOUND
     elif requirement.derivable_from and set(requirement.derivable_from) <= (
@@ -187,6 +219,11 @@ def evaluate(
     ):
         status = CalcReadinessStatus.DERIVABLE
         reason = f"Выводится расчётом из: {_titles(requirement.derivable_from)}"
+    elif untaken and requirement.fact_type not in DOCUMENT_FACT_TYPES:
+        # Таблица в документации есть, извлечение не сделано: значение не отсутствует,
+        # а не определено — инженер вводит его по этой таблице.
+        status = CalcReadinessStatus.UNKNOWN
+        reason = f"{untaken[0].message} — введите значение по этой таблице"
     elif requirement.manual_when_sources_absent and not (
         set(requirement.expected_sources) & present_classes
     ):
@@ -200,13 +237,8 @@ def evaluate(
             f" (обычно: {where})" if where else ""
         )
     else:
-        latest = [
-            document
-            for document in documents
-            if document.recognized
-            and document.latest
-            and document.declared_class is not CalcSourceClass.PROJECT_COMPOSITION
-        ]
+        latest = _collectable(documents)
+        raw = sum(1 for document in documents if document.latest and document.raw_pdf)
         pending = [
             document
             for document in latest
@@ -221,7 +253,12 @@ def evaluate(
         ]
         if not latest:
             status = CalcReadinessStatus.UNKNOWN
-            reason = "В проекте нет распознанных документов"
+            reason = (
+                "В проекте нет распознанных документов"
+                if not any(document.recognized and document.latest for document in documents)
+                else "Распознаны только ВОР Заказчика или состав проекта — "
+                "они не источник исходных данных"
+            )
         elif pending:
             status = CalcReadinessStatus.NOT_INSPECTED
             reason = f"Не проверено документов: {len(pending)} из {len(latest)}"
@@ -231,7 +268,9 @@ def evaluate(
             reason = undetermined[0].message + (f" (и ещё {more})" if more else "")
         else:
             status = CalcReadinessStatus.MISSING
-            reason = f"Проверено документов: {len(latest)} — не найдено"
+            reason = f"Проверено документов: {len(latest)} — не найдено" + (
+                f"; PDF без распознавания не проверялись: {raw}" if raw else ""
+            )
 
     return CalcReadinessRowRead(
         requirement_id=requirement.id,
@@ -361,6 +400,7 @@ async def _document_states(
             DocumentState(
                 recognized=info.text_regions > 0,
                 latest=True,
+                raw_pdf=info.document.document_kind is DocumentKind.PDF and not info.text_regions,
                 inspected_fact_types=(
                     None if inspection is None else frozenset(inspection.inspected_fact_types)
                 ),
@@ -408,68 +448,3 @@ async def load_readiness(
         present_classes=present,
         class_titles=lambda item: inspections.SOURCE_CLASS_TITLES[item],
     )
-
-
-# ------------------------------------------------------------------------ таблица фактов
-
-
-def usage_of(fact: CalcFact, resolution: Resolution | None) -> CalcFactUsage:
-    """Идёт ли утверждение в расчёт — ответ сервера, а не вывод интерфейса."""
-    if fact.review_status is CalcReviewStatus.REJECTED:
-        return CalcFactUsage.REJECTED
-    if not fact.calculation_eligible:
-        return CalcFactUsage.EXCLUDED_VOR
-    if resolution is None:
-        raise InvariantError("у действующего утверждения нет выбора по ключу")
-    if resolution.chosen is not None and resolution.chosen.id == fact.id:
-        return CalcFactUsage.USED
-    if resolution.state is CalcResolutionState.UNRESOLVED:
-        return CalcFactUsage.CONFLICT
-    definition = fact_type_def(fact.fact_type)
-    if (
-        resolution.value is not None
-        and definition is not None
-        and values_agree(definition, registry.parse_value(fact.value), resolution.value)
-    ):
-        return CalcFactUsage.AGREES
-    return CalcFactUsage.NOT_CHOSEN
-
-
-async def list_input_facts(
-    session: AsyncSession,
-    *,
-    project: Project,
-    fact_type: str | None,
-    limit: int,
-    offset: int,
-) -> CalcInputFactPage:
-    conditions = [CalcFact.project_id == project.id, CalcFact.status == CalcFactStatus.ACTIVE]
-    if fact_type is not None:
-        conditions.append(CalcFact.fact_type == fact_type)
-    total = await session.scalar(select(func.count(CalcFact.id)).where(*conditions))
-    facts = (
-        await session.scalars(
-            select(CalcFact)
-            .where(*conditions)
-            .options(selectinload(CalcFact.evidence), selectinload(CalcFact.source))
-            .order_by(CalcFact.fact_type, CalcFact.subject_key, CalcFact.created_at, CalcFact.id)
-            .limit(limit)
-            .offset(offset)
-        )
-    ).all()
-    resolutions = {
-        entry.fact_key: entry.resolution
-        for entry, _ in await registry.resolve_project(session, project_id=project.id)
-    }
-    items: list[CalcInputFactRead] = []
-    for fact in facts:
-        definition = fact_type_def(fact.fact_type)
-        items.append(
-            CalcInputFactRead(
-                fact=CalcFactRead.model_validate(fact),
-                fact_type_title=fact.fact_type if definition is None else definition.title,
-                source_title=fact.source.title,
-                usage=usage_of(fact, resolutions.get(fact.fact_key)),
-            )
-        )
-    return CalcInputFactPage(items=items, total=total or 0)

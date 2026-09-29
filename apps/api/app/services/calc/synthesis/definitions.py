@@ -365,6 +365,14 @@ def synthesize(
     if problems:
         return outcome(CalcSynthesisStatus.FAILED, failure=("GraphInvalid", "; ".join(problems)))
     structural = any(item.structural for item in built.graph.unresolved)
+    applied = set(built.applied_decisions)
+    # Решение, которое синтезатор не умеет применить, не теряется молча: запуск говорит об этом.
+    ignored = tuple(
+        f"Решение инженера по узлу «{item.node_id}» (выбрано {item.selected_count}) этим "
+        "синтезатором не применяется — выбор в запуске не учтён"
+        for item in decisions
+        if item.id not in applied
+    )
     return SynthesisOutcome(
         status=CalcSynthesisStatus.PARTIAL if structural else CalcSynthesisStatus.SUCCEEDED,
         graph=built.graph,
@@ -373,6 +381,6 @@ def synthesize(
         bindings=bindings,
         snapshot_items=snapshot,
         reasons=(),
-        warnings=tuple(built.graph.warnings),
+        warnings=(*built.graph.warnings, *ignored),
         applied_decisions=built.applied_decisions,
     )

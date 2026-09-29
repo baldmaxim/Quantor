@@ -64,33 +64,67 @@ export const VkAssumptions = ({
   );
 };
 
-export const VkUnresolved = ({ passport }: { passport: CalcPassportRead }) => {
-  const issues = passport.body.unresolved;
-  if (issues.length === 0) return <EmptyState compact title="Неопределённостей нет" />;
+type IssuesBody = Pick<CalcPassportRead['body'], 'unresolved' | 'conflicts' | 'warnings'>;
+
+export const VkUnresolved = ({ body }: { body: IssuesBody }) => {
+  const { unresolved: issues, conflicts, warnings } = body;
+  if (issues.length === 0 && conflicts.length === 0 && warnings.length === 0) {
+    return <EmptyState compact title="Неопределённостей нет" />;
+  }
   return (
-    <ul className="flex list-none flex-col gap-[var(--s-2)]">
-      {issues.map((issue) => (
-        <li
-          key={issue.key}
-          className="flex flex-col gap-[var(--s-1)] rounded-[var(--radius-sm)] border border-border px-[var(--s-4)] py-[var(--s-3)] text-sm"
-        >
-          <span className="flex flex-wrap items-center gap-[var(--s-3)]">
-            <span className="min-w-0 flex-1 font-medium wrap-anywhere">{issue.title}</span>
-            {issue.structural && <StatusBadge tone="warning">структура</StatusBadge>}
-            <span className="font-mono text-xs text-muted">{issue.key}</span>
-          </span>
-          <span className="wrap-anywhere">Известно: {issue.known}</span>
-          <span className="wrap-anywhere">Нужно: {issue.needed}</span>
-          {issue.blocks.length > 0 && (
-            <span className="wrap-anywhere">Влияет на: {issue.blocks.join(', ')}</span>
-          )}
-          {issue.not_blocks.length > 0 && (
-            <span className="text-muted wrap-anywhere">
-              Не влияет на: {issue.not_blocks.join(', ')}
-            </span>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-[var(--s-5)]">
+      {conflicts.length > 0 && (
+        <section className="flex flex-col gap-[var(--s-2)]">
+          <h3 className="text-sm font-medium">Расхождения источников</h3>
+          <ul className="flex list-none flex-col gap-[var(--s-1)] text-sm">
+            {conflicts.map((item) => (
+              <li key={`${item.fact_key}|${item.message}`} className="wrap-anywhere">
+                {item.message} <span className="font-mono text-xs text-muted">{item.fact_key}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {warnings.length > 0 && (
+        <section className="flex flex-col gap-[var(--s-2)]">
+          <h3 className="text-sm font-medium">Предупреждения расчёта</h3>
+          <ul className="flex list-disc flex-col gap-[var(--s-1)] pl-[var(--s-5)] text-sm">
+            {warnings.map((line) => (
+              <li key={line} className="wrap-anywhere">
+                {line}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {issues.length > 0 && <UnresolvedList issues={issues} />}
+    </div>
   );
 };
+
+const UnresolvedList = ({ issues }: { issues: CalcPassportRead['body']['unresolved'] }) => (
+  <ul className="flex list-none flex-col gap-[var(--s-2)]">
+    {issues.map((issue) => (
+      <li
+        key={issue.key}
+        className="flex flex-col gap-[var(--s-1)] rounded-[var(--radius-sm)] border border-border px-[var(--s-4)] py-[var(--s-3)] text-sm"
+      >
+        <span className="flex flex-wrap items-center gap-[var(--s-3)]">
+          <span className="min-w-0 flex-1 font-medium wrap-anywhere">{issue.title}</span>
+          {issue.structural && <StatusBadge tone="warning">структура</StatusBadge>}
+          <span className="font-mono text-xs text-muted">{issue.key}</span>
+        </span>
+        <span className="wrap-anywhere">Известно: {issue.known}</span>
+        <span className="wrap-anywhere">Нужно: {issue.needed}</span>
+        {issue.blocks.length > 0 && (
+          <span className="wrap-anywhere">Влияет на: {issue.blocks.join(', ')}</span>
+        )}
+        {issue.not_blocks.length > 0 && (
+          <span className="text-muted wrap-anywhere">
+            Не влияет на: {issue.not_blocks.join(', ')}
+          </span>
+        )}
+      </li>
+    ))}
+  </ul>
+);

@@ -77,15 +77,16 @@ from app.services.calc.facts.resolution import (
     resolve,
 )
 
-# Методы, которым в ручном вводе нет места: у каждого свой производитель, и он появится в
-# своём промте. Ручная запись «вычислено» без запуска расчёта была бы подделкой происхождения.
+# Методы, которым в ручном вводе нет места. Ручная запись «вычислено» без запуска расчёта была
+# бы подделкой происхождения. Выведенные правилами и ядром значения в реестр не пишутся вовсе:
+# они живут в неизменяемых запусках (PROMPT 03 T15, PROMPT 04 T18) со своим объяснением.
 _METHOD_LATER: Final[dict[CalcFactMethod, str]] = {
     CalcFactMethod.GEOMETRY_MEASURED: "адаптером обмеров (ещё не реализован)",
     CalcFactMethod.TABLE_COUNTED: "сбором фактов из распознанных таблиц",
-    CalcFactMethod.INFERRED: "правилом реестра (PROMPT 03)",
-    CalcFactMethod.NORMATIVE: "правилом реестра (PROMPT 03)",
-    CalcFactMethod.MANUFACTURER_RULE: "правилом реестра (PROMPT 03)",
-    CalcFactMethod.CALCULATED: "расчётным ядром (PROMPT 04)",
+    CalcFactMethod.INFERRED: "в результатах запуска расчёта, а не в реестре фактов",
+    CalcFactMethod.NORMATIVE: "в результатах запуска расчёта по правилу реестра",
+    CalcFactMethod.MANUFACTURER_RULE: "в результатах запуска расчёта по правилу реестра",
+    CalcFactMethod.CALCULATED: "в результатах запуска расчёта, а не в реестре фактов",
 }
 
 _DEFAULT_CONFIDENCE: Final[dict[CalcFactMethod, CalcConfidence]] = {
@@ -405,6 +406,12 @@ async def _record_fact(
     if payload.method is CalcFactMethod.MANUAL:
         if author_id is None:
             raise InvariantError("ручной ввод без автора")
+        if not (payload.note or "").strip():
+            # Ручное значение без основания нельзя ни проверить, ни объяснить в паспорте.
+            raise DomainError(
+                ErrorCode.CALC_EVIDENCE_REQUIRED,
+                "У ручного значения должно быть основание: документ, лист, расчёт или решение",
+            )
         evidence.insert(
             0,
             CalcFactEvidence(
@@ -523,7 +530,13 @@ async def review_fact(
     comment: str | None,
     reviewer_id: uuid.UUID,
 ) -> CalcFact:
-    """Проверка человеком: подтверждение или отклонение. Отклонённое в выборе не участвует."""
+    """Проверка человеком: подтверждение или отклонение. Отклонённое в выборе не участвует.
+
+    Проверяющий — не автор: своё ручное значение автор отзывает, а не отклоняет. Запустивший
+    сбор автором значений документа не считается — их написал документ.
+    """
+    if fact.inspection_id is None and fact.created_by == reviewer_id:
+        raise DomainError(ErrorCode.CALC_FACT_SELF_REVIEW)
     await _lock_active(session, fact)
     fact.review_status = status
     fact.review_comment = (comment or "").strip() or None

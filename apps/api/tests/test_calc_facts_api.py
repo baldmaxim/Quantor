@@ -61,7 +61,13 @@ async def calc_enabled(db_session: AsyncSession) -> None:
     await db_session.commit()
 
 
+REVIEWER_ID = uuid.UUID("00000000-0000-4000-8000-00000000c0de")
+"""Проверяющий — другой человек: своё утверждение автор не подтверждает (CALC_FACT_SELF_REVIEW)."""
+
+
 def _as(role: Role, workspace_id: uuid.UUID) -> AuthContext:
+    if role is Role.REVIEWER:
+        return make_context(role, workspace_id=workspace_id, user_id=REVIEWER_ID)
     return make_context(role, workspace_id=workspace_id)
 
 
@@ -396,6 +402,7 @@ class TestFacts:
                     "subject": {"building": "1", "discipline": "VK", "system_code": "В1"},
                     "value": {"kind": "TEXT", "value": "медь"},
                     "method": "MANUAL",
+                    "note": "по листу проекта",
                 },
             )
 
@@ -657,6 +664,8 @@ class TestRules:
             ({"method": "CALCULATED"}, "CALC_METHOD_NOT_AVAILABLE"),
             ({"method": "GEOMETRY_MEASURED"}, "CALC_METHOD_NOT_AVAILABLE"),
             ({"method": "ASSUMPTION"}, "CALC_EVIDENCE_REQUIRED"),
+            # Ручное значение без основания нельзя ни проверить, ни объяснить.
+            ({"note": "   "}, "CALC_EVIDENCE_REQUIRED"),
             ({"fact_type": "floor.secret"}, "CALC_FACT_TYPE_UNKNOWN"),
             ({"subject": {"building": "1"}}, "CALC_SUBJECT_INVALID"),
             ({"value": {"kind": "NUMBER", "value": "3.3", "unit": "m2"}}, "CALC_UNIT_MISMATCH"),
@@ -678,6 +687,7 @@ class TestRules:
             "subject": {"building": "1", "floor": "3"},
             "value": {"kind": "NUMBER", "value": "3.3", "unit": "m"},
             "method": "MANUAL",
+            "note": "по листу проекта",
             **body,
         }
         async with build_api(_as(Role.ENGINEER, workspace_id)) as client:
@@ -817,6 +827,7 @@ class TestRules:
                         "subject": {"building": "1"},
                         "value": {"kind": "COUNT", "value": 25},
                         "method": "MANUAL",
+                        "note": "по листу проекта",
                     },
                 )
             ).json()
@@ -845,6 +856,7 @@ class TestRules:
                     "subject": {"building": "1"},
                     "value": {"kind": "COUNT", "value": 2},
                     "method": "MANUAL",
+                    "note": "по листу проекта",
                 },
             )
         actions = set((await db_session.scalars(select(AuditEvent.action))).all())
@@ -872,10 +884,16 @@ class TestAccess:
                         "subject": {"building": "1"},
                         "value": {"kind": "COUNT", "value": 2},
                         "method": "MANUAL",
+                        "note": "по листу проекта",
                     },
                 )
             ).json()
 
+        async with build_api(_as(Role.ENGINEER, workspace_id)) as client:
+            # У инженера есть право проверки, но своё значение он не подтверждает.
+            self_review = await client.post(
+                f"{API}/facts/{fact['id']}/review", json={"status": "CONFIRMED"}
+            )
         async with build_api(_as(Role.VIEWER, workspace_id)) as client:
             viewer_list = await client.get(f"{API}/projects/{project.id}/facts")
             viewer_create = await client.post(
@@ -894,6 +912,8 @@ class TestAccess:
                 f"{API}/facts/{fact['id']}/review", json={"status": "CONFIRMED"}
             )
 
+        assert self_review.status_code == 403
+        assert self_review.json()["detail"]["code"] == "CALC_FACT_SELF_REVIEW"
         assert viewer_list.status_code == 200
         assert viewer_create.status_code == 403
         assert viewer_review.status_code == 403
@@ -920,6 +940,7 @@ class TestAccess:
                         "subject": {"building": "1"},
                         "value": {"kind": "COUNT", "value": 25},
                         "method": "MANUAL",
+                        "note": "по листу проекта",
                     },
                 )
             ).json()
@@ -1021,6 +1042,7 @@ class TestConcurrency:
                         "subject": {"building": "1"},
                         "value": {"kind": "COUNT", "value": 25},
                         "method": "MANUAL",
+                        "note": "по листу проекта",
                     },
                 )
             ).json()

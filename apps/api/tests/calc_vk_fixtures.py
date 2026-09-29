@@ -177,6 +177,7 @@ class VkProject:
                     "subject": dict(subject),
                     "value": dict(value),
                     "method": "MANUAL",
+                    "note": "по листу проекта",
                 },
             )
         assert response.status_code == 201, response.text

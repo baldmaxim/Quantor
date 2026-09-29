@@ -36,7 +36,7 @@ from app.contracts.calc.requirements import (
 from app.contracts.calc.subjects import normalize_system_code
 from app.domain import AuditAction
 from app.services import audit as audit_service
-from app.services.calc import inspections, readiness
+from app.services.calc import input_facts, inspections, readiness
 from app.services.calc.systems.vk.requirements import (
     VK_REQUIREMENTS,
     VK_REQUIREMENTS_VERSION,
@@ -203,6 +203,6 @@ async def list_calc_input_facts(
 ) -> CalcInputFactPage:
     """Действующие утверждения и ответ сервера, идёт ли каждое в расчёт."""
     project = await project_in_scope(session, context, project_id)
-    return await readiness.list_input_facts(
+    return await input_facts.list_input_facts(
         session, project=project, fact_type=fact_type, limit=limit, offset=offset
     )

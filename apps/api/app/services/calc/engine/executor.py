@@ -36,7 +36,7 @@ from app.contracts.calc.engine import (
     CalcStepRead,
 )
 from app.contracts.calc.enums import CalcBlockCode, CalcInputSource, CalcStepStatus
-from app.contracts.calc.units import UNITS
+from app.contracts.calc.units import UNITS, UnitError
 from app.services.calc.engine.handlers import (
     HandlerContext,
     HandlerSpec,
@@ -282,8 +282,13 @@ class _Executor:
         if set(step.depends_on) & self.undetermined:
             self.undetermined.add(step.step_key)
             return
-        inputs = self.gather_inputs(planned)
-        parameters = self.gather_parameters(planned)
+        try:
+            inputs = self.gather_inputs(planned)
+            parameters = self.gather_parameters(planned)
+        except UnitError as error:
+            # План проверил совместимость единиц; остаётся неточный перевод — это FAILED
+            # запуска с объяснением, а не необработанная ошибка сервера.
+            raise StepExecutionError(step.step_key, "UnitError", str(error)) from error
         fingerprint = step_fingerprint(self.plan, planned, inputs, parameters, self.fingerprints)
         reused_from: uuid.UUID | None = None
         roundings: list[CalcRoundingRecord] = []

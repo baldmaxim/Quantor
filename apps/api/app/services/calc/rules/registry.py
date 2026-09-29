@@ -149,6 +149,21 @@ def _apply(row: CalcRuleVersion, content: CalcRuleContent, legacy: LegacyCatalog
     row.legacy_provenance = [item.model_dump(mode="json") for item in _provenance(content, legacy)]
 
 
+def _keep_legacy(previous: CalcRuleVersion, content: CalcRuleContent) -> None:
+    """Происхождение из старого портала только дописывается.
+
+    Иначе правка черновика убрала бы ссылку на старое правило, а с ней — его опасности и
+    обязательный разбор: проверяющий увидел бы правило без истории.
+    """
+    before = {str(item["legacy_id"]) for item in previous.legacy_provenance}
+    dropped = sorted(before - set(validation.legacy_ids(content)))
+    if dropped:
+        raise DomainError(
+            ErrorCode.CALC_RULE_CONTENT_INVALID,
+            "Происхождение из старого портала не удаляется из правила: " + ", ".join(dropped),
+        )
+
+
 def _check(content: CalcRuleContent, discipline: CalcDiscipline, legacy: LegacyCatalog) -> None:
     problems = validation.content_problems(content, legacy)
     if content.discipline is not discipline:
@@ -418,6 +433,7 @@ async def update_draft(
     if row.status is not CalcRuleStatus.DRAFT:
         raise DomainError(ErrorCode.CALC_RULE_NOT_DRAFT)
     _check(payload.content, definition.discipline, legacy)
+    _keep_legacy(row, payload.content)
     _apply(row, payload.content, legacy)
     row.edited_by = editor
     await session.flush()
@@ -440,6 +456,7 @@ async def create_version(
     latest = definition.versions[-1]
     content = payload.content or content_of(latest, definition.discipline)
     _check(content, definition.discipline, legacy)
+    _keep_legacy(latest, content)
     row = CalcRuleVersion(
         rule=definition,
         version=latest.version + 1,

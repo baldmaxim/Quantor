@@ -1,8 +1,11 @@
 'use client';
 
-import type { CalcFactTypeRead, CalcInputFactRead } from '@quantor/api-client';
+import type { CalcFactRead, CalcFactTypeRead, CalcInputFactRead } from '@quantor/api-client';
+import { useState } from 'react';
 
-import { StatusBadge, cx } from '@/components/ui';
+import type { FactAction } from '@/components/calc/FactDecisionDialogs';
+import { FactEvidence } from '@/components/calc/FactEvidence';
+import { Button, StatusBadge, cx } from '@/components/ui';
 import {
   CONFIDENCE_TITLES,
   REVIEW_TITLES,
@@ -18,18 +21,35 @@ import {
  * Утверждения реестра: значение, место, источник и — ответом сервера — идёт ли оно в расчёт.
  *
  * На телефоне девять колонок не помещаются: строка разворачивается в карточку с теми же
- * данными, как в списке проектов.
+ * данными, как в списке проектов. Основание (свидетельства) раскрывается под строкой.
  */
 
 const COLUMNS =
   'minmax(180px,1.4fr) 90px 70px minmax(140px,1fr) 90px minmax(160px,1.2fr) 110px 90px 150px';
 
-interface IInputFactsTableProps {
+interface IFactActions {
+  projectId?: string;
+  /** Подтвердить или отклонить — право проверки; отозвать — только ручной ввод. */
+  canVerify?: boolean;
+  canEdit?: boolean;
+  /** Своё ручное значение автор не проверяет — сервер ответит CALC_FACT_SELF_REVIEW. */
+  currentUserId?: string;
+  onAction?: (action: FactAction, fact: CalcFactRead) => void;
+  onConflict?: (fact: CalcFactRead) => void;
+}
+
+interface IInputFactsTableProps extends IFactActions {
   items: readonly CalcInputFactRead[];
   factTypes: ReadonlyMap<string, CalcFactTypeRead>;
 }
 
-export const InputFactsTable = ({ items, factTypes }: IInputFactsTableProps) => (
+export const InputFactsTable = ({
+  items,
+  factTypes,
+  canVerify = false,
+  canEdit = false,
+  ...rest
+}: IInputFactsTableProps) => (
   <div className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
     <div
       role="row"
@@ -48,7 +68,14 @@ export const InputFactsTable = ({ items, factTypes }: IInputFactsTableProps) => 
     </div>
     <ul className="list-none">
       {items.map((item) => (
-        <FactRow key={item.fact.id} item={item} type={factTypes.get(item.fact.fact_type)} />
+        <FactRow
+          key={item.fact.id}
+          item={item}
+          type={factTypes.get(item.fact.fact_type)}
+          canVerify={canVerify}
+          canEdit={canEdit}
+          {...rest}
+        />
       ))}
     </ul>
   </div>
@@ -57,11 +84,21 @@ export const InputFactsTable = ({ items, factTypes }: IInputFactsTableProps) => 
 const FactRow = ({
   item,
   type,
-}: {
+  projectId,
+  canVerify,
+  canEdit,
+  currentUserId,
+  onAction,
+  onConflict,
+}: IFactActions & {
   item: CalcInputFactRead;
   type: CalcFactTypeRead | undefined;
 }) => {
+  const [open, setOpen] = useState(false);
   const { fact } = item;
+  const own = fact.inspection_id === null && fact.created_by === currentUserId;
+  const review = onAction && canVerify && !own;
+  const withdraw = onAction && canEdit && fact.source_class === 'MANUAL';
   const usage = USAGE[item.usage];
   const qualifier = type?.qualifier_options.find(
     (option) => option.value === fact.subject.qualifier,
@@ -97,6 +134,41 @@ const FactRow = ({
           {usage.label}
         </StatusBadge>
       </span>
+      <span className="flex basis-full flex-wrap gap-[var(--s-3)] lg:col-span-full">
+        <Button compact aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+          {open ? 'Скрыть основание' : `Основание (${fact.evidence.length})`}
+        </Button>
+        {onConflict && item.usage === 'CONFLICT' && (
+          <Button compact onClick={() => onConflict(fact)}>
+            Расхождение
+          </Button>
+        )}
+        {review && fact.review_status !== 'CONFIRMED' && (
+          <Button compact onClick={() => onAction('confirm', fact)}>
+            Подтвердить
+          </Button>
+        )}
+        {review && fact.review_status !== 'REJECTED' && (
+          <Button compact onClick={() => onAction('reject', fact)}>
+            Отклонить
+          </Button>
+        )}
+        {withdraw && (
+          <Button compact onClick={() => onAction('withdraw', fact)}>
+            Отозвать
+          </Button>
+        )}
+      </span>
+      {open && (
+        <div className="basis-full lg:col-span-full">
+          {fact.review_comment && (
+            <p className="mb-[var(--s-2)] text-xs wrap-anywhere">
+              Комментарий проверки: {fact.review_comment}
+            </p>
+          )}
+          <FactEvidence projectId={projectId ?? fact.project_id} evidence={fact.evidence} />
+        </div>
+      )}
     </li>
   );
 };

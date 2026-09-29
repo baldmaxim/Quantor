@@ -51,6 +51,20 @@ const MESSAGES: Record<string, string> = {
 export const errorMessage = (code: string, fallback?: string): string =>
   MESSAGES[code] ?? fallback ?? 'Операция не удалась.';
 
+/**
+ * Сообщение сервера из отказа. У доменных отказов оно конкретнее общего текста по коду:
+ * «Место факта: нужен этаж», а не «Данные запроса не приняты».
+ */
+export const extractMessage = (error: unknown): string | undefined => {
+  const detail = (error as { detail?: { message?: unknown } } | null)?.detail;
+  if (typeof detail?.message === 'string') return detail.message;
+
+  const nested = (error as { error?: { detail?: { message?: unknown } } } | null)?.error?.detail;
+  if (typeof nested?.message === 'string') return nested.message;
+
+  return undefined;
+};
+
 /** Известен ли код порталу. Неизвестный стоит показать как есть — вместе с кодом. */
 export const isKnownError = (code: string): boolean => code in MESSAGES;
 
