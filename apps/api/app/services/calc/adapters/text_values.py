@@ -405,14 +405,14 @@ def _counts(
     building: CalcFactSubject,
 ) -> None:
     for match in _SECTION_WORD_COUNT.finditer(line.text):
-        count = _SECTION_WORD_VALUES[match.group("v").lower().replace("ё", "е")]
+        sections = _SECTION_WORD_VALUES[match.group("v").lower().replace("ё", "е")]
         start, end = line.start + match.start(), line.start + match.end()
         result.candidates.append(
             _text_candidate(
                 declaration,
                 "building.sections_count",
                 building,
-                CalcCountValue(value=count),
+                CalcCountValue(value=sections),
                 _text_evidence(region, start, end, "Число секций в тексте документа"),
                 "Явно указано, из скольких жилых секций состоит здание.",
             )

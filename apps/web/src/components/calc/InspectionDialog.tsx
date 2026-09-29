@@ -86,7 +86,10 @@ const InspectionForm = ({
   const mep = sourceClass === 'MEP_DESIGN';
   const buildingIsList = /\d\s*[,;]\s*\d/.test(building);
   const ready =
-    sourceClass !== '' && building.trim().length > 0 && !buildingIsList && (!mep || discipline !== '');
+    sourceClass !== '' &&
+    building.trim().length > 0 &&
+    !buildingIsList &&
+    (!mep || discipline !== '');
 
   if (mutation.data) {
     return <InspectionResult inspection={mutation.data} onClose={onClose} />;
