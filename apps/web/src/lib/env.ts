@@ -9,6 +9,7 @@ import { z } from 'zod';
 const schema = z.object({
   apiBaseUrl: z.url({ error: 'NEXT_PUBLIC_API_BASE_URL должен быть корректным URL' }),
   apiInternalBaseUrl: z.url({ error: 'API_INTERNAL_BASE_URL должен быть корректным URL' }),
+  adminUrl: z.url({ error: 'NEXT_PUBLIC_ADMIN_URL должен быть корректным URL' }),
 });
 
 const publicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL;
@@ -19,4 +20,7 @@ export const env = schema.parse({
   // где имя сервиса недоступно снаружи. Локально совпадают, поэтому переменная
   // необязательна.
   apiInternalBaseUrl: process.env.API_INTERNAL_BASE_URL?.trim() || publicApiBaseUrl,
+  // Контур управления — отдельное приложение на своём адресе (ADR-0013): локально это
+  // другой порт, в бою — поддомен.
+  adminUrl: process.env.NEXT_PUBLIC_ADMIN_URL?.trim() || 'http://localhost:3001',
 });

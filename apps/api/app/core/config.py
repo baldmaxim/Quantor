@@ -17,6 +17,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 REPO_ROOT = Path(__file__).resolve().parents[4]
 API_ROOT = Path(__file__).resolve().parents[2]
 
+# Способ входа. `dev` — фиксированная личность без проверки, `oidc` — внешний провайдер
+# (ADR-0012), `local` — свой вход по почте и паролю с одобрением администратора (ADR-0031).
+AuthMode = Literal["dev", "oidc", "local"]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -45,6 +49,10 @@ class Settings(BaseSettings):
     s3_secret_access_key: SecretStr = SecretStr("quantor_dev_secret")
     s3_bucket: str = "quantor-dev"
     s3_use_path_style: bool = True
+    # Адрес хранилища, каким его видит браузер. Ссылки на файлы подписываются под него,
+    # а API и воркер ходят в хранилище по внутреннему `s3_endpoint_url`. Пусто — адрес один:
+    # так работает локальный стенд, где MinIO виден браузеру напрямую.
+    s3_public_endpoint_url: str = ""
 
     # Таймаут проверок готовности, чтобы /health/ready не висел на недоступной зависимости.
     readiness_timeout_seconds: float = Field(default=3.0, gt=0)
@@ -115,10 +123,11 @@ class Settings(BaseSettings):
     # --- вход в портал ---
     #
     # `dev` — фиксированная личность без провайдера: так работают `pnpm dev` и тесты.
-    # `oidc` — настоящий провайдер. Валидатор ниже не даёт запустить `dev` вне локальной
+    # `oidc` — настоящий провайдер. `local` — вход по почте и паролю, доступ выдаёт
+    # администратор (ADR-0031). Валидатор ниже не даёт запустить `dev` вне локальной
     # среды: тихий откат к режиму без проверки — это ровно тот способ, которым портал
     # открывают наружу, не заметив.
-    auth_mode: Literal["dev", "oidc"] = "dev"
+    auth_mode: AuthMode = "dev"
 
     auth_cookie_name: str = "quantor_session"
     auth_csrf_cookie_name: str = "quantor_csrf"
@@ -180,7 +189,7 @@ class Settings(BaseSettings):
         if self.auth_mode == "dev" and not self.is_local:
             raise ValueError(
                 f"AUTH_MODE=dev недопустим при ENVIRONMENT={self.environment}: "
-                "настройте провайдера входа (AUTH_MODE=oidc, OIDC_ISSUER)"
+                "настройте вход (AUTH_MODE=local или AUTH_MODE=oidc с OIDC_ISSUER)"
             )
         if self.auth_mode == "oidc" and not (
             self.oidc_issuer.strip() and self.oidc_client_id.strip()
@@ -201,6 +210,11 @@ class Settings(BaseSettings):
     def auth_cookie_secure(self) -> bool:
         """Вне локальной среды cookie уходит только по HTTPS."""
         return not self.is_local
+
+    @property
+    def s3_presign_endpoint_url(self) -> str:
+        """Под какой адрес подписываются ссылки для браузера."""
+        return self.s3_public_endpoint_url.strip() or self.s3_endpoint_url
 
     @property
     def oidc_expected_audience(self) -> str:

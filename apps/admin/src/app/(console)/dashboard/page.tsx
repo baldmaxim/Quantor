@@ -24,6 +24,12 @@ const COMPONENT_STATUS: Record<string, ProbeStatus> = {
   unavailable: 'unavailable',
 };
 
+const AUTH_MODE_LABEL = {
+  oidc: 'провайдер OIDC',
+  local: 'почта и пароль портала',
+  dev: 'режим разработки',
+} as const;
+
 const Page = () => {
   const meta = useMeta();
   const flags = useFeatureFlags();
@@ -74,13 +80,15 @@ const Page = () => {
           />
           <Tile
             label="Вход"
-            value={meta.data?.auth_mode === 'oidc' ? 'провайдер OIDC' : 'режим разработки'}
-            tone={meta.data?.auth_mode === 'oidc' ? 'success' : 'warning'}
-            badge={meta.data?.auth_mode === 'oidc' ? 'настроен' : 'без проверки'}
+            value={AUTH_MODE_LABEL[meta.data?.auth_mode ?? 'dev']}
+            tone={meta.data?.auth_mode === 'dev' ? 'warning' : 'success'}
+            badge={meta.data?.auth_mode === 'dev' ? 'без проверки' : 'настроен'}
             hint={
               meta.data?.auth_mode === 'dev'
                 ? 'Допустим только локально: вне local запуск не пройдёт'
-                : undefined
+                : meta.data?.auth_mode === 'local'
+                  ? 'Доступ выдаётся одобрением заявки в разделе «Пользователи и доступ»'
+                  : undefined
             }
           />
 

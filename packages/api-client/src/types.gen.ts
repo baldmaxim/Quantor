@@ -92,6 +92,106 @@ export type AdminJobRead = {
 };
 
 /**
+ * AdminSetPasswordRequest
+ *
+ * Временный пароль от администратора. Пользователь обязан сменить его при входе.
+ */
+export type AdminSetPasswordRequest = {
+    /**
+     * Password
+     */
+    password: string;
+};
+
+/**
+ * AdminUserRead
+ *
+ * Пользователь в административном списке.
+ *
+ * Пароля и его хеша здесь нет ни в каком виде — только признаки, нужные решению
+ * администратора: локальный ли вход, заблокирован ли перебором, ждёт ли смены пароля.
+ */
+export type AdminUserRead = {
+    approval_status: ApprovalStatus;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Display Name
+     */
+    display_name: string | null;
+    /**
+     * Email
+     */
+    email: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Is Active
+     */
+    is_active: boolean;
+    /**
+     * Is Local
+     */
+    is_local: boolean;
+    /**
+     * Is Platform Admin
+     */
+    is_platform_admin: boolean;
+    /**
+     * Last Login At
+     */
+    last_login_at: string | null;
+    /**
+     * Locked Until
+     */
+    locked_until: string | null;
+    /**
+     * Memberships
+     */
+    memberships?: Array<SessionWorkspace>;
+    /**
+     * Must Change Password
+     */
+    must_change_password: boolean;
+};
+
+/**
+ * AdminWorkspaceRead
+ *
+ * Рабочее пространство для выбора при выдаче доступа.
+ */
+export type AdminWorkspaceRead = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    status: WorkspaceStatus;
+};
+
+/**
+ * ApprovalStatus
+ *
+ * Допуск личности к порталу (ADR-0031).
+ *
+ * Самостоятельная регистрация заводит заявку, а не доступ: войти можно только после
+ * одобрения администратором платформы. Отклонённая заявка остаётся строкой — повторная
+ * регистрация на тот же адрес не должна тихо превращаться в новую заявку.
+ */
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+/**
  * ArtifactKind
  *
  * Роль файла внутри распознанного пакета.
@@ -5934,6 +6034,34 @@ export type CalibrationSnapshot = {
 };
 
 /**
+ * ChangePasswordRequest
+ *
+ * Смена собственного пароля. Текущий пароль обязателен и при выданном администратором.
+ */
+export type ChangePasswordRequest = {
+    /**
+     * Current Password
+     */
+    current_password: string;
+    /**
+     * New Password
+     */
+    new_password: string;
+};
+
+/**
+ * ChangePasswordResponse
+ *
+ * Пароль сменён. Прочие сеансы пользователя отозваны, текущий продолжает работать.
+ */
+export type ChangePasswordResponse = {
+    /**
+     * Ok
+     */
+    ok?: boolean;
+};
+
+/**
  * ClassDef
  *
  * Класс элемента. Слой evidence и слой сети описываются раздельно даже для одного объекта.
@@ -7354,7 +7482,7 @@ export type MetaResponse = {
     /**
      * Auth Mode
      */
-    auth_mode: 'dev' | 'oidc';
+    auth_mode: 'dev' | 'oidc' | 'local';
     /**
      * Environment
      */
@@ -7733,6 +7861,28 @@ export type PageAdminJobRead = {
 };
 
 /**
+ * Page[AdminUserRead]
+ */
+export type PageAdminUserRead = {
+    /**
+     * Items
+     */
+    items: Array<AdminUserRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
  * Page[AuditEventRead]
  */
 export type PageAuditEventRead = {
@@ -7926,6 +8076,30 @@ export type Participant = {
      * Value
      */
     value?: boolean | number | number | string | null;
+};
+
+/**
+ * PasswordLoginRequest
+ *
+ * Вход по почте и паролю.
+ */
+export type PasswordLoginRequest = {
+    /**
+     * Email
+     */
+    email: string;
+};
+
+/**
+ * PasswordLoginResponse
+ *
+ * Вход выполнен, cookie сеанса выставлены ответом.
+ */
+export type PasswordLoginResponse = {
+    /**
+     * Must Change Password
+     */
+    must_change_password: boolean;
 };
 
 /**
@@ -8398,6 +8572,37 @@ export type RegionRead = {
 export type RegionShape = 'rectangle' | 'polygon';
 
 /**
+ * RegisterRequest
+ *
+ * Заявка на доступ к порталу.
+ */
+export type RegisterRequest = {
+    /**
+     * Display Name
+     */
+    display_name: string;
+    /**
+     * Email
+     */
+    email: string;
+};
+
+/**
+ * RegisterResponse
+ *
+ * Заявка принята.
+ *
+ * Ответ одинаков для нового адреса и для уже известного: иначе форма регистрации
+ * отвечала бы на вопрос «есть ли у портала такой пользователь» кому угодно.
+ */
+export type RegisterResponse = {
+    /**
+     * Status
+     */
+    status?: 'pending';
+};
+
+/**
  * RelationTypeDef
  */
 export type RelationTypeDef = {
@@ -8652,7 +8857,7 @@ export type SessionResponse = {
     /**
      * Auth Mode
      */
-    auth_mode: 'dev' | 'oidc';
+    auth_mode: 'dev' | 'oidc' | 'local';
     /**
      * Authenticated
      */
@@ -8661,6 +8866,10 @@ export type SessionResponse = {
      * Csrf Token
      */
     csrf_token?: string | null;
+    /**
+     * Must Change Password
+     */
+    must_change_password?: boolean;
     /**
      * Permissions
      */
@@ -9454,6 +9663,32 @@ export type UploadedFileType = {
 };
 
 /**
+ * UserApproveRequest
+ *
+ * Одобрение заявки: доступ выдаётся сразу в конкретное пространство с конкретной ролью.
+ */
+export type UserApproveRequest = {
+    role: Role;
+    /**
+     * Workspace Id
+     */
+    workspace_id: string;
+};
+
+/**
+ * UserMembershipRequest
+ *
+ * Назначение или смена роли пользователя в пространстве.
+ */
+export type UserMembershipRequest = {
+    role: Role;
+    /**
+     * Workspace Id
+     */
+    workspace_id: string;
+};
+
+/**
  * ValidationError
  */
 export type ValidationError = {
@@ -9569,6 +9804,52 @@ export type WorkerRead = {
      * Version
      */
     version: string;
+};
+
+/**
+ * WorkspaceStatus
+ *
+ * Состояние рабочего пространства.
+ *
+ * Приостановленное пространство остаётся в базе со всеми данными: удаление арендатора —
+ * отдельная операция с другими последствиями, и путать её с временным отключением нельзя.
+ */
+export type WorkspaceStatus = 'active' | 'suspended';
+
+/**
+ * PasswordLoginRequest
+ *
+ * Вход по почте и паролю.
+ */
+export type PasswordLoginRequestWritable = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Password
+     */
+    password: string;
+};
+
+/**
+ * RegisterRequest
+ *
+ * Заявка на доступ к порталу.
+ */
+export type RegisterRequestWritable = {
+    /**
+     * Display Name
+     */
+    display_name: string;
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Password
+     */
+    password: string;
 };
 
 export type ListAuditEventsData = {
@@ -10183,6 +10464,248 @@ export type SetSettingOverrideResponses = {
 
 export type SetSettingOverrideResponse = SetSettingOverrideResponses[keyof SetSettingOverrideResponses];
 
+export type ListAdminUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         *
+         * Сколько записей вернуть
+         */
+        limit?: number;
+        /**
+         * Offset
+         *
+         * Сколько записей пропустить
+         */
+        offset?: number;
+        /**
+         * Status
+         *
+         * Состояние заявки: pending, approved, rejected
+         */
+        status?: ApprovalStatus | null;
+    };
+    url: '/api/v1/admin/users';
+};
+
+export type ListAdminUsersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListAdminUsersError = ListAdminUsersErrors[keyof ListAdminUsersErrors];
+
+export type ListAdminUsersResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageAdminUserRead;
+};
+
+export type ListAdminUsersResponse = ListAdminUsersResponses[keyof ListAdminUsersResponses];
+
+export type ApproveAdminUserData = {
+    body: UserApproveRequest;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{user_id}/approve';
+};
+
+export type ApproveAdminUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ApproveAdminUserError = ApproveAdminUserErrors[keyof ApproveAdminUserErrors];
+
+export type ApproveAdminUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminUserRead;
+};
+
+export type ApproveAdminUserResponse = ApproveAdminUserResponses[keyof ApproveAdminUserResponses];
+
+export type DisableAdminUserData = {
+    body?: never;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{user_id}/disable';
+};
+
+export type DisableAdminUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DisableAdminUserError = DisableAdminUserErrors[keyof DisableAdminUserErrors];
+
+export type DisableAdminUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminUserRead;
+};
+
+export type DisableAdminUserResponse = DisableAdminUserResponses[keyof DisableAdminUserResponses];
+
+export type EnableAdminUserData = {
+    body?: never;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{user_id}/enable';
+};
+
+export type EnableAdminUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type EnableAdminUserError = EnableAdminUserErrors[keyof EnableAdminUserErrors];
+
+export type EnableAdminUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminUserRead;
+};
+
+export type EnableAdminUserResponse = EnableAdminUserResponses[keyof EnableAdminUserResponses];
+
+export type SetAdminUserMembershipData = {
+    body: UserMembershipRequest;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{user_id}/membership';
+};
+
+export type SetAdminUserMembershipErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetAdminUserMembershipError = SetAdminUserMembershipErrors[keyof SetAdminUserMembershipErrors];
+
+export type SetAdminUserMembershipResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminUserRead;
+};
+
+export type SetAdminUserMembershipResponse = SetAdminUserMembershipResponses[keyof SetAdminUserMembershipResponses];
+
+export type SetAdminUserPasswordData = {
+    body: AdminSetPasswordRequest;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{user_id}/password';
+};
+
+export type SetAdminUserPasswordErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetAdminUserPasswordError = SetAdminUserPasswordErrors[keyof SetAdminUserPasswordErrors];
+
+export type SetAdminUserPasswordResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminUserRead;
+};
+
+export type SetAdminUserPasswordResponse = SetAdminUserPasswordResponses[keyof SetAdminUserPasswordResponses];
+
+export type RejectAdminUserData = {
+    body?: never;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{user_id}/reject';
+};
+
+export type RejectAdminUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RejectAdminUserError = RejectAdminUserErrors[keyof RejectAdminUserErrors];
+
+export type RejectAdminUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminUserRead;
+};
+
+export type RejectAdminUserResponse = RejectAdminUserResponses[keyof RejectAdminUserResponses];
+
+export type ListAdminWorkspacesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/workspaces';
+};
+
+export type ListAdminWorkspacesResponses = {
+    /**
+     * Response List Admin Workspaces
+     *
+     * Successful Response
+     */
+    200: Array<AdminWorkspaceRead>;
+};
+
+export type ListAdminWorkspacesResponse = ListAdminWorkspacesResponses[keyof ListAdminWorkspacesResponses];
+
 export type CompleteLoginData = {
     body?: never;
     path?: never;
@@ -10211,6 +10734,31 @@ export type CompleteLoginErrors = {
 };
 
 export type CompleteLoginError = CompleteLoginErrors[keyof CompleteLoginErrors];
+
+export type ChangePasswordData = {
+    body: ChangePasswordRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/change-password';
+};
+
+export type ChangePasswordErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
+
+export type ChangePasswordResponses = {
+    /**
+     * Successful Response
+     */
+    200: ChangePasswordResponse;
+};
+
+export type ChangePasswordResponse2 = ChangePasswordResponses[keyof ChangePasswordResponses];
 
 export type BeginLoginData = {
     body?: never;
@@ -10250,6 +10798,56 @@ export type LogoutResponses = {
 };
 
 export type LogoutResponse2 = LogoutResponses[keyof LogoutResponses];
+
+export type LoginWithPasswordData = {
+    body: PasswordLoginRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/password-login';
+};
+
+export type LoginWithPasswordErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type LoginWithPasswordError = LoginWithPasswordErrors[keyof LoginWithPasswordErrors];
+
+export type LoginWithPasswordResponses = {
+    /**
+     * Successful Response
+     */
+    200: PasswordLoginResponse;
+};
+
+export type LoginWithPasswordResponse = LoginWithPasswordResponses[keyof LoginWithPasswordResponses];
+
+export type RegisterData = {
+    body: RegisterRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/register';
+};
+
+export type RegisterErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RegisterError = RegisterErrors[keyof RegisterErrors];
+
+export type RegisterResponses = {
+    /**
+     * Successful Response
+     */
+    202: RegisterResponse;
+};
+
+export type RegisterResponse2 = RegisterResponses[keyof RegisterResponses];
 
 export type ReadSessionData = {
     body?: never;

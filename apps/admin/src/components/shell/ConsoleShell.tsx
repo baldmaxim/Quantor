@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
+import { PendingUsersBadge } from '@/components/shell/PendingUsersBadge';
 import { env } from '@/lib/env';
 
 /**
@@ -83,7 +84,10 @@ export const ConsoleShell = ({ session, children }: IConsoleShellProps) => {
                     : 'text-muted hover:bg-surface-muted hover:text-text',
                 )}
               >
-                <span className="text-sm">{section.label}</span>
+                <span className="flex items-center gap-[var(--s-3)] text-sm">
+                  {section.label}
+                  {section.href === '/users' && <PendingUsersBadge />}
+                </span>
                 <span className="text-micro text-muted">{section.hint}</span>
               </Link>
             </li>

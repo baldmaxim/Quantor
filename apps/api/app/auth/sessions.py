@@ -95,19 +95,20 @@ async def revoke(session: AsyncSession, row: AuthSession) -> None:
         row.revoked_at = datetime.now(UTC)
 
 
-async def revoke_all_for_user(session: AsyncSession, user_id: uuid.UUID) -> int:
-    """Гасит все сеансы личности. Нужно при отключении пользователя и разборе инцидента."""
-    rows = (
-        (
-            await session.execute(
-                select(AuthSession).where(
-                    AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None)
-                )
-            )
-        )
-        .scalars()
-        .all()
+async def revoke_all_for_user(
+    session: AsyncSession, user_id: uuid.UUID, *, keep: uuid.UUID | None = None
+) -> int:
+    """Гасит все сеансы личности. Нужно при отключении пользователя и разборе инцидента.
+
+    `keep` — сеанс, который остаётся: после смены пароля гаснут чужие входы, а тот, из
+    которого пароль сменили, продолжает работать.
+    """
+    query = select(AuthSession).where(
+        AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None)
     )
+    if keep is not None:
+        query = query.where(AuthSession.id != keep)
+    rows = (await session.execute(query)).scalars().all()
     now = datetime.now(UTC)
     for row in rows:
         row.revoked_at = now

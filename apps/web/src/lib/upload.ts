@@ -1,5 +1,6 @@
 'use client';
 
+import { CSRF_HEADER, readCsrfToken } from './csrf';
 import { env } from './env';
 
 /**
@@ -10,6 +11,9 @@ import { env } from './env';
  * отличает медленную загрузку от зависшей и жмёт кнопку второй раз.
  *
  * Файл не читается в память: XHR отправляет его потоком из FormData.
+ *
+ * Запрос идёт мимо клиента API, поэтому cookie сеанса и подтверждение CSRF здесь
+ * выставляются руками: без них под настоящим входом загрузка получала бы 401 или 403.
  */
 
 export interface UploadProgress {
@@ -64,6 +68,11 @@ export const uploadFile = ({
     const request = new XMLHttpRequest();
     request.open('POST', `${env.apiBaseUrl}/api/v1/projects/${projectId}/uploads`);
     request.responseType = 'json';
+    // API может жить на другом origin того же site (локально — другой порт): без этого
+    // браузер не отправил бы cookie сеанса.
+    request.withCredentials = true;
+    const csrfToken = readCsrfToken();
+    if (csrfToken) request.setRequestHeader(CSRF_HEADER, csrfToken);
 
     request.upload.addEventListener('progress', (event) => {
       onProgress?.({

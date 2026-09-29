@@ -15,6 +15,7 @@ import re
 import uuid
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -250,6 +251,9 @@ def test_8_admin_api_denies_by_default() -> None:
             "complete_login",
             "logout",
             "read_session",
+            "register",
+            "login_with_password",
+            "change_password",
         }
         and not any(
             isinstance(dependency.call, PermissionCheck)
@@ -263,11 +267,61 @@ def test_8_admin_api_denies_by_default() -> None:
 # 9 -----------------------------------------------------------------------------
 
 
+# Поля пароля локального входа (ADR-0031). Пароль приходит от пользователя и обратно не
+# уходит никогда: такие поля допустимы только во входных схемах и только как writeOnly.
+_PASSWORD_INPUTS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("RegisterRequest", "password"),
+        ("PasswordLoginRequest", "password"),
+        ("ChangePasswordRequest", "current_password"),
+        ("ChangePasswordRequest", "new_password"),
+        ("AdminSetPasswordRequest", "password"),
+    }
+)
+# Признак «пароль нужно сменить» — булево значение, а не секрет.
+_PASSWORD_FLAGS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("SessionResponse", "must_change_password"),
+        ("PasswordLoginResponse", "must_change_password"),
+        ("AdminUserRead", "must_change_password"),
+    }
+)
+
+
+def _response_schemas(schema: dict[str, Any]) -> set[str]:
+    """Схемы, достижимые из ответов API, вместе со всем, что они в себя включают."""
+    components = schema.get("components", {}).get("schemas", {})
+    pending: list[object] = [
+        body.get("schema", {})
+        for path in schema.get("paths", {}).values()
+        for operation in path.values()
+        for response in operation.get("responses", {}).values()
+        for body in response.get("content", {}).values()
+    ]
+    seen: set[str] = set()
+    while pending:
+        node = pending.pop()
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str):
+                name = ref.rsplit("/", 1)[-1]
+                if name not in seen:
+                    seen.add(name)
+                    pending.append(components.get(name, {}))
+            pending.extend(node.values())
+        elif isinstance(node, list):
+            pending.extend(node)
+    return seen
+
+
 def test_9_no_secret_reaches_the_contract_or_the_client() -> None:
     """Ни один секрет не попадает в контракт API и в сгенерированный клиент.
 
     Проверяются имена полей, а не значения: значение может быть пустым на этой машине
     и заполненным на другой, а поле с таким именем опасно само по себе.
+
+    Исключение одно — пароль локального входа во входных схемах. Для него проверяется
+    обратное: поле только для записи и ни одна схема ответа его не содержит.
     """
     forbidden = re.compile(
         r"(api_?token|api_?key|client_secret|secret_access_key|password|private_key)",
@@ -280,13 +334,31 @@ def test_9_no_secret_reaches_the_contract_or_the_client() -> None:
         f"{name}.{field}"
         for name, model in components.items()
         for field in model.get("properties", {})
-        if forbidden.search(field)
+        if forbidden.search(field) and (name, field) not in _PASSWORD_INPUTS | _PASSWORD_FLAGS
     ]
     assert not leaks, f"поля с секретами в контракте: {leaks}"
 
+    returned = _response_schemas(schema)
+    for name, field in _PASSWORD_INPUTS:
+        assert name not in returned, f"{name} с паролем уходит в ответе API"
+        prop = components[name]["properties"][field]
+        assert prop.get("writeOnly") is True, f"{name}.{field} не помечен writeOnly"
+
     client_source = (REPO_ROOT / "packages/api-client/src/types.gen.ts").read_text(encoding="utf-8")
-    client_leaks = sorted(set(forbidden.findall(client_source)))
+    strict = re.compile(
+        r"(api_?token|api_?key|client_secret|secret_access_key|private_key)", re.IGNORECASE
+    )
+    client_leaks = sorted(set(strict.findall(client_source)))
     assert not client_leaks, f"секреты в сгенерированном клиенте: {client_leaks}"
+
+    # Слово «password» в клиенте есть законно — в именах входных типов. Поэтому для него
+    # проверяются объявленные поля: только разрешённые выше и ни одного другого.
+    allowed_fields = {field for _, field in _PASSWORD_INPUTS | _PASSWORD_FLAGS}
+    declared = re.findall(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\??\s*:", client_source, re.MULTILINE)
+    password_fields = {name for name in declared if re.search("password", name, re.IGNORECASE)}
+    assert password_fields <= allowed_fields, (
+        f"поля пароля в клиенте сверх разрешённых: {sorted(password_fields - allowed_fields)}"
+    )
 
 
 # 10 ----------------------------------------------------------------------------

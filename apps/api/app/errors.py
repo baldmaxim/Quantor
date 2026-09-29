@@ -26,6 +26,15 @@ class ErrorCode(StrEnum):
     MEMBERSHIP_EXISTS = "MEMBERSHIP_EXISTS"
     LAST_ADMIN_REMOVAL = "LAST_ADMIN_REMOVAL"
 
+    # --- локальный вход ---
+    ACCOUNT_PENDING = "ACCOUNT_PENDING"
+    ACCOUNT_REJECTED = "ACCOUNT_REJECTED"
+    ACCOUNT_DISABLED = "ACCOUNT_DISABLED"
+    TOO_MANY_ATTEMPTS = "TOO_MANY_ATTEMPTS"
+    CREDENTIAL_TOO_WEAK = "CREDENTIAL_TOO_WEAK"
+    USER_STATE_INVALID = "USER_STATE_INVALID"
+    USER_SELF_ACTION = "USER_SELF_ACTION"
+
     # --- контур управления ---
     SETTING_UNKNOWN = "SETTING_UNKNOWN"
     SETTING_VALUE_INVALID = "SETTING_VALUE_INVALID"
@@ -157,6 +166,13 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.WORKSPACE_NOT_FOUND: "Рабочее пространство не найдено",
     ErrorCode.MEMBERSHIP_EXISTS: "Участник уже добавлен в пространство",
     ErrorCode.LAST_ADMIN_REMOVAL: "Нельзя убрать последнего администратора пространства",
+    ErrorCode.ACCOUNT_PENDING: "Заявка ещё не одобрена администратором",
+    ErrorCode.ACCOUNT_REJECTED: "Заявка на доступ отклонена",
+    ErrorCode.ACCOUNT_DISABLED: "Учётная запись отключена",
+    ErrorCode.TOO_MANY_ATTEMPTS: "Слишком много неудачных попыток, повторите позже",
+    ErrorCode.CREDENTIAL_TOO_WEAK: "Пароль слишком простой",
+    ErrorCode.USER_STATE_INVALID: "Действие недоступно в текущем состоянии пользователя",
+    ErrorCode.USER_SELF_ACTION: "Это действие нельзя выполнить над собственной учётной записью",
     ErrorCode.SETTING_UNKNOWN: "Такой настройки нет",
     ErrorCode.SETTING_VALUE_INVALID: "Значение настройки не подходит",
     ErrorCode.SETTING_SCOPE_INVALID: "Настройка не переопределяется на этом уровне",
@@ -267,6 +283,13 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.WORKSPACE_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.MEMBERSHIP_EXISTS: status.HTTP_409_CONFLICT,
     ErrorCode.LAST_ADMIN_REMOVAL: status.HTTP_409_CONFLICT,
+    ErrorCode.ACCOUNT_PENDING: status.HTTP_403_FORBIDDEN,
+    ErrorCode.ACCOUNT_REJECTED: status.HTTP_403_FORBIDDEN,
+    ErrorCode.ACCOUNT_DISABLED: status.HTTP_403_FORBIDDEN,
+    ErrorCode.TOO_MANY_ATTEMPTS: status.HTTP_429_TOO_MANY_REQUESTS,
+    ErrorCode.CREDENTIAL_TOO_WEAK: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.USER_STATE_INVALID: status.HTTP_409_CONFLICT,
+    ErrorCode.USER_SELF_ACTION: status.HTTP_409_CONFLICT,
     # Провайдер личности — такая же внешняя система, как TenderHUB, и отвечает так же:
     # не настроен — 503, не отвечает — 502, прислал негодный ответ — 400.
     ErrorCode.SETTING_UNKNOWN: status.HTTP_404_NOT_FOUND,

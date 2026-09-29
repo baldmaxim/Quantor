@@ -25,6 +25,10 @@ const PortalLayout = async ({ children }: { children: ReactNode }) => {
   if (session !== null && !session.authenticated) {
     redirect('/signed-out');
   }
+  // Пароль, выданный администратором, знают двое: работать с ним дальше нельзя (ADR-0031).
+  if (session?.must_change_password) {
+    redirect('/account/password');
+  }
 
   return (
     <div className="flex h-dvh flex-col md:flex-row">

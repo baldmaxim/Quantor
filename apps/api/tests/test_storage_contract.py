@@ -105,3 +105,41 @@ class TestFakeStorageBehaviour:
 
         with pytest.raises(ObjectNotFoundError):
             await fake_storage.presigned_get_url("revisions/нет/source.pdf", expires_in=60)
+
+
+class TestPresignedUrl:
+    """Ссылка для браузера подписывается под публичный адрес, а не под внутренний.
+
+    Подпись SigV4 включает хост: ссылка на `minio:9000` снаружи не откроется, а ссылка,
+    переписанная на другой хост после подписи, не пройдёт проверку.
+    """
+
+    async def test_signed_for_public_endpoint(self) -> None:
+        from app.storage.s3 import S3ObjectStorage
+        from tests.conftest import clean_settings
+
+        storage = S3ObjectStorage(
+            clean_settings(
+                s3_endpoint_url="http://minio:9000",
+                s3_public_endpoint_url="https://quantor.example.ru",
+                s3_bucket="quantor-files",
+            )
+        )
+        url = await storage.presigned_get_url(
+            "revisions/x/source.pdf", expires_in=60, download_filename=RUSSIAN_NAME
+        )
+
+        assert url.startswith("https://quantor.example.ru/quantor-files/revisions/x/source.pdf?")
+        assert "X-Amz-Signature=" in url
+        assert "minio" not in url
+
+    async def test_single_endpoint_when_public_is_not_set(self) -> None:
+        from app.storage.s3 import S3ObjectStorage
+        from tests.conftest import clean_settings
+
+        storage = S3ObjectStorage(
+            clean_settings(s3_endpoint_url="http://localhost:9000", s3_public_endpoint_url="")
+        )
+        url = await storage.presigned_get_url("k", expires_in=60)
+
+        assert url.startswith("http://localhost:9000/")

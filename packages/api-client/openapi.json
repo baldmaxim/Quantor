@@ -199,6 +199,164 @@
         "title": "AdminJobRead",
         "type": "object"
       },
+      "AdminSetPasswordRequest": {
+        "description": "Временный пароль от администратора. Пользователь обязан сменить его при входе.",
+        "properties": {
+          "password": {
+            "format": "password",
+            "maxLength": 256,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "AdminSetPasswordRequest",
+        "type": "object"
+      },
+      "AdminUserRead": {
+        "description": "Пользователь в административном списке.\n\nПароля и его хеша здесь нет ни в каком виде — только признаки, нужные решению\nадминистратора: локальный ли вход, заблокирован ли перебором, ждёт ли смены пароля.",
+        "properties": {
+          "approval_status": {
+            "$ref": "#/components/schemas/ApprovalStatus"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_local": {
+            "title": "Is Local",
+            "type": "boolean"
+          },
+          "is_platform_admin": {
+            "title": "Is Platform Admin",
+            "type": "boolean"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "locked_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked Until"
+          },
+          "memberships": {
+            "items": {
+              "$ref": "#/components/schemas/SessionWorkspace"
+            },
+            "title": "Memberships",
+            "type": "array"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "is_local",
+          "approval_status",
+          "is_active",
+          "is_platform_admin",
+          "must_change_password",
+          "locked_until",
+          "last_login_at",
+          "created_at"
+        ],
+        "title": "AdminUserRead",
+        "type": "object"
+      },
+      "AdminWorkspaceRead": {
+        "description": "Рабочее пространство для выбора при выдаче доступа.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/WorkspaceStatus"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "status"
+        ],
+        "title": "AdminWorkspaceRead",
+        "type": "object"
+      },
+      "ApprovalStatus": {
+        "description": "Допуск личности к порталу (ADR-0031).\n\nСамостоятельная регистрация заводит заявку, а не доступ: войти можно только после\nодобрения администратором платформы. Отклонённая заявка остаётся строкой — повторная\nрегистрация на тот же адрес не должна тихо превращаться в новую заявку.",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected"
+        ],
+        "title": "ApprovalStatus",
+        "type": "string"
+      },
       "ArtifactKind": {
         "description": "Роль файла внутри распознанного пакета.",
         "enum": [
@@ -11241,6 +11399,43 @@
         "title": "CalibrationSnapshot",
         "type": "object"
       },
+      "ChangePasswordRequest": {
+        "description": "Смена собственного пароля. Текущий пароль обязателен и при выданном администратором.",
+        "properties": {
+          "current_password": {
+            "format": "password",
+            "maxLength": 256,
+            "title": "Current Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "new_password": {
+            "format": "password",
+            "maxLength": 256,
+            "title": "New Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest",
+        "type": "object"
+      },
+      "ChangePasswordResponse": {
+        "description": "Пароль сменён. Прочие сеансы пользователя отозваны, текущий продолжает работать.",
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "ChangePasswordResponse",
+        "type": "object"
+      },
       "ClassDef": {
         "additionalProperties": false,
         "description": "Класс элемента. Слой evidence и слой сети описываются раздельно даже для одного объекта.",
@@ -13918,7 +14113,8 @@
           "auth_mode": {
             "enum": [
               "dev",
-              "oidc"
+              "oidc",
+              "local"
             ],
             "title": "Auth Mode",
             "type": "string"
@@ -14581,6 +14777,40 @@
         "title": "Page[AdminJobRead]",
         "type": "object"
       },
+      "Page_AdminUserRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUserRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[AdminUserRead]",
+        "type": "object"
+      },
       "Page_AuditEventRead_": {
         "properties": {
           "items": {
@@ -14929,6 +15159,44 @@
           "role"
         ],
         "title": "Participant",
+        "type": "object"
+      },
+      "PasswordLoginRequest": {
+        "description": "Вход по почте и паролю.",
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 256,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "PasswordLoginRequest",
+        "type": "object"
+      },
+      "PasswordLoginResponse": {
+        "description": "Вход выполнен, cookie сеанса выставлены ответом.",
+        "properties": {
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "must_change_password"
+        ],
+        "title": "PasswordLoginResponse",
         "type": "object"
       },
       "PointGeometry": {
@@ -15803,6 +16071,51 @@
         "title": "RegionShape",
         "type": "string"
       },
+      "RegisterRequest": {
+        "description": "Заявка на доступ к порталу.",
+        "properties": {
+          "display_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 256,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "display_name",
+          "password"
+        ],
+        "title": "RegisterRequest",
+        "type": "object"
+      },
+      "RegisterResponse": {
+        "description": "Заявка принята.\n\nОтвет одинаков для нового адреса и для уже известного: иначе форма регистрации\nотвечала бы на вопрос «есть ли у портала такой пользователь» кому угодно.",
+        "properties": {
+          "status": {
+            "const": "pending",
+            "default": "pending",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "RegisterResponse",
+        "type": "object"
+      },
       "RelationTypeDef": {
         "additionalProperties": false,
         "properties": {
@@ -16232,7 +16545,8 @@
           "auth_mode": {
             "enum": [
               "dev",
-              "oidc"
+              "oidc",
+              "local"
             ],
             "title": "Auth Mode",
             "type": "string"
@@ -16251,6 +16565,11 @@
               }
             ],
             "title": "Csrf Token"
+          },
+          "must_change_password": {
+            "default": false,
+            "title": "Must Change Password",
+            "type": "boolean"
           },
           "permissions": {
             "items": {
@@ -17800,6 +18119,44 @@
         "title": "UploadedFileType",
         "type": "object"
       },
+      "UserApproveRequest": {
+        "description": "Одобрение заявки: доступ выдаётся сразу в конкретное пространство с конкретной ролью.",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "workspace_id": {
+            "format": "uuid",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "role"
+        ],
+        "title": "UserApproveRequest",
+        "type": "object"
+      },
+      "UserMembershipRequest": {
+        "description": "Назначение или смена роли пользователя в пространстве.",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "workspace_id": {
+            "format": "uuid",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "role"
+        ],
+        "title": "UserMembershipRequest",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -18002,6 +18359,15 @@
         ],
         "title": "WorkerRead",
         "type": "object"
+      },
+      "WorkspaceStatus": {
+        "description": "Состояние рабочего пространства.\n\nПриостановленное пространство остаётся в базе со всеми данными: удаление арендатора —\nотдельная операция с другими последствиями, и путать её с временным отключением нельзя.",
+        "enum": [
+          "active",
+          "suspended"
+        ],
+        "title": "WorkspaceStatus",
+        "type": "string"
       }
     }
   },
@@ -19038,6 +19404,403 @@
         ]
       }
     },
+    "/api/v1/admin/users": {
+      "get": {
+        "description": "Пользователи установки, новые сверху. Фильтр `pending` — очередь заявок.",
+        "operationId": "list_admin_users",
+        "parameters": [
+          {
+            "description": "Сколько записей вернуть",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Сколько записей вернуть",
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Сколько записей пропустить",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Сколько записей пропустить",
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Состояние заявки: pending, approved, rejected",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ApprovalStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Состояние заявки: pending, approved, rejected",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AdminUserRead_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Пользователи",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/approve": {
+      "post": {
+        "description": "Одобряет заявку и сразу выдаёт роль в пространстве.",
+        "operationId": "approve_admin_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserApproveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Одобрить заявку",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/disable": {
+      "post": {
+        "description": "Отключает вход и гасит все сеансы пользователя. История действий остаётся.",
+        "operationId": "disable_admin_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отключить пользователя",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/enable": {
+      "post": {
+        "operationId": "enable_admin_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Включить пользователя",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/membership": {
+      "put": {
+        "description": "Назначает одобренному пользователю роль в пространстве или меняет её.",
+        "operationId": "set_admin_user_membership",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMembershipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Роль в пространстве",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/password": {
+      "post": {
+        "description": "Задаёт временный пароль. Пользователь сменит его при входе, его сеансы гаснут.",
+        "operationId": "set_admin_user_password",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выдать временный пароль",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/reject": {
+      "post": {
+        "operationId": "reject_admin_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отклонить заявку",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/workspaces": {
+      "get": {
+        "description": "Пространства установки — для выбора при выдаче доступа.",
+        "operationId": "list_admin_workspaces",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminWorkspaceRead"
+                  },
+                  "title": "Response List Admin Workspaces",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Рабочие пространства",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/auth/callback": {
       "get": {
         "description": "Меняет код на токены, заводит сеанс и возвращает браузер в портал.",
@@ -19092,9 +19855,51 @@
         ]
       }
     },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "description": "Смена пароля владельцем учётной записи.\n\nМаршрут сам проверяет сеанс и подтверждение, как выход: он нужен и пользователю,\nкоторому пространство ещё не назначено, а общий разбор контекста такому отказывает.\nПрочие сеансы пользователя гаснут — текущий продолжает работать.",
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePasswordResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сменить свой пароль",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "get": {
-        "description": "Переадресует на страницу входа провайдера.\n\nВ dev-режиме провайдера нет: браузер сразу возвращается в портал, где его уже ждёт\nфиксированная личность.",
+        "description": "Переадресует на страницу входа провайдера.\n\nВ dev-режиме провайдера нет: браузер сразу возвращается в портал, где его уже ждёт\nфиксированная личность. При локальном входе — на форму почты и пароля портала.",
         "operationId": "begin_login",
         "parameters": [
           {
@@ -19159,6 +19964,90 @@
           }
         },
         "summary": "Выйти",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-login": {
+      "post": {
+        "description": "Проверяет пароль и допуск, заводит сеанс.\n\nОтказ фиксируется в базе до ответа: счётчик неудач и запись журнала обязаны\nпережить отказ, иначе блокировка перебора не срабатывала бы никогда.",
+        "operationId": "login_with_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordLoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Войти по паролю",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "description": "Заводит заявку: войти можно будет после одобрения администратором.\n\nОтвет один и тот же, занят адрес или свободен: форма регистрации не должна служить\nсправочником пользователей портала.",
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Заявка на доступ",
         "tags": [
           "auth"
         ]

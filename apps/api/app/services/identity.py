@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain import Role, UserKind, WorkspaceStatus
+from app.domain import ApprovalStatus, Role, UserKind, WorkspaceStatus
 from app.models import UserIdentity, Workspace, WorkspaceMembership
 
 
@@ -39,6 +39,15 @@ async def get_user_by_subject(
 
 async def get_user(session: AsyncSession, user_id: uuid.UUID) -> UserIdentity | None:
     return await session.get(UserIdentity, user_id)
+
+
+def can_sign_in(user: UserIdentity) -> bool:
+    """Личность допущена к работе: не отключена и одобрена (ADR-0031).
+
+    Проверяется при каждом запросе, а не только при входе: отклонение и отключение должны
+    действовать на уже выданные сеансы, а не ждать их истечения.
+    """
+    return user.is_active and user.approval_status is ApprovalStatus.APPROVED
 
 
 async def upsert_identity(

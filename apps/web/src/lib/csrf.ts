@@ -26,6 +26,15 @@ const readCookie = (name: string): string | null => {
   return null;
 };
 
+/**
+ * Значение подтверждения для запроса мимо клиента API — загрузки файла через XHR.
+ * Пусто в dev-режиме и вне браузера: там подтверждение не проверяется.
+ */
+export const readCsrfToken = (): string | null =>
+  typeof document === 'undefined' ? null : readCookie(CSRF_COOKIE);
+
+export { CSRF_HEADER };
+
 export const installCsrfInterceptor = (): void => {
   if (installed || typeof document === 'undefined') return;
   installed = true;

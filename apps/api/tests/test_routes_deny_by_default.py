@@ -35,6 +35,11 @@ PUBLIC: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/v1/auth/callback"): "возврат от провайдера",
     ("POST", "/api/v1/auth/logout"): "выход не должен требовать действующего сеанса",
     ("GET", "/api/v1/auth/session"): "«не вошёл» — это ответ, а не ошибка",
+    ("POST", "/api/v1/auth/register"): "заявку на доступ подаёт тот, у кого доступа ещё нет",
+    ("POST", "/api/v1/auth/password-login"): "вход по паролю выдаёт сеанс, а не требует его",
+    ("POST", "/api/v1/auth/change-password"): (
+        "сеанс и подтверждение проверяет сам, как выход: нужен и без назначенного пространства"
+    ),
 }
 
 _METHODS = ("get", "post", "patch", "put", "delete")
@@ -114,6 +119,9 @@ def test_every_protected_operation_declares_a_permission() -> None:
         "complete_login",
         "logout",
         "read_session",
+        "register",
+        "login_with_password",
+        "change_password",
     }
     missing: list[str] = []
     for route in walk(app.routes):

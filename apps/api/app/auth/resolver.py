@@ -82,11 +82,15 @@ async def _authenticate(
     """Опознаёт личность по cookie или заголовку."""
     header = request.headers.get("Authorization", "")
     if header.lower().startswith(_BEARER_PREFIX):
+        if settings.auth_mode != "oidc":
+            # Токен в заголовке выдаёт только провайдер. При локальном входе его нет, и
+            # проверять подпись нечем — это отказ в учётных данных, а не сбой настройки.
+            raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
         claims = await oidc.verify_access_token(settings, header[len(_BEARER_PREFIX) :].strip())
         user = await identity_service.get_user_by_subject(
             session, issuer=str(claims.get("iss", "")), subject=str(claims.get("sub", ""))
         )
-        if user is None or not user.is_active:
+        if user is None or not identity_service.can_sign_in(user):
             # Токен настоящий, но такой личности портал не знает. Это не «неверный токен»,
             # а «доступ не выдан», и 401 здесь честнее 403: сеанса нет вовсе.
             raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
@@ -101,7 +105,7 @@ async def _authenticate(
         raise _unauthenticated(ErrorCode.SESSION_EXPIRED)
 
     user = await identity_service.get_user(session, row.user_id)
-    if user is None or not user.is_active:
+    if user is None or not identity_service.can_sign_in(user):
         raise _unauthenticated(ErrorCode.SESSION_EXPIRED)
 
     await sessions.touch(session, row)
@@ -136,10 +140,17 @@ async def _resolve_workspace(
     requested = _requested_workspace(request)
     memberships = await identity_service.list_memberships(session, principal.user_id)
 
+    def role_in(membership: identity_service.MembershipView) -> Role:
+        # Администратор платформы остаётся им и в пространстве, где он участник: так же
+        # его показывает `/auth/session`. Иначе интерфейс открывал бы админку, а API
+        # отвечал на неё отказом `system.admin`. Его права включают все права пространства,
+        # так что это не повышение, а согласованность.
+        return Role.PLATFORM_ADMIN if principal.is_platform_admin else membership.role
+
     if requested is not None:
         for membership in memberships:
             if membership.workspace_id == requested:
-                return requested, membership.role
+                return requested, role_in(membership)
         if principal.is_platform_admin:
             # Администратор платформы входит в чужое пространство только так — заголовком,
             # то есть намеренно. Молчаливого доступа «просто потому что админ» нет.
@@ -155,7 +166,7 @@ async def _resolve_workspace(
 
     if memberships:
         first = memberships[0]
-        return first.workspace_id, first.role
+        return first.workspace_id, role_in(first)
 
     if principal.is_platform_admin:
         # Ни одного членства и ни одного заголовка. Подставить сюда «первое попавшееся»

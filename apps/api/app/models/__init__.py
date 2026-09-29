@@ -16,7 +16,13 @@ from app.models.calc_runs import CalcRun, CalcRunResult, CalcRunStep
 from app.models.calc_synthesis import CalcSynthesisDecision, CalcSynthesisRun
 from app.models.control_plane import FeatureFlagOverride, SettingOverride
 from app.models.document import Document, DocumentRevision
-from app.models.identity import AuthSession, UserIdentity, Workspace, WorkspaceMembership
+from app.models.identity import (
+    AuthSession,
+    LocalCredential,
+    UserIdentity,
+    Workspace,
+    WorkspaceMembership,
+)
 from app.models.job import Job
 from app.models.page_geometry import PageGeometry
 from app.models.project import Project
@@ -48,6 +54,7 @@ __all__ = [
     "DocumentRevision",
     "FeatureFlagOverride",
     "Job",
+    "LocalCredential",
     "Measurement",
     "PageGeometry",
     "Project",

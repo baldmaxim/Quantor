@@ -68,15 +68,35 @@ class S3ObjectStorage:
     def bucket(self) -> str:
         return self._settings.s3_bucket
 
-    def _client(self) -> ClientCreatorContext[S3Client]:
+    def _client(self, endpoint_url: str | None = None) -> ClientCreatorContext[S3Client]:
         return self._session.client(
             "s3",
-            endpoint_url=self._settings.s3_endpoint_url,
+            endpoint_url=endpoint_url or self._settings.s3_endpoint_url,
             region_name=self._settings.s3_region,
             aws_access_key_id=self._settings.s3_access_key_id,
             aws_secret_access_key=self._settings.s3_secret_access_key.get_secret_value(),
             config=self._config,
         )
+
+    async def ensure_bucket(self) -> bool:
+        """Создаёт бакет, если его нет. True — создан сейчас.
+
+        Нужна развёртыванию: боевое хранилище поднимается пустым, а отдельного клиента
+        хранилища в образе нет. Бакет остаётся закрытым — файлы отдаются только по
+        подписанным ссылкам.
+        """
+        try:
+            async with self._client() as client:
+                try:
+                    await client.head_bucket(Bucket=self.bucket)
+                    return False
+                except ClientError as error:
+                    if not _is_not_found(error):
+                        raise
+                await client.create_bucket(Bucket=self.bucket)
+                return True
+        except (ClientError, BotoCoreError) as error:
+            raise StorageUnavailableError(str(error)) from error
 
     async def check_available(self) -> None:
         """HEAD по бакету: разом проверяет сеть, креды и существование бакета."""
@@ -213,13 +233,19 @@ class S3ObjectStorage:
     async def presigned_get_url(
         self, key: str, *, expires_in: int, download_filename: str | None = None
     ) -> str:
+        """Ссылка для браузера.
+
+        Подписывается под публичный адрес хранилища: подпись SigV4 включает хост, и ссылка,
+        подписанная под внутренний `minio:9000`, снаружи недостижима. Подпись считается
+        локально, без обращения к хранилищу, поэтому публичный адрес серверу видеть не нужно.
+        """
         params: dict[str, str] = {"Bucket": self.bucket, "Key": key}
         if download_filename:
             # RFC 5987: имя файла с кириллицей должно доехать до браузера читаемым.
             encoded = quote(download_filename, safe="")
             params["ResponseContentDisposition"] = f"inline; filename*=UTF-8''{encoded}"
         try:
-            async with self._client() as client:
+            async with self._client(self._settings.s3_presign_endpoint_url) as client:
                 url: str = await client.generate_presigned_url(
                     "get_object", Params=params, ExpiresIn=expires_in
                 )

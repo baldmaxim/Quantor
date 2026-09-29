@@ -6,14 +6,13 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app import API_VERSION, SCHEMA_VERSION
 from app.api.v1.deps import SessionDep, SettingsDep
 from app.auth.resolver import optional_context
+from app.core.config import AuthMode
 from app.services import feature_flags as flags_service
 
 router = APIRouter(tags=["meta"])
@@ -25,7 +24,7 @@ class MetaResponse(BaseModel):
     environment: str
     stage: str
     features: dict[str, bool]
-    auth_mode: Literal["dev", "oidc"]
+    auth_mode: AuthMode
     """Как устроен вход. Интерфейс по нему решает, показывать ли кнопку входа."""
 
 

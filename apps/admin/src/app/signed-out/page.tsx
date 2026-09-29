@@ -18,7 +18,8 @@ const SignedOutPage = () => (
     <div className="flex max-w-[420px] flex-col items-center gap-[var(--s-5)] text-center">
       <h1 className="text-xl font-semibold tracking-[-0.02em]">Требуется вход</h1>
       <p className="text-sm text-muted">
-        Контур управления платформой доступен только администраторам. Войдите, чтобы продолжить.
+        Контур управления платформой доступен только администраторам. Войдите, чтобы продолжить:
+        вход общий с порталом, после него откройте управление из меню учётной записи.
       </p>
       <a
         href={`${env.apiBaseUrl}/api/v1/auth/login`}

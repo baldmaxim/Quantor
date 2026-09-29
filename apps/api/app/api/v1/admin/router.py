@@ -20,6 +20,7 @@ from app.api.v1.admin import (
     jobs,
     model_providers,
     settings,
+    users,
 )
 from app.api.v1.deps import require
 from app.auth.permissions import Permission
@@ -36,3 +37,4 @@ admin_router.include_router(jobs.router)
 admin_router.include_router(model_providers.router)
 admin_router.include_router(audit.router)
 admin_router.include_router(diagnostics.router)
+admin_router.include_router(users.router)

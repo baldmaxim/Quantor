@@ -1,8 +1,10 @@
 """Рабочие пространства, личности, членство и сессии.
 
-Четыре таблицы одного назначения: ответить на вопрос «кто спрашивает и что ему можно».
-Пароли здесь не хранятся ни в каком виде — личность удостоверяет внешний провайдер
-(ADR-0012).
+Таблицы одного назначения: ответить на вопрос «кто спрашивает и что ему можно».
+
+Личность удостоверяет внешний провайдер (ADR-0012) или локальный вход (ADR-0031). Во втором
+случае пароль лежит отдельной таблицей и только хешем argon2id: сама личность о способе
+входа не знает, и строка провайдера не обрастает пустыми колонками пароля.
 """
 
 from __future__ import annotations
@@ -16,7 +18,14 @@ from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.domain import PLATFORM_ROLES, WORKSPACE_ROLES, Role, UserKind, WorkspaceStatus
+from app.domain import (
+    PLATFORM_ROLES,
+    WORKSPACE_ROLES,
+    ApprovalStatus,
+    Role,
+    UserKind,
+    WorkspaceStatus,
+)
 from app.models.mixins import CreatedAtMixin, TimestampMixin, str_enum, uuid_pk
 
 if TYPE_CHECKING:
@@ -91,6 +100,15 @@ class UserIdentity(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True, server_default="true")
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Допуск к порталу. Личности провайдера и заведённые до локального входа — одобрены:
+    # их допускал сам провайдер. Заявка самостоятельной регистрации ждёт администратора.
+    approval_status: Mapped[ApprovalStatus] = mapped_column(
+        str_enum(ApprovalStatus, name="approval_status"),
+        nullable=False,
+        default=ApprovalStatus.APPROVED,
+        server_default=ApprovalStatus.APPROVED.value,
+    )
+
     memberships: Mapped[list[WorkspaceMembership]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -105,6 +123,36 @@ class UserIdentity(TimestampMixin, Base):
         ),
         Index("ix_user_identities_email", "email"),
     )
+
+
+class LocalCredential(TimestampMixin, Base):
+    """Пароль локального входа (ADR-0031).
+
+    Только хеш argon2id: соль и параметры живут внутри строки хеша, и смена параметров
+    не требует миграции — старый хеш пересчитывается при следующем удачном входе.
+
+    Счётчик неудач и срок блокировки — здесь же, а не в памяти процесса: перезапуск API
+    не должен обнулять перебор, а у второго процесса не должно быть своего счётчика.
+    """
+
+    __tablename__ = "local_credentials"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        pg.UUID(as_uuid=True),
+        ForeignKey("user_identities.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Пароль выдан администратором: пользователь обязан сменить его при первом входе.
+    must_change_password: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="false"
+    )
+    failed_attempts: Mapped[int] = mapped_column(nullable=False, default=0, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[UserIdentity] = relationship()
+
+    __table_args__ = (CheckConstraint("failed_attempts >= 0", name="failed_attempts_non_negative"),)
 
 
 class WorkspaceMembership(TimestampMixin, Base):

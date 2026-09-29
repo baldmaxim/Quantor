@@ -1,0 +1,30 @@
+# Белый список. Контекст сборки — корень монорепозитория, а в корне лежат частные архивы,
+# PDF и данные: в образ и даже в контекст сборки они не должны попадать ни при каких
+# условиях. Поэтому исключено всё, кроме того, что нужно образам.
+*
+
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.npmrc
+!apps/api/pyproject.toml
+!apps/api/alembic.ini
+!apps/api/alembic
+!apps/api/app
+!apps/web
+!apps/admin
+!packages/api-client
+!packages/ui
+!deploy/docker-compose.yml
+!deploy/update.sh
+
+# Внутри разрешённого — только исходники, без артефактов сборки и окружений.
+**/node_modules
+**/.next
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.*
+**/test-results
+**/playwright-report
+apps/*/e2e

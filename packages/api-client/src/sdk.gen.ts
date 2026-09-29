@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApproveCalcRuleVersionData, ApproveCalcRuleVersionErrors, ApproveCalcRuleVersionResponses, ArchiveTakeoffItemData, ArchiveTakeoffItemErrors, ArchiveTakeoffItemResponses, BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompareCalcRunsData, CompareCalcRunsErrors, CompareCalcRunsResponses, CompareCalcSynthesisRunsData, CompareCalcSynthesisRunsErrors, CompareCalcSynthesisRunsResponses, CompleteLoginData, CompleteLoginErrors, CreateCalcFactData, CreateCalcFactErrors, CreateCalcFactResponses, CreateCalcInspectionData, CreateCalcInspectionErrors, CreateCalcInspectionResponses, CreateCalcRuleData, CreateCalcRuleErrors, CreateCalcRuleFromLegacyData, CreateCalcRuleFromLegacyErrors, CreateCalcRuleFromLegacyResponses, CreateCalcRuleResponses, CreateCalcRuleVersionData, CreateCalcRuleVersionErrors, CreateCalcRuleVersionResponses, CreateCalcRunData, CreateCalcRunErrors, CreateCalcRunResponses, CreateCalcSourceData, CreateCalcSourceErrors, CreateCalcSourceResponses, CreateCalcSynthesisDecisionData, CreateCalcSynthesisDecisionErrors, CreateCalcSynthesisDecisionResponses, CreateCalcSynthesisRunData, CreateCalcSynthesisRunErrors, CreateCalcSynthesisRunResponses, CreateCalcVkPassportsData, CreateCalcVkPassportsErrors, CreateCalcVkPassportsResponses, CreateMeasurementData, CreateMeasurementErrors, CreateMeasurementResponses, CreateMeasurementsBatchData, CreateMeasurementsBatchErrors, CreateMeasurementsBatchResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateSheetCalibrationData, CreateSheetCalibrationErrors, CreateSheetCalibrationResponses, CreateTakeoffItemData, CreateTakeoffItemErrors, CreateTakeoffItemResponses, DecideCalcConflictData, DecideCalcConflictErrors, DecideCalcConflictResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteMeasurementData, DeleteMeasurementErrors, DeleteMeasurementResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, DeprecateCalcRuleVersionData, DeprecateCalcRuleVersionErrors, DeprecateCalcRuleVersionResponses, ExportSheetTakeoffData, ExportSheetTakeoffErrors, ExportSheetTakeoffResponses, GetCalcFactData, GetCalcFactErrors, GetCalcFactResponses, GetCalcLegacyRuleData, GetCalcLegacyRuleErrors, GetCalcLegacyRuleResponses, GetCalcRuleData, GetCalcRuleErrors, GetCalcRuleResponses, GetCalcRuleVersionData, GetCalcRuleVersionErrors, GetCalcRuleVersionResponses, GetCalcRunData, GetCalcRunErrors, GetCalcRunResponses, GetCalcRunResultData, GetCalcRunResultErrors, GetCalcRunResultResponses, GetCalcRunTraceData, GetCalcRunTraceErrors, GetCalcRunTraceResponses, GetCalcSynthesisGraphData, GetCalcSynthesisGraphErrors, GetCalcSynthesisGraphResponses, GetCalcSynthesisRunData, GetCalcSynthesisRunErrors, GetCalcSynthesisRunResponses, GetCalcSynthesisTraceData, GetCalcSynthesisTraceErrors, GetCalcSynthesisTraceResponses, GetCalcVkPassportData, GetCalcVkPassportErrors, GetCalcVkPassportResponses, GetCalcVkReadinessData, GetCalcVkReadinessErrors, GetCalcVkReadinessResponses, GetCalcVkStructureData, GetCalcVkStructureErrors, GetCalcVkStructureResponses, GetCalcVkVolumeTraceData, GetCalcVkVolumeTraceErrors, GetCalcVkVolumeTraceResponses, GetMepScenarioData, GetMepScenarioErrors, GetMepScenarioResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListCalcCalculatorsData, ListCalcCalculatorsErrors, ListCalcCalculatorsResponses, ListCalcConflictsData, ListCalcConflictsErrors, ListCalcConflictsResponses, ListCalcDocumentsData, ListCalcDocumentsErrors, ListCalcDocumentsResponses, ListCalcFactsData, ListCalcFactsErrors, ListCalcFactsResponses, ListCalcFactTypesData, ListCalcFactTypesResponses, ListCalcFactValuesData, ListCalcFactValuesErrors, ListCalcFactValuesResponses, ListCalcInputFactsData, ListCalcInputFactsErrors, ListCalcInputFactsResponses, ListCalcInspectionsData, ListCalcInspectionsErrors, ListCalcInspectionsResponses, ListCalcLegacyRulesData, ListCalcLegacyRulesErrors, ListCalcLegacyRulesResponses, ListCalcRequirementsData, ListCalcRequirementsResponses, ListCalcRulesData, ListCalcRulesErrors, ListCalcRulesResponses, ListCalcRunsData, ListCalcRunsErrors, ListCalcRunsResponses, ListCalcSourcesData, ListCalcSourcesErrors, ListCalcSourcesResponses, ListCalcSynthesisRunsData, ListCalcSynthesisRunsErrors, ListCalcSynthesisRunsResponses, ListCalcSynthesisUnresolvedData, ListCalcSynthesisUnresolvedErrors, ListCalcSynthesisUnresolvedResponses, ListCalcSynthesisVariantsData, ListCalcSynthesisVariantsErrors, ListCalcSynthesisVariantsResponses, ListCalcSynthesizersData, ListCalcSynthesizersErrors, ListCalcSynthesizersResponses, ListCalcVkAssumptionsData, ListCalcVkAssumptionsErrors, ListCalcVkAssumptionsResponses, ListCalcVkCalculatorsData, ListCalcVkCalculatorsResponses, ListCalcVkPassportsData, ListCalcVkPassportsErrors, ListCalcVkPassportsResponses, ListCalcVkUnresolvedData, ListCalcVkUnresolvedErrors, ListCalcVkUnresolvedResponses, ListCalcVkVolumesData, ListCalcVkVolumesErrors, ListCalcVkVolumesResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListMepScenariosData, ListMepScenariosResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetCalibrationsData, ListSheetCalibrationsErrors, ListSheetCalibrationsResponses, ListSheetMeasurementsData, ListSheetMeasurementsErrors, ListSheetMeasurementsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTakeoffItemsData, ListTakeoffItemsErrors, ListTakeoffItemsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LogoutData, LogoutResponses, MakeCalibrationDefaultData, MakeCalibrationDefaultErrors, MakeCalibrationDefaultResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadCalcReadinessData, ReadCalcReadinessErrors, ReadCalcReadinessResponses, ReadCalibrationData, ReadCalibrationErrors, ReadCalibrationResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadSheetGeometryData, ReadSheetGeometryErrors, ReadSheetGeometryResponses, ReadSheetQuantitiesData, ReadSheetQuantitiesErrors, ReadSheetQuantitiesResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RejectCalcRuleVersionData, RejectCalcRuleVersionErrors, RejectCalcRuleVersionResponses, ReplayCalcRunData, ReplayCalcRunErrors, ReplayCalcRunResponses, ReplayCalcSynthesisRunData, ReplayCalcSynthesisRunErrors, ReplayCalcSynthesisRunResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, ReviewCalcFactData, ReviewCalcFactErrors, ReviewCalcFactResponses, SetCalibrationVerificationData, SetCalibrationVerificationErrors, SetCalibrationVerificationResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateCalcRuleDraftData, UpdateCalcRuleDraftErrors, UpdateCalcRuleDraftResponses, UpdateMeasurementData, UpdateMeasurementErrors, UpdateMeasurementResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UpdateTakeoffItemData, UpdateTakeoffItemErrors, UpdateTakeoffItemResponses, UploadFileData, UploadFileErrors, UploadFileResponses, ValidateCalcRunData, ValidateCalcRunErrors, ValidateCalcRunResponses, ValidateCalcSynthesisData, ValidateCalcSynthesisErrors, ValidateCalcSynthesisResponses, WithdrawCalcFactData, WithdrawCalcFactErrors, WithdrawCalcFactResponses } from './types.gen';
+import type { ApproveAdminUserData, ApproveAdminUserErrors, ApproveAdminUserResponses, ApproveCalcRuleVersionData, ApproveCalcRuleVersionErrors, ApproveCalcRuleVersionResponses, ArchiveTakeoffItemData, ArchiveTakeoffItemErrors, ArchiveTakeoffItemResponses, BeginLoginData, BeginLoginErrors, CancelAdminJobData, CancelAdminJobErrors, CancelAdminJobResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CheckModelProviderData, CheckModelProviderErrors, CheckModelProviderResponses, CompareCalcRunsData, CompareCalcRunsErrors, CompareCalcRunsResponses, CompareCalcSynthesisRunsData, CompareCalcSynthesisRunsErrors, CompareCalcSynthesisRunsResponses, CompleteLoginData, CompleteLoginErrors, CreateCalcFactData, CreateCalcFactErrors, CreateCalcFactResponses, CreateCalcInspectionData, CreateCalcInspectionErrors, CreateCalcInspectionResponses, CreateCalcRuleData, CreateCalcRuleErrors, CreateCalcRuleFromLegacyData, CreateCalcRuleFromLegacyErrors, CreateCalcRuleFromLegacyResponses, CreateCalcRuleResponses, CreateCalcRuleVersionData, CreateCalcRuleVersionErrors, CreateCalcRuleVersionResponses, CreateCalcRunData, CreateCalcRunErrors, CreateCalcRunResponses, CreateCalcSourceData, CreateCalcSourceErrors, CreateCalcSourceResponses, CreateCalcSynthesisDecisionData, CreateCalcSynthesisDecisionErrors, CreateCalcSynthesisDecisionResponses, CreateCalcSynthesisRunData, CreateCalcSynthesisRunErrors, CreateCalcSynthesisRunResponses, CreateCalcVkPassportsData, CreateCalcVkPassportsErrors, CreateCalcVkPassportsResponses, CreateMeasurementData, CreateMeasurementErrors, CreateMeasurementResponses, CreateMeasurementsBatchData, CreateMeasurementsBatchErrors, CreateMeasurementsBatchResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateSheetCalibrationData, CreateSheetCalibrationErrors, CreateSheetCalibrationResponses, CreateTakeoffItemData, CreateTakeoffItemErrors, CreateTakeoffItemResponses, DecideCalcConflictData, DecideCalcConflictErrors, DecideCalcConflictResponses, DeleteFeatureFlagOverrideData, DeleteFeatureFlagOverrideErrors, DeleteFeatureFlagOverrideResponses, DeleteMeasurementData, DeleteMeasurementErrors, DeleteMeasurementResponses, DeleteSettingOverrideData, DeleteSettingOverrideErrors, DeleteSettingOverrideResponses, DeprecateCalcRuleVersionData, DeprecateCalcRuleVersionErrors, DeprecateCalcRuleVersionResponses, DisableAdminUserData, DisableAdminUserErrors, DisableAdminUserResponses, EnableAdminUserData, EnableAdminUserErrors, EnableAdminUserResponses, ExportSheetTakeoffData, ExportSheetTakeoffErrors, ExportSheetTakeoffResponses, GetCalcFactData, GetCalcFactErrors, GetCalcFactResponses, GetCalcLegacyRuleData, GetCalcLegacyRuleErrors, GetCalcLegacyRuleResponses, GetCalcRuleData, GetCalcRuleErrors, GetCalcRuleResponses, GetCalcRuleVersionData, GetCalcRuleVersionErrors, GetCalcRuleVersionResponses, GetCalcRunData, GetCalcRunErrors, GetCalcRunResponses, GetCalcRunResultData, GetCalcRunResultErrors, GetCalcRunResultResponses, GetCalcRunTraceData, GetCalcRunTraceErrors, GetCalcRunTraceResponses, GetCalcSynthesisGraphData, GetCalcSynthesisGraphErrors, GetCalcSynthesisGraphResponses, GetCalcSynthesisRunData, GetCalcSynthesisRunErrors, GetCalcSynthesisRunResponses, GetCalcSynthesisTraceData, GetCalcSynthesisTraceErrors, GetCalcSynthesisTraceResponses, GetCalcVkPassportData, GetCalcVkPassportErrors, GetCalcVkPassportResponses, GetCalcVkReadinessData, GetCalcVkReadinessErrors, GetCalcVkReadinessResponses, GetCalcVkStructureData, GetCalcVkStructureErrors, GetCalcVkStructureResponses, GetCalcVkVolumeTraceData, GetCalcVkVolumeTraceErrors, GetCalcVkVolumeTraceResponses, GetMepScenarioData, GetMepScenarioErrors, GetMepScenarioResponses, ImportTenderData, ImportTenderErrors, ImportTenderResponses, ListAdminJobsData, ListAdminJobsErrors, ListAdminJobsResponses, ListAdminUsersData, ListAdminUsersErrors, ListAdminUsersResponses, ListAdminWorkspacesData, ListAdminWorkspacesResponses, ListAuditEventsData, ListAuditEventsErrors, ListAuditEventsResponses, ListCalcCalculatorsData, ListCalcCalculatorsErrors, ListCalcCalculatorsResponses, ListCalcConflictsData, ListCalcConflictsErrors, ListCalcConflictsResponses, ListCalcDocumentsData, ListCalcDocumentsErrors, ListCalcDocumentsResponses, ListCalcFactsData, ListCalcFactsErrors, ListCalcFactsResponses, ListCalcFactTypesData, ListCalcFactTypesResponses, ListCalcFactValuesData, ListCalcFactValuesErrors, ListCalcFactValuesResponses, ListCalcInputFactsData, ListCalcInputFactsErrors, ListCalcInputFactsResponses, ListCalcInspectionsData, ListCalcInspectionsErrors, ListCalcInspectionsResponses, ListCalcLegacyRulesData, ListCalcLegacyRulesErrors, ListCalcLegacyRulesResponses, ListCalcRequirementsData, ListCalcRequirementsResponses, ListCalcRulesData, ListCalcRulesErrors, ListCalcRulesResponses, ListCalcRunsData, ListCalcRunsErrors, ListCalcRunsResponses, ListCalcSourcesData, ListCalcSourcesErrors, ListCalcSourcesResponses, ListCalcSynthesisRunsData, ListCalcSynthesisRunsErrors, ListCalcSynthesisRunsResponses, ListCalcSynthesisUnresolvedData, ListCalcSynthesisUnresolvedErrors, ListCalcSynthesisUnresolvedResponses, ListCalcSynthesisVariantsData, ListCalcSynthesisVariantsErrors, ListCalcSynthesisVariantsResponses, ListCalcSynthesizersData, ListCalcSynthesizersErrors, ListCalcSynthesizersResponses, ListCalcVkAssumptionsData, ListCalcVkAssumptionsErrors, ListCalcVkAssumptionsResponses, ListCalcVkCalculatorsData, ListCalcVkCalculatorsResponses, ListCalcVkPassportsData, ListCalcVkPassportsErrors, ListCalcVkPassportsResponses, ListCalcVkUnresolvedData, ListCalcVkUnresolvedErrors, ListCalcVkUnresolvedResponses, ListCalcVkVolumesData, ListCalcVkVolumesErrors, ListCalcVkVolumesResponses, ListDocumentRevisionsData, ListDocumentRevisionsErrors, ListDocumentRevisionsResponses, ListFeatureFlagsData, ListFeatureFlagsResponses, ListJobWorkersData, ListJobWorkersResponses, ListMepScenariosData, ListMepScenariosResponses, ListModelProvidersData, ListModelProvidersResponses, ListProjectDocumentsData, ListProjectDocumentsErrors, ListProjectDocumentsResponses, ListProjectJobsData, ListProjectJobsErrors, ListProjectJobsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListRevisionArtifactsData, ListRevisionArtifactsErrors, ListRevisionArtifactsResponses, ListRevisionSheetsData, ListRevisionSheetsErrors, ListRevisionSheetsResponses, ListSettingsData, ListSettingsResponses, ListSheetCalibrationsData, ListSheetCalibrationsErrors, ListSheetCalibrationsResponses, ListSheetMeasurementsData, ListSheetMeasurementsErrors, ListSheetMeasurementsResponses, ListSheetRegionsData, ListSheetRegionsErrors, ListSheetRegionsResponses, ListTakeoffItemsData, ListTakeoffItemsErrors, ListTakeoffItemsResponses, ListTendersData, ListTendersErrors, ListTendersResponses, LivenessData, LivenessResponses, LoginWithPasswordData, LoginWithPasswordErrors, LoginWithPasswordResponses, LogoutData, LogoutResponses, MakeCalibrationDefaultData, MakeCalibrationDefaultErrors, MakeCalibrationDefaultResponses, PreviewTenderhubRebindData, PreviewTenderhubRebindErrors, PreviewTenderhubRebindResponses, ReadAdminJobData, ReadAdminJobErrors, ReadAdminJobResponses, ReadCalcReadinessData, ReadCalcReadinessErrors, ReadCalcReadinessResponses, ReadCalibrationData, ReadCalibrationErrors, ReadCalibrationResponses, ReadDiagnosticsData, ReadDiagnosticsResponses, ReadDocumentData, ReadDocumentErrors, ReadDocumentResponses, ReadinessData, ReadinessResponses, ReadJobData, ReadJobErrors, ReadJobResponses, ReadJobStatsData, ReadJobStatsResponses, ReadMetaData, ReadMetaResponses, ReadProjectData, ReadProjectErrors, ReadProjectResponses, ReadRevisionContentUrlData, ReadRevisionContentUrlErrors, ReadRevisionContentUrlResponses, ReadRevisionData, ReadRevisionErrors, ReadRevisionResponses, ReadSessionData, ReadSessionResponses, ReadSheetGeometryData, ReadSheetGeometryErrors, ReadSheetGeometryResponses, ReadSheetQuantitiesData, ReadSheetQuantitiesErrors, ReadSheetQuantitiesResponses, ReadTenderhubStatusData, ReadTenderhubStatusResponses, ReadUploadCapabilitiesData, ReadUploadCapabilitiesErrors, ReadUploadCapabilitiesResponses, RebindTenderhubProjectData, RebindTenderhubProjectErrors, RebindTenderhubProjectResponses, RegisterData, RegisterErrors, RegisterResponses, RejectAdminUserData, RejectAdminUserErrors, RejectAdminUserResponses, RejectCalcRuleVersionData, RejectCalcRuleVersionErrors, RejectCalcRuleVersionResponses, ReplayCalcRunData, ReplayCalcRunErrors, ReplayCalcRunResponses, ReplayCalcSynthesisRunData, ReplayCalcSynthesisRunErrors, ReplayCalcSynthesisRunResponses, RetryAdminJobData, RetryAdminJobErrors, RetryAdminJobResponses, ReviewCalcFactData, ReviewCalcFactErrors, ReviewCalcFactResponses, SetAdminUserMembershipData, SetAdminUserMembershipErrors, SetAdminUserMembershipResponses, SetAdminUserPasswordData, SetAdminUserPasswordErrors, SetAdminUserPasswordResponses, SetCalibrationVerificationData, SetCalibrationVerificationErrors, SetCalibrationVerificationResponses, SetFeatureFlagOverrideData, SetFeatureFlagOverrideErrors, SetFeatureFlagOverrideResponses, SetSettingOverrideData, SetSettingOverrideErrors, SetSettingOverrideResponses, TestTenderhubConnectionData, TestTenderhubConnectionResponses, UnlinkTenderhubProjectData, UnlinkTenderhubProjectErrors, UnlinkTenderhubProjectResponses, UpdateCalcRuleDraftData, UpdateCalcRuleDraftErrors, UpdateCalcRuleDraftResponses, UpdateMeasurementData, UpdateMeasurementErrors, UpdateMeasurementResponses, UpdateProjectData, UpdateProjectErrors, UpdateProjectResponses, UpdateTakeoffItemData, UpdateTakeoffItemErrors, UpdateTakeoffItemResponses, UploadFileData, UploadFileErrors, UploadFileResponses, ValidateCalcRunData, ValidateCalcRunErrors, ValidateCalcRunResponses, ValidateCalcSynthesisData, ValidateCalcSynthesisErrors, ValidateCalcSynthesisResponses, WithdrawCalcFactData, WithdrawCalcFactErrors, WithdrawCalcFactResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -222,6 +222,79 @@ export const setSettingOverride = <ThrowOnError extends boolean = false>(options
 });
 
 /**
+ * Пользователи
+ *
+ * Пользователи установки, новые сверху. Фильтр `pending` — очередь заявок.
+ */
+export const listAdminUsers = <ThrowOnError extends boolean = false>(options?: Options<ListAdminUsersData, ThrowOnError>): RequestResult<ListAdminUsersResponses, ListAdminUsersErrors, ThrowOnError> => (options?.client ?? client).get<ListAdminUsersResponses, ListAdminUsersErrors, ThrowOnError>({ url: '/api/v1/admin/users', ...options });
+
+/**
+ * Одобрить заявку
+ *
+ * Одобряет заявку и сразу выдаёт роль в пространстве.
+ */
+export const approveAdminUser = <ThrowOnError extends boolean = false>(options: Options<ApproveAdminUserData, ThrowOnError>): RequestResult<ApproveAdminUserResponses, ApproveAdminUserErrors, ThrowOnError> => (options.client ?? client).post<ApproveAdminUserResponses, ApproveAdminUserErrors, ThrowOnError>({
+    url: '/api/v1/admin/users/{user_id}/approve',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Отключить пользователя
+ *
+ * Отключает вход и гасит все сеансы пользователя. История действий остаётся.
+ */
+export const disableAdminUser = <ThrowOnError extends boolean = false>(options: Options<DisableAdminUserData, ThrowOnError>): RequestResult<DisableAdminUserResponses, DisableAdminUserErrors, ThrowOnError> => (options.client ?? client).post<DisableAdminUserResponses, DisableAdminUserErrors, ThrowOnError>({ url: '/api/v1/admin/users/{user_id}/disable', ...options });
+
+/**
+ * Включить пользователя
+ */
+export const enableAdminUser = <ThrowOnError extends boolean = false>(options: Options<EnableAdminUserData, ThrowOnError>): RequestResult<EnableAdminUserResponses, EnableAdminUserErrors, ThrowOnError> => (options.client ?? client).post<EnableAdminUserResponses, EnableAdminUserErrors, ThrowOnError>({ url: '/api/v1/admin/users/{user_id}/enable', ...options });
+
+/**
+ * Роль в пространстве
+ *
+ * Назначает одобренному пользователю роль в пространстве или меняет её.
+ */
+export const setAdminUserMembership = <ThrowOnError extends boolean = false>(options: Options<SetAdminUserMembershipData, ThrowOnError>): RequestResult<SetAdminUserMembershipResponses, SetAdminUserMembershipErrors, ThrowOnError> => (options.client ?? client).put<SetAdminUserMembershipResponses, SetAdminUserMembershipErrors, ThrowOnError>({
+    url: '/api/v1/admin/users/{user_id}/membership',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Выдать временный пароль
+ *
+ * Задаёт временный пароль. Пользователь сменит его при входе, его сеансы гаснут.
+ */
+export const setAdminUserPassword = <ThrowOnError extends boolean = false>(options: Options<SetAdminUserPasswordData, ThrowOnError>): RequestResult<SetAdminUserPasswordResponses, SetAdminUserPasswordErrors, ThrowOnError> => (options.client ?? client).post<SetAdminUserPasswordResponses, SetAdminUserPasswordErrors, ThrowOnError>({
+    url: '/api/v1/admin/users/{user_id}/password',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Отклонить заявку
+ */
+export const rejectAdminUser = <ThrowOnError extends boolean = false>(options: Options<RejectAdminUserData, ThrowOnError>): RequestResult<RejectAdminUserResponses, RejectAdminUserErrors, ThrowOnError> => (options.client ?? client).post<RejectAdminUserResponses, RejectAdminUserErrors, ThrowOnError>({ url: '/api/v1/admin/users/{user_id}/reject', ...options });
+
+/**
+ * Рабочие пространства
+ *
+ * Пространства установки — для выбора при выдаче доступа.
+ */
+export const listAdminWorkspaces = <ThrowOnError extends boolean = false>(options?: Options<ListAdminWorkspacesData, ThrowOnError>): RequestResult<ListAdminWorkspacesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListAdminWorkspacesResponses, unknown, ThrowOnError>({ url: '/api/v1/admin/workspaces', ...options });
+
+/**
  * Завершить вход
  *
  * Меняет код на токены, заводит сеанс и возвращает браузер в портал.
@@ -229,12 +302,30 @@ export const setSettingOverride = <ThrowOnError extends boolean = false>(options
 export const completeLogin = <ThrowOnError extends boolean = false>(options: Options<CompleteLoginData, ThrowOnError>): RequestResult<unknown, CompleteLoginErrors, ThrowOnError> => (options.client ?? client).get<unknown, CompleteLoginErrors, ThrowOnError>({ url: '/api/v1/auth/callback', ...options });
 
 /**
+ * Сменить свой пароль
+ *
+ * Смена пароля владельцем учётной записи.
+ *
+ * Маршрут сам проверяет сеанс и подтверждение, как выход: он нужен и пользователю,
+ * которому пространство ещё не назначено, а общий разбор контекста такому отказывает.
+ * Прочие сеансы пользователя гаснут — текущий продолжает работать.
+ */
+export const changePassword = <ThrowOnError extends boolean = false>(options: Options<ChangePasswordData, ThrowOnError>): RequestResult<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError> => (options.client ?? client).post<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError>({
+    url: '/api/v1/auth/change-password',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Начать вход
  *
  * Переадресует на страницу входа провайдера.
  *
  * В dev-режиме провайдера нет: браузер сразу возвращается в портал, где его уже ждёт
- * фиксированная личность.
+ * фиксированная личность. При локальном входе — на форму почты и пароля портала.
  */
 export const beginLogin = <ThrowOnError extends boolean = false>(options?: Options<BeginLoginData, ThrowOnError>): RequestResult<unknown, BeginLoginErrors, ThrowOnError> => (options?.client ?? client).get<unknown, BeginLoginErrors, ThrowOnError>({ url: '/api/v1/auth/login', ...options });
 
@@ -247,6 +338,40 @@ export const beginLogin = <ThrowOnError extends boolean = false>(options?: Optio
  * после выхода токен всё равно не сработает.
  */
 export const logout = <ThrowOnError extends boolean = false>(options?: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, unknown, ThrowOnError> => (options?.client ?? client).post<LogoutResponses, unknown, ThrowOnError>({ url: '/api/v1/auth/logout', ...options });
+
+/**
+ * Войти по паролю
+ *
+ * Проверяет пароль и допуск, заводит сеанс.
+ *
+ * Отказ фиксируется в базе до ответа: счётчик неудач и запись журнала обязаны
+ * пережить отказ, иначе блокировка перебора не срабатывала бы никогда.
+ */
+export const loginWithPassword = <ThrowOnError extends boolean = false>(options: Options<LoginWithPasswordData, ThrowOnError>): RequestResult<LoginWithPasswordResponses, LoginWithPasswordErrors, ThrowOnError> => (options.client ?? client).post<LoginWithPasswordResponses, LoginWithPasswordErrors, ThrowOnError>({
+    url: '/api/v1/auth/password-login',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Заявка на доступ
+ *
+ * Заводит заявку: войти можно будет после одобрения администратором.
+ *
+ * Ответ один и тот же, занят адрес или свободен: форма регистрации не должна служить
+ * справочником пользователей портала.
+ */
+export const register = <ThrowOnError extends boolean = false>(options: Options<RegisterData, ThrowOnError>): RequestResult<RegisterResponses, RegisterErrors, ThrowOnError> => (options.client ?? client).post<RegisterResponses, RegisterErrors, ThrowOnError>({
+    url: '/api/v1/auth/register',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Текущий сеанс

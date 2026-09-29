@@ -255,6 +255,15 @@ async def _probe_oidc(settings: Settings) -> ComponentDiagnostics:
             detail="портал работает без проверки личности (AUTH_MODE=dev)",
             remediation="Допустимо только локально: вне local запуск не пройдёт",
         )
+    if settings.auth_mode == "local":
+        # Внешнего провайдера нет: личность удостоверяет сам портал, и опрашивать нечего.
+        return _component(
+            "oidc",
+            "Провайдер входа",
+            ProbeStatus.HEALTHY,
+            ProbeSource.CONFIG,
+            detail="локальный вход по паролю с одобрением администратора (AUTH_MODE=local)",
+        )
 
     issuer = settings.oidc_issuer.strip().rstrip("/")
     loop = asyncio.get_running_loop()

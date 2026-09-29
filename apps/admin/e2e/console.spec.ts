@@ -170,3 +170,16 @@ test('реестр моделей честно сообщает, что пост
   // Ни одного обращения к моделям при открытии — и никакой выдуманной таблицы.
   await expect(page.locator('.admin-table')).toHaveCount(0);
 });
+
+test('заявка на доступ видна в очереди и открывает окно одобрения', async ({ page }) => {
+  await page.goto('/users');
+
+  await expect(page.getByRole('heading', { name: 'Пользователи и доступ' })).toBeVisible();
+  const row = page.locator('.admin-table tbody tr').filter({ hasText: 'Инженер Заявкин' });
+  await expect(row.getByText('ждёт решения')).toBeVisible();
+
+  await row.getByRole('button', { name: 'Одобрить' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Одобрить заявку' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('combobox')).toHaveValue('00000000-0000-4000-8000-000000000001');
+});

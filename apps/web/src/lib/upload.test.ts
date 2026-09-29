@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { errorMessage, isKnownError } from './errors';
-import { ACCEPTED_EXTENSIONS, ACCEPT_ATTRIBUTE, extensionOf, isAccepted } from './upload';
+import {
+  ACCEPTED_EXTENSIONS,
+  ACCEPT_ATTRIBUTE,
+  extensionOf,
+  isAccepted,
+  uploadFile,
+} from './upload';
 
 /**
  * Приём файлов на стороне интерфейса.
@@ -76,5 +82,64 @@ describe('сообщения об ошибках', () => {
       const text = errorMessage(code);
       expect(text).not.toMatch(/Traceback|postgresql:\/\/|asyncpg|127\.0\.0\.1/);
     }
+  });
+});
+
+describe('запрос загрузки', () => {
+  /** Подменный XHR: запоминает, с чем запрос ушёл, и сразу отвечает успехом. */
+  class FakeXhr {
+    static last: FakeXhr | null = null;
+    withCredentials = false;
+    responseType = '';
+    status = 0;
+    response: unknown = null;
+    readonly headers: Record<string, string> = {};
+    readonly upload = { addEventListener: () => undefined };
+    private readonly listeners: Record<string, () => void> = {};
+
+    constructor() {
+      FakeXhr.last = this;
+    }
+
+    open() {}
+
+    setRequestHeader(name: string, value: string) {
+      this.headers[name] = value;
+    }
+
+    addEventListener(type: string, listener: () => void) {
+      this.listeners[type] = listener;
+    }
+
+    send() {
+      this.status = 201;
+      this.response = { document: {}, revision: {}, job: null, is_duplicate: false };
+      this.listeners.load?.();
+    }
+
+    abort() {}
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.cookie = 'quantor_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  });
+
+  it('несёт cookie сеанса и подтверждение CSRF', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    document.cookie = 'quantor_csrf=token-123; path=/';
+
+    await uploadFile({ projectId: 'p1', file: new File(['x'], 'план.pdf') });
+
+    expect(FakeXhr.last?.withCredentials).toBe(true);
+    expect(FakeXhr.last?.headers['X-CSRF-Token']).toBe('token-123');
+  });
+
+  it('без cookie подтверждения пустой заголовок не отправляется', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    await uploadFile({ projectId: 'p1', file: new File(['x'], 'план.pdf') });
+
+    expect(FakeXhr.last?.headers).not.toHaveProperty('X-CSRF-Token');
   });
 });

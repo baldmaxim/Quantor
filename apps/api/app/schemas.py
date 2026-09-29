@@ -11,15 +11,17 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from app.contracts.models import DataPolicy, ProviderKind
+from app.core.config import AuthMode
 from app.domain import (
     COORDINATES_PER_POINT,
     MAX_HOLE_POINTS_TOTAL,
     MAX_MEASUREMENT_BATCH,
     MAX_MEASUREMENT_POINTS,
     MAX_POLYGON_HOLES,
+    ApprovalStatus,
     ArtifactKind,
     AuditResult,
     DocumentKind,
@@ -43,6 +45,7 @@ from app.domain import (
     ScaleSource,
     ValueSource,
     VerificationState,
+    WorkspaceStatus,
 )
 from app.services.diagnostics import ProbeSource, ProbeStatus
 
@@ -142,7 +145,7 @@ class SessionResponse(BaseModel):
     """
 
     authenticated: bool
-    auth_mode: Literal["dev", "oidc"]
+    auth_mode: AuthMode
     user: SessionUser | None = None
     workspace_id: uuid.UUID | None = None
     role: Role | None = None
@@ -151,12 +154,125 @@ class SessionResponse(BaseModel):
     """Пространства пользователя. Переключатель показывается только если их больше одного."""
     csrf_token: str | None = None
     """Значение для заголовка X-CSRF-Token. В dev-режиме отсутствует: проверки нет."""
+    must_change_password: bool = False
+    """Пароль выдан администратором и должен быть сменён до работы в портале (ADR-0031)."""
 
 
 class LogoutResponse(BaseModel):
     """Результат выхода. Повторный выход не ошибка — сеанса уже нет."""
 
     ok: bool = True
+
+
+# --- локальный вход (ADR-0031) ---
+#
+# Пароль — только во входных схемах и только как SecretStr: в контракте он помечен
+# `writeOnly`, в логах и трейсбеках печатается маской. Ни одна выходная схема пароля
+# не содержит — это проверяет тест контракта.
+
+# Проверка адреса нарочно грубая: настоящая проверка почты — письмо, которого здесь нет.
+# Её роль — отсечь очевидную ошибку ввода, а допуск всё равно выдаёт администратор.
+EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+MAX_PASSWORD_LENGTH = 256
+
+
+class RegisterRequest(BaseModel):
+    """Заявка на доступ к порталу."""
+
+    email: str = Field(min_length=3, max_length=320, pattern=EMAIL_PATTERN)
+    display_name: str = Field(min_length=1, max_length=200)
+    password: SecretStr = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+class RegisterResponse(BaseModel):
+    """Заявка принята.
+
+    Ответ одинаков для нового адреса и для уже известного: иначе форма регистрации
+    отвечала бы на вопрос «есть ли у портала такой пользователь» кому угодно.
+    """
+
+    status: Literal["pending"] = "pending"
+
+
+class PasswordLoginRequest(BaseModel):
+    """Вход по почте и паролю."""
+
+    email: str = Field(min_length=3, max_length=320)
+    password: SecretStr = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+class PasswordLoginResponse(BaseModel):
+    """Вход выполнен, cookie сеанса выставлены ответом."""
+
+    must_change_password: bool
+    """Пароль выдан администратором: интерфейс сначала ведёт на смену пароля."""
+
+
+class ChangePasswordRequest(BaseModel):
+    """Смена собственного пароля. Текущий пароль обязателен и при выданном администратором."""
+
+    current_password: SecretStr = Field(max_length=MAX_PASSWORD_LENGTH)
+    new_password: SecretStr = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+class ChangePasswordResponse(BaseModel):
+    """Пароль сменён. Прочие сеансы пользователя отозваны, текущий продолжает работать."""
+
+    ok: bool = True
+
+
+# ------------------------------------------------------- пользователи и доступ (админка)
+
+
+class AdminUserRead(BaseModel):
+    """Пользователь в административном списке.
+
+    Пароля и его хеша здесь нет ни в каком виде — только признаки, нужные решению
+    администратора: локальный ли вход, заблокирован ли перебором, ждёт ли смены пароля.
+    """
+
+    id: uuid.UUID
+    email: str | None
+    display_name: str | None
+    is_local: bool
+    """Вход по паролю портала, а не через внешний провайдер."""
+    approval_status: ApprovalStatus
+    is_active: bool
+    is_platform_admin: bool
+    must_change_password: bool
+    locked_until: datetime | None
+    last_login_at: datetime | None
+    created_at: datetime
+    memberships: list[SessionWorkspace] = Field(default_factory=list)
+
+
+class AdminWorkspaceRead(ApiModel):
+    """Рабочее пространство для выбора при выдаче доступа."""
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    status: WorkspaceStatus
+
+
+class UserApproveRequest(BaseModel):
+    """Одобрение заявки: доступ выдаётся сразу в конкретное пространство с конкретной ролью."""
+
+    workspace_id: uuid.UUID
+    role: Role
+
+
+class UserMembershipRequest(BaseModel):
+    """Назначение или смена роли пользователя в пространстве."""
+
+    workspace_id: uuid.UUID
+    role: Role
+
+
+class AdminSetPasswordRequest(BaseModel):
+    """Временный пароль от администратора. Пользователь обязан сменить его при входе."""
+
+    password: SecretStr = Field(max_length=MAX_PASSWORD_LENGTH)
 
 
 # ------------------------------------------------------------------ контур управления

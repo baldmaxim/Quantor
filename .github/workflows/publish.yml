@@ -1,0 +1,105 @@
+# Сборка боевых образов Quantor и публикация в GHCR (ADR-0032).
+#
+# Запускается руками (Actions → publish → Run workflow): выкладка — осознанное действие,
+# а не побочный эффект каждого коммита в main. Собирать на сервере нельзя: два ядра и
+# четыре гигабайта заняты самим стеком.
+#
+# Теги образа — полный git-sha (его выкатывает update.sh, откат — предыдущий sha) и latest.
+# Публичные адреса вшиваются в web и admin при сборке: образ собран под конкретный домен.
+
+name: publish
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  # Хранилище: сборка MinIO от Chainguard, закреплённая по digest. Реестр Chainguard с
+  # сервера в России недоступен, поэтому образ копируется в GHCR рядом с образами портала.
+  MINIO_SOURCE: cgr.dev/chainguard/minio@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+  MINIO_RELEASE: RELEASE.2026-09-22T19-25-18Z
+  PUBLIC_ORIGIN: ${{ vars.QUANTOR_PUBLIC_ORIGIN || 'https://quantor.meridianai.ru' }}
+  ADMIN_ORIGIN: ${{ vars.QUANTOR_ADMIN_ORIGIN || 'https://admin.quantor.meridianai.ru' }}
+
+jobs:
+  mirror-minio:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Копия манифеста между реестрами, без скачивания слоёв на раннер. Уже скопированный
+      # выпуск не трогается: у Chainguard в бесплатном доступе живёт только latest, и
+      # старый digest однажды перестанет отдаваться.
+      - name: Зеркалирование MinIO
+        run: |
+          target="${REGISTRY}/${{ github.repository_owner }}/quantor-minio:${MINIO_RELEASE}"
+          if docker buildx imagetools inspect "$target" >/dev/null 2>&1; then
+            echo "уже в GHCR: $target"
+          else
+            docker buildx imagetools create --tag "$target" "$MINIO_SOURCE"
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      # Один упавший образ не отменяет остальные: чинить проще, видя все результаты.
+      fail-fast: false
+      matrix:
+        include:
+          - name: quantor-api
+            dockerfile: deploy/Dockerfile.api
+            app: ''
+          - name: quantor-web
+            dockerfile: deploy/Dockerfile.next
+            app: web
+          - name: quantor-admin
+            dockerfile: deploy/Dockerfile.next
+            app: admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=long,prefix=
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          build-args: |
+            APP=${{ matrix.app }}
+            NEXT_PUBLIC_API_BASE_URL=${{ env.PUBLIC_ORIGIN }}
+            NEXT_PUBLIC_PORTAL_URL=${{ env.PUBLIC_ORIGIN }}
+            NEXT_PUBLIC_ADMIN_URL=${{ env.ADMIN_ORIGIN }}
+            NEXT_PUBLIC_BUILD_VERSION=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

@@ -1,0 +1,57 @@
+# Образ портала (`APP=web`) или контура управления (`APP=admin`).
+#
+# Next.js собирается автономным сервером (`QUANTOR_STANDALONE=1`): в образ уходит только
+# то, что нашла трассировка, без всего дерева node_modules монорепозитория.
+#
+# Публичные адреса (`NEXT_PUBLIC_*`) вшиваются в бандл при сборке — поэтому они аргументы
+# сборки, а не переменные окружения контейнера. Адрес API для серверных компонентов
+# (`API_INTERNAL_BASE_URL`) читается при запуске и задаётся в compose.
+ARG APP=web
+
+FROM node:22-slim AS build
+ARG APP
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    CI=1
+RUN corepack enable
+
+WORKDIR /repo
+
+# Манифесты отдельным слоем: установка зависимостей кешируется, пока не меняется lockfile.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/web/package.json apps/web/package.json
+COPY apps/admin/package.json apps/admin/package.json
+COPY packages/api-client/package.json packages/api-client/package.json
+COPY packages/ui/package.json packages/ui/package.json
+RUN pnpm install --frozen-lockfile --filter "@quantor/${APP}..."
+
+COPY packages ./packages
+COPY apps/${APP} ./apps/${APP}
+
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_PORTAL_URL
+ARG NEXT_PUBLIC_ADMIN_URL
+ARG NEXT_PUBLIC_BUILD_VERSION=dev
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
+    NEXT_PUBLIC_PORTAL_URL=${NEXT_PUBLIC_PORTAL_URL} \
+    NEXT_PUBLIC_ADMIN_URL=${NEXT_PUBLIC_ADMIN_URL} \
+    NEXT_PUBLIC_BUILD_VERSION=${NEXT_PUBLIC_BUILD_VERSION} \
+    QUANTOR_STANDALONE=1
+RUN pnpm --filter "@quantor/${APP}" build \
+    && mkdir -p apps/${APP}/public
+
+FROM node:22-slim AS runtime
+ARG APP
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000 \
+    APP=${APP}
+
+WORKDIR /app
+COPY --from=build --chown=node:node /repo/apps/${APP}/.next/standalone ./
+COPY --from=build --chown=node:node /repo/apps/${APP}/.next/static ./apps/${APP}/.next/static
+COPY --from=build --chown=node:node /repo/apps/${APP}/public ./apps/${APP}/public
+
+USER node
+EXPOSE 3000
+CMD ["sh", "-c", "exec node apps/${APP}/server.js"]

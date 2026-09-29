@@ -49,6 +49,19 @@ class Role(StrEnum):
     SERVICE = "service"
 
 
+class ApprovalStatus(StrEnum):
+    """Допуск личности к порталу (ADR-0031).
+
+    Самостоятельная регистрация заводит заявку, а не доступ: войти можно только после
+    одобрения администратором платформы. Отклонённая заявка остаётся строкой — повторная
+    регистрация на тот же адрес не должна тихо превращаться в новую заявку.
+    """
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 # Роли платформенного уровня. Ограничение в базе не даёт положить их в членство: иначе
 # администратором платформы стал бы любой, кто может добавить себе строку в своём же
 # пространстве.
@@ -109,6 +122,15 @@ class AuditAction(StrEnum):
     LOGIN_FAILED = "login_failed"
     LOGOUT = "logout"
     SESSION_REVOKED = "session_revoked"
+    CREDENTIAL_CHANGED = "credential_changed"
+
+    USER_REGISTERED = "user_registered"
+    USER_APPROVED = "user_approved"
+    USER_REJECTED = "user_rejected"
+    USER_DISABLED = "user_disabled"
+    USER_ENABLED = "user_enabled"
+    USER_MEMBERSHIP_SET = "user_membership_set"
+    USER_CREDENTIAL_RESET = "user_credential_reset"
 
     SETTING_OVERRIDE_SET = "setting_override_set"
     SETTING_OVERRIDE_DELETED = "setting_override_deleted"

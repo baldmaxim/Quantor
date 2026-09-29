@@ -1,0 +1,205 @@
+# Боевой стек Quantor на сервере Selectel (ADR-0032).
+#
+# Границы, которые этот файл соблюдает:
+#   - наружу не публикуется ни один порт: снаружи ходит только nginx из /opt/infra/nginx
+#     по сети infra_web; консоль MinIO — на петле сервера, через SSH-туннель;
+#   - база и хранилище — только во внутренней сети;
+#   - у каждого контейнера предел памяти: на сервере четыре гигабайта на всё;
+#   - значения — в .env рядом с этим файлом, здесь только имена и умолчания;
+#   - тег выпуска IMAGE_TAG приходит не из .env, а из файла RELEASE через update.sh и compose.sh.
+#
+# Запуск и обновление — deploy/update.sh; ручные команды — deploy/compose.sh;
+# первичная выкладка — deploy/README.md.
+
+name: quantor
+
+x-api-env: &api-env
+  ENVIRONMENT: production
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  POSTGRES_HOST: db
+  POSTGRES_PORT: '5432'
+  POSTGRES_DB: quantor
+  POSTGRES_USER: quantor
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?требуется POSTGRES_PASSWORD}
+  # Хранилище: API и воркер ходят внутрь сети, а ссылки для браузера подписываются под
+  # публичный адрес портала — nginx отдаёт /quantor-files/ из MinIO (same-origin, без CORS).
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_PUBLIC_ENDPOINT_URL: ${PUBLIC_ORIGIN:?требуется PUBLIC_ORIGIN}
+  S3_REGION: us-east-1
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?требуется S3_ACCESS_KEY_ID}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?требуется S3_SECRET_ACCESS_KEY}
+  # Имя бакета — часть адреса в nginx (location /quantor-files/), поэтому не настраивается.
+  S3_BUCKET: quantor-files
+  S3_USE_PATH_STYLE: 'true'
+  API_CORS_ORIGINS: ${PUBLIC_ORIGIN},${ADMIN_ORIGIN:?требуется ADMIN_ORIGIN}
+  PORTAL_BASE_URL: ${PUBLIC_ORIGIN}
+  AUTH_MODE: local
+  AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:?требуется AUTH_COOKIE_DOMAIN}
+  JOB_EXECUTOR: worker
+  WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+  TENDERHUB_API_TOKEN: ${TENDERHUB_API_TOKEN:-}
+  # Флаг calc.portal сюда не добавлять: он включается только отдельным решением владельца.
+  FEATURE_FLAGS: ${FEATURE_FLAGS:-}
+  MALLOC_ARENA_MAX: '2'
+
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    container_name: quantor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quantor
+      POSTGRES_USER: quantor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?требуется POSTGRES_PASSWORD}
+      # Русская сортировка, как в локальном стенде.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=ru-RU'
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - max_connections=40
+      - -c
+      - work_mem=8MB
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U quantor -d quantor']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+    networks: [internal]
+
+  # Права на том хранилища. Образ MinIO работает не от root и без оболочки, а новый том
+  # создаётся принадлежащим root — без этого шага MinIO не сможет писать данные.
+  storage-init:
+    image: busybox:1.37
+    container_name: quantor-storage-init
+    command: ['chown', '65532:65532', '/data']
+    volumes:
+      - minio_data:/data
+    restart: 'no'
+    network_mode: none
+
+  minio:
+    # Официальные образы MinIO сняты с публикации, а реестр Chainguard с сервера недоступен.
+    # Поэтому publish.yml зеркалит закреплённую по digest сборку Chainguard в закрытый пакет
+    # GHCR. Лицензия MinIO — AGPL-3.0: отдельный неизменённый сервис, в код портала не входит.
+    image: ghcr.io/baldmaxim/quantor-minio:RELEASE.2026-09-22T19-25-18Z
+    container_name: quantor-minio
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?требуется S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?требуется S3_SECRET_ACCESS_KEY}
+      MINIO_BROWSER_REDIRECT: 'false'
+    volumes:
+      - minio_data:/data
+    ports:
+      # Консоль — только на петле: открывается через `ssh -L 9001:127.0.0.1:9001 quantor`.
+      - '127.0.0.1:9001:9001'
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+    mem_limit: 512m
+    networks: [internal, infra_web]
+
+  # Разовые команды обслуживания: миграции и бакет. Отдельным шагом выкладки, а не при
+  # старте API — два поднявшихся процесса накатывали бы схему наперегонки.
+  migrate:
+    image: ghcr.io/baldmaxim/quantor-api:${IMAGE_TAG:?запускайте через update.sh или compose.sh}
+    container_name: quantor-migrate
+    profiles: ['tools']
+    environment: *api-env
+    command: ['python', '-m', 'alembic', 'upgrade', 'head']
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 384m
+    networks: [internal]
+
+  api:
+    image: ghcr.io/baldmaxim/quantor-api:${IMAGE_TAG:?запускайте через update.sh или compose.sh}
+    container_name: quantor-api
+    restart: unless-stopped
+    environment: *api-env
+    volumes:
+      # Загрузки до гигабайта идут через временный файл: на диск, а не в память.
+      - api_tmp:/tmp
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3).status == 200 else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    mem_limit: 512m
+    networks: [internal, infra_web]
+
+  worker:
+    image: ghcr.io/baldmaxim/quantor-api:${IMAGE_TAG:?запускайте через update.sh или compose.sh}
+    container_name: quantor-worker
+    restart: unless-stopped
+    environment: *api-env
+    command: ['python', '-m', 'app.worker']
+    # Воркер доводит задание до конца или отдаёт аренду: SIGTERM, затем минута на выход.
+    stop_grace_period: 60s
+    volumes:
+      - worker_tmp:/tmp
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    mem_limit: 768m
+    networks: [internal]
+
+  web:
+    image: ghcr.io/baldmaxim/quantor-web:${IMAGE_TAG:?запускайте через update.sh или compose.sh}
+    container_name: quantor-web
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_BASE_URL: http://quantor-api:8000
+      PORT: '3000'
+    depends_on:
+      api:
+        condition: service_started
+    mem_limit: 384m
+    networks: [internal, infra_web]
+
+  admin:
+    image: ghcr.io/baldmaxim/quantor-admin:${IMAGE_TAG:?запускайте через update.sh или compose.sh}
+    container_name: quantor-admin
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_BASE_URL: http://quantor-api:8000
+      PORT: '3001'
+    depends_on:
+      api:
+        condition: service_started
+    mem_limit: 256m
+    networks: [internal, infra_web]
+
+volumes:
+  db_data:
+  minio_data:
+  api_tmp:
+  worker_tmp:
+
+networks:
+  internal:
+    driver: bridge
+  # Общая сеть с ingress-nginx (/opt/infra/nginx): docker network create infra_web
+  infra_web:
+    external: true

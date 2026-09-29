@@ -20,7 +20,7 @@ ADR не переписываются задним числом. Если реш
 | [0009](0009-python-i-lokalnyj-tuling.md)                                      | Python 3.12 и локальный тулинг                                                  | Принято                |
 | [0010](0010-orkestrator-buduschego-konvejera.md)                              | Оркестратор будущего конвейера                                                  | принято                |
 | [0011](0011-integraciya-s-tenderhub.md)                                       | Интеграция с TenderHUB                                                          | принято                |
-| [0012](0012-granica-autentifikacii-i-avtorizacii.md)                          | Граница аутентификации и авторизации                                            | принято                |
+| [0012](0012-granica-autentifikacii-i-avtorizacii.md)                          | Граница аутентификации и авторизации                                            | принято, уточнён 0031  |
 | [0013](0013-granica-razvyortyvaniya-admin-console.md)                         | Граница развёртывания админ-контура                                             | принято                |
 | [0014](0014-otdelnyj-ispolnitel-zadanij.md)                                   | Отдельный исполнитель заданий                                                   | принято                |
 | [0015](0015-sloi-nalozheniya-na-canvas2d.md)                                  | Слои наложения на Canvas2D до замера                                            | принято                |
@@ -39,3 +39,5 @@ ADR не переписываются задним числом. Если реш
 | [0028](0028-mep-semanticheskoe-raspoznavanie-v-scope.md)                      | MEP: базовое распознавание заморожено, семантическое — в scope                  | принято                |
 | [0029](0029-sloi-css-i-granica-sluzhebnyh-klassov.md)                         | Служебные классы в слое components и всегда проигрывают разметке                | принято                |
 | [0030](0030-raschyotnyj-kontur-stadii-p.md)                                   | Расчётный контур стадии П: факты, детерминированный расчёт, сверка с ВОР        | принято                |
+| [0031](0031-lokalnaya-autentifikaciya-s-odobreniem.md)                        | Локальная аутентификация с одобрением администратора                            | принято                |
+| [0032](0032-boevoe-razvyortyvanie-na-selectel.md)                             | Боевое развёртывание на Selectel                                                | принято                |

@@ -148,6 +148,32 @@ const READINESS = {
 
 const AUDIT = { items: [], total: 0, limit: 50, offset: 0 };
 
+const PENDING_USER = {
+  id: '00000000-0000-4000-8000-0000000000a1',
+  email: 'engineer@example.ru',
+  display_name: 'Инженер Заявкин',
+  is_local: true,
+  approval_status: 'pending',
+  is_active: true,
+  is_platform_admin: false,
+  must_change_password: false,
+  locked_until: null,
+  last_login_at: null,
+  created_at: '2026-09-29T08:00:00Z',
+  memberships: [],
+};
+
+const USERS = { items: [PENDING_USER], total: 1, limit: 50, offset: 0 };
+
+const WORKSPACES = [
+  {
+    id: '00000000-0000-4000-8000-000000000001',
+    slug: 'default',
+    name: 'Рабочее пространство по умолчанию',
+    status: 'active',
+  },
+];
+
 const JOB_STATS = {
   queued: 0,
   running: 1,
@@ -297,6 +323,8 @@ const handle = (request: IncomingMessage, response: ServerResponse): void => {
     if (url.includes('/feature-flags')) return json(request, response, FLAGS);
     if (url.includes('/integrations/tenderhub')) return json(request, response, TENDERHUB);
     if (url.includes('/audit')) return json(request, response, AUDIT);
+    if (url.includes('/users')) return json(request, response, USERS);
+    if (url.includes('/workspaces')) return json(request, response, WORKSPACES);
     if (url.includes('/jobs/stats')) return json(request, response, JOB_STATS);
     if (url.includes('/jobs/workers')) return json(request, response, WORKERS);
     if (url.includes('/jobs')) return json(request, response, JOBS);

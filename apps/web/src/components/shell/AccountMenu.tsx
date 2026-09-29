@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Spinner, cx } from '@/components/ui';
+import { env } from '@/lib/env';
 import { useLogout, useSession } from '@/lib/session';
 
 /**
@@ -116,11 +117,21 @@ export const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
 
           {canOpenAdmin && (
             <a
-              href="/admin"
+              href={env.adminUrl}
               role="menuitem"
               className="press mb-[var(--s-2)] block rounded-[var(--radius-xs)] px-[var(--s-3)] py-[var(--s-3)] text-sm text-muted hover:bg-surface-muted hover:text-text"
             >
               Управление платформой
+            </a>
+          )}
+
+          {session.auth_mode === 'local' && (
+            <a
+              href="/account/password"
+              role="menuitem"
+              className="press mb-[var(--s-2)] block rounded-[var(--radius-xs)] px-[var(--s-3)] py-[var(--s-3)] text-sm text-muted hover:bg-surface-muted hover:text-text"
+            >
+              Сменить пароль
             </a>
           )}
 

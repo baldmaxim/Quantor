@@ -1,7 +1,15 @@
 'use client';
 
 import {
+  approveAdminUser,
   cancelAdminJob,
+  disableAdminUser,
+  enableAdminUser,
+  listAdminUsers,
+  listAdminWorkspaces,
+  rejectAdminUser,
+  setAdminUserMembership,
+  setAdminUserPassword,
   checkModelProvider,
   deleteFeatureFlagOverride,
   deleteSettingOverride,
@@ -21,6 +29,7 @@ import {
   setSettingOverride,
   testTenderhubConnection,
 } from '@quantor/api-client';
+import type { ApprovalStatus, Role } from '@quantor/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
@@ -277,3 +286,117 @@ export const useCheckModelProvider = () => {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: jobKeys.modelProviders }),
   });
 };
+
+/* ----------------------------------------------------------- пользователи и доступ */
+
+/** Роль, которую выдаёт членство. Платформенные роли через членство не выдаются. */
+export type WorkspaceRole = Exclude<Role, 'platform_admin' | 'service'>;
+
+export interface UsersQuery {
+  limit: number;
+  offset: number;
+  status?: ApprovalStatus;
+}
+
+export const userKeys = {
+  all: ['users'] as const,
+  list: (page: UsersQuery) => ['users', 'list', page] as const,
+  pendingCount: ['users', 'pending-count'] as const,
+  workspaces: ['workspaces'] as const,
+} as const;
+
+export const useAdminUsers = (page: UsersQuery) =>
+  useQuery({
+    queryKey: userKeys.list(page),
+    queryFn: async () =>
+      unwrap(
+        await listAdminUsers({
+          query: {
+            limit: page.limit,
+            offset: page.offset,
+            ...(page.status ? { status: page.status } : {}),
+          },
+          throwOnError: true,
+        }),
+      ),
+  });
+
+/** Число заявок, ждущих решения. Для отметки в навигации — отсюда видно, что ждут. */
+export const usePendingUsersCount = () =>
+  useQuery({
+    queryKey: userKeys.pendingCount,
+    queryFn: async () =>
+      unwrap(
+        await listAdminUsers({
+          query: { status: 'pending', limit: 1, offset: 0 },
+          throwOnError: true,
+        }),
+      ).total,
+    refetchInterval: 60_000,
+  });
+
+export const useAdminWorkspaces = () =>
+  useQuery({
+    queryKey: userKeys.workspaces,
+    queryFn: async () => unwrap(await listAdminWorkspaces({ throwOnError: true })),
+    staleTime: 5 * 60_000,
+  });
+
+/** Изменение пользователя: список, счётчик заявок и журнал обновляются вместе. */
+const useUserMutation = <TInput>(run: (input: TInput) => Promise<unknown>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: userKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['audit'] });
+    },
+  });
+};
+
+export const useApproveUser = () =>
+  useUserMutation(async (input: { userId: string; workspaceId: string; role: WorkspaceRole }) =>
+    unwrap(
+      await approveAdminUser({
+        path: { user_id: input.userId },
+        body: { workspace_id: input.workspaceId, role: input.role },
+        throwOnError: true,
+      }),
+    ),
+  );
+
+export const useSetUserMembership = () =>
+  useUserMutation(async (input: { userId: string; workspaceId: string; role: WorkspaceRole }) =>
+    unwrap(
+      await setAdminUserMembership({
+        path: { user_id: input.userId },
+        body: { workspace_id: input.workspaceId, role: input.role },
+        throwOnError: true,
+      }),
+    ),
+  );
+
+export const useRejectUser = () =>
+  useUserMutation(async (userId: string) =>
+    unwrap(await rejectAdminUser({ path: { user_id: userId }, throwOnError: true })),
+  );
+
+export const useSetUserActive = () =>
+  useUserMutation(async (input: { userId: string; active: boolean }) =>
+    unwrap(
+      input.active
+        ? await enableAdminUser({ path: { user_id: input.userId }, throwOnError: true })
+        : await disableAdminUser({ path: { user_id: input.userId }, throwOnError: true }),
+    ),
+  );
+
+export const useSetUserPassword = () =>
+  useUserMutation(async (input: { userId: string; password: string }) =>
+    unwrap(
+      await setAdminUserPassword({
+        path: { user_id: input.userId },
+        body: { password: input.password },
+        throwOnError: true,
+      }),
+    ),
+  );
