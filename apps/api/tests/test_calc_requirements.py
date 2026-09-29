@@ -189,6 +189,18 @@ class TestReadiness:
         assert status is CalcReadinessStatus.NOT_INSPECTED
         assert reason == "Не проверено документов: 1 из 2"
 
+    def test_project_composition_does_not_make_facts_uninspected(self) -> None:
+        composition = DocumentState(
+            recognized=True,
+            latest=True,
+            inspected_fact_types=frozenset(),
+            declared_class=CalcSourceClass.PROJECT_COMPOSITION,
+            issues=(),
+        )
+        status, reason, _ = _status("vk.apartments.per_floor", [], [_document(), composition])
+        assert status is CalcReadinessStatus.MISSING
+        assert reason == "Проверено документов: 1 — не найдено"
+
     def test_no_recognized_documents_is_unknown(self) -> None:
         documents = [_document(recognized=False, inspected=False)]
         status, reason, _ = _status("vk.apartments.per_floor", [], documents)

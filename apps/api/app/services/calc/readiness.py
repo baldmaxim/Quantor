@@ -200,7 +200,13 @@ def evaluate(
             f" (обычно: {where})" if where else ""
         )
     else:
-        latest = [document for document in documents if document.recognized and document.latest]
+        latest = [
+            document
+            for document in documents
+            if document.recognized
+            and document.latest
+            and document.declared_class is not CalcSourceClass.PROJECT_COMPOSITION
+        ]
         pending = [
             document
             for document in latest
