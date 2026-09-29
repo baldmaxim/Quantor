@@ -263,13 +263,27 @@ test.describe('карточка проекта', () => {
     ...overrides,
   });
 
-  const mockProject = async (page: Page, revisions: Record<string, unknown>[]) => {
-    const json = (body: unknown) => ({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    });
+  const PDF_DOCUMENT = {
+    id: DOCUMENT_ID,
+    project_id: PROJECT_ID,
+    display_name: 'План 3 этажа.pdf',
+    discipline: null,
+    document_kind: 'pdf',
+    created_at: '2026-09-01T10:00:00Z',
+    updated_at: '2026-09-01T10:00:00Z',
+  };
 
+  const json = (body: unknown) => ({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(body),
+  });
+
+  const mockProject = async (
+    page: Page,
+    revisions: Record<string, unknown>[],
+    documents: Record<string, unknown>[] = [PDF_DOCUMENT],
+  ) => {
     await page.route(`**/api/v1/projects/${PROJECT_ID}`, (route) =>
       route.fulfill(
         json({
@@ -288,24 +302,7 @@ test.describe('карточка проекта', () => {
     );
 
     await page.route(`**/api/v1/projects/${PROJECT_ID}/documents*`, (route) =>
-      route.fulfill(
-        json({
-          items: [
-            {
-              id: DOCUMENT_ID,
-              project_id: PROJECT_ID,
-              display_name: 'План 3 этажа.pdf',
-              discipline: null,
-              document_kind: 'pdf',
-              created_at: '2026-09-01T10:00:00Z',
-              updated_at: '2026-09-01T10:00:00Z',
-            },
-          ],
-          total: 1,
-          limit: 200,
-          offset: 0,
-        }),
-      ),
+      route.fulfill(json({ items: documents, total: documents.length, limit: 200, offset: 0 })),
     );
 
     await page.route(`**/api/v1/documents/${DOCUMENT_ID}/revisions*`, (route) =>
@@ -338,6 +335,64 @@ test.describe('карточка проекта', () => {
     await expect(button).toHaveAttribute('title', /Готовим листы/);
     // Распознанный пакет больше не требуется ни в одном тексте карточки.
     await expect(page.getByText('Нужен распознанный PDF')).toHaveCount(0);
+  });
+
+  test('архив распознанного пакета спрятан за переключателем', async ({ page }) => {
+    // После импорта рядом с архивом лежит PDF из него: показанные подряд, они выглядели
+    // как дубли, хотя работают только с PDF.
+    const PACKAGE_ID = '55555555-5555-4555-8555-555555555555';
+    await mockProject(
+      page,
+      [revision()],
+      [
+        {
+          ...PDF_DOCUMENT,
+          id: PACKAGE_ID,
+          display_name: 'План 3 этажа.zip',
+          document_kind: 'recognized_package',
+        },
+        PDF_DOCUMENT,
+      ],
+    );
+    await page.route(`**/api/v1/documents/${PACKAGE_ID}/revisions*`, (route) =>
+      route.fulfill(
+        json({
+          items: [
+            revision({
+              id: '66666666-6666-4666-8666-666666666666',
+              document_id: PACKAGE_ID,
+              source_filename: 'План 3 этажа.zip',
+              source_mime: 'application/zip',
+              processing_status: 'ready',
+              geometry_status: 'not_applicable',
+              sheet_count: 0,
+            }),
+          ],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        }),
+      ),
+    );
+    await page.goto(`/projects/${PROJECT_ID}`);
+
+    const toggle = page.getByRole('group', { name: 'Вид документов' });
+    await expect(toggle.getByRole('button', { name: /PDF/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByText('План 3 этажа.pdf')).toBeVisible();
+    await expect(page.getByText('План 3 этажа.zip')).toHaveCount(0);
+
+    await toggle.getByRole('button', { name: /ZIP/ }).click();
+
+    await expect(page.getByText('План 3 этажа.zip')).toBeVisible();
+    await expect(page.getByText('План 3 этажа.pdf')).toHaveCount(0);
+    // Переключатель прячет только строки: верхняя кнопка по-прежнему ведёт в PDF.
+    await expect(page.getByRole('link', { name: 'Открыть рабочую область' })).toHaveAttribute(
+      'href',
+      `/projects/${PROJECT_ID}/workspace?revision=${REVISION_ID}`,
+    );
   });
 });
 

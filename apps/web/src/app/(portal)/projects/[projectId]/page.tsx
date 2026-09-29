@@ -13,9 +13,18 @@ import {
   ErrorState,
   Field,
   ProgressRow,
+  SegmentedControl,
   Skeleton,
   StatusBadge,
 } from '@/components/ui';
+import {
+  DOCUMENT_GROUP_LABELS,
+  activeGroup,
+  countByGroup,
+  documentGroup,
+  presentGroups,
+  type DocumentGroup,
+} from '@/lib/document-groups';
 import { errorMessage } from '@/lib/errors';
 import { formatWhen, projectStatus } from '@/lib/format';
 import {
@@ -47,6 +56,7 @@ const workspaceHref = (projectId: string, revisionId: string): string =>
 const ProjectPage = ({ params }: IPageProps) => {
   const { projectId } = use(params);
   const [uploading, setUploading] = useState(false);
+  const [pickedGroup, setPickedGroup] = useState<DocumentGroup | null>(null);
 
   const project = useProject(projectId);
   const documents = useProjectDocuments(projectId);
@@ -63,6 +73,13 @@ const ProjectPage = ({ params }: IPageProps) => {
   const states = items
     .map((document) => documentOpenState(document, revisionsOf(document.id)))
     .filter((state): state is OpenState => state !== null);
+
+  // Переключатель только прячет строки: ревизии и выбор верхней кнопки по-прежнему считаются
+  // по всем документам проекта.
+  const groupCounts = countByGroup(items);
+  const groups = presentGroups(groupCounts);
+  const group = activeGroup(pickedGroup, groups);
+  const shown = items.filter((document) => documentGroup(document.document_kind) === group);
 
   const status = projectStatus(project.data?.last_job);
 
@@ -95,12 +112,39 @@ const ProjectPage = ({ params }: IPageProps) => {
       <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
         <div className="mx-auto grid w-full max-w-[1400px] items-start gap-[var(--s-6)] lg:grid-cols-[1.6fr_1fr]">
           <section className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
-            <h2 className="flex items-center gap-[var(--s-5)] border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
-              Документы
-              {documents.data && (
-                <span className="mono text-xs font-normal text-muted">{documents.data.total}</span>
+            {/* Высота заголовка равна высоте переключателя, в том числе на телефоне: шапка
+                одинакова с ним и без него и не прыгает, когда он появляется. */}
+            <header className="flex flex-wrap items-center gap-[var(--s-4)] border-b border-border px-[var(--s-6)] py-[var(--s-3)]">
+              <h2 className="flex min-h-[var(--h-ctl)] items-center gap-[var(--s-5)] text-sm font-medium max-md:min-h-[44px]">
+                Документы
+                {documents.data && (
+                  <span className="mono text-xs font-normal text-muted">
+                    {documents.data.total}
+                  </span>
+                )}
+              </h2>
+
+              {/* Выбирать есть из чего, только когда в проекте документы разных видов. */}
+              {group !== null && groups.length > 1 && (
+                <SegmentedControl
+                  label="Вид документов"
+                  className="ml-auto"
+                  value={group}
+                  onChange={setPickedGroup}
+                  options={groups.map((value) => ({
+                    value,
+                    label: (
+                      <>
+                        {DOCUMENT_GROUP_LABELS[value]}
+                        <span className="mono ml-[var(--s-2)] text-muted">
+                          {groupCounts[value]}
+                        </span>
+                      </>
+                    ),
+                  }))}
+                />
               )}
-            </h2>
+            </header>
 
             <div className="px-[var(--s-6)]">
               {documents.isPending && <Skeleton className="my-[var(--s-6)] h-[64px] w-full" />}
@@ -125,7 +169,7 @@ const ProjectPage = ({ params }: IPageProps) => {
                 </div>
               )}
 
-              {items.map((document) => (
+              {shown.map((document) => (
                 <DocumentRow
                   key={document.id}
                   projectId={projectId}
