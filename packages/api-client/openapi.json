@@ -8737,6 +8737,7 @@
           "ADJACENT_TASK",
           "BRAND_LIST",
           "TECHNICAL_REQUIREMENTS",
+          "PROJECT_COMPOSITION",
           "CUSTOMER_VOR",
           "MANUAL"
         ],
@@ -10641,6 +10642,7 @@
           "APARTMENT_SUMMARY",
           "SANITARY_FIXTURES",
           "WATER_CONSUMERS",
+          "WATER_SYSTEM_SUMMARY",
           "LOADS",
           "AIR_EXCHANGE",
           "EQUIPMENT_SPEC",

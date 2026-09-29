@@ -26,7 +26,7 @@ from app.contracts.calc.enums import (
     CalcInspectionIssueCode,
     CalcSourceClass,
 )
-from app.contracts.calc.facts import CalcRegionTextLocator
+from app.contracts.calc.facts import CalcRegionTableLocator, CalcRegionTextLocator
 from app.contracts.calc.subjects import CalcFactSubject
 from app.contracts.calc.values import (
     CalcBooleanValue,
@@ -117,6 +117,12 @@ _COUNTS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         ),
     ),
 )
+_SECTION_WORD_COUNT = re.compile(
+    r"(?:здани[ея]|комплекс)\s+состоит\s+из\s+(?P<v>двух|тр[её]х|четыр[её]х)\s+"
+    r"(?:жилых\s+)?секций",
+    re.IGNORECASE,
+)
+_SECTION_WORD_VALUES: Final = {"двух": 2, "трех": 3, "четырех": 4}
 _FLOOR_HEIGHT = re.compile(
     rf"высот\w*\s+(?P<scope>[^—–:\n]{{0,40}}?)этаж\w*(?P<scope2>[^—–:\d\n]{{0,6}}"
     r"(?:\(?\s*(?:с\s+)?-?\d{1,3}\s*(?:[-–]|по)\s*-?\d{1,3}\s*(?:этаж\w*)?\s*\)?)?)"
@@ -243,6 +249,74 @@ def extract_sheet_titles(
     return result
 
 
+def extract_contents_sheet_titles(
+    parsed: tuple[ParsedRegion, ...], declaration: CollectionDeclaration
+) -> Extraction:
+    """Floor elevations from the architecture volume's sheet list.
+
+    Only the explicit «Содержание раздела АР» table is used. Revision comparison
+    tables elsewhere in the volume contain obsolete elevations as well.
+    """
+    result = Extraction()
+    if declaration.source_class is not CalcSourceClass.ARCHITECTURE:
+        return result
+    for item in parsed:
+        for parsed_table in item.tables:
+            table = parsed_table.table
+            if not any("содержание раздела ар" in part.lower() for part in table.context):
+                continue
+            column = next(
+                (index for index, cell in enumerate(table.header) if "имя листа" in cell.lower()),
+                None,
+            )
+            if column is None:
+                continue
+            for row_index, row in enumerate(table.rows):
+                if len(row) <= column:
+                    continue
+                name = row[column]
+                match = _PLAN_TYPICAL.search(name) or _PLAN.search(name)
+                if match is None:
+                    continue
+                levels = [
+                    _meters(level) for level in re.split(r"\s*[,;и]\s*", match.group("levels"))
+                ]
+                high = match.group("high")
+                scope = floor_code(int(match.group("low")), None if high is None else int(high))
+                if scope is None or any(level is None for level in levels):
+                    continue
+                floors = floors_in(scope)
+                if len(levels) != len(floors):
+                    continue
+                evidence = CandidateEvidence(
+                    region=item.region,
+                    locator=CalcRegionTableLocator(
+                        table_index=table.index, rows=[row_index], column=column
+                    ),
+                    label=clip("Название листа в содержании раздела АР", LABEL_LIMIT),
+                    excerpt=clip(" | ".join(row), EXCERPT_LIMIT),
+                )
+                for floor, level in zip(floors, levels, strict=True):
+                    if level is None:
+                        continue
+                    result.candidates.append(
+                        CalcCandidate(
+                            extractor=SHEET_EXTRACTOR,
+                            source_class=declaration.source_class,
+                            fact_type="floor.elevation",
+                            subject=CalcFactSubject(
+                                building=declaration.building, floor=str(floor)
+                            ),
+                            value=CalcNumberValue(value=stated_text(level), unit="m"),
+                            method=CalcFactMethod.DOCUMENT_EXPLICIT,
+                            confidence=CalcConfidence.HIGH,
+                            note="Отметка из названия листа в содержании раздела АР.",
+                            evidence=(evidence,),
+                        )
+                    )
+    return result
+
+
 # ------------------------------------------------------------------------- текст записок
 
 
@@ -330,6 +404,19 @@ def _counts(
     declaration: CollectionDeclaration,
     building: CalcFactSubject,
 ) -> None:
+    for match in _SECTION_WORD_COUNT.finditer(line.text):
+        count = _SECTION_WORD_VALUES[match.group("v").lower().replace("ё", "е")]
+        start, end = line.start + match.start(), line.start + match.end()
+        result.candidates.append(
+            _text_candidate(
+                declaration,
+                "building.sections_count",
+                building,
+                CalcCountValue(value=count),
+                _text_evidence(region, start, end, "Число секций в тексте документа"),
+                "Явно указано, из скольких жилых секций состоит здание.",
+            )
+        )
     for fact_type, pattern in _COUNTS:
         for match in pattern.finditer(line.text):
             if _approximate(result, match, fact_type):

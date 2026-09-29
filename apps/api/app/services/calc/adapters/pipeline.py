@@ -56,9 +56,14 @@ from app.services.calc.adapters.table_kinds import (
     TABLE_KINDS_VERSION,
     UNEXTRACTED_FACT_TYPES,
 )
-from app.services.calc.adapters.text_values import extract_sheet_titles, extract_text_values
+from app.services.calc.adapters.text_values import (
+    extract_contents_sheet_titles,
+    extract_sheet_titles,
+    extract_text_values,
+)
+from app.services.calc.adapters.water_summary import extract_water_summary
 
-EXTRACTOR_VERSION: Final = f"calc.recognized.v1+{TABLE_KINDS_VERSION}"
+EXTRACTOR_VERSION: Final = f"calc.recognized.v2+{TABLE_KINDS_VERSION}"
 
 DOCUMENT_FACT_TYPES: Final = frozenset(
     {
@@ -219,15 +224,18 @@ def _aggregate(issues: list[CandidateIssue]) -> tuple[CalcInspectionIssueRead, .
 def collect(document: RecognizedDocument, declaration: CollectionDeclaration) -> CollectionResult:
     parsed = parse_document(document)
     vor = declaration.source_class is CalcSourceClass.CUSTOMER_VOR
+    composition = declaration.source_class is CalcSourceClass.PROJECT_COMPOSITION
     extraction = Extraction()
     if vor:
         extraction.extend(extract_customer_vor(parsed, declaration))
-    else:
+    elif not composition:
         extraction.extend(extract_explications(parsed, declaration))
         extraction.extend(extract_apartment_summary(parsed, declaration))
         extraction.extend(extract_sheet_titles(parsed, declaration))
+        extraction.extend(extract_contents_sheet_titles(parsed, declaration))
         extraction.extend(extract_text_values(parsed, declaration))
         extraction.extend(extract_system_functions(parsed, declaration))
+        extraction.extend(extract_water_summary(parsed, declaration))
 
     kinds: Counter[CalcTableKind] = Counter(
         table.classification.kind for region in parsed for table in region.tables
@@ -237,7 +245,7 @@ def collect(document: RecognizedDocument, declaration: CollectionDeclaration) ->
         for kind, count in sorted(kinds.items(), key=lambda item: item[0].value)
     )
     issues = list(extraction.issues)
-    if not vor:
+    if not vor and not composition:
         for kind, fact_types in UNEXTRACTED_FACT_TYPES.items():
             if kinds[kind]:
                 issues.extend(
@@ -271,7 +279,7 @@ def collect(document: RecognizedDocument, declaration: CollectionDeclaration) ->
         candidates_total=len(extraction.candidates),
         rejected=rejected,
         stamp=summarize_stamps([region.stamp for region in parsed if region.stamp is not None]),
-        inspected_fact_types=DOCUMENT_FACT_TYPES,
+        inspected_fact_types=frozenset() if composition else DOCUMENT_FACT_TYPES,
         regions_total=len(document.regions),
         text_regions=sum(1 for region in document.regions if region.block_type == TEXT_BLOCK),
         image_regions=sum(1 for region in document.regions if region.block_type == IMAGE_BLOCK),

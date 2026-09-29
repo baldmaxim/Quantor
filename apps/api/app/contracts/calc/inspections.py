@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 from typing import Annotated
@@ -47,6 +48,8 @@ class CalcInspectionCreate(BaseModel):
     def _not_manual(self) -> CalcInspectionCreate:
         if self.source_class is CalcSourceClass.MANUAL:
             raise ValueError("ручной ввод — не документ: его не собирают, а вводят")
+        if re.search(r"\d\s*[,;]\s*\d", self.building):
+            raise ValueError("укажите один корпус; секции 1, 2, 3 не являются корпусами")
         return self
 
 

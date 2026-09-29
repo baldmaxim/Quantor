@@ -22,6 +22,7 @@ from app.contracts.calc.enums import (
     CalcTableKind,
 )
 from app.contracts.calc.facts import CalcRegionTableLocator, CalcRegionTextLocator
+from app.contracts.calc.inspections import CalcInspectionCreate
 from app.contracts.calc.subjects import CalcFactSubject
 from app.contracts.calc.units import UnitError, to_canonical
 from app.contracts.calc.values import CalcCountValue, CalcNumberValue
@@ -134,6 +135,20 @@ NOTE = """Этажность здания — 25 этажей.
 
 ARCHITECTURE = CollectionDeclaration(CalcSourceClass.ARCHITECTURE, "1", None)
 NOTE_DECLARED = CollectionDeclaration(CalcSourceClass.EXPLANATORY_NOTE, "1", None)
+VK_DECLARED = CollectionDeclaration(CalcSourceClass.MEP_DESIGN, "1", CalcDiscipline.VK)
+
+WATER_SUMMARY = """Корпус 1 (рекламное название Событие 6.1)
+Таблица 1 – Основные показатели систем водоснабжения
+| Наименование системы | Требуемый напор, м | Расчетный расход воды и стоков | | | Примечание |
+|---|---|---|---|---|---|
+| | | м3/сут | м3/ч | л/с | |
+| Корпус 6.1 общий расход | | | | | |
+| ХВС | | 173,70 | 14,55 | 5,32 | |
+| ГВС | | 98,18 | 14,07 | 5,16 | |
+| Общий | | 271,87 | 27,35 | 9,75 | |
+| Корпус 6.1 зона 1 | | | | | |
+| ХВС | | 19,28 | 6,29 | 2,54 | |
+"""
 
 
 def region(text: str, *, page: int = 0, block_type: str = "text") -> RecognizedRegion:
@@ -209,6 +224,16 @@ class TestTables:
 
 
 class TestNormalization:
+    def test_inspection_requires_one_building(self) -> None:
+        payload = {
+            "document_revision_id": uuid.uuid4(),
+            "source_class": "ARCHITECTURE",
+            "document_stage": "P",
+            "building": "1,2,3",
+        }
+        with pytest.raises(ValueError, match="один корпус"):
+            CalcInspectionCreate.model_validate(payload)
+
     @pytest.mark.parametrize(
         ("text", "scope"),
         [
@@ -240,6 +265,30 @@ class TestNormalization:
         result = collect(document(region("Высота этажей 2-24 — 3,3\n")), NOTE_DECLARED)
         assert not [item for item in result.accepted if item.candidate.fact_type == "floor.height"]
         assert CalcInspectionIssueCode.UNIT_MISSING in issue_codes(result)
+
+    def test_section_count_written_in_words(self) -> None:
+        text = "Проектируемый комплекс состоит из трех жилых секций разной высоты."
+        result = collect(document(region(text)), NOTE_DECLARED)
+        item = accepted(result, "building.sections_count", building="1")
+        assert item.canonical == CalcCountValue(value=3, unit="section")
+
+    def test_architecture_contents_gives_elevations_not_revision_history(self) -> None:
+        text = """### Содержание раздела АР
+| Номер листа | Имя листа |
+|---|---|
+| АР-6 | План 2 этажа на отм. +7.370 |
+| АР-8 | План типового этажа на отм. +14.090, +17.450 (4-5 этаж) |
+"""
+        result = collect(document(region(text)), ARCHITECTURE)
+        assert accepted(result, "floor.elevation", building="1", floor="2").canonical == (
+            CalcNumberValue(value="7.37", unit="m")
+        )
+        assert accepted(result, "floor.elevation", building="1", floor="4").canonical == (
+            CalcNumberValue(value="14.09", unit="m")
+        )
+        assert accepted(result, "floor.elevation", building="1", floor="5").canonical == (
+            CalcNumberValue(value="17.45", unit="m")
+        )
 
     def test_unit_by_rule_elevation_and_head(self) -> None:
         """Единица без слова «м» допустима только по правилу: отметки и напор."""
@@ -273,6 +322,46 @@ class TestNormalization:
         with pytest.raises(UnitError):
             to_canonical(Decimal("10"), "m3_h", "l_s")
         assert to_canonical(Decimal("6.5"), "l_s", "m3_h") == Decimal("23.4")
+
+
+class TestWaterSummary:
+    def test_whole_building_flow_excludes_total_and_zones(self) -> None:
+        result = collect(document(region(WATER_SUMMARY)), VK_DECLARED)
+        assert any(
+            table.kind is CalcTableKind.WATER_SYSTEM_SUMMARY and table.extracted
+            for table in result.tables
+        )
+        assert CalcInspectionIssueCode.TABLE_NOT_EXTRACTED not in issue_codes(result)
+        flows = [
+            item for item in result.accepted if item.candidate.extractor == "water_system_summary"
+        ]
+        assert len(flows) == 6
+        cold = accepted(
+            result, "system.flow_daily", building="1", discipline="VK", system_code="В1"
+        )
+        hot = accepted(
+            result, "system.flow_second_max", building="1", discipline="VK", system_code="Т3"
+        )
+        assert cold.candidate.value == CalcNumberValue(value="173.70", unit="m3_day")
+        assert cold.canonical == CalcNumberValue(value="173.7", unit="m3_day")
+        assert hot.canonical == CalcNumberValue(value="5.16", unit="l_s")
+        assert cold.candidate.evidence[0].locator == CalcRegionTableLocator(
+            table_index=0, rows=[2], column=2
+        )
+
+    def test_alias_must_be_proven_by_document(self) -> None:
+        without_alias = WATER_SUMMARY.split("\n", 1)[1]
+        result = collect(document(region(without_alias)), VK_DECLARED)
+        assert not [
+            item for item in result.accepted if item.candidate.extractor == "water_system_summary"
+        ]
+
+    def test_project_composition_does_not_claim_calculation_facts(self) -> None:
+        text = "Этажность здания — 50 этажей.\nКоличество секций — 3."
+        declaration = CollectionDeclaration(CalcSourceClass.PROJECT_COMPOSITION, "1", None)
+        result = collect(document(region(text)), declaration)
+        assert result.accepted == ()
+        assert result.inspected_fact_types == frozenset()
 
 
 class TestExplications:

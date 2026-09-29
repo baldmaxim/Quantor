@@ -92,6 +92,7 @@ export const SOURCE_CLASS_TITLES: Readonly<Record<CalcSourceClass, string>> = {
   ADJACENT_TASK: 'Задание смежного раздела',
   BRAND_LIST: 'Бренд-лист',
   TECHNICAL_REQUIREMENTS: 'Технические требования',
+  PROJECT_COMPOSITION: 'Состав проекта',
   CUSTOMER_VOR: 'ВОР Заказчика',
   MANUAL: 'Ручной ввод',
 };
@@ -108,6 +109,7 @@ export const TABLE_KIND_TITLES: Readonly<Record<CalcTableKind, string>> = {
   APARTMENT_SUMMARY: 'квартирография',
   SANITARY_FIXTURES: 'санитарные приборы',
   WATER_CONSUMERS: 'потребители воды',
+  WATER_SYSTEM_SUMMARY: 'сводные расходы систем водоснабжения',
   LOADS: 'нагрузки',
   AIR_EXCHANGE: 'воздухообмены',
   EQUIPMENT_SPEC: 'спецификации',

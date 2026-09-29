@@ -84,7 +84,9 @@ const InspectionForm = ({
   const mutation = useStartInspection(projectId);
 
   const mep = sourceClass === 'MEP_DESIGN';
-  const ready = sourceClass !== '' && building.trim().length > 0 && (!mep || discipline !== '');
+  const buildingIsList = /\d\s*[,;]\s*\d/.test(building);
+  const ready =
+    sourceClass !== '' && building.trim().length > 0 && !buildingIsList && (!mep || discipline !== '');
 
   if (mutation.data) {
     return <InspectionResult inspection={mutation.data} onClose={onClose} />;
@@ -147,6 +149,12 @@ const InspectionForm = ({
           maxLength={64}
           className={FIELD}
         />
+        <span className="text-xs text-muted">
+          Укажите один корпус. Для корпуса 1 с секциями 1, 2 и 3 введите «1».
+        </span>
+        {buildingIsList && (
+          <span className="text-xs text-danger">Нельзя перечислить несколько корпусов.</span>
+        )}
       </label>
 
       {mep && (

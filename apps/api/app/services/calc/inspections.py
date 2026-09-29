@@ -74,6 +74,7 @@ SOURCE_CLASS_TITLES: Final[MappingProxyType[CalcSourceClass, str]] = MappingProx
         CalcSourceClass.ADJACENT_TASK: "Задание смежного раздела",
         CalcSourceClass.BRAND_LIST: "Бренд-лист",
         CalcSourceClass.TECHNICAL_REQUIREMENTS: "Технические требования",
+        CalcSourceClass.PROJECT_COMPOSITION: "Состав проекта",
         CalcSourceClass.CUSTOMER_VOR: "ВОР Заказчика",
         CalcSourceClass.MANUAL: "Ручной ввод",
     }

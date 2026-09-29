@@ -131,6 +131,7 @@ _SECTION_MARKS: Final[tuple[tuple[str, CalcSourceClass, CalcDiscipline | None], 
     ("ЭМ", CalcSourceClass.MEP_DESIGN, CalcDiscipline.EOM),
     ("СС", CalcSourceClass.MEP_DESIGN, CalcDiscipline.SS),
     ("ПЗ", CalcSourceClass.EXPLANATORY_NOTE, None),
+    ("СП", CalcSourceClass.PROJECT_COMPOSITION, None),
 )
 _TOKEN_SPLIT = re.compile(r"[-_.\s/,]+")
 

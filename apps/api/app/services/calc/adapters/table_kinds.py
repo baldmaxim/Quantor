@@ -17,16 +17,17 @@ from app.contracts.calc.enums import CalcTableKind
 from app.services.calc.adapters.markdown_tables import MarkdownTable
 from app.services.calc.adapters.normalize import normalize_text
 
-TABLE_KINDS_VERSION: Final = "calc.table_kinds.v1"
+TABLE_KINDS_VERSION: Final = "calc.table_kinds.v2"
 
 EXTRACTED_KINDS: Final = frozenset(
     {
         CalcTableKind.APARTMENT_EXPLICATION,
         CalcTableKind.ROOM_EXPLICATION,
         CalcTableKind.APARTMENT_SUMMARY,
+        CalcTableKind.WATER_SYSTEM_SUMMARY,
     }
 )
-"""Виды таблиц, из которых адаптеры версии v1 извлекают факты."""
+"""Виды таблиц, из которых текущие адаптеры извлекают факты."""
 
 UNEXTRACTED_FACT_TYPES: Final[MappingProxyType[CalcTableKind, tuple[str, ...]]] = MappingProxyType(
     {
@@ -97,6 +98,17 @@ def classify(table: MarkdownTable) -> TableClassification:
     fixtures = {m.group(0) for cell in (*header, *first) for m in _FIXTURE_WORDS.finditer(cell)}
     if by_context(r"санитарн\w*\s+прибор") or len(fixtures) >= 2:
         return TableClassification(CalcTableKind.SANITARY_FIXTURES, "названия приборов")
+    if (
+        header
+        and header[0] == "наименование системы"
+        and table.rows
+        and len(table.rows[0]) >= 5
+        and tuple(normalize_text(cell).replace("³", "3") for cell in table.rows[0][2:5])
+        == ("м3/сут", "м3/ч", "л/с")
+    ):
+        return TableClassification(
+            CalcTableKind.WATER_SYSTEM_SUMMARY, "шапка систем и единицы расходов"
+        )
     if hit := _find(header, r"потребител|водопотреблен|норм\w*\s+расход|расход\w*\s+вод"):
         return TableClassification(CalcTableKind.WATER_CONSUMERS, f"шапка: «{hit}»")
     if (hit := _find(header, r"воздухообмен|кратност")) or (
