@@ -42,9 +42,10 @@ pnpm lint:licenses               # гейт лицензий моделей по
 pnpm benchmark:viewer            # замер просмотрщика: холсты, память, отрисовка, панорама (ADR-0024)
 ```
 
-Боевая выкладка — `deploy/README.md` (ADR-0032): образы собирает `publish.yml` в GHCR, сервер
-Selectel (SSH-алиас `quantor`) обновляется `deploy/update.sh <git-sha>`. Вход в бою — `AUTH_MODE=local`
-с одобрением заявок в админке (ADR-0031); первый администратор — `python -m app.cli create-admin`.
+Боевая выкладка — `deploy.md` (обычный деплой) и `deploy/README.md` (первичная установка, ADR-0032):
+образы собирает `publish.yml` в GHCR, сервер Selectel (SSH-алиас `quantor`) обновляется
+`deploy/update.sh <git-sha>`. Вход в бою — `AUTH_MODE=local` с одобрением заявок в админке (ADR-0031);
+первый администратор — `python -m app.cli create-admin`.
 
 ## Границы этапа
 
