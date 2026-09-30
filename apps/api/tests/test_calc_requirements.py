@@ -255,7 +255,7 @@ class TestReadiness:
         issue = CalcInspectionIssueRead(
             code=CalcInspectionIssueCode.TABLE_NOT_EXTRACTED,
             fact_type="building.fixtures_count",
-            message="Найдена таблица вида SANITARY_FIXTURES: извлечение ещё не реализовано",
+            message="Найдена таблица «санитарные приборы»: извлечение ещё не реализовано",
             count=1,
         )
         status, reason, _ = _status("vk.apartments.fixtures", [], [_document(issues=(issue,))])

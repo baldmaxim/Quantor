@@ -35,6 +35,13 @@ const ENTERABLE: ReadonlySet<CalcReadinessRowRead['status']> = new Set([
   'NOT_INSPECTED',
 ]);
 
+/**
+ * Поэтажное данное «найдено», даже если этажей не хватает: полноту по этажам проверяет расчёт.
+ * Недостающий этаж (в том числе явный 0 на нежилом) вносится вручную, не трогая найденные.
+ */
+const addsFloor = (row: CalcReadinessRowRead, type: CalcFactTypeRead): boolean =>
+  row.status === 'FOUND' && type.required_subject.includes('floor');
+
 interface IReadinessActions {
   /** Ввести значение вручную — последний путь; нет права — кнопки нет. */
   onEnter?: (row: CalcReadinessRowRead) => void;
@@ -121,9 +128,9 @@ const ReadinessRow = ({
 
       <span className="flex flex-col items-start gap-[var(--s-2)]">
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-        {onEnter && type && ENTERABLE.has(row.status) && (
+        {onEnter && type && (ENTERABLE.has(row.status) || addsFloor(row, type)) && (
           <Button compact onClick={() => onEnter(row)}>
-            Ввести значение
+            {ENTERABLE.has(row.status) ? 'Ввести значение' : 'Добавить этаж'}
           </Button>
         )}
       </span>

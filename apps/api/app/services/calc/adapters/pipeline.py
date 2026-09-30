@@ -53,6 +53,7 @@ from app.services.calc.adapters.recognized import (
 from app.services.calc.adapters.system_semantics import extract_system_functions
 from app.services.calc.adapters.table_kinds import (
     EXTRACTED_KINDS,
+    TABLE_KIND_TITLES,
     TABLE_KINDS_VERSION,
     UNEXTRACTED_FACT_TYPES,
 )
@@ -254,7 +255,8 @@ def collect(document: RecognizedDocument, declaration: CollectionDeclaration) ->
                 issues.extend(
                     CandidateIssue(
                         CalcInspectionIssueCode.TABLE_NOT_EXTRACTED,
-                        f"Найдена таблица вида {kind.value}: извлечение ещё не реализовано",
+                        f"Найдена таблица «{TABLE_KIND_TITLES[kind]}»: "
+                        "извлечение ещё не реализовано",
                         fact_type,
                         count=kinds[kind],
                     )

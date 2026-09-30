@@ -40,7 +40,7 @@ from app.services.calc.adapters.pipeline import (
     validate_candidate,
 )
 from app.services.calc.adapters.recognized import RecognizedDocument, RecognizedRegion
-from app.services.calc.adapters.table_kinds import classify
+from app.services.calc.adapters.table_kinds import TABLE_KIND_TITLES, classify
 
 STAMP = (
     "> **Created:** 2026-09-28\n"
@@ -221,6 +221,22 @@ class TestTables:
     def test_kind_is_read_from_title_and_header(self, text: str, kind: CalcTableKind) -> None:
         [table] = parse_tables(text)
         assert classify(table).kind is kind
+
+    def test_every_kind_has_a_title(self) -> None:
+        assert set(TABLE_KIND_TITLES) == set(CalcTableKind)
+
+    def test_unextracted_table_is_named_in_russian(self) -> None:
+        """В сводке сбора — подпись вида таблицы, а не внутренний код."""
+        fixtures = (
+            "| Прибор | Количество |\n| --- | --- |\n| Умывальник | 207 |\n| Унитаз | 207 |\n"
+        )
+        result = collect(document(region(fixtures)), VK_DECLARED)
+        messages = {
+            item.message
+            for item in result.issues
+            if item.code is CalcInspectionIssueCode.TABLE_NOT_EXTRACTED
+        }
+        assert messages == {"Найдена таблица «санитарные приборы»: извлечение ещё не реализовано"}
 
 
 class TestNormalization:

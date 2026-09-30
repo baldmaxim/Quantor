@@ -46,6 +46,23 @@ UNEXTRACTED_FACT_TYPES: Final[MappingProxyType[CalcTableKind, tuple[str, ...]]] 
 данные, скорее всего, в документе есть.
 """
 
+TABLE_KIND_TITLES: Final[MappingProxyType[CalcTableKind, str]] = MappingProxyType(
+    {
+        CalcTableKind.APARTMENT_EXPLICATION: "экспликации квартир",
+        CalcTableKind.ROOM_EXPLICATION: "экспликации помещений",
+        CalcTableKind.PARKING_STORAGE: "машиноместа и кладовые",
+        CalcTableKind.APARTMENT_SUMMARY: "квартирография",
+        CalcTableKind.SANITARY_FIXTURES: "санитарные приборы",
+        CalcTableKind.WATER_CONSUMERS: "потребители воды",
+        CalcTableKind.WATER_SYSTEM_SUMMARY: "сводные расходы систем водоснабжения",
+        CalcTableKind.LOADS: "нагрузки",
+        CalcTableKind.AIR_EXCHANGE: "воздухообмены",
+        CalcTableKind.EQUIPMENT_SPEC: "спецификации",
+        CalcTableKind.UNKNOWN: "не определены",
+    }
+)
+"""Подписи видов для текста сводки сбора — те же, что в интерфейсе (`lib/calc/format.ts`)."""
+
 
 @dataclass(frozen=True, slots=True)
 class TableClassification:

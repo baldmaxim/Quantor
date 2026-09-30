@@ -64,6 +64,31 @@ describe('матрица требований системы', () => {
     expect(onEnter).toHaveBeenCalledWith(missing);
   });
 
+  it('в найденной поэтажной строке можно добавить недостающий этаж', async () => {
+    const onEnter = vi.fn();
+    const found = readinessRow();
+    render(<ReadinessTable rows={[found]} factTypes={TYPES} onEnter={onEnter} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Добавить этаж' }));
+    expect(onEnter).toHaveBeenCalledWith(found);
+  });
+
+  it('найденное значение уровня корпуса вручную не дописывается', () => {
+    const building = factType({
+      key: 'building.apartments_total',
+      required_subject: ['building'],
+      allowed_subject: ['building'],
+    });
+    const total = readinessRow({ fact_type: 'building.apartments_total' });
+    render(
+      <ReadinessTable
+        rows={[total]}
+        factTypes={new Map([['building.apartments_total', building]])}
+        onEnter={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Добавить этаж|Ввести значение/ })).toBeNull();
+  });
+
   it('без права ввода кнопки нет', () => {
     render(
       <ReadinessTable rows={[readinessRow({ status: 'MISSING', values: [] })]} factTypes={TYPES} />,
