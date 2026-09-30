@@ -442,6 +442,30 @@ class TestSummaryAndText:
         assert isinstance(evidence.locator, CalcRegionTextLocator)
         assert note.text[evidence.locator.start : evidence.locator.end].startswith("Этажность")
 
+    @pytest.mark.parametrize(
+        ("text", "fact_type", "value"),
+        [
+            ("Расчетное количество жителей — 2 235 человек.", "building.residents_count", 2235),
+            ("Расчетное количество жителей — 2\u00a0235 чел.", "building.residents_count", 2235),
+            ("Количество жителей: 764 чел.", "building.residents_count", 764),
+            ("Общее количество квартир — 1 024.", "building.apartments_total", 1024),
+        ],
+    )
+    def test_thousands_separator_is_part_of_the_number(
+        self, text: str, fact_type: str, value: int
+    ) -> None:
+        """«2 235» — одно число, а не 2: пробел между разрядами число не обрывает."""
+        result = collect(document(region(text)), NOTE_DECLARED)
+        assert accepted(result, fact_type, building="1").canonical.value == value
+
+    def test_broken_digit_groups_give_nothing_rather_than_a_wrong_number(self) -> None:
+        result = collect(document(region("Количество жителей — 2 23 человек.")), NOTE_DECLARED)
+        assert not [
+            item
+            for item in result.accepted
+            if item.candidate.fact_type == "building.residents_count"
+        ]
+
     def test_systems_named_in_a_note(self) -> None:
         result = collect(document(region(NOTE)), NOTE_DECLARED)
         codes = {

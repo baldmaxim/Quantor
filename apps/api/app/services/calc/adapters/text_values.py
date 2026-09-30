@@ -77,6 +77,10 @@ _ZERO_ABS = re.compile(
 )
 _APPROX = r"(?P<approx>≈|~|около|порядка|примерно)?\s*"
 _SEP = r"\s*(?:[—–:\-]|составляет|равн\w*)?\s*"
+_GROUP = r"[ \u00a0\u2009\u202f]"
+# «2 235 человек» — группы разрядов через пробел. Число не обрывается на пробеле перед цифрами:
+# иначе «2 235» молча читалось бы как 2 — неверное значение хуже ненайденного.
+_LARGE_COUNT = rf"(?P<v>\d{{1,3}}(?:{_GROUP}\d{{3}})+|\d{{1,5}})(?!\d|[.,]\d|{_GROUP}\d)"
 _COUNTS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     (
         "building.floors_above_ground",
@@ -98,7 +102,7 @@ _COUNTS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         "building.apartments_total",
         re.compile(
             rf"(?:общее\s+)?(?:количеств\w*|число)\s+квартир\w*"
-            rf"(?:\s+в\s+(?:доме|корпусе|здании))?{_SEP}{_APPROX}(?P<v>\d{{1,5}})(?!\d|[.,]\d)",
+            rf"(?:\s+в\s+(?:доме|корпусе|здании))?{_SEP}{_APPROX}{_LARGE_COUNT}",
             re.IGNORECASE,
         ),
     ),
@@ -112,7 +116,7 @@ _COUNTS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         "building.residents_count",
         re.compile(
             rf"(?:расч[её]тн\w*\s+)?(?:количеств\w*|число)\s+(?:жителей|проживающих)"
-            rf"{_SEP}{_APPROX}(?P<v>\d{{1,5}})(?!\d|[.,]\d)",
+            rf"{_SEP}{_APPROX}{_LARGE_COUNT}",
             re.IGNORECASE,
         ),
     ),

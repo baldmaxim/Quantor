@@ -63,7 +63,7 @@ from app.services.calc.adapters.text_values import (
 )
 from app.services.calc.adapters.water_summary import extract_water_summary
 
-EXTRACTOR_VERSION: Final = f"calc.recognized.v2+{TABLE_KINDS_VERSION}"
+EXTRACTOR_VERSION: Final = f"calc.recognized.v3+{TABLE_KINDS_VERSION}"
 
 DOCUMENT_FACT_TYPES: Final = frozenset(
     {
