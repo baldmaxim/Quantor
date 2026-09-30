@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
+import { PendingRequestsLink } from '@/components/shell/PendingRequestsLink';
 import { PendingUsersBadge } from '@/components/shell/PendingUsersBadge';
 import { env } from '@/lib/env';
 
@@ -30,7 +31,7 @@ interface ISection {
 const SECTIONS: readonly ISection[] = [
   { href: '/dashboard', label: 'Обзор', hint: 'Состояние установки' },
   { href: '/workspaces', label: 'Пространства', hint: 'Арендаторы' },
-  { href: '/users', label: 'Пользователи и доступ', hint: 'Личности, членство, роли' },
+  { href: '/users', label: 'Пользователи и доступ', hint: 'Заявки на доступ, роли, пароли' },
   { href: '/settings', label: 'Настройки', hint: 'Управляемые параметры' },
   { href: '/feature-flags', label: 'Флаги возможностей', hint: 'Что показано, что скрыто' },
   { href: '/integrations', label: 'Интеграции', hint: 'TenderHUB' },
@@ -123,6 +124,8 @@ export const ConsoleShell = ({ session, children }: IConsoleShellProps) => {
           </span>
 
           <div className="flex-1" />
+
+          <PendingRequestsLink />
 
           <span className="hidden max-w-[220px] truncate text-xs text-muted sm:block" title={actor}>
             {actor}

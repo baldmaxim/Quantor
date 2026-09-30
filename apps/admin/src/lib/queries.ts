@@ -321,7 +321,12 @@ export const useAdminUsers = (page: UsersQuery) =>
       ),
   });
 
-/** Число заявок, ждущих решения. Для отметки в навигации — отсюда видно, что ждут. */
+/**
+ * Число заявок, ждущих решения, — для отметок в навигации, шапке и на обзоре.
+ *
+ * Без опроса по таймеру: контур управления сам сервер не опрашивает. Число обновляется,
+ * когда администратор возвращается на вкладку, и после каждого действия с пользователями.
+ */
 export const usePendingUsersCount = () =>
   useQuery({
     queryKey: userKeys.pendingCount,
@@ -332,7 +337,7 @@ export const usePendingUsersCount = () =>
           throwOnError: true,
         }),
       ).total,
-    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
 export const useAdminWorkspaces = () =>

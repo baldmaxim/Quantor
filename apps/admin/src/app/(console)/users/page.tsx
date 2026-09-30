@@ -5,10 +5,17 @@ import { Button, EmptyState, ErrorState, SegmentedControl, SkeletonRows } from '
 import { useState } from 'react';
 
 import { Section } from '@/components/common/Section';
+import { AccessRequestsCard } from '@/components/users/AccessRequestsCard';
 import { TemporaryPasswordDialog } from '@/components/users/TemporaryPasswordDialog';
 import { UserAccessDialog } from '@/components/users/UserAccessDialog';
 import { UsersTable } from '@/components/users/UsersTable';
-import { useAdminUsers, useRejectUser, useSession, useSetUserActive } from '@/lib/queries';
+import {
+  useAdminUsers,
+  usePendingUsersCount,
+  useRejectUser,
+  useSession,
+  useSetUserActive,
+} from '@/lib/queries';
 import { failureText } from '@/lib/users';
 
 /**
@@ -29,8 +36,7 @@ const FILTERS: readonly { value: Filter; label: string }[] = [
   { value: 'all', label: 'Все' },
 ];
 
-const EMPTY: Record<Filter, string> = {
-  pending: 'Новых заявок нет. Заявку подают со страницы входа портала.',
+const EMPTY: Record<Exclude<Filter, 'pending'>, string> = {
   approved: 'Одобренных пользователей пока нет.',
   rejected: 'Отклонённых заявок нет.',
   all: 'Пользователей пока нет.',
@@ -46,6 +52,7 @@ const Page = () => {
   const [passwordFor, setPasswordFor] = useState<AdminUserRead | null>(null);
 
   const session = useSession();
+  const pendingCount = usePendingUsersCount();
   const users = useAdminUsers({
     limit: PAGE_SIZE,
     offset,
@@ -73,11 +80,21 @@ const Page = () => {
     }
 
     const { items, total } = users.data;
-    if (items.length === 0) return <EmptyState title="Пусто" description={EMPTY[filter]} />;
+    if (items.length === 0) {
+      // Пустая очередь заявок — повод объяснить, откуда они берутся, а не просто «пусто».
+      if (filter === 'pending') return <AccessRequestsCard />;
+      return <EmptyState title="Пусто" description={EMPTY[filter]} />;
+    }
 
     const shown = offset + items.length;
     return (
       <>
+        {filter === 'pending' && (
+          <p className="text-sm">
+            Нажмите «Одобрить» в строке заявки и выберите рабочее пространство и роль — доступ
+            откроется сразу. «Отклонить» закрывает заявку без доступа.
+          </p>
+        )}
         <UsersTable
           items={items}
           busyId={busyId}
@@ -112,7 +129,7 @@ const Page = () => {
   return (
     <Section
       title="Пользователи и доступ"
-      description="Заявки на доступ, роли в пространствах, временные пароли. Отключение сразу завершает все сеансы пользователя."
+      description="Здесь одобряют заявки на доступ к порталу и управляют пользователями: роль в пространстве, временный пароль, отключение. Отключение сразу завершает все сеансы пользователя."
     >
       <SegmentedControl
         label="Показать"
@@ -122,7 +139,11 @@ const Page = () => {
           setFilter(value);
           setOffset(0);
         }}
-        options={FILTERS}
+        options={FILTERS.map((item) =>
+          item.value === 'pending' && pendingCount.data
+            ? { ...item, label: `${item.label} · ${pendingCount.data}` }
+            : item,
+        )}
       />
 
       {failure && <p className="text-xs text-danger">{failureText(failure)}</p>}

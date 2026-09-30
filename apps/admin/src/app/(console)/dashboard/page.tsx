@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { Section } from '@/components/common/Section';
 import { Tile } from '@/components/common/Tile';
+import { AccessRequestsCard } from '@/components/users/AccessRequestsCard';
 import { env } from '@/lib/env';
 import { useFeatureFlags, useJobStats, useMeta, useTenderHubStatus } from '@/lib/queries';
 import { NOT_MEASURED, statusView, type ProbeStatus } from '@/lib/status';
@@ -59,6 +60,9 @@ const Page = () => {
           onRetry={() => void meta.refetch()}
         />
       )}
+
+      {/* Первым — то, что ждёт решения человека: состояние установки подождёт. */}
+      <AccessRequestsCard withLink />
 
       {meta.isPending ? (
         <SkeletonRows rows={4} />

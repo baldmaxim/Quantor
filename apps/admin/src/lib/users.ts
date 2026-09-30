@@ -42,3 +42,22 @@ export const failureText = (error: unknown): string => {
   if (typeof detail?.message === 'string') return detail.message;
   return 'Сервер отклонил действие. Обновите страницу и повторите.';
 };
+
+/**
+ * «1 заявка ждёт решения», «3 заявки ждут решения», «11 заявок ждут решения».
+ * Русское согласование: форма слова и глагола зависит от последних цифр числа.
+ */
+export const pendingSummary = (count: number): string => {
+  if (count <= 0) return 'Новых заявок нет';
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} заявка ждёт решения`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} заявки ждут решения`;
+  }
+  return `${count} заявок ждут решения`;
+};
+
+/** Ссылка на форму заявки в портале — её администратор отправляет коллегам. */
+export const registrationUrl = (portalUrl: string): string =>
+  new URL('/register', portalUrl).toString();

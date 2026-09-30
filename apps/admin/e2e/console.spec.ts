@@ -183,3 +183,22 @@ test('заявка на доступ видна в очереди и откры�
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('combobox')).toHaveValue('00000000-0000-4000-8000-000000000001');
 });
+
+test('обзор показывает, где одобрять заявки, и ведёт туда', async ({ page }) => {
+  await page.goto('/dashboard');
+
+  const card = page.getByRole('region', { name: 'Заявки на доступ' });
+  await expect(card).toBeVisible();
+  await expect(card.getByText('1 заявка ждёт решения')).toBeVisible();
+  await expect(card.getByText('/register')).toBeVisible();
+
+  // Ссылка в шапке видна и там, где навигация свёрнута.
+  await expect(page.getByRole('link', { name: 'Заявки: 1' })).toBeVisible();
+
+  await card.getByRole('link', { name: 'Рассмотреть заявки' }).click();
+  await expect(page).toHaveURL(/\/users/);
+  await expect(page.getByRole('button', { name: /Заявки · 1/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});

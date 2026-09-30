@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Spinner, cx } from '@/components/ui';
+import { usePendingAccessRequests } from '@/lib/access-requests';
 import { env } from '@/lib/env';
 import { useLogout, useSession } from '@/lib/session';
 
@@ -21,6 +22,8 @@ const ADMIN_PERMISSION = 'system.admin';
 export const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
   const { data: session } = useSession();
   const logout = useLogout();
+  const canOpenAdmin = session?.permissions?.includes(ADMIN_PERMISSION) ?? false;
+  const { data: pendingRequests = 0 } = usePendingAccessRequests(canOpenAdmin);
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
 
@@ -49,7 +52,6 @@ export const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
   const initial = label.trim().charAt(0).toUpperCase() || '?';
   const workspaces = session.workspaces ?? [];
   const current = workspaces.find((item) => item.id === session.workspace_id);
-  const canOpenAdmin = session.permissions?.includes(ADMIN_PERMISSION) ?? false;
 
   return (
     <div ref={container} className="relative">
@@ -58,10 +60,14 @@ export const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Учётная запись: ${label}`}
+        aria-label={
+          pendingRequests > 0
+            ? `Учётная запись: ${label}. Заявок на доступ: ${pendingRequests}`
+            : `Учётная запись: ${label}`
+        }
         title={label}
         className={cx(
-          'press grid place-items-center rounded-full border border-border-control bg-surface-muted text-xs font-semibold text-text',
+          'press relative grid place-items-center rounded-full border border-border-control bg-surface-muted text-xs font-semibold text-text',
           compact ? 'h-[28px] w-[28px]' : 'h-[32px] w-[32px]',
           // На телефоне кнопку тянет до тап-цели 44px: без явной ширины круг
           // растягивался в овал.
@@ -70,6 +76,13 @@ export const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
         )}
       >
         {initial}
+        {pendingRequests > 0 && (
+          // Точка, а не число: на круге в 28 пикселей число не читается. Число — в меню.
+          <span
+            aria-hidden="true"
+            className="absolute -top-[2px] -right-[2px] h-[10px] w-[10px] rounded-full border-2 border-surface bg-warning"
+          />
+        )}
       </button>
 
       {open && (
@@ -113,6 +126,17 @@ export const AccountMenu = ({ compact = false }: { compact?: boolean }) => {
                 </span>
               ))}
             </div>
+          )}
+
+          {canOpenAdmin && pendingRequests > 0 && (
+            <a
+              href={`${env.adminUrl}/users`}
+              role="menuitem"
+              className="press mb-[var(--s-2)] flex items-center justify-between gap-[var(--s-3)] rounded-[var(--radius-xs)] bg-warning-soft px-[var(--s-3)] py-[var(--s-3)] text-sm text-warning hover:text-text"
+            >
+              Заявки на доступ
+              <span className="font-semibold">{pendingRequests}</span>
+            </a>
           )}
 
           {canOpenAdmin && (

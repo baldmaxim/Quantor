@@ -1,7 +1,7 @@
 import type { AdminUserRead } from '@quantor/api-client';
 import { describe, expect, it } from 'vitest';
 
-import { isLocked, roleLabel, userState } from './users';
+import { isLocked, pendingSummary, registrationUrl, roleLabel, userState } from './users';
 
 const user = (patch: Partial<AdminUserRead> = {}): AdminUserRead => ({
   id: 'u1',
@@ -41,5 +41,27 @@ describe('состояние пользователя', () => {
   it('роль подписана по-русски', () => {
     expect(roleLabel('engineer')).toBe('Инженер');
     expect(roleLabel('неизвестная')).toBe('неизвестная');
+  });
+});
+
+describe('заявки на доступ', () => {
+  it.each([
+    [0, 'Новых заявок нет'],
+    [1, '1 заявка ждёт решения'],
+    [3, '3 заявки ждут решения'],
+    [5, '5 заявок ждут решения'],
+    [11, '11 заявок ждут решения'],
+    [12, '12 заявок ждут решения'],
+    [21, '21 заявка ждёт решения'],
+    [22, '22 заявки ждут решения'],
+  ])('%i → «%s»', (count, text) => {
+    expect(pendingSummary(count)).toBe(text);
+  });
+
+  it('ссылка на регистрацию ведёт в портал', () => {
+    expect(registrationUrl('https://quantor.meridianai.ru')).toBe(
+      'https://quantor.meridianai.ru/register',
+    );
+    expect(registrationUrl('http://localhost:3000/')).toBe('http://localhost:3000/register');
   });
 });
