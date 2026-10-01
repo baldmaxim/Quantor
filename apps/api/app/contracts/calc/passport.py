@@ -36,8 +36,10 @@ from app.contracts.calc.enums import (
     CalcSynthesisStatus,
     CalcUnresolvedKind,
 )
+from app.contracts.calc.rules import CalcRuleSource, LocalName, LongText
 from app.contracts.calc.subjects import CalcFactSubject, normalize_system_code
 from app.contracts.calc.synthesis import CalcSynthesisTraceNode, CalcSynthesizerRead
+from app.contracts.calc.values import DecimalText
 
 QUANTITY_KEY_PATTERN: Final = r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+){1,5}$"
 MINIMUM_NOTICE: Final = "Это нижняя оценка, не проектное решение"
@@ -378,6 +380,35 @@ class CalcVkRuleNeedRead(BaseModel):
     affects: list[str]
     gate: bool
     example: str
+
+
+class CalcVkRuleParameterValue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: LocalName
+    value: DecimalText
+    """В единице параметра заявки."""
+
+
+class CalcVkRuleVersionCreate(BaseModel):
+    """Версия правила по заявке калькулятора ВК: значения параметров и основание вносит инженер.
+
+    Контракт реализации (входы, выходы, реализация, формула) берётся из заявки — его не набирают
+    руками. Черновик утверждает другой человек с правом проверки.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_type: CalcRuleType
+    """Один из типов, допустимых заявкой."""
+    parameters: Annotated[list[CalcVkRuleParameterValue], Field(max_length=30)]
+    sources: Annotated[list[CalcRuleSource], Field(min_length=1, max_length=10)]
+    limitations: Annotated[list[LongText], Field(max_length=10)] = Field(default_factory=list)
+    """Ограничения применения сверх общего «значения — только из источника версии»."""
+    impact: LongText | None = None
+    """Влияние на результат — обязательно у тендерного допущения."""
+    change_reason: LongText | None = None
+    """Почему новая версия — обязательно, если у правила уже есть решённые версии."""
 
 
 class CalcVkCalculatorRead(BaseModel):

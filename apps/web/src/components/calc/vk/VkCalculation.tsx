@@ -1,6 +1,7 @@
 'use client';
 
 import type { CalcPassportRead } from '@quantor/api-client';
+import Link from 'next/link';
 
 import { StatusBadge } from '@/components/ui';
 import { LAYER_TITLES, RULE_READINESS, amountText } from '@/lib/calc/vk';
@@ -10,7 +11,13 @@ import { LAYER_TITLES, RULE_READINESS, amountText } from '@/lib/calc/vk';
  * решений. Документальное значение не заменяется расчётом: расхождение видно отдельно.
  */
 
-export const VkCalculation = ({ passport }: { passport: CalcPassportRead }) => {
+export const VkCalculation = ({
+  projectId,
+  passport,
+}: {
+  projectId: string;
+  passport: CalcPassportRead;
+}) => {
   const { calculation, checks, rules } = passport.body;
   return (
     <div className="flex flex-col gap-[var(--s-5)]">
@@ -56,7 +63,15 @@ export const VkCalculation = ({ passport }: { passport: CalcPassportRead }) => {
         </ul>
       </section>
       <section className="flex flex-col gap-[var(--s-2)]">
-        <h3 className="text-sm font-medium">Инженерные решения калькулятора</h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-[var(--s-3)]">
+          <h3 className="text-sm font-medium">Инженерные решения калькулятора</h3>
+          <Link
+            href={`/projects/${projectId}/calc/rules`}
+            className="inline-flex min-h-[44px] items-center text-sm text-accent underline-offset-2 hover:underline md:min-h-0"
+          >
+            Внести или проверить решения
+          </Link>
+        </div>
         <ul className="flex list-none flex-col divide-y divide-border rounded-[var(--radius-sm)] border border-border text-sm">
           {rules.map((rule) => (
             <li

@@ -5927,6 +5927,54 @@ export type CalcVkRuleNeedRead = {
 };
 
 /**
+ * CalcVkRuleParameterValue
+ */
+export type CalcVkRuleParameterValue = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Value
+     *
+     * Десятичное число строкой: «12.5», «-1», «0.035».
+     */
+    value: string;
+};
+
+/**
+ * CalcVkRuleVersionCreate
+ *
+ * Версия правила по заявке калькулятора ВК: значения параметров и основание вносит инженер.
+ *
+ * Контракт реализации (входы, выходы, реализация, формула) берётся из заявки — его не набирают
+ * руками. Черновик утверждает другой человек с правом проверки.
+ */
+export type CalcVkRuleVersionCreate = {
+    /**
+     * Change Reason
+     */
+    change_reason?: string | null;
+    /**
+     * Impact
+     */
+    impact?: string | null;
+    /**
+     * Limitations
+     */
+    limitations?: Array<string>;
+    /**
+     * Parameters
+     */
+    parameters: Array<CalcVkRuleParameterValue>;
+    rule_type: CalcRuleType;
+    /**
+     * Sources
+     */
+    sources: Array<CalcNormativeSource | CalcManufacturerSource | CalcEngineeringSource | CalcDecisionSource | CalcLegacySource | CalcOtherSource>;
+};
+
+/**
  * CalcVkRunCreate
  *
  * Расчёт комплекта ВК: корпус (и секция), системы. Три сценария — всегда вместе.
@@ -12764,6 +12812,36 @@ export type ListCalcVkVolumesResponses = {
 };
 
 export type ListCalcVkVolumesResponse = ListCalcVkVolumesResponses[keyof ListCalcVkVolumesResponses];
+
+export type SaveCalcVkRuleVersionData = {
+    body: CalcVkRuleVersionCreate;
+    path: {
+        /**
+         * Rule Key
+         */
+        rule_key: string;
+    };
+    query?: never;
+    url: '/api/v1/calc/vk/rules/{rule_key}/versions';
+};
+
+export type SaveCalcVkRuleVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SaveCalcVkRuleVersionError = SaveCalcVkRuleVersionErrors[keyof SaveCalcVkRuleVersionErrors];
+
+export type SaveCalcVkRuleVersionResponses = {
+    /**
+     * Successful Response
+     */
+    201: CalcRuleVersionRead;
+};
+
+export type SaveCalcVkRuleVersionResponse = SaveCalcVkRuleVersionResponses[keyof SaveCalcVkRuleVersionResponses];
 
 export type GetCalcVkVolumeTraceData = {
     body?: never;

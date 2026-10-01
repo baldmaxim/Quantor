@@ -24,6 +24,7 @@ def rule_content(
     rule_type: CalcRuleType | None = None,
     systems: Sequence[str] | None = None,
     impact: str | None = None,
+    limitations: Sequence[str] = (),
 ) -> CalcRuleContent:
     """Версия правила по заявке. ValueError — нет реализации или не хватает параметра."""
     if need.implementation_key is None:
@@ -41,7 +42,10 @@ def rule_content(
                 "systems": list(systems or need.systems),
                 "stages": ["P"],
                 "scope": "Жилые здания, стадия П: оценка до РД.",
-                "limitations": ["Значения параметров — только из источника версии правила."],
+                "limitations": [
+                    "Значения параметров — только из источника версии правила.",
+                    *limitations,
+                ],
             },
             "inputs": [
                 {

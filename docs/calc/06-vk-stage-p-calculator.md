@@ -331,12 +331,13 @@ upgrade → check → downgrade → upgrade → check — чисто.
 
 ## AG. API
 
-10 операций (всего calc — 60), все за флагом `calc.portal` и правами `calc.*`; путей с маркерами
+11 операций (всего calc — 61), все за флагом `calc.portal` и правами `calc.*`; путей с маркерами
 обмера и `/mep/` нет:
 
 | Операция                                | Метод и путь                                            |
 | --------------------------------------- | ------------------------------------------------------- |
 | калькуляторы ВК с заявками на правила   | `GET /calc/vk/calculators`                              |
+| версия правила по заявке (гейт)         | `POST /calc/vk/rules/{key}/versions`                    |
 | готовность: назначение, данные, правила | `GET /calc/projects/{id}/vk/readiness?building&section` |
 | рассчитать комплект                     | `POST /calc/projects/{id}/vk/passports`                 |
 | история паспортов                       | `GET /calc/projects/{id}/vk/passports`                  |

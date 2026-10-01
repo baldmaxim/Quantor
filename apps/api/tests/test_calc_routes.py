@@ -29,9 +29,10 @@ CALC_PERMISSIONS = {Permission.CALC_READ, Permission.CALC_EDIT, Permission.CALC_
 FOREIGN_MARKERS = ("takeoff-items", "measurements", "quantities", "scale-calibrations", "/mep/")
 
 # Операции PROMPT 01 (11), PROMPT 02 (6), PROMPT 03 (12), PROMPT 04 (9), PROMPT 05 (12) и
-# PROMPT 06 (10). Число сверяется точно: маршрут «на будущее» должен ломать тест, а не проходить
-# мимо (решение владельца: API будущих сущностей до их промта не заводится).
-EXPECTED_OPERATIONS = 60
+# PROMPT 06 (10 + версия правила по заявке для гейта). Число сверяется точно: маршрут «на
+# будущее» должен ломать тест, а не проходить мимо (решение владельца: API будущих сущностей до
+# их промта не заводится).
+EXPECTED_OPERATIONS = 61
 
 
 def _routes() -> list[APIRoute]:

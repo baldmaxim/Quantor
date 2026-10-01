@@ -16,6 +16,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Response, status
 
 from app.api.v1.calc import project_in_scope
+from app.api.v1.calc_rules import audit_rule_version
 from app.api.v1.deps import AuthDep, SessionDep, require, require_feature
 from app.auth.permissions import Permission
 from app.contracts.calc.engine import CalcAssumptionRecord
@@ -31,9 +32,11 @@ from app.contracts.calc.passport import (
     CalcVkCalculatorRead,
     CalcVkReadinessRead,
     CalcVkRuleNeedRead,
+    CalcVkRuleVersionCreate,
     CalcVkRunCreate,
     CalcVkSystemReadinessRead,
 )
+from app.contracts.calc.rules import CalcRuleVersionRead
 from app.contracts.calc.synthesis import CalcSystemGraph
 from app.domain import AuditAction
 from app.errors import not_found
@@ -42,9 +45,10 @@ from app.services import audit as audit_service
 from app.services.calc import readiness as input_readiness
 from app.services.calc.engine.catalog import CALCULATORS
 from app.services.calc.engine.reads import calculator_read
+from app.services.calc.rules import registry as rules_registry
 from app.services.calc.synthesis.catalog import SYNTHESIZERS
 from app.services.calc.synthesis.reads import synthesizer_read
-from app.services.calc.systems.vk import orchestrator, reads
+from app.services.calc.systems.vk import orchestrator, reads, rule_versions
 from app.services.calc.systems.vk.passport_sections import missing as missing_rows
 from app.services.calc.systems.vk.readiness import (
     function_title,
@@ -118,6 +122,36 @@ async def list_calc_vk_calculators() -> list[CalcVkCalculatorRead]:
         )
         for spec in VK_SPECS
     ]
+
+
+@router.post(
+    "/vk/rules/{rule_key}/versions",
+    response_model=CalcRuleVersionRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Версия правила по заявке калькулятора ВК",
+    dependencies=[require(Permission.CALC_EDIT)],
+)
+async def save_calc_vk_rule_version(
+    rule_key: str, payload: CalcVkRuleVersionCreate, session: SessionDep, context: AuthDep
+) -> CalcRuleVersionRead:
+    """Черновик по заявке: значения параметров и основание — инженера, контракт — из заявки.
+
+    Нет правила — создаётся; есть черновик — он правится; иначе — новая версия с причиной.
+    Утверждает другой человек: `POST /calc/rules/{rule_key}/versions/{version}/approve`.
+    """
+    try:
+        definition, row, action = await rule_versions.save(
+            session,
+            workspace_id=context.tenant,
+            rule_key=rule_key,
+            payload=payload,
+            author=context.principal.user_id,
+        )
+    except LookupError:
+        raise not_found("Заявка правила") from None
+    await audit_rule_version(session, context, action, definition, row)
+    await session.commit()
+    return rules_registry.version_read(definition, row, rules_registry.today())
 
 
 @router.get(

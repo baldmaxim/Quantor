@@ -4,23 +4,25 @@ import type { CalcLegacyCatalog } from '@quantor/api-client';
 import { useState } from 'react';
 
 import { LegacyRulesTable } from '@/components/calc/LegacyRulesTable';
+import { RuleNeeds } from '@/components/calc/RuleNeeds';
 import { RulesTable } from '@/components/calc/RulesTable';
 import { EmptyState, ErrorState, SegmentedControl, SkeletonRows } from '@/components/ui';
 import { LEGACY_CATALOG_TITLES } from '@/lib/calc/rules';
 import { useCalcLegacyRules, useCalcRules } from '@/lib/calc/queries';
 
 /**
- * Экран «Расчёты → Правила»: диагностический, только чтение. Редактора правил нет —
- * черновики, утверждение и вывод из действия идут через API реестра.
+ * Экран «Расчёты → Правила». Решения инженера по заявкам калькуляторов ВК вносятся и
+ * утверждаются здесь; реестр и карантин старого портала — только чтение. Правило вне заявок,
+ * правило производителя и вывод из действия — через API реестра.
  */
 
-type Section = 'rules' | 'legacy';
+type Section = 'needs' | 'rules' | 'legacy';
 type CatalogFilter = CalcLegacyCatalog | 'ALL';
 
 const CATALOGS: readonly CalcLegacyCatalog[] = ['VK', 'K', 'OV', 'VRF', 'FIRE'];
 
 export const CalcRules = () => {
-  const [section, setSection] = useState<Section>('rules');
+  const [section, setSection] = useState<Section>('needs');
   const [catalog, setCatalog] = useState<CatalogFilter>('ALL');
   const rules = useCalcRules(section === 'rules');
   const legacy = useCalcLegacyRules(section === 'legacy');
@@ -36,10 +38,13 @@ export const CalcRules = () => {
         value={section}
         onChange={setSection}
         options={[
+          { value: 'needs', label: 'Решения инженера ВК' },
           { value: 'rules', label: 'Правила Quantor' },
           { value: 'legacy', label: 'Старый портал — карантин' },
         ]}
       />
+
+      {section === 'needs' && <RuleNeeds />}
 
       {section === 'rules' &&
         (rules.isError ? (

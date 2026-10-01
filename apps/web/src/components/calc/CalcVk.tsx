@@ -171,7 +171,7 @@ export const CalcVk = ({ projectId }: { projectId: string }) => {
           ) : !passport.data ? (
             <SkeletonRows rows={4} />
           ) : tab === 'calculation' ? (
-            <VkCalculation passport={passport.data} />
+            <VkCalculation projectId={projectId} passport={passport.data} />
           ) : tab === 'structure' ? (
             <VkStructureTab passport={passport.data} scenario={scenario} />
           ) : tab === 'volumes' ? (

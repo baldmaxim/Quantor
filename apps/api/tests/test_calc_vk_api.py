@@ -31,7 +31,15 @@ from app.models import (
 )
 from app.services import documents as documents_service
 from app.services import projects as projects_service
-from tests.calc_vk_fixtures import API, APPROVE, Building, VkProject, _as, content_for
+from tests.calc_vk_fixtures import (
+    API,
+    APPROVE,
+    ENGINEERING_SOURCE,
+    Building,
+    VkProject,
+    _as,
+    content_for,
+)
 from tests.test_calc_inspections_api import _collect, _recognized
 
 NOTE = """Этажность здания — 24 этажа.
@@ -396,3 +404,79 @@ class TestAccess:
         readiness = await vk.get(f"/projects/{vk.project.id}/vk/readiness", building="1")
         statuses = {rule["status"] for item in readiness["systems"] for rule in item["rules"]}
         assert statuses <= {"SOURCE_REQUIRED", "IMPLEMENTATION_REQUIRED"}
+
+    async def test_gate_decision_from_need_is_approved_by_second_person(
+        self, vk: VkProject
+    ) -> None:
+        """Решение инженера по заявке: контракт — из заявки, утверждает другой человек."""
+        key = "vk.b1.risers.count_range"
+        body: dict[str, Any] = {
+            "rule_type": "ENGINEERING",
+            "parameters": [
+                {"name": "per_riser_min", "value": "2"},
+                {"name": "per_riser_max", "value": "3"},
+            ],
+            "sources": [ENGINEERING_SOURCE],
+            "limitations": ["Только типовые жилые этажи."],
+        }
+        draft = await vk.post(f"/vk/rules/{key}/versions", body)
+        assert (draft["version"], draft["status"]) == (1, "DRAFT")
+        assert draft["content"]["implementation_key"] == "vk.risers.count_range.v1"
+        assert [item["value"] for item in draft["content"]["parameters"]] == ["2", "3"]
+        assert "Только типовые жилые этажи." in draft["content"]["applicability"]["limitations"]
+
+        # Повтор до утверждения правит черновик, а не плодит версии.
+        fixed = {
+            **body,
+            "parameters": [
+                {"name": "per_riser_min", "value": "2"},
+                {"name": "per_riser_max", "value": "4"},
+            ],
+        }
+        again = await vk.post(f"/vk/rules/{key}/versions", fixed)
+        assert again["version"] == 1
+        assert [item["value"] for item in again["content"]["parameters"]] == ["2", "4"]
+
+        async with vk.engineer() as client:
+            own = await client.post(f"{API}/rules/{key}/versions/1/approve", json=APPROVE)
+        assert own.status_code == 403
+        async with vk.reviewer() as client:
+            approved = await client.post(f"{API}/rules/{key}/versions/1/approve", json=APPROVE)
+        assert approved.status_code == 200, approved.text
+        readiness = await vk.get(f"/projects/{vk.project.id}/vk/readiness", building="1")
+        [b1] = [item for item in readiness["systems"] if item["system_code"] == "В1"]
+        assert {rule["rule_key"]: rule["status"] for rule in b1["rules"]}[key] == "READY"
+
+        # Утверждённая версия не правится: новая — только с причиной.
+        async with vk.engineer() as client:
+            no_reason = await client.post(f"{API}/vk/rules/{key}/versions", json=body)
+        assert no_reason.status_code == 422
+        second = await vk.post(
+            f"/vk/rules/{key}/versions", {**body, "change_reason": "Уточнено по схеме В1."}
+        )
+        assert (second["version"], second["status"]) == (2, "DRAFT")
+
+    async def test_decision_from_need_is_checked_against_the_need(self, vk: VkProject) -> None:
+        risers = {
+            "rule_type": "ENGINEERING",
+            "parameters": [
+                {"name": "per_riser_min", "value": "2"},
+                {"name": "per_riser_max", "value": "3"},
+            ],
+            "sources": [ENGINEERING_SOURCE],
+        }
+        cases: list[tuple[str, dict[str, Any], int]] = [
+            ("vk.b1.risers.count_range", {**risers, "rule_type": "TENDER_ASSUMPTION"}, 422),
+            ("vk.b1.risers.count_range", {**risers, "parameters": risers["parameters"][:1]}, 422),
+            ("vk.main.coarse_routing", {**risers, "parameters": []}, 422),
+            ("vk.unknown.rule", risers, 404),
+        ]
+        async with vk.engineer() as client:
+            for key, body, code in cases:
+                response = await client.post(f"{API}/vk/rules/{key}/versions", json=body)
+                assert response.status_code == code, (key, response.text)
+        async with vk.build_api(_as(Role.VIEWER, vk.workspace_id)) as client:
+            viewer = await client.post(
+                f"{API}/vk/rules/vk.b1.risers.count_range/versions", json=risers
+            )
+        assert viewer.status_code == 403

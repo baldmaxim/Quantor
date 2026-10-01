@@ -52,7 +52,7 @@ router = APIRouter(prefix="/calc", tags=["calc"], dependencies=[require_feature(
 _RULE = "Правило"
 
 
-async def _audit(
+async def audit_rule_version(
     session: SessionDep,
     context: AuthContext,
     action: AuditAction,
@@ -120,7 +120,7 @@ async def create_calc_rule(
         payload=payload,
         author=context.principal.user_id,
     )
-    await _audit(session, context, AuditAction.CALC_RULE_CREATED, definition, row)
+    await audit_rule_version(session, context, AuditAction.CALC_RULE_CREATED, definition, row)
     await session.commit()
     return registry.version_read(definition, row, registry.today())
 
@@ -183,7 +183,7 @@ async def update_calc_rule_draft(
         )
     except LookupError:
         raise not_found(_RULE) from None
-    await _audit(session, context, AuditAction.CALC_RULE_DRAFT_UPDATED, definition, row)
+    await audit_rule_version(session, context, AuditAction.CALC_RULE_DRAFT_UPDATED, definition, row)
     await session.commit()
     return registry.version_read(definition, row, registry.today())
 
@@ -208,7 +208,9 @@ async def create_calc_rule_version(
         )
     except LookupError:
         raise not_found(_RULE) from None
-    await _audit(session, context, AuditAction.CALC_RULE_VERSION_CREATED, definition, row)
+    await audit_rule_version(
+        session, context, AuditAction.CALC_RULE_VERSION_CREATED, definition, row
+    )
     await session.commit()
     return registry.version_read(definition, row, registry.today())
 
@@ -239,8 +241,10 @@ async def approve_calc_rule_version(
     except LookupError:
         raise not_found(_RULE) from None
     if previous is not None:
-        await _audit(session, context, AuditAction.CALC_RULE_DEPRECATED, definition, previous)
-    await _audit(session, context, AuditAction.CALC_RULE_APPROVED, definition, row)
+        await audit_rule_version(
+            session, context, AuditAction.CALC_RULE_DEPRECATED, definition, previous
+        )
+    await audit_rule_version(session, context, AuditAction.CALC_RULE_APPROVED, definition, row)
     await session.commit()
     return registry.version_read(definition, row, registry.today())
 
@@ -269,7 +273,7 @@ async def reject_calc_rule_version(
         )
     except LookupError:
         raise not_found(_RULE) from None
-    await _audit(session, context, AuditAction.CALC_RULE_REJECTED, definition, row)
+    await audit_rule_version(session, context, AuditAction.CALC_RULE_REJECTED, definition, row)
     await session.commit()
     return registry.version_read(definition, row, registry.today())
 
@@ -299,7 +303,7 @@ async def deprecate_calc_rule_version(
         )
     except LookupError:
         raise not_found(_RULE) from None
-    await _audit(session, context, AuditAction.CALC_RULE_DEPRECATED, definition, row)
+    await audit_rule_version(session, context, AuditAction.CALC_RULE_DEPRECATED, definition, row)
     await session.commit()
     return registry.version_read(definition, row, registry.today())
 
@@ -360,6 +364,6 @@ async def create_calc_rule_from_legacy(
         payload=payload,
         author=context.principal.user_id,
     )
-    await _audit(session, context, AuditAction.CALC_RULE_CREATED, definition, row)
+    await audit_rule_version(session, context, AuditAction.CALC_RULE_CREATED, definition, row)
     await session.commit()
     return registry.version_read(definition, row, registry.today())

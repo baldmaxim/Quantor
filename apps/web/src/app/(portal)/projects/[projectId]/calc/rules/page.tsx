@@ -50,7 +50,7 @@ const CalcRulesPage = ({ params }: IPageProps) => {
           { label: 'Расчёты', href: `/projects/${projectId}/calc` },
           { label: 'Правила' },
         ]}
-        status={<StatusBadge tone="warning">разработка · только чтение</StatusBadge>}
+        status={<StatusBadge tone="warning">разработка</StatusBadge>}
       />
       <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-[var(--s-5)]">

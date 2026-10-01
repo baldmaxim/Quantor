@@ -11223,6 +11223,128 @@
         "title": "CalcVkRuleNeedRead",
         "type": "object"
       },
+      "CalcVkRuleParameterValue": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "description": "Десятичное число строкой: «12.5», «-1», «0.035».",
+            "pattern": "^-?\\d{1,12}(\\.\\d{1,9})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "CalcVkRuleParameterValue",
+        "type": "object"
+      },
+      "CalcVkRuleVersionCreate": {
+        "additionalProperties": false,
+        "description": "Версия правила по заявке калькулятора ВК: значения параметров и основание вносит инженер.\n\nКонтракт реализации (входы, выходы, реализация, формула) берётся из заявки — его не набирают\nруками. Черновик утверждает другой человек с правом проверки.",
+        "properties": {
+          "change_reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "limitations": {
+            "items": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/CalcVkRuleParameterValue"
+            },
+            "maxItems": 30,
+            "title": "Parameters",
+            "type": "array"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/CalcRuleType"
+          },
+          "sources": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "ENGINEERING_METHOD": "#/components/schemas/CalcEngineeringSource",
+                  "LEGACY_CODE": "#/components/schemas/CalcLegacySource",
+                  "MANUFACTURER_DOCUMENT": "#/components/schemas/CalcManufacturerSource",
+                  "NORMATIVE_DOCUMENT": "#/components/schemas/CalcNormativeSource",
+                  "OTHER": "#/components/schemas/CalcOtherSource",
+                  "OWNER_DECISION": "#/components/schemas/CalcDecisionSource",
+                  "REVIEWER_DECISION": "#/components/schemas/CalcDecisionSource"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/CalcNormativeSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcManufacturerSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcEngineeringSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcDecisionSource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcLegacySource"
+                },
+                {
+                  "$ref": "#/components/schemas/CalcOtherSource"
+                }
+              ]
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rule_type",
+          "parameters",
+          "sources"
+        ],
+        "title": "CalcVkRuleVersionCreate",
+        "type": "object"
+      },
       "CalcVkRunCreate": {
         "additionalProperties": false,
         "description": "Расчёт комплекта ВК: корпус (и секция), системы. Три сценария — всегда вместе.",
@@ -23227,6 +23349,59 @@
           }
         },
         "summary": "Ожидаемые количества паспорта",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/api/v1/calc/vk/rules/{rule_key}/versions": {
+      "post": {
+        "description": "Черновик по заявке: значения параметров и основание — инженера, контракт — из заявки.\n\nНет правила — создаётся; есть черновик — он правится; иначе — новая версия с причиной.\nУтверждает другой человек: `POST /calc/rules/{rule_key}/versions/{version}/approve`.",
+        "operationId": "save_calc_vk_rule_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_key",
+            "required": true,
+            "schema": {
+              "title": "Rule Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcVkRuleVersionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalcRuleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версия правила по заявке калькулятора ВК",
         "tags": [
           "calc"
         ]
