@@ -1,0 +1,35 @@
+[project]
+name = "building-model"
+version = "0.1.0"
+description = "Офлайн-прототип нормализатора модели здания (план docs/building-model, этап M1): выход plangeom -> quantor.building_model.v1"
+requires-python = ">=3.12"
+# Нормализатор — чистая функция над JSON: стандартная библиотека и Pydantic v2, без Shapely, numpy и OpenCV.
+# Он должен потом работать в обычном воркере (без тяжёлых зависимостей). plangeom сюда не входит:
+# работаем только с его выходным JSON. Команды check-binding и overlay используют pypdfium2/Pillow
+# из отдельного окружения оценки и Pydantic не тянут.
+dependencies = ["pydantic>=2.6"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "S"]
+# Документация и комментарии на русском: кириллица не «неоднозначный символ».
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["building_model", "tests"]
+
+[[tool.mypy.overrides]]
+# pypdfium2 и Pillow стоят только в окружении оценки plangeom, в основном окружении их нет.
+module = ["pypdfium2", "pypdfium2.*", "PIL", "PIL.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

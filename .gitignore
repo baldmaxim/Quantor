@@ -98,3 +98,4 @@ ml_peer*
 # Вывод plangeom по чертежу заказчика и справка несвободного пакета — только локально
 plangeom_example_*.json
 plangeom_fields.txt
+/tools/building_model/out/
