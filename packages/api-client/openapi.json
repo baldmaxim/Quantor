@@ -17770,6 +17770,18 @@
             ],
             "title": "Imported Project Id"
           },
+          "same_number_project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Same Number Project Id"
+          },
           "submission_deadline": {
             "anyOf": [
               {
@@ -17828,9 +17840,48 @@
           "construction_scope",
           "submission_deadline",
           "updated_at",
-          "imported_project_id"
+          "imported_project_id",
+          "same_number_project_id"
         ],
         "title": "TenderBriefRead",
+        "type": "object"
+      },
+      "TenderHubCandidateRead": {
+        "description": "Строка HUBTender того же номера, с которой можно связать версию.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "submission_deadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Deadline"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "submission_deadline"
+        ],
+        "title": "TenderHubCandidateRead",
         "type": "object"
       },
       "TenderHubProbeRead": {
@@ -17960,6 +18011,440 @@
           "tender_id"
         ],
         "title": "TenderRebindRequest",
+        "type": "object"
+      },
+      "TenderVersionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "external_tender_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Tender Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "title": "TenderVersionCreate",
+        "type": "object"
+      },
+      "TenderVersionDocumentPut": {
+        "additionalProperties": false,
+        "description": "Состав: какая ревизия документа входит в версию, в каком разделе и участвует ли в модели.",
+        "properties": {
+          "document_revision_id": {
+            "format": "uuid",
+            "title": "Document Revision Id",
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "use_in_model": {
+            "default": true,
+            "title": "Use In Model",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "document_revision_id"
+        ],
+        "title": "TenderVersionDocumentPut",
+        "type": "object"
+      },
+      "TenderVersionDocumentRead": {
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_name": {
+            "title": "Document Name",
+            "type": "string"
+          },
+          "document_revision_id": {
+            "format": "uuid",
+            "title": "Document Revision Id",
+            "type": "string"
+          },
+          "revision_number": {
+            "minimum": 1.0,
+            "title": "Revision Number",
+            "type": "integer"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "source_sha256": {
+            "title": "Source Sha256",
+            "type": "string"
+          },
+          "use_in_model": {
+            "title": "Use In Model",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "document_id",
+          "document_name",
+          "document_revision_id",
+          "revision_number",
+          "source_sha256",
+          "section",
+          "use_in_model"
+        ],
+        "title": "TenderVersionDocumentRead",
+        "type": "object"
+      },
+      "TenderVersionRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "document_count": {
+            "minimum": 0.0,
+            "title": "Document Count",
+            "type": "integer"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/TenderVersionDocumentRead"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "external_tender_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Tender Id"
+          },
+          "external_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Version"
+          },
+          "frozen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen At"
+          },
+          "frozen_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen By"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Sha256"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TenderVersionStatus"
+          },
+          "tender_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tender Number"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "number",
+          "label",
+          "external_tender_id",
+          "external_version",
+          "status",
+          "manifest_sha256",
+          "frozen_at",
+          "frozen_by",
+          "created_at",
+          "created_by",
+          "document_count",
+          "tender_number",
+          "documents"
+        ],
+        "title": "TenderVersionRead",
+        "type": "object"
+      },
+      "TenderVersionStatus": {
+        "description": "Состояние версии тендера (ADR-0035): черновик собирается, замороженная неизменна.",
+        "enum": [
+          "draft",
+          "frozen"
+        ],
+        "title": "TenderVersionStatus",
+        "type": "string"
+      },
+      "TenderVersionSummaryRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "document_count": {
+            "minimum": 0.0,
+            "title": "Document Count",
+            "type": "integer"
+          },
+          "external_tender_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Tender Id"
+          },
+          "external_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Version"
+          },
+          "frozen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen At"
+          },
+          "frozen_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen By"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Sha256"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TenderVersionStatus"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "number",
+          "label",
+          "external_tender_id",
+          "external_version",
+          "status",
+          "manifest_sha256",
+          "frozen_at",
+          "frozen_by",
+          "created_at",
+          "created_by",
+          "document_count"
+        ],
+        "title": "TenderVersionSummaryRead",
+        "type": "object"
+      },
+      "TenderVersionUpdate": {
+        "additionalProperties": false,
+        "description": "Частичное изменение черновика.\n\nРазличается «поле не прислано» (не трогать) и «прислан null» (очистить): для\n`external_tender_id` это разница между «оставить связь» и «снять связь».",
+        "properties": {
+          "external_tender_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Tender Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "title": "TenderVersionUpdate",
         "type": "object"
       },
       "Tool": {
@@ -24344,6 +24829,489 @@
         "summary": "Создать строку обмера",
         "tags": [
           "takeoff"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender-versions": {
+      "get": {
+        "operationId": "list_tender_versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TenderVersionSummaryRead"
+                  },
+                  "title": "Response List Tender Versions",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версии тендера проекта",
+        "tags": [
+          "tender-versions"
+        ]
+      },
+      "post": {
+        "operationId": "create_tender_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenderVersionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать черновик версии",
+        "tags": [
+          "tender-versions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender-versions/hub-candidates": {
+      "get": {
+        "operationId": "list_hub_candidates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TenderHubCandidateRead"
+                  },
+                  "title": "Response List Hub Candidates",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Строки HUBTender с номером тендера проекта",
+        "tags": [
+          "tender-versions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender-versions/{version_id}": {
+      "delete": {
+        "operationId": "delete_tender_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить черновик версии",
+        "tags": [
+          "tender-versions"
+        ]
+      },
+      "get": {
+        "operationId": "read_tender_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версия тендера с составом",
+        "tags": [
+          "tender-versions"
+        ]
+      },
+      "patch": {
+        "operationId": "update_tender_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenderVersionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Изменить черновик версии",
+        "tags": [
+          "tender-versions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender-versions/{version_id}/documents/{document_id}": {
+      "delete": {
+        "operationId": "delete_tender_version_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Убрать документ из состава черновика",
+        "tags": [
+          "tender-versions"
+        ]
+      },
+      "put": {
+        "operationId": "put_tender_version_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenderVersionDocumentPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выбрать ревизию документа в составе черновика",
+        "tags": [
+          "tender-versions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender-versions/{version_id}/freeze": {
+      "post": {
+        "operationId": "freeze_tender_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Заморозить версию",
+        "tags": [
+          "tender-versions"
         ]
       }
     },

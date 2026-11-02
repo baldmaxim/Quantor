@@ -81,6 +81,16 @@ async def preview(
         external_id=tender_id,
     )
     conflicting = occupied if occupied is not None and occupied.id != project.id else None
+    if conflicting is None and tender.tender_number:
+        # ADR-0035: другая версия того же номера не должна увести связь в чужой проект.
+        same_number = await projects_service.find_by_external_ref(
+            session,
+            workspace_id=workspace_id,
+            source=ProjectSource.TENDERHUB,
+            external_ref=tender.tender_number,
+        )
+        if same_number is not None and same_number.id != project.id:
+            conflicting = same_number
 
     return BindingPreview(
         project_id=project.id,

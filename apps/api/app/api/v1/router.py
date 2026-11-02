@@ -37,6 +37,7 @@ from app.api.v1 import (
     projects,
     scale,
     takeoff,
+    tender_versions,
     uploads,
 )
 from app.api.v1.admin import admin_router
@@ -66,6 +67,8 @@ protected_router.include_router(calc_rules.router)
 protected_router.include_router(calc_runs.router)
 protected_router.include_router(calc_synthesis.router)
 protected_router.include_router(calc_vk.router)
+# Версии тендера: замороженные комплекты ревизий, закрыты флагом tender.versions (ADR-0035).
+protected_router.include_router(tender_versions.router)
 
 api_v1_router.include_router(protected_router)
 

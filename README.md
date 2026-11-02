@@ -41,12 +41,12 @@ curl http://localhost:8000/api/v1/meta     # версии и флаги возм
 ```
 
 Документация API: <http://localhost:8000/api/docs>.
-Консоль MinIO: <http://localhost:9001> (логин и пароль — из `.env.example`).
+Консоль MinIO: <http://localhost:9001> (логин и пароль — из `example.env`).
 
 ## Запуск с другого компьютера
 
 Приложения слушают `0.0.0.0`, поэтому портал доступен по сети. На машине, где запущен портал,
-скопируйте `.env.example` в `.env` и укажите адрес хоста:
+скопируйте `example.env` в `.env` и укажите адрес хоста:
 
 ```dotenv
 NEXT_PUBLIC_API_BASE_URL=http://192.168.1.50:8000
@@ -100,7 +100,7 @@ scripts               кроссплатформенные команды раз
 ## Документация
 
 - [План работ этапа](docs/stage1/ROADMAP.md)
-- [Образец дизайна](design-reference.html) — откройте файл в браузере
+- [Образец дизайна](docs/design/design-reference.html) — откройте файл в браузере
 - [Границы этапа и правила разработки](CLAUDE.md)
 - [Архитектурные решения](docs/adr/README.md)
 - [Аудит репозитория](docs/architecture/repo-audit-2026-09-04.md)

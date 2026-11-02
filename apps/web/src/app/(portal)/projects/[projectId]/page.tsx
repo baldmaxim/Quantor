@@ -35,6 +35,7 @@ import {
   type OpenState,
 } from '@/lib/openability';
 import { CALC_FEATURE } from '@/lib/calc/access';
+import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 import { useDocumentsRevisions, useFeatures, useProject, useProjectDocuments } from '@/lib/queries';
 
 /**
@@ -90,6 +91,14 @@ const ProjectPage = ({ params }: IPageProps) => {
         status={status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : null}
         actions={
           <>
+            {features[TENDER_VERSIONS_FEATURE] === true && (
+              <ButtonLink
+                href={`/projects/${projectId}/versions`}
+                transitionTypes={['nav-forward']}
+              >
+                Версии тендера
+              </ButtonLink>
+            )}
             {features[CALC_FEATURE] === true && (
               <ButtonLink href={`/projects/${projectId}/calc`} transitionTypes={['nav-forward']}>
                 Расчёты

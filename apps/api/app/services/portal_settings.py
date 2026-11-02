@@ -144,14 +144,6 @@ async def effective(
     return resolved
 
 
-async def value_of(
-    session: AsyncSession, key: str, *, workspace_id: uuid.UUID | None, settings: Settings
-) -> SettingValue:
-    """Одно действующее значение. Для мест, которым нужна ровно одна настройка."""
-    resolved = await effective(session, workspace_id=workspace_id, settings=settings)
-    return resolved[key].value
-
-
 def _definition_or_404(key: str) -> SettingDefinition:
     definition = registry.get(key)
     if definition is None:

@@ -221,6 +221,7 @@ def test_every_stage1_flag_key_survived() -> None:
         "bim.import",
         "drawing.compare",
         "mep_rd_hypothesis_v1",
+        "tender.versions",
         "calc.portal",
     }
     assert set(FLAG_REGISTRY) == expected

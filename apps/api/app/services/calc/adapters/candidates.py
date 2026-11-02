@@ -10,7 +10,6 @@ from app.contracts.calc.enums import (
     CalcFactMethod,
     CalcInspectionIssueCode,
     CalcSourceClass,
-    CalcTableKind,
 )
 from app.contracts.calc.facts import CalcRegionTableLocator, CalcRegionTextLocator
 from app.contracts.calc.subjects import CalcFactSubject
@@ -68,12 +67,6 @@ class CandidateIssue:
     message: str
     fact_type: str | None = None
     count: int = 1
-
-
-@dataclass(frozen=True, slots=True)
-class TableSeen:
-    kind: CalcTableKind
-    extracted: bool
 
 
 @dataclass(slots=True)

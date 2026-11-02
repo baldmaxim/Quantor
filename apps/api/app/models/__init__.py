@@ -29,6 +29,7 @@ from app.models.project import Project
 from app.models.scale import ScaleCalibration
 from app.models.sheet import Region, Sheet
 from app.models.takeoff import Measurement, TakeoffItem
+from app.models.tender_version import TenderVersion, TenderVersionDocument
 from app.models.worker import Worker
 
 __all__ = [
@@ -64,6 +65,8 @@ __all__ = [
     "SettingOverride",
     "Sheet",
     "TakeoffItem",
+    "TenderVersion",
+    "TenderVersionDocument",
     "UserIdentity",
     "Worker",
     "Workspace",

@@ -38,13 +38,6 @@ def artifact_key(revision_id: uuid.UUID, artifact_id: uuid.UUID, filename: str) 
     return f"revisions/{revision_id}/artifacts/{artifact_id}{suffix}"
 
 
-def upload_key(upload_id: uuid.UUID, filename: str) -> str:
-    """Ключ временно принятого файла до того, как решено, какой ревизией он станет."""
-    extension = extension_of(filename)
-    suffix = f".{extension}" if extension else ""
-    return f"uploads/{upload_id}{suffix}"
-
-
 def display_filename(filename: str) -> str:
     """Имя для показа и для заголовка скачивания.
 

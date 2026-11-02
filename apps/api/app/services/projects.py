@@ -103,6 +103,51 @@ async def map_external_ids(
     return {external: project_id for external, project_id in result.all() if external}
 
 
+async def find_by_external_ref(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    source: ProjectSource,
+    external_ref: str,
+) -> Project | None:
+    """Проект пространства, уже занявший номер тендера (ADR-0035: один номер — один проект).
+
+    Уникальности по номеру в базе нет: проекты, заведённые до этого решения, могут её
+    нарушать. Тогда берётся самый ранний — он остаётся «настоящим» проектом номера.
+    """
+    result = await session.execute(
+        _scoped(workspace_id)
+        .where(Project.source == source, Project.external_ref == external_ref)
+        .order_by(Project.created_at.asc(), Project.id.asc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def map_external_refs(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    source: ProjectSource,
+    external_refs: Sequence[str],
+) -> dict[str, uuid.UUID]:
+    """Соответствие «номер тендера → проект» одним запросом; при дублях — самый ранний проект."""
+    if not external_refs:
+        return {}
+
+    result = await session.execute(
+        select(Project.external_ref, Project.id)
+        .where(
+            Project.workspace_id == workspace_id,
+            Project.source == source,
+            Project.external_ref.in_(list(external_refs)),
+        )
+        .order_by(Project.created_at.desc(), Project.id.desc())
+    )
+    # Порядок от новых к ранним: при дубле последняя запись словаря — самый ранний проект.
+    return {ref: project_id for ref, project_id in result.all() if ref}
+
+
 async def get_project(
     session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
 ) -> Project | None:

@@ -185,6 +185,51 @@ async def test_preview_reports_the_conflict_before_anything_changes(
     assert project.external_id == TENDER["id"]
 
 
+async def test_preview_refuses_another_version_of_a_number_taken_by_other_project(
+    db_session: AsyncSession, workspace_id: uuid.UUID
+) -> None:
+    project = await bound_project(db_session, workspace_id)
+    occupied = await projects_service.create_project(
+        db_session,
+        workspace_id=workspace_id,
+        name="Проект этого номера",
+        source=ProjectSource.TENDERHUB,
+        external_id="строка-другой-версии",
+        external_ref=OTHER_TENDER["tender_number"],
+    )
+    await db_session.commit()
+
+    plan = await tenderhub_binding.preview(
+        db_session,
+        client_for(TENDER, OTHER_TENDER),
+        workspace_id=workspace_id,
+        project=project,
+        tender_id=OTHER_TENDER["id"],
+    )
+    assert plan.conflicting_project_id == occupied.id
+
+
+async def test_preview_allows_another_version_of_the_own_number(
+    db_session: AsyncSession, workspace_id: uuid.UUID
+) -> None:
+    project = await bound_project(db_session, workspace_id)
+    await db_session.commit()
+    next_version: dict[str, Any] = {
+        **TENDER,
+        "id": "33333333-3333-4333-8333-333333333333",
+        "version": 2,
+    }
+
+    plan = await tenderhub_binding.preview(
+        db_session,
+        client_for(TENDER, next_version),
+        workspace_id=workspace_id,
+        project=project,
+        tender_id=next_version["id"],
+    )
+    assert plan.conflicting_project_id is None
+
+
 async def test_rebind_is_audited_from_old_to_new(
     db_session: AsyncSession, workspace_id: uuid.UUID
 ) -> None:

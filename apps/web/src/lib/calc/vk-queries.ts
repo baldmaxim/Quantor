@@ -7,7 +7,6 @@ import {
   getCalcVkStructure,
   getCalcVkVolumeTrace,
   listCalcVkAssumptions,
-  listCalcVkCalculators,
   listCalcVkPassports,
   listCalcVkVolumes,
   type CalcScenario,
@@ -24,7 +23,6 @@ import { unwrap } from '@/lib/queries';
  */
 
 export const vkQueryKeys = {
-  calculators: ['calc', 'vk', 'calculators'] as const,
   readiness: (projectId: string, building: string, section: string) =>
     ['project', projectId, 'calc', 'vk', 'readiness', building, section] as const,
   passports: (projectId: string) => ['project', projectId, 'calc', 'vk', 'passports'] as const,
@@ -35,13 +33,6 @@ export const vkQueryKeys = {
   assumptions: (id: string) => ['calc', 'vk', 'assumptions', id] as const,
   trace: (quantityId: string) => ['calc', 'vk', 'trace', quantityId] as const,
 };
-
-export const useVkCalculators = () =>
-  useQuery({
-    queryKey: vkQueryKeys.calculators,
-    queryFn: async () => unwrap(await listCalcVkCalculators({ throwOnError: true })),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
 
 export const useVkReadiness = (projectId: string, building: string, section: string) =>
   useQuery({

@@ -46,6 +46,19 @@ async def list_tenders(
         external_ids=[tender.id for tender in tenders],
     )
 
+    # Другая версия того же номера ведёт в уже существующий проект (ADR-0035): строка с
+    # собственным проектом — подключённая — в такой подсказке не нуждается.
+    by_number = await projects_service.map_external_refs(
+        session,
+        workspace_id=workspace.tenant,
+        source=ProjectSource.TENDERHUB,
+        external_refs=[
+            tender.tender_number
+            for tender in tenders
+            if tender.tender_number and tender.id not in linked
+        ],
+    )
+
     return [
         TenderBriefRead(
             id=tender.id,
@@ -57,6 +70,11 @@ async def list_tenders(
             submission_deadline=tender.submission_deadline,
             updated_at=tender.updated_at,
             imported_project_id=linked.get(tender.id),
+            same_number_project_id=(
+                None
+                if tender.id in linked or not tender.tender_number
+                else by_number.get(tender.tender_number)
+            ),
         )
         for tender in tenders
     ]
@@ -85,6 +103,20 @@ async def import_tender(
         raise DomainError(ErrorCode.TENDERHUB_ALREADY_LINKED)
 
     tender = await client.get_tender(payload.tender_id)
+
+    # Один номер тендера — один проект (ADR-0035). Другая версия того же номера добавляется
+    # версией в существующий проект; интерфейс ведёт туда по `issue.project_id`.
+    if tender.tender_number:
+        occupied = await projects_service.find_by_external_ref(
+            session,
+            workspace_id=workspace.tenant,
+            source=ProjectSource.TENDERHUB,
+            external_ref=tender.tender_number,
+        )
+        if occupied is not None:
+            raise DomainError(
+                ErrorCode.TENDERHUB_NUMBER_TAKEN, issue={"project_id": str(occupied.id)}
+            )
 
     project = await projects_service.create_project(
         session,

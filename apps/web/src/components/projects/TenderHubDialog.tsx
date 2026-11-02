@@ -18,7 +18,8 @@ import {
 } from '@/components/ui';
 import { useListAnimation } from '@/lib/animate';
 import { errorMessage, extractCode } from '@/lib/errors';
-import { useTenders } from '@/lib/queries';
+import { useFeatures, useTenders } from '@/lib/queries';
+import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 
 /**
  * Выбор тендера в TenderHUB.
@@ -45,6 +46,14 @@ export const TenderHubDialog = ({ open, onClose }: ITenderHubDialogProps) => {
 
   const tenders = useTenders(search, open);
   const list = useListAnimation<HTMLUListElement>(open);
+  const features = useFeatures();
+
+  // Другая версия уже занятого номера ведёт в существующий проект (ADR-0035). Экран версий
+  // закрыт флагом: без него остаётся карточка проекта.
+  const projectHref = (projectId: string): string =>
+    features[TENDER_VERSIONS_FEATURE] === true
+      ? `/projects/${projectId}/versions`
+      : `/projects/${projectId}`;
 
   const connect = async (tender: TenderBriefRead) => {
     setFailure(null);
@@ -143,6 +152,7 @@ export const TenderHubDialog = ({ open, onClose }: ITenderHubDialogProps) => {
             disabled={busyId !== null}
             onConnect={() => void connect(tender)}
             onOpen={(projectId) => router.push(`/projects/${projectId}`)}
+            onOpenVersions={(projectId) => router.push(projectHref(projectId))}
           />
         ))}
       </ul>
@@ -156,10 +166,19 @@ interface ITenderRowProps {
   disabled: boolean;
   onConnect: () => void;
   onOpen: (projectId: string) => void;
+  onOpenVersions: (projectId: string) => void;
 }
 
-const TenderRow = ({ tender, busy, disabled, onConnect, onOpen }: ITenderRowProps) => {
+const TenderRow = ({
+  tender,
+  busy,
+  disabled,
+  onConnect,
+  onOpen,
+  onOpenVersions,
+}: ITenderRowProps) => {
   const linked = tender.imported_project_id;
+  const sameNumber = tender.same_number_project_id;
 
   return (
     <li className="flex flex-wrap items-center gap-x-[var(--s-5)] gap-y-[var(--s-3)] border-b border-border py-[var(--s-4)] last:border-b-0">
@@ -185,6 +204,14 @@ const TenderRow = ({ tender, busy, disabled, onConnect, onOpen }: ITenderRowProp
         <span className={cx('flex flex-none items-center gap-[var(--s-4)]')}>
           <StatusBadge tone="success">подключён</StatusBadge>
           <Button onClick={() => onOpen(linked)}>Открыть</Button>
+        </span>
+      ) : sameNumber ? (
+        // Номер уже занят проектом: вместо «Создать проект» — переход к нему на экран версий.
+        <span className="flex flex-none flex-wrap items-center gap-[var(--s-4)]">
+          <StatusBadge tone="warning">номер уже в проекте</StatusBadge>
+          <Button variant="primary" onClick={() => onOpenVersions(sameNumber)}>
+            Версии проекта
+          </Button>
         </span>
       ) : (
         <Button

@@ -152,6 +152,18 @@ class ErrorCode(StrEnum):
     TENDERHUB_UNAVAILABLE = "TENDERHUB_UNAVAILABLE"
     TENDERHUB_TENDER_NOT_FOUND = "TENDERHUB_TENDER_NOT_FOUND"
     TENDERHUB_ALREADY_LINKED = "TENDERHUB_ALREADY_LINKED"
+    # Один номер тендера — один проект (ADR-0035): другая версия того же номера добавляется
+    # в существующий проект версией, а не создаёт второй проект.
+    TENDERHUB_NUMBER_TAKEN = "TENDERHUB_NUMBER_TAKEN"
+
+    # --- версия тендера (ADR-0035) ---
+    TENDER_VERSION_FROZEN = "TENDER_VERSION_FROZEN"
+    TENDER_VERSION_DRAFT_EXISTS = "TENDER_VERSION_DRAFT_EXISTS"
+    TENDER_VERSION_EMPTY = "TENDER_VERSION_EMPTY"
+    TENDER_VERSION_REVISION_NO_HASH = "TENDER_VERSION_REVISION_NO_HASH"
+    TENDER_VERSION_REVISION_MISMATCH = "TENDER_VERSION_REVISION_MISMATCH"
+    TENDER_VERSION_NUMBER_MISMATCH = "TENDER_VERSION_NUMBER_MISMATCH"
+    TENDER_VERSION_LINK_FORBIDDEN = "TENDER_VERSION_LINK_FORBIDDEN"
 
 
 MESSAGES: dict[ErrorCode, str] = {
@@ -266,6 +278,24 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.TENDERHUB_UNAVAILABLE: "TenderHUB недоступен",
     ErrorCode.TENDERHUB_TENDER_NOT_FOUND: "Тендер не найден в TenderHUB",
     ErrorCode.TENDERHUB_ALREADY_LINKED: "Проект по этому тендеру уже создан",
+    ErrorCode.TENDERHUB_NUMBER_TAKEN: (
+        "Проект с этим номером тендера уже есть — добавьте версию в него, а не создавайте второй"
+    ),
+    ErrorCode.TENDER_VERSION_FROZEN: "Версия заморожена и не меняется",
+    ErrorCode.TENDER_VERSION_DRAFT_EXISTS: (
+        "У проекта уже есть черновик версии — заморозьте или удалите его"
+    ),
+    ErrorCode.TENDER_VERSION_EMPTY: "В версии нет документов — замораживать нечего",
+    ErrorCode.TENDER_VERSION_REVISION_NO_HASH: (
+        "У ревизии нет хеша исходного файла — заморозить комплект с ней нельзя"
+    ),
+    ErrorCode.TENDER_VERSION_REVISION_MISMATCH: "Ревизия не принадлежит этому документу",
+    ErrorCode.TENDER_VERSION_NUMBER_MISMATCH: (
+        "Номер тендера в HUBTender не совпадает с номером проекта"
+    ),
+    ErrorCode.TENDER_VERSION_LINK_FORBIDDEN: (
+        "Проект заведён вручную: связывать его версию с тендером HUBTender нельзя"
+    ),
 }
 
 # HTTP-статус зависит от кода: клиенту важно отличать свою ошибку от отказа инфраструктуры.
@@ -377,6 +407,14 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.TENDERHUB_UNAVAILABLE: status.HTTP_502_BAD_GATEWAY,
     ErrorCode.TENDERHUB_TENDER_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.TENDERHUB_ALREADY_LINKED: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDERHUB_NUMBER_TAKEN: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDER_VERSION_FROZEN: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDER_VERSION_DRAFT_EXISTS: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDER_VERSION_EMPTY: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_VERSION_REVISION_NO_HASH: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_VERSION_REVISION_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_VERSION_NUMBER_MISMATCH: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDER_VERSION_LINK_FORBIDDEN: status.HTTP_409_CONFLICT,
 }
 
 

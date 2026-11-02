@@ -80,13 +80,6 @@ def schedule_legacy_import(job_id: uuid.UUID) -> None:
     task.add_done_callback(_running.discard)
 
 
-async def wait_for_pending(limit_seconds: float = 30.0) -> None:
-    """Ждёт завершения запущенных задач. Нужно тестам и корректной остановке приложения."""
-    if not _running:
-        return
-    await asyncio.wait(set(_running), timeout=limit_seconds)
-
-
 async def _run_legacy_import(job_id: uuid.UUID) -> None:
     """Выполняет импорт пакета в отдельной сессии."""
     factory = get_session_factory()

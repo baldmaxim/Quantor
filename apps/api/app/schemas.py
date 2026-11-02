@@ -1052,6 +1052,12 @@ class TenderBriefRead(BaseModel):
     updated_at: str | None
     imported_project_id: uuid.UUID | None
     """Проект портала, уже созданный по этому тендеру. None — тендер ещё не подключён."""
+    same_number_project_id: uuid.UUID | None
+    """Проект, уже занявший номер этого тендера под другой строкой HUBTender.
+
+    Другая версия того же номера добавляется в этот проект версией тендера, а не создаёт
+    новый проект (ADR-0035). Пусто, если у строки есть собственный проект или номер свободен.
+    """
 
 
 class TenderImport(BaseModel):

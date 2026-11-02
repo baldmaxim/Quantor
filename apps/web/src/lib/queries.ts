@@ -3,7 +3,6 @@
 import {
   archiveTakeoffItem,
   createMeasurement,
-  createMeasurementsBatch,
   createSheetCalibration,
   createTakeoffItem,
   deleteMeasurement,
@@ -19,8 +18,6 @@ import {
   listSheetCalibrations,
   listSheetRegions,
   listTenders,
-  makeCalibrationDefault,
-  readJob,
   updateMeasurement,
   updateTakeoffItem,
   readMeta,
@@ -31,7 +28,6 @@ import {
   type PageDocumentRevisionRead,
   type ProjectSummary,
   type MeasurementRead,
-  type ScaleCalibrationRead,
   type TakeoffItemRead,
   type TenderBriefRead,
 } from '@quantor/api-client';
@@ -63,7 +59,6 @@ export const queryKeys = {
     ['sheet', sheetId, 'regions', blockType] as const,
   revision: (revisionId: string) => ['revision', revisionId] as const,
   document: (documentId: string) => ['document', documentId] as const,
-  job: (jobId: string) => ['job', jobId] as const,
   contentUrl: (revisionId: string) => ['revision', revisionId, 'content-url'] as const,
   tenders: (search: string) => ['tenderhub', 'tenders', search] as const,
   calibrations: (sheetId: string) => ['sheet', sheetId, 'scale-calibrations'] as const,
@@ -290,18 +285,6 @@ export const useContentUrl = (revisionId: string | null) =>
     },
   });
 
-export const useJob = (jobId: string | null) =>
-  useQuery({
-    queryKey: queryKeys.job(jobId ?? ''),
-    enabled: jobId !== null,
-    queryFn: async () =>
-      unwrap(await readJob({ throwOnError: true, path: { job_id: jobId ?? '' } })),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === 'queued' || status === 'running' ? JOB_POLL_INTERVAL : false;
-    },
-  });
-
 const isRunning = (project: ProjectSummary | undefined): boolean => {
   const status = project?.last_job?.status;
   return status === 'queued' || status === 'running';
@@ -343,12 +326,6 @@ export const useScaleCalibrations = (sheetId: string | null) =>
     enabled: Boolean(sheetId),
   });
 
-/** Действующая калибровка листа или `null`, если масштаб не задан. */
-export const useDefaultCalibration = (sheetId: string | null): ScaleCalibrationRead | null => {
-  const { data } = useScaleCalibrations(sheetId);
-  return data?.find((item) => item.is_default) ?? null;
-};
-
 export interface CreateCalibrationInput {
   readonly sheetId: string;
   readonly pointA: readonly [number, number];
@@ -384,25 +361,6 @@ export const useCreateCalibration = () => {
     onSuccess: (_result, input) => {
       void client.invalidateQueries({ queryKey: queryKeys.calibrations(input.sheetId) });
       void client.invalidateQueries({ queryKey: queryKeys.quantities(input.sheetId) });
-    },
-  });
-};
-
-/** Делает калибровку действующей. Уже посчитанные величины при этом не меняются. */
-export const useMakeCalibrationDefault = (sheetId: string) => {
-  const client = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (calibrationId: string) =>
-      unwrap(
-        await makeCalibrationDefault({
-          throwOnError: true,
-          path: { calibration_id: calibrationId },
-        }),
-      ),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: queryKeys.calibrations(sheetId) });
-      void client.invalidateQueries({ queryKey: queryKeys.quantities(sheetId) });
     },
   });
 };
@@ -518,37 +476,6 @@ export const useCreateMeasurement = (sheetId: string) => {
           body: {
             takeoff_item_id: input.takeoffItemId,
             points: input.points.map(([x, y]) => [x, y]),
-          },
-        }),
-      ),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: queryKeys.measurements(sheetId) });
-      void client.invalidateQueries({ queryKey: queryKeys.quantities(sheetId) });
-    },
-  });
-};
-
-/**
- * Пакетная постановка меток счёта.
- *
- * Счёт должен ощущаться мгновенно: метки ставят подряд, и ждать ответа сервера на каждый
- * щелчок пользователь не должен. Пакет атомарен — либо все, либо ни одной.
- */
-export const useCreateMeasurementsBatch = (sheetId: string) => {
-  const client = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: {
-      takeoffItemId: string;
-      items: readonly (readonly (readonly [number, number])[])[];
-    }) =>
-      unwrap(
-        await createMeasurementsBatch({
-          throwOnError: true,
-          path: { sheet_id: sheetId },
-          body: {
-            takeoff_item_id: input.takeoffItemId,
-            items: input.items.map((shape) => shape.map(([x, y]) => [x, y])),
           },
         }),
       ),

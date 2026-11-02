@@ -1,4 +1,4 @@
-import type { CalcRunStatus, CalcScenario, CalcStepStatus } from '@quantor/api-client';
+import type { CalcRunStatus, CalcScenario } from '@quantor/api-client';
 
 import type { BadgeTone } from '@/components/ui';
 
@@ -18,12 +18,6 @@ export const SCENARIO_TITLES: Record<CalcScenario, string> = {
   MINIMUM: 'Минимум',
   EXPECTED: 'Ожидаемый',
   TENDER_SAFE: 'Тендерный запас',
-};
-
-export const STEP_STATUS_TITLES: Record<CalcStepStatus, string> = {
-  EXECUTED: 'посчитано',
-  REUSED: 'взято из прежнего запуска',
-  NOT_APPLIED: 'не применено',
 };
 
 /** Точное число сервера для чтения: запятая вместо точки, значение не меняется. */

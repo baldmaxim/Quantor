@@ -28,7 +28,6 @@ __pycache__/
 # --- Env / secrets ---
 .env
 .env.*
-!.env.example
 
 # --- Test artifacts ---
 coverage/
@@ -88,5 +87,14 @@ Thumbs.db
 /*.pdf
 /*.zip
 
+# Комплект SSH-доступа к ML-серверу с GPU: закрытый ключ, в git и образы не попадает нигде
+ML-SSH-access.zip
+ML-SSH-access/
+id_ed25519_ml_peer*
+ml_peer*
+
 # Архивы ревью промтов: артефакт передачи владельцу, в git не попадает
 /review/
+# Вывод plangeom по чертежу заказчика и справка несвободного пакета — только локально
+plangeom_example_*.json
+plangeom_fields.txt

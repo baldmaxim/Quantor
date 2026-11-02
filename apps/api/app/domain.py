@@ -170,6 +170,13 @@ class AuditAction(StrEnum):
     CALC_SYNTHESIS_DECIDED = "calc_synthesis_decided"
     CALC_PASSPORT_CREATED = "calc_passport_created"
 
+    TENDER_VERSION_CREATED = "tender_version_created"
+    TENDER_VERSION_UPDATED = "tender_version_updated"
+    TENDER_VERSION_DELETED = "tender_version_deleted"
+    TENDER_VERSION_DOCUMENT_SET = "tender_version_document_set"
+    TENDER_VERSION_DOCUMENT_REMOVED = "tender_version_document_removed"
+    TENDER_VERSION_FROZEN = "tender_version_frozen"
+
     JOB_RETRIED = "job_retried"
     JOB_CANCELLED = "job_cancelled"
 
@@ -181,6 +188,13 @@ class ProjectStatus(StrEnum):
 
     ACTIVE = "active"
     ARCHIVED = "archived"
+
+
+class TenderVersionStatus(StrEnum):
+    """Состояние версии тендера (ADR-0035): черновик собирается, замороженная неизменна."""
+
+    DRAFT = "draft"
+    FROZEN = "frozen"
 
 
 class ProjectSource(StrEnum):

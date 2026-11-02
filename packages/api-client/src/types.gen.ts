@@ -9466,6 +9466,10 @@ export type TenderBriefRead = {
      */
     imported_project_id: string | null;
     /**
+     * Same Number Project Id
+     */
+    same_number_project_id: string | null;
+    /**
      * Submission Deadline
      */
     submission_deadline: string | null;
@@ -9481,6 +9485,26 @@ export type TenderBriefRead = {
      * Updated At
      */
     updated_at: string | null;
+    /**
+     * Version
+     */
+    version: number | null;
+};
+
+/**
+ * TenderHubCandidateRead
+ *
+ * Строка HUBTender того же номера, с которой можно связать версию.
+ */
+export type TenderHubCandidateRead = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Submission Deadline
+     */
+    submission_deadline: string | null;
     /**
      * Version
      */
@@ -9567,6 +9591,218 @@ export type TenderRebindRequest = {
      * Tender Id
      */
     tender_id: string;
+};
+
+/**
+ * TenderVersionCreate
+ */
+export type TenderVersionCreate = {
+    /**
+     * External Tender Id
+     */
+    external_tender_id?: string | null;
+    /**
+     * Label
+     */
+    label?: string | null;
+};
+
+/**
+ * TenderVersionDocumentPut
+ *
+ * Состав: какая ревизия документа входит в версию, в каком разделе и участвует ли в модели.
+ */
+export type TenderVersionDocumentPut = {
+    /**
+     * Document Revision Id
+     */
+    document_revision_id: string;
+    /**
+     * Section
+     */
+    section?: string | null;
+    /**
+     * Use In Model
+     */
+    use_in_model?: boolean;
+};
+
+/**
+ * TenderVersionDocumentRead
+ */
+export type TenderVersionDocumentRead = {
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Document Name
+     */
+    document_name: string;
+    /**
+     * Document Revision Id
+     */
+    document_revision_id: string;
+    /**
+     * Revision Number
+     */
+    revision_number: number;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Source Sha256
+     */
+    source_sha256: string;
+    /**
+     * Use In Model
+     */
+    use_in_model: boolean;
+};
+
+/**
+ * TenderVersionRead
+ */
+export type TenderVersionRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Document Count
+     */
+    document_count: number;
+    /**
+     * Documents
+     */
+    documents: Array<TenderVersionDocumentRead>;
+    /**
+     * External Tender Id
+     */
+    external_tender_id: string | null;
+    /**
+     * External Version
+     */
+    external_version: number | null;
+    /**
+     * Frozen At
+     */
+    frozen_at: string | null;
+    /**
+     * Frozen By
+     */
+    frozen_by: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string | null;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string | null;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    status: TenderVersionStatus;
+    /**
+     * Tender Number
+     */
+    tender_number: string | null;
+};
+
+/**
+ * TenderVersionStatus
+ *
+ * Состояние версии тендера (ADR-0035): черновик собирается, замороженная неизменна.
+ */
+export type TenderVersionStatus = 'draft' | 'frozen';
+
+/**
+ * TenderVersionSummaryRead
+ */
+export type TenderVersionSummaryRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Document Count
+     */
+    document_count: number;
+    /**
+     * External Tender Id
+     */
+    external_tender_id: string | null;
+    /**
+     * External Version
+     */
+    external_version: number | null;
+    /**
+     * Frozen At
+     */
+    frozen_at: string | null;
+    /**
+     * Frozen By
+     */
+    frozen_by: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string | null;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string | null;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    status: TenderVersionStatus;
+};
+
+/**
+ * TenderVersionUpdate
+ *
+ * Частичное изменение черновика.
+ *
+ * Различается «поле не прислано» (не трогать) и «прислан null» (очистить): для
+ * `external_tender_id` это разница между «оставить связь» и «снять связь».
+ */
+export type TenderVersionUpdate = {
+    /**
+     * External Tender Id
+     */
+    external_tender_id?: string | null;
+    /**
+     * Label
+     */
+    label?: string | null;
 };
 
 /**
@@ -13439,6 +13675,312 @@ export type CreateTakeoffItemResponses = {
 };
 
 export type CreateTakeoffItemResponse = CreateTakeoffItemResponses[keyof CreateTakeoffItemResponses];
+
+export type ListTenderVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions';
+};
+
+export type ListTenderVersionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTenderVersionsError = ListTenderVersionsErrors[keyof ListTenderVersionsErrors];
+
+export type ListTenderVersionsResponses = {
+    /**
+     * Response List Tender Versions
+     *
+     * Successful Response
+     */
+    200: Array<TenderVersionSummaryRead>;
+};
+
+export type ListTenderVersionsResponse = ListTenderVersionsResponses[keyof ListTenderVersionsResponses];
+
+export type CreateTenderVersionData = {
+    body: TenderVersionCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions';
+};
+
+export type CreateTenderVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateTenderVersionError = CreateTenderVersionErrors[keyof CreateTenderVersionErrors];
+
+export type CreateTenderVersionResponses = {
+    /**
+     * Successful Response
+     */
+    201: TenderVersionRead;
+};
+
+export type CreateTenderVersionResponse = CreateTenderVersionResponses[keyof CreateTenderVersionResponses];
+
+export type ListHubCandidatesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions/hub-candidates';
+};
+
+export type ListHubCandidatesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListHubCandidatesError = ListHubCandidatesErrors[keyof ListHubCandidatesErrors];
+
+export type ListHubCandidatesResponses = {
+    /**
+     * Response List Hub Candidates
+     *
+     * Successful Response
+     */
+    200: Array<TenderHubCandidateRead>;
+};
+
+export type ListHubCandidatesResponse = ListHubCandidatesResponses[keyof ListHubCandidatesResponses];
+
+export type DeleteTenderVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions/{version_id}';
+};
+
+export type DeleteTenderVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteTenderVersionError = DeleteTenderVersionErrors[keyof DeleteTenderVersionErrors];
+
+export type DeleteTenderVersionResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteTenderVersionResponse = DeleteTenderVersionResponses[keyof DeleteTenderVersionResponses];
+
+export type ReadTenderVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions/{version_id}';
+};
+
+export type ReadTenderVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadTenderVersionError = ReadTenderVersionErrors[keyof ReadTenderVersionErrors];
+
+export type ReadTenderVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderVersionRead;
+};
+
+export type ReadTenderVersionResponse = ReadTenderVersionResponses[keyof ReadTenderVersionResponses];
+
+export type UpdateTenderVersionData = {
+    body: TenderVersionUpdate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions/{version_id}';
+};
+
+export type UpdateTenderVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateTenderVersionError = UpdateTenderVersionErrors[keyof UpdateTenderVersionErrors];
+
+export type UpdateTenderVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderVersionRead;
+};
+
+export type UpdateTenderVersionResponse = UpdateTenderVersionResponses[keyof UpdateTenderVersionResponses];
+
+export type DeleteTenderVersionDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions/{version_id}/documents/{document_id}';
+};
+
+export type DeleteTenderVersionDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteTenderVersionDocumentError = DeleteTenderVersionDocumentErrors[keyof DeleteTenderVersionDocumentErrors];
+
+export type DeleteTenderVersionDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteTenderVersionDocumentResponse = DeleteTenderVersionDocumentResponses[keyof DeleteTenderVersionDocumentResponses];
+
+export type PutTenderVersionDocumentData = {
+    body: TenderVersionDocumentPut;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions/{version_id}/documents/{document_id}';
+};
+
+export type PutTenderVersionDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutTenderVersionDocumentError = PutTenderVersionDocumentErrors[keyof PutTenderVersionDocumentErrors];
+
+export type PutTenderVersionDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderVersionRead;
+};
+
+export type PutTenderVersionDocumentResponse = PutTenderVersionDocumentResponses[keyof PutTenderVersionDocumentResponses];
+
+export type FreezeTenderVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender-versions/{version_id}/freeze';
+};
+
+export type FreezeTenderVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FreezeTenderVersionError = FreezeTenderVersionErrors[keyof FreezeTenderVersionErrors];
+
+export type FreezeTenderVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderVersionRead;
+};
+
+export type FreezeTenderVersionResponse = FreezeTenderVersionResponses[keyof FreezeTenderVersionResponses];
 
 export type ReadUploadCapabilitiesData = {
     body?: never;

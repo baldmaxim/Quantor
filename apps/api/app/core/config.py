@@ -33,8 +33,6 @@ class Settings(BaseSettings):
     environment: Literal["local", "test", "staging", "production"] = "local"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
-    api_host: str = "0.0.0.0"  # noqa: S104 — dev-стенд открывают с другой машины в локальной сети
-    api_port: int = 8000
     api_cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     postgres_host: str = "localhost"

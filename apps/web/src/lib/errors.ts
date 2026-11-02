@@ -58,6 +58,20 @@ const MESSAGES: Record<string, string> = {
   TENDERHUB_TENDER_NOT_FOUND:
     'Тендер не найден в TenderHUB — возможно, он удалён или скрыт от ключа.',
   TENDERHUB_ALREADY_LINKED: 'Проект по этому тендеру уже создан.',
+  TENDERHUB_NUMBER_TAKEN:
+    'Проект с этим номером тендера уже есть. Другая версия добавляется в него как версия тендера, а не вторым проектом.',
+
+  // Версии тендера (ADR-0035).
+  TENDER_VERSION_FROZEN: 'Версия заморожена и не меняется. Для правок создайте новую версию.',
+  TENDER_VERSION_DRAFT_EXISTS: 'У проекта уже есть черновик версии — заморозьте или удалите его.',
+  TENDER_VERSION_EMPTY: 'В версии нет документов — замораживать нечего.',
+  TENDER_VERSION_REVISION_NO_HASH:
+    'У одной из ревизий нет хеша исходного файла — заморозить комплект с ней нельзя.',
+  TENDER_VERSION_REVISION_MISMATCH: 'Выбранная ревизия не принадлежит этому документу.',
+  TENDER_VERSION_NUMBER_MISMATCH:
+    'Номер тендера в HUBTender не совпадает с номером проекта — связать эту строку нельзя.',
+  TENDER_VERSION_LINK_FORBIDDEN:
+    'Проект заведён вручную: связывать его версию с тендером HUBTender нельзя.',
 };
 
 export const errorMessage = (code: string, fallback?: string): string =>

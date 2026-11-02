@@ -155,11 +155,3 @@ export const IconWarning = (props: IconProps) => (
     <path d="M12 10v4M12 17h.01" />
   </Base>
 );
-
-export const IconExternal = (props: IconProps) => (
-  <Base {...props}>
-    <path d="M14 4h6v6" />
-    <path d="M20 4l-8 8" />
-    <path d="M19 14v5a1 1 0 01-1 1H6a1 1 0 01-1-1V7a1 1 0 011-1h5" />
-  </Base>
-);

@@ -32,7 +32,7 @@ from app.contracts.calc.enums import (
 )
 from app.contracts.calc.fact_types import SYSTEM_FUNCTIONS, fact_key
 from app.contracts.calc.passport import CalcInputCounts, CalcPassportRule
-from app.contracts.calc.readiness import CalcReadinessRowRead, CalcSystemReadinessRead
+from app.contracts.calc.readiness import CalcSystemReadinessRead
 from app.contracts.calc.subjects import CalcFactSubject
 from app.models import CalcRuleDefinition
 from app.services.calc.engine.inputs import fact_outcomes
@@ -115,10 +115,6 @@ def input_counts(system: CalcSystemReadinessRead | None) -> CalcInputCounts:
         required_total=len(required),
         required_satisfied=sum(1 for row in required if row.status in _SATISFIED),
     )
-
-
-def unsatisfied(system: CalcSystemReadinessRead | None) -> list[CalcReadinessRowRead]:
-    return [] if system is None else [row for row in system.rows if row.status not in _SATISFIED]
 
 
 async def rule_matrix(

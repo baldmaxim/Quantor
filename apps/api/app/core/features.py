@@ -129,6 +129,14 @@ REGISTRY: Final[MappingProxyType[str, FlagDefinition]] = MappingProxyType(
                 "Синтетические сценарии: evidence, сеть РД, физический ВОР. Не рабочий ВОР.",
                 stage="MEP-эксперимент · пилот",
             ),
+            # Версия тендера (ADR-0035, этап M2): замороженный комплект ревизий документов.
+            # Не зависит от разбора планов и модели здания; пилот, включается на пространство.
+            _pilot(
+                "tender.versions",
+                "Версии тендера",
+                "Замороженные комплекты ревизий документов проекта и связь с версией HUBTender.",
+                stage="Версия тендера · пилот",
+            ),
             # Расчётный контур стадии П (ADR-0030). Объявлен и закрыт: из админки не
             # включается до PASS реального инженерного гейта стадии П после PROMPT 06 и
             # отдельного решения владельца. Разработка — через FEATURE_FLAGS.
@@ -147,12 +155,8 @@ REGISTRY: Final[MappingProxyType[str, FlagDefinition]] = MappingProxyType(
 
 # --- совместимость с прежней формой ---
 #
-# Прежние кортежи и словарь умолчаний выводятся из реестра, а не ведутся рядом: два
+# Прежний кортеж и словарь умолчаний выводятся из реестра, а не ведутся рядом: два
 # списка одного и того же расходятся при первой же правке.
-
-STAGE1_FEATURES: Final[tuple[str, ...]] = tuple(
-    key for key, definition in REGISTRY.items() if definition.stage == "Этап 1"
-)
 
 STAGE2_FEATURES: Final[tuple[str, ...]] = tuple(
     key for key, definition in REGISTRY.items() if definition.stage == "Этап 2"

@@ -115,12 +115,6 @@ def _jwks_client(issuer: str, jwks_uri: str) -> PyJWKClient:
     return client
 
 
-def reset_caches() -> None:
-    """Сбрасывает кэши. Нужно тестам и смене настроек на лету."""
-    _discovery_cache.clear()
-    _jwks_clients.clear()
-
-
 def authorization_url(
     discovery: _Discovery,
     settings: Settings,

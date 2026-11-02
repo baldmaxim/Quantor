@@ -128,22 +128,6 @@ async def list_memberships(session: AsyncSession, user_id: uuid.UUID) -> list[Me
     ]
 
 
-async def get_membership_role(
-    session: AsyncSession, *, user_id: uuid.UUID, workspace_id: uuid.UUID
-) -> Role | None:
-    """Роль пользователя в конкретном пространстве, если он там состоит."""
-    query = (
-        select(WorkspaceMembership.role)
-        .join(Workspace, WorkspaceMembership.workspace_id == Workspace.id)
-        .where(
-            WorkspaceMembership.user_id == user_id,
-            WorkspaceMembership.workspace_id == workspace_id,
-            Workspace.status == WorkspaceStatus.ACTIVE,
-        )
-    )
-    return (await session.execute(query)).scalar_one_or_none()
-
-
 async def workspace_exists(session: AsyncSession, workspace_id: uuid.UUID) -> bool:
     query = select(Workspace.id).where(
         Workspace.id == workspace_id, Workspace.status == WorkspaceStatus.ACTIVE

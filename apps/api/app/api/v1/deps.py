@@ -54,6 +54,24 @@ async def get_tenderhub_client(settings: SettingsDep) -> AsyncIterator[TenderHub
 TenderHubDep = Annotated[TenderHubClient, Depends(get_tenderhub_client)]
 
 
+async def get_optional_tenderhub_client(
+    settings: SettingsDep,
+) -> AsyncIterator[TenderHubClient | None]:
+    """Клиент внешней системы или `None`, если интеграция не настроена.
+
+    Для маршрутов, которым HUBTender нужен лишь иногда: экран версий тендера обязан работать
+    и без ключа доступа, а обычная зависимость закрыла бы его отказом TENDERHUB_DISABLED.
+    """
+    if not settings.tenderhub_enabled:
+        yield None
+        return
+    async with TenderHubClient(settings) as client:
+        yield client
+
+
+OptionalTenderHubDep = Annotated[TenderHubClient | None, Depends(get_optional_tenderhub_client)]
+
+
 class FeatureCheck:
     """Возможность включена для пространства запроса (ADR-0023).
 
@@ -99,6 +117,7 @@ __all__ = [
     "AuthDep",
     "LimitDep",
     "OffsetDep",
+    "OptionalTenderHubDep",
     "SchedulerDep",
     "SessionDep",
     "SettingsDep",

@@ -244,7 +244,7 @@ Document(pdf)                     то, что откроет просмотрщ
 ## Переработка дизайна и промт 04 — оболочка приложения
 
 Дизайн переработан отдельным UX/UI-агентом; что и почему изменено — в
-[docs/design/REDESIGN_NOTES.md](../design/REDESIGN_NOTES.md), макет — в `design-reference.html`.
+[docs/design/REDESIGN_NOTES.md](../design/REDESIGN_NOTES.md), макет — [docs/design/design-reference.html](../design/design-reference.html).
 Ключевое: границы контролов разведены с разделителями (было 1.5:1, стало 3.85:1), цвета
 областей распознавания одинаковы в обеих темах, потому что лист чертежа всегда светлый,
 хром рабочей области уплотнён со 106 до 92 px.
