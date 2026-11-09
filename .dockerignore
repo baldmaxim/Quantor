@@ -21,6 +21,7 @@
 !tools/cad_engine/quantor_cad_runner.py
 !tools/cad_engine/pins.json
 !tools/cad_engine/requirements.linux-cp312.lock.txt
+!deploy/cad-engine/engine.zip
 
 # Внутри разрешённого — только исходники, без артефактов сборки и окружений.
 **/node_modules

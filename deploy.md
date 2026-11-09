@@ -46,7 +46,7 @@
 Образ собирает `publish.yml` (job `build-cad-worker`) поверх `quantor-api` того же коммита; архив
 движка скачивается из приватного `baldmaxim/CAD_engine` по `tools/cad_engine/pins.json`
 (`engine.repo_ref`, `engine.archive_path`) с проверкой SHA256. Секрет репозитория
-**`CAD_ENGINE_READ_TOKEN`** (токен чтения `CAD_engine`) добавляет владелец; без него шаг падает.
+**`CAD_ENGINE_DEPLOY_KEY`** — deploy-key только на чтение `CAD_engine`; без него шаг checkout падает.
 
 - Возможность открывает флаг пространства `cad.export` (админка → пространство); без него маршруты отвечают 403.
 - Лимиты в `.env` (необязательно): `CAD_MAX_MEMORY_MB` (6144, потолок адресного пространства движка),

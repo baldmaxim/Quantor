@@ -128,8 +128,8 @@ venv; PyMuPDF и Shapely есть только в нём). Команда `pytho
 `cpus: 1.0`. Образ собирает job `build-cad-worker` в `publish.yml` после образов портала; `update.sh`
 скачивает и перезапускает его вместе с остальными.
 
-- Секрет репозитория GitHub **`CAD_ENGINE_READ_TOKEN`** — токен чтения приватного `baldmaxim/CAD_engine`
-  (BuildKit secret, в образ не попадает). Без него сборка `cad-worker` падает с сообщением.
+- Секрет репозитория GitHub **`CAD_ENGINE_DEPLOY_KEY`** — приватная часть deploy-key `quantor-publish-read`
+  (только чтение `baldmaxim/CAD_engine`). `publish.yml` забирает им архив в контекст сборки; в образ ключ не попадает.
 - Закрепление движка — `tools/cad_engine/pins.json`: `engine.repo_ref` (коммит), `engine.archive_path`,
   `engine.archive_sha256` (сверяется при сборке и runner'ом при старте).
 - Возможность включает владелец флагом `cad.export` на пространство (админка); пилот — отдельное
