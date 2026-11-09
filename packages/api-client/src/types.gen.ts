@@ -438,6 +438,1044 @@ export type BoxGeometry = {
 };
 
 /**
+ * CadArtifactRead
+ */
+export type CadArtifactRead = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Size
+     */
+    size: number;
+};
+
+/**
+ * CadAttemptRead
+ */
+export type CadAttemptRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    engine: CadEngineStateRead | null;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Event Count
+     */
+    event_count: number;
+    /**
+     * Events Dropped
+     */
+    events_dropped: number;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Last Seq
+     */
+    last_seq: number;
+    /**
+     * Outcome
+     */
+    outcome: 'running' | 'succeeded' | 'failed' | 'lost';
+    pages: CadPagesPlanRead | null;
+    /**
+     * Phase
+     */
+    phase: string | null;
+    /**
+     * Phase Detail
+     */
+    phase_detail: string | null;
+    /**
+     * Result Status
+     */
+    result_status: string | null;
+    /**
+     * Started At
+     */
+    started_at: string | null;
+    /**
+     * Views
+     */
+    views: Array<CadProgressViewRead>;
+};
+
+/**
+ * CadChecksRead
+ */
+export type CadChecksRead = {
+    /**
+     * All Source Fills Valid
+     */
+    all_source_fills_valid: boolean | null;
+    /**
+     * Audit Errors
+     */
+    audit_errors: number | null;
+    /**
+     * Door Block Count
+     */
+    door_block_count: number | null;
+    /**
+     * Door Block Inserts
+     */
+    door_block_inserts: number | null;
+    /**
+     * Gate Block Inserts
+     */
+    gate_block_inserts: number | null;
+    /**
+     * Layers
+     */
+    layers: {
+        [key: string]: number;
+    };
+    /**
+     * Quantity Release Allowed
+     */
+    quantity_release_allowed: boolean;
+    /**
+     * Recognized Monolith Fill Count
+     */
+    recognized_monolith_fill_count: number | null;
+    /**
+     * Region Approved
+     */
+    region_approved: boolean | null;
+    /**
+     * Rooms Recognized Rows
+     */
+    rooms_recognized_rows: number | null;
+    /**
+     * Rooms Schedule Rows
+     */
+    rooms_schedule_rows: number | null;
+    /**
+     * Source Fill Count
+     */
+    source_fill_count: number | null;
+};
+
+/**
+ * CadConvertCreate
+ *
+ * Постановка. `pages` — page_index с 0 (как у листов Quantor), null — все плановые листы.
+ */
+export type CadConvertCreate = {
+    /**
+     * Finishes
+     */
+    finishes?: boolean;
+    /**
+     * Pages
+     */
+    pages?: Array<number> | null;
+    /**
+     * Schedules
+     */
+    schedules?: boolean;
+};
+
+/**
+ * CadEngineStateRead
+ */
+export type CadEngineStateRead = {
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Stage
+     */
+    stage: string;
+    /**
+     * Status
+     */
+    status: string;
+};
+
+/**
+ * CadEventRead
+ */
+export type CadEventRead = {
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Completed
+     */
+    completed?: number | null;
+    /**
+     * Detail
+     */
+    detail?: string | null;
+    /**
+     * Elapsed S
+     */
+    elapsed_s?: number | null;
+    /**
+     * Legacy Pdf Page
+     */
+    legacy_pdf_page?: number | null;
+    /**
+     * Page Index
+     */
+    page_index?: number | null;
+    /**
+     * Phase
+     */
+    phase?: string | null;
+    /**
+     * Scope
+     */
+    scope: 'document' | 'view';
+    /**
+     * Seq
+     */
+    seq: number;
+    /**
+     * Stage
+     */
+    stage?: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Total
+     */
+    total?: number | null;
+    /**
+     * View
+     */
+    view?: number | null;
+};
+
+/**
+ * CadEventsRead
+ */
+export type CadEventsRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Events
+     */
+    events: Array<CadEventRead>;
+    /**
+     * Finished
+     */
+    finished: boolean;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Last Seq
+     */
+    last_seq: number;
+};
+
+/**
+ * CadFrameRead
+ *
+ * Кадр координат DXF (мм) -> PDF (pt от левого верхнего угла страницы).
+ *
+ * `pt = origin_pt + (x_mm, -y_mm) / mm_per_pdf_point`. Подтверждён, только если масштаб
+ * прошёл размерную проверку и движок указал начало координат DXF на странице.
+ */
+export type CadFrameRead = {
+    /**
+     * Confirmed
+     */
+    confirmed: boolean;
+    /**
+     * Mm Per Pdf Point
+     */
+    mm_per_pdf_point: number | null;
+    /**
+     * Origin Pt
+     */
+    origin_pt: [
+        number,
+        number
+    ] | null;
+    /**
+     * Reason
+     */
+    reason: string | null;
+    /**
+     * Units
+     */
+    units: string | null;
+};
+
+/**
+ * CadJobListRead
+ */
+export type CadJobListRead = {
+    /**
+     * Items
+     */
+    items: Array<CadJobSummaryRead>;
+    /**
+     * Server Time
+     */
+    server_time: string;
+};
+
+/**
+ * CadJobRead
+ */
+export type CadJobRead = {
+    /**
+     * Artifacts
+     */
+    artifacts: Array<CadArtifactRead>;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Attempts
+     */
+    attempts: Array<CadAttemptRead>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Engine Version
+     */
+    engine_version: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Known Limitation
+     */
+    known_limitation: string | null;
+    /**
+     * Pages
+     */
+    pages: Array<CadPageRead>;
+    /**
+     * Requested Pages
+     */
+    requested_pages: Array<number> | null;
+    /**
+     * Result Attempt
+     */
+    result_attempt: number | null;
+    /**
+     * Result Status
+     */
+    result_status: string | null;
+    /**
+     * Retry Blocked Reason
+     */
+    retry_blocked_reason: string | null;
+    /**
+     * Retryable
+     */
+    retryable: boolean;
+    /**
+     * Review Required
+     */
+    review_required: boolean;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Server Time
+     */
+    server_time: string;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    /**
+     * Started At
+     */
+    started_at: string | null;
+    status: JobStatus;
+};
+
+/**
+ * CadJobSummaryRead
+ */
+export type CadJobSummaryRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Requested Pages
+     */
+    requested_pages: Array<number> | null;
+    /**
+     * Result Status
+     */
+    result_status: string | null;
+    status: JobStatus;
+};
+
+/**
+ * CadPageRead
+ */
+export type CadPageRead = {
+    /**
+     * Index
+     */
+    index: number;
+    /**
+     * Legacy Pdf Page
+     */
+    legacy_pdf_page: number;
+    /**
+     * Views
+     */
+    views: Array<CadViewRead>;
+};
+
+/**
+ * CadPagesPlanRead
+ *
+ * Страницы PDF по входному контролю движка: всего, плановые, взятые в работу (с 0).
+ */
+export type CadPagesPlanRead = {
+    /**
+     * Planned
+     */
+    planned: Array<number>;
+    /**
+     * Requested
+     */
+    requested: Array<number>;
+    /**
+     * Total
+     */
+    total: number | null;
+};
+
+/**
+ * CadPreviewPathRead
+ */
+export type CadPreviewPathRead = {
+    /**
+     * Closed
+     */
+    closed: boolean;
+    /**
+     * Fill
+     */
+    fill: boolean;
+    /**
+     * Layer
+     */
+    layer: number;
+    /**
+     * Points
+     */
+    points: Array<number>;
+};
+
+/**
+ * CadPreviewRead
+ */
+export type CadPreviewRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ] | null;
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256: string;
+    /**
+     * Flatten Mm
+     */
+    flatten_mm: number;
+    frame: CadFrameRead;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Layers
+     */
+    layers: Array<string>;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Paths
+     */
+    paths: Array<CadPreviewPathRead>;
+    /**
+     * Point Count
+     */
+    point_count: number;
+    /**
+     * Truncated
+     */
+    truncated: boolean;
+    /**
+     * Units
+     */
+    units: 'mm';
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadProgressViewRead
+ */
+export type CadProgressViewRead = {
+    /**
+     * Legacy Pdf Page
+     */
+    legacy_pdf_page: number;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Ready
+     */
+    ready: boolean;
+    /**
+     * Stage
+     */
+    stage: string;
+    /**
+     * Stages
+     */
+    stages: Array<CadStageRead>;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadRemarkFileItem
+ *
+ * Замечание в файле обмена; лишние поля игнорируются, как у разбора файла в интерфейсе.
+ */
+export type CadRemarkFileItem = {
+    /**
+     * Bbox Pt
+     */
+    bbox_pt: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Comment
+     */
+    comment: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reviewer
+     */
+    reviewer?: string;
+    /**
+     * Status
+     */
+    status: 'open' | 'resolved';
+    /**
+     * Type
+     */
+    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'other';
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * CadRemarkRead
+ *
+ * Замечание в том же виде, что `IRemark` интерфейса: `id` — клиентский ключ.
+ */
+export type CadRemarkRead = {
+    /**
+     * Bbox Pt
+     */
+    bbox_pt: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Comment
+     */
+    comment: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reviewer
+     */
+    reviewer: string;
+    /**
+     * Status
+     */
+    status: 'open' | 'resolved';
+    /**
+     * Type
+     */
+    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'other';
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * CadRemarkWrite
+ *
+ * Создание или изменение замечания: время и автора выставляет сервер.
+ */
+export type CadRemarkWrite = {
+    /**
+     * Bbox Pt
+     */
+    bbox_pt: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Comment
+     */
+    comment: string;
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256?: string | null;
+    /**
+     * Reviewer
+     */
+    reviewer?: string;
+    /**
+     * Status
+     */
+    status: 'open' | 'resolved';
+    /**
+     * Type
+     */
+    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'other';
+};
+
+/**
+ * CadRemarksFile
+ *
+ * Файл `quantor.cad-remarks.v1`. Формат тот же, что строит и разбирает интерфейс.
+ */
+export type CadRemarksFile = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Coordinate System
+     */
+    coordinate_system: 'pdf_pt_top_left';
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256: string | null;
+    /**
+     * Engineering Acceptance
+     */
+    engineering_acceptance: false;
+    /**
+     * Exported At
+     */
+    exported_at: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Legacy Pdf Page
+     */
+    legacy_pdf_page: number;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Remarks
+     */
+    remarks: Array<CadRemarkFileItem>;
+    /**
+     * Reviewer
+     */
+    reviewer: string;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Schema
+     */
+    schema: 'quantor.cad-remarks.v1';
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadRemarksImportRead
+ */
+export type CadRemarksImportRead = {
+    /**
+     * Imported
+     */
+    imported: number;
+    /**
+     * Updated
+     */
+    updated: number;
+};
+
+/**
+ * CadScaleControlRead
+ */
+export type CadScaleControlRead = {
+    /**
+     * Axis Angle Deg
+     */
+    axis_angle_deg: number | null;
+    /**
+     * Chain Id
+     */
+    chain_id: number | null;
+    /**
+     * Endpoints Pt
+     */
+    endpoints_pt: Array<[
+        number,
+        number
+    ]>;
+    /**
+     * Fitted Measured Mm
+     */
+    fitted_measured_mm: number | null;
+    /**
+     * Label Mm
+     */
+    label_mm: number | null;
+    /**
+     * Length Pt
+     */
+    length_pt: number | null;
+    /**
+     * Residual Mm
+     */
+    residual_mm: number | null;
+    /**
+     * Role
+     */
+    role: string;
+    /**
+     * Tolerance Mm
+     */
+    tolerance_mm: number | null;
+    /**
+     * Within Tolerance
+     */
+    within_tolerance: boolean | null;
+};
+
+/**
+ * CadScaleRead
+ *
+ * Проверка масштаба движком: подбор по размерным цепочкам и независимая проверка.
+ */
+export type CadScaleRead = {
+    /**
+     * Anchored Conflicts
+     */
+    anchored_conflicts: number;
+    /**
+     * Context Crop Pt
+     */
+    context_crop_pt: Array<number> | null;
+    /**
+     * Controls
+     */
+    controls: Array<CadScaleControlRead>;
+    /**
+     * Fit And Holdout Chains Disjoint
+     */
+    fit_and_holdout_chains_disjoint: boolean | null;
+    /**
+     * Fit Chains
+     */
+    fit_chains: number | null;
+    /**
+     * Fit Controls
+     */
+    fit_controls: number;
+    /**
+     * Heldout Chains
+     */
+    heldout_chains: number | null;
+    /**
+     * Heldout Controls
+     */
+    heldout_controls: number;
+    /**
+     * Hold Reasons
+     */
+    hold_reasons: Array<string>;
+    /**
+     * Independent Axes
+     */
+    independent_axes: boolean | null;
+    /**
+     * Method
+     */
+    method: string | null;
+    /**
+     * Mm Per Pdf Point
+     */
+    mm_per_pdf_point: number | null;
+    /**
+     * Passed
+     */
+    passed: boolean;
+    /**
+     * Printed Scale Consistent
+     */
+    printed_scale_consistent: boolean | null;
+    /**
+     * Printed Scale Labels
+     */
+    printed_scale_labels: Array<number>;
+    /**
+     * Release Allowed
+     */
+    release_allowed: boolean;
+    /**
+     * Scale Denominator
+     */
+    scale_denominator: number | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Unassociated Numeric Labels
+     */
+    unassociated_numeric_labels: number;
+};
+
+/**
+ * CadStageRead
+ *
+ * Этап вида, как его записал движок. Ключ — один из семи этапов штатного worker.
+ */
+export type CadStageRead = {
+    /**
+     * Completed
+     */
+    completed: number | null;
+    /**
+     * Detail
+     */
+    detail: string | null;
+    /**
+     * Elapsed S
+     */
+    elapsed_s: number | null;
+    /**
+     * Key
+     */
+    key: 'source' | 'regions' | 'scale' | 'geometry' | 'assemblies' | 'checks' | 'export';
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Total
+     */
+    total: number | null;
+};
+
+/**
+ * CadViewDiagnosticsRead
+ */
+export type CadViewDiagnosticsRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    checks: CadChecksRead | null;
+    dxf: CadArtifactRead | null;
+    /**
+     * Engineering Acceptance
+     */
+    engineering_acceptance: 'not_accepted';
+    /**
+     * Files
+     */
+    files: Array<CadArtifactRead>;
+    frame: CadFrameRead;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Legacy Pdf Page
+     */
+    legacy_pdf_page: number;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Preview Available
+     */
+    preview_available: boolean;
+    /**
+     * Result Status
+     */
+    result_status: string | null;
+    /**
+     * Review Required
+     */
+    review_required: boolean;
+    scale: CadScaleRead | null;
+    /**
+     * Scale Status
+     */
+    scale_status: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadViewRead
+ */
+export type CadViewRead = {
+    /**
+     * Dxf
+     */
+    dxf: string | null;
+    /**
+     * Dxf Entities
+     */
+    dxf_entities: number | null;
+    /**
+     * Scale Status
+     */
+    scale_status: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
  * CalcAmount
  *
  * Значение или диапазон. Диапазон не превращается в середину.
@@ -6983,7 +8021,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert';
 
 /**
  * LengthUnit
@@ -13606,6 +14644,534 @@ export type ListProjectJobsResponses = {
 };
 
 export type ListProjectJobsResponse = ListProjectJobsResponses[keyof ListProjectJobsResponses];
+
+export type ListCadJobsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad';
+};
+
+export type ListCadJobsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCadJobsError = ListCadJobsErrors[keyof ListCadJobsErrors];
+
+export type ListCadJobsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadJobListRead;
+};
+
+export type ListCadJobsResponse = ListCadJobsResponses[keyof ListCadJobsResponses];
+
+export type CreateCadJobData = {
+    body: CadConvertCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad';
+};
+
+export type CreateCadJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCadJobError = CreateCadJobErrors[keyof CreateCadJobErrors];
+
+export type CreateCadJobResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadJobRead;
+};
+
+export type CreateCadJobResponse = CreateCadJobResponses[keyof CreateCadJobResponses];
+
+export type ReadCadJobData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}';
+};
+
+export type ReadCadJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadJobError = ReadCadJobErrors[keyof ReadCadJobErrors];
+
+export type ReadCadJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadJobRead;
+};
+
+export type ReadCadJobResponse = ReadCadJobResponses[keyof ReadCadJobResponses];
+
+export type DownloadCadArtifactData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Name
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/artifacts/{name}';
+};
+
+export type DownloadCadArtifactErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadCadArtifactError = DownloadCadArtifactErrors[keyof DownloadCadArtifactErrors];
+
+export type DownloadCadArtifactResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ReadCadEventsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: {
+        /**
+         * Attempt
+         */
+        attempt?: number | null;
+        /**
+         * After Seq
+         */
+        after_seq?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/events';
+};
+
+export type ReadCadEventsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadEventsError = ReadCadEventsErrors[keyof ReadCadEventsErrors];
+
+export type ReadCadEventsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadEventsRead;
+};
+
+export type ReadCadEventsResponse = ReadCadEventsResponses[keyof ReadCadEventsResponses];
+
+export type ListCadRemarksData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query: {
+        /**
+         * Attempt
+         */
+        attempt: number;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/remarks';
+};
+
+export type ListCadRemarksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCadRemarksError = ListCadRemarksErrors[keyof ListCadRemarksErrors];
+
+export type ListCadRemarksResponses = {
+    /**
+     * Response List Cad Remarks
+     *
+     * Successful Response
+     */
+    200: Array<CadRemarkRead>;
+};
+
+export type ListCadRemarksResponse = ListCadRemarksResponses[keyof ListCadRemarksResponses];
+
+export type ImportCadRemarksData = {
+    body: CadRemarksFile;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/remarks/import';
+};
+
+export type ImportCadRemarksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ImportCadRemarksError = ImportCadRemarksErrors[keyof ImportCadRemarksErrors];
+
+export type ImportCadRemarksResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadRemarksImportRead;
+};
+
+export type ImportCadRemarksResponse = ImportCadRemarksResponses[keyof ImportCadRemarksResponses];
+
+export type DeleteCadRemarkData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Remark Key
+         */
+        remark_key: string;
+    };
+    query: {
+        /**
+         * Attempt
+         */
+        attempt: number;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/remarks/{remark_key}';
+};
+
+export type DeleteCadRemarkErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteCadRemarkError = DeleteCadRemarkErrors[keyof DeleteCadRemarkErrors];
+
+export type DeleteCadRemarkResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteCadRemarkResponse = DeleteCadRemarkResponses[keyof DeleteCadRemarkResponses];
+
+export type PutCadRemarkData = {
+    body: CadRemarkWrite;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Remark Key
+         */
+        remark_key: string;
+    };
+    query: {
+        /**
+         * Attempt
+         */
+        attempt: number;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/remarks/{remark_key}';
+};
+
+export type PutCadRemarkErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutCadRemarkError = PutCadRemarkErrors[keyof PutCadRemarkErrors];
+
+export type PutCadRemarkResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadRemarkRead;
+};
+
+export type PutCadRemarkResponse = PutCadRemarkResponses[keyof PutCadRemarkResponses];
+
+export type RetryCadJobData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/retry';
+};
+
+export type RetryCadJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RetryCadJobError = RetryCadJobErrors[keyof RetryCadJobErrors];
+
+export type RetryCadJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadJobRead;
+};
+
+export type RetryCadJobResponse = RetryCadJobResponses[keyof RetryCadJobResponses];
+
+export type ReadCadViewData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}';
+};
+
+export type ReadCadViewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadViewError = ReadCadViewErrors[keyof ReadCadViewErrors];
+
+export type ReadCadViewResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadViewDiagnosticsRead;
+};
+
+export type ReadCadViewResponse = ReadCadViewResponses[keyof ReadCadViewResponses];
+
+export type ReadCadPreviewData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/preview';
+};
+
+export type ReadCadPreviewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadPreviewError = ReadCadPreviewErrors[keyof ReadCadPreviewErrors];
+
+export type ReadCadPreviewResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadPreviewRead;
+};
+
+export type ReadCadPreviewResponse = ReadCadPreviewResponses[keyof ReadCadPreviewResponses];
 
 export type ListTakeoffItemsData = {
     body?: never;

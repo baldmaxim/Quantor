@@ -68,11 +68,14 @@ class TestStageBoundaries:
 
         Список сверяется целиком, а не по длине: новый тип должен попадать сюда осознанным
         решением. На Stage 2A к импорту пакета добавилось извлечение геометрии страниц —
-        оно читает размеры страницы и ничего не распознаёт.
+        оно читает размеры страницы и ничего не распознаёт. Трек «Модель здания» добавил
+        конвертацию PDF → CAD: детерминированный движок в отдельном исполнителе за гейтом
+        CAD_QA_ENABLED (только local/test), модели он не вызывает.
         """
         assert [job_type.value for job_type in JobType] == [
             "legacy_import",
             "pdf_geometry_extract",
+            "cad_pdf_convert",
         ]
 
     def test_no_job_type_invokes_a_model(self) -> None:

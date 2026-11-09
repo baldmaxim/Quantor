@@ -118,6 +118,21 @@ class Settings(BaseSettings):
     # Через сколько молчания исполнитель считается мёртвым. Втрое больше аренды.
     worker_stale_after_seconds: int = Field(default=180, gt=0)
 
+    # --- PDF -> CAD, QA-контур (app/cad_worker) ---
+    #
+    # Выключено по умолчанию. Вне ENVIRONMENT=local|test включить нельзя: валидатор ниже
+    # роняет запуск, а маршруты и исполнитель без этого флага не существуют. Движок —
+    # отдельный интерпретатор с закреплёнными зависимостями и SHA-закреплённый архив; в
+    # процесс API ни PyMuPDF, ни Shapely не импортируются.
+    cad_qa_enabled: bool = False
+    cad_engine_python: str = ""
+    cad_engine_runner: str = ""
+    cad_engine_archive: str = ""
+    # Пусто — системный каталог временных файлов + quantor-cad.
+    cad_work_root: str = ""
+    cad_total_timeout_seconds: int = Field(default=900, ge=10, le=7200)
+    cad_max_memory_mb: int = Field(default=3072, ge=256, le=16384)
+
     # --- вход в портал ---
     #
     # `dev` — фиксированная личность без провайдера: так работают `pnpm dev` и тесты.
@@ -193,6 +208,11 @@ class Settings(BaseSettings):
             self.oidc_issuer.strip() and self.oidc_client_id.strip()
         ):
             raise ValueError("AUTH_MODE=oidc требует OIDC_ISSUER и OIDC_CLIENT_ID")
+        if self.cad_qa_enabled and not self.is_local:
+            raise ValueError(
+                f"CAD_QA_ENABLED недопустим при ENVIRONMENT={self.environment}: PDF -> CAD "
+                "закрыт до решений по ADR-0016/0034/0035 и матрице лицензий"
+            )
         return self
 
     @property

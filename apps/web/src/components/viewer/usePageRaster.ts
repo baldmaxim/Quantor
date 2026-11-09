@@ -39,6 +39,8 @@ interface IPageRasterInput {
   readonly stackRef: RefObject<HTMLDivElement | null>;
   readonly pageHostRef: RefObject<HTMLDivElement | null>;
   readonly onError: (code: string) => void;
+  /** Растр поставлен в стопку: прежняя ошибка отрисовки этого листа устарела. */
+  readonly onRendered?: () => void;
 }
 
 /** Задержка перед показом значка отрисовки: быстрые листы не должны им мигать. */
@@ -71,6 +73,7 @@ export const usePageRaster = ({
   stackRef,
   pageHostRef,
   onError,
+  onRendered,
 }: IPageRasterInput) => {
   const [rendering, setRendering] = useState(false);
 
@@ -92,9 +95,11 @@ export const usePageRaster = ({
   const installed = useRef<RasterPlan | null>(null);
 
   const failed = useRef(onError);
+  const rasterReady = useRef(onRendered);
   useEffect(() => {
     failed.current = onError;
-  }, [onError]);
+    rasterReady.current = onRendered;
+  }, [onError, onRendered]);
 
   /** Двигает стопку по камере. Вызывается на каждом её кадре — дёшево, без отрисовки. */
   const placeStack = useCallback(
@@ -228,6 +233,7 @@ export const usePageRaster = ({
         }
         done();
         install(plan, canvas);
+        rasterReady.current?.();
         scheduleRef.current();
       })
       .catch((error: unknown) => {

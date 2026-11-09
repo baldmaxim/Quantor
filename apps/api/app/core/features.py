@@ -149,6 +149,18 @@ REGISTRY: Final[MappingProxyType[str, FlagDefinition]] = MappingProxyType(
                 stage="Расчётный контур · разработка",
                 admin_editable=False,
             ),
+            # PDF -> CAD (QA-контур, docs/building-model/cad-engine-integration-contract.md):
+            # из админки не включается; маршруты существуют только при CAD_QA_ENABLED в
+            # local/test. PyMuPDF (AGPL) и Shapely в бою не разрешены (ADR-0016, ADR-0035).
+            FlagDefinition(
+                key="cad.export",
+                title="PDF -> CAD (QA)",
+                description="Преобразование плана PDF в DXF отдельным движком. Только QA: "
+                "результат требует проверки инженером, отделка и ведомости объёмов выключены.",
+                default=False,
+                stage="PDF -> CAD · QA",
+                admin_editable=False,
+            ),
         )
     }
 )

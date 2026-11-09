@@ -223,6 +223,7 @@ def test_every_stage1_flag_key_survived() -> None:
         "mep_rd_hypothesis_v1",
         "tender.versions",
         "calc.portal",
+        "cad.export",
     }
     assert set(FLAG_REGISTRY) == expected
 
@@ -234,6 +235,7 @@ def test_unfinished_features_cannot_be_enabled_from_the_console() -> None:
     которую владелец включает на пространство (ADR-0023). Проверки пилота — test_pilot_flag.py.
 
     `calc.portal` здесь до PASS инженерного гейта стадии П после PROMPT 06 (ADR-0030).
+    `cad.export` здесь до решения владельца об открытии CAD в бою (ADR-0035, гейт CAD_QA_ENABLED).
     """
     for key in (
         "takeoff.ai",
@@ -242,6 +244,7 @@ def test_unfinished_features_cannot_be_enabled_from_the_console() -> None:
         "bim.import",
         "drawing.compare",
         "calc.portal",
+        "cad.export",
     ):
         assert not FLAG_REGISTRY[key].admin_editable, key
 

@@ -34,6 +34,8 @@ interface ILayerCanvases {
   readonly regionsRef: RefObject<HTMLCanvasElement | null>;
   readonly scaleRef: RefObject<HTMLCanvasElement | null>;
   readonly measurementsRef: RefObject<HTMLCanvasElement | null>;
+  /** Дополнительный слой, чужой для рабочей области (CAD-просмотр). Нет холста — нет слоя. */
+  readonly extraRef?: RefObject<HTMLCanvasElement | null>;
 }
 
 interface IViewportLayersInput {
@@ -51,9 +53,13 @@ interface IViewportLayersInput {
   /** Пространственный индекс измерений: отсечение спрашивает его, а не весь список (промт 04). */
   readonly measurementIndex: ShapeIndex<OverlayMeasurement>;
   readonly measurementColors: Readonly<Record<string, string>>;
+  /** Рисовальщик дополнительного слоя. Данные слоя живут в нём; новый объект = перерисовка. */
+  readonly extraPainter?: LayerPainter | null;
 }
 
-type LayerKey = 'regions' | 'scale' | 'measurements';
+type LayerKey = 'regions' | 'scale' | 'measurements' | 'extra';
+
+const LAYER_KEYS: readonly LayerKey[] = ['regions', 'scale', 'measurements', 'extra'];
 
 /** Цвета областей берутся из токенов темы — хардкод здесь означал бы разъехавшуюся тему. */
 const readRegionColors = (): Record<string, string> => {
@@ -84,7 +90,7 @@ const readSheetInk = (): Record<string, string> => {
 };
 
 export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLayersInput) => {
-  const { hostRef, regionsRef, scaleRef, measurementsRef } = canvases;
+  const { hostRef, regionsRef, scaleRef, measurementsRef, extraRef } = canvases;
   const {
     page,
     cameraRef,
@@ -98,6 +104,7 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
     measurements,
     measurementIndex,
     measurementColors,
+    extraPainter = null,
   } = input;
 
   // Цвета читаются из токенов один раз на тему, а не на каждой полосе панорамы: чтение
@@ -193,8 +200,13 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
   const layers = useRef<Partial<Record<LayerKey, ViewportLayer>>>({});
   const layerOf = useCallback(
     (key: LayerKey): ViewportLayer | null => {
-      const refs = { regions: regionsRef, scale: scaleRef, measurements: measurementsRef };
-      const canvas = refs[key].current;
+      const refs = {
+        regions: regionsRef,
+        scale: scaleRef,
+        measurements: measurementsRef,
+        extra: extraRef,
+      };
+      const canvas = refs[key]?.current;
       if (!canvas) return null;
       const existing = layers.current[key];
       if (existing) return existing;
@@ -202,7 +214,7 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
       layers.current[key] = created;
       return created;
     },
-    [regionsRef, scaleRef, measurementsRef],
+    [regionsRef, scaleRef, measurementsRef, extraRef],
   );
 
   const viewOf = useCallback(
@@ -226,6 +238,7 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
     regions: regionsPainter,
     scale: scalePainter,
     measurements: measurementsPainter,
+    extra: extraPainter,
   });
   const view = useRef(viewOf);
   useEffect(() => {
@@ -233,9 +246,10 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
       regions: regionsPainter,
       scale: scalePainter,
       measurements: measurementsPainter,
+      extra: extraPainter,
     };
     view.current = viewOf;
-  }, [regionsPainter, scalePainter, measurementsPainter, viewOf]);
+  }, [regionsPainter, scalePainter, measurementsPainter, extraPainter, viewOf]);
 
   const repaint = useCallback(
     (key: LayerKey) => {
@@ -252,7 +266,7 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
     (camera: CameraState) => {
       const current = view.current(camera);
       if (!current) return;
-      for (const key of ['regions', 'scale', 'measurements'] as const) {
+      for (const key of LAYER_KEYS) {
         const painter = painters.current[key];
         const layer = layerOf(key);
         if (painter && layer) layer.follow(current, painter);
@@ -265,7 +279,7 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
   const settleLayers = useCallback(() => {
     const current = view.current(cameraRef.current);
     if (!current) return;
-    for (const key of ['regions', 'scale', 'measurements'] as const) {
+    for (const key of LAYER_KEYS) {
       const painter = painters.current[key];
       const layer = layerOf(key);
       if (painter && layer) layer.settle(current, painter);
@@ -294,6 +308,11 @@ export const useViewportLayers = (canvases: ILayerCanvases, input: IViewportLaye
     repaint('measurements');
     return tools.subscribe(() => repaint('measurements'));
   }, [tools, measurementsPainter, viewOf, repaint]);
+
+  // Дополнительный слой: его данные сменились (другой рисовальщик) - слой рисуется целиком.
+  useEffect(() => {
+    if (extraPainter) repaint('extra');
+  }, [extraPainter, viewOf, repaint]);
 
   return { followCamera, settleLayers, paintRegions };
 };

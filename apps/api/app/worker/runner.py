@@ -25,12 +25,13 @@ import os
 import platform
 import signal
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from app import API_VERSION
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
-from app.domain import JobStatus
+from app.domain import JobStatus, JobType
 from app.errors import ErrorCode
 from app.models import Job
 from app.services import jobs as jobs_service
@@ -67,10 +68,22 @@ class _LeaseFlag:
 class Worker:
     """Один процесс-исполнитель."""
 
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        handlers: Mapping[JobType, registry.JobHandler] | None = None,
+    ) -> None:
         self._settings = settings or get_settings()
+        # Реестр — параметр: отдельный исполнитель (app.cad_worker) берёт только свои типы,
+        # основной — прежний реестр. Захват фильтруется по этим же типам.
+        self._handlers: Mapping[JobType, registry.JobHandler] = (
+            registry.HANDLERS if handlers is None else handlers
+        )
         self.worker_id = make_worker_id()
         self._stopping = asyncio.Event()
+
+    def _supported_types(self) -> list[str]:
+        return [job_type.value for job_type in self._handlers]
 
     def request_stop(self) -> None:
         """Просит остановиться после текущего задания.
@@ -91,14 +104,14 @@ class Worker:
                 host=platform.node()[:255] or "unknown",
                 pid=os.getpid(),
                 version=API_VERSION,
-                job_types=registry.supported_types(),
+                job_types=self._supported_types(),
             )
             await session.commit()
 
         log.info(
             "worker_started",
             worker_id=self.worker_id,
-            job_types=registry.supported_types(),
+            job_types=self._supported_types(),
             executor="worker",
         )
 
@@ -131,7 +144,7 @@ class Worker:
             job = await jobs_service.claim(
                 session,
                 worker_id=self.worker_id,
-                job_types=registry.supported_types(),
+                job_types=self._supported_types(),
                 lease_seconds=settings.worker_lease_seconds,
             )
             if job is None:
@@ -170,7 +183,7 @@ class Worker:
                 log.error("job_missing", job_id=str(job_id))
                 return
 
-            handler = registry.handler_for(job.job_type)
+            handler = self._handlers.get(job.job_type)
             if handler is None:
                 # Тип задания есть в базе, а исполнителя для него нет. Это не отказ
                 # работы, а рассогласование установки, и висеть «выполняется» оно
@@ -240,12 +253,15 @@ class Worker:
                 log.warning("reaper_failed", error_type=type(error).__name__)
 
 
-async def run_worker(settings: Settings | None = None) -> None:
+async def run_worker(
+    settings: Settings | None = None,
+    handlers: Mapping[JobType, registry.JobHandler] | None = None,
+) -> None:
     """Точка входа: запускает исполнителя и корректно останавливает по сигналу."""
     resolved = settings or get_settings()
     configure_logging(level=resolved.log_level, json_output=not resolved.is_local)
 
-    worker = Worker(resolved)
+    worker = Worker(resolved, handlers)
     loop = asyncio.get_running_loop()
     for name in ("SIGINT", "SIGTERM"):
         sig = getattr(signal, name, None)

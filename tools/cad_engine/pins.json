@@ -1,0 +1,27 @@
+{
+  "schema": "quantor.cad_engine.pins.v1",
+  "runner_version": "0.1.0",
+  "engine": {
+    "name": "quantor-cad-legacy-ar",
+    "version": "2026.11.09+80cc6563f45a",
+    "archive_name": "Quantor_CAD_source_2026.11.09_80cc6563f45a.zip",
+    "archive_sha256": "2757a9edc2b95ae1a79b8915643d78b4a10801d8830b5f9d3514f31ee7890de4",
+    "manifest_sha256": "947aed8c6542624edb0ae0392c7cccc89ab73b867976c6ba5126f7aa142b4e31",
+    "source_snapshot_sha256": "80cc6563f45adc0dad2fd90527067b1b154d6811742b29a48284c511cb1c97b0",
+    "archive_entries": 133,
+    "max_unpacked_bytes": 4194304,
+    "worker": "АР_Обработка/90_Пайплайн/pdf_job_monitor/worker.py",
+    "intake": "АР_Обработка/90_Пайплайн/pdf_job_monitor"
+  },
+  "python": "3.12",
+  "packages": {
+    "PyMuPDF": "1.28.2",
+    "Pillow": "12.3.0",
+    "ezdxf": "1.4.5",
+    "Shapely": "2.2.0",
+    "numpy": "2.5.4",
+    "fonttools": "4.68.0",
+    "pyparsing": "3.3.3",
+    "typing-extensions": "4.16.0"
+  }
+}

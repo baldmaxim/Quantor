@@ -866,6 +866,2099 @@
         "title": "BoxGeometry",
         "type": "object"
       },
+      "CadArtifactRead": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "sha256",
+          "size"
+        ],
+        "title": "CadArtifactRead",
+        "type": "object"
+      },
+      "CadAttemptRead": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadEngineStateRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "event_count": {
+            "title": "Event Count",
+            "type": "integer"
+          },
+          "events_dropped": {
+            "title": "Events Dropped",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "last_seq": {
+            "title": "Last Seq",
+            "type": "integer"
+          },
+          "outcome": {
+            "enum": [
+              "running",
+              "succeeded",
+              "failed",
+              "lost"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadPagesPlanRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "phase_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase Detail"
+          },
+          "result_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Status"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/CadProgressViewRead"
+            },
+            "title": "Views",
+            "type": "array"
+          }
+        },
+        "required": [
+          "attempt",
+          "started_at",
+          "finished_at",
+          "outcome",
+          "error_code",
+          "result_status",
+          "phase",
+          "phase_detail",
+          "pages",
+          "engine",
+          "views",
+          "event_count",
+          "events_dropped",
+          "last_seq"
+        ],
+        "title": "CadAttemptRead",
+        "type": "object"
+      },
+      "CadChecksRead": {
+        "properties": {
+          "all_source_fills_valid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "All Source Fills Valid"
+          },
+          "audit_errors": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audit Errors"
+          },
+          "door_block_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Block Count"
+          },
+          "door_block_inserts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Block Inserts"
+          },
+          "gate_block_inserts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gate Block Inserts"
+          },
+          "layers": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Layers",
+            "type": "object"
+          },
+          "quantity_release_allowed": {
+            "title": "Quantity Release Allowed",
+            "type": "boolean"
+          },
+          "recognized_monolith_fill_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recognized Monolith Fill Count"
+          },
+          "region_approved": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Approved"
+          },
+          "rooms_recognized_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rooms Recognized Rows"
+          },
+          "rooms_schedule_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rooms Schedule Rows"
+          },
+          "source_fill_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Fill Count"
+          }
+        },
+        "required": [
+          "audit_errors",
+          "layers",
+          "door_block_inserts",
+          "gate_block_inserts",
+          "source_fill_count",
+          "recognized_monolith_fill_count",
+          "door_block_count",
+          "rooms_schedule_rows",
+          "rooms_recognized_rows",
+          "region_approved",
+          "all_source_fills_valid",
+          "quantity_release_allowed"
+        ],
+        "title": "CadChecksRead",
+        "type": "object"
+      },
+      "CadConvertCreate": {
+        "additionalProperties": false,
+        "description": "Постановка. `pages` — page_index с 0 (как у листов Quantor), null — все плановые листы.",
+        "properties": {
+          "finishes": {
+            "default": false,
+            "title": "Finishes",
+            "type": "boolean"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "items": {
+                  "minimum": 0.0,
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          },
+          "schedules": {
+            "default": false,
+            "title": "Schedules",
+            "type": "boolean"
+          }
+        },
+        "title": "CadConvertCreate",
+        "type": "object"
+      },
+      "CadEngineStateRead": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "stage",
+          "error"
+        ],
+        "title": "CadEngineStateRead",
+        "type": "object"
+      },
+      "CadEventRead": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "completed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "elapsed_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed S"
+          },
+          "legacy_pdf_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Pdf Page"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "scope": {
+            "enum": [
+              "document",
+              "view"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
+          }
+        },
+        "required": [
+          "seq",
+          "at",
+          "attempt",
+          "scope",
+          "status"
+        ],
+        "title": "CadEventRead",
+        "type": "object"
+      },
+      "CadEventsRead": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CadEventRead"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "finished": {
+            "title": "Finished",
+            "type": "boolean"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "last_seq": {
+            "title": "Last Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "attempt",
+          "events",
+          "last_seq",
+          "finished"
+        ],
+        "title": "CadEventsRead",
+        "type": "object"
+      },
+      "CadFrameRead": {
+        "description": "Кадр координат DXF (мм) -> PDF (pt от левого верхнего угла страницы).\n\n`pt = origin_pt + (x_mm, -y_mm) / mm_per_pdf_point`. Подтверждён, только если масштаб\nпрошёл размерную проверку и движок указал начало координат DXF на странице.",
+        "properties": {
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "mm_per_pdf_point": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mm Per Pdf Point"
+          },
+          "origin_pt": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Pt"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "units": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Units"
+          }
+        },
+        "required": [
+          "confirmed",
+          "reason",
+          "units",
+          "origin_pt",
+          "mm_per_pdf_point"
+        ],
+        "title": "CadFrameRead",
+        "type": "object"
+      },
+      "CadJobListRead": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CadJobSummaryRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "server_time"
+        ],
+        "title": "CadJobListRead",
+        "type": "object"
+      },
+      "CadJobRead": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/CadArtifactRead"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/CadAttemptRead"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "known_limitation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Limitation"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/CadPageRead"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "requested_pages": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Pages"
+          },
+          "result_attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Attempt"
+          },
+          "result_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Status"
+          },
+          "retry_blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Blocked Reason"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "review_required": {
+            "title": "Review Required",
+            "type": "boolean"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "revision_id",
+          "status",
+          "stage",
+          "attempt",
+          "error_code",
+          "error_message",
+          "engine_version",
+          "result_status",
+          "review_required",
+          "known_limitation",
+          "pages",
+          "artifacts",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "server_time",
+          "requested_pages",
+          "result_attempt",
+          "attempts",
+          "retryable",
+          "retry_blocked_reason"
+        ],
+        "title": "CadJobRead",
+        "type": "object"
+      },
+      "CadJobSummaryRead": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "requested_pages": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Pages"
+          },
+          "result_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Status"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "attempt",
+          "created_at",
+          "finished_at",
+          "requested_pages",
+          "result_status",
+          "error_code"
+        ],
+        "title": "CadJobSummaryRead",
+        "type": "object"
+      },
+      "CadPageRead": {
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "legacy_pdf_page": {
+            "title": "Legacy Pdf Page",
+            "type": "integer"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/CadViewRead"
+            },
+            "title": "Views",
+            "type": "array"
+          }
+        },
+        "required": [
+          "index",
+          "legacy_pdf_page",
+          "views"
+        ],
+        "title": "CadPageRead",
+        "type": "object"
+      },
+      "CadPagesPlanRead": {
+        "description": "Страницы PDF по входному контролю движка: всего, плановые, взятые в работу (с 0).",
+        "properties": {
+          "planned": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Planned",
+            "type": "array"
+          },
+          "requested": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Requested",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "required": [
+          "total",
+          "planned",
+          "requested"
+        ],
+        "title": "CadPagesPlanRead",
+        "type": "object"
+      },
+      "CadPreviewPathRead": {
+        "properties": {
+          "closed": {
+            "title": "Closed",
+            "type": "boolean"
+          },
+          "fill": {
+            "title": "Fill",
+            "type": "boolean"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "integer"
+          },
+          "points": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layer",
+          "closed",
+          "fill",
+          "points"
+        ],
+        "title": "CadPreviewPathRead",
+        "type": "object"
+      },
+      "CadPreviewRead": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "maxItems": 4,
+                "minItems": 4,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "dxf_sha256": {
+            "title": "Dxf Sha256",
+            "type": "string"
+          },
+          "flatten_mm": {
+            "title": "Flatten Mm",
+            "type": "number"
+          },
+          "frame": {
+            "$ref": "#/components/schemas/CadFrameRead"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "layers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "paths": {
+            "items": {
+              "$ref": "#/components/schemas/CadPreviewPathRead"
+            },
+            "title": "Paths",
+            "type": "array"
+          },
+          "point_count": {
+            "title": "Point Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "units": {
+            "const": "mm",
+            "title": "Units",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "attempt",
+          "page_index",
+          "view",
+          "units",
+          "dxf_sha256",
+          "layers",
+          "paths",
+          "point_count",
+          "truncated",
+          "flatten_mm",
+          "bbox",
+          "frame"
+        ],
+        "title": "CadPreviewRead",
+        "type": "object"
+      },
+      "CadProgressViewRead": {
+        "properties": {
+          "legacy_pdf_page": {
+            "title": "Legacy Pdf Page",
+            "type": "integer"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/CadStageRead"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page_index",
+          "legacy_pdf_page",
+          "view",
+          "status",
+          "stage",
+          "ready",
+          "stages"
+        ],
+        "title": "CadProgressViewRead",
+        "type": "object"
+      },
+      "CadRemarkFileItem": {
+        "description": "Замечание в файле обмена; лишние поля игнорируются, как у разбора файла в интерфейсе.",
+        "properties": {
+          "bbox_pt": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Bbox Pt",
+            "type": "array"
+          },
+          "comment": {
+            "maxLength": 4000,
+            "title": "Comment",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "reviewer": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Reviewer",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "missing_wall",
+              "false_wall",
+              "missing_door",
+              "door_geometry",
+              "missing_gate",
+              "missing_glazing",
+              "monolith",
+              "room_boundary",
+              "wrong_class",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "comment",
+          "status",
+          "bbox_pt",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CadRemarkFileItem",
+        "type": "object"
+      },
+      "CadRemarkRead": {
+        "description": "Замечание в том же виде, что `IRemark` интерфейса: `id` — клиентский ключ.",
+        "properties": {
+          "bbox_pt": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Bbox Pt",
+            "type": "array"
+          },
+          "comment": {
+            "title": "Comment",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reviewer": {
+            "title": "Reviewer",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "missing_wall",
+              "false_wall",
+              "missing_door",
+              "door_geometry",
+              "missing_gate",
+              "missing_glazing",
+              "monolith",
+              "room_boundary",
+              "wrong_class",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "comment",
+          "reviewer",
+          "status",
+          "bbox_pt",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CadRemarkRead",
+        "type": "object"
+      },
+      "CadRemarkWrite": {
+        "additionalProperties": false,
+        "description": "Создание или изменение замечания: время и автора выставляет сервер.",
+        "properties": {
+          "bbox_pt": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Bbox Pt",
+            "type": "array"
+          },
+          "comment": {
+            "maxLength": 4000,
+            "title": "Comment",
+            "type": "string"
+          },
+          "dxf_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dxf Sha256"
+          },
+          "reviewer": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Reviewer",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "missing_wall",
+              "false_wall",
+              "missing_door",
+              "door_geometry",
+              "missing_gate",
+              "missing_glazing",
+              "monolith",
+              "room_boundary",
+              "wrong_class",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "comment",
+          "status",
+          "bbox_pt"
+        ],
+        "title": "CadRemarkWrite",
+        "type": "object"
+      },
+      "CadRemarksFile": {
+        "description": "Файл `quantor.cad-remarks.v1`. Формат тот же, что строит и разбирает интерфейс.",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "coordinate_system": {
+            "const": "pdf_pt_top_left",
+            "title": "Coordinate System",
+            "type": "string"
+          },
+          "dxf_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dxf Sha256"
+          },
+          "engineering_acceptance": {
+            "const": false,
+            "title": "Engineering Acceptance",
+            "type": "boolean"
+          },
+          "exported_at": {
+            "format": "date-time",
+            "title": "Exported At",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "legacy_pdf_page": {
+            "title": "Legacy Pdf Page",
+            "type": "integer"
+          },
+          "page_index": {
+            "minimum": 0.0,
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "remarks": {
+            "items": {
+              "$ref": "#/components/schemas/CadRemarkFileItem"
+            },
+            "maxItems": 500,
+            "title": "Remarks",
+            "type": "array"
+          },
+          "reviewer": {
+            "maxLength": 200,
+            "title": "Reviewer",
+            "type": "string"
+          },
+          "revision_id": {
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "schema": {
+            "const": "quantor.cad-remarks.v1",
+            "title": "Schema",
+            "type": "string"
+          },
+          "view": {
+            "minimum": 0.0,
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema",
+          "project_id",
+          "revision_id",
+          "job_id",
+          "attempt",
+          "page_index",
+          "legacy_pdf_page",
+          "view",
+          "dxf_sha256",
+          "coordinate_system",
+          "exported_at",
+          "reviewer",
+          "engineering_acceptance",
+          "remarks"
+        ],
+        "title": "CadRemarksFile",
+        "type": "object"
+      },
+      "CadRemarksImportRead": {
+        "properties": {
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "imported",
+          "updated"
+        ],
+        "title": "CadRemarksImportRead",
+        "type": "object"
+      },
+      "CadScaleControlRead": {
+        "properties": {
+          "axis_angle_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axis Angle Deg"
+          },
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id"
+          },
+          "endpoints_pt": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Endpoints Pt",
+            "type": "array"
+          },
+          "fitted_measured_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fitted Measured Mm"
+          },
+          "label_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Mm"
+          },
+          "length_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length Pt"
+          },
+          "residual_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Mm"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "tolerance_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tolerance Mm"
+          },
+          "within_tolerance": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Within Tolerance"
+          }
+        },
+        "required": [
+          "chain_id",
+          "role",
+          "label_mm",
+          "length_pt",
+          "fitted_measured_mm",
+          "residual_mm",
+          "tolerance_mm",
+          "within_tolerance",
+          "axis_angle_deg",
+          "endpoints_pt"
+        ],
+        "title": "CadScaleControlRead",
+        "type": "object"
+      },
+      "CadScaleRead": {
+        "description": "Проверка масштаба движком: подбор по размерным цепочкам и независимая проверка.",
+        "properties": {
+          "anchored_conflicts": {
+            "title": "Anchored Conflicts",
+            "type": "integer"
+          },
+          "context_crop_pt": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Crop Pt"
+          },
+          "controls": {
+            "items": {
+              "$ref": "#/components/schemas/CadScaleControlRead"
+            },
+            "title": "Controls",
+            "type": "array"
+          },
+          "fit_and_holdout_chains_disjoint": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit And Holdout Chains Disjoint"
+          },
+          "fit_chains": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Chains"
+          },
+          "fit_controls": {
+            "title": "Fit Controls",
+            "type": "integer"
+          },
+          "heldout_chains": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heldout Chains"
+          },
+          "heldout_controls": {
+            "title": "Heldout Controls",
+            "type": "integer"
+          },
+          "hold_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hold Reasons",
+            "type": "array"
+          },
+          "independent_axes": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Independent Axes"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "mm_per_pdf_point": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mm Per Pdf Point"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "printed_scale_consistent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printed Scale Consistent"
+          },
+          "printed_scale_labels": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Printed Scale Labels",
+            "type": "array"
+          },
+          "release_allowed": {
+            "title": "Release Allowed",
+            "type": "boolean"
+          },
+          "scale_denominator": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Denominator"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "unassociated_numeric_labels": {
+            "title": "Unassociated Numeric Labels",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "passed",
+          "method",
+          "mm_per_pdf_point",
+          "scale_denominator",
+          "printed_scale_labels",
+          "printed_scale_consistent",
+          "fit_controls",
+          "heldout_controls",
+          "fit_chains",
+          "heldout_chains",
+          "fit_and_holdout_chains_disjoint",
+          "independent_axes",
+          "anchored_conflicts",
+          "unassociated_numeric_labels",
+          "release_allowed",
+          "controls",
+          "hold_reasons",
+          "context_crop_pt"
+        ],
+        "title": "CadScaleRead",
+        "type": "object"
+      },
+      "CadStageRead": {
+        "description": "Этап вида, как его записал движок. Ключ — один из семи этапов штатного worker.",
+        "properties": {
+          "completed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "elapsed_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed S"
+          },
+          "key": {
+            "enum": [
+              "source",
+              "regions",
+              "scale",
+              "geometry",
+              "assemblies",
+              "checks",
+              "export"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "elapsed_s",
+          "completed",
+          "total",
+          "detail"
+        ],
+        "title": "CadStageRead",
+        "type": "object"
+      },
+      "CadViewDiagnosticsRead": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "checks": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadChecksRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dxf": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadArtifactRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "engineering_acceptance": {
+            "const": "not_accepted",
+            "title": "Engineering Acceptance",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/CadArtifactRead"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "frame": {
+            "$ref": "#/components/schemas/CadFrameRead"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "legacy_pdf_page": {
+            "title": "Legacy Pdf Page",
+            "type": "integer"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "preview_available": {
+            "title": "Preview Available",
+            "type": "boolean"
+          },
+          "result_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Status"
+          },
+          "review_required": {
+            "title": "Review Required",
+            "type": "boolean"
+          },
+          "scale": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadScaleRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scale_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Status"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "attempt",
+          "page_index",
+          "legacy_pdf_page",
+          "view",
+          "status",
+          "scale_status",
+          "result_status",
+          "files",
+          "dxf",
+          "preview_available",
+          "scale",
+          "frame",
+          "checks",
+          "review_required",
+          "engineering_acceptance"
+        ],
+        "title": "CadViewDiagnosticsRead",
+        "type": "object"
+      },
+      "CadViewRead": {
+        "properties": {
+          "dxf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dxf"
+          },
+          "dxf_entities": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dxf Entities"
+          },
+          "scale_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Status"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "view",
+          "status",
+          "scale_status",
+          "dxf",
+          "dxf_entities"
+        ],
+        "title": "CadViewRead",
+        "type": "object"
+      },
       "CalcAmount": {
         "additionalProperties": false,
         "description": "Значение или диапазон. Диапазон не превращается в середину.",
@@ -13207,7 +15300,8 @@
         "description": "Типы заданий.\n\nРеальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и\nне исполняются.",
         "enum": [
           "legacy_import",
-          "pdf_geometry_extract"
+          "pdf_geometry_extract",
+          "cad_pdf_convert"
         ],
         "title": "JobType",
         "type": "string"
@@ -24718,6 +26812,955 @@
         "summary": "Задания проекта",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad": {
+      "get": {
+        "operationId": "list_cad_jobs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadJobListRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Задания PDF -> DXF ревизии: очередь и история (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      },
+      "post": {
+        "operationId": "create_cad_job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadConvertCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Поставить преобразование PDF ревизии в DXF (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}": {
+      "get": {
+        "operationId": "read_cad_job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Состояние преобразования в DXF (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/artifacts/{name}": {
+      "get": {
+        "operationId": "download_cad_artifact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Файл результата преобразования в DXF (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/events": {
+      "get": {
+        "operationId": "read_cad_events",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attempt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attempt"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_seq",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadEventsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "События попытки по порядку номеров, после курсора (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/remarks": {
+      "get": {
+        "operationId": "list_cad_remarks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attempt",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Attempt",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CadRemarkRead"
+                  },
+                  "title": "Response List Cad Remarks",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Замечания проверяющего к виду результата (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/remarks/import": {
+      "post": {
+        "operationId": "import_cad_remarks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadRemarksFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadRemarksImportRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Импорт файла quantor.cad-remarks.v1: слияние по ключу замечания (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/remarks/{remark_key}": {
+      "delete": {
+        "operationId": "delete_cad_remark",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "remark_key",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Remark Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attempt",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Attempt",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить замечание к виду результата (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      },
+      "put": {
+        "operationId": "put_cad_remark",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "remark_key",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Remark Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attempt",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Attempt",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadRemarkWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadRemarkRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать или изменить замечание к виду результата (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/retry": {
+      "post": {
+        "operationId": "retry_cad_job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Повторить отказавшее преобразование новой попыткой того же задания (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}": {
+      "get": {
+        "operationId": "read_cad_view",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadViewDiagnosticsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Диагностика вида: масштаб, кадр координат, проверки и файлы (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/preview": {
+      "get": {
+        "operationId": "read_cad_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadPreviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Геометрия выпущенного DXF вида для просмотра поверх PDF (QA)",
+        "tags": [
+          "cad-qa"
         ]
       }
     },

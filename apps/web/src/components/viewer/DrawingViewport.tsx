@@ -14,6 +14,7 @@ import type { ScaleDraft } from '@/lib/viewer/scale-draft';
 import type { OverlayMeasurement } from '@/lib/viewer/measurement-overlay';
 import { ShapeIndex } from '@/lib/viewer/shape-index';
 import type { ToolController } from '@/lib/viewer/tool-controller';
+import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 
 /** Инструменты, которые понимает холст. Остальные живут выше и сюда не доходят. */
 export type ViewportTool = 'pointer' | 'pan' | 'scale';
@@ -67,8 +68,16 @@ interface IDrawingViewportProps {
   tools?: ToolController | null;
   /** Цвета строк обмера по ключу палитры. */
   measurementColors?: Readonly<Record<string, string>>;
+  /**
+   * Дополнительный слой наложения поверх остальных (CAD-просмотр). Тот же протокол, что у
+   * слоёв рабочей области: рисовальщик получает размещение листа и полосы панорамы. Новый
+   * объект перерисовывает слой целиком; `null` - слоя нет.
+   */
+  extraPainter?: LayerPainter | null;
   onViewChange?: (state: CameraState) => void;
   onError?: (code: string) => void;
+  /** Растр листа поставлен: ошибка отрисовки, о которой сообщал `onError`, больше не актуальна. */
+  onRendered?: () => void;
 }
 
 /** Холст слоя перекрывает область просмотра, а не лист; сдвигается от левого верхнего угла. */
@@ -98,8 +107,10 @@ export const DrawingViewport = ({
   measurements = NO_MEASUREMENTS,
   tools = null,
   measurementColors = NO_COLORS,
+  extraPainter = null,
   onViewChange,
   onError,
+  onRendered,
 }: IDrawingViewportProps) => {
   const host = useRef<HTMLDivElement>(null);
   const stack = useRef<HTMLDivElement>(null);
@@ -111,6 +122,7 @@ export const DrawingViewport = ({
   const overlayCanvas = useRef<HTMLCanvasElement>(null);
   const scaleCanvas = useRef<HTMLCanvasElement>(null);
   const measurementCanvas = useRef<HTMLCanvasElement>(null);
+  const extraCanvas = useRef<HTMLCanvasElement>(null);
 
   // Состояние камеры и наведения читается обработчиками кадра, поэтому живёт в ссылках:
   // класть его в состояние React значило бы перерисовывать дерево на каждом кадре.
@@ -155,6 +167,7 @@ export const DrawingViewport = ({
     stackRef: stack,
     pageHostRef: pageHost,
     onError: reportError,
+    onRendered,
   });
 
   const { followCamera, settleLayers, paintRegions } = useViewportLayers(
@@ -163,6 +176,7 @@ export const DrawingViewport = ({
       regionsRef: overlayCanvas,
       scaleRef: scaleCanvas,
       measurementsRef: measurementCanvas,
+      extraRef: extraCanvas,
     },
     {
       page,
@@ -177,6 +191,7 @@ export const DrawingViewport = ({
       measurements,
       measurementIndex,
       measurementColors,
+      extraPainter,
     },
   );
 
@@ -286,6 +301,11 @@ export const DrawingViewport = ({
         ref={measurementCanvas}
         data-testid="measurement-layer"
         className={cx(LAYER_CLASS, !tools && 'hidden')}
+      />
+      <canvas
+        ref={extraCanvas}
+        data-testid="extra-layer"
+        className={cx(LAYER_CLASS, !extraPainter && 'hidden')}
       />
 
       {rendering && (

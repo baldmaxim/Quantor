@@ -1,0 +1,579 @@
+"""PDF -> CAD (QA-контур): постановка, состояние, скачивание артефактов.
+
+Маршрутизатор подключается только при `CAD_QA_ENABLED` в ENVIRONMENT=local|test (валидатор
+настроек не даёт включить его иначе) и вдобавок закрыт флагом `cad.export`, который из админки
+не включается. Доступ — по пространству, проекту и ревизии; чужое — 404. Артефакты отдаются
+только через API после этой проверки; ключи и presigned-адреса наружу не выходят.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
+
+from app.api.v1.deps import (
+    AuthDep,
+    SessionDep,
+    SettingsDep,
+    StorageDep,
+    require,
+    require_feature,
+)
+from app.auth.context import AuthContext
+from app.auth.permissions import Permission
+from app.auth.resolver import require_authenticated
+from app.contracts.cad import (
+    CadArtifactRead,
+    CadConvertCreate,
+    CadEventRead,
+    CadEventsRead,
+    CadJobListRead,
+    CadJobRead,
+    CadPreviewPathRead,
+    CadPreviewRead,
+    CadRemarkRead,
+    CadRemarksFile,
+    CadRemarksImportRead,
+    CadRemarkWrite,
+    CadViewDiagnosticsRead,
+    summary_of,
+)
+from app.domain import JobStatus
+from app.errors import DomainError, ErrorCode, http_error, not_found
+from app.models import CadRemark, DocumentRevision, Job, Project
+from app.services import cad as cad_service
+from app.services import cad_progress, cad_remarks, cad_views
+from app.services import jobs as jobs_service
+from app.services import projects as projects_service
+from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
+
+router = APIRouter(
+    prefix="/projects/{project_id}/revisions/{revision_id}/cad",
+    tags=["cad-qa"],
+    dependencies=[require_feature("cad.export")],
+)
+
+
+async def _scope(
+    session: SessionDep, context: AuthContext, project_id: uuid.UUID, revision_id: uuid.UUID
+) -> tuple[Project, DocumentRevision]:
+    project = await projects_service.get_project(
+        session, workspace_id=context.tenant, project_id=project_id
+    )
+    if project is None:
+        raise not_found("Проект")
+    revision = await cad_service.revision_in_project(
+        session, project=project, revision_id=revision_id
+    )
+    if revision is None:
+        raise not_found("Ревизия")
+    return project, revision
+
+
+async def _job(
+    session: SessionDep,
+    context: AuthContext,
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+) -> Job:
+    await _scope(session, context, project_id, revision_id)
+    job = await cad_service.get_cad_job(
+        session,
+        workspace_id=context.tenant,
+        project_id=project_id,
+        revision_id=revision_id,
+        job_id=job_id,
+    )
+    if job is None:
+        raise not_found("Задание")
+    return job
+
+
+@router.post(
+    "",
+    response_model=CadJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Поставить преобразование PDF ревизии в DXF (QA)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def create_cad_job(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    body: CadConvertCreate,
+    session: SessionDep,
+    context: AuthDep,
+    settings: SettingsDep,
+) -> CadJobRead:
+    project, revision = await _scope(session, context, project_id, revision_id)
+    pages = cad_service.validate_request(
+        body.pages, finishes=body.finishes, schedules=body.schedules
+    )
+    job = await cad_service.schedule_convert(
+        session, project=project, revision=revision, pages=pages, settings=settings
+    )
+    await session.commit()
+    return CadJobRead.of(job)
+
+
+@router.get(
+    "/{job_id}",
+    response_model=CadJobRead,
+    summary="Состояние преобразования в DXF (QA)",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_cad_job(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+) -> CadJobRead:
+    return CadJobRead.of(await _job(session, context, project_id, revision_id, job_id))
+
+
+@router.get(
+    "/{job_id}/artifacts/{name:path}",
+    summary="Файл результата преобразования в DXF (QA)",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+    response_class=StreamingResponse,
+)
+async def download_cad_artifact(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    name: str,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+) -> StreamingResponse:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    if job.status is not JobStatus.SUCCEEDED:
+        raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
+    artifact = cad_service.find_artifact(job, name)
+    if artifact is None:
+        raise not_found("Файл")
+    attempt = cad_service.result_of(job).get("attempt")
+    if type(attempt) is not int or attempt < 1:
+        raise not_found("Файл")
+    key = cad_service.artifact_storage_key(revision_id, job.id, attempt, name)
+    if artifact.get("key") != key:
+        raise not_found("Файл")
+    try:
+        await storage.stat(key)
+    except ObjectNotFoundError as error:
+        raise http_error(ErrorCode.CONTENT_NOT_AVAILABLE) from error
+    except StorageUnavailableError as error:
+        raise http_error(ErrorCode.STORAGE_UNAVAILABLE) from error
+    filename = name.replace("/", "_")
+    return StreamingResponse(
+        storage.iter_stream(key),
+        media_type=cad_service.content_type_for(name),
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+            "X-Content-SHA256": str(artifact["sha256"]),
+            "X-Quantor-Review-Required": "true",
+        },
+    )
+
+
+@router.get(
+    "",
+    response_model=CadJobListRead,
+    summary="Задания PDF -> DXF ревизии: очередь и история (QA)",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def list_cad_jobs(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+) -> CadJobListRead:
+    await _scope(session, context, project_id, revision_id)
+    jobs = await cad_service.list_cad_jobs(
+        session, workspace_id=context.tenant, project_id=project_id, revision_id=revision_id
+    )
+    return CadJobListRead(items=[summary_of(job) for job in jobs], server_time=_now())
+
+
+@router.post(
+    "/{job_id}/retry",
+    response_model=CadJobRead,
+    summary="Повторить отказавшее преобразование новой попыткой того же задания (QA)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def retry_cad_job(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+) -> CadJobRead:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    # Строка под блокировкой: два одновременных нажатия не ставят задание дважды.
+    await session.refresh(job, with_for_update=True)
+    retryable, reason = cad_service.retry_state(job)
+    if not retryable:
+        raise DomainError(ErrorCode.JOB_NOT_RETRYABLE, reason or "Повтор недоступен")
+    await jobs_service.retry(session, job=job)
+    await session.commit()
+    return CadJobRead.of(job)
+
+
+@router.get(
+    "/{job_id}/events",
+    response_model=CadEventsRead,
+    summary="События попытки по порядку номеров, после курсора (QA)",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_cad_events(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    attempt: int | None = Query(default=None, ge=1),
+    after_seq: int = Query(default=0, ge=0),
+    limit: int = Query(default=500, ge=1, le=1000),
+) -> CadEventsRead:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    records = cad_progress.attempts_of(job.payload)
+    number = attempt if attempt is not None else (records[-1]["attempt"] if records else 0)
+    record = cad_progress.attempt_record(job.payload, number) if number else None
+    if record is None:
+        if attempt is not None and attempt != job.attempt:
+            raise not_found("Попытка")
+        return CadEventsRead(job_id=job.id, attempt=number, events=[], last_seq=0, finished=False)
+    events = [
+        CadEventRead.model_validate(event)
+        for event in record.get("events", [])
+        if isinstance(event, dict) and int(event.get("seq", 0)) > after_seq
+    ][:limit]
+    live = job.status is JobStatus.RUNNING and job.attempt == number
+    return CadEventsRead(
+        job_id=job.id,
+        attempt=number,
+        events=events,
+        last_seq=int(record.get("last_seq", 0)),
+        finished=record.get("finished_at") is not None or not live,
+    )
+
+
+def _now() -> datetime:
+    return cad_progress.now()
+
+
+def _succeeded_view(job: Job, page_index: int, view: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Итог и вид текущей успешной попытки. Чужие или прошлые попытки сюда не попадают."""
+    if job.status is not JobStatus.SUCCEEDED:
+        raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
+    result = cad_service.current_result(job)
+    for page in result.get("pages", []):
+        if page.get("index") != page_index:
+            continue
+        for row in page.get("views", []):
+            if row.get("view") == view:
+                return result, row
+    raise not_found("Вид")
+
+
+async def _read_artifact_json(
+    storage: ObjectStorage, job: Job, revision_id: uuid.UUID, attempt: int, name: str
+) -> Any:
+    artifact = cad_service.find_artifact(job, name)
+    if artifact is None:
+        return None
+    key = cad_service.artifact_storage_key(revision_id, job.id, attempt, name)
+    if artifact.get("key") != key:
+        raise not_found("Файл")
+    try:
+        return await cad_views.read_json(storage, key)
+    except ObjectNotFoundError as error:
+        raise http_error(ErrorCode.CONTENT_NOT_AVAILABLE) from error
+    except StorageUnavailableError as error:
+        raise http_error(ErrorCode.STORAGE_UNAVAILABLE) from error
+    except (cad_views.ArtifactTooLargeError, ValueError) as error:
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "файл диагностики не читается") from error
+
+
+@router.get(
+    "/{job_id}/views/{page_index}/{view}",
+    response_model=CadViewDiagnosticsRead,
+    summary="Диагностика вида: масштаб, кадр координат, проверки и файлы (QA)",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_cad_view(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+) -> CadViewDiagnosticsRead:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    result, row = _succeeded_view(job, page_index, view)
+    attempt = int(result["attempt"])
+    try:
+        folder = cad_service.view_folder(page_index, view)
+    except ValueError as error:
+        raise not_found("Вид") from error
+    files = [
+        CadArtifactRead(name=a["name"], sha256=a["sha256"], size=a["size"])
+        for a in result.get("artifacts", [])
+        if str(a.get("name", "")).startswith(folder + "/")
+    ]
+    scale = cad_views.scale_from(
+        await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/scale.json")
+    )
+    cad_checks = await _read_artifact_json(
+        storage, job, revision_id, attempt, f"{folder}/cad_checks.json"
+    )
+    checks = await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/checks.json")
+    dxf_name = f"{folder}/plan_candidates.dxf"
+    return CadViewDiagnosticsRead(
+        job_id=job.id,
+        attempt=attempt,
+        page_index=page_index,
+        legacy_pdf_page=page_index + 1,
+        view=view,
+        status=str(row.get("status")),
+        scale_status=row.get("scale_status"),
+        result_status=result.get("result_status"),
+        files=files,
+        dxf=next((f for f in files if f.name == dxf_name), None),
+        preview_available=any(f.name == f"{folder}/preview.json" for f in files),
+        scale=scale,
+        frame=cad_views.frame_from(scale, cad_checks),
+        checks=cad_views.checks_from(cad_checks, checks),
+        review_required=True,
+        engineering_acceptance="not_accepted",
+    )
+
+
+@router.get(
+    "/{job_id}/views/{page_index}/{view}/preview",
+    response_model=CadPreviewRead,
+    summary="Геометрия выпущенного DXF вида для просмотра поверх PDF (QA)",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_cad_preview(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+) -> CadPreviewRead:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    result, _row = _succeeded_view(job, page_index, view)
+    attempt = int(result["attempt"])
+    try:
+        folder = cad_service.view_folder(page_index, view)
+    except ValueError as error:
+        raise not_found("Вид") from error
+    dxf = cad_service.find_artifact(job, f"{folder}/plan_candidates.dxf")
+    raw = await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/preview.json")
+    if dxf is None or raw is None:
+        raise not_found("Предпросмотр")
+    # Предпросмотр обязан описывать ровно тот DXF, что выпущен этой попыткой.
+    if (
+        not isinstance(raw, dict)
+        or raw.get("schema") != "quantor.cad_engine.preview.v1"
+        or raw.get("units") != "mm"
+        or raw.get("dxf") != f"{folder}/plan_candidates.dxf"
+        or raw.get("dxf_sha256") != dxf.get("sha256")
+    ):
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр не относится к DXF попытки")
+    layers = [str(name)[:64] for name in raw.get("layers", []) if isinstance(name, str)]
+    try:
+        paths = [CadPreviewPathRead.model_validate(path) for path in raw.get("paths", [])]
+    except ValidationError as error:
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр вне контракта") from error
+    if any(p.layer >= len(layers) or len(p.points) % 2 or len(p.points) < 4 for p in paths):
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр вне контракта")
+    scale = cad_views.scale_from(
+        await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/scale.json")
+    )
+    cad_checks = await _read_artifact_json(
+        storage, job, revision_id, attempt, f"{folder}/cad_checks.json"
+    )
+    bbox = raw.get("bbox")
+    return CadPreviewRead(
+        job_id=job.id,
+        attempt=attempt,
+        page_index=page_index,
+        view=view,
+        units="mm",
+        dxf_sha256=str(dxf["sha256"]),
+        layers=layers,
+        paths=paths,
+        point_count=sum(len(p.points) // 2 for p in paths),
+        truncated=raw.get("truncated") is True,
+        flatten_mm=float(raw.get("flatten_mm") or 0),
+        bbox=tuple(bbox) if isinstance(bbox, list) and len(bbox) == 4 else None,
+        frame=cad_views.frame_from(scale, cad_checks),
+    )
+
+
+# ------------------------------------------------------------------ замечания проверяющего
+
+RemarkKey = Path(min_length=1, max_length=64)
+
+
+def _remark_read(row: CadRemark) -> CadRemarkRead:
+    # Через разбор словаря: тип и статус из базы проверяются по тем же Literal, что в контракте.
+    return CadRemarkRead.model_validate(
+        {
+            "id": row.remark_key,
+            "type": row.type,
+            "comment": row.comment,
+            "reviewer": row.reviewer or "",
+            "status": row.status,
+            "bbox_pt": (row.bbox_x0, row.bbox_y0, row.bbox_x1, row.bbox_y1),
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+    )
+
+
+def _require_attempt(job: Job, attempt: int) -> None:
+    if not cad_remarks.attempt_in_range(job, attempt):
+        raise not_found("Попытка")
+
+
+@router.get(
+    "/{job_id}/remarks",
+    response_model=list[CadRemarkRead],
+    summary="Замечания проверяющего к виду результата (QA)",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def list_cad_remarks(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    attempt: int = Query(ge=1),
+    page_index: int = Query(ge=0),
+    view: int = Query(ge=0),
+) -> list[CadRemarkRead]:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    _require_attempt(job, attempt)
+    rows = await cad_remarks.list_remarks(
+        session, job=job, attempt=attempt, page_index=page_index, view=view
+    )
+    return [_remark_read(row) for row in rows]
+
+
+@router.post(
+    "/{job_id}/remarks/import",
+    response_model=CadRemarksImportRead,
+    summary="Импорт файла quantor.cad-remarks.v1: слияние по ключу замечания (QA)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def import_cad_remarks(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    body: CadRemarksFile,
+    session: SessionDep,
+    context: AuthDep,
+) -> CadRemarksImportRead:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    cad_remarks.check_file_binding(job, body)
+    _require_attempt(job, body.attempt)
+    cad_remarks.check_dxf(
+        job,
+        attempt=body.attempt,
+        page_index=body.page_index,
+        view=body.view,
+        dxf_sha256=body.dxf_sha256,
+    )
+    imported, updated = await cad_remarks.import_remarks(
+        session, job=job, file=body, user_id=context.principal.user_id
+    )
+    await session.commit()
+    return CadRemarksImportRead(imported=imported, updated=updated)
+
+
+@router.put(
+    "/{job_id}/remarks/{remark_key}",
+    response_model=CadRemarkRead,
+    summary="Создать или изменить замечание к виду результата (QA)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def put_cad_remark(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    body: CadRemarkWrite,
+    session: SessionDep,
+    context: AuthDep,
+    remark_key: str = RemarkKey,
+    attempt: int = Query(ge=1),
+    page_index: int = Query(ge=0),
+    view: int = Query(ge=0),
+) -> CadRemarkRead:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    _require_attempt(job, attempt)
+    row = await cad_remarks.upsert_remark(
+        session,
+        job=job,
+        attempt=attempt,
+        page_index=page_index,
+        view=view,
+        remark_key=remark_key,
+        body=body,
+        user_id=context.principal.user_id,
+    )
+    result = _remark_read(row)
+    await session.commit()
+    return result
+
+
+@router.delete(
+    "/{job_id}/remarks/{remark_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить замечание к виду результата (QA)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def delete_cad_remark(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    remark_key: str = RemarkKey,
+    attempt: int = Query(ge=1),
+    page_index: int = Query(ge=0),
+    view: int = Query(ge=0),
+) -> Response:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    _require_attempt(job, attempt)
+    deleted = await cad_remarks.delete_remark(
+        session,
+        job=job,
+        attempt=attempt,
+        page_index=page_index,
+        view=view,
+        remark_key=remark_key,
+    )
+    if not deleted:
+        raise not_found("Замечание")
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# Отдельная группа под общим требованием опознания: подключается только при CAD_QA_ENABLED.
+qa_router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_authenticated)])
+qa_router.include_router(router)

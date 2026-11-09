@@ -17,6 +17,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 
 from app import API_VERSION
 from app.api import health
+from app.api.v1.cad import qa_router as cad_qa_router
 from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
@@ -86,6 +87,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(api_v1_router)
+    if settings.cad_qa_enabled:
+        # PDF -> CAD только в QA-контуре: валидатор настроек не даёт включить его вне
+        # local/test, поэтому в production маршрутов нет вовсе (и в OpenAPI тоже).
+        app.include_router(cad_qa_router)
     return app
 
 

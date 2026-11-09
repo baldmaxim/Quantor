@@ -411,6 +411,9 @@ class JobType(StrEnum):
     # Каноническая геометрия страниц PDF (ADR-0016). Ставится и после обычной загрузки PDF,
     # и после импорта пакета: это не распознавание, а чтение размеров страницы.
     PDF_GEOMETRY_EXTRACT = "pdf_geometry_extract"
+    # PDF -> DXF отдельным движком в отдельном исполнителе (QA-контур, app/cad_worker). Основной
+    # исполнитель этот тип не берёт: в его реестре обработчика нет.
+    CAD_PDF_CONVERT = "cad_pdf_convert"
 
 
 class JobStatus(StrEnum):

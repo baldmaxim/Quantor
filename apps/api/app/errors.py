@@ -141,6 +141,15 @@ class ErrorCode(StrEnum):
     JOB_NOT_RETRYABLE = "JOB_NOT_RETRYABLE"
     WORKER_UNAVAILABLE = "WORKER_UNAVAILABLE"
 
+    # --- PDF -> CAD, QA-контур (docs/building-model/cad-engine-integration-contract.md) ---
+    CAD_INPUT_INVALID = "CAD_INPUT_INVALID"
+    CAD_PARAMS_INVALID = "CAD_PARAMS_INVALID"
+    CAD_INPUT_LIMIT_EXCEEDED = "CAD_INPUT_LIMIT_EXCEEDED"
+    CAD_ENGINE_FAILED = "CAD_ENGINE_FAILED"
+    CAD_ENGINE_UNAVAILABLE = "CAD_ENGINE_UNAVAILABLE"
+    CAD_RESULT_NOT_READY = "CAD_RESULT_NOT_READY"
+    CAD_REMARKS_BINDING_MISMATCH = "CAD_REMARKS_BINDING_MISMATCH"
+
     # --- поставщики моделей ---
     MODEL_PROVIDER_NOT_CONFIGURED = "MODEL_PROVIDER_NOT_CONFIGURED"
 
@@ -268,6 +277,13 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.JOB_TRANSITION_INVALID: "Недопустимый переход состояния задания",
     ErrorCode.JOB_LEASE_LOST: "Исполнитель перестал отвечать, задание брошено",
     ErrorCode.JOB_TIMEOUT: "Задание не уложилось в отведённое время",
+    ErrorCode.CAD_INPUT_INVALID: "PDF не подходит для преобразования в CAD",
+    ErrorCode.CAD_PARAMS_INVALID: "Параметры преобразования в CAD вне контракта",
+    ErrorCode.CAD_INPUT_LIMIT_EXCEEDED: "PDF превышает пределы преобразования в CAD",
+    ErrorCode.CAD_ENGINE_FAILED: "Движок CAD не выдал проверенный результат",
+    ErrorCode.CAD_ENGINE_UNAVAILABLE: "Движок CAD не установлен или не прошёл проверку",
+    ErrorCode.CAD_RESULT_NOT_READY: "Результат преобразования в CAD ещё не готов",
+    ErrorCode.CAD_REMARKS_BINDING_MISMATCH: "Замечания относятся к другому результату CAD",
     ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
     ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: "Поставщик моделей не настроен",
@@ -395,6 +411,13 @@ STATUS_CODES: dict[ErrorCode, int] = {
     # только на случай, когда их всё же поднимают исключением.
     ErrorCode.JOB_LEASE_LOST: status.HTTP_409_CONFLICT,
     ErrorCode.JOB_TIMEOUT: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_INPUT_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_PARAMS_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_INPUT_LIMIT_EXCEEDED: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_ENGINE_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.CAD_ENGINE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
+    ErrorCode.CAD_RESULT_NOT_READY: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_REMARKS_BINDING_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: status.HTTP_409_CONFLICT,
