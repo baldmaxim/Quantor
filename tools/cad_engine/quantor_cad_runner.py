@@ -1,4 +1,4 @@
-"""Runner движка PDF → CAD для Quantor (QA-контур, ADR-0035 не снят).
+"""Runner движка PDF → CAD для Quantor (пилот за флагом cad.export, ADR-0036).
 
 Запускается интерпретатором отдельного окружения движка с закреплёнными зависимостями:
 
@@ -31,6 +31,7 @@ import argparse
 import contextlib
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -45,10 +46,16 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 PINS_PATH = Path(__file__).resolve().with_name("pins.json")
-PARAMS_SCHEMA = "quantor.cad_engine.params.v1"
+PARAMS_SCHEMA = "quantor.cad_engine.params.v2"
 REPORT_SCHEMA = "quantor.cad_engine.report.v1"
 MANIFEST_SCHEMA = "quantor.cad_engine.manifest.v1"
-SCALE_PASSED = "dimension_checks_passed"
+# scale.json вида (движок после ADR-0036): status — passed | needs_review | failed,
+# source — operator_calibration | dimension_chains.
+SCALE_PASSED = "passed"
+SCALE_NEEDS_REVIEW = "needs_review"
+SCALE_FAILED = "failed"
+SCALE_SOURCE_OPERATOR = "operator_calibration"
+FAILURE_CALIBRATION_MISMATCH = "calibration_mismatch"
 LIMIT_KEYS = {"max_pages": (1, 200), "total_timeout_s": (10, 7200), "max_memory_mb": (256, 16384)}
 DEFAULT_LIMITS = {"max_pages": 50, "total_timeout_s": 900, "max_memory_mb": 3072}
 # Имена, которые публикует legacy worker (available_artifacts), → ASCII-имена Quantor.
@@ -207,26 +214,53 @@ def extract_archive(archive: Path, target: Path, pins: dict[str, Any]) -> None:
 # ------------------------------------------------------------------ параметры и вход
 
 
+def _parse_scales(raw: Any, pages: list[int]) -> dict[str, dict[str, Any]]:
+    """scales: ключ — индекс страницы с 0 строкой, ровно для выбранных страниц."""
+    if not isinstance(raw, dict) or set(raw) != {str(p) for p in pages}:
+        raise RunnerError(EXIT_PARAMS, "params_invalid", "scales: ключи должны совпадать с pages")
+    scales: dict[str, dict[str, Any]] = {}
+    for key, entry in raw.items():
+        if not isinstance(entry, dict) or set(entry) != {"mm_per_pt", "calibration_id"}:
+            raise RunnerError(EXIT_PARAMS, "params_invalid",
+                              f"scales.{key}: нужны mm_per_pt и calibration_id")
+        factor, calibration = entry["mm_per_pt"], entry["calibration_id"]
+        if (isinstance(factor, bool) or not isinstance(factor, (int, float))
+                or not math.isfinite(factor) or factor <= 0):
+            raise RunnerError(EXIT_PARAMS, "params_invalid",
+                              f"scales.{key}.mm_per_pt: конечное число больше нуля")
+        if not isinstance(calibration, str) or not calibration or len(calibration) > 64:
+            raise RunnerError(EXIT_PARAMS, "params_invalid",
+                              f"scales.{key}.calibration_id: непустая строка")
+        scales[key] = {"mm_per_pt": float(factor), "calibration_id": calibration}
+    return scales
+
+
 def parse_params(raw: bytes) -> dict[str, Any]:
-    """Схема quantor.cad_engine.params.v1. Отделка и ведомости объёмов — только false."""
+    """Схема quantor.cad_engine.params.v2: лист и масштаб задаёт человек.
+
+    Отделка и ведомости объёмов — только false. `pages` обязательны, `scales` — по странице.
+    """
     try:
         params = json.loads(raw)
     except ValueError as error:
         raise RunnerError(EXIT_PARAMS, "params_invalid", "params.json не JSON") from error
     if not isinstance(params, dict):
         raise RunnerError(EXIT_PARAMS, "params_invalid", "params.json не объект")
-    allowed = {"schema", "mode", "pages", "finishes", "schedules", "limits"}
+    allowed = {"schema", "mode", "pages", "page_selection", "scales", "finishes", "schedules",
+               "limits"}
     if set(params) - allowed or params.get("schema") != PARAMS_SCHEMA:
         raise RunnerError(EXIT_PARAMS, "params_invalid", "неизвестная схема или поле параметров")
     if params.get("mode") != "architecture":
         raise RunnerError(EXIT_PARAMS, "params_invalid", "поддерживается только mode=architecture")
+    if params.get("page_selection") != "operator":
+        raise RunnerError(EXIT_PARAMS, "params_invalid", "page_selection: только operator")
     if params.get("finishes") is not False or params.get("schedules") is not False:
         raise RunnerError(EXIT_PARAMS, "params_invalid", "отделка и ведомости объёмов выключены")
     pages = params.get("pages")
-    if pages is not None and (not isinstance(pages, list) or not pages
-                              or not all(type(p) is int and p >= 0 for p in pages)
-                              or len(set(pages)) != len(pages)):
-        raise RunnerError(EXIT_PARAMS, "params_invalid", "pages: null или список индексов с 0")
+    if (not isinstance(pages, list) or not pages or not all(type(p) is int and p >= 0 for p in pages)
+            or len(set(pages)) != len(pages)):
+        raise RunnerError(EXIT_PARAMS, "params_invalid", "pages: непустой список индексов с 0")
+    scales = _parse_scales(params.get("scales"), pages)
     limits = dict(DEFAULT_LIMITS)
     given = params.get("limits", {})
     if not isinstance(given, dict) or set(given) - set(LIMIT_KEYS):
@@ -236,7 +270,20 @@ def parse_params(raw: bytes) -> dict[str, Any]:
         if type(value) is not int or not low <= value <= high:
             raise RunnerError(EXIT_PARAMS, "params_invalid", f"limits.{key} вне [{low}, {high}]")
         limits[key] = value
-    return {**params, "pages": pages, "limits": limits}
+    return {**params, "pages": pages, "scales": scales, "limits": limits}
+
+
+def operator_scales_for_job(params: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Масштабы оператора для job.json: ключ — pdf_page с 1 строкой (как `legacy_page`)."""
+    return {str(legacy_page(int(index))): {"mm_per_pt": entry["mm_per_pt"],
+                                           "calibration_id": entry["calibration_id"]}
+            for index, entry in params["scales"].items()}
+
+
+def job_document(pages: list[int], params: dict[str, Any]) -> dict[str, Any]:
+    """job.json для worker'а движка: страницы и масштабы выбирает оператор."""
+    return {"id": "job", "status": "running", "attempt": 1, "pages": pages,
+            "operator_pages": True, "operator_scales": operator_scales_for_job(params)}
 
 
 def legacy_page(index: int) -> int:
@@ -485,10 +532,11 @@ def collect(attempt: Path, out: Path, inventory: dict[str, Any], exit_code: int,
     for view in events.get("views", []):
         page = int(view["page"])
         entry = pages.setdefault(page, {"index": quantor_index(page), "legacy_pdf_page": page,
-                                        "selected": bool(titles.get(page, {}).get("selected")),
+                                        "intake_selected": bool(titles.get(page, {}).get("selected")),
                                         "views": []})
         entry["views"].append({"view": int(view["view"]), "status": view["status"],
                                "stage": view.get("stage", ""), "scale_status": None,
+                               "scale_source": None, "scale_deviation": None,
                                "files": [], "dxf": None})
     if events["status"] == "needs_review" and exit_code == 0:
         published = [item["path"] for item in events.get("artifacts", [])]
@@ -511,13 +559,30 @@ def collect(attempt: Path, out: Path, inventory: dict[str, Any], exit_code: int,
             for view in page_entry["views"]:
                 folder_rel = f"views/p{page_entry['legacy_pdf_page']:03d}_v{view['view']:02d}"
                 scale_file = out / folder_rel / "scale.json"
-                if scale_file.is_file():
-                    view["scale_status"] = json.loads(scale_file.read_bytes()).get("status")
+                scale = json.loads(scale_file.read_bytes()) if scale_file.is_file() else {}
+                scale = scale if isinstance(scale, dict) else {}
+                view["scale_status"] = scale["status"] if isinstance(scale.get("status"), str) else None
+                view["scale_source"] = scale["source"] if isinstance(scale.get("source"), str) else None
+                deviation = scale.get("deviation")
+                if isinstance(deviation, (int, float)) and not isinstance(deviation, bool) \
+                        and math.isfinite(deviation):
+                    view["scale_deviation"] = float(deviation)
                 dxf = out / folder_rel / "plan_candidates.dxf"
+                if view["scale_status"] == SCALE_FAILED:
+                    # Калибровка человека расходится с размерными цепочками: DXF не выпускается,
+                    # причина движка доходит до результата.
+                    if dxf.is_file():
+                        raise RunnerError(EXIT_ENGINE, "gate_violation", "DXF при отказе по масштабу")
+                    view["failure_code"] = FAILURE_CALIBRATION_MISMATCH
+                    view["failure_reason"] = _text(scale.get("reason"), 400) or None
+                    continue
                 if not dxf.is_file():
                     continue
-                # DXF без подтверждённого размерными цепочками масштаба не выпускается.
-                if view["scale_status"] != SCALE_PASSED:
+                # DXF разрешён при passed, а при needs_review — только по калибровке человека;
+                # needs_review по размерным цепочкам без калибровки оператора DXF не даёт.
+                if not (view["scale_status"] == SCALE_PASSED
+                        or (view["scale_status"] == SCALE_NEEDS_REVIEW
+                            and view["scale_source"] == SCALE_SOURCE_OPERATOR)):
                     raise RunnerError(EXIT_ENGINE, "gate_violation", "DXF без подтверждённого масштаба")
                 legacy = attempt / f"PDF_{page_entry['legacy_pdf_page']:03d}_Вид_{view['view']:02d}"
                 checks_src = legacy / CHECKS_FILE
@@ -533,13 +598,23 @@ def collect(attempt: Path, out: Path, inventory: dict[str, Any], exit_code: int,
                            _preview(dxf, f"{folder_rel}/plan_candidates.dxf"))
                 view["files"].append(f"{folder_rel}/preview.json")
         has_dxf = any(v["dxf"] for p in pages.values() for v in p["views"])
+        # Вид с ошибкой движка без DXF — отказ, а не «CAD не требуется»: движок публикует
+        # масштаб.json и при падении вида, и завершается кодом 0 (событие needs_review).
+        engine_error = any(v["status"] == "error" for p in pages.values() for v in p["views"])
+        if engine_error and not has_dxf:
+            return "failed", _engine_failed(log_text), sorted(
+                pages.values(), key=lambda p: p["legacy_pdf_page"])
         status = "completed_requires_review" if has_dxf else "no_cad_review_required"
         return status, None, sorted(pages.values(), key=lambda p: p["legacy_pdf_page"])
-    error = {"code": "engine_failed", "message": "движок не выдал пригодных результатов"}
+    return "failed", _engine_failed(log_text), sorted(pages.values(), key=lambda p: p["legacy_pdf_page"])
+
+
+def _engine_failed(log_text: str) -> dict[str, Any]:
+    error: dict[str, Any] = {"code": "engine_failed", "message": "движок не выдал пригодных результатов"}
     if FILL_ONLY_SIGNATURE in log_text:
         # Известное ограничение: калиброванный лист без чёрных штрихов в области — PDFContext.
         error["known_limitation"] = "pdfcontext_empty_black_stroke_index"
-    return "failed", error, sorted(pages.values(), key=lambda p: p["legacy_pdf_page"])
+    return error
 
 
 def write_manifest(out: Path, base: dict[str, Any]) -> None:
@@ -601,19 +676,13 @@ def run(args: argparse.Namespace) -> int:
             inventory = intake(engine_root, pins, job_dir / "input.pdf")
             base["input"].update(pages=inventory["page_count"])
             selected = [row["pdf_page"] for row in inventory["pages"] if row["selected"]]
-            if params["pages"] is None:
-                pages = selected
-            else:
-                pages = [legacy_page(index) for index in params["pages"]]
-                if not set(pages) <= set(selected):
-                    raise RunnerError(EXIT_PARAMS, "pages_not_eligible",
-                                      "запрошены страницы вне перечня плановых листов")
-            if not pages:
-                raise RunnerError(EXIT_INPUT, "no_plan_pages", "в PDF не найдено плановых листов")
+            # Лист выбирает человек; перечень входного контроля — лишь подсказка intake_selected.
+            if any(index >= inventory["page_count"] for index in params["pages"]):
+                raise RunnerError(EXIT_PARAMS, "pages_out_of_range", "страница вне PDF")
+            pages = [legacy_page(index) for index in params["pages"]]
             if len(pages) > params["limits"]["max_pages"]:
                 raise RunnerError(EXIT_LIMIT, "limit_exceeded", "превышено число страниц")
-            write_json(job_dir / "job.json", {"id": "job", "status": "running", "attempt": 1,
-                                              "pages": pages})
+            write_json(job_dir / "job.json", job_document(pages, params))
             progress.phase("worker", f"Движок обрабатывает листы: {len(pages)}",
                            pages={"total": inventory["page_count"],
                                   "planned": [quantor_index(p) for p in selected],
@@ -709,6 +778,11 @@ def main(argv: list[str] | None = None) -> int:
     synth.add_argument("--kind", choices=sorted(FIXTURES), required=True)
     synth.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
+    # Движок работает с cwd в своём каталоге: относительные пути вызывающего — к абсолютным.
+    for name in ("archive", "input", "params", "work", "out", "progress"):
+        value = getattr(args, name, None)
+        if isinstance(value, Path):
+            setattr(args, name, value.absolute())
     handlers = {"verify": verify, "run": run, "fixture": fixture}
     return handlers[args.command](args)
 

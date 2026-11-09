@@ -46,7 +46,8 @@ vi.mock('@/components/viewer/DrawingViewport', () => ({
   },
 }));
 vi.mock('@quantor/api-client', async (importOriginal) => {
-  const slot = (query: IQuery, id = '') => `${query.attempt}:${query.page_index}:${query.view}:${id}`;
+  const slot = (query: IQuery, id = '') =>
+    `${query.attempt}:${query.page_index}:${query.view}:${id}`;
   return {
     ...(await importOriginal<typeof Api>()),
     listCadRemarks: async ({ query }: { query: IQuery }) => {
@@ -163,9 +164,25 @@ const strokeRects = (painter: LayerPainter) => {
 
 const draw = (from: [number, number], to: [number, number]) => {
   const layer = screen.getByTestId('remark-capture');
-  fireEvent.pointerDown(layer, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: from[0], clientY: from[1] });
-  fireEvent.pointerMove(layer, { pointerId: 1, pointerType: 'mouse', clientX: to[0], clientY: to[1] });
-  fireEvent.pointerUp(layer, { pointerId: 1, pointerType: 'mouse', clientX: to[0], clientY: to[1] });
+  fireEvent.pointerDown(layer, {
+    pointerId: 1,
+    pointerType: 'mouse',
+    button: 0,
+    clientX: from[0],
+    clientY: from[1],
+  });
+  fireEvent.pointerMove(layer, {
+    pointerId: 1,
+    pointerType: 'mouse',
+    clientX: to[0],
+    clientY: to[1],
+  });
+  fireEvent.pointerUp(layer, {
+    pointerId: 1,
+    pointerType: 'mouse',
+    clientX: to[0],
+    clientY: to[1],
+  });
 };
 
 const fillDraft = (comment = 'Нет стены у оси Б') => {
@@ -345,7 +362,9 @@ describe('замечания в панели вида', () => {
     const create = vi.fn(() => 'blob:x');
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: vi.fn() });
     const clicked: string[] = [];
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
       clicked.push(this.download);
     });
 
@@ -448,17 +467,25 @@ describe('замечания в панели вида', () => {
   });
 
   it('CAD без подтверждённого кадра: причина про кадр координат', async () => {
-    state.preview = { data: preview({ frame: FRAME_NO }), isPending: false, isError: false, refetch: vi.fn() };
+    state.preview = {
+      data: preview({ frame: FRAME_NO }),
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
     await mount({ frame: FRAME_NO });
     expect(screen.getByRole('button', { name: 'Отметить участок' })).toBeDisabled();
-    expect(screen.getByText(/кадр координат не подтверждён, а замечания привязаны/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/кадр координат не подтверждён, а замечания привязаны/),
+    ).toBeInTheDocument();
   });
 });
 
 describe('ошибка отрисовки PDF', () => {
   it('показывается в режиме PDF, пропадает при переключении в CAD и после успешной отрисовки', async () => {
     await mount();
-    const viewport = () => state.lastViewport as { onError: (code: string) => void; onRendered: () => void };
+    const viewport = () =>
+      state.lastViewport as { onError: (code: string) => void; onRendered: () => void };
     act(() => viewport().onError('PDF_LOAD_FAILED'));
     expect(screen.getByRole('alert')).toHaveTextContent('PDF_LOAD_FAILED');
 
@@ -473,7 +500,9 @@ describe('ошибка отрисовки PDF', () => {
 
   it('отказ прежнего отрисовщика не показывается после его замены', async () => {
     const view = await mount();
-    act(() => (state.lastViewport as { onError: (code: string) => void }).onError('PDF_LOAD_FAILED'));
+    act(() =>
+      (state.lastViewport as { onError: (code: string) => void }).onError('PDF_LOAD_FAILED'),
+    );
     expect(screen.getByText(/Не удалось отрисовать страницу PDF/)).toBeInTheDocument();
 
     state.pdf = { ...state.pdf, backend: {} };

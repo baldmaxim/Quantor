@@ -18,7 +18,11 @@ import type { RenderBackend } from '@/lib/viewer/backend';
 
 export interface ICadPdfPage {
   readonly backend: RenderBackend | null;
-  readonly sheet: { readonly pageIndex: number; readonly width: number; readonly height: number } | null;
+  readonly sheet: {
+    readonly pageIndex: number;
+    readonly width: number;
+    readonly height: number;
+  } | null;
   readonly loading: boolean;
   /** Код отказа или `null`. */
   readonly errorCode: string | null;

@@ -172,7 +172,9 @@ describe('CadViewerPane', () => {
   it('упрощённая геометрия: предупреждение с flatten_mm и число точек', () => {
     loaded(preview({ truncated: true, flatten_mm: 2.5, point_count: 12345 }));
     mount();
-    expect(screen.getByText(/Показана упрощённая геометрия \(flatten_mm 2,5\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Показана упрощённая геометрия \(flatten_mm 2,5\)/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Точек в предпросмотре/)).toHaveTextContent('12');
   });
 

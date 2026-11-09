@@ -15,11 +15,10 @@ from httpx import AsyncClient
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import Settings
 from app.main import create_app
 from app.models import CadRemark, Job, Workspace
 from tests.conftest import clean_settings, make_context
-from tests.test_cad_qa import BROKEN_PDF, _upload, cad_settings
+from tests.test_cad_qa import BROKEN_PDF, _upload, _upload_calibrated, cad_settings
 
 SHA = "a" * 64
 OTHER_SHA = "b" * 64
@@ -84,7 +83,7 @@ async def _job(
     api: AsyncClient, db_session: AsyncSession, *, attempt: int = 2, dxf_sha: str | None = None
 ) -> tuple[str, str, str, str]:
     """Проект, ревизия, задание и базовый адрес; у задания `attempt` попыток."""
-    project_id, revision_id = await _upload(api, BROKEN_PDF)
+    project_id, revision_id = await _upload_calibrated(api, db_session, BROKEN_PDF)
     base = f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad"
     created = await api.post(base, json={"pages": [0]})
     assert created.status_code == 202, created.text
@@ -393,14 +392,12 @@ async def test_flag_off_closes_remarks(
         assert response.json()["detail"]["code"] == "FEATURE_DISABLED"
 
 
-def test_routes_exist_only_behind_qa_gate() -> None:
+def test_routes_exist_without_the_qa_gate() -> None:
     suffixes = ("/remarks", "/remarks/{remark_key}", "/remarks/import")
-    default: Settings = clean_settings()
-    default_paths = create_app(default).openapi()["paths"]
-    assert not any("remarks" in path for path in default_paths)
-    gated = create_app(clean_settings(environment="test", cad_qa_enabled=True)).openapi()["paths"]
-    for suffix in suffixes:
-        assert (
-            f"/api/v1/projects/{{project_id}}/revisions/{{revision_id}}/cad/{{job_id}}{suffix}"
-            in gated
-        )
+    for settings in (clean_settings(), clean_settings(environment="production", auth_mode="local")):
+        paths = create_app(settings).openapi()["paths"]
+        for suffix in suffixes:
+            assert (
+                f"/api/v1/projects/{{project_id}}/revisions/{{revision_id}}/cad/{{job_id}}{suffix}"
+                in paths
+            )

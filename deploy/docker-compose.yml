@@ -165,6 +165,33 @@ services:
     mem_limit: 768m
     networks: [internal]
 
+  # CAD-исполнитель PDF -> DXF (ADR-0036). Отдельный образ: движок, PyMuPDF и Shapely есть только
+  # в нём. Берёт только задания cad_pdf_convert, по одному; без движка выходит с ошибкой.
+  # Пилотный флаг cad.export включается в админке на пространство, а не здесь. Лимиты памяти —
+  # по замеру на пилотном листе; подробности — deploy/README.md.
+  cad-worker:
+    image: ghcr.io/baldmaxim/quantor-cad-worker:${IMAGE_TAG:?запускайте через update.sh или compose.sh}
+    container_name: quantor-cad-worker
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+      CAD_ENGINE_PYTHON: /opt/cad-engine/venv/bin/python
+      CAD_ENGINE_RUNNER: /opt/cad-engine/runner/quantor_cad_runner.py
+      CAD_ENGINE_ARCHIVE: /opt/cad-engine/engine.zip
+      CAD_WORK_ROOT: /var/tmp/quantor-cad
+      CAD_MAX_MEMORY_MB: ${CAD_MAX_MEMORY_MB:-6144}
+    command: ['python', '-m', 'app.cad_worker']
+    stop_grace_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    cpus: 1.0
+    mem_limit: ${CAD_WORKER_MEM_LIMIT:-1536m}
+    memswap_limit: ${CAD_WORKER_MEMSWAP_LIMIT:-3g}
+    networks: [internal]
+
   web:
     image: ghcr.io/baldmaxim/quantor-web:${IMAGE_TAG:?запускайте через update.sh или compose.sh}
     container_name: quantor-web

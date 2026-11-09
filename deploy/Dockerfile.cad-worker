@@ -1,0 +1,84 @@
+# syntax=docker/dockerfile:1.7
+# Образ CAD-исполнителя PDF -> DXF (ADR-0036).
+#
+# Тот же код `apps/api` (образ quantor-api того же коммита) плюс отдельный интерпретатор движка
+# с закреплёнными пакетами. PyMuPDF (AGPL-3.0), Shapely/GEOS и Pillow живут только здесь и
+# только в закрытом пакете GHCR (ADR-0036 п. 3); в образ quantor-api они не попадают.
+#
+#   docker buildx build -f deploy/Dockerfile.cad-worker \
+#     --build-arg API_IMAGE=ghcr.io/baldmaxim/quantor-api:<sha> \
+#     --build-arg CAD_ENGINE_REF=<sha репозитория движка> \
+#     --build-arg ENGINE_ARCHIVE_PATH=<pins.engine.archive_path> \
+#     --build-arg ENGINE_ARCHIVE_SHA256=<pins.engine.archive_sha256> \
+#     --secret id=cad_engine_token,env=CAD_ENGINE_READ_TOKEN .
+#
+# Архив движка скачивается из приватного репозитория при сборке; токен — секрет BuildKit
+# (в слои, ARG и историю образа не попадает). SHA256 скачанного архива сверяется с pins.json.
+ARG API_IMAGE
+FROM ${API_IMAGE}
+
+ARG CAD_ENGINE_REPO=baldmaxim/CAD_engine
+ARG CAD_ENGINE_REF
+ARG ENGINE_ARCHIVE_PATH
+ARG ENGINE_ARCHIVE_SHA256
+
+USER root
+
+ENV CAD_ENGINE_HOME=/opt/cad-engine
+
+# Пакеты движка — в своём venv (Python 3.12), версии и хеши из lock-файла.
+COPY tools/cad_engine/requirements.linux-cp312.lock.txt /tmp/cad-requirements.txt
+RUN python -m venv ${CAD_ENGINE_HOME}/venv \
+    && ${CAD_ENGINE_HOME}/venv/bin/pip install --no-cache-dir --disable-pip-version-check \
+        --require-hashes --only-binary :all: -r /tmp/cad-requirements.txt \
+    && rm /tmp/cad-requirements.txt
+
+# Runner и pins лежат рядом: runner читает pins.json из своего каталога.
+COPY tools/cad_engine/quantor_cad_runner.py tools/cad_engine/pins.json ${CAD_ENGINE_HOME}/runner/
+
+# Архив движка: приватный репозиторий, закреплённый коммит, сверка SHA256 с pins.json.
+RUN --mount=type=secret,id=cad_engine_token,required=true \
+    python - <<'PY'
+import hashlib, os, sys, urllib.request
+
+repo, ref = os.environ["CAD_ENGINE_REPO"], os.environ["CAD_ENGINE_REF"]
+path, expected = os.environ["ENGINE_ARCHIVE_PATH"], os.environ["ENGINE_ARCHIVE_SHA256"]
+if not (ref and path and expected):
+    sys.exit("CAD_ENGINE_REF, ENGINE_ARCHIVE_PATH и ENGINE_ARCHIVE_SHA256 обязательны")
+token = open("/run/secrets/cad_engine_token", encoding="utf-8").read().strip()
+if not token:
+    sys.exit("секрет cad_engine_token пуст: добавьте CAD_ENGINE_READ_TOKEN в секреты репозитория")
+request = urllib.request.Request(
+    f"https://api.github.com/repos/{repo}/contents/{path}?ref={ref}",
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.raw+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "quantor-cad-worker-build",
+    },
+)
+with urllib.request.urlopen(request, timeout=120) as response:
+    data = response.read()
+actual = hashlib.sha256(data).hexdigest()
+if actual != expected:
+    sys.exit(f"SHA256 архива движка не совпал с pins.json: ожидался {expected}, получен {actual}")
+with open(os.environ["CAD_ENGINE_HOME"] + "/engine.zip", "wb") as sink:
+    sink.write(data)
+print("архив движка скачан, SHA256 сверен")
+PY
+
+# Рабочие каталоги попыток: удаляются после каждого задания. Файлы движка — только на чтение.
+RUN chmod -R a=rX ${CAD_ENGINE_HOME} \
+    && mkdir -p /var/tmp/quantor-cad \
+    && chown quantor:quantor /var/tmp/quantor-cad \
+    && chmod 700 /var/tmp/quantor-cad
+
+ENV CAD_ENGINE_PYTHON=${CAD_ENGINE_HOME}/venv/bin/python \
+    CAD_ENGINE_RUNNER=${CAD_ENGINE_HOME}/runner/quantor_cad_runner.py \
+    CAD_ENGINE_ARCHIVE=${CAD_ENGINE_HOME}/engine.zip \
+    CAD_WORK_ROOT=/var/tmp/quantor-cad
+
+USER quantor
+
+# Одно задание за раз; исполнитель выходит с кодом != 0, если движок не прошёл проверку.
+CMD ["python", "-m", "app.cad_worker"]

@@ -7,10 +7,7 @@ import type { INormalizedPath } from './frame';
 
 const PLACEMENT: SheetPlacement = { x: 0, y: 0, width: 1000, height: 500, rotation: 0 };
 
-const path = (
-  points: number[],
-  extra: Partial<INormalizedPath> = {},
-): INormalizedPath => {
+const path = (points: number[], extra: Partial<INormalizedPath> = {}): INormalizedPath => {
   const xs = points.filter((_, index) => index % 2 === 0);
   const ys = points.filter((_, index) => index % 2 === 1);
   return {

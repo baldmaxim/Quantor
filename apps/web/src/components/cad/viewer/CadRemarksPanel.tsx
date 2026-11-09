@@ -62,14 +62,18 @@ export const CadRemarksPanel: FC<ICadRemarksPanelProps> = ({
         <span className="tabular text-xs font-normal tracking-normal text-muted normal-case">
           {store.loading ? '…' : remarksCounter(remarks)}
         </span>
-      }>
+      }
+    >
       <div className="flex min-w-0 flex-col gap-[var(--s-5)]" data-testid="cad-remarks">
         <p className="rounded-[var(--radius-sm)] border border-warning-soft bg-warning-soft px-[var(--s-4)] py-[var(--s-3)] text-xs">
           Замечания хранятся на сервере и видны всем, у кого есть доступ к этой ревизии; для
           передачи вне портала — экспорт JSON. Это не инженерная приёмка.
         </p>
         {store.loadError && (
-          <div role="alert" className="flex flex-wrap items-center gap-[var(--s-3)] text-xs text-danger">
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-[var(--s-3)] text-xs text-danger"
+          >
             <span>Не удалось загрузить замечания. {store.loadError}</span>
             <Button compact onClick={store.reload} className="max-md:h-[44px]">
               Повторить

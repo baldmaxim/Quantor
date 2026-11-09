@@ -107,7 +107,9 @@ export const viewSelectionKind = (
   if (attempt === null) {
     return 'unavailable';
   }
-  const failed = attempt.outcome === 'failed' || (job.result_attempt === attempt.attempt && job.result_status === 'failed');
+  const failed =
+    attempt.outcome === 'failed' ||
+    (job.result_attempt === attempt.attempt && job.result_status === 'failed');
   if (failed) {
     return 'failed';
   }

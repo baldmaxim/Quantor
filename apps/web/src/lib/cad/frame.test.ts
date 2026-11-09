@@ -150,11 +150,15 @@ describe('standaloneSheet', () => {
 
 describe('cropToNormalized', () => {
   it('делит на размер страницы', () => {
-    expect(cropToNormalized([0, 0, 500, 400], { width: 1000, height: 800 })).toEqual([0, 0, 0.5, 0.5]);
+    expect(cropToNormalized([0, 0, 500, 400], { width: 1000, height: 800 })).toEqual([
+      0, 0, 0.5, 0.5,
+    ]);
   });
 
   it('перепутанные углы упорядочиваются', () => {
-    expect(cropToNormalized([500, 400, 0, 0], { width: 1000, height: 800 })).toEqual([0, 0, 0.5, 0.5]);
+    expect(cropToNormalized([500, 400, 0, 0], { width: 1000, height: 800 })).toEqual([
+      0, 0, 0.5, 0.5,
+    ]);
   });
 
   it('не прямоугольник - null', () => {

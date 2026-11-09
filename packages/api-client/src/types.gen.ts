@@ -570,7 +570,10 @@ export type CadChecksRead = {
 /**
  * CadConvertCreate
  *
- * Постановка. `pages` — page_index с 0 (как у листов Quantor), null — все плановые листы.
+ * Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.
+ *
+ * Лист выбирает человек. Масштаб клиент не передаёт: сервер берёт действующую калибровку
+ * листа (ADR-0018); без неё — 409 `CAD_CALIBRATION_REQUIRED`.
  */
 export type CadConvertCreate = {
     /**
@@ -580,7 +583,7 @@ export type CadConvertCreate = {
     /**
      * Pages
      */
-    pages?: Array<number> | null;
+    pages: Array<number>;
     /**
      * Schedules
      */
@@ -875,6 +878,10 @@ export type CadPageRead = {
      * Index
      */
     index: number;
+    /**
+     * Intake Selected
+     */
+    intake_selected?: boolean | null;
     /**
      * Legacy Pdf Page
      */
@@ -1294,6 +1301,14 @@ export type CadScaleRead = {
      */
     controls: Array<CadScaleControlRead>;
     /**
+     * Deviation
+     */
+    deviation?: number | null;
+    /**
+     * Dimension Mm Per Pt
+     */
+    dimension_mm_per_pt?: number | null;
+    /**
      * Fit And Holdout Chains Disjoint
      */
     fit_and_holdout_chains_disjoint: boolean | null;
@@ -1330,6 +1345,10 @@ export type CadScaleRead = {
      */
     mm_per_pdf_point: number | null;
     /**
+     * Operator Mm Per Pt
+     */
+    operator_mm_per_pt?: number | null;
+    /**
      * Passed
      */
     passed: boolean;
@@ -1342,6 +1361,10 @@ export type CadScaleRead = {
      */
     printed_scale_labels: Array<number>;
     /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
      * Release Allowed
      */
     release_allowed: boolean;
@@ -1350,9 +1373,19 @@ export type CadScaleRead = {
      */
     scale_denominator: number | null;
     /**
+     * Source
+     */
+    source?: string | null;
+    /**
      * Status
      */
     status: string;
+    /**
+     * Tolerances
+     */
+    tolerances?: {
+        [key: string]: number;
+    };
     /**
      * Unassociated Numeric Labels
      */
@@ -1461,6 +1494,22 @@ export type CadViewRead = {
      * Dxf Entities
      */
     dxf_entities: number | null;
+    /**
+     * Failure Code
+     */
+    failure_code?: string | null;
+    /**
+     * Failure Reason
+     */
+    failure_reason?: string | null;
+    /**
+     * Scale Deviation
+     */
+    scale_deviation?: number | null;
+    /**
+     * Scale Source
+     */
+    scale_source?: string | null;
     /**
      * Scale Status
      */

@@ -1,4 +1,4 @@
-"""PDF -> CAD в QA-контуре: постановка задания и доступ к артефактам.
+"""PDF -> CAD (пилот, ADR-0036): постановка задания и доступ к артефактам.
 
 Контракт — `docs/building-model/cad-engine-integration-contract.md`, исполнитель —
 `app/cad_worker`, движок — отдельный процесс `tools/cad_engine/quantor_cad_runner.py` в своём
@@ -12,8 +12,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Final
 
 from sqlalchemy import select
@@ -22,13 +25,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode
-from app.models import Document, DocumentRevision, Job, Project
+from app.models import Document, DocumentRevision, Job, Project, ScaleCalibration, Sheet
 from app.services import jobs as jobs_service
 
 # Закрепление движка: архив сверяется и здесь (передаётся runner'у), и в tools/cad_engine/pins.json.
-ENGINE_VERSION: Final = "2026.11.09+80cc6563f45a"
-ENGINE_ARCHIVE_SHA256: Final = "2757a9edc2b95ae1a79b8915643d78b4a10801d8830b5f9d3514f31ee7890de4"
-PARAMS_SCHEMA: Final = "quantor.cad_engine.params.v1"
+ENGINE_VERSION: Final = "2026.11.09+3e53ca9bd05d"
+ENGINE_ARCHIVE_SHA256: Final = "0e9589cfdd50518fd446ecdf2d33e1e38952594bc66c74c2702ef40b099f15e7"
+PARAMS_SCHEMA: Final = "quantor.cad_engine.params.v2"
+PAGE_SELECTION: Final = "operator"
 MAX_PAGES: Final = 50
 
 # Статусы результата. Ни один не означает «принято»: DXF — кандидат для проверки инженером.
@@ -45,12 +49,51 @@ ARTIFACT_NAME: Final = re.compile(
 CONTENT_TYPES: Final = {".dxf": "application/dxf", ".json": "application/json"}
 
 
-def build_params(pages: list[int] | None, settings: Settings) -> dict[str, Any]:
-    """Параметры движка. Отделка и ведомости объёмов выключены всегда."""
+@dataclass(frozen=True, slots=True)
+class PageScale:
+    """Масштаб страницы от человека: калибровка листа (ADR-0018).
+
+    `mm_per_pt` — реальные мм на 1 pt пространства страницы PDF (1/72 дюйма). Это ровно
+    `ScaleCalibration.mm_per_pt` (мм известного размера / расстояние между точками в pt
+    канонической геометрии): пересчёта не требуется. Для масштаба 1:N он равен
+    `N * 25.4 / 72` (1:200 -> 70.5556 мм/pt).
+    """
+
+    mm_per_pt: float
+    calibration_id: str
+
+
+def page_scale_of(calibration: ScaleCalibration) -> PageScale:
+    value = float(calibration.mm_per_pt)
+    if not math.isfinite(value) or value <= 0:
+        raise DomainError(ErrorCode.CAD_PARAMS_INVALID, "Коэффициент калибровки вне допустимого")
+    return PageScale(mm_per_pt=value, calibration_id=str(calibration.id))
+
+
+def build_params(
+    pages: list[int], scales: Mapping[int, PageScale], settings: Settings
+) -> dict[str, Any]:
+    """Параметры движка v2. Отделка и ведомости объёмов выключены всегда.
+
+    Лист выбирает человек (`page_selection=operator`), масштаб каждой страницы — его
+    калибровка. Ключ `scales` — индекс страницы с 0 строкой; идентификатор калибровки входит
+    в параметры, поэтому новая калибровка даёт новый ключ идемпотентности.
+    """
+    ordered = sorted(pages)
+    if set(scales) != set(ordered):
+        raise DomainError(ErrorCode.CAD_PARAMS_INVALID, "Масштаб нужен ровно для выбранных страниц")
     return {
         "schema": PARAMS_SCHEMA,
         "mode": "architecture",
-        "pages": sorted(pages) if pages is not None else None,
+        "pages": ordered,
+        "page_selection": PAGE_SELECTION,
+        "scales": {
+            str(index): {
+                "mm_per_pt": scales[index].mm_per_pt,
+                "calibration_id": scales[index].calibration_id,
+            }
+            for index in ordered
+        },
         "finishes": False,
         "schedules": False,
         "limits": {
@@ -84,21 +127,18 @@ def content_type_for(name: str) -> str:
     return CONTENT_TYPES[name[name.rindex(".") :]]
 
 
-def validate_request(
-    pages: list[int] | None, *, finishes: bool, schedules: bool
-) -> list[int] | None:
+def validate_request(pages: list[int], *, finishes: bool, schedules: bool) -> list[int]:
     """Проверка до постановки: параметры вне контракта задание не создают."""
     if finishes or schedules:
         raise DomainError(
             ErrorCode.CAD_PARAMS_INVALID, "Отделка и ведомости объёмов в CAD выключены"
         )
-    if pages is not None and (
-        not pages or len(set(pages)) != len(pages) or any(p < 0 for p in pages)
-    ):
+    if not pages or len(set(pages)) != len(pages) or any(p < 0 for p in pages):
         raise DomainError(
-            ErrorCode.CAD_PARAMS_INVALID, "pages — null или непустой список индексов с 0"
+            ErrorCode.CAD_PARAMS_INVALID,
+            "pages — непустой список индексов страниц с 0 без повторов",
         )
-    if pages is not None and len(pages) > MAX_PAGES:
+    if len(pages) > MAX_PAGES:
         raise DomainError(ErrorCode.CAD_INPUT_LIMIT_EXCEEDED, f"Не больше {MAX_PAGES} страниц")
     return pages
 
@@ -121,17 +161,45 @@ async def revision_in_project(
     return revision
 
 
+async def resolve_scales(
+    session: AsyncSession, *, revision: DocumentRevision, pages: list[int]
+) -> dict[int, PageScale]:
+    """Действующая калибровка листа для каждой выбранной страницы (ADR-0018).
+
+    Страница ревизии — `Sheet` с тем же `page_index` (с 0); действующая калибровка — та, что
+    помечена `is_default`. Нет листа или калибровки хотя бы у одной страницы — 409
+    `CAD_CALIBRATION_REQUIRED` со списком таких страниц. Клиент масштаб не передаёт.
+    """
+    rows = await session.execute(
+        select(Sheet.page_index, ScaleCalibration)
+        .join(
+            ScaleCalibration,
+            (ScaleCalibration.sheet_id == Sheet.id) & ScaleCalibration.is_default.is_(True),
+        )
+        .where(Sheet.revision_id == revision.id, Sheet.page_index.in_(pages))
+    )
+    found = {index: page_scale_of(calibration) for index, calibration in rows.all()}
+    missing = sorted(set(pages) - set(found))
+    if missing:
+        raise DomainError(
+            ErrorCode.CAD_CALIBRATION_REQUIRED,
+            issue={"pages": ",".join(str(index) for index in missing)},
+        )
+    return found
+
+
 async def schedule_convert(
     session: AsyncSession,
     *,
     project: Project,
     revision: DocumentRevision,
-    pages: list[int] | None,
+    pages: list[int],
     settings: Settings,
 ) -> Job:
     if not is_pdf(revision):
         raise DomainError(ErrorCode.CAD_INPUT_INVALID, "Источник ревизии не PDF")
-    params = build_params(pages, settings)
+    scales = await resolve_scales(session, revision=revision, pages=pages)
+    params = build_params(pages, scales, settings)
     return await jobs_service.enqueue(
         session,
         job_type=JobType.CAD_PDF_CONVERT,
@@ -183,7 +251,7 @@ def find_artifact(job: Job, name: str) -> dict[str, Any] | None:
     return None
 
 
-# ------------------------------------------------------------------ интерфейс QA-контура
+# ------------------------------------------------------------------ интерфейс контура CAD
 
 # Почему повтор не предлагается. Повтор — то же задание, новая попытка (jobs.retry); он
 # разрешён только для отказов из jobs.RETRYABLE_ERROR_CODES: движок детерминирован, и тот же
@@ -191,8 +259,8 @@ def find_artifact(job: Job, name: str) -> dict[str, Any] | None:
 _NOT_RETRYABLE_REASONS: Final = {
     ErrorCode.CAD_INPUT_INVALID.value: "PDF не прошёл входной контроль движка: повтор того же "
     "файла даст тот же отказ. Загрузите исправленный PDF новой ревизией.",
-    ErrorCode.CAD_PARAMS_INVALID.value: "Параметры вне контракта или страницы вне перечня "
-    "плановых листов: поставьте задание с другим выбором страниц.",
+    ErrorCode.CAD_PARAMS_INVALID.value: "Параметры вне контракта или страница вне PDF: "
+    "поставьте задание с другим выбором страниц.",
     ErrorCode.CAD_INPUT_LIMIT_EXCEEDED.value: "PDF превышает пределы преобразования: уменьшите "
     "число страниц.",
     ErrorCode.CAD_ENGINE_FAILED.value: "Движок детерминирован: на том же PDF и тех же "

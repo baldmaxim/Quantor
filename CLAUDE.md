@@ -6,6 +6,8 @@
 Трек «Модель здания» (версия тендера, разбор PDF, JSON для Revit) — [ADR-0035](docs/adr/0035-model-zdaniya-i-versiya-tendera.md)
 и [план](docs/building-model/00-plan.md); его исключения из запретов ниже действуют только внутри контура за флагом
 `model.auto`, и этот флаг закрыт до условий ADR-0035.
+Пилот CAD PDF→DXF (3D DXF для AutoCAD вместо Revit) — [ADR-0036](docs/adr/0036-pilot-cad-v-boyu-i-3d-dxf.md): флаг
+`cad.export` на одно пространство, отдельный сервис `quantor-cad-worker`; PyMuPDF, Shapely и Pillow — только в его образе.
 Работа ведётся по пакету промтов `_prompts/stage2b_ai_geometry_qwen/` строго по порядку,
 по одному промту за раз. Параллельно идёт изолированный MEP-эксперимент по пакету
 `_prompts/mep_p_to_rd_v3/` (раздел «MEP-эксперимент» ниже). Третий трек — расчётный контур стадии П

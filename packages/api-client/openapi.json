@@ -1175,7 +1175,7 @@
       },
       "CadConvertCreate": {
         "additionalProperties": false,
-        "description": "Постановка. `pages` — page_index с 0 (как у листов Quantor), null — все плановые листы.",
+        "description": "Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.\n\nЛист выбирает человек. Масштаб клиент не передаёт: сервер берёт действующую калибровку\nлиста (ADR-0018); без неё — 409 `CAD_CALIBRATION_REQUIRED`.",
         "properties": {
           "finishes": {
             "default": false,
@@ -1183,19 +1183,14 @@
             "type": "boolean"
           },
           "pages": {
-            "anyOf": [
-              {
-                "items": {
-                  "minimum": 0.0,
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pages"
+            "items": {
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Pages",
+            "type": "array"
           },
           "schedules": {
             "default": false,
@@ -1203,6 +1198,9 @@
             "type": "boolean"
           }
         },
+        "required": [
+          "pages"
+        ],
         "title": "CadConvertCreate",
         "type": "object"
       },
@@ -1795,6 +1793,17 @@
           "index": {
             "title": "Index",
             "type": "integer"
+          },
+          "intake_selected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intake Selected"
           },
           "legacy_pdf_page": {
             "title": "Legacy Pdf Page",
@@ -2554,6 +2563,28 @@
             "title": "Controls",
             "type": "array"
           },
+          "deviation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deviation"
+          },
+          "dimension_mm_per_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimension Mm Per Pt"
+          },
           "fit_and_holdout_chains_disjoint": {
             "anyOf": [
               {
@@ -2635,6 +2666,17 @@
             ],
             "title": "Mm Per Pdf Point"
           },
+          "operator_mm_per_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Mm Per Pt"
+          },
           "passed": {
             "title": "Passed",
             "type": "boolean"
@@ -2657,6 +2699,17 @@
             "title": "Printed Scale Labels",
             "type": "array"
           },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
           "release_allowed": {
             "title": "Release Allowed",
             "type": "boolean"
@@ -2672,9 +2725,27 @@
             ],
             "title": "Scale Denominator"
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "tolerances": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Tolerances",
+            "type": "object"
           },
           "unassociated_numeric_labels": {
             "title": "Unassociated Numeric Labels",
@@ -2928,6 +2999,50 @@
               }
             ],
             "title": "Dxf Entities"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
+          },
+          "scale_deviation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Deviation"
+          },
+          "scale_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Source"
           },
           "scale_status": {
             "anyOf": [

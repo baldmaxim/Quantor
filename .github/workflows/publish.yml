@@ -103,3 +103,69 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  # CAD-исполнитель PDF -> DXF (ADR-0036): строится поверх образа quantor-api того же коммита,
+  # поэтому ждёт сборки всех образов. Архив движка скачивается из приватного репозитория по
+  # закреплённому в tools/cad_engine/pins.json коммиту; токен чтения — секрет репозитория
+  # CAD_ENGINE_READ_TOKEN (его добавляет владелец), в слои образа он не попадает.
+  build-cad-worker:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      CAD_ENGINE_READ_TOKEN: ${{ secrets.CAD_ENGINE_READ_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Проверка секрета доступа к репозиторию движка
+        run: |
+          if [ -z "$CAD_ENGINE_READ_TOKEN" ]; then
+            echo "::error::Не задан секрет CAD_ENGINE_READ_TOKEN (токен чтения github.com/baldmaxim/CAD_engine). Добавьте его в Settings → Secrets and variables → Actions и запустите publish снова."
+            exit 1
+          fi
+
+      - id: pins
+        name: Закрепление движка из pins.json
+        run: |
+          pins=tools/cad_engine/pins.json
+          for key in repo_ref archive_path archive_sha256; do
+            value="$(jq -r --arg k "$key" '.engine[$k] // empty' "$pins")"
+            [ -n "$value" ] || { echo "::error::В $pins нет engine.$key"; exit 1; }
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/quantor-cad-worker
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=long,prefix=
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.cad-worker
+          push: true
+          build-args: |
+            API_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/quantor-api:${{ github.sha }}
+            CAD_ENGINE_REF=${{ steps.pins.outputs.repo_ref }}
+            ENGINE_ARCHIVE_PATH=${{ steps.pins.outputs.archive_path }}
+            ENGINE_ARCHIVE_SHA256=${{ steps.pins.outputs.archive_sha256 }}
+          secrets: |
+            cad_engine_token=${{ secrets.CAD_ENGINE_READ_TOKEN }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=quantor-cad-worker
+          cache-to: type=gha,mode=max,scope=quantor-cad-worker

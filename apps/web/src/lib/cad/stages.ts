@@ -91,23 +91,24 @@ export const outcomeLabel = (outcome: string): string => OUTCOME_LABELS[outcome]
  * Итог результата. Ни один из них не является инженерной приёмкой: приёмка — отдельный шаг
  * человека, в QA-контуре не выполняется.
  */
-const RESULT_LABELS: Readonly<Record<string, { label: string; tone: CadBadgeTone; hint: string }>> = {
-  completed_requires_review: {
-    label: 'DXF выпущен · нужна проверка инженером',
-    tone: 'warning',
-    hint: 'Кандидат движка. Масштаб подтверждён размерными цепочками; до приёмки инженером в работу не идёт.',
-  },
-  no_cad_review_required: {
-    label: 'Только диагностика · DXF не создан',
-    tone: 'warning',
-    hint: 'Масштаб не подтверждён размерной проверкой: выпущена диагностика без DXF.',
-  },
-  failed: {
-    label: 'Ошибка',
-    tone: 'danger',
-    hint: 'Попытка завершилась отказом; причина и этап — в деталях попытки.',
-  },
-};
+const RESULT_LABELS: Readonly<Record<string, { label: string; tone: CadBadgeTone; hint: string }>> =
+  {
+    completed_requires_review: {
+      label: 'DXF выпущен · нужна проверка инженером',
+      tone: 'warning',
+      hint: 'Кандидат движка. Масштаб подтверждён размерными цепочками; до приёмки инженером в работу не идёт.',
+    },
+    no_cad_review_required: {
+      label: 'Только диагностика · DXF не создан',
+      tone: 'warning',
+      hint: 'Масштаб не подтверждён размерной проверкой: выпущена диагностика без DXF.',
+    },
+    failed: {
+      label: 'Ошибка',
+      tone: 'danger',
+      hint: 'Попытка завершилась отказом; причина и этап — в деталях попытки.',
+    },
+  };
 
 export const resultInfo = (
   status: string | null | undefined,

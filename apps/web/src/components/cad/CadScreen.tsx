@@ -5,6 +5,7 @@ import type { FC } from 'react';
 
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
 import { CadJobList } from '@/components/cad/CadJobList';
+import { CadSheetPicker } from '@/components/cad/CadSheetPicker';
 import { CadSourcePicker } from '@/components/cad/CadSourcePicker';
 import {
   parseSelection,
@@ -37,8 +38,17 @@ export const CadScreen: FC<ICadScreenProps> = ({ projectId }) => {
         <CadSourcePicker
           projectId={projectId}
           selectedRevisionId={selection.revision}
-          onSelect={(revisionId, jobId) => navigate(withJob(withRevision(revisionId), jobId))}
+          onSelect={(revisionId) => navigate(withRevision(revisionId))}
         />
+        {selection.revision && (
+          <CadSheetPicker
+            // Ключ по ревизии: выбор листов другого документа не переиспользуется.
+            key={`sheets:${selection.revision}`}
+            projectId={projectId}
+            revisionId={selection.revision}
+            onJobCreated={(jobId) => navigate(withJob(selection, jobId))}
+          />
+        )}
         {selection.revision && (
           <CadJobList
             // Ключ по ревизии: список другого документа не переиспользуется.
@@ -65,7 +75,8 @@ export const CadScreen: FC<ICadScreenProps> = ({ projectId }) => {
           />
         ) : (
           <p className="rounded-[var(--radius-md)] border border-dashed border-border-strong px-[var(--s-6)] py-[var(--s-7)] text-center text-sm text-muted">
-            Загрузите PDF или выберите документ проекта — преобразование запустится автоматически.
+            Загрузите PDF или выберите документ проекта, затем отметьте откалиброванные листы и
+            запустите преобразование.
           </p>
         )}
       </div>

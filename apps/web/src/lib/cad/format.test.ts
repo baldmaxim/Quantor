@@ -75,6 +75,9 @@ describe('монотонный таймер идущей попытки', () => 
   });
 
   it('без значения - прочерк, потолок сбрасывается', () => {
-    expect(holdElapsed({ key: 'a', value: 3 }, 'a', null, true)).toEqual({ shown: null, peak: null });
+    expect(holdElapsed({ key: 'a', value: 3 }, 'a', null, true)).toEqual({
+      shown: null,
+      peak: null,
+    });
   });
 });

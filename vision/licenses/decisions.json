@@ -71,9 +71,9 @@
     "shapely": {
       "spdx": "BSD-3-Clause (GEOS: LGPL-2.1)",
       "decision": "conditional",
-      "scope": "vision[vectorize]",
+      "scope": "vision[vectorize]; образ quantor-cad-worker (ADR-0036)",
       "evidence": "https://raw.githubusercontent.com/shapely/shapely/main/LICENSE.txt sha256:4a207eac9bf257ed286e1c6f0fce253d1abfdb134fc61ec855e37f5692a3f754",
-      "condition": "в производственный образ — только после ADR о способе распространения GEOS"
+      "condition": "в производственный образ — только после ADR о способе распространения GEOS; для образа quantor-cad-worker решение — ADR-0036 п.3"
     },
     "unsloth": {
       "spdx": "Apache-2.0 для пакета; внутри wheel — AGPL-3.0 файлы",
@@ -173,6 +173,19 @@
         "evidence": "https://pypi.org/pypi/fonttools/4.65.0/json",
         "checked": "2026-09-18"
       }
+    },
+    "pymupdf": {
+      "spdx": "AGPL-3.0-only (или коммерческая лицензия Artifex)",
+      "decision": "conditional",
+      "scope": "только образ quantor-cad-worker (ADR-0036)",
+      "evidence": "https://github.com/pymupdf/PyMuPDF/blob/main/COPYING; PyPI 1.28.2",
+      "condition": "решение владельца 2026-11-09: образ закрытый (GHCR), пользуется только владелец, не распространяется; в apps/api, основном исполнителе и calc запрещён; пересмотр до стороннего пользователя или передачи Quantor заказчику"
+    },
+    "pillow": {
+      "spdx": "MIT-CMU",
+      "decision": "allow",
+      "scope": "образ quantor-cad-worker (ADR-0036)",
+      "evidence": "https://github.com/python-pillow/Pillow/blob/main/LICENSE; PyPI 12.3.0"
     }
   },
   "weights": {

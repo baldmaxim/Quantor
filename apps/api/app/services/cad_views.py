@@ -21,7 +21,19 @@ from app.contracts.cad import (
 from app.services import cad as cad_service
 from app.storage.base import ObjectStorage
 
+# Статус масштаба в scale.json: `passed|needs_review|failed` (движок после ADR-0036) и прежний
+# `dimension_checks_passed` — артефакты уже выполненных заданий читаются как раньше.
 SCALE_PASSED: Final = "dimension_checks_passed"
+SCALE_PASSED_STATUSES: Final = frozenset({"passed", SCALE_PASSED})
+OPERATOR_SOURCE: Final = "operator_calibration"
+
+
+def _tolerances(value: Any) -> dict[str, float]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key)[:48]: number for key, item in value.items() if (number := _num(item)) is not None
+    }
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -80,9 +92,12 @@ def _point(value: Any) -> tuple[float, float] | None:
 
 def hold_reasons(raw: dict[str, Any]) -> list[str]:
     """Почему масштаб не подтверждён. Только по полям проверки движка, без догадок."""
-    if raw.get("status") == SCALE_PASSED:
+    if raw.get("status") in SCALE_PASSED_STATUSES:
         return []
     reasons: list[str] = []
+    reason = raw.get("reason")
+    if isinstance(reason, str) and reason.strip():
+        reasons.append(reason.strip()[:400])
     controls = _as_list(raw.get("controls"))
     fit, held = _int(raw.get("fit_controls")) or 0, _int(raw.get("heldout_controls")) or 0
     if not controls:
@@ -151,12 +166,24 @@ def scale_from(raw: Any) -> CadScaleRead | None:
     labels = raw.get("printed_scale_labels")
     crop = raw.get("source_context_crop_pdf_display_pt")
     crop_values = [_num(v) for v in crop] if isinstance(crop, list) and len(crop) == 4 else None
-    passed = raw["status"] == SCALE_PASSED
+    passed = raw["status"] in SCALE_PASSED_STATUSES
+    source = str(raw["source"])[:48] if isinstance(raw.get("source"), str) else None
+    operator_factor = _num(raw.get("operator_mm_per_pt"))
+    reason = raw.get("reason")
     return CadScaleRead(
         status=raw["status"][:64],
         passed=passed,
+        source=source,
+        operator_mm_per_pt=operator_factor,
+        dimension_mm_per_pt=_num(raw.get("dimension_mm_per_pt")),
+        deviation=_num(raw.get("deviation")),
+        tolerances=_tolerances(raw.get("tolerances")),
+        reason=reason.strip()[:400] if isinstance(reason, str) and reason.strip() else None,
         method=str(raw["method"])[:96] if isinstance(raw.get("method"), str) else None,
-        mm_per_pdf_point=_num(raw.get("mm_per_pdf_point_fitted")),
+        # Масштаб оператора — тот, по которому построен DXF; подбор по цепочкам — лишь проверка.
+        mm_per_pdf_point=operator_factor
+        if source == OPERATOR_SOURCE and operator_factor is not None
+        else _num(raw.get("mm_per_pdf_point_fitted")),
         scale_denominator=_num(raw.get("scale_denominator_fitted")),
         printed_scale_labels=[v for v in (_num(x) for x in labels) if v is not None]
         if isinstance(labels, list)
@@ -180,7 +207,11 @@ def scale_from(raw: Any) -> CadScaleRead | None:
 
 
 def frame_from(scale: CadScaleRead | None, cad_checks: Any) -> CadFrameRead:
-    """Кадр DXF -> PDF. Без подтверждённого масштаба и начала координат — не подтверждён."""
+    """Кадр DXF -> PDF. Без пригодного масштаба и начала координат — не подтверждён.
+
+    Пригоден масштаб, прошедший проверку (`passed`), и масштаб оператора со статусом
+    `needs_review`: DXF построен по калибровке человека, расхождение показывается отдельно.
+    """
     origin = (
         _point(cad_checks.get("origin_pdf_display_pt")) if isinstance(cad_checks, dict) else None
     )
@@ -189,7 +220,9 @@ def frame_from(scale: CadScaleRead | None, cad_checks: Any) -> CadFrameRead:
     reason: str | None = None
     if cad_checks is None:
         reason = "DXF в этой попытке нет: сравнивать с PDF нечего."
-    elif scale is None or not scale.passed:
+    elif scale is None or not (
+        scale.passed or (scale.status == "needs_review" and scale.source == OPERATOR_SOURCE)
+    ):
         reason = "Масштаб не подтверждён размерной проверкой: кадр координат не установлен."
     elif units != "mm":
         reason = "Единицы DXF не указаны как мм."

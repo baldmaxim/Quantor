@@ -119,11 +119,10 @@ export const newRemarkId = (): string => {
 // ---------------------------------------------------------------- координаты
 
 /** Точка экрана (px области просмотра) -> точка листа в pt при данной камере. */
-export const screenToPagePt = (
-  camera: CameraState,
-  x: number,
-  y: number,
-): [number, number] => [(x - camera.offsetX) / camera.scale, (y - camera.offsetY) / camera.scale];
+export const screenToPagePt = (camera: CameraState, x: number, y: number): [number, number] => [
+  (x - camera.offsetX) / camera.scale,
+  (y - camera.offsetY) / camera.scale,
+];
 
 /**
  * Две угловые точки (pt) -> прямоугольник отметки: порядок углов любой, края ограничены
@@ -147,11 +146,15 @@ export const normalizeBboxPt = (
 const PAGE_EPSILON_PT = 0.5;
 
 /** Прямоугольник годен: конечные числа, x0 < x1, y0 < y1, неотрицательный и (если страница известна) внутри неё. */
-export const isValidBboxPt = (bbox: readonly number[], page: IPageSizePt | null): bbox is BboxPt => {
+export const isValidBboxPt = (
+  bbox: readonly number[],
+  page: IPageSizePt | null,
+): bbox is BboxPt => {
   if (bbox.length !== 4 || !bbox.every(Number.isFinite)) return false;
   const [x0, y0, x1, y1] = bbox as unknown as BboxPt;
   if (x0 < 0 || y0 < 0 || !(x0 < x1) || !(y0 < y1)) return false;
-  if (page && (x1 > page.width + PAGE_EPSILON_PT || y1 > page.height + PAGE_EPSILON_PT)) return false;
+  if (page && (x1 > page.width + PAGE_EPSILON_PT || y1 > page.height + PAGE_EPSILON_PT))
+    return false;
   return true;
 };
 
@@ -317,7 +320,9 @@ export const parseRemarksFile = (
 
   for (const remark of file.remarks) {
     if (!isValidBboxPt(remark.bbox_pt, page)) {
-      return fail(`Некорректный участок у замечания ${remark.id}: нужны x0 < x1, y0 < y1 внутри страницы.`);
+      return fail(
+        `Некорректный участок у замечания ${remark.id}: нужны x0 < x1, y0 < y1 внутри страницы.`,
+      );
     }
   }
   return { ok: true, remarks: file.remarks, reviewer: file.reviewer };
@@ -356,8 +361,7 @@ export const toImportBody = (file: IRemarksFile): CadRemarksFile => ({
 export const importSummary = (result: {
   readonly imported: number;
   readonly updated: number;
-}): string =>
-  `Импортировано: ${result.imported}, обновлено: ${result.updated}`;
+}): string => `Импортировано: ${result.imported}, обновлено: ${result.updated}`;
 
 /** Счётчик «открыто N / всего M». */
 export const remarksCounter = (remarks: readonly IRemark[]): string =>

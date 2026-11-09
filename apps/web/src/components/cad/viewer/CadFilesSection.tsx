@@ -48,7 +48,9 @@ export const CadFilesSection: FC<ICadFilesSectionProps> = ({
             <p className="mono text-xs [overflow-wrap:anywhere]" data-testid="cad-dxf-sha">
               SHA-256: {dxf.sha256}
             </p>
-            <p className="text-xs text-muted">Кандидат движка: до приёмки инженером в работу не идёт.</p>
+            <p className="text-xs text-muted">
+              Кандидат движка: до приёмки инженером в работу не идёт.
+            </p>
           </div>
         ) : (
           <p className="text-xs text-muted">DXF в этой попытке не создан.</p>

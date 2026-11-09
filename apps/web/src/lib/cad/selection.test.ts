@@ -69,9 +69,9 @@ describe('что показать для выбранного вида', () => {
   });
 
   it('попытка с отказом - без панели и без запроса', () => {
-    expect(
-      viewSelectionKind(job({ result_status: 'failed' }), attempt(2, 'failed'), 0, 1),
-    ).toBe('failed');
+    expect(viewSelectionKind(job({ result_status: 'failed' }), attempt(2, 'failed'), 0, 1)).toBe(
+      'failed',
+    );
     // Отказ и у более новой попытки, чем результат.
     expect(viewSelectionKind(job(), attempt(3, 'failed'), 0, 1)).toBe('failed');
     expect(viewSelectionKind(job({ result_status: 'failed' }), attempt(2), 0, 1)).toBe('failed');

@@ -66,8 +66,10 @@ const cropBox = (rect: NormalizedRect, placement: SheetPlacement): IScreenBox =>
     placement,
   );
 
-const hits = (box: IScreenBox, rects: readonly { x: number; y: number; width: number; height: number }[]) =>
-  boundsIntersectAny(box.minX, box.minY, box.maxX, box.maxY, rects);
+const hits = (
+  box: IScreenBox,
+  rects: readonly { x: number; y: number; width: number; height: number }[],
+) => boundsIntersectAny(box.minX, box.minY, box.maxX, box.maxY, rects);
 
 const tracePath = (
   context: CanvasRenderingContext2D,
@@ -75,7 +77,10 @@ const tracePath = (
   placement: SheetPlacement,
 ): void => {
   const { points } = path;
-  context.moveTo(placement.x + (points[0] ?? 0) * placement.width, placement.y + (points[1] ?? 0) * placement.height);
+  context.moveTo(
+    placement.x + (points[0] ?? 0) * placement.width,
+    placement.y + (points[1] ?? 0) * placement.height,
+  );
   for (let index = 2; index + 1 < points.length; index += 2) {
     context.lineTo(
       placement.x + (points[index] ?? 0) * placement.width,

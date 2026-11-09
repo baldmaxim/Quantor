@@ -1,8 +1,8 @@
 # PDF → CAD в Quantor
 
-Локальный QA-контур использует исходный PDF ревизии, очередь Quantor и отдельный процесс CAD.
-Зафиксированный вход — архив `Quantor_CAD_source_2026.11.09_80cc6563f45a.zip` с SHA256
-`2757a9edc2b95ae1a79b8915643d78b4a10801d8830b5f9d3514f31ee7890de4`.
+CAD-контур (пилот за флагом `cad.export`, ADR-0036; в бою — образ `deploy/Dockerfile.cad-worker`) использует исходный PDF ревизии, очередь Quantor и отдельный процесс CAD.
+Зафиксированный вход — архив `Quantor_CAD_source_2026.11.09_3e53ca9bd05d.zip` с SHA256
+`0e9589cfdd50518fd446ecdf2d33e1e38952594bc66c74c2702ef40b099f15e7`.
 Путь к архиву задаётся окружением. Раннер 0.1.0 проверяет версии библиотек, архив, манифест
 и хеши извлечённых файлов.
 
@@ -17,8 +17,7 @@ uv pip install --python "$CAD_PYTHON" --require-hashes --only-binary :all: \
 "$CAD_PYTHON" -I -B tools/cad_engine/quantor_cad_runner.py verify --archive "$CAD_ARCHIVE"
 ```
 
-Для тестового API и исполнителя задайте `ENVIRONMENT=local` или `test`,
-`CAD_QA_ENABLED=true`, `CAD_ENGINE_PYTHON=$CAD_PYTHON`, `CAD_ENGINE_ARCHIVE=$CAD_ARCHIVE`
+Для исполнителя задайте `CAD_ENGINE_PYTHON=$CAD_PYTHON`, `CAD_ENGINE_ARCHIVE=$CAD_ARCHIVE`
 и `CAD_ENGINE_RUNNER` с абсолютным путём к `tools/cad_engine/quantor_cad_runner.py`.
 Из `apps/api` запустите CAD-исполнитель командой `python -m app.cad_worker` в окружении API.
 Для тестов установите dev-зависимости API в отдельное окружение, используйте одноразовый
@@ -29,6 +28,10 @@ python -B -m pytest -ra tests/test_cad_qa.py tests/test_jobs_service.py \
   tests/test_worker_claiming.py tests/test_openapi.py
 ```
 
+Параметры задания — `quantor.cad_engine.params.v2`: `pages` (лист выбирает человек) и `scales`
+(`mm_per_pt` и `calibration_id` на страницу из действующей калибровки листа, ADR-0018); без калибровки
+API отвечает 409 `CAD_CALIBRATION_REQUIRED`.
+
 Маршрут `POST /api/v1/projects/{project_id}/revisions/{revision_id}/cad` ставит
 `cad_pdf_convert`. Статус доступен по `GET …/cad/{job_id}`, файлы по
 `GET …/cad/{job_id}/artifacts/{name}`. Индексы страниц в API начинаются с нуля.
@@ -37,5 +40,5 @@ python -B -m pytest -ra tests/test_cad_qa.py tests/test_jobs_service.py \
 На входе с одними заливками текущий PDFContext может вернуть ошибку, даже если масштаб
 подтверждён. Артефакты каждой попытки имеют собственный префикс.
 
-Для боевого включения действуют ADR-0016, ADR-0034 и ADR-0035, а также матрица допуска
-зависимостей. `CAD_QA_ENABLED` доступен только в локальном и тестовом окружении.
+Боевое включение — флаг пространства `cad.export` (ADR-0036); лицензии PyMuPDF/Shapely допущены только
+в образе CAD-исполнителя. `CAD_QA_ENABLED` — только QA-режим в локальном и тестовом окружении.

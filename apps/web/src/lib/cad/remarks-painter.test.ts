@@ -19,7 +19,8 @@ const data = (patch: Partial<IRemarkPaintData> = {}): IRemarkPaintData => ({
 
 /** Контекст-пустышка: записывает вызовы рисования. */
 const recording = () => {
-  const calls: { name: string; args: unknown[]; dash: number[]; fill: unknown; stroke: unknown }[] = [];
+  const calls: { name: string; args: unknown[]; dash: number[]; fill: unknown; stroke: unknown }[] =
+    [];
   const state = { dash: [] as number[], fill: '', stroke: '' };
   const context = new Proxy(
     { canvas: { width: 2000, height: 1000 }, measureText: () => ({ width: 10 }) },
@@ -75,7 +76,9 @@ describe('рисовальщик отметок', () => {
 
   it('touches: полоса без отметок - нет, с отметкой - да', () => {
     const painter = createRemarksPainter(data(), { clear: true });
-    expect(painter.touches(PLACEMENT, 1, [{ x: 1500, y: 0, width: 400, height: 1000 }])).toBe(false);
+    expect(painter.touches(PLACEMENT, 1, [{ x: 1500, y: 0, width: 400, height: 1000 }])).toBe(
+      false,
+    );
     expect(painter.touches(PLACEMENT, 1, [{ x: 150, y: 100, width: 100, height: 100 }])).toBe(true);
   });
 

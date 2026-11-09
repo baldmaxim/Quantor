@@ -235,7 +235,7 @@ def test_unfinished_features_cannot_be_enabled_from_the_console() -> None:
     которую владелец включает на пространство (ADR-0023). Проверки пилота — test_pilot_flag.py.
 
     `calc.portal` здесь до PASS инженерного гейта стадии П после PROMPT 06 (ADR-0030).
-    `cad.export` здесь до решения владельца об открытии CAD в бою (ADR-0035, гейт CAD_QA_ENABLED).
+    `cad.export` отсюда ушёл: ADR-0036 открыл CAD в бою как пилотный флаг пространства.
     """
     for key in (
         "takeoff.ai",
@@ -244,9 +244,14 @@ def test_unfinished_features_cannot_be_enabled_from_the_console() -> None:
         "bim.import",
         "drawing.compare",
         "calc.portal",
-        "cad.export",
     ):
         assert not FLAG_REGISTRY[key].admin_editable, key
+
+
+def test_cad_export_is_an_admin_editable_pilot_flag() -> None:
+    flag = FLAG_REGISTRY["cad.export"]
+    assert flag.admin_editable is True and flag.workspace_scoped is True
+    assert flag.default is False
 
 
 async def test_enabling_an_unready_feature_is_refused(

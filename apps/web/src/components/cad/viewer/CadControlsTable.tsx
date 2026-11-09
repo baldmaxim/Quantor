@@ -50,7 +50,9 @@ export const CadControlsTable: FC<ICadControlsTableProps> = ({ controls }) => {
         <tbody>
           {controls.map((control, index) => (
             <tr key={`${control.chain_id ?? 'n'}-${index}`} className="border-t border-border">
-              <td className={TD}>{control.chain_id === null ? NO_VALUE : formatInt(control.chain_id)}</td>
+              <td className={TD}>
+                {control.chain_id === null ? NO_VALUE : formatInt(control.chain_id)}
+              </td>
               <td className={TD}>{ROLE_LABELS[control.role] ?? (control.role || NO_VALUE)}</td>
               <td className={TD}>{formatNumber(control.label_mm, 1)}</td>
               <td className={TD}>{formatNumber(control.fitted_measured_mm, 1)}</td>

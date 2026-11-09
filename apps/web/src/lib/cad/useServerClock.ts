@@ -27,7 +27,11 @@ export const useTicker = (active: boolean): number => {
  * Состояние «потолка» меняется прямо в рендере по сравнению значений (шаблон «значение с прошлого
  * рендера»), без эффекта и без лишнего кадра.
  */
-export const useHeldElapsed = (key: string, raw: number | null, running: boolean): number | null => {
+export const useHeldElapsed = (
+  key: string,
+  raw: number | null,
+  running: boolean,
+): number | null => {
   const [peak, setPeak] = useState<IElapsedPeak | null>(null);
   const held = holdElapsed(peak, key, raw, running);
   if (held.peak?.key !== peak?.key || held.peak?.value !== peak?.value) {

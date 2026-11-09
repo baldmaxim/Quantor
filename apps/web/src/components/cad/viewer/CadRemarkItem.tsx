@@ -86,7 +86,11 @@ export const CadRemarkItem: FC<ICadRemarkItemProps> = ({
           </Button>
         )}
         {confirming ? (
-          <span className="flex items-center gap-[var(--s-3)]" role="group" aria-label="Подтверждение удаления">
+          <span
+            className="flex items-center gap-[var(--s-3)]"
+            role="group"
+            aria-label="Подтверждение удаления"
+          >
             <span className="text-xs">Удалить?</span>
             <Button compact variant="danger" onClick={onDelete} className="max-md:h-[44px]">
               Да, удалить

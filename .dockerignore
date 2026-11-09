@@ -17,6 +17,10 @@
 !packages/ui
 !deploy/docker-compose.yml
 !deploy/update.sh
+# Образ CAD-исполнителя (Dockerfile.cad-worker): только runner, pins и lock; образ API их не копирует.
+!tools/cad_engine/quantor_cad_runner.py
+!tools/cad_engine/pins.json
+!tools/cad_engine/requirements.linux-cp312.lock.txt
 
 # Внутри разрешённого — только исходники, без артефактов сборки и окружений.
 **/node_modules

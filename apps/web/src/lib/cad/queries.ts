@@ -171,8 +171,8 @@ export const useCadEvents = (
 };
 
 interface ICreateCadJobInput {
-  /** Индексы страниц PDF с 0; `null` — страницы, выбранные движком. */
-  readonly pages: readonly number[] | null;
+  /** Индексы страниц PDF с 0, 1..50 без повторов: лист выбирает человек (ADR-0036). */
+  readonly pages: readonly number[];
 }
 
 /** Создаёт задание. Если такое уже идёт, сервер возвращает его же — дубля нет. */
@@ -187,7 +187,7 @@ export const useCreateCadJob = (
         await createCadJob({
           throwOnError: true,
           path: { project_id: projectId, revision_id: revisionId },
-          body: { pages: pages === null ? null : [...pages], finishes: false, schedules: false },
+          body: { pages: [...pages], finishes: false, schedules: false },
         }),
       ),
     onSuccess: (job) => {
@@ -215,50 +215,6 @@ export const useRetryCadJob = (
     onSuccess: (job) => {
       client.setQueryData(cadKeys.job(projectId, revisionId, jobId), job);
       void client.invalidateQueries({ queryKey: cadKeys.job(projectId, revisionId, jobId) });
-      void client.invalidateQueries({ queryKey: cadKeys.jobs(projectId, revisionId) });
-    },
-  });
-};
-
-/**
- * Запуск преобразования для ревизии: если у неё уже есть задание — выбирается идущее или
- * последнее, иначе создаётся новое со страницами по выбору движка. Возвращает идентификатор
- * задания.
- */
-export const useStartCadJob = (
-  projectId: string,
-): UseMutationResult<string, unknown, { revisionId: string }> => {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ revisionId }) => {
-      const list = await client.fetchQuery({
-        queryKey: cadKeys.jobs(projectId, revisionId),
-        staleTime: 0,
-        queryFn: async () =>
-          unwrap(
-            await listCadJobs({
-              throwOnError: true,
-              path: { project_id: projectId, revision_id: revisionId },
-            }),
-          ),
-      });
-      // Идущее задание важнее; иначе — последнее завершённое: выбор ревизии с историей
-      // показывает её, а не ставит тот же детерминированный прогон ещё раз.
-      const existing = list.items.find((item) => isActiveStatus(item.status)) ?? list.items[0];
-      if (existing) {
-        return existing.job_id;
-      }
-      const job = unwrap(
-        await createCadJob({
-          throwOnError: true,
-          path: { project_id: projectId, revision_id: revisionId },
-          body: { pages: null, finishes: false, schedules: false },
-        }),
-      );
-      client.setQueryData(cadKeys.job(projectId, revisionId, job.job_id), job);
-      return job.job_id;
-    },
-    onSuccess: (_jobId, { revisionId }) => {
       void client.invalidateQueries({ queryKey: cadKeys.jobs(projectId, revisionId) });
     },
   });

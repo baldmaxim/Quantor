@@ -6,11 +6,7 @@ import { useCallback, useMemo, useRef, useState, type FC } from 'react';
 import { ErrorState, Skeleton, type ISegmentedOption } from '@/components/ui';
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
-import {
-  bboxPtToNormalized,
-  type BboxPt,
-  type IRemarkBinding,
-} from '@/lib/cad/remarks';
+import { bboxPtToNormalized, type BboxPt, type IRemarkBinding } from '@/lib/cad/remarks';
 import {
   composePainters,
   createRemarksPainter,
@@ -283,7 +279,10 @@ export const CadViewerPane: FC<ICadViewerPaneProps> = ({ params, diagnostics }) 
   const pdfError = pdf.outOfRange
     ? { code: 'PDF_PAGE_MISSING', text: `В PDF ревизии нет страницы ${pageIndex + 1}.` }
     : pdf.errorCode
-      ? { code: pdf.errorCode, text: errorMessage(pdf.errorCode, 'Не удалось открыть PDF ревизии.') }
+      ? {
+          code: pdf.errorCode,
+          text: errorMessage(pdf.errorCode, 'Не удалось открыть PDF ревизии.'),
+        }
       : null;
 
   const markDisabledReason =
@@ -401,7 +400,11 @@ export const CadViewerPane: FC<ICadViewerPaneProps> = ({ params, diagnostics }) 
           )
         ) : pdfError ? (
           <div className="p-[var(--s-4)]">
-            <ErrorState title="PDF страницы не показан" code={pdfError.code} description={pdfError.text} />
+            <ErrorState
+              title="PDF страницы не показан"
+              code={pdfError.code}
+              description={pdfError.text}
+            />
           </div>
         ) : (
           <>

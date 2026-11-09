@@ -32,10 +32,12 @@ from tests.test_cad_qa import (
     ENGINE_ARCHIVE,
     ENGINE_PYTHON,
     RUNNER,
+    WRONG_KNOWN_MM,
     FlakyStorage,
     _exec,
     _run_cad_worker,
     _upload,
+    _upload_calibrated,
     cad_settings,
     needs_engine,
 )
@@ -225,7 +227,41 @@ def test_hold_reasons_and_frame() -> None:
     assert cad_views.frame_from(scale, None).confirmed is False
 
 
-def test_contract_is_exported_for_the_client_but_routes_stay_gated(tmp_path: Path) -> None:
+def test_operator_scale_diagnostics_and_frame() -> None:
+    needs_review = {
+        "status": "needs_review",
+        "source": "operator_calibration",
+        "operator_mm_per_pt": 70.5556,
+        "dimension_mm_per_pt": 68.9,
+        "deviation": 0.023,
+        "tolerances": {"warn": 0.01, "fail": 0.05, "bad": "x"},
+        "reason": "Отклонение 2,3% выше допуска проверки",
+    }
+    scale = cad_views.scale_from(needs_review)
+    assert scale is not None and scale.passed is False
+    assert scale.source == "operator_calibration"
+    assert scale.operator_mm_per_pt == 70.5556 and scale.dimension_mm_per_pt == 68.9
+    assert scale.deviation == 0.023 and scale.tolerances == {"warn": 0.01, "fail": 0.05}
+    assert scale.mm_per_pdf_point == 70.5556
+    assert cad_views.hold_reasons(needs_review)[0].startswith("Отклонение")
+    checks = {"units": "mm", "origin_pdf_display_pt": [1.0, 2.0]}
+    assert cad_views.frame_from(scale, checks).confirmed is True
+
+    by_chains = cad_views.scale_from({**needs_review, "source": "dimension_chains"})
+    assert by_chains is not None and cad_views.frame_from(by_chains, checks).confirmed is False
+    failed = cad_views.scale_from({**needs_review, "status": "failed"})
+    assert failed is not None and cad_views.frame_from(failed, checks).confirmed is False
+    passed = cad_views.scale_from(
+        {"status": "passed", "source": "operator_calibration", "operator_mm_per_pt": 35.0}
+    )
+    assert passed is not None and passed.passed is True
+    assert cad_views.hold_reasons({"status": "passed"}) == []
+    assert cad_views.frame_from(passed, checks).mm_per_pdf_point == 35.0
+
+
+def test_contract_is_exported_for_the_client_and_routes_are_always_mounted(
+    tmp_path: Path,
+) -> None:
     target = tmp_path / "openapi.json"
     export(target)
     paths = json.loads(target.read_text(encoding="utf-8"))["paths"]
@@ -239,8 +275,8 @@ def test_contract_is_exported_for_the_client_but_routes_stay_gated(tmp_path: Pat
         "/{job_id}/views/{page_index}/{view}/preview",
     ):
         assert base + suffix in paths, suffix
-    # Экспорт не открывает маршруты: приложение без QA-гейта их не содержит.
-    assert not any("/cad" in path for path in create_app(clean_settings()).openapi()["paths"])
+    # ADR-0036: маршруты подключены всегда; закрывает их флаг пространства, а не гейт сборки.
+    assert base in create_app(clean_settings()).openapi()["paths"]
 
 
 # ------------------------------------------------------------------ реальный путь Quantor
@@ -256,9 +292,9 @@ async def test_live_events_diagnostics_preview_and_download(
 ) -> None:
     settings = cad_settings(tmp_path)
     async with build_api(make_context(), settings=settings) as api:
-        project_id, revision_id = await _upload(api, pdfs["calibrated"])
+        project_id, revision_id = await _upload_calibrated(api, db_session, pdfs["calibrated"])
         base = f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad"
-        job_id = (await api.post(base, json={})).json()["job_id"]
+        job_id = (await api.post(base, json={"pages": [0]})).json()["job_id"]
         listed = (await api.get(base)).json()
         assert [row["job_id"] for row in listed["items"]] == [job_id]
 
@@ -316,7 +352,7 @@ async def test_live_events_diagnostics_preview_and_download(
 
 
 @needs_engine
-async def test_scale_hold_gives_diagnostics_without_dxf_or_frame(
+async def test_wrong_calibration_gives_diagnostics_without_dxf_or_frame(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],
     flaky: FlakyStorage,
@@ -325,9 +361,11 @@ async def test_scale_hold_gives_diagnostics_without_dxf_or_frame(
 ) -> None:
     settings = cad_settings(tmp_path)
     async with build_api(make_context(), settings=settings) as api:
-        project_id, revision_id = await _upload(api, pdfs["scale_only"])
+        project_id, revision_id = await _upload_calibrated(
+            api, db_session, pdfs["calibrated"], known_mm=WRONG_KNOWN_MM
+        )
         base = f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad"
-        job_id = (await api.post(base, json={})).json()["job_id"]
+        job_id = (await api.post(base, json={"pages": [0]})).json()["job_id"]
         await _run_cad_worker(db_session, flaky, settings, job_id)
         read = (await api.get(f"{base}/{job_id}")).json()
         assert read["result_status"] == "no_cad_review_required"
@@ -351,9 +389,9 @@ async def test_failed_attempt_keeps_stages_and_retry_runs_a_new_attempt(
     settings = cad_settings(tmp_path)
     async with build_api(make_context(), settings=settings) as api:
         # Отказ движка: этапы вида с ошибкой сохраняются, повтор не предлагается.
-        project_id, revision_id = await _upload(api, pdfs["fill_only"])
+        project_id, revision_id = await _upload_calibrated(api, db_session, pdfs["fill_only"])
         base = f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad"
-        job_id = (await api.post(base, json={})).json()["job_id"]
+        job_id = (await api.post(base, json={"pages": [0]})).json()["job_id"]
         await _run_cad_worker(db_session, flaky, settings, job_id)
         read = (await api.get(f"{base}/{job_id}")).json()
         assert read["status"] == "failed" and read["retryable"] is False
@@ -368,7 +406,9 @@ async def test_failed_attempt_keeps_stages_and_retry_runs_a_new_attempt(
         assert (await api.get(f"{base}/{job_id}/views/0/1")).status_code == 409
 
         # Повторяемый отказ хранилища: повтор — то же задание, новая попытка со своими событиями.
-        project_id, revision_id = await _upload(api, pdfs["calibrated"], "Второй.pdf")
+        project_id, revision_id = await _upload_calibrated(
+            api, db_session, pdfs["calibrated"], "Второй.pdf"
+        )
         base = f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad"
         job_id = (await api.post(base, json={"pages": [0]})).json()["job_id"]
         flaky.fail_reads = 1
@@ -409,9 +449,9 @@ async def test_foreign_workspace_cannot_read_ui_routes(
 ) -> None:
     settings = cad_settings(tmp_path)
     async with build_api(make_context(), settings=settings) as api:
-        project_id, revision_id = await _upload(api, pdfs["calibrated"])
+        project_id, revision_id = await _upload_calibrated(api, db_session, pdfs["calibrated"])
         base = f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad"
-        job_id = (await api.post(base, json={})).json()["job_id"]
+        job_id = (await api.post(base, json={"pages": [0]})).json()["job_id"]
         await _run_cad_worker(db_session, flaky, settings, job_id)
 
     stranger = make_context(platform_admin=False, workspace_id=second_workspace.id)

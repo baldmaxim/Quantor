@@ -1,7 +1,8 @@
-"""Запуск: `python -m app.cad_worker` (только ENVIRONMENT=local|test и CAD_QA_ENABLED=true).
+"""Запуск: `python -m app.cad_worker` (образ `quantor-cad-worker`, ADR-0036).
 
-Перед циклом заданий runner проверяет окружение движка, SHA архива, манифест и каждый файл;
-при отказе исполнитель не стартует.
+Исполнитель стартует, если движок сконфигурирован (`CAD_ENGINE_PYTHON`, `CAD_ENGINE_RUNNER`,
+`CAD_ENGINE_ARCHIVE`). Перед циклом заданий runner проверяет окружение движка, SHA архива,
+манифест и каждый файл; при отказе исполнитель не стартует и выходит с кодом != 0.
 """
 
 from __future__ import annotations
@@ -17,8 +18,6 @@ from app.worker.runner import run_worker
 
 def main() -> None:
     settings = get_settings()
-    if not settings.cad_qa_enabled:
-        raise SystemExit("CAD_QA_ENABLED=false: исполнитель PDF -> CAD выключен")
     try:
         identity = asyncio.run(verify_engine(settings))
     except CadError as failure:

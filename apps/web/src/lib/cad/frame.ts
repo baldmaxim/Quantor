@@ -126,8 +126,7 @@ export const overlayPaths = (
   paths: readonly CadPreviewPathRead[],
   frame: ICadFrame,
   page: IPageSize,
-): INormalizedPath[] =>
-  convertPaths(paths, (x, y) => cadToNormalized(frame, page, x, y));
+): INormalizedPath[] => convertPaths(paths, (x, y) => cadToNormalized(frame, page, x, y));
 
 /** Охват по самим путям - когда сервер не прислал `bbox`. */
 export const bboxOfPaths = (paths: readonly CadPreviewPathRead[]): CadBbox | null => {
@@ -145,7 +144,10 @@ export const bboxOfPaths = (paths: readonly CadPreviewPathRead[]): CadBbox | nul
       if (y > maxY) maxY = y;
     }
   }
-  return Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)
+  return Number.isFinite(minX) &&
+    Number.isFinite(minY) &&
+    Number.isFinite(maxX) &&
+    Number.isFinite(maxY)
     ? [minX, minY, maxX, maxY]
     : null;
 };
@@ -195,7 +197,12 @@ export const cropToNormalized = (
   crop: readonly number[] | null | undefined,
   page: IPageSize,
 ): NormalizedRect | null => {
-  if (!crop || crop.length !== 4 || !isFinitePositive(page.width) || !isFinitePositive(page.height)) {
+  if (
+    !crop ||
+    crop.length !== 4 ||
+    !isFinitePositive(page.width) ||
+    !isFinitePositive(page.height)
+  ) {
     return null;
   }
   const [x0, y0, x1, y1] = crop as [number, number, number, number];

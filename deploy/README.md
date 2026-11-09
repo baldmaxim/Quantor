@@ -24,7 +24,7 @@ quantor-worker, quantor-db (PostGIS 17), quantor-minio — внутренняя 
 | `deploy/nginx/quantor.conf` — после выпуска сертификата                | `/opt/infra/nginx/conf.d/quantor.conf` |
 
 Образы собирает [publish.yml](../.github/workflows/publish.yml) (Actions → publish → Run
-workflow): `ghcr.io/baldmaxim/quantor-{api,web,admin}` с тегами git-sha и `latest`, плюс
+workflow): `ghcr.io/baldmaxim/quantor-{api,web,admin,cad-worker}` с тегами git-sha и `latest`, плюс
 зеркало MinIO `quantor-minio` (реестр Chainguard с сервера недоступен).
 
 ## Первая выкладка
@@ -120,6 +120,25 @@ EOF'
 ```
 
 Файлы MinIO в тестовом режиме не копируются — они на том же диске (ADR-0032).
+
+## CAD-исполнитель (ADR-0036)
+
+`cad-worker` — отдельный сервис и образ `quantor-cad-worker` (код `apps/api` + движок PDF → DXF в своём
+venv; PyMuPDF и Shapely есть только в нём). Команда `python -m app.cad_worker`, одно задание за раз,
+`cpus: 1.0`. Образ собирает job `build-cad-worker` в `publish.yml` после образов портала; `update.sh`
+скачивает и перезапускает его вместе с остальными.
+
+- Секрет репозитория GitHub **`CAD_ENGINE_READ_TOKEN`** — токен чтения приватного `baldmaxim/CAD_engine`
+  (BuildKit secret, в образ не попадает). Без него сборка `cad-worker` падает с сообщением.
+- Закрепление движка — `tools/cad_engine/pins.json`: `engine.repo_ref` (коммит), `engine.archive_path`,
+  `engine.archive_sha256` (сверяется при сборке и runner'ом при старте).
+- Возможность включает владелец флагом `cad.export` на пространство (админка); пилот — отдельное
+  пространство. Для калибровки масштаба листа в нём же нужен `takeoff.manual`.
+- Переменные лимитов в `.env` (по умолчанию в compose): `CAD_MAX_MEMORY_MB=6144`,
+  `CAD_WORKER_MEM_LIMIT=1536m`, `CAD_WORKER_MEMSWAP_LIMIT=3g` (замер: пик 465 МБ на плане этажа). На сервере 2 vCPU / 4 ГБ: лимиты
+  уточняются замером на пилотном листе.
+- Проверка: `./compose.sh logs --tail 50 cad-worker` — первая строка JSON с версией движка; ошибка
+  `CAD_ENGINE_UNAVAILABLE` — архив или окружение не прошли проверку.
 
 ## Проверка после выкладки
 

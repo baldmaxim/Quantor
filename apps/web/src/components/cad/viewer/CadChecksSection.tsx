@@ -57,8 +57,12 @@ export const CadChecksSection: FC<ICadChecksSectionProps> = ({ checks, frame }) 
                 {formatInt(checks.recognized_monolith_fill_count)}
               </Field>
               <Field label="Блоков дверей">{formatInt(checks.door_block_count)}</Field>
-              <Field label="Строк ведомости помещений">{formatInt(checks.rooms_schedule_rows)}</Field>
-              <Field label="Распознано строк помещений">{formatInt(checks.rooms_recognized_rows)}</Field>
+              <Field label="Строк ведомости помещений">
+                {formatInt(checks.rooms_schedule_rows)}
+              </Field>
+              <Field label="Распознано строк помещений">
+                {formatInt(checks.rooms_recognized_rows)}
+              </Field>
               <Field label="Область плана одобрена">{formatBool(checks.region_approved)}</Field>
               <Field label="Все заливки валидны">{formatBool(checks.all_source_fills_valid)}</Field>
               <Field label="Выпуск количеств разрешён">

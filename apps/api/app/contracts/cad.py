@@ -24,13 +24,24 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 
 class CadConvertCreate(BaseModel):
-    """Постановка. `pages` — page_index с 0 (как у листов Quantor), null — все плановые листы."""
+    """Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.
+
+    Лист выбирает человек. Масштаб клиент не передаёт: сервер берёт действующую калибровку
+    листа (ADR-0018); без неё — 409 `CAD_CALIBRATION_REQUIRED`.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    pages: list[Annotated[int, Field(ge=0)]] | None = None
+    pages: list[Annotated[int, Field(ge=0)]] = Field(min_length=1, max_length=50)
     finishes: bool = False
     schedules: bool = False
+
+    @field_validator("pages")
+    @classmethod
+    def _unique_pages(cls, value: list[int]) -> list[int]:
+        if len(set(value)) != len(value):
+            raise ValueError("страницы не должны повторяться")
+        return value
 
 
 class CadArtifactRead(BaseModel):
@@ -43,6 +54,13 @@ class CadViewRead(BaseModel):
     view: int
     status: str
     scale_status: str | None
+    # Откуда масштаб вида (`operator_calibration` | `dimension_chains`), отклонение и причина
+    # отказа — как записал движок; подробности — в диагностике вида.
+    scale_source: str | None = None
+    scale_deviation: float | None = None
+    # `calibration_mismatch` — расхождение калибровки человека с размерными цепочками.
+    failure_code: str | None = None
+    failure_reason: str | None = None
     dxf: str | None
     dxf_entities: int | None
 
@@ -50,6 +68,8 @@ class CadViewRead(BaseModel):
 class CadPageRead(BaseModel):
     index: int
     legacy_pdf_page: int
+    # Подсказка: попала ли страница в перечень плановых листов входного контроля движка.
+    intake_selected: bool | None = None
     views: list[CadViewRead]
 
 
@@ -307,6 +327,14 @@ class CadScaleRead(BaseModel):
 
     status: str
     passed: bool
+    # Сверка масштаба оператора с размерными цепочками (ADR-0036 п. 4). Для прежних артефактов
+    # (подбор только по цепочкам) эти поля пусты.
+    source: str | None = None
+    operator_mm_per_pt: float | None = None
+    dimension_mm_per_pt: float | None = None
+    deviation: float | None = None
+    tolerances: dict[str, float] = Field(default_factory=dict)
+    reason: str | None = None
     method: str | None
     mm_per_pdf_point: float | None
     scale_denominator: float | None

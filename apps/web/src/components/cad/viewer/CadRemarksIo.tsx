@@ -91,7 +91,9 @@ export const CadRemarksIo: FC<ICadRemarksIoProps> = ({
       return;
     }
     // Клиентский разбор - предварительная проверка; привязку и слияние окончательно решает сервер.
-    const body = toImportBody(buildRemarksFile(binding, parsed.reviewer, parsed.remarks, new Date()));
+    const body = toImportBody(
+      buildRemarksFile(binding, parsed.reviewer, parsed.remarks, new Date()),
+    );
     setImporting(true);
     try {
       setMessage({ tone: 'ok', text: importSummary(await onImport(body)) });

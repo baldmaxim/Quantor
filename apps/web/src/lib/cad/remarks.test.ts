@@ -97,7 +97,7 @@ describe('координаты', () => {
     const camera = cameraForBbox([100, 100, 300, 200], view);
     expect(camera).not.toBeNull();
     if (!camera) return;
-    const [x, y] = [(200 * camera.scale + camera.offsetX), (150 * camera.scale + camera.offsetY)];
+    const [x, y] = [200 * camera.scale + camera.offsetX, 150 * camera.scale + camera.offsetY];
     expect(x).toBeCloseTo(400, 6);
     expect(y).toBeCloseTo(300, 6);
     expect(200 * camera.scale).toBeLessThanOrEqual(800);
@@ -128,7 +128,12 @@ describe('порядок и счётчик', () => {
 
 describe('файл замечаний', () => {
   it('выгрузка имеет схему, привязку, систему координат и приёмку=false', () => {
-    const file = buildRemarksFile(BINDING, ' Иванов ', [remark()], new Date('2026-11-09T10:00:00Z'));
+    const file = buildRemarksFile(
+      BINDING,
+      ' Иванов ',
+      [remark()],
+      new Date('2026-11-09T10:00:00Z'),
+    );
     expect(file).toMatchObject({
       schema: REMARKS_SCHEMA,
       project_id: 'p1',
@@ -191,7 +196,9 @@ describe('файл замечаний', () => {
   });
 
   it('приёмка true в файле отклоняется', () => {
-    expect(parseRemarksFile(fileOf({ engineering_acceptance: true }), BINDING, PAGE).ok).toBe(false);
+    expect(parseRemarksFile(fileOf({ engineering_acceptance: true }), BINDING, PAGE).ok).toBe(
+      false,
+    );
   });
 
   it('некорректный участок отклоняет файл', () => {

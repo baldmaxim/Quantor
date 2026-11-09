@@ -203,13 +203,22 @@ def _page_summary(report: dict[str, Any]) -> list[dict[str, Any]]:
                 "view": view["view"],
                 "status": view["status"],
                 "scale_status": view.get("scale_status"),
+                "scale_source": view.get("scale_source"),
+                "scale_deviation": view.get("scale_deviation"),
+                "failure_code": view.get("failure_code"),
+                "failure_reason": view.get("failure_reason"),
                 "dxf": (view.get("dxf") or {}).get("file"),
                 "dxf_entities": (view.get("dxf") or {}).get("entities"),
             }
             for view in page.get("views", [])
         ]
         pages.append(
-            {"index": page["index"], "legacy_pdf_page": page["legacy_pdf_page"], "views": views}
+            {
+                "index": page["index"],
+                "legacy_pdf_page": page["legacy_pdf_page"],
+                "intake_selected": page.get("intake_selected"),
+                "views": views,
+            }
         )
     return pages
 

@@ -6,8 +6,6 @@ import { useEffect, useRef, useState, type FC } from 'react';
 
 import { CadPdfDropzone } from '@/components/cad/CadPdfDropzone';
 import { Button, ProgressRow, SkeletonRows, StatusBadge, cx } from '@/components/ui';
-import { cadErrorText } from '@/lib/cad/errors';
-import { useStartCadJob } from '@/lib/cad/queries';
 import { errorMessage } from '@/lib/errors';
 import { formatBytes } from '@/lib/format';
 import { useDocumentsRevisions, useProjectDocuments } from '@/lib/queries';
@@ -16,8 +14,8 @@ import { UploadError, extensionOf, uploadFile } from '@/lib/upload';
 interface ICadSourcePickerProps {
   projectId: string;
   selectedRevisionId: string | null;
-  /** Ревизия и задание выбраны (запущены или найдены идущие). */
-  onSelect: (revisionId: string, jobId: string) => void;
+  /** Ревизия выбрана: листы и запуск - в `CadSheetPicker`. */
+  onSelect: (revisionId: string) => void;
 }
 
 interface IUploadState {
@@ -27,8 +25,8 @@ interface IUploadState {
 
 /**
  * Выбор исходного PDF: загрузка нового или одна из ревизий проекта.
- * После выбора запускается преобразование (страницы выбирает движок); если у ревизии уже
- * есть идущее задание, выбирается оно.
+ * Запуск преобразования здесь не выполняется: листы выбирает человек в `CadSheetPicker`
+ * (ADR-0036), после загрузки новой ревизии выбирается она же.
  */
 export const CadSourcePicker: FC<ICadSourcePickerProps> = ({
   projectId,
@@ -39,34 +37,17 @@ export const CadSourcePicker: FC<ICadSourcePickerProps> = ({
   const documents = useProjectDocuments(projectId);
   const pdfs = (documents.data?.items ?? []).filter((item) => item.document_kind === 'pdf');
   const revisions = useDocumentsRevisions(pdfs.map((item) => item.id));
-  const start = useStartCadJob(projectId);
 
   const [upload, setUpload] = useState<IUploadState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
-  // Синхронная защита от повторного запуска: состояние `busy` обновляется после рендера, и два
-  // быстрых нажатия успевают запустить два задания или две загрузки.
-  const launching = useRef(false);
+  // Синхронная защита от повторной загрузки: состояние `busy` обновляется после рендера.
   const uploading = useRef(false);
 
   useEffect(() => () => controller.current?.abort(), []);
 
-  const busy = upload !== null || start.isPending;
-
-  const launch = async (revisionId: string) => {
-    if (launching.current) return;
-    launching.current = true;
-    setProblem(null);
-    try {
-      const jobId = await start.mutateAsync({ revisionId });
-      onSelect(revisionId, jobId);
-    } catch (error) {
-      setProblem(cadErrorText(error));
-    } finally {
-      launching.current = false;
-    }
-  };
+  const busy = upload !== null;
 
   const handleFile = async (file: File) => {
     if (uploading.current) return;
@@ -93,7 +74,7 @@ export const CadSourcePicker: FC<ICadSourcePickerProps> = ({
       }
       setUpload(null);
       uploading.current = false;
-      await launch(result.revision.id);
+      onSelect(result.revision.id);
     } catch (error) {
       setUpload(null);
       uploading.current = false;
@@ -136,7 +117,7 @@ export const CadSourcePicker: FC<ICadSourcePickerProps> = ({
                 revision={revisions.byDocument.get(document.id)?.items.at(-1) ?? null}
                 selectedRevisionId={selectedRevisionId}
                 disabled={busy}
-                onLaunch={(revisionId) => void launch(revisionId)}
+                onPick={onSelect}
               />
             ))}
           </ul>
@@ -151,16 +132,10 @@ interface IPdfRowProps {
   revision: DocumentRevisionRead | null;
   selectedRevisionId: string | null;
   disabled: boolean;
-  onLaunch: (revisionId: string) => void;
+  onPick: (revisionId: string) => void;
 }
 
-const PdfRow: FC<IPdfRowProps> = ({
-  document,
-  revision,
-  selectedRevisionId,
-  disabled,
-  onLaunch,
-}) => {
+const PdfRow: FC<IPdfRowProps> = ({ document, revision, selectedRevisionId, disabled, onPick }) => {
   const selected = revision !== null && revision.id === selectedRevisionId;
 
   return (
@@ -190,7 +165,7 @@ const PdfRow: FC<IPdfRowProps> = ({
         <Button
           compact
           disabled={disabled || revision === null}
-          onClick={() => revision && onLaunch(revision.id)}
+          onClick={() => revision && onPick(revision.id)}
           className="max-md:h-[44px]"
         >
           Выбрать

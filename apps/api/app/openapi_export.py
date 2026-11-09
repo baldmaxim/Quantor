@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.api.v1.cad import qa_router as cad_qa_router
 from app.core.config import REPO_ROOT
 from app.main import create_app
 
@@ -18,11 +17,6 @@ OUTPUT_PATH = REPO_ROOT / "packages" / "api-client" / "openapi.json"
 
 def export(path: Path = OUTPUT_PATH) -> Path:
     app = create_app()
-    if not any(getattr(route, "path", "").endswith("/cad") for route in app.routes):
-        # Контракт QA-маршрутов PDF -> CAD входит в клиент, чтобы интерфейс работал на
-        # сгенерированных типах. На сервере маршруты существуют только при CAD_QA_ENABLED
-        # (local/test) и флаге `cad.export`; интерфейс проверяет тот же флаг.
-        app.include_router(cad_qa_router)
     schema = app.openapi()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(

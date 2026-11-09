@@ -3,6 +3,7 @@
 import type { CadJobRead } from '@quantor/api-client';
 import type { FC } from 'react';
 
+import { CadCalibrationMismatch } from '@/components/cad/CadCalibrationMismatch';
 import { StatusBadge } from '@/components/ui';
 import { cadArtifactUrl, shortSha } from '@/lib/cad/artifacts';
 import { resultInfo } from '@/lib/cad/stages';
@@ -40,6 +41,7 @@ export const CadResult: FC<ICadResultProps> = ({ projectId, revisionId, job, att
               {info.hint && <p className="text-xs text-muted">{info.hint}</p>}
             </div>
           )}
+          <CadCalibrationMismatch projectId={projectId} revisionId={revisionId} job={job} />
           {job.artifacts.length === 0 ? (
             <p className="text-xs text-muted">Файлов нет.</p>
           ) : (

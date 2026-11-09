@@ -16,15 +16,7 @@ vi.mock('./CadViewerPane', () => ({ CadViewerPane: () => <div data-testid="pane"
 import { CadViewPanel } from './CadViewPanel';
 
 const mount = (patch: Parameters<typeof job>[0] = {}) =>
-  render(
-    <CadViewPanel
-      projectId="p1"
-      revisionId="r1"
-      job={job(patch)}
-      pageIndex={0}
-      view={1}
-    />,
-  );
+  render(<CadViewPanel projectId="p1" revisionId="r1" job={job(patch)} pageIndex={0} view={1} />);
 
 const ready = (data: ReturnType<typeof diagnostics>) => {
   view.current = { isPending: false, isError: false, data, refetch: vi.fn() };
@@ -78,7 +70,9 @@ describe('CadViewPanel', () => {
     expect(screen.getByText(/DXF выпущен · нужна проверка/)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Скачать DXF' });
     expect(link).toHaveAttribute('download');
-    expect(link.getAttribute('href')).toContain(`/cad/${JOB_ID}/artifacts/views/p001_v01/plan_candidates.dxf`);
+    expect(link.getAttribute('href')).toContain(
+      `/cad/${JOB_ID}/artifacts/views/p001_v01/plan_candidates.dxf`,
+    );
     expect(screen.getByTestId('cad-dxf-sha')).toHaveTextContent(SHA);
   });
 
@@ -108,13 +102,24 @@ describe('CadViewPanel', () => {
   });
 
   it('ошибка вида отличается от остальных исходов', () => {
-    ready(diagnostics({ status: 'error', result_status: 'failed', dxf: null, preview_available: false }));
+    ready(
+      diagnostics({
+        status: 'error',
+        result_status: 'failed',
+        dxf: null,
+        preview_available: false,
+      }),
+    );
     mount();
     expect(screen.getByText(/Вид завершился ошибкой/)).toBeInTheDocument();
   });
 
   it('HOLD: причины списком; без причин - подтверждён размерной проверкой', () => {
-    ready(diagnostics({ scale: scale({ passed: false, hold_reasons: ['Нет независимой проверки (holdout).'] }) }));
+    ready(
+      diagnostics({
+        scale: scale({ passed: false, hold_reasons: ['Нет независимой проверки (holdout).'] }),
+      }),
+    );
     const first = mount();
     expect(screen.getByText(/HOLD/)).toBeInTheDocument();
     expect(screen.getByText('Нет независимой проверки (holdout).')).toBeInTheDocument();

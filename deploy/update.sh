@@ -25,7 +25,7 @@ COMPOSE=(docker compose -p quantor)
 
 echo "→ выкатывается ${TAG}"
 # Именно pull: `up -d` не перекачивает образ, если тег уже есть на диске.
-"${COMPOSE[@]}" pull minio api worker web admin
+"${COMPOSE[@]}" pull minio api worker cad-worker web admin
 
 echo -n "→ описание развёртывания: "
 tmp_compose="$(mktemp)"
@@ -64,11 +64,11 @@ done
 echo "→ миграции"
 "${COMPOSE[@]}" --profile tools run --rm migrate
 
-"${COMPOSE[@]}" up -d --force-recreate api worker web admin
+"${COMPOSE[@]}" up -d --force-recreate api worker cad-worker web admin
 
 echo "→ из чего собраны контейнеры:"
 fail=0
-for name in api worker web admin; do
+for name in api worker cad-worker web admin; do
   image="quantor-${name}"
   [ "$name" = worker ] && image="quantor-api"
   want="ghcr.io/baldmaxim/${image}:${TAG}"

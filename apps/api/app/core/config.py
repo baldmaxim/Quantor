@@ -118,12 +118,13 @@ class Settings(BaseSettings):
     # Через сколько молчания исполнитель считается мёртвым. Втрое больше аренды.
     worker_stale_after_seconds: int = Field(default=180, gt=0)
 
-    # --- PDF -> CAD, QA-контур (app/cad_worker) ---
+    # --- PDF -> CAD (app/cad_worker, ADR-0036) ---
     #
-    # Выключено по умолчанию. Вне ENVIRONMENT=local|test включить нельзя: валидатор ниже
-    # роняет запуск, а маршруты и исполнитель без этого флага не существуют. Движок —
-    # отдельный интерпретатор с закреплёнными зависимостями и SHA-закреплённый архив; в
-    # процесс API ни PyMuPDF, ни Shapely не импортируются.
+    # Боевой гейт маршрутов — флаг пространства `cad.export`, а не эта настройка.
+    # `cad_qa_enabled` — только QA-режим local/test (вне них валидатор ниже роняет запуск).
+    # Исполнитель стартует, если движок сконфигурирован. Движок — отдельный интерпретатор
+    # с закреплёнными зависимостями и SHA-закреплённый архив; в процесс API ни PyMuPDF,
+    # ни Shapely не импортируются.
     cad_qa_enabled: bool = False
     cad_engine_python: str = ""
     cad_engine_runner: str = ""
@@ -210,8 +211,8 @@ class Settings(BaseSettings):
             raise ValueError("AUTH_MODE=oidc требует OIDC_ISSUER и OIDC_CLIENT_ID")
         if self.cad_qa_enabled and not self.is_local:
             raise ValueError(
-                f"CAD_QA_ENABLED недопустим при ENVIRONMENT={self.environment}: PDF -> CAD "
-                "закрыт до решений по ADR-0016/0034/0035 и матрице лицензий"
+                f"CAD_QA_ENABLED недопустим при ENVIRONMENT={self.environment}: это QA-режим "
+                "local/test; в бою CAD открывает флаг пространства cad.export (ADR-0036)"
             )
         return self
 

@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatBool, formatInt, formatNumber, formatScaleDenominator, NO_VALUE } from './view-format';
+import {
+  formatBool,
+  formatDeviationPercent,
+  formatInt,
+  formatNumber,
+  formatScaleDenominator,
+  formatScaleFromMmPerPt,
+  NO_VALUE,
+  scaleDenominatorFromMmPerPt,
+  scaleSourceLabel,
+  scaleStatusInfo,
+} from './view-format';
 
 describe('view-format', () => {
   it('отсутствующее значение - прочерк, а не ноль', () => {
@@ -26,5 +37,29 @@ describe('view-format', () => {
     expect(formatScaleDenominator(100)).toBe('1:100');
     expect(formatScaleDenominator(null)).toBe(NO_VALUE);
     expect(formatScaleDenominator(0)).toBe(NO_VALUE);
+  });
+});
+
+describe('view-format: масштаб из мм/pt', () => {
+  it('1:N = мм/pt * 72 / 25,4, целым', () => {
+    expect(formatScaleFromMmPerPt(35.28)).toBe('1:100');
+    expect(formatScaleFromMmPerPt(70.5556)).toBe('1:200');
+    expect(scaleDenominatorFromMmPerPt(17.64)).toBe(50);
+    expect(scaleDenominatorFromMmPerPt(28.22)).toBe(80);
+  });
+
+  it('нет значения - прочерк', () => {
+    expect(formatScaleFromMmPerPt(null)).toBe(NO_VALUE);
+    expect(formatScaleFromMmPerPt(0)).toBe(NO_VALUE);
+    expect(scaleDenominatorFromMmPerPt(undefined)).toBeNull();
+  });
+
+  it('отклонение - доля в процентах, статус - словами', () => {
+    expect(formatDeviationPercent(0.023)).toMatch(/^2[.,]3\s*%$/);
+    expect(formatDeviationPercent(null)).toBe(NO_VALUE);
+    expect(scaleStatusInfo('passed').label).toBe('подтверждена');
+    expect(scaleStatusInfo('needs_review').label).toBe('требует проверки');
+    expect(scaleStatusInfo('failed')).toEqual({ label: 'отклонена', tone: 'danger' });
+    expect(scaleSourceLabel('operator_calibration')).toBe('Калибровка человека');
   });
 });
