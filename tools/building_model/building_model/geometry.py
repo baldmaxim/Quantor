@@ -130,6 +130,51 @@ def point_in_polygon(p: Pt, poly: Sequence[Pt]) -> bool:
     return inside
 
 
+def _scanline_intervals(poly: Sequence[Pt], y: float) -> list[tuple[float, float]]:
+    """Внутренние отрезки прямой y: правило чётности, вершины — по полуоткрытому правилу."""
+    xs: list[float] = []
+    n = len(poly)
+    for i in range(n):
+        a, b = poly[i], poly[(i + 1) % n]
+        if (a[1] <= y < b[1]) or (b[1] <= y < a[1]):
+            xs.append(a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]))
+    xs.sort()
+    return [(xs[i], xs[i + 1]) for i in range(0, len(xs) - 1, 2)]
+
+
+_SCAN_FRACTIONS = (0.5, 0.37, 0.63, 0.25, 0.75, 0.13, 0.87, 0.06, 0.94)
+
+
+def interior_point(poly: Sequence[Pt]) -> Pt | None:
+    """Точка гарантированно внутри контура (мм, округление до 0,1) или None для вырожденного.
+
+    Центроид, если он внутри. Иначе — середина самого длинного внутреннего отрезка горизонтальной
+    прямой: сначала на высоте центроида, затем на фиксированных долях высоты рамки. Детерминирована.
+    """
+    if len(poly) < 3 or abs(signed_area(poly)) < 1e-9:
+        return None
+    c = rnd_pt(centroid(poly), 1)
+    if (
+        point_in_polygon(c, poly)
+        and min(
+            point_segment_distance(c, poly[i], poly[(i + 1) % len(poly)]) for i in range(len(poly))
+        )
+        >= 0.5
+    ):
+        return c
+    _, y0, _, y1 = bbox(poly)
+    heights = [c[1], *(y0 + (y1 - y0) * f for f in _SCAN_FRACTIONS)]
+    for y in heights:
+        intervals = [iv for iv in _scanline_intervals(poly, y) if iv[1] - iv[0] >= 1.0]
+        if not intervals:
+            continue
+        lo, hi = max(intervals, key=lambda iv: (iv[1] - iv[0], -iv[0]))
+        candidate = rnd_pt(((lo + hi) / 2.0, y), 1)
+        if point_in_polygon(candidate, poly):
+            return candidate
+    return None
+
+
 def canonical_polygon(poly: Sequence[Pt]) -> list[Pt]:
     """Контур против часовой стрелки, начало — наименьшая вершина: не зависит от порядка входа."""
     pts = list(poly)

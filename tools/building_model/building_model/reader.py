@@ -171,6 +171,17 @@ def _as_page(raw: JsonObject) -> int:
     return page
 
 
+def _single_sheet_page(raw: JsonObject) -> int:
+    """Номер страницы одиночного листа: parse_page пишет его только в source.page."""
+    if isinstance(raw.get("page"), int) and not isinstance(raw.get("page"), bool):
+        return _as_page(raw)
+    source = raw.get("source")
+    page = source.get("page") if isinstance(source, dict) else None
+    if not isinstance(page, int) or isinstance(page, bool):
+        raise SheetValidationError("у листа нет целого номера страницы (ни page, ни source.page)")
+    return page
+
+
 def exclusion_reason(raw: JsonObject) -> str | None:
     """Причина, по которой лист не годится для модели плана; None — лист годится."""
     verdict = raw.get("verdict")
@@ -250,9 +261,10 @@ def document_from_json(data: object) -> Document:
             sheets[page] = sheet
         return Document(sheets=sheets, building_pages=_building_pages(top.get("buildings")))
     if "plangeom_version" in top and "walls" in top:
-        page = _as_page(top)
+        # Одиночный лист (parse_page): верхнего page нет, номер лежит в source.page.
+        page = _single_sheet_page(top)
         _check_version(top, f"страница {page}")
-        return Document(sheets={page: top})
+        return Document(sheets={page: {**top, "page": page}})
     raise SheetValidationError("файл не похож на вывод parse_document или parse_page")
 
 

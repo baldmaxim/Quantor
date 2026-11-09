@@ -39,7 +39,7 @@ def _axis_order(axis: AxisIn) -> tuple[str, float, float, int, float, float]:
     )
 
 
-def _intersection(a: AxisIn, b: AxisIn) -> Pt | None:
+def intersection(a: AxisIn, b: AxisIn) -> Pt | None:
     det = a.normal[0] * b.normal[1] - a.normal[1] * b.normal[0]
     if abs(det) < 1e-9:
         return None
@@ -48,7 +48,7 @@ def _intersection(a: AxisIn, b: AxisIn) -> Pt | None:
     return (x, y)
 
 
-def _angle_between_deg(a: AxisIn, b: AxisIn) -> float:
+def angle_between_deg(a: AxisIn, b: AxisIn) -> float:
     na = math.hypot(*a.normal)
     nb = math.hypot(*b.normal)
     if na < 1e-9 or nb < 1e-9:
@@ -66,10 +66,10 @@ def choose_origin(axes: Sequence[AxisIn], params: Params, corner: Pt) -> Frame:
     best: tuple[int, AxisIn, AxisIn, Pt] | None = None
     for i, first in enumerate(ordered):
         for second in ordered[i + 1 :]:
-            angle = _angle_between_deg(first, second)
+            angle = angle_between_deg(first, second)
             if not params.origin_angle_min_deg <= angle <= params.origin_angle_max_deg:
                 continue
-            point = _intersection(first, second)
+            point = intersection(first, second)
             if point is None:
                 continue
             score = first.bubbles + second.bubbles

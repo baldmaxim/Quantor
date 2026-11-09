@@ -1,0 +1,546 @@
+{
+ "schema": "quantor.revit_package.v0",
+ "draft_format": true,
+ "manifest": {
+  "tender": {
+   "number": null,
+   "version": null,
+   "manifest_sha256": null
+  },
+  "reader": {
+   "name": "plangeom",
+   "version": "0.1.0a2",
+   "normalizer": "0.2.0"
+  },
+  "adapter": {
+   "name": "quantor.revit_adapter",
+   "version": "0.1.0"
+  },
+  "model_sha256": "432a012e50b533c359a4c01b713256b3409aba269a4e5c2489209d99dd29f536",
+  "page": 0,
+  "approval": {
+   "schema": "quantor.model_approval.v1",
+   "page": 0,
+   "model_sha256": "432a012e50b533c359a4c01b713256b3409aba269a4e5c2489209d99dd29f536",
+   "mm_per_pt": 35.0,
+   "by": "Проверяющий (синтетический пример)",
+   "at": "2026-01-01T00:00:00Z",
+   "note": "пример, не реальное подтверждение",
+   "accepted_blockers": []
+  },
+  "scale_status": "human",
+  "units": "mm",
+  "origin": {
+   "axes": [
+    "1",
+    "A"
+   ],
+   "source": "axes",
+   "y": "up"
+  },
+  "coverage": {
+   "columns": {
+    "total": 1,
+    "exported": 1,
+    "not_exported": 0
+   },
+   "floor_holes": {
+    "total": 1,
+    "exported": 1,
+    "not_exported": 0
+   },
+   "floors": {
+    "total": 1,
+    "exported": 1,
+    "not_exported": 0
+   },
+   "openings": {
+    "total": 4,
+    "exported": 3,
+    "not_exported": 1
+   },
+   "rooms": {
+    "total": 2,
+    "exported": 2,
+    "not_exported": 0
+   },
+   "stacks": {
+    "total": 1,
+    "exported": 1,
+    "not_exported": 0
+   },
+   "walls": {
+    "total": 5,
+    "exported": 5,
+    "not_exported": 0
+   }
+  },
+  "review_summary": {
+   "blocker": {
+    "scale_needs_human": 1
+   },
+   "warning": {
+    "opening_no_host": 1
+   },
+   "info": {}
+  },
+  "assumptions": {
+   "params": {
+    "door_height_mm": 2100.0,
+    "window_sill_mm": 900.0,
+    "window_head_mm": 2400.0,
+    "slab_thickness_mm": 200.0,
+    "level_height_mm": 3300.0
+   },
+   "assumed_elements": {
+    "columns": 0,
+    "floors": 1,
+    "levels": 1,
+    "openings": 3,
+    "rooms": 0,
+    "stacks": 0,
+    "walls": 0
+   }
+  }
+ },
+ "levels": [
+  {
+   "id": "L5",
+   "floor": 5,
+   "elevation_mm": 14000.0,
+   "height_mm": 3300.0,
+   "status": {
+    "elevation_mm": "observed",
+    "height_mm": "derived"
+   },
+   "instance_of": null
+  },
+  {
+   "id": "L6",
+   "floor": 6,
+   "elevation_mm": 17300.0,
+   "height_mm": 3300.0,
+   "status": {
+    "elevation_mm": "observed",
+    "height_mm": "assumed"
+   },
+   "instance_of": "L5"
+  }
+ ],
+ "wall_types": [
+  {
+   "id": "QTO-W-100",
+   "thickness_mm": 100.0,
+   "count": 1
+  },
+  {
+   "id": "QTO-W-300",
+   "thickness_mm": 300.0,
+   "count": 4
+  }
+ ],
+ "walls": [
+  {
+   "id": "w_042fde73",
+   "level": "L5",
+   "start": [
+    0.0,
+    5000.0
+   ],
+   "end": [
+    6000.0,
+    5000.0
+   ],
+   "height_mm": 3300.0,
+   "type": "QTO-W-300",
+   "thickness_mm": 300.0,
+   "structural": true,
+   "params": {
+    "QTO_Key": "w_042fde73",
+    "QTO_Source": "p0:W2",
+    "QTO_Status": "observed",
+    "QTO_Role": "outer wall"
+   }
+  },
+  {
+   "id": "w_1e1622e2",
+   "level": "L5",
+   "start": [
+    0.0,
+    0.0
+   ],
+   "end": [
+    6000.0,
+    0.0
+   ],
+   "height_mm": 3300.0,
+   "type": "QTO-W-300",
+   "thickness_mm": 300.0,
+   "structural": true,
+   "params": {
+    "QTO_Key": "w_1e1622e2",
+    "QTO_Source": "p0:W0",
+    "QTO_Status": "observed",
+    "QTO_Role": "outer wall"
+   }
+  },
+  {
+   "id": "w_272f4f2f",
+   "level": "L5",
+   "start": [
+    6000.0,
+    0.0
+   ],
+   "end": [
+    6000.0,
+    5000.0
+   ],
+   "height_mm": 3300.0,
+   "type": "QTO-W-300",
+   "thickness_mm": 300.0,
+   "structural": true,
+   "params": {
+    "QTO_Key": "w_272f4f2f",
+    "QTO_Source": "p0:W1",
+    "QTO_Status": "observed",
+    "QTO_Role": "outer wall"
+   }
+  },
+  {
+   "id": "w_740c75b6",
+   "level": "L5",
+   "start": [
+    0.0,
+    0.0
+   ],
+   "end": [
+    0.0,
+    5000.0
+   ],
+   "height_mm": 3300.0,
+   "type": "QTO-W-300",
+   "thickness_mm": 300.0,
+   "structural": true,
+   "params": {
+    "QTO_Key": "w_740c75b6",
+    "QTO_Source": "p0:W3",
+    "QTO_Status": "observed",
+    "QTO_Role": "outer wall"
+   }
+  },
+  {
+   "id": "w_c76e2b34",
+   "level": "L5",
+   "start": [
+    3000.0,
+    0.0
+   ],
+   "end": [
+    3000.0,
+    5000.0
+   ],
+   "height_mm": 3300.0,
+   "type": "QTO-W-100",
+   "thickness_mm": 100.0,
+   "structural": false,
+   "params": {
+    "QTO_Key": "w_c76e2b34",
+    "QTO_Source": "p0:W4",
+    "QTO_Status": "observed",
+    "QTO_Role": "partition"
+   }
+  }
+ ],
+ "openings": [
+  {
+   "id": "o_640fa226",
+   "kind": "window",
+   "host": "w_042fde73",
+   "offset_mm": 4500.0,
+   "width_mm": 1000.0,
+   "height_mm": 1500.0,
+   "sill_mm": 900.0,
+   "swing": null,
+   "at": [
+    4500.0,
+    5000.0
+   ],
+   "params": {
+    "QTO_Key": "o_640fa226",
+    "QTO_Source": "p0:O1",
+    "QTO_Status": "assumed"
+   }
+  },
+  {
+   "id": "o_8f12e979",
+   "kind": "window",
+   "host": "w_740c75b6",
+   "offset_mm": 2000.0,
+   "width_mm": 1000.0,
+   "height_mm": 1500.0,
+   "sill_mm": 900.0,
+   "swing": null,
+   "at": [
+    0.0,
+    2000.0
+   ],
+   "params": {
+    "QTO_Key": "o_8f12e979",
+    "QTO_Source": "p0:O0",
+    "QTO_Status": "assumed"
+   }
+  },
+  {
+   "id": "o_a74aea3f",
+   "kind": "door",
+   "host": "w_1e1622e2",
+   "offset_mm": 1500.0,
+   "width_mm": 1000.0,
+   "height_mm": 2100.0,
+   "sill_mm": null,
+   "swing": [
+    {
+     "hinge_at": "a",
+     "opens_to": "left"
+    }
+   ],
+   "at": [
+    1500.0,
+    0.0
+   ],
+   "params": {
+    "QTO_Key": "o_a74aea3f",
+    "QTO_Source": "p0:D0",
+    "QTO_Status": "assumed"
+   }
+  }
+ ],
+ "floors": [
+  {
+   "id": "s_a8bb08bd",
+   "level": "L5",
+   "boundary": [
+    [
+     -150.0,
+     -150.0
+    ],
+    [
+     6150.0,
+     -150.0
+    ],
+    [
+     6150.0,
+     5150.0
+    ],
+    [
+     -150.0,
+     5150.0
+    ]
+   ],
+   "holes": [
+    {
+     "kind": "stair",
+     "boundary": [
+      [
+       3300.0,
+       3300.0
+      ],
+      [
+       3900.0,
+       3300.0
+      ],
+      [
+       3900.0,
+       4500.0
+      ],
+      [
+       3300.0,
+       4500.0
+      ]
+     ]
+    }
+   ],
+   "thickness_mm": 200.0,
+   "params": {
+    "QTO_Key": "s_a8bb08bd",
+    "QTO_Source": "p0:",
+    "QTO_Status": "assumed"
+   }
+  }
+ ],
+ "columns": [
+  {
+   "id": "c_3390ae8d",
+   "level": "L5",
+   "outline": [
+    [
+     500.0,
+     2800.0
+    ],
+    [
+     700.0,
+     2800.0
+    ],
+    [
+     700.0,
+     3200.0
+    ],
+    [
+     500.0,
+     3200.0
+    ]
+   ],
+   "height_mm": 3300.0,
+   "params": {
+    "QTO_Key": "c_3390ae8d",
+    "QTO_Source": "p0:W5",
+    "QTO_Status": "observed"
+   }
+  }
+ ],
+ "stacks": [
+  {
+   "id": "k_6e43e6ee",
+   "level": "L5",
+   "kind": "stair",
+   "outline": [
+    [
+     3300.0,
+     3300.0
+    ],
+    [
+     3900.0,
+     3300.0
+    ],
+    [
+     3900.0,
+     4500.0
+    ],
+    [
+     3300.0,
+     4500.0
+    ]
+   ],
+   "slab_opening": [
+    [
+     3300.0,
+     3300.0
+    ],
+    [
+     3900.0,
+     3300.0
+    ],
+    [
+     3900.0,
+     4500.0
+    ],
+    [
+     3300.0,
+     4500.0
+    ]
+   ],
+   "params": {
+    "QTO_Key": "k_6e43e6ee",
+    "QTO_Source": "p0:T0",
+    "QTO_Status": "derived"
+   }
+  }
+ ],
+ "rooms": [
+  {
+   "id": "r_925b973b",
+   "level": "L5",
+   "tag": null,
+   "type": "corridor",
+   "area_m2": 8.0,
+   "boundary": [
+    [
+     3200.0,
+     200.0
+    ],
+    [
+     5800.0,
+     200.0
+    ],
+    [
+     5800.0,
+     4800.0
+    ],
+    [
+     5000.0,
+     4800.0
+    ],
+    [
+     5000.0,
+     1000.0
+    ],
+    [
+     4000.0,
+     1000.0
+    ],
+    [
+     4000.0,
+     4800.0
+    ],
+    [
+     3200.0,
+     4800.0
+    ]
+   ],
+   "point": [
+    3600.0,
+    2313.7
+   ],
+   "params": {
+    "QTO_Key": "r_925b973b",
+    "QTO_Source": "p0:R1",
+    "QTO_Status": "derived"
+   }
+  },
+  {
+   "id": "r_d4f18795",
+   "level": "L5",
+   "tag": "1",
+   "type": "living",
+   "area_m2": 12.0,
+   "boundary": [
+    [
+     200.0,
+     200.0
+    ],
+    [
+     2900.0,
+     200.0
+    ],
+    [
+     2900.0,
+     2900.0
+    ],
+    [
+     200.0,
+     2900.0
+    ]
+   ],
+   "point": [
+    1550.0,
+    1550.0
+   ],
+   "params": {
+    "QTO_Key": "r_d4f18795",
+    "QTO_Source": "p0:R0",
+    "QTO_Status": "observed"
+   }
+  }
+ ],
+ "not_exported": [
+  {
+   "key": "o_909ab008",
+   "kind": "opening",
+   "reason": "no_host",
+   "at": [
+    9400.0,
+    9000.0
+   ]
+  }
+ ]
+}

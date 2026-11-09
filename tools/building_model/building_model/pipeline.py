@@ -299,6 +299,24 @@ def _scale_review(sheet: SheetIn, has_axes: bool) -> list[ReviewItem]:
     return review
 
 
+def _noise_review(openings: Sequence[OpeningOut], params: Params) -> list[ReviewItem]:
+    """Блокер шумного листа: тысячи проёмов без хозяина обычно значат пустые проёмы-шум."""
+    total = len(openings)
+    unhosted = sum(1 for o in openings if o.host is None)
+    if unhosted < params.noise_unhosted_min or unhosted < params.noise_unhosted_share * total:
+        return []
+    return [
+        _item(
+            "openings_noise",
+            "blocker",
+            None,
+            [],
+            None,
+            {"unhosted": unhosted, "openings_total": total},
+        )
+    ]
+
+
 def build_sheet_model(
     sheet: SheetIn,
     neighbors_mm: Sequence[float],
@@ -327,6 +345,7 @@ def build_sheet_model(
 
     items = [
         *_scale_review(sheet, frame.has_axes_origin),
+        *_noise_review(openings, params),
         *levels.review,
         *_wall_review(walls_result, wall_keys, params),
         *opening_review,

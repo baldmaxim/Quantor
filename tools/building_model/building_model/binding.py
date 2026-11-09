@@ -34,7 +34,12 @@ def read_raw_sheet(input_path: Path, page: int) -> dict[str, object]:
         data = json.load(fh)
     sheets = data["sheets"] if isinstance(data, dict) and "sheets" in data else [data]
     for sheet in sheets:
-        if isinstance(sheet, dict) and sheet.get("page") == page:
+        if not isinstance(sheet, dict):
+            continue
+        # Одиночный лист (parse_page) не имеет верхнего page: номер лежит в source.page.
+        source = sheet.get("source")
+        number = sheet.get("page", source.get("page") if isinstance(source, dict) else None)
+        if number == page:
             return {str(k): v for k, v in sheet.items()}
     raise ValueError(f"в комплекте нет страницы {page}")
 

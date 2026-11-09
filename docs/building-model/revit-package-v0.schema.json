@@ -1,0 +1,1145 @@
+{
+ "$defs": {
+  "AdapterRef": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "string"
+    }
+   },
+   "required": [
+    "name",
+    "version"
+   ],
+   "title": "AdapterRef",
+   "type": "object"
+  },
+  "ApprovalOut": {
+   "additionalProperties": false,
+   "properties": {
+    "schema": {
+     "const": "quantor.model_approval.v1",
+     "default": "quantor.model_approval.v1",
+     "title": "Schema",
+     "type": "string"
+    },
+    "page": {
+     "title": "Page",
+     "type": "integer"
+    },
+    "model_sha256": {
+     "title": "Model Sha256",
+     "type": "string"
+    },
+    "mm_per_pt": {
+     "title": "Mm Per Pt",
+     "type": "number"
+    },
+    "by": {
+     "title": "By",
+     "type": "string"
+    },
+    "at": {
+     "title": "At",
+     "type": "string"
+    },
+    "note": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Note"
+    },
+    "accepted_blockers": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Accepted Blockers",
+     "type": "array"
+    }
+   },
+   "required": [
+    "page",
+    "model_sha256",
+    "mm_per_pt",
+    "by",
+    "at"
+   ],
+   "title": "ApprovalOut",
+   "type": "object"
+  },
+  "AssumedParams": {
+   "additionalProperties": false,
+   "properties": {
+    "door_height_mm": {
+     "title": "Door Height Mm",
+     "type": "number"
+    },
+    "window_sill_mm": {
+     "title": "Window Sill Mm",
+     "type": "number"
+    },
+    "window_head_mm": {
+     "title": "Window Head Mm",
+     "type": "number"
+    },
+    "slab_thickness_mm": {
+     "title": "Slab Thickness Mm",
+     "type": "number"
+    },
+    "level_height_mm": {
+     "title": "Level Height Mm",
+     "type": "number"
+    }
+   },
+   "required": [
+    "door_height_mm",
+    "window_sill_mm",
+    "window_head_mm",
+    "slab_thickness_mm",
+    "level_height_mm"
+   ],
+   "title": "AssumedParams",
+   "type": "object"
+  },
+  "Assumptions": {
+   "additionalProperties": false,
+   "properties": {
+    "params": {
+     "$ref": "#/$defs/AssumedParams"
+    },
+    "assumed_elements": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Assumed Elements",
+     "type": "object"
+    }
+   },
+   "required": [
+    "params",
+    "assumed_elements"
+   ],
+   "title": "Assumptions",
+   "type": "object"
+  },
+  "ColumnPkg": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "level": {
+     "title": "Level",
+     "type": "string"
+    },
+    "outline": {
+     "items": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "type": "array"
+     },
+     "title": "Outline",
+     "type": "array"
+    },
+    "height_mm": {
+     "title": "Height Mm",
+     "type": "number"
+    },
+    "params": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Params",
+     "type": "object"
+    }
+   },
+   "required": [
+    "id",
+    "level",
+    "outline",
+    "height_mm",
+    "params"
+   ],
+   "title": "ColumnPkg",
+   "type": "object"
+  },
+  "Coverage": {
+   "additionalProperties": false,
+   "properties": {
+    "total": {
+     "title": "Total",
+     "type": "integer"
+    },
+    "exported": {
+     "title": "Exported",
+     "type": "integer"
+    },
+    "not_exported": {
+     "title": "Not Exported",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "total",
+    "exported",
+    "not_exported"
+   ],
+   "title": "Coverage",
+   "type": "object"
+  },
+  "FloorPkg": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "level": {
+     "title": "Level",
+     "type": "string"
+    },
+    "boundary": {
+     "items": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "type": "array"
+     },
+     "title": "Boundary",
+     "type": "array"
+    },
+    "holes": {
+     "items": {
+      "$ref": "#/$defs/HolePkg"
+     },
+     "title": "Holes",
+     "type": "array"
+    },
+    "thickness_mm": {
+     "title": "Thickness Mm",
+     "type": "number"
+    },
+    "params": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Params",
+     "type": "object"
+    }
+   },
+   "required": [
+    "id",
+    "level",
+    "boundary",
+    "holes",
+    "thickness_mm",
+    "params"
+   ],
+   "title": "FloorPkg",
+   "type": "object"
+  },
+  "HolePkg": {
+   "additionalProperties": false,
+   "properties": {
+    "kind": {
+     "enum": [
+      "stair",
+      "shaft"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "boundary": {
+     "items": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "type": "array"
+     },
+     "title": "Boundary",
+     "type": "array"
+    }
+   },
+   "required": [
+    "kind",
+    "boundary"
+   ],
+   "title": "HolePkg",
+   "type": "object"
+  },
+  "LevelPkg": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "floor": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Floor"
+    },
+    "elevation_mm": {
+     "title": "Elevation Mm",
+     "type": "number"
+    },
+    "height_mm": {
+     "title": "Height Mm",
+     "type": "number"
+    },
+    "status": {
+     "$ref": "#/$defs/LevelStatusOut"
+    },
+    "instance_of": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Instance Of"
+    }
+   },
+   "required": [
+    "id",
+    "floor",
+    "elevation_mm",
+    "height_mm",
+    "status",
+    "instance_of"
+   ],
+   "title": "LevelPkg",
+   "type": "object"
+  },
+  "LevelStatusOut": {
+   "additionalProperties": false,
+   "properties": {
+    "elevation_mm": {
+     "title": "Elevation Mm",
+     "type": "string"
+    },
+    "height_mm": {
+     "title": "Height Mm",
+     "type": "string"
+    }
+   },
+   "required": [
+    "elevation_mm",
+    "height_mm"
+   ],
+   "title": "LevelStatusOut",
+   "type": "object"
+  },
+  "Manifest": {
+   "additionalProperties": false,
+   "properties": {
+    "tender": {
+     "$ref": "#/$defs/TenderRef"
+    },
+    "reader": {
+     "$ref": "#/$defs/ReaderRef"
+    },
+    "adapter": {
+     "$ref": "#/$defs/AdapterRef"
+    },
+    "model_sha256": {
+     "title": "Model Sha256",
+     "type": "string"
+    },
+    "page": {
+     "title": "Page",
+     "type": "integer"
+    },
+    "approval": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ApprovalOut"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "scale_status": {
+     "enum": [
+      "human",
+      "candidate"
+     ],
+     "title": "Scale Status",
+     "type": "string"
+    },
+    "units": {
+     "const": "mm",
+     "default": "mm",
+     "title": "Units",
+     "type": "string"
+    },
+    "origin": {
+     "$ref": "#/$defs/OriginRef"
+    },
+    "coverage": {
+     "additionalProperties": {
+      "$ref": "#/$defs/Coverage"
+     },
+     "title": "Coverage",
+     "type": "object"
+    },
+    "review_summary": {
+     "$ref": "#/$defs/ReviewSummary"
+    },
+    "assumptions": {
+     "$ref": "#/$defs/Assumptions"
+    }
+   },
+   "required": [
+    "tender",
+    "reader",
+    "adapter",
+    "model_sha256",
+    "page",
+    "approval",
+    "scale_status",
+    "origin",
+    "coverage",
+    "review_summary",
+    "assumptions"
+   ],
+   "title": "Manifest",
+   "type": "object"
+  },
+  "NotExported": {
+   "additionalProperties": false,
+   "properties": {
+    "key": {
+     "title": "Key",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "wall",
+      "opening",
+      "floor",
+      "floor_hole",
+      "column",
+      "stack",
+      "room"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "reason": {
+     "enum": [
+      "no_host",
+      "ambiguous_host",
+      "offset_outside_host",
+      "wider_than_host",
+      "zero_length_wall",
+      "degenerate_polygon"
+     ],
+     "title": "Reason",
+     "type": "string"
+    },
+    "at": {
+     "anyOf": [
+      {
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "At"
+    }
+   },
+   "required": [
+    "key",
+    "kind",
+    "reason",
+    "at"
+   ],
+   "title": "NotExported",
+   "type": "object"
+  },
+  "OpeningPkg": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "door",
+      "window",
+      "opening"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "host": {
+     "title": "Host",
+     "type": "string"
+    },
+    "offset_mm": {
+     "title": "Offset Mm",
+     "type": "number"
+    },
+    "width_mm": {
+     "title": "Width Mm",
+     "type": "number"
+    },
+    "height_mm": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Height Mm"
+    },
+    "sill_mm": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Sill Mm"
+    },
+    "swing": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/SwingPkg"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Swing"
+    },
+    "at": {
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "At",
+     "type": "array"
+    },
+    "params": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Params",
+     "type": "object"
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "host",
+    "offset_mm",
+    "width_mm",
+    "height_mm",
+    "sill_mm",
+    "swing",
+    "at",
+    "params"
+   ],
+   "title": "OpeningPkg",
+   "type": "object"
+  },
+  "OriginRef": {
+   "additionalProperties": false,
+   "properties": {
+    "axes": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Axes"
+    },
+    "source": {
+     "enum": [
+      "axes",
+      "sheet_corner"
+     ],
+     "title": "Source",
+     "type": "string"
+    },
+    "y": {
+     "const": "up",
+     "default": "up",
+     "title": "Y",
+     "type": "string"
+    }
+   },
+   "required": [
+    "axes",
+    "source"
+   ],
+   "title": "OriginRef",
+   "type": "object"
+  },
+  "ReaderRef": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "title": "Name",
+     "type": "string"
+    },
+    "version": {
+     "title": "Version",
+     "type": "string"
+    },
+    "normalizer": {
+     "title": "Normalizer",
+     "type": "string"
+    }
+   },
+   "required": [
+    "name",
+    "version",
+    "normalizer"
+   ],
+   "title": "ReaderRef",
+   "type": "object"
+  },
+  "ReviewSummary": {
+   "additionalProperties": false,
+   "description": "Код review -> число записей, по важности. Берётся из модели как есть.",
+   "properties": {
+    "blocker": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Blocker",
+     "type": "object"
+    },
+    "warning": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Warning",
+     "type": "object"
+    },
+    "info": {
+     "additionalProperties": {
+      "type": "integer"
+     },
+     "title": "Info",
+     "type": "object"
+    }
+   },
+   "required": [
+    "blocker",
+    "warning",
+    "info"
+   ],
+   "title": "ReviewSummary",
+   "type": "object"
+  },
+  "RoomPkg": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "level": {
+     "title": "Level",
+     "type": "string"
+    },
+    "tag": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Tag"
+    },
+    "type": {
+     "title": "Type",
+     "type": "string"
+    },
+    "area_m2": {
+     "title": "Area M2",
+     "type": "number"
+    },
+    "boundary": {
+     "items": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "type": "array"
+     },
+     "title": "Boundary",
+     "type": "array"
+    },
+    "point": {
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "Point",
+     "type": "array"
+    },
+    "params": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Params",
+     "type": "object"
+    }
+   },
+   "required": [
+    "id",
+    "level",
+    "tag",
+    "type",
+    "area_m2",
+    "boundary",
+    "point",
+    "params"
+   ],
+   "title": "RoomPkg",
+   "type": "object"
+  },
+  "StackPkg": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "level": {
+     "title": "Level",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "stair",
+      "lift",
+      "possible_lift"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "outline": {
+     "items": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "type": "array"
+     },
+     "title": "Outline",
+     "type": "array"
+    },
+    "slab_opening": {
+     "anyOf": [
+      {
+       "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+         {
+          "type": "number"
+         },
+         {
+          "type": "number"
+         }
+        ],
+        "type": "array"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Slab Opening"
+    },
+    "params": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Params",
+     "type": "object"
+    }
+   },
+   "required": [
+    "id",
+    "level",
+    "kind",
+    "outline",
+    "slab_opening",
+    "params"
+   ],
+   "title": "StackPkg",
+   "type": "object"
+  },
+  "SwingPkg": {
+   "additionalProperties": false,
+   "properties": {
+    "hinge_at": {
+     "enum": [
+      "a",
+      "b"
+     ],
+     "title": "Hinge At",
+     "type": "string"
+    },
+    "opens_to": {
+     "enum": [
+      "left",
+      "right"
+     ],
+     "title": "Opens To",
+     "type": "string"
+    }
+   },
+   "required": [
+    "hinge_at",
+    "opens_to"
+   ],
+   "title": "SwingPkg",
+   "type": "object"
+  },
+  "TenderRef": {
+   "additionalProperties": false,
+   "properties": {
+    "number": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Number"
+    },
+    "version": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Version"
+    },
+    "manifest_sha256": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "title": "Manifest Sha256"
+    }
+   },
+   "required": [
+    "number",
+    "version",
+    "manifest_sha256"
+   ],
+   "title": "TenderRef",
+   "type": "object"
+  },
+  "WallPkg": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "level": {
+     "title": "Level",
+     "type": "string"
+    },
+    "start": {
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "Start",
+     "type": "array"
+    },
+    "end": {
+     "maxItems": 2,
+     "minItems": 2,
+     "prefixItems": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "number"
+      }
+     ],
+     "title": "End",
+     "type": "array"
+    },
+    "height_mm": {
+     "title": "Height Mm",
+     "type": "number"
+    },
+    "type": {
+     "title": "Type",
+     "type": "string"
+    },
+    "thickness_mm": {
+     "title": "Thickness Mm",
+     "type": "number"
+    },
+    "structural": {
+     "title": "Structural",
+     "type": "boolean"
+    },
+    "params": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "title": "Params",
+     "type": "object"
+    }
+   },
+   "required": [
+    "id",
+    "level",
+    "start",
+    "end",
+    "height_mm",
+    "type",
+    "thickness_mm",
+    "structural",
+    "params"
+   ],
+   "title": "WallPkg",
+   "type": "object"
+  },
+  "WallType": {
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "thickness_mm": {
+     "title": "Thickness Mm",
+     "type": "number"
+    },
+    "count": {
+     "title": "Count",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "id",
+    "thickness_mm",
+    "count"
+   ],
+   "title": "WallType",
+   "type": "object"
+  }
+ },
+ "additionalProperties": false,
+ "properties": {
+  "schema": {
+   "const": "quantor.revit_package.v0",
+   "default": "quantor.revit_package.v0",
+   "title": "Schema",
+   "type": "string"
+  },
+  "draft_format": {
+   "const": true,
+   "default": true,
+   "title": "Draft Format",
+   "type": "boolean"
+  },
+  "manifest": {
+   "$ref": "#/$defs/Manifest"
+  },
+  "levels": {
+   "items": {
+    "$ref": "#/$defs/LevelPkg"
+   },
+   "title": "Levels",
+   "type": "array"
+  },
+  "wall_types": {
+   "items": {
+    "$ref": "#/$defs/WallType"
+   },
+   "title": "Wall Types",
+   "type": "array"
+  },
+  "walls": {
+   "items": {
+    "$ref": "#/$defs/WallPkg"
+   },
+   "title": "Walls",
+   "type": "array"
+  },
+  "openings": {
+   "items": {
+    "$ref": "#/$defs/OpeningPkg"
+   },
+   "title": "Openings",
+   "type": "array"
+  },
+  "floors": {
+   "items": {
+    "$ref": "#/$defs/FloorPkg"
+   },
+   "title": "Floors",
+   "type": "array"
+  },
+  "columns": {
+   "items": {
+    "$ref": "#/$defs/ColumnPkg"
+   },
+   "title": "Columns",
+   "type": "array"
+  },
+  "stacks": {
+   "items": {
+    "$ref": "#/$defs/StackPkg"
+   },
+   "title": "Stacks",
+   "type": "array"
+  },
+  "rooms": {
+   "items": {
+    "$ref": "#/$defs/RoomPkg"
+   },
+   "title": "Rooms",
+   "type": "array"
+  },
+  "not_exported": {
+   "items": {
+    "$ref": "#/$defs/NotExported"
+   },
+   "title": "Not Exported",
+   "type": "array"
+  }
+ },
+ "required": [
+  "manifest",
+  "levels",
+  "wall_types",
+  "walls",
+  "openings",
+  "floors",
+  "columns",
+  "stacks",
+  "rooms",
+  "not_exported"
+ ],
+ "title": "RevitPackage",
+ "type": "object"
+}

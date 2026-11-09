@@ -43,6 +43,10 @@ class Params(BaseModel):
     # между петлями отличается от раскрытия не больше чем на double_door_hinge_tol_mm.
     pair_opening_tol_mm: float = 2.0
     double_door_hinge_tol_mm: float = 200.0
+    # Шумный лист: проёмов без хозяина не меньше этого числа и не меньше этой доли от всех проёмов
+    # листа. Пороги прототипа, по эталону не подбирались.
+    noise_unhosted_min: int = 100
+    noise_unhosted_share: float = 0.5
 
     # --- этажи, плиты, помещения ---
     level_height_mm: float = 3300.0
