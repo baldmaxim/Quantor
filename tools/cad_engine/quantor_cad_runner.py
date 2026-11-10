@@ -40,7 +40,9 @@ import subprocess
 import sys
 import time
 import zipfile
+from collections import Counter
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -82,6 +84,12 @@ PROGRESS_POLL_S = 0.25
 # Предпросмотр DXF: кривые спрямляются с этой точностью, объём ограничен.
 PREVIEW_FLATTEN_MM = 5.0
 PREVIEW_MAX_POINTS = 250_000
+# Свойства чертежа в заголовке DXF ($CUSTOMPROPERTYTAG/$CUSTOMPROPERTY; AutoCAD: DWGPROPS → Custom).
+DXF_PROP_PREFIX = "QUANTOR_"
+DXF_PROP_VALUE_MAX = 255
+MM_PER_PAPER_POINT = 25.4 / 72  # 1 pt PDF на бумаге, мм
+SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+SAFE_ID = re.compile(r"^[0-9A-Za-z._-]{1,64}$")
 
 
 class RunnerError(Exception):
@@ -467,6 +475,132 @@ def _dxf_summary(path: Path) -> dict[str, Any]:
     return {"dxf_version": document.dxfversion, "entities": entities, "audit_errors": errors}
 
 
+# ------------------------------------------------------------------ свойства чертежа в DXF
+
+
+def _prop_text(value: Any) -> str | None:
+    """Значение свойства: одна строка без управляющих символов и путей, не длиннее 255."""
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(PATH_LIKE.sub("…", value).split())
+    return cleaned[:DXF_PROP_VALUE_MAX] or None
+
+
+def _prop_number(value: Any) -> str | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    return format(value, ".8g")
+
+
+def _prop_count(value: Any) -> str | None:
+    if type(value) is int and value >= 0:
+        return str(value)
+    return str(len(value)) if isinstance(value, list) else None
+
+
+def _prop_flag(value: Any) -> str | None:
+    return None if not isinstance(value, bool) else ("true" if value else "false")
+
+
+def _positive(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if math.isfinite(value) and value > 0 else None
+
+
+def _prop_ratio(denominator: float) -> str:
+    rounded = round(denominator, 2)
+    return f"1:{int(rounded) if rounded == int(rounded) else rounded}"
+
+
+def build_dxf_properties(*, page: int, view: int, scale: dict[str, Any], cad_checks: dict[str, Any],
+                         context: dict[str, str], generated_at: datetime | None = None
+                         ) -> list[tuple[str, str]]:
+    """Свойства DXF по данным runner: масштаб и проверки движка, происхождение попытки.
+
+    `page` — pdf_page с 1 (как в имени папки вида). Отсутствующие поля пропускаются; в значения
+    попадают только числа, флаги, короткие коды и хеши, без путей и секретов.
+    """
+    source = scale.get("source")
+    operator = scale.get("operator_mm_per_pt") if source == SCALE_SOURCE_OPERATOR else None
+    factor = _positive(operator if operator is not None else scale.get("mm_per_pdf_point_fitted"))
+    labels = scale.get("printed_scale_labels")
+    printed = ", ".join(_prop_ratio(x) for x in map(_positive, labels) if x is not None) \
+        if isinstance(labels, list) else None
+    fitted = _positive(scale.get("scale_denominator_fitted"))
+    origin = cad_checks.get("origin_pdf_display_pt")
+    origin_text = None
+    if isinstance(origin, list) and len(origin) == 2 and all(_prop_number(c) for c in origin):
+        origin_text = f"{_prop_number(origin[0])}, {_prop_number(origin[1])}"
+    moment = (generated_at or datetime.now(UTC)).astimezone(UTC)
+    job_id, source_sha = context.get("job_id", ""), context.get("source_sha256", "")
+    candidates: list[tuple[str, str | None]] = [
+        ("JOB_ID", job_id if SAFE_ID.match(job_id) else None),
+        ("PAGE_INDEX", str(page - 1)),
+        ("PAGE_NUMBER", str(page)),
+        ("VIEW", str(view)),
+        ("SOURCE_PDF_SHA256", source_sha if SHA256_HEX.match(source_sha) else None),
+        ("SCALE_METHOD", _prop_text(scale.get("method"))),
+        ("SCALE", _prop_ratio(factor / MM_PER_PAPER_POINT) if factor else None),
+        ("MM_PER_PDF_POINT", _prop_number(factor)),
+        ("SCALE_SOURCE", _prop_text(source)),
+        ("SCALE_FITTED", _prop_ratio(fitted) if fitted else None),
+        ("MM_PER_PDF_POINT_FITTED", _prop_number(scale.get("mm_per_pdf_point_fitted"))),
+        ("PRINTED_SCALE", printed or None),
+        ("PRINTED_SCALE_CONSISTENT", _prop_flag(scale.get("printed_scale_consistent"))),
+        ("SCALE_STATUS", _prop_text(scale.get("status"))),
+        ("SCALE_DEVIATION", _prop_number(scale.get("deviation"))),
+        ("FIT_CONTROLS", _prop_count(scale.get("fit_controls"))),
+        ("CHECK_CONTROLS", _prop_count(scale.get("heldout_controls"))),
+        ("FIT_CHAINS", _prop_count(scale.get("fit_chains"))),
+        ("CHECK_CHAINS", _prop_count(scale.get("heldout_chains"))),
+        ("INDEPENDENT_AXES", _prop_flag(scale.get("independent_axes"))),
+        ("BINDING_CONFLICTS", _prop_count(scale.get("anchored_conflicts"))),
+        ("UNBOUND_LABELS", _prop_count(scale.get("unassociated_numeric_labels"))),
+        ("RELEASE_ALLOWED", _prop_flag(scale.get("release_allowed"))),
+        ("DXF_UNITS", _prop_text(cad_checks.get("units"))),
+        ("ORIGIN_PDF_PT", origin_text),
+        ("ENGINE_VERSION", _prop_text(context.get("engine_version"))),
+        ("ENGINE_COMMIT", _prop_text(context.get("engine_commit"))),
+        ("RUNNER_VERSION", _prop_text(context.get("runner_version"))),
+        ("GENERATED_AT", moment.strftime("%Y-%m-%dT%H:%M:%SZ")),
+    ]
+    return [(DXF_PROP_PREFIX + name, value) for name, value in candidates if value]
+
+
+def _dxf_profile(path: Path) -> tuple[str, int, Counter[str]]:
+    """Версия DXF, число ошибок аудита и состав модели - для сверки до и после записи свойств."""
+    from ezdxf.filemanagement import readfile  # окружение движка
+
+    document = readfile(path)
+    types = Counter(entity.dxftype() for entity in document.modelspace())
+    return document.dxfversion, len(document.audit().errors), types
+
+
+def embed_dxf_properties(path: Path, properties: list[tuple[str, str]]) -> None:
+    """Пишет свойства в заголовок DXF и атомарно подменяет файл.
+
+    Вызывается до подсчёта SHA256 и размера: все хеши и манифест строятся по итоговому файлу.
+    Прежние свойства `QUANTOR_*` заменяются. Версия DXF, результат аудита и состав модели
+    после записи обязаны совпасть с исходными, иначе - отказ.
+    """
+    from ezdxf.filemanagement import readfile  # окружение движка
+
+    before = _dxf_profile(path)
+    document = readfile(path)
+    custom = document.header.custom_vars
+    custom.properties[:] = [row for row in custom.properties
+                            if not row[0].startswith(DXF_PROP_PREFIX)]
+    for tag, value in properties:
+        custom.append(tag, value)
+    temporary = path.with_name(path.name + ".tmp")
+    document.saveas(temporary)
+    os.replace(temporary, path)
+    after = _dxf_profile(path)
+    if after != before:
+        raise RunnerError(EXIT_ENGINE, "gate_violation", "запись свойств изменила содержимое DXF")
+
+
 def _preview(dxf: Path, rel: str) -> dict[str, Any]:
     """Геометрия DXF для просмотра: полилинии по слоям в мм системы DXF, без текста.
 
@@ -519,8 +653,13 @@ def _preview(dxf: Path, rel: str) -> dict[str, Any]:
 
 
 def collect(attempt: Path, out: Path, inventory: dict[str, Any], exit_code: int,
-            log_text: str) -> tuple[str, dict[str, Any] | None, list[dict[str, Any]]]:
-    """Перенос опубликованных worker'ом файлов в out/ с гейтами. Возвращает статус, ошибку, страницы."""
+            log_text: str, context: dict[str, str] | None = None,
+            ) -> tuple[str, dict[str, Any] | None, list[dict[str, Any]]]:
+    """Перенос опубликованных worker'ом файлов в out/ с гейтами. Возвращает статус, ошибку, страницы.
+
+    `context` - происхождение попытки для свойств DXF (job_id, source_sha256, engine_*,
+    runner_version).
+    """
     if list(attempt.rglob("*.dwg")):
         raise RunnerError(EXIT_ENGINE, "gate_violation", "движок выдал DWG")
     events_path = attempt / "events.json"
@@ -593,6 +732,15 @@ def collect(attempt: Path, out: Path, inventory: dict[str, Any], exit_code: int,
                     raise RunnerError(EXIT_ENGINE, "gate_violation", "активен запрещённый режим движка")
                 shutil.copyfile(checks_src, out / folder_rel / CHECKS_NAME)
                 view["files"].append(f"{folder_rel}/{CHECKS_NAME}")
+                # Свойства чертежа пишутся в DXF до сводки и предпросмотра: SHA256 и размер
+                # (preview.json, manifest.json) считаются уже по итоговому файлу.
+                checks_cad_file = out / folder_rel / "cad_checks.json"
+                cad_checks = (json.loads(checks_cad_file.read_bytes())
+                              if checks_cad_file.is_file() else {})
+                embed_dxf_properties(dxf, build_dxf_properties(
+                    page=page_entry["legacy_pdf_page"], view=view["view"], scale=scale,
+                    cad_checks=cad_checks if isinstance(cad_checks, dict) else {},
+                    context=context or {}))
                 view["dxf"] = {"file": f"{folder_rel}/plan_candidates.dxf", **_dxf_summary(dxf)}
                 write_json(out / folder_rel / "preview.json",
                            _preview(dxf, f"{folder_rel}/plan_candidates.dxf"))
@@ -694,7 +842,10 @@ def run(args: argparse.Namespace) -> int:
             if sha256_file(job_dir / "input.pdf") != source_sha:
                 raise RunnerError(EXIT_ENGINE, "gate_violation", "worker изменил входной PDF")
             log_text = log_path.read_text(encoding="utf-8", errors="replace")
-            status, error, page_rows = collect(attempt, out, inventory, code, log_text)
+            origin = {"source_sha256": source_sha, "engine_version": pins["engine"]["version"],
+                      "engine_commit": pins["engine"]["repo_ref"],
+                      "runner_version": pins["runner_version"], "job_id": args.job_id or ""}
+            status, error, page_rows = collect(attempt, out, inventory, code, log_text, origin)
             report.update(status=status, error=error, pages=page_rows,
                           requested_pages=[{"index": quantor_index(p), "legacy_pdf_page": p}
                                            for p in pages],
@@ -773,6 +924,7 @@ def main(argv: list[str] | None = None) -> int:
         execute.add_argument(name, type=Path, required=True)
     execute.add_argument("--expect-archive-sha256")
     execute.add_argument("--progress", type=Path, default=None)
+    execute.add_argument("--job-id", default=None, help="id задания Quantor для свойств DXF")
     synth = commands.add_parser("fixture", help="синтетический PDF штатным генератором архива")
     synth.add_argument("--archive", type=Path, required=True)
     synth.add_argument("--kind", choices=sorted(FIXTURES), required=True)

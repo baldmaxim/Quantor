@@ -6,7 +6,6 @@ import {
   requestedPagesLabel,
   secondsSince,
   serverOffsetMs,
-  togglePage,
   viewLabel,
 } from './format';
 
@@ -15,11 +14,6 @@ describe('страницы', () => {
     expect(viewLabel(2, 2)).toBe('Стр. 3 · вид 2');
     expect(requestedPagesLabel(null)).toBe('все плановые');
     expect(requestedPagesLabel([2, 0])).toBe('стр. 1, 3');
-  });
-
-  it('выбор страниц сохраняет порядок', () => {
-    expect(togglePage([0, 4], 2)).toEqual([0, 2, 4]);
-    expect(togglePage([0, 2, 4], 2)).toEqual([0, 4]);
   });
 });
 

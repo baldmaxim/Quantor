@@ -7,9 +7,11 @@ ezdxf-часть (`_dxf_summary`, `_preview`) подменяется заглу�
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -184,11 +186,19 @@ def _attempt(
 
 
 @pytest.fixture
-def stubbed(runner: ModuleType, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+def embedded() -> list[list[tuple[str, str]]]:
+    return []
+
+
+@pytest.fixture
+def stubbed(
+    runner: ModuleType, monkeypatch: pytest.MonkeyPatch, embedded: list[list[tuple[str, str]]]
+) -> ModuleType:
     monkeypatch.setattr(
         runner, "_dxf_summary", lambda path: {"dxf_version": "AC1032", "entities": 3}
     )
     monkeypatch.setattr(runner, "_preview", lambda dxf, rel: {"schema": runner.PREVIEW_SCHEMA})
+    monkeypatch.setattr(runner, "embed_dxf_properties", lambda path, props: embedded.append(props))
     return runner
 
 
@@ -343,3 +353,127 @@ def test_failure_and_intake_hint_reach_the_job_result() -> None:
         }
     )
     assert legacy.intake_selected is None and legacy.views[0].failure_code is None
+
+
+# ------------------------------------------------------------------ свойства чертежа в DXF
+
+SCALE_RAW: dict[str, Any] = {
+    "status": "needs_review",
+    "source": "operator_calibration",
+    "method": "dimension_chain_fit",
+    "operator_mm_per_pt": 70.5556,
+    "dimension_mm_per_pt": 68.9,
+    "mm_per_pdf_point_fitted": 68.9,
+    "scale_denominator_fitted": 195.3,
+    "deviation": 0.023,
+    "printed_scale_labels": [200, 100],
+    "printed_scale_consistent": True,
+    "fit_controls": 4,
+    "heldout_controls": 2,
+    "fit_chains": 3,
+    "heldout_chains": 1,
+    "independent_axes": True,
+    "anchored_conflicts": [{"a": 1}],
+    "unassociated_numeric_labels": [],
+    "release_allowed": False,
+}
+SHA = "ab" * 32
+CONTEXT = {
+    "job_id": "5f1c0f1e-0000-4000-8000-000000000001",
+    "source_sha256": SHA,
+    "engine_version": "2026.11.10+e37b347ff1a4",
+    "engine_commit": "c10110fea15f95fb9e4ce7bed44e298dca2cadbf",
+    "runner_version": "0.1.0",
+}
+CHECKS_RAW = {"units": "mm", "origin_pdf_display_pt": [12.5, 40.0]}
+
+
+def test_dxf_properties_cover_scale_and_origin(runner: ModuleType) -> None:
+    moment = datetime(2026, 11, 10, 12, 30, tzinfo=UTC)
+    props = dict(
+        runner.build_dxf_properties(
+            page=3,
+            view=1,
+            scale=SCALE_RAW,
+            cad_checks=CHECKS_RAW,
+            context=CONTEXT,
+            generated_at=moment,
+        )
+    )
+    assert props["QUANTOR_JOB_ID"] == CONTEXT["job_id"]
+    assert (props["QUANTOR_PAGE_INDEX"], props["QUANTOR_PAGE_NUMBER"]) == ("2", "3")
+    assert props["QUANTOR_SOURCE_PDF_SHA256"] == SHA
+    assert props["QUANTOR_SCALE"] == "1:200"  # масштаб оператора 70.5556 мм/pt
+    assert props["QUANTOR_MM_PER_PDF_POINT"] == "70.5556"
+    assert props["QUANTOR_SCALE_FITTED"] == "1:195.3"
+    assert props["QUANTOR_PRINTED_SCALE"] == "1:200, 1:100"
+    assert props["QUANTOR_SCALE_STATUS"] == "needs_review"
+    assert props["QUANTOR_SCALE_DEVIATION"] == "0.023"
+    assert (props["QUANTOR_FIT_CONTROLS"], props["QUANTOR_CHECK_CONTROLS"]) == ("4", "2")
+    assert (props["QUANTOR_FIT_CHAINS"], props["QUANTOR_CHECK_CHAINS"]) == ("3", "1")
+    assert props["QUANTOR_INDEPENDENT_AXES"] == "true"
+    assert (props["QUANTOR_BINDING_CONFLICTS"], props["QUANTOR_UNBOUND_LABELS"]) == ("1", "0")
+    assert props["QUANTOR_RELEASE_ALLOWED"] == "false"
+    assert props["QUANTOR_DXF_UNITS"] == "mm" and props["QUANTOR_ORIGIN_PDF_PT"] == "12.5, 40"
+    assert props["QUANTOR_ENGINE_COMMIT"] == CONTEXT["engine_commit"]
+    assert props["QUANTOR_GENERATED_AT"] == "2026-11-10T12:30:00Z"
+    assert all(len(v) <= 255 and "\n" not in v for v in props.values())
+
+
+def test_dxf_properties_skip_absent_fields_and_bad_values(runner: ModuleType) -> None:
+    props = dict(
+        runner.build_dxf_properties(
+            page=1,
+            view=1,
+            scale={"status": "passed", "deviation": float("nan")},
+            cad_checks={},
+            context={"job_id": "../etc/passwd", "source_sha256": "zz"},
+        )
+    )
+    assert set(props) == {
+        "QUANTOR_PAGE_INDEX",
+        "QUANTOR_PAGE_NUMBER",
+        "QUANTOR_VIEW",
+        "QUANTOR_SCALE_STATUS",
+        "QUANTOR_GENERATED_AT",
+    }
+
+
+def test_collect_passes_properties_before_dxf_summary(
+    stubbed: ModuleType, embedded: list[list[tuple[str, str]]], tmp_path: Path
+) -> None:
+    attempt, out, inventory = _attempt(tmp_path, {"status": "passed", "source": "dimension_chains"})
+    (attempt / "PDF_001_Вид_01" / "Контроль_CAD.json").write_text(
+        json.dumps(CHECKS_RAW), encoding="utf-8"
+    )
+    stubbed.collect(attempt, out, inventory, 0, "", CONTEXT)
+    [props] = embedded
+    assert dict(props)["QUANTOR_DXF_UNITS"] == "mm"
+    assert dict(props)["QUANTOR_JOB_ID"] == CONTEXT["job_id"]
+
+
+def test_embed_dxf_properties_roundtrip_keeps_version_and_geometry(
+    runner: ModuleType, tmp_path: Path
+) -> None:
+    ezdxf = pytest.importorskip("ezdxf")
+    path = tmp_path / "plan.dxf"
+    document = ezdxf.new("R2018")
+    document.header.custom_vars.append("QUANTOR_OLD", "stale")
+    document.header.custom_vars.append("OTHER", "keep")
+    document.modelspace().add_line((0, 0), (1000, 0))
+    document.modelspace().add_lwpolyline([(0, 0), (1000, 0), (1000, 500)], close=True)
+    document.saveas(path)
+    props = runner.build_dxf_properties(
+        page=1, view=1, scale=SCALE_RAW, cad_checks=CHECKS_RAW, context=CONTEXT
+    )
+    for _ in range(2):  # повторная запись заменяет, а не дублирует
+        runner.embed_dxf_properties(path, props)
+    reread = ezdxf.readfile(path)
+    assert reread.dxfversion == "AC1032"
+    stored = dict(reread.header.custom_vars)
+    assert stored["QUANTOR_SCALE"] == "1:200" and stored["QUANTOR_JOB_ID"] == CONTEXT["job_id"]
+    assert stored["OTHER"] == "keep" and "QUANTOR_OLD" not in stored
+    assert len(reread.header.custom_vars) == len(props) + 1
+    assert [e.dxftype() for e in reread.modelspace()] == ["LINE", "LWPOLYLINE"]
+    assert len(reread.audit().errors) == 0
+    assert runner.sha256_file(path) == hashlib.sha256(path.read_bytes()).hexdigest()

@@ -4,7 +4,6 @@ import { useState, type FC } from 'react';
 
 import { CadJobList } from '@/components/cad/CadJobList';
 import { CadSheetPicker } from '@/components/cad/CadSheetPicker';
-import { CadSourcePicker } from '@/components/cad/CadSourcePicker';
 import { CadTabs, type ICadTab } from '@/components/cad/CadTabs';
 
 import type { IWorkspaceCadLeftProps } from './types';
@@ -17,10 +16,10 @@ const LEFT_TABS: readonly ICadTab<LeftTab>[] = [
 ];
 
 /**
- * Левая панель вкладки CAD: листы ревизии (выбор, калибровка, запуск, результат) и задания.
+ * Левая панель вкладки CAD: листы ревизии и задания.
  *
- * Клик по листу переводит рабочую область на него. Источник PDF - загрузка нового файла или
- * другой PDF проекта - свёрнут в строку: ревизия в основном уже открыта в рабочей области.
+ * Клик по листу переводит рабочую область на него; преобразование листа запускается в правой
+ * панели. Исходный PDF выбирают в рабочей области, здесь его нет.
  */
 export const WorkspaceCadLeft: FC<IWorkspaceCadLeftProps> = ({
   projectId,
@@ -29,8 +28,6 @@ export const WorkspaceCadLeft: FC<IWorkspaceCadLeftProps> = ({
   selectedJobId,
   onOpenSheet,
   onSelectJob,
-  onJobCreated,
-  onSourceSelect,
 }) => {
   const [tab, setTab] = useState<LeftTab>('sheets');
 
@@ -39,19 +36,6 @@ export const WorkspaceCadLeft: FC<IWorkspaceCadLeftProps> = ({
       className="flex min-w-0 flex-col gap-[var(--s-4)] p-[var(--s-4)]"
       data-testid="workspace-cad-left"
     >
-      <details className="rounded-[var(--radius-md)] border border-border">
-        <summary className="flex min-h-[44px] cursor-pointer items-center px-[var(--s-5)] text-sm">
-          Исходный PDF: загрузить или выбрать
-        </summary>
-        <div className="p-[var(--s-3)]">
-          <CadSourcePicker
-            projectId={projectId}
-            selectedRevisionId={revisionId}
-            onSelect={onSourceSelect}
-          />
-        </div>
-      </details>
-
       <CadTabs
         bare
         idPrefix="ws-cad-left"
@@ -60,14 +44,13 @@ export const WorkspaceCadLeft: FC<IWorkspaceCadLeftProps> = ({
         active={tab}
         onChange={setTab}
       >
-        {/* Листы не размонтируются при переключении: иначе сбросится выбор отмеченных. */}
+        {/* Листы не размонтируются при переключении: список не перечитывается заново. */}
         <div hidden={tab !== 'sheets'}>
           <CadSheetPicker
             // Ключ по ревизии: выбор листов другого документа не переиспользуется.
             key={`sheets:${revisionId}`}
             projectId={projectId}
             revisionId={revisionId}
-            onJobCreated={onJobCreated}
             activePage={activePage}
             onOpenSheet={onOpenSheet}
           />

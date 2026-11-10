@@ -390,6 +390,8 @@ async def execute_cad_pdf_convert(
                 str(out),
                 "--progress",
                 str(progress_path),
+                "--job-id",
+                str(job.id),
             ),
             limit_seconds=float(settings.cad_total_timeout_seconds + _GRACE_SECONDS),
             poll_interval=settings.worker_heartbeat_interval_seconds,

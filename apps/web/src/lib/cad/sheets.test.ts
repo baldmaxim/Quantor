@@ -3,13 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import { cadErrorText } from './errors';
 import {
-  MAX_CAD_PAGES,
   calibrationPagesOf,
   canLaunchCad,
   hasDefaultCalibration,
   missingCalibrationPages,
   sheetWorkspaceHref,
-  toggleSheetPage,
   type SheetCalibrationState,
 } from './sheets';
 
@@ -19,18 +17,6 @@ const calibration = (isDefault: boolean) => ({ is_default: isDefault }) as Scale
 describe('выбор листов', () => {
   it('по умолчанию ничего не выбрано - запуск закрыт', () => {
     expect(canLaunchCad([], states([[0, 'calibrated']]))).toBe(false);
-  });
-
-  it('выбор добавляется, снимается и остаётся упорядоченным', () => {
-    expect(toggleSheetPage([], 3)).toEqual([3]);
-    expect(toggleSheetPage([3], 1)).toEqual([1, 3]);
-    expect(toggleSheetPage([1, 3], 3)).toEqual([1]);
-  });
-
-  it('больше 50 листов выбрать нельзя, снять можно', () => {
-    const full = Array.from({ length: MAX_CAD_PAGES }, (_, index) => index);
-    expect(toggleSheetPage(full, 99)).toEqual(full);
-    expect(toggleSheetPage(full, 0)).toHaveLength(MAX_CAD_PAGES - 1);
   });
 
   it('действующая калибровка - только is_default', () => {

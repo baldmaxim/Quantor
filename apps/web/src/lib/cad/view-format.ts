@@ -20,9 +20,6 @@ export const formatNumber = (
 
 export const formatInt = (value: number | null | undefined): string => formatNumber(value, 0);
 
-export const formatBool = (value: boolean | null | undefined): string =>
-  value === null || value === undefined ? NO_VALUE : value ? 'да' : 'нет';
-
 /** «1:100» из знаменателя масштаба; без знаменателя - «—». */
 export const formatScaleDenominator = (value: number | null | undefined): string =>
   value === null || value === undefined || !Number.isFinite(value) || value <= 0
@@ -38,25 +35,6 @@ export const scaleDenominatorFromMmPerPt = (mmPerPt: number | null | undefined):
 /** «1:100» из мм на точку PDF; без значения - «—». */
 export const formatScaleFromMmPerPt = (mmPerPt: number | null | undefined): string =>
   formatScaleDenominator(scaleDenominatorFromMmPerPt(mmPerPt));
-
-export type ScaleStatusTone = 'success' | 'warning' | 'danger' | 'neutral';
-
-/** Статус масштаба вида словами: passed / needs_review / failed; незнакомый - как есть. */
-export const scaleStatusInfo = (
-  status: string | null | undefined,
-): { label: string; tone: ScaleStatusTone } => {
-  if (status === 'passed') return { label: 'подтверждена', tone: 'success' };
-  if (status === 'needs_review') return { label: 'требует проверки', tone: 'warning' };
-  if (status === 'failed') return { label: 'отклонена', tone: 'danger' };
-  return { label: status ?? NO_VALUE, tone: 'neutral' };
-};
-
-/** Источник масштаба вида: калибровка человека или подбор по размерным цепочкам. */
-export const scaleSourceLabel = (source: string | null | undefined): string => {
-  if (source === 'operator_calibration') return 'Калибровка человека';
-  if (source === 'dimension_chains') return 'Размерные цепочки';
-  return source ?? NO_VALUE;
-};
 
 /** Отклонение от размерных цепочек: движок отдаёт долю (0,023), показываем проценты. */
 export const formatDeviationPercent = (deviation: number | null | undefined): string =>

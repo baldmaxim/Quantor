@@ -8,7 +8,8 @@ import { queryKeys, unwrap } from '@/lib/queries';
 import { hasDefaultCalibration, type SheetCalibrationState } from './sheets';
 
 /**
- * Состояние калибровки каждого листа: страница PDF (индекс с 0) -> состояние.
+ * Состояние калибровки переданных листов: страница PDF (индекс с 0) -> состояние. Передавайте
+ * только нужные листы (открытый в рабочей области): запрос идёт на каждый лист.
  *
  * Читает те же калибровки листа (ADR-0018) и под тем же ключом, что рабочая область, поэтому
  * калибровка, созданная в просмотрщике, видна здесь после возврата. Список калибровок закрыт
@@ -16,7 +17,7 @@ import { hasDefaultCalibration, type SheetCalibrationState } from './sheets';
  * не шлются.
  */
 export const useSheetCalibrationStates = (
-  sheets: readonly SheetRead[],
+  sheets: readonly Pick<SheetRead, 'id' | 'page_index'>[],
   enabled: boolean,
 ): ReadonlyMap<number, SheetCalibrationState> =>
   useQueries({

@@ -23,26 +23,18 @@ describe('непрозрачность PDF', () => {
 });
 
 describe('режим показа', () => {
-  it('DXF можно показать - выбранный режим сохраняется', () => {
-    expect(resolveCadMode('overlay', true)).toBe('overlay');
-    expect(resolveCadMode('cad', true)).toBe('cad');
-    expect(resolveCadMode('pdf', true)).toBe('pdf');
+  it('DXF можно показать - наложение', () => {
+    expect(resolveCadMode(true)).toBe('overlay');
   });
 
   it('DXF показать нельзя - только PDF', () => {
-    expect(resolveCadMode('overlay', false)).toBe('pdf');
-    expect(resolveCadMode('cad', false)).toBe('pdf');
+    expect(resolveCadMode(false)).toBe('pdf');
   });
 });
 
 describe('что рисуется на холсте', () => {
   it('вкладка CAD, «PDF»: подложка целиком, DXF скрыт', () => {
     expect(cadRender('pdf', 0.4, true)).toEqual({ dxfVisible: false, pdfOpacity: 1 });
-  });
-
-  it('вкладка CAD, «CAD»: подложка скрыта независимо от ползунка, DXF виден', () => {
-    expect(cadRender('cad', 0.4, true)).toEqual({ dxfVisible: true, pdfOpacity: 0 });
-    expect(cadRender('cad', 1, true)).toEqual({ dxfVisible: true, pdfOpacity: 0 });
   });
 
   it('вкладка CAD, «Наложение»: подложка с непрозрачностью ползунка, DXF виден', () => {
@@ -52,7 +44,6 @@ describe('что рисуется на холсте', () => {
 
   it('другие вкладки: подложка всегда целиком (на ней ведут обмер), DXF по режиму', () => {
     expect(cadRender('overlay', 0.2, false)).toEqual({ dxfVisible: true, pdfOpacity: 1 });
-    expect(cadRender('cad', 0.2, false)).toEqual({ dxfVisible: true, pdfOpacity: 1 });
     expect(cadRender('pdf', 0.2, false)).toEqual({ dxfVisible: false, pdfOpacity: 1 });
   });
 });

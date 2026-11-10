@@ -12,12 +12,6 @@ const mount = (patch: Partial<IWorkspaceCadBarProps> = {}) => {
     views: [1],
     view: 1,
     onViewChange: vi.fn(),
-    mode: 'overlay',
-    dxfAvailable: true,
-    dxfReason: null,
-    onModeChange: vi.fn(),
-    onZoomIn: vi.fn(),
-    onZoomOut: vi.fn(),
     onFit: vi.fn(),
     notices: [],
     loading: false,
@@ -28,45 +22,28 @@ const mount = (patch: Partial<IWorkspaceCadBarProps> = {}) => {
 };
 
 describe('WorkspaceCadBar', () => {
-  it('заголовок вида, режимы PDF / CAD / Наложение и масштаб', () => {
+  it('заголовок вида и «Вписать»; переключателя режимов и кнопок +/− нет', () => {
     mount();
     expect(screen.getByText(/Стр\. 1 · вид 1/)).toBeInTheDocument();
-    const modes = screen.getByRole('group', { name: 'Что показывать' });
-    expect(modes).toHaveTextContent('PDF');
-    expect(modes).toHaveTextContent('CAD');
-    expect(modes).toHaveTextContent('Наложение');
-    expect(screen.getByRole('button', { name: 'Наложение' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'Вписать' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Что показывать' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'PDF' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'CAD' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Наложение' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Увеличить' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Уменьшить' })).toBeNull();
   });
 
-  it('режим меняется кликом', () => {
+  it('«Вписать» идёт в камеру рабочей области', () => {
     const props = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'CAD' }));
-    expect(props.onModeChange).toHaveBeenCalledWith('cad');
-  });
-
-  it('кнопки масштаба идут в камеру рабочей области', () => {
-    const props = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Увеличить' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Уменьшить' }));
     fireEvent.click(screen.getByRole('button', { name: 'Вписать' }));
-    expect(props.onZoomIn).toHaveBeenCalledTimes(1);
-    expect(props.onZoomOut).toHaveBeenCalledTimes(1);
     expect(props.onFit).toHaveBeenCalledTimes(1);
   });
 
-  it('DXF накладывать нельзя: CAD и наложение закрыты, причина в подсказке и в строке', () => {
+  it('DXF накладывать нельзя: причина в строке предупреждений', () => {
     mount({
-      mode: 'pdf',
-      dxfAvailable: false,
-      dxfReason: 'Кадр координат не подтверждён: DXF не накладывается.',
       notices: [{ tone: 'note', text: 'Кадр координат не подтверждён: DXF не накладывается.' }],
     });
-    expect(screen.getByRole('button', { name: 'CAD' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Наложение' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'PDF' })).toBeEnabled();
     expect(screen.getByRole('note')).toHaveTextContent('Кадр координат не подтверждён');
   });
 

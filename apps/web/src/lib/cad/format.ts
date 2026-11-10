@@ -110,11 +110,3 @@ export const formatTime = (iso: string | null | undefined): string => {
     second: '2-digit',
   }).format(value);
 };
-
-/** Добавляет или убирает страницу в выборе, сохраняя порядок по возрастанию. */
-export const togglePage = (selected: readonly number[], index: number): number[] => {
-  const next = selected.includes(index)
-    ? selected.filter((item) => item !== index)
-    : [...selected, index];
-  return next.sort((a, b) => a - b);
-};

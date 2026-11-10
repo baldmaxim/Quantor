@@ -3,32 +3,34 @@
 import type { CadScaleRead } from '@quantor/api-client';
 import type { FC } from 'react';
 
-import { Field, InspectorSection, StatusBadge } from '@/components/ui';
+import { InspectorSection, StatusBadge } from '@/components/ui';
 import {
-  formatBool,
   formatDeviationPercent,
-  formatInt,
-  formatNumber,
   formatScaleDenominator,
   formatScaleFromMmPerPt,
   NO_VALUE,
-  scaleSourceLabel,
-  scaleStatusInfo,
 } from '@/lib/cad/view-format';
-
-import { CadControlsTable } from './CadControlsTable';
 
 interface ICadScaleSectionProps {
   scale: CadScaleRead | null;
 }
 
-const LIST = 'grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-x-[var(--s-5)] gap-y-[var(--s-3)]';
+/** «1:N»: при калибровке человека - из неё, иначе - масштаб, подобранный движком. */
+const scaleText = (scale: CadScaleRead): string => {
+  const fromCalibration = formatScaleFromMmPerPt(scale.operator_mm_per_pt ?? scale.mm_per_pdf_point);
+  const fromEngine = formatScaleDenominator(scale.scale_denominator);
+  const text = scale.source ? fromCalibration : fromEngine;
+  if (text !== NO_VALUE) return text;
+  return fromCalibration !== NO_VALUE ? fromCalibration : fromEngine;
+};
 
-/**
- * Диагностика масштаба: подбор по размерным цепочкам и независимая проверка.
- * Напечатанный масштаб (`М 1:100`) один масштаб не подтверждает - он показан отдельной строкой
- * и только как сопоставление с подобранным.
- */
+/** Причины, по которым масштаб не подтверждён: причины отказа, иначе общая причина. */
+const reasonsOf = (scale: CadScaleRead): readonly string[] => {
+  if (scale.hold_reasons.length > 0) return scale.hold_reasons;
+  return scale.reason ? [scale.reason] : [];
+};
+
+/** Раздел «Масштаб» словами: сам масштаб, подтверждён ли он и отклонение от размерных цепочек. */
 export const CadScaleSection: FC<ICadScaleSectionProps> = ({ scale }) => {
   if (!scale) {
     return (
@@ -38,96 +40,40 @@ export const CadScaleSection: FC<ICadScaleSectionProps> = ({ scale }) => {
     );
   }
 
-  const printed =
-    scale.printed_scale_labels.length > 0
-      ? scale.printed_scale_labels.map((label) => `1:${formatNumber(label, 1)}`).join(', ')
-      : NO_VALUE;
+  const confirmed = scale.passed && scale.hold_reasons.length === 0;
+  const reasons = confirmed ? [] : reasonsOf(scale);
+  const hasDeviation = scale.deviation !== null && scale.deviation !== undefined;
 
   return (
     <InspectorSection
       title="Масштаб"
       aside={
-        <StatusBadge tone={scale.passed ? 'success' : 'warning'} dot={false}>
-          {scale.passed ? 'проверка пройдена' : 'не подтверждён'}
+        <StatusBadge tone={confirmed ? 'success' : 'warning'} dot={false}>
+          {confirmed ? 'подтверждён' : 'не подтверждён'}
         </StatusBadge>
       }
     >
-      <div className="flex min-w-0 flex-col gap-[var(--s-5)]">
-        {scale.hold_reasons.length > 0 ? (
+      <div className="flex min-w-0 flex-col gap-[var(--s-4)]" data-testid="cad-scale-summary">
+        <p className="text-sm font-medium">Масштаб {scaleText(scale)}</p>
+        {hasDeviation && (
+          <p className="text-sm">
+            Отклонение от размерных цепочек: {formatDeviationPercent(scale.deviation)}
+          </p>
+        )}
+        {reasons.length > 0 && (
           <div
             role="alert"
-            className="flex flex-col gap-[var(--s-3)] rounded-[var(--radius-sm)] border border-warning-soft bg-warning-soft px-[var(--s-5)] py-[var(--s-4)]"
+            className="flex flex-col gap-[var(--s-2)] rounded-[var(--radius-sm)] border border-warning-soft bg-warning-soft px-[var(--s-5)] py-[var(--s-4)]"
           >
-            <p className="text-sm font-semibold text-warning">HOLD: масштаб не подтверждён</p>
+            <p className="text-sm font-semibold text-warning">Масштаб не подтверждён</p>
             <ul className="flex list-disc flex-col gap-[var(--s-2)] pl-[var(--s-6)] text-xs [overflow-wrap:anywhere]">
-              {scale.hold_reasons.map((reason) => (
+              {reasons.map((reason) => (
                 <li key={reason}>{reason}</li>
               ))}
             </ul>
           </div>
-        ) : (
-          <p className="text-xs font-medium text-success">Подтверждён размерной проверкой</p>
         )}
-
-        {scale.source && <OperatorScale scale={scale} />}
-
-        <dl className={LIST}>
-          <Field label="Статус">{scale.status}</Field>
-          <Field label="Метод">{scale.method ?? NO_VALUE}</Field>
-          <Field label="мм на точку PDF">{formatNumber(scale.mm_per_pdf_point, 6)}</Field>
-          <Field label="Масштаб">{formatScaleDenominator(scale.scale_denominator)}</Field>
-          <Field label="Напечатанный масштаб">{printed}</Field>
-          <Field label="Совпадает с подобранным">
-            {formatBool(scale.printed_scale_consistent)}
-          </Field>
-          <Field label="Контролей: подбор / проверка">
-            {formatInt(scale.fit_controls)} / {formatInt(scale.heldout_controls)}
-          </Field>
-          <Field label="Цепочек: подбор / проверка">
-            {formatInt(scale.fit_chains)} / {formatInt(scale.heldout_chains)}
-          </Field>
-          <Field label="Цепочки подбора и проверки не пересекаются">
-            {formatBool(scale.fit_and_holdout_chains_disjoint)}
-          </Field>
-          <Field label="Независимые оси">{formatBool(scale.independent_axes)}</Field>
-          <Field label="Конфликтов привязки">{formatInt(scale.anchored_conflicts)}</Field>
-          <Field label="Подписей без цепочки">{formatInt(scale.unassociated_numeric_labels)}</Field>
-          <Field label="Выпуск разрешён движком">{formatBool(scale.release_allowed)}</Field>
-        </dl>
-
-        <CadControlsTable controls={scale.controls} />
       </div>
     </InspectorSection>
-  );
-};
-
-/** Сверка масштаба: чей он, чему равен и насколько расходится с размерными цепочками. */
-const OperatorScale: FC<{ scale: CadScaleRead }> = ({ scale }) => {
-  const status = scaleStatusInfo(scale.status);
-  const operatorMm = scale.operator_mm_per_pt ?? scale.mm_per_pdf_point;
-  // Причина уже может быть в плашке HOLD выше: не повторяем её.
-  const showReason = scale.reason && !scale.hold_reasons.includes(scale.reason);
-
-  return (
-    <div
-      className="flex min-w-0 flex-col gap-[var(--s-4)] rounded-[var(--radius-sm)] border border-border px-[var(--s-5)] py-[var(--s-4)]"
-      data-testid="cad-scale-source"
-    >
-      <div className="flex flex-wrap items-center gap-[var(--s-3)]">
-        <span className="text-sm font-medium">{scaleSourceLabel(scale.source)}</span>
-        <StatusBadge tone={status.tone} dot={false}>
-          {status.label}
-        </StatusBadge>
-      </div>
-      <dl className={LIST}>
-        <Field label="Масштаб">{formatScaleFromMmPerPt(operatorMm)}</Field>
-        <Field label="мм/pt (калибровка)">{formatNumber(operatorMm, 4)}</Field>
-        <Field label="мм/pt (размерные цепочки)">
-          {formatNumber(scale.dimension_mm_per_pt, 4)}
-        </Field>
-        <Field label="Отклонение от цепочек">{formatDeviationPercent(scale.deviation)}</Field>
-      </dl>
-      {showReason && <p className="text-xs [overflow-wrap:anywhere]">{scale.reason}</p>}
-    </div>
   );
 };

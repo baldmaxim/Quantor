@@ -16,17 +16,6 @@ export const hasDefaultCalibration = (
   calibrations: readonly ScaleCalibrationRead[] | undefined,
 ): boolean => calibrations?.some((item) => item.is_default) === true;
 
-/** Добавляет или убирает страницу; сверх предела новая страница не добавляется. */
-export const toggleSheetPage = (selected: readonly number[], pageIndex: number): number[] => {
-  if (selected.includes(pageIndex)) {
-    return selected.filter((item) => item !== pageIndex);
-  }
-  if (selected.length >= MAX_CAD_PAGES) {
-    return [...selected];
-  }
-  return [...selected, pageIndex].sort((a, b) => a - b);
-};
-
 /** Выбранные страницы, у которых калибровки точно нет. */
 export const missingCalibrationPages = (
   selected: readonly number[],

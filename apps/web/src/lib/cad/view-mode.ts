@@ -1,11 +1,12 @@
 /**
- * Режимы показа CAD на листе рабочей области: «PDF», «CAD», «Наложение».
+ * Показ CAD на листе рабочей области: DXF накладывается на подложку PDF («наложение»), а пока
+ * DXF показать нельзя - виден один PDF.
  *
  * Подложка PDF и геометрия DXF - два независимых слоя одной камеры. DXF всегда непрозрачный;
- * прозрачность меняется только у PDF, и только в режиме «Наложение» её задаёт ползунок.
+ * прозрачность меняется только у PDF, и только в наложении её задаёт ползунок.
  */
 
-export type CadViewMode = 'pdf' | 'cad' | 'overlay';
+export type CadViewMode = 'pdf' | 'overlay';
 
 /** Непрозрачность подложки PDF в наложении по умолчанию. */
 export const DEFAULT_PDF_OPACITY = 0.4;
@@ -22,11 +23,11 @@ export const clampPdfOpacity = (value: number): number =>
     : DEFAULT_PDF_OPACITY;
 
 /**
- * Какой режим показан. DXF накладывается на лист только при подтверждённом кадре координат:
- * без него доступен лишь «PDF», как бы ни был выбран режим раньше.
+ * Какой режим показан. DXF накладывается на лист только при подтверждённом кадре координат и
+ * полученном предпросмотре: без них виден один PDF.
  */
-export const resolveCadMode = (picked: CadViewMode, dxfAvailable: boolean): CadViewMode =>
-  dxfAvailable ? picked : 'pdf';
+export const resolveCadMode = (dxfAvailable: boolean): CadViewMode =>
+  dxfAvailable ? 'overlay' : 'pdf';
 
 export interface ICadRender {
   /** Геометрия DXF рисуется. */
@@ -37,12 +38,11 @@ export interface ICadRender {
 
 /**
  * Что показывать на холсте. Вне вкладки CAD подложка всегда полная (на ней ведут обмер), а DXF
- * виден, пока режим не «PDF». На вкладке CAD: «PDF» - DXF скрыт; «CAD» - PDF скрыт, ползунок не
- * трогается; «Наложение» - оба, PDF с непрозрачностью ползунка.
+ * виден, пока режим не «PDF». На вкладке CAD: «PDF» - DXF скрыт; «Наложение» - оба, PDF с
+ * непрозрачностью ползунка.
  */
 export const cadRender = (mode: CadViewMode, sliderOpacity: number, onCadTab: boolean): ICadRender => {
   if (!onCadTab) return { dxfVisible: mode !== 'pdf', pdfOpacity: 1 };
   if (mode === 'pdf') return { dxfVisible: false, pdfOpacity: 1 };
-  if (mode === 'cad') return { dxfVisible: true, pdfOpacity: 0 };
   return { dxfVisible: true, pdfOpacity: clampPdfOpacity(sliderOpacity) };
 };

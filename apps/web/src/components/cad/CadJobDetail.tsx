@@ -3,9 +3,7 @@
 import { useState, type FC } from 'react';
 
 import { CadAttemptSwitcher } from '@/components/cad/CadAttemptSwitcher';
-import { CadJobActions } from '@/components/cad/CadJobActions';
 import { CadPipeline } from '@/components/cad/CadPipeline';
-import { CadResult } from '@/components/cad/CadResult';
 import { ErrorState, SkeletonRows, StatusBadge } from '@/components/ui';
 import { serverOffsetMs } from '@/lib/cad/format';
 import { isActiveStatus, useCadEvents, useCadJob } from '@/lib/cad/queries';
@@ -21,10 +19,9 @@ interface ICadJobDetailProps {
   selectedPage: number | null;
   selectedView: number | null;
   onSelectView: (page: number, view: number) => void;
-  onJobCreated: (jobId: string) => void;
 }
 
-/** Выбранное задание: попытки, ход, действия и итог. Чертёж вида показывает рабочая область. */
+/** Выбранное задание: попытки и ход преобразования. Чертёж вида показывает рабочая область. */
 export const CadJobDetail: FC<ICadJobDetailProps> = ({
   projectId,
   revisionId,
@@ -32,7 +29,6 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
   selectedPage,
   selectedView,
   onSelectView,
-  onJobCreated,
 }) => {
   const query = useCadJob(projectId, revisionId, jobId);
   // Попытка, выбранная вручную; `null` — всегда последняя, в том числе после повтора.
@@ -107,24 +103,6 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
           selectedPage={selectedPage}
           selectedView={shownView}
           onSelectView={onSelectView}
-        />
-      )}
-
-      <CadJobActions
-        projectId={projectId}
-        revisionId={revisionId}
-        job={job}
-        attempt={attempt}
-        onJobCreated={onJobCreated}
-        onRetried={() => setChosenAttempt(null)}
-      />
-
-      {attempt !== null && (
-        <CadResult
-          projectId={projectId}
-          revisionId={revisionId}
-          job={job}
-          attempt={attempt.attempt}
         />
       )}
 

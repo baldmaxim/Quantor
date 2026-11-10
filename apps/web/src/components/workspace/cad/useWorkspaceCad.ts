@@ -19,6 +19,7 @@ import {
   resolveCadMode,
   type CadViewMode,
 } from '@/lib/cad/view-mode';
+import { sheetWorkspaceHref } from '@/lib/cad/sheets';
 import { overlayPaintData } from '@/lib/cad/workspace-cad';
 import { pageForJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { useTheme } from '@/lib/theme';
@@ -42,7 +43,7 @@ interface IUseWorkspaceCadInput {
   revisionId: string | null;
   /** Листы ревизии в порядке рабочей области: позиция листа в адресе - номер с 1. */
   sheets: readonly Pick<SheetRead, 'page_index'>[];
-  sheet: Pick<SheetRead, 'page_index' | 'page_label'> | null;
+  sheet: Pick<SheetRead, 'id' | 'page_index' | 'page_label'> | null;
   /** Размер листа у отрисовщика (pt при масштабе 1); `null` - ещё не известен. */
   page: ViewportSheet | null;
   camera: Camera;
@@ -112,8 +113,6 @@ export const useWorkspaceCad = ({
   }, [theme]);
 
   const setLeftTab = useWorkspaceStore((state) => state.setLeftTab);
-  const picked = useWorkspaceStore((state) => state.cadMode);
-  const setPicked = useWorkspaceStore((state) => state.setCadMode);
   const [sliderOpacity, setSliderOpacity] = useStoredNumber(PDF_OPACITY_KEY, DEFAULT_PDF_OPACITY);
 
   // `?tab=cad` открывает вкладку один раз на значение адреса. Вкладку закрывает флаг в странице,
@@ -139,9 +138,9 @@ export const useWorkspaceCad = ({
   });
   const { diagnostics, preview, frame, params, availability } = data;
 
-  // Режим «CAD» прячет PDF, поэтому честно показывается только когда DXF уже можно нарисовать.
+  // DXF накладывается на PDF, только когда его уже можно нарисовать; иначе виден один PDF.
   const geometryReady = availability?.available === true && preview !== null && frame !== null;
-  const mode: CadViewMode = resolveCadMode(picked, geometryReady);
+  const mode: CadViewMode = resolveCadMode(geometryReady);
   const render = cadRender(mode, sliderOpacity, active);
 
   const pageSize = useMemo(
@@ -170,8 +169,7 @@ export const useWorkspaceCad = ({
     () => (pageSize ? cropToNormalized(cropContext, pageSize) : null),
     [pageSize, cropContext],
   );
-  // Область проверки масштаба лежит на PDF: в режиме «CAD» подложки нет, и рамка не нужна.
-  const cropAvailable = cropRect !== null && mode !== 'cad';
+  const cropAvailable = cropRect !== null;
   const cropColor = colors.crop;
   const crop = useMemo(
     () =>
@@ -226,10 +224,10 @@ export const useWorkspaceCad = ({
   );
 
   // --- переходы: всё в адрес рабочей области ---
+  // Лист вне списка адресуется по индексу страницы (позиция обычно ему равна), а не теряется молча.
+  const positionOf = (target: number): number => sheetPosition(sheets, target) ?? target + 1;
   const goToSheet = (target: number, changes: Record<string, string | null>) => {
-    const position = sheetPosition(sheets, target);
-    if (position === null) return;
-    navigate({ page: String(position), region: null, ...changes });
+    navigate({ page: String(positionOf(target)), region: null, ...changes });
   };
 
   // Задание выбрано (из списка или только что создано): рабочая область встаёт на его лист.
@@ -250,9 +248,6 @@ export const useWorkspaceCad = ({
           onOpenSheet: (target) => goToSheet(target, { job: null, view: null }),
           onSelectJob: (jobId) =>
             openJob(jobId, data.jobs.find((item) => item.job_id === jobId)?.requested_pages ?? null),
-          onJobCreated: (jobId, pages) => openJob(jobId, pages),
-          onSourceSelect: (revision) =>
-            navigate({ revision, page: '1', region: null, job: null, view: null }),
         }
       : null;
 
@@ -280,12 +275,6 @@ export const useWorkspaceCad = ({
           views: data.views,
           view: data.view,
           onViewChange: (next) => navigate({ job: data.jobId, view: String(next) }),
-          mode,
-          dxfAvailable: availability?.available === true,
-          dxfReason: availability?.reason ?? null,
-          onModeChange: setPicked,
-          onZoomIn: () => camera.zoomIn(viewportSize()),
-          onZoomOut: () => camera.zoomOut(viewportSize()),
           onFit: () => page && camera.fitPage(page, viewportSize()),
           notices,
           loading: diagnostics.preview_available && preview === null && data.previewPending,
@@ -309,10 +298,19 @@ export const useWorkspaceCad = ({
         else next.add(index);
         return next;
       }),
+    onSetLayersHidden: (indices, hidden) =>
+      setHiddenLayers((current) => {
+        const next = new Set(current);
+        indices.forEach((index) => {
+          if (hidden) next.add(index);
+          else next.delete(index);
+        });
+        return next;
+      }),
     pdfOpacity: sliderOpacity,
     onPdfOpacityChange: (value) => setSliderOpacity(clampPdfOpacity(value)),
     pdfOpacityActive: mode === 'overlay',
-    cadShown: mode !== 'pdf' && preview !== null,
+    cadShown: mode === 'overlay' && preview !== null,
     previewAvailable: diagnostics?.preview_available === true,
     pointCount: preview ? preview.point_count : null,
     cropAvailable,
@@ -331,12 +329,24 @@ export const useWorkspaceCad = ({
             projectId,
             revisionId,
             jobId: data.jobId,
+            detail: data.job,
+            failed: data.kind === 'failed',
             page: pageIndex,
             view: data.view,
             onSelectView: (target, next) => {
               goToSheet(target, { job: data.jobId, view: String(next) });
             },
-            onJobCreated: (jobId) => openJob(jobId, null),
+          }
+        : null,
+    convert:
+      sheet && revisionId !== null
+        ? {
+            projectId,
+            revisionId,
+            sheetId: sheet.id,
+            pageIndex: sheet.page_index,
+            calibrateHref: sheetWorkspaceHref(projectId, revisionId, positionOf(sheet.page_index) - 1),
+            onJobCreated: (jobId, pages) => openJob(jobId, pages),
           }
         : null,
     viewLoading:

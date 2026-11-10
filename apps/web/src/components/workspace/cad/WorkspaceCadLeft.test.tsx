@@ -4,33 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   picker: vi.fn(),
   list: vi.fn(),
-  source: vi.fn(),
 }));
 
-vi.mock('@/components/cad/CadSourcePicker', () => ({
-  CadSourcePicker: (props: { selectedRevisionId: string | null; onSelect: (id: string) => void }) => {
-    mocks.source(props);
-    return (
-      <button type="button" onClick={() => props.onSelect('r2')}>
-        источник
-      </button>
-    );
-  },
-}));
 vi.mock('@/components/cad/CadSheetPicker', () => ({
   CadSheetPicker: (props: {
     activePage: number | null;
     onOpenSheet: (page: number) => void;
-    onJobCreated: (jobId: string, pages: readonly number[]) => void;
   }) => {
     mocks.picker(props);
     return (
       <div>
         <button type="button" onClick={() => props.onOpenSheet(3)}>
           лист
-        </button>
-        <button type="button" onClick={() => props.onJobCreated('j9', [3])}>
-          запуск
         </button>
       </div>
     );
@@ -52,8 +37,6 @@ import { WorkspaceCadLeft } from './WorkspaceCadLeft';
 const handlers = () => ({
   onOpenSheet: vi.fn(),
   onSelectJob: vi.fn(),
-  onJobCreated: vi.fn(),
-  onSourceSelect: vi.fn(),
 });
 
 const mount = (h = handlers()) => {
@@ -90,12 +73,6 @@ describe('WorkspaceCadLeft', () => {
     expect(h.onOpenSheet).toHaveBeenCalledWith(3);
   });
 
-  it('создание задания передаётся наружу вместе со страницами', () => {
-    const h = mount();
-    fireEvent.click(screen.getByText('запуск'));
-    expect(h.onJobCreated).toHaveBeenCalledWith('j9', [3]);
-  });
-
   it('вкладка «Задания»: список с выбранным заданием, выбор уходит наружу; листы не теряются', () => {
     const h = mount();
     fireEvent.click(screen.getByRole('tab', { name: 'Задания' }));
@@ -109,10 +86,9 @@ describe('WorkspaceCadLeft', () => {
     expect(screen.getByText('лист')).toBeVisible();
   });
 
-  it('источник PDF: выбранная ревизия — текущая, выбор другой уходит наружу', () => {
-    const h = mount();
-    expect(mocks.source.mock.calls.at(-1)?.[0]).toMatchObject({ selectedRevisionId: 'r1' });
-    fireEvent.click(screen.getByText('источник'));
-    expect(h.onSourceSelect).toHaveBeenCalledWith('r2');
+  it('блока «Исходный PDF» нет', () => {
+    mount();
+    expect(screen.queryByText(/Исходный PDF/)).toBeNull();
+    expect(screen.queryByRole('group')).toBeNull();
   });
 });

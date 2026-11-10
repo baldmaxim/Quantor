@@ -37,6 +37,11 @@ export const CadRemarkEditor: FC<ICadRemarkEditorProps> = ({
     form.current?.scrollIntoView?.({ block: 'nearest' });
   }, []);
 
+  const save = () => {
+    if (saving || comment.length > MAX_COMMENT_LENGTH) return;
+    onSave({ type, comment: comment.trim() });
+  };
+
   return (
     <form
       ref={form}
@@ -44,7 +49,7 @@ export const CadRemarkEditor: FC<ICadRemarkEditorProps> = ({
       className="flex flex-col gap-[var(--s-4)] rounded-[var(--radius-md)] border border-accent bg-surface-muted p-[var(--s-5)]"
       onSubmit={(event) => {
         event.preventDefault();
-        onSave({ type, comment: comment.trim() });
+        save();
       }}
     >
       <h4 className="text-sm font-medium">Замечание {number}</h4>
@@ -77,6 +82,13 @@ export const CadRemarkEditor: FC<ICadRemarkEditorProps> = ({
             maxLength={MAX_COMMENT_LENGTH}
             value={comment}
             onChange={(event) => setComment(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter сохраняет замечание, Shift+Enter - перенос строки. Ввод через IME (выбор
+              // варианта клавишей Enter) не трогаем.
+              if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              save();
+            }}
             className={`${FIELD} w-full py-[var(--s-3)] pr-[calc(var(--s-6)+var(--s-5))]`}
           />
           {comment.length > 0 && (

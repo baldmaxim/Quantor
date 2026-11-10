@@ -3,7 +3,7 @@
 import { useState, type FC } from 'react';
 
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
-import { CadChecksSection } from '@/components/cad/viewer/CadChecksSection';
+import { CadResult } from '@/components/cad/CadResult';
 import { CadFilesSection } from '@/components/cad/viewer/CadFilesSection';
 import { CadLayersPanel } from '@/components/cad/viewer/CadLayersPanel';
 import { CadRemarksPanel } from '@/components/cad/viewer/CadRemarksPanel';
@@ -13,15 +13,17 @@ import { CadViewHeader } from '@/components/cad/viewer/CadViewHeader';
 import { Button, ErrorState, Skeleton, SkeletonRows } from '@/components/ui';
 
 import type { IWorkspaceCadSideProps } from './types';
+import { WorkspaceCadConvert } from './WorkspaceCadConvert';
 
 const HINT = 'p-[var(--s-5)] text-xs text-muted';
 
 /**
- * Правая панель вкладки CAD: слои, замечания, масштаб, файлы и задание листа рабочей области.
+ * Правая панель вкладки CAD: слои, замечания, масштаб, файлы (с результатом) и задание листа
+ * рабочей области.
  *
- * Лист без задания, с идущим или упавшим заданием получает только раздел «Задание» (или
- * подсказку): диагностики вида у него нет. Ширину и сворачивание панели ведёт каркас рабочей
- * области.
+ * Показано только задание открытого листа. Лист без задания получает кнопку «Преобразовать лист
+ * в CAD», с идущим или упавшим заданием - только раздел «Задание» (у упавшего та же кнопка):
+ * диагностики вида у него нет. Ширину и сворачивание панели ведёт каркас рабочей области.
  */
 export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
   state,
@@ -29,6 +31,7 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
   loadError,
   onRetry,
   job,
+  convert,
   viewLoading,
   viewError,
   view,
@@ -66,9 +69,8 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
           </p>
         )}
         <p className="text-sm">Лист не преобразовывался</p>
-        <p className="text-xs text-muted">
-          Отметьте лист слева и запустите преобразование: результат появится здесь.
-        </p>
+        <p className="text-xs text-muted">Запустите преобразование: результат появится здесь.</p>
+        {convert && <WorkspaceCadConvert key={convert.pageIndex} {...convert} />}
       </div>
     );
   }
@@ -101,8 +103,8 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
           selectedPage={job.page}
           selectedView={job.view}
           onSelectView={job.onSelectView}
-          onJobCreated={job.onJobCreated}
         />
+        {job.failed && convert && <WorkspaceCadConvert key={convert.pageIndex} {...convert} />}
       </div>
     ),
   };
@@ -122,23 +124,29 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
         {
           id: 'scale',
           label: 'Масштаб',
-          content: (
-            <div className="flex min-w-0 flex-col gap-[var(--s-6)]">
-              <CadScaleSection scale={view.diagnostics.scale} />
-              <CadChecksSection checks={view.diagnostics.checks} frame={view.diagnostics.frame} />
-            </div>
-          ),
+          content: <CadScaleSection scale={view.diagnostics.scale} />,
         },
         {
           id: 'files',
           label: 'Файлы',
           content: (
-            <CadFilesSection
-              projectId={job.projectId}
-              revisionId={job.revisionId}
-              jobId={job.jobId}
-              diagnostics={view.diagnostics}
-            />
+            <div className="flex min-w-0 flex-col gap-[var(--s-6)]">
+              {job.detail && (
+                <CadResult
+                  projectId={job.projectId}
+                  revisionId={job.revisionId}
+                  job={job.detail}
+                  // Файлы принадлежат попытке с результатом; без неё - текущей.
+                  attempt={job.detail.result_attempt ?? job.detail.attempt}
+                />
+              )}
+              <CadFilesSection
+                projectId={job.projectId}
+                revisionId={job.revisionId}
+                jobId={job.jobId}
+                diagnostics={view.diagnostics}
+              />
+            </div>
           ),
         },
         jobTab,

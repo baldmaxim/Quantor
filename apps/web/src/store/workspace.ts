@@ -2,8 +2,6 @@
 
 import { create } from 'zustand';
 
-import type { CadViewMode } from '@/lib/cad/view-mode';
-
 /**
  * Эфемерное состояние рабочей области.
  *
@@ -36,8 +34,6 @@ interface WorkspaceState {
   overlayVisible: boolean;
   /** Типы областей, скрытые пользователем. Пустое множество — показаны все. */
   hiddenTypes: ReadonlySet<string>;
-  /** Режим показа CAD: PDF, CAD или наложение. Живёт здесь, чтобы DXF держался на других вкладках. */
-  cadMode: CadViewMode;
 
   setLeftTab: (tab: LeftTab) => void;
   setLeftWidth: (width: number) => void;
@@ -47,7 +43,6 @@ interface WorkspaceState {
   setTool: (tool: Tool) => void;
   toggleOverlay: () => void;
   toggleType: (type: string) => void;
-  setCadMode: (mode: CadViewMode) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -61,7 +56,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   tool: 'pointer',
   overlayVisible: true,
   hiddenTypes: new Set<string>(),
-  cadMode: 'overlay',
 
   setLeftTab: (leftTab) => set({ leftTab }),
   setLeftWidth: (width) => set({ leftWidth: clamp(width, MIN_LEFT, MAX_LEFT) }),
@@ -69,7 +63,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   toggleLeft: () => set((state) => ({ leftCollapsed: !state.leftCollapsed })),
   toggleRight: () => set((state) => ({ rightCollapsed: !state.rightCollapsed })),
   setTool: (tool) => set({ tool }),
-  setCadMode: (cadMode) => set({ cadMode }),
   toggleOverlay: () => set((state) => ({ overlayVisible: !state.overlayVisible })),
   toggleType: (type) =>
     set((state) => {

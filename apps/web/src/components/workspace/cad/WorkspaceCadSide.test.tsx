@@ -3,12 +3,25 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { diagnostics } from '@/components/cad/viewer/fixtures';
 
-const mocks = vi.hoisted(() => ({ detail: vi.fn() }));
+const mocks = vi.hoisted(() => ({ detail: vi.fn(), convert: vi.fn() }));
 
 vi.mock('@/components/cad/CadJobDetail', () => ({
   CadJobDetail: (props: { jobId: string; selectedPage: number | null }) => {
     mocks.detail(props);
     return <p>ход задания {props.jobId}</p>;
+  },
+}));
+vi.mock('@/components/cad/CadResult', () => ({
+  CadResult: (props: { attempt: number }) => <p>результат попытки {props.attempt}</p>,
+}));
+vi.mock('./WorkspaceCadConvert', () => ({
+  WorkspaceCadConvert: (props: { pageIndex: number; onJobCreated: (id: string, p: number[]) => void }) => {
+    mocks.convert(props);
+    return (
+      <button type="button" onClick={() => props.onJobCreated('new', [props.pageIndex])}>
+        Преобразовать лист в CAD
+      </button>
+    );
   },
 }));
 vi.mock('@/components/cad/viewer/CadRemarksPanel', () => ({
@@ -18,17 +31,32 @@ vi.mock('@/components/cad/viewer/CadFilesSection', () => ({
   CadFilesSection: () => <p>панель файлов</p>,
 }));
 
+import type { CadJobRead } from '@quantor/api-client';
+
 import type { IWorkspaceCadSideProps } from './types';
 import { WorkspaceCadSide } from './WorkspaceCadSide';
+
+const DETAIL = { job_id: 'j1', attempt: 2, result_attempt: 1 } as CadJobRead;
 
 const JOB = {
   projectId: 'p1',
   revisionId: 'r1',
   jobId: 'j1',
+  detail: DETAIL,
+  failed: false,
   page: 0,
   view: 1,
   onSelectView: vi.fn(),
-  onJobCreated: vi.fn(),
+};
+
+const onConvertCreated = vi.fn();
+const CONVERT: NonNullable<IWorkspaceCadSideProps['convert']> = {
+  projectId: 'p1',
+  revisionId: 'r1',
+  sheetId: 's0',
+  pageIndex: 0,
+  calibrateHref: '/projects/p1/workspace?revision=r1&page=1',
+  onJobCreated: onConvertCreated,
 };
 
 const VIEW: NonNullable<IWorkspaceCadSideProps['view']> = {
@@ -37,6 +65,7 @@ const VIEW: NonNullable<IWorkspaceCadSideProps['view']> = {
     layers: ['WALLS'],
     visibleLayers: new Set([0]),
     onToggleLayer: vi.fn(),
+    onSetLayersHidden: vi.fn(),
     pdfOpacity: 0.4,
     onPdfOpacityChange: vi.fn(),
     pdfOpacityActive: true,
@@ -58,6 +87,7 @@ const mount = (patch: Partial<IWorkspaceCadSideProps> = {}) =>
       loadError={null}
       onRetry={vi.fn()}
       job={JOB}
+      convert={CONVERT}
       viewLoading={false}
       viewError={null}
       view={VIEW}
@@ -78,6 +108,39 @@ describe('WorkspaceCadSide', () => {
     expect(screen.getByRole('tab', { name: 'Слои' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Непрозрачность PDF')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'WALLS' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Группа «Стены»' })).toBeChecked();
+  });
+
+  it('«Масштаб» - человекочитаемая сводка без технических строк', () => {
+    mount();
+    fireEvent.click(screen.getByRole('tab', { name: 'Масштаб' }));
+    expect(screen.getByTestId('cad-scale-summary')).toHaveTextContent('Масштаб 1:100');
+    expect(screen.queryByText(/Независимые оси/)).toBeNull();
+    expect(screen.queryByText(/Проверки движка/i)).toBeNull();
+  });
+
+  it('«Файлы» начинаются с результата попытки с результатом, затем файлы', () => {
+    mount();
+    fireEvent.click(screen.getByRole('tab', { name: 'Файлы' }));
+    const result = screen.getByText('результат попытки 1');
+    const files = screen.getByText('панель файлов');
+    expect(result.compareDocumentPosition(files) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('«Задание» без блока «Действия» и без результата', () => {
+    mount();
+    fireEvent.click(screen.getByRole('tab', { name: 'Задание' }));
+    expect(screen.queryByText('Действия')).toBeNull();
+    expect(screen.queryByText(/Запустить по выбранным/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Преобразовать лист в CAD' })).toBeNull();
+  });
+
+  it('задание листа упало: в «Задании» кнопка «Преобразовать лист в CAD» создаёт новое', () => {
+    mount({ view: null, job: { ...JOB, failed: true } });
+    expect(screen.getByText('ход задания j1')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Преобразовать лист в CAD' }));
+    expect(onConvertCreated).toHaveBeenCalledWith('new', [0]);
+    expect(mocks.convert.mock.calls.at(-1)?.[0]).toMatchObject({ pageIndex: 0 });
   });
 
   it('раздел «Задание» показывает ход выбранного задания для листа', () => {
@@ -97,6 +160,7 @@ describe('WorkspaceCadSide', () => {
         loadError={null}
         onRetry={vi.fn()}
         job={{ ...JOB, page: 1 }}
+        convert={CONVERT}
         viewLoading={false}
         viewError={null}
         view={{ ...VIEW, diagnostics: diagnostics({ page_index: 1 }) }}
@@ -122,10 +186,12 @@ describe('WorkspaceCadSide', () => {
     expect(screen.getByText('ход задания j1')).toBeInTheDocument();
   });
 
-  it('лист не преобразовывался: подсказка, панели с разделами нет', () => {
+  it('лист не преобразовывался: подсказка и кнопка запуска, панели с разделами нет', () => {
     mount({ state: 'none', job: null, view: null });
     expect(screen.getByText('Лист не преобразовывался')).toBeInTheDocument();
     expect(screen.queryByRole('tab')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Преобразовать лист в CAD' }));
+    expect(onConvertCreated).toHaveBeenCalledWith('new', [0]);
   });
 
   it('лист не выбран', () => {

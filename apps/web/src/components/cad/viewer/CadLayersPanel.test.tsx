@@ -5,12 +5,14 @@ import { CadLayersPanel } from './CadLayersPanel';
 
 const mount = (patch: Partial<Parameters<typeof CadLayersPanel>[0]> = {}) => {
   const onToggleLayer = vi.fn();
+  const onSetLayersHidden = vi.fn();
   const onPdfOpacityChange = vi.fn();
   render(
     <CadLayersPanel
       layers={['WALLS', 'DOORS', 'TEXT']}
       visibleLayers={new Set([0, 2])}
       onToggleLayer={onToggleLayer}
+      onSetLayersHidden={onSetLayersHidden}
       pdfOpacity={0.4}
       onPdfOpacityChange={onPdfOpacityChange}
       pdfOpacityActive
@@ -23,7 +25,7 @@ const mount = (patch: Partial<Parameters<typeof CadLayersPanel>[0]> = {}) => {
       {...patch}
     />,
   );
-  return { onToggleLayer, onPdfOpacityChange };
+  return { onToggleLayer, onSetLayersHidden, onPdfOpacityChange };
 };
 
 describe('CadLayersPanel', () => {
@@ -68,10 +70,10 @@ describe('CadLayersPanel', () => {
     expect(onPdfOpacityChange).toHaveBeenCalledWith(0.7);
   });
 
-  it('вне режима «Наложение» ползунок заблокирован и объясняет почему', () => {
+  it('DXF не наложен - ползунок заблокирован и объясняет почему', () => {
     mount({ pdfOpacityActive: false });
     expect(screen.getByRole('slider')).toBeDisabled();
-    expect(screen.getByText(/действует в режиме «Наложение»/)).toBeInTheDocument();
+    expect(screen.getByText(/действует, когда DXF наложен на лист/)).toBeInTheDocument();
   });
 
   it('область проверки масштаба и число точек', () => {
@@ -85,9 +87,7 @@ describe('CadLayersPanel', () => {
   it('геометрия CAD не показана: слоёв нет, причина названа', () => {
     mount({ cadShown: false, pdfOpacityActive: false });
     expect(screen.queryByTestId('layer-swatch')).toBeNull();
-    expect(screen.getByText(/Геометрия CAD не показана/)).toHaveTextContent(
-      'режимах «CAD» и «Наложение»',
-    );
+    expect(screen.getByText(/Геометрия CAD пока не наложена/)).toBeInTheDocument();
   });
 
   it('предпросмотра нет совсем: другая причина, ползунка нет', () => {
@@ -95,5 +95,54 @@ describe('CadLayersPanel', () => {
     expect(screen.getByText(/предпросмотр геометрии не получен/)).toBeInTheDocument();
     expect(screen.queryByRole('slider')).toBeNull();
     expect(screen.queryByText(/Точек в предпросмотре/)).toBeNull();
+  });
+
+  it('слои сгруппированы по типу, пустые группы не показаны', () => {
+    mount({ layers: ['A-WALL', 'DOORS', '0', 'WALLS-2'], visibleLayers: new Set([0, 1, 2, 3]) });
+    expect(screen.getByRole('checkbox', { name: 'Группа «Стены»' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Группа «Двери»' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Группа «Прочее»' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Группа «Окна»' })).toBeNull();
+    expect(screen.getByTestId('layer-group-walls')).toHaveTextContent('2 / 2');
+  });
+
+  it('переключатель группы скрывает все слои группы разом', () => {
+    const { onSetLayersHidden } = mount({
+      layers: ['A-WALL', 'DOORS', 'WALLS-2'],
+      visibleLayers: new Set([0, 1, 2]),
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Группа «Стены»' }));
+    expect(onSetLayersHidden).toHaveBeenCalledWith([0, 2], true);
+  });
+
+  it('частично видимая группа: неопределённое состояние; щелчок показывает все слои', () => {
+    const { onSetLayersHidden } = mount({
+      layers: ['A-WALL', 'WALLS-2'],
+      visibleLayers: new Set([0]),
+    });
+    const master = screen.getByRole('checkbox', { name: 'Группа «Стены»' }) as HTMLInputElement;
+    expect(master.indeterminate).toBe(true);
+    expect(master.checked).toBe(false);
+    fireEvent.click(master);
+    expect(onSetLayersHidden).toHaveBeenCalledWith([0, 1], false);
+  });
+
+  it('полностью скрытая группа не неопределённая и показывается целиком', () => {
+    const { onSetLayersHidden } = mount({ layers: ['DOORS'], visibleLayers: new Set<number>() });
+    const master = screen.getByRole('checkbox', { name: 'Группа «Двери»' }) as HTMLInputElement;
+    expect(master.indeterminate).toBe(false);
+    fireEvent.click(master);
+    expect(onSetLayersHidden).toHaveBeenCalledWith([0], false);
+  });
+
+  it('заголовок группы сворачивает слои; общий чекбокс при этом не срабатывает', () => {
+    const { onSetLayersHidden } = mount({ layers: ['DOORS'], visibleLayers: new Set([0]) });
+    const toggle = screen.getByRole('button', { name: /Двери/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('checkbox', { name: 'DOORS' })).toBeVisible();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('checkbox', { name: 'DOORS', hidden: true })).not.toBeVisible();
+    expect(onSetLayersHidden).not.toHaveBeenCalled();
   });
 });

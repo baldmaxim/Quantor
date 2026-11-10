@@ -92,7 +92,7 @@ const inputs = (patch: Partial<Inputs> = {}): Inputs => ({
   projectId: 'p1',
   revisionId: 'r1',
   sheets: [{ page_index: 0 }, { page_index: 1 }, { page_index: 2 }],
-  sheet: { page_index: 0, page_label: '1' },
+  sheet: { id: 's0', page_index: 0, page_label: '1' },
   page: { pageIndex: 0, width: 842, height: 595 },
   camera,
   viewportSize: () => ({ width: 800, height: 600 }),
@@ -120,7 +120,7 @@ beforeEach(() => {
   mocks.jobsData.current = { items: [], server_time: '' };
   mocks.jobData.current = undefined;
   mocks.diagnosticsPatch.current = {};
-  useWorkspaceStore.setState({ leftTab: 'documents', cadMode: 'overlay' });
+  useWorkspaceStore.setState({ leftTab: 'documents' });
 });
 
 describe('useWorkspaceCad: запросы', () => {
@@ -177,6 +177,7 @@ describe('useWorkspaceCad: состояния листа', () => {
     const { result } = mount();
     expect(result.current.side.state).toBe('ready');
     expect(result.current.side.job?.jobId).toBe(JOB_ID);
+    expect(result.current.side.job?.failed).toBe(patch.status === 'failed');
     expect(result.current.side.view).toBeNull();
     expect(result.current.bar).toBeNull();
   });
@@ -188,8 +189,8 @@ describe('useWorkspaceCad: состояния листа', () => {
     expect(result.current.side.job).toMatchObject({ jobId: JOB_ID, page: 0, view: 1 });
     expect(result.current.bar?.views).toEqual([1, 2]);
     expect(result.current.bar?.view).toBe(1);
-    expect(result.current.bar?.mode).toBe('overlay');
-    expect(result.current.bar?.dxfAvailable).toBe(true);
+    expect(result.current.side.view?.layers.cadShown).toBe(true);
+    expect(result.current.side.view?.layers.pdfOpacityActive).toBe(true);
     expect(result.current.side.view?.layers.layers).toEqual(['WALLS', 'DOORS']);
     expect(result.current.painter).not.toBeNull();
     // замечания читаются у показанного вида
@@ -257,10 +258,16 @@ describe('useWorkspaceCad: переходы', () => {
     expect(navigate).toHaveBeenCalledWith({ page: '3', region: null, job: null, view: null });
   });
 
-  it('листа нет в ревизии - адрес не меняется', () => {
+  it('лист вне переданного списка не теряется молча: адресуется по индексу страницы', () => {
     const { result } = mount();
     act(() => result.current.left?.onOpenSheet(77));
-    expect(navigate).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith({ page: '78', region: null, job: null, view: null });
+  });
+
+  it('позиция листа берётся из списка, а не из индекса страницы', () => {
+    const { result } = mount({ sheets: [{ page_index: 5 }, { page_index: 9 }] });
+    act(() => result.current.left?.onOpenSheet(9));
+    expect(navigate).toHaveBeenCalledWith({ page: '2', region: null, job: null, view: null });
   });
 
   it('выбор задания, закрывающего лист: только задание в адресе', () => {
@@ -277,22 +284,42 @@ describe('useWorkspaceCad: переходы', () => {
     expect(navigate).toHaveBeenCalledWith({ page: '2', region: null, job: JOB_ID, view: null });
   });
 
-  it('созданное задание открывается на своём листе', () => {
+  it('преобразование открытого листа: запуск на его страницу, ссылка калибровки, задание открывается', () => {
     const { result } = mount();
-    act(() => result.current.left?.onJobCreated(OTHER_JOB, [1]));
+    const convert = result.current.side.convert;
+    expect(convert).toMatchObject({
+      projectId: 'p1',
+      revisionId: 'r1',
+      sheetId: 's0',
+      pageIndex: 0,
+      calibrateHref: '/projects/p1/workspace?revision=r1&page=1',
+    });
+    act(() => convert?.onJobCreated(OTHER_JOB, [0]));
+    // лист тот же - в адресе только задание
+    expect(navigate).toHaveBeenCalledWith({ job: OTHER_JOB, view: null });
+  });
+
+  it('созданное задание другого листа открывается на своём листе', () => {
+    const { result } = mount();
+    act(() => result.current.side.convert?.onJobCreated(OTHER_JOB, [1]));
     expect(navigate).toHaveBeenCalledWith({ page: '2', region: null, job: OTHER_JOB, view: null });
   });
 
-  it('другой PDF проекта открывает его ревизию с первого листа', () => {
+  it('листа или ревизии нет - запуска нет', () => {
+    expect(mount({ sheet: null }).result.current.side.convert).toBeNull();
+    expect(mount({ revisionId: null }).result.current.side.convert).toBeNull();
+  });
+
+  it('у левой панели нет ни запуска, ни выбора исходного PDF', () => {
     const { result } = mount();
-    act(() => result.current.left?.onSourceSelect('r2'));
-    expect(navigate).toHaveBeenCalledWith({
-      revision: 'r2',
-      page: '1',
-      region: null,
-      job: null,
-      view: null,
-    });
+    expect(Object.keys(result.current.left ?? {}).sort()).toEqual([
+      'activePage',
+      'onOpenSheet',
+      'onSelectJob',
+      'projectId',
+      'revisionId',
+      'selectedJobId',
+    ]);
   });
 
   it('выбор вида в ходе задания: лист, задание и вид в адресе', () => {
@@ -312,7 +339,7 @@ describe('useWorkspaceCad: переходы', () => {
   });
 });
 
-describe('useWorkspaceCad: режимы PDF / CAD / Наложение и непрозрачность PDF', () => {
+describe('useWorkspaceCad: наложение и непрозрачность PDF', () => {
   it('наложение: PDF с непрозрачностью ползунка (40 % по умолчанию), DXF рисуется', () => {
     recognized();
     const { result } = mount();
@@ -322,25 +349,18 @@ describe('useWorkspaceCad: режимы PDF / CAD / Наложение и неп
     expect(result.current.side.view?.layers.pdfOpacityActive).toBe(true);
   });
 
-  it('CAD: PDF скрыт, ползунок не тронут, DXF рисуется', () => {
+  it('в строке над холстом нет ни режима, ни кнопок масштаба: только «Вписать»', () => {
     recognized();
     const { result } = mount();
-    act(() => result.current.bar?.onModeChange('cad'));
-    expect(useWorkspaceStore.getState().cadMode).toBe('cad');
-    expect(result.current.bar?.mode).toBe('cad');
-    expect(result.current.pageOpacity).toBe(0);
-    expect(result.current.side.view?.layers.pdfOpacity).toBe(0.4);
-    expect(result.current.side.view?.layers.pdfOpacityActive).toBe(false);
-    expect(result.current.painter).not.toBeNull();
-  });
-
-  it('PDF: подложка целиком, DXF скрыт', () => {
-    recognized();
-    const { result } = mount();
-    act(() => result.current.bar?.onModeChange('pdf'));
-    expect(result.current.pageOpacity).toBe(1);
-    expect(result.current.painter).toBeNull();
-    expect(result.current.side.view?.layers.cadShown).toBe(false);
+    expect(Object.keys(result.current.bar ?? {}).sort()).toEqual([
+      'diagnostics',
+      'loading',
+      'notices',
+      'onFit',
+      'onViewChange',
+      'view',
+      'views',
+    ]);
   });
 
   it('ползунок меняет прозрачность PDF и хранится в localStorage', () => {
@@ -368,23 +388,17 @@ describe('useWorkspaceCad: режимы PDF / CAD / Наложение и неп
     expect(hook.result.current.painter).not.toBeNull();
   });
 
-  it('кадр координат не подтверждён: DXF не накладывается, режимы CAD и наложение закрыты', () => {
+  it('кадр координат не подтверждён: DXF не накладывается, виден один PDF, причина в строке', () => {
     mocks.diagnosticsPatch.current = { frame: FRAME_NO };
     recognized();
     const { result } = mount();
-    expect(result.current.bar?.dxfAvailable).toBe(false);
-    expect(result.current.bar?.dxfReason).toContain('Кадр координат не подтверждён');
-    expect(result.current.bar?.mode).toBe('pdf');
+    expect(result.current.bar?.notices.map((notice) => notice.text).join(' ')).toContain(
+      'Кадр координат не подтверждён',
+    );
+    expect(result.current.side.view?.layers.cadShown).toBe(false);
+    expect(result.current.side.view?.layers.pdfOpacityActive).toBe(false);
     expect(result.current.pageOpacity).toBe(1);
     expect(result.current.painter).toBeNull();
-  });
-
-  it('режим живёт в хранилище и переживает смену листа', () => {
-    recognized();
-    const hook = mount();
-    act(() => hook.result.current.bar?.onModeChange('cad'));
-    hook.rerender(inputs({ sheet: { page_index: 1, page_label: '2' } }));
-    expect(useWorkspaceStore.getState().cadMode).toBe('cad');
   });
 });
 
@@ -399,6 +413,17 @@ describe('useWorkspaceCad: слои и область проверки масш�
     expect([...(result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([0, 1]);
   });
 
+  it('группа слоёв скрывается и показывается одним вызовом', () => {
+    recognized();
+    const { result } = mount();
+    act(() => result.current.side.view?.layers.onSetLayersHidden([0, 1], true));
+    expect([...(result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([]);
+    act(() => result.current.side.view?.layers.onSetLayersHidden([1], false));
+    expect([...(result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([1]);
+    act(() => result.current.side.view?.layers.onSetLayersHidden([0, 1], false));
+    expect([...(result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([0, 1]);
+  });
+
   it('выбор слоёв принадлежит виду: на другом виде все слои снова видны', () => {
     recognized();
     const hook = mount({ jobParam: JOB_ID, viewParam: 1 });
@@ -408,19 +433,16 @@ describe('useWorkspaceCad: слои и область проверки масш�
     expect([...(hook.result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([0, 1]);
   });
 
-  it('область проверки масштаба: доступна в PDF и наложении, в CAD нет; рисуется и без DXF', () => {
+  it('область проверки масштаба: доступна, рисуется на PDF и без DXF', () => {
+    mocks.diagnosticsPatch.current = { frame: FRAME_NO };
     recognized();
     const { result } = mount();
     expect(result.current.side.view?.layers.cropAvailable).toBe(true);
-
-    act(() => result.current.bar?.onModeChange('pdf'));
+    // DXF не наложен, виден один PDF
     expect(result.current.painter).toBeNull();
     act(() => result.current.side.view?.layers.onCropChange(true));
-    // DXF скрыт, но рамка области на PDF нарисована
+    // рамка области на PDF нарисована
     expect(result.current.painter).not.toBeNull();
-
-    act(() => result.current.bar?.onModeChange('cad'));
-    expect(result.current.side.view?.layers.cropAvailable).toBe(false);
   });
 });
 
@@ -449,14 +471,6 @@ describe('useWorkspaceCad: отметка участка', () => {
     expect(result.current.capture).toBeNull();
     expect(result.current.side.view?.remarks?.draft).toEqual([10, 20, 110, 220]);
     expect(result.current.painter).not.toBeNull();
-  });
-
-  it('в режиме CAD (PDF скрыт) отметка по-прежнему возможна: координаты те же', () => {
-    recognized();
-    const { result } = mount();
-    act(() => result.current.bar?.onModeChange('cad'));
-    act(() => result.current.side.view?.remarks?.onMarkingChange(true));
-    expect(result.current.capture).not.toBeNull();
   });
 
   it('размер листа неизвестен - отметка недоступна', () => {

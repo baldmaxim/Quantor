@@ -1,9 +1,8 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  mutate: vi.fn(),
-  calibrations: new Map<number, string>(),
+  calibrations: vi.fn(),
   features: { 'takeoff.manual': true } as Record<string, boolean>,
   jobs: [] as unknown[],
 }));
@@ -25,25 +24,22 @@ vi.mock('@/lib/queries', () => ({
   useFeatures: () => mocks.features,
 }));
 vi.mock('@/lib/cad/sheet-queries', () => ({
-  useSheetCalibrationStates: () => mocks.calibrations,
+  useSheetCalibrationStates: (sheets: readonly { page_index: number }[], enabled: boolean) => {
+    mocks.calibrations(sheets, enabled);
+    return new Map(sheets.map((sheet) => [sheet.page_index, 'missing']));
+  },
 }));
 vi.mock('@/lib/cad/queries', () => ({
-  useCreateCadJob: () => ({ mutate: mocks.mutate, isPending: false }),
   useCadJobs: () => ({ data: { items: mocks.jobs, server_time: '' } }),
 }));
 
 import { CadSheetPicker } from './CadSheetPicker';
 
-const mount = (
-  onJobCreated = vi.fn(),
-  onOpenSheet = vi.fn(),
-  activePage: number | null = null,
-) =>
+const mount = (onOpenSheet = vi.fn(), activePage: number | null = null) =>
   render(
     <CadSheetPicker
       projectId="p"
       revisionId="r"
-      onJobCreated={onJobCreated}
       activePage={activePage}
       onOpenSheet={onOpenSheet}
     />,
@@ -58,87 +54,27 @@ const job = (patch: Record<string, unknown>) => ({
   ...patch,
 });
 
-const launchButton = () => screen.getByRole('button', { name: /Запустить преобразование/ });
-
 beforeEach(() => {
-  mocks.mutate.mockReset();
+  mocks.calibrations.mockReset();
   mocks.jobs = [];
   mocks.features = { 'takeoff.manual': true };
-  mocks.calibrations = new Map([
-    [0, 'calibrated'],
-    [1, 'missing'],
-  ]);
 });
 
 describe('CadSheetPicker', () => {
-  it('по умолчанию ничего не выбрано, запуск неактивен', () => {
+  it('нет чекбоксов и запуска по выбранным: строки - только кнопки открытия', () => {
     mount();
-    expect(screen.getByRole('checkbox', { name: /Стр. 1/ })).not.toBeChecked();
-    expect(launchButton()).toBeDisabled();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Запустить/ })).toBeNull();
+    expect(screen.getAllByRole('button')).toHaveLength(2);
   });
 
-  it('откалиброванный лист запускается с его индексом', () => {
-    mount();
-    fireEvent.click(screen.getByRole('checkbox', { name: /Стр. 1/ }));
-    expect(launchButton()).toBeEnabled();
-    fireEvent.click(launchButton());
-    expect(mocks.mutate).toHaveBeenCalledTimes(1);
-    expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ pages: [0] });
-  });
-
-  it('лист без калибровки: метка, ссылка на просмотрщик и закрытый запуск', () => {
-    mount();
-    expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Откалибровать' })).toHaveAttribute(
-      'href',
-      '/projects/p/workspace?revision=r&page=2',
-    );
-    fireEvent.click(screen.getByRole('checkbox', { name: /Стр. 1/ }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /Стр. 2/ }));
-    expect(launchButton()).toBeDisabled();
-    expect(screen.getByText(/Нет калибровки: Стр. 2/)).toBeInTheDocument();
-  });
-
-  it('флаг ручного обмера выключен: вместо ссылки - пояснение', () => {
-    mocks.features = {};
-    mocks.calibrations = new Map([[1, 'missing']]);
-    mount();
-    expect(screen.queryByRole('link', { name: 'Откалибровать' })).toBeNull();
-    expect(
-      screen.getAllByText(/Калибровка недоступна: включите в пространстве флаг/).length,
-    ).toBeGreaterThan(0);
-  });
-
-  it('ответ 409 показывает страницы и блокирует их', () => {
-    mocks.calibrations = new Map([
-      [0, 'unknown'],
-      [1, 'calibrated'],
-    ]);
-    mount();
-    fireEvent.click(screen.getByRole('checkbox', { name: /Стр. 1/ }));
-    fireEvent.click(launchButton());
-    const options = mocks.mutate.mock.calls[0]?.[1] as { onError: (error: unknown) => void };
-    act(() => {
-      options.onError({ detail: { code: 'CAD_CALIBRATION_REQUIRED', issue: { pages: '0' } } });
-    });
-    expect(screen.getByRole('alert')).toHaveTextContent('стр. 1');
-    expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
-    expect(launchButton()).toBeDisabled();
-  });
-
-  it('распознанный лист: бейдж, открытие по строке, чекбокс отдельно', () => {
+  it('распознанный лист: бейдж результата, строка открывает лист', () => {
     mocks.jobs = [job({})];
     const onOpenSheet = vi.fn();
-    mount(vi.fn(), onOpenSheet);
+    mount(onOpenSheet);
     expect(screen.getByText('DXF есть · проверка')).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole('button', { name: /Стр. 1/ }));
     expect(onOpenSheet).toHaveBeenCalledWith(0);
-    expect(screen.getByRole('checkbox', { name: 'Стр. 1' })).not.toBeChecked();
-
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Стр. 1' }));
-    expect(screen.getByRole('checkbox', { name: 'Стр. 1' })).toBeChecked();
-    expect(onOpenSheet).toHaveBeenCalledTimes(1);
   });
 
   it('идущее и упавшее задание: бейджи; строка открывает лист', () => {
@@ -147,42 +83,43 @@ describe('CadSheetPicker', () => {
       job({ job_id: 'bad', status: 'failed', result_status: 'failed', requested_pages: [1] }),
     ];
     const onOpenSheet = vi.fn();
-    mount(vi.fn(), onOpenSheet);
+    mount(onOpenSheet);
     expect(screen.getByText('Выполняется')).toBeInTheDocument();
     expect(screen.getByText('Ошибка')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Стр. 2/ }));
     expect(onOpenSheet).toHaveBeenCalledWith(1);
   });
 
-  it('лист без задания тоже открывается по строке, а не только отмечается', () => {
+  it('лист без задания тоже открывается по строке', () => {
     const onOpenSheet = vi.fn();
-    mount(vi.fn(), onOpenSheet);
+    mount(onOpenSheet);
     fireEvent.click(screen.getByRole('button', { name: /Стр. 1/ }));
     expect(onOpenSheet).toHaveBeenCalledWith(0);
-    expect(screen.getByRole('checkbox', { name: /Стр. 1/ })).not.toBeChecked();
   });
 
   it('открытый сейчас лист помечен aria-current', () => {
-    mount(vi.fn(), vi.fn(), 0);
+    mount(vi.fn(), 0);
     expect(screen.getByRole('button', { name: /Стр. 1/ })).toHaveAttribute('aria-current', 'true');
     expect(screen.getByRole('button', { name: /Стр. 2/ })).not.toHaveAttribute('aria-current');
   });
 
-  it('создание задания сообщает его номер и листы запуска', () => {
-    const onJobCreated = vi.fn();
-    mount(onJobCreated);
-    fireEvent.click(screen.getByRole('checkbox', { name: /Стр. 1/ }));
-    fireEvent.click(launchButton());
-    const options = mocks.mutate.mock.calls[0]?.[1] as {
-      onSuccess: (job: unknown) => void;
-    };
-    act(() => options.onSuccess({ job_id: 'new', requested_pages: [0] }));
-    expect(onJobCreated).toHaveBeenCalledWith('new', [0]);
+  it('калибровка читается только у открытого листа', () => {
+    mount(vi.fn(), 1);
+    const [sheets, enabled] = mocks.calibrations.mock.calls.at(-1) as [{ page_index: number }[], boolean];
+    expect(sheets.map((sheet) => sheet.page_index)).toEqual([1]);
+    expect(enabled).toBe(true);
+    // Лист без калибровки: бейдж и ссылка только у открытой строки.
+    expect(screen.getAllByText('Нет калибровки')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Откалибровать' })).toHaveAttribute(
+      'href',
+      '/projects/p/workspace?revision=r&page=2',
+    );
   });
 
-  it('чекбокс листа переключается', () => {
+  it('открытого листа нет: калибровка не читается ни у одного', () => {
     mount();
-    fireEvent.click(screen.getByRole('checkbox', { name: /Стр. 1/ }));
-    expect(screen.getByRole('checkbox', { name: /Стр. 1/ })).toBeChecked();
+    const [sheets] = mocks.calibrations.mock.calls.at(-1) as [unknown[]];
+    expect(sheets).toEqual([]);
+    expect(screen.queryByText('Нет калибровки')).toBeNull();
   });
 });
