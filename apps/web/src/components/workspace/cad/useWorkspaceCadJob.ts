@@ -26,6 +26,7 @@ import {
   workspaceViewParams,
   type IOverlayAvailability,
 } from '@/lib/cad/workspace-cad';
+import { isRouteJob } from '@/lib/cad/mep-jobs';
 import { jobCoversPage } from '@/lib/cad/workspace-url';
 
 interface IInput {
@@ -44,8 +45,10 @@ export interface IWorkspaceCadJobData {
   readonly jobsPending: boolean;
   readonly jobsError: string | null;
   readonly refetchJobs: () => void;
-  /** Задания ревизии, новые сверху. */
+  /** Задания ревизии, новые сверху (и преобразования, и трассы механики). */
   readonly jobs: readonly CadJobSummaryRead[];
+  /** Выбранное route-задание (трассы механики) этого листа; `null` - показан сам вид. */
+  readonly routeSummary: CadJobSummaryRead | null;
   /** Показанное задание: из адреса, если оно закрывает лист, иначе последнее по листу. */
   readonly jobId: string | null;
   readonly kind: SheetResultKind | null;
@@ -69,6 +72,9 @@ export interface IWorkspaceCadJobData {
  * Выбор живёт в адресе (`job`, `view`): явное задание берётся, только если оно закрывает лист, а
  * без него - последнее задание листа и его первый вид. Так устаревший адрес после перехода на
  * другой лист не показывает чужой результат.
+ *
+ * Route-задание (трассы механики) в «последнее задание листа» не входит. Если оно выбрано в адресе,
+ * показан вид его родителя (DXF вида под трассами), а само задание отдаётся как `routeSummary`.
  */
 export const useWorkspaceCadJob = ({
   projectId,
@@ -81,14 +87,29 @@ export const useWorkspaceCadJob = ({
   const loadRevision = load ? revisionId : null;
   const jobs = useCadJobs(projectId, loadRevision);
   const items = useMemo(() => jobs.data?.items ?? [], [jobs.data]);
-  const results = useMemo(() => latestSheetJobs(items), [items]);
+  const converts = useMemo(() => items.filter((item) => !isRouteJob(item)), [items]);
+  const results = useMemo(() => latestSheetJobs(converts), [converts]);
 
   const latest = pageIndex !== null ? (results.get(pageIndex) ?? null) : null;
-  const explicit =
+  const routeSummary =
     jobParam !== null && pageIndex !== null
-      ? (items.find((item) => item.job_id === jobParam && jobCoversPage(item, pageIndex)) ?? null)
+      ? (items.find(
+          (item) =>
+            item.job_id === jobParam &&
+            isRouteJob(item) &&
+            item.page_index === pageIndex &&
+            item.view !== null &&
+            item.parent_job_id !== null,
+        ) ?? null)
       : null;
-  const summary = explicit ?? items.find((item) => item.job_id === latest?.jobId) ?? null;
+  const explicit =
+    routeSummary !== null
+      ? (converts.find((item) => item.job_id === routeSummary.parent_job_id) ?? null)
+      : jobParam !== null && pageIndex !== null
+        ? (converts.find((item) => item.job_id === jobParam && jobCoversPage(item, pageIndex)) ??
+          null)
+        : null;
+  const summary = explicit ?? converts.find((item) => item.job_id === latest?.jobId) ?? null;
   const jobId = summary?.job_id ?? null;
   const kind = summary ? jobResultKind(summary) : null;
 
@@ -98,9 +119,13 @@ export const useWorkspaceCadJob = ({
   const pick = useMemo(
     () =>
       job && pageIndex !== null
-        ? pickWorkspaceView(job, pageIndex, explicit !== null ? viewParam : null)
+        ? pickWorkspaceView(
+            job,
+            pageIndex,
+            routeSummary !== null ? routeSummary.view : explicit !== null ? viewParam : null,
+          )
         : null,
-    [job, pageIndex, explicit, viewParam],
+    [job, pageIndex, explicit, viewParam, routeSummary],
   );
   const view = pick?.view ?? null;
 
@@ -136,6 +161,7 @@ export const useWorkspaceCadJob = ({
     jobsError: jobs.isError ? cadErrorText(jobs.error) : null,
     refetchJobs: () => void jobs.refetch(),
     jobs: items,
+    routeSummary,
     jobId,
     kind,
     job,

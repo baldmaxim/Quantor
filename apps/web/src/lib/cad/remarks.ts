@@ -43,6 +43,7 @@ export const REMARK_TYPES = [
   { value: 'monolith', label: 'Монолит' },
   { value: 'room_boundary', label: 'Граница помещения' },
   { value: 'wrong_class', label: 'Неверный класс' },
+  { value: 'route', label: 'Трасса' },
   { value: 'other', label: 'Другое' },
 ] as const;
 

@@ -438,6 +438,38 @@ export type BoxGeometry = {
 };
 
 /**
+ * CadAcceptanceCreate
+ *
+ * Принятие трасс этажа целиком. Страница и вид берутся из route-задания.
+ */
+export type CadAcceptanceCreate = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+};
+
+/**
+ * CadApprovalCreate
+ *
+ * Одобрение вида: решение человека. Попытка - та, чей результат он смотрел.
+ */
+export type CadApprovalCreate = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+};
+
+/**
  * CadArtifactRead
  */
 export type CadArtifactRead = {
@@ -588,6 +620,56 @@ export type CadConvertCreate = {
      * Schedules
      */
     schedules?: boolean;
+};
+
+/**
+ * CadDecisionRead
+ */
+export type CadDecisionRead = {
+    /**
+     * Artifact Sha256
+     */
+    artifact_sha256: string;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Comment
+     */
+    comment: string | null;
+    /**
+     * Decided At
+     */
+    decided_at: string;
+    /**
+     * Decided By
+     */
+    decided_by: string;
+    /**
+     * Decided By Name
+     */
+    decided_by_name: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Kind
+     */
+    kind: 'view_approval' | 'mep_acceptance';
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * View
+     */
+    view: number;
 };
 
 /**
@@ -781,17 +863,45 @@ export type CadJobRead = {
      */
     finished_at: string | null;
     /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm: number | null;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number | null;
+    /**
+     * Generator Version
+     */
+    generator_version: string | null;
+    /**
      * Job Id
      */
     job_id: string;
+    /**
+     * Job Type
+     */
+    job_type: 'cad_pdf_convert' | 'cad_mep_route';
     /**
      * Known Limitation
      */
     known_limitation: string | null;
     /**
+     * Page Index
+     */
+    page_index: number | null;
+    /**
      * Pages
      */
     pages: Array<CadPageRead>;
+    /**
+     * Parent Attempt
+     */
+    parent_attempt: number | null;
+    /**
+     * Parent Job Id
+     */
+    parent_job_id: string | null;
     /**
      * Requested Pages
      */
@@ -833,6 +943,10 @@ export type CadJobRead = {
      */
     started_at: string | null;
     status: JobStatus;
+    /**
+     * View
+     */
+    view: number | null;
 };
 
 /**
@@ -860,6 +974,18 @@ export type CadJobSummaryRead = {
      */
     job_id: string;
     /**
+     * Job Type
+     */
+    job_type: 'cad_pdf_convert' | 'cad_mep_route';
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+    /**
+     * Parent Job Id
+     */
+    parent_job_id: string | null;
+    /**
      * Requested Pages
      */
     requested_pages: Array<number> | null;
@@ -868,6 +994,30 @@ export type CadJobSummaryRead = {
      */
     result_status: string | null;
     status: JobStatus;
+    /**
+     * View
+     */
+    view: number | null;
+};
+
+/**
+ * CadMepRoutesCreate
+ *
+ * Постановка трасс. Отметка пола и высота этажа - ввод человека, обе обязательны.
+ */
+export type CadMepRoutesCreate = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm: number;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number;
 };
 
 /**
@@ -1066,7 +1216,7 @@ export type CadRemarkFileItem = {
     /**
      * Type
      */
-    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'other';
+    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'route' | 'other';
     /**
      * Updated At
      */
@@ -1111,7 +1261,7 @@ export type CadRemarkRead = {
     /**
      * Type
      */
-    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'other';
+    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'route' | 'other';
     /**
      * Updated At
      */
@@ -1152,7 +1302,7 @@ export type CadRemarkWrite = {
     /**
      * Type
      */
-    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'other';
+    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'route' | 'other';
 };
 
 /**
@@ -1231,6 +1381,51 @@ export type CadRemarksImportRead = {
      * Updated
      */
     updated: number;
+};
+
+/**
+ * CadRouteJobRead
+ *
+ * Route-задание вида в списке у родителя.
+ */
+export type CadRouteJobRead = {
+    /**
+     * Accepted
+     */
+    accepted: boolean;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm: number | null;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number | null;
+    /**
+     * Generator Version
+     */
+    generator_version: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    status: JobStatus;
 };
 
 /**
@@ -1428,6 +1623,8 @@ export type CadStageRead = {
  * CadViewDiagnosticsRead
  */
 export type CadViewDiagnosticsRead = {
+    acceptance?: CadDecisionRead | null;
+    approval?: CadDecisionRead | null;
     /**
      * Attempt
      */
@@ -1467,6 +1664,10 @@ export type CadViewDiagnosticsRead = {
      * Review Required
      */
     review_required: boolean;
+    /**
+     * Route Jobs
+     */
+    route_jobs?: Array<CadRouteJobRead>;
     scale: CadScaleRead | null;
     /**
      * Scale Status
@@ -1484,8 +1685,12 @@ export type CadViewDiagnosticsRead = {
 
 /**
  * CadViewRead
+ *
+ * Вид результата; решения человека (одобрение, принятие трасс) и route-задания - в базе.
  */
 export type CadViewRead = {
+    acceptance?: CadDecisionRead | null;
+    approval?: CadDecisionRead | null;
     /**
      * Dxf
      */
@@ -1502,6 +1707,10 @@ export type CadViewRead = {
      * Failure Reason
      */
     failure_reason?: string | null;
+    /**
+     * Route Jobs
+     */
+    route_jobs?: Array<CadRouteJobRead>;
     /**
      * Scale Deviation
      */
@@ -8070,7 +8279,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route';
 
 /**
  * LengthUnit
@@ -14800,6 +15009,44 @@ export type ReadCadJobResponses = {
 
 export type ReadCadJobResponse = ReadCadJobResponses[keyof ReadCadJobResponses];
 
+export type AcceptCadMepRoutesData = {
+    body: CadAcceptanceCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/acceptance';
+};
+
+export type AcceptCadMepRoutesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AcceptCadMepRoutesError = AcceptCadMepRoutesErrors[keyof AcceptCadMepRoutesErrors];
+
+export type AcceptCadMepRoutesResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadDecisionRead;
+};
+
+export type AcceptCadMepRoutesResponse = AcceptCadMepRoutesResponses[keyof AcceptCadMepRoutesResponses];
+
 export type DownloadCadArtifactData = {
     body?: never;
     path: {
@@ -15175,6 +15422,98 @@ export type ReadCadViewResponses = {
 };
 
 export type ReadCadViewResponse = ReadCadViewResponses[keyof ReadCadViewResponses];
+
+export type ApproveCadViewData = {
+    body: CadApprovalCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/approval';
+};
+
+export type ApproveCadViewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ApproveCadViewError = ApproveCadViewErrors[keyof ApproveCadViewErrors];
+
+export type ApproveCadViewResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadDecisionRead;
+};
+
+export type ApproveCadViewResponse = ApproveCadViewResponses[keyof ApproveCadViewResponses];
+
+export type CreateCadMepRoutesData = {
+    body: CadMepRoutesCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/mep-routes';
+};
+
+export type CreateCadMepRoutesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCadMepRoutesError = CreateCadMepRoutesErrors[keyof CreateCadMepRoutesErrors];
+
+export type CreateCadMepRoutesResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadJobRead;
+};
+
+export type CreateCadMepRoutesResponse = CreateCadMepRoutesResponses[keyof CreateCadMepRoutesResponses];
 
 export type ReadCadPreviewData = {
     body?: never;

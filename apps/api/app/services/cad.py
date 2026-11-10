@@ -46,7 +46,15 @@ ARTIFACT_NAME: Final = re.compile(
     r"views/p\d{3}_v\d{2}/"
     r"(?:plan_candidates\.dxf|scale\.json|cad_checks\.json|checks\.json|preview\.json))$"
 )
+# Артефакты задания трасс механики (`cad_mep_route`, ADR-0036 п. 8): отчёт и манифест как у
+# движка, плюс DXF трасс и кандидат — в каталоге того же вида.
+ROUTE_ARTIFACT_NAME: Final = re.compile(
+    r"^(?:report\.json|manifest\.json|"
+    r"views/p\d{3}_v\d{2}/(?:mep_routes\.dxf|candidate\.json|preview\.json))$"
+)
 CONTENT_TYPES: Final = {".dxf": "application/dxf", ".json": "application/json"}
+# Типы заданий контура CAD: у обоих один и тот же вид доступа (пространство, проект, ревизия).
+CAD_JOB_TYPES: Final = (JobType.CAD_PDF_CONVERT, JobType.CAD_MEP_ROUTE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,7 +126,7 @@ def idempotency_key(revision_id: uuid.UUID, params: dict[str, Any]) -> str:
 
 
 def artifact_storage_key(revision_id: uuid.UUID, job_id: uuid.UUID, attempt: int, name: str) -> str:
-    if attempt < 1 or not ARTIFACT_NAME.fullmatch(name):
+    if attempt < 1 or not (ARTIFACT_NAME.fullmatch(name) or ROUTE_ARTIFACT_NAME.fullmatch(name)):
         raise ValueError("недопустимое имя артефакта или номер попытки CAD")
     return f"revisions/{revision_id}/cad/{job_id}/attempt-{attempt}/{name}"
 
@@ -228,7 +236,7 @@ async def get_cad_job(
     job = await jobs_service.get_job(session, workspace_id=workspace_id, job_id=job_id)
     if (
         job is None
-        or job.job_type is not JobType.CAD_PDF_CONVERT
+        or job.job_type not in CAD_JOB_TYPES
         or job.project_id != project_id
         or job.payload.get("revision_id") != str(revision_id)
     ):
@@ -267,6 +275,9 @@ _NOT_RETRYABLE_REASONS: Final = {
     "параметрах повтор даст тот же результат.",
     ErrorCode.CAD_ENGINE_UNAVAILABLE.value: "Движок не установлен или не прошёл проверку: "
     "повтор возможен после исправления установки, через администратора.",
+    ErrorCode.CAD_MEP_NOT_BUILT.value: "Генератор детерминирован: на том же виде и тех же "
+    "параметрах он даст тот же отказ. Результат изменят другие отметки этажа или новая версия "
+    "генератора.",
 }
 
 
@@ -303,7 +314,7 @@ async def list_cad_jobs(
         .where(
             Job.workspace_id == workspace_id,
             Job.project_id == project_id,
-            Job.job_type == JobType.CAD_PDF_CONVERT,
+            Job.job_type.in_(CAD_JOB_TYPES),
             Job.payload["revision_id"].astext == str(revision_id),
         )
         .order_by(Job.created_at.desc())

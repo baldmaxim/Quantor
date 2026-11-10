@@ -1,7 +1,13 @@
-import type { CadJobRead, CadViewDiagnosticsRead } from '@quantor/api-client';
+import type {
+  CadDecisionRead,
+  CadJobRead,
+  CadRouteJobRead,
+  CadViewDiagnosticsRead,
+} from '@quantor/api-client';
 
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
+import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { CameraState, Viewport } from '@/lib/viewer/camera';
 
 /** Замечания вида: всё, что нужно разделу «Замечания» (тот же, что был на странице CAD). */
@@ -44,7 +50,22 @@ export interface IWorkspaceCadBarProps {
   readonly loading: boolean;
 }
 
+/** Группа «Трассы механики» панели «Слои»: слои route-задания, которые есть в превью. */
+export interface IWorkspaceCadMepLayers {
+  /** Имена слоёв DXF трасс, в порядке показа. */
+  readonly names: readonly string[];
+  /** Подписи пунктов списка, по одной на имя. */
+  readonly titles: readonly string[];
+  /** Индексы показанных слоёв. */
+  readonly visible: ReadonlySet<number>;
+  readonly onToggle: (index: number) => void;
+  /** Скрыть или показать несколько слоёв разом (переключатель группы). */
+  readonly onSetHidden: (indices: readonly number[], hidden: boolean) => void;
+}
+
 export interface IWorkspaceCadLayers {
+  /** Трассы механики выбранного route-задания; `null` - их на листе нет. */
+  readonly mep?: IWorkspaceCadMepLayers | null;
   readonly layers: readonly string[];
   readonly visibleLayers: ReadonlySet<number>;
   readonly onToggleLayer: (index: number) => void;
@@ -61,10 +82,39 @@ export interface IWorkspaceCadLayers {
   readonly onCropChange: (visible: boolean) => void;
 }
 
+/** Выбранное route-задание: то, что нужно блоку «Принять трассы». */
+export interface IWorkspaceCadMepRoute {
+  readonly summaryId: string;
+  /** Полное задание; `null` - ещё читается. */
+  readonly job: CadJobRead | null;
+  /** Параметры чтения вида трасс (задание, попытка-результат, лист, вид); `null` - результата нет. */
+  readonly params: ICadViewParams | null;
+  /** Принятие трасс; `null` - не приняты. */
+  readonly acceptance: CadDecisionRead | null;
+  /** Отказ чтения задания, вида или превью. */
+  readonly error: string | null;
+}
+
+/** Вкладка «Трассы»: одобрение вида, построение, принятие, скачивание. */
+export interface IWorkspaceCadMep {
+  /** Родитель: задание преобразования, попытка с результатом, лист и вид. */
+  readonly parent: ICadViewParams;
+  readonly approval: CadDecisionRead | null;
+  /** Route-задания этого вида, новые сверху. */
+  readonly routeJobs: readonly CadRouteJobRead[];
+  readonly route: IWorkspaceCadMepRoute | null;
+  /** Открытые замечания показанного вида (родителя или трасс); `null` - ещё не прочитаны. */
+  readonly openRemarks: number | null;
+  /** Открыть трассы (задание) или вернуться к виду (`null`). */
+  readonly onSelectRoute: (jobId: string | null) => void;
+}
+
 /** Вид листа с диагностикой: слои, замечания, масштаб и файлы. */
 export interface IWorkspaceCadView {
   readonly diagnostics: CadViewDiagnosticsRead;
   readonly layers: IWorkspaceCadLayers;
+  /** `null` - параметры вида не получены (трассы недоступны). */
+  readonly mep?: IWorkspaceCadMep | null;
   /** `null` - замечания пока недоступны. */
   readonly remarks: IWorkspaceCadRemarks | null;
 }

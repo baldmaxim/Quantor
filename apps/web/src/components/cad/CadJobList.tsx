@@ -6,6 +6,7 @@ import type { FC } from 'react';
 import { ErrorState, SkeletonRows, StatusBadge, cx } from '@/components/ui';
 import { formatTime, requestedPagesLabel } from '@/lib/cad/format';
 import { useCadJobs } from '@/lib/cad/queries';
+import { isRouteJob, routeJobLabel } from '@/lib/cad/mep-jobs';
 import { jobLabel, jobTone, resultInfo } from '@/lib/cad/stages';
 import { extractCode } from '@/lib/errors';
 
@@ -79,7 +80,8 @@ const JobRow: FC<IJobRowProps> = ({ job, selected, onSelect }) => {
           {job.error_code && <span className="mono text-xs text-danger">{job.error_code}</span>}
         </span>
         <span className="text-xs text-muted">
-          {formatTime(job.created_at)} · {requestedPagesLabel(job.requested_pages)}
+          {formatTime(job.created_at)} ·{' '}
+          {isRouteJob(job) ? routeJobLabel(job) : requestedPagesLabel(job.requested_pages)}
         </span>
         {result && (
           <StatusBadge tone={result.tone} dot={false} wrap>

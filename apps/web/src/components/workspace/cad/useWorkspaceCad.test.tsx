@@ -234,7 +234,7 @@ describe('useWorkspaceCad: задание и вид в адресе', () => {
     recognized();
     const withView = mount({ jobParam: JOB_ID, viewParam: 2 });
     expect(withView.result.current.bar?.view).toBe(2);
-    expect(mocks.view.mock.calls.at(-1)?.[0]).toMatchObject({ view: 2, attempt: 1, pageIndex: 0 });
+    expect(mocks.view.mock.calls[0]?.[0]).toMatchObject({ view: 2, attempt: 1, pageIndex: 0 });
     expect(mount({ jobParam: JOB_ID, viewParam: 9 }).result.current.bar?.view).toBe(1);
   });
 

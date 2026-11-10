@@ -414,6 +414,9 @@ class JobType(StrEnum):
     # PDF -> DXF отдельным движком в отдельном исполнителе (QA-контур, app/cad_worker). Основной
     # исполнитель этот тип не берёт: в его реестре обработчика нет.
     CAD_PDF_CONVERT = "cad_pdf_convert"
+    # Трассы механики по одобренному виду результата CAD (ADR-0036 п. 8): генератор tools/cad_mep
+    # подпроцессом в том же cad-worker. Основной исполнитель этот тип не берёт.
+    CAD_MEP_ROUTE = "cad_mep_route"
 
 
 class JobStatus(StrEnum):

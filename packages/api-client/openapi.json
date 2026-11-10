@@ -866,6 +866,62 @@
         "title": "BoxGeometry",
         "type": "object"
       },
+      "CadAcceptanceCreate": {
+        "additionalProperties": false,
+        "description": "Принятие трасс этажа целиком. Страница и вид берутся из route-задания.",
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "required": [
+          "attempt"
+        ],
+        "title": "CadAcceptanceCreate",
+        "type": "object"
+      },
+      "CadApprovalCreate": {
+        "additionalProperties": false,
+        "description": "Одобрение вида: решение человека. Попытка - та, чей результат он смотрел.",
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "required": [
+          "attempt"
+        ],
+        "title": "CadApprovalCreate",
+        "type": "object"
+      },
       "CadArtifactRead": {
         "properties": {
           "name": {
@@ -1202,6 +1258,91 @@
           "pages"
         ],
         "title": "CadConvertCreate",
+        "type": "object"
+      },
+      "CadDecisionRead": {
+        "properties": {
+          "artifact_sha256": {
+            "title": "Artifact Sha256",
+            "type": "string"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "decided_at": {
+            "format": "date-time",
+            "title": "Decided At",
+            "type": "string"
+          },
+          "decided_by": {
+            "format": "uuid",
+            "title": "Decided By",
+            "type": "string"
+          },
+          "decided_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "view_approval",
+              "mep_acceptance"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "job_id",
+          "attempt",
+          "page_index",
+          "view",
+          "artifact_sha256",
+          "decided_by",
+          "decided_by_name",
+          "decided_at",
+          "comment"
+        ],
+        "title": "CadDecisionRead",
         "type": "object"
       },
       "CadEngineStateRead": {
@@ -1565,9 +1706,50 @@
             ],
             "title": "Finished At"
           },
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Mm"
+          },
+          "generator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator Version"
+          },
           "job_id": {
             "format": "uuid",
             "title": "Job Id",
+            "type": "string"
+          },
+          "job_type": {
+            "enum": [
+              "cad_pdf_convert",
+              "cad_mep_route"
+            ],
+            "title": "Job Type",
             "type": "string"
           },
           "known_limitation": {
@@ -1581,12 +1763,46 @@
             ],
             "title": "Known Limitation"
           },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
           "pages": {
             "items": {
               "$ref": "#/components/schemas/CadPageRead"
             },
             "title": "Pages",
             "type": "array"
+          },
+          "parent_attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Attempt"
+          },
+          "parent_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Job Id"
           },
           "requested_pages": {
             "anyOf": [
@@ -1678,11 +1894,30 @@
           },
           "status": {
             "$ref": "#/components/schemas/JobStatus"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
           }
         },
         "required": [
           "job_id",
+          "job_type",
           "revision_id",
+          "parent_job_id",
+          "parent_attempt",
+          "page_index",
+          "view",
+          "floor_elevation_mm",
+          "floor_height_mm",
+          "generator_version",
           "status",
           "stage",
           "attempt",
@@ -1746,6 +1981,37 @@
             "title": "Job Id",
             "type": "string"
           },
+          "job_type": {
+            "enum": [
+              "cad_pdf_convert",
+              "cad_mep_route"
+            ],
+            "title": "Job Type",
+            "type": "string"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "parent_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Job Id"
+          },
           "requested_pages": {
             "anyOf": [
               {
@@ -1773,10 +2039,25 @@
           },
           "status": {
             "$ref": "#/components/schemas/JobStatus"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
           }
         },
         "required": [
           "job_id",
+          "job_type",
+          "parent_job_id",
+          "page_index",
+          "view",
           "status",
           "attempt",
           "created_at",
@@ -1786,6 +2067,36 @@
           "error_code"
         ],
         "title": "CadJobSummaryRead",
+        "type": "object"
+      },
+      "CadMepRoutesCreate": {
+        "additionalProperties": false,
+        "description": "Постановка трасс. Отметка пола и высота этажа - ввод человека, обе обязательны.",
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "floor_elevation_mm": {
+            "maximum": 1000000.0,
+            "minimum": -100000.0,
+            "title": "Floor Elevation Mm",
+            "type": "integer"
+          },
+          "floor_height_mm": {
+            "maximum": 6000.0,
+            "minimum": 2000.0,
+            "title": "Floor Height Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attempt",
+          "floor_elevation_mm",
+          "floor_height_mm"
+        ],
+        "title": "CadMepRoutesCreate",
         "type": "object"
       },
       "CadPageRead": {
@@ -2106,6 +2417,7 @@
               "monolith",
               "room_boundary",
               "wrong_class",
+              "route",
               "other"
             ],
             "title": "Type",
@@ -2188,6 +2500,7 @@
               "monolith",
               "room_boundary",
               "wrong_class",
+              "route",
               "other"
             ],
             "title": "Type",
@@ -2278,6 +2591,7 @@
               "monolith",
               "room_boundary",
               "wrong_class",
+              "route",
               "other"
             ],
             "title": "Type",
@@ -2406,6 +2720,102 @@
           "updated"
         ],
         "title": "CadRemarksImportRead",
+        "type": "object"
+      },
+      "CadRouteJobRead": {
+        "description": "Route-задание вида в списке у родителя.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Mm"
+          },
+          "generator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator Version"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "attempt",
+          "created_at",
+          "finished_at",
+          "error_code",
+          "floor_elevation_mm",
+          "floor_height_mm",
+          "generator_version",
+          "accepted"
+        ],
+        "title": "CadRouteJobRead",
         "type": "object"
       },
       "CadScaleControlRead": {
@@ -2854,6 +3264,26 @@
       },
       "CadViewDiagnosticsRead": {
         "properties": {
+          "acceptance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadDecisionRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadDecisionRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "attempt": {
             "title": "Attempt",
             "type": "integer"
@@ -2925,6 +3355,13 @@
             "title": "Review Required",
             "type": "boolean"
           },
+          "route_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/CadRouteJobRead"
+            },
+            "title": "Route Jobs",
+            "type": "array"
+          },
           "scale": {
             "anyOf": [
               {
@@ -2977,7 +3414,28 @@
         "type": "object"
       },
       "CadViewRead": {
+        "description": "Вид результата; решения человека (одобрение, принятие трасс) и route-задания - в базе.",
         "properties": {
+          "acceptance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadDecisionRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadDecisionRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "dxf": {
             "anyOf": [
               {
@@ -3021,6 +3479,13 @@
               }
             ],
             "title": "Failure Reason"
+          },
+          "route_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/CadRouteJobRead"
+            },
+            "title": "Route Jobs",
+            "type": "array"
           },
           "scale_deviation": {
             "anyOf": [
@@ -15416,7 +15881,8 @@
         "enum": [
           "legacy_import",
           "pdf_geometry_extract",
-          "cad_pdf_convert"
+          "cad_pdf_convert",
+          "cad_mep_route"
         ],
         "title": "JobType",
         "type": "string"
@@ -27107,6 +27573,79 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/acceptance": {
+      "post": {
+        "operationId": "accept_cad_mep_routes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadAcceptanceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadDecisionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Принять трассы этажа: открывает скачивание DXF трасс (решение человека)",
+        "tags": [
+          "cad-mep"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/artifacts/{name}": {
       "get": {
         "operationId": "download_cad_artifact",
@@ -27795,6 +28334,188 @@
         "summary": "Диагностика вида: масштаб, кадр координат, проверки и файлы (QA)",
         "tags": [
           "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/approval": {
+      "post": {
+        "operationId": "approve_cad_view",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadApprovalCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadDecisionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Одобрить вид результата CAD для построения трасс (решение человека)",
+        "tags": [
+          "cad-mep"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/mep-routes": {
+      "post": {
+        "operationId": "create_cad_mep_routes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadMepRoutesCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Поставить построение трасс механики по одобренному виду",
+        "tags": [
+          "cad-mep"
         ]
       }
     },

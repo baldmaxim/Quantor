@@ -1,0 +1,99 @@
+import { z } from 'zod';
+
+/**
+ * `candidate.json` трасс механики (схема `quantor.cad_mep.candidate.v1`).
+ *
+ * Это файл-артефакт задания, а не DTO API: его форму держит генератор (tools/cad_mep), здесь она
+ * проверяется на входе. Читается только то, что показывает панель; остальные поля файла
+ * (шахты, помещения, проверки, происхождение) пропускаются. Файл - кандидат: до принятия
+ * человеком в расчёт не идёт.
+ */
+
+/** Каталог вида в артефактах: страница и вид с 1 (`views/p081_v01`), как у сервера. */
+export const viewFolder = (pageIndex: number, view: number): string =>
+  `views/p${String(pageIndex + 1).padStart(3, '0')}_v${String(view).padStart(2, '0')}`;
+
+export const CANDIDATE_SCHEMA = 'quantor.cad_mep.candidate.v1';
+
+const lengthSchema = z.object({ plan_m: z.number(), len3d_m: z.number() });
+const layerLengthSchema = lengthSchema.extend({ polylines: z.number().optional() });
+const sourcedSchema = z.object({ value: z.number(), source: z.string() });
+
+const candidateSchema = z.object({
+  schema: z.literal(CANDIDATE_SCHEMA),
+  status: z.string(),
+  elevation: z.object({
+    floor_elevation_mm: sourcedSchema,
+    floor_height_mm: sourcedSchema,
+    sheet_marks_mm: z.array(z.number()).default([]),
+  }),
+  assumptions: z
+    .array(
+      z.object({
+        name: z.string(),
+        value: z.unknown(),
+        unit: z.string().nullable().optional(),
+        note: z.string().nullable().optional(),
+      }),
+    )
+    .default([]),
+  apartments: z
+    .array(
+      z.object({
+        idx: z.number(),
+        number: z.string().nullable().optional(),
+        lengths_own_lines: z.record(z.string(), lengthSchema).default({}),
+      }),
+    )
+    .default([]),
+  routes: z.object({
+    by_layer: z.record(z.string(), layerLengthSchema).default({}),
+    by_system: z.record(z.string(), lengthSchema).default({}),
+    totals: lengthSchema,
+  }),
+  issues: z
+    .array(
+      z.object({
+        code: z.string(),
+        message: z.string(),
+        apartment: z.union([z.string(), z.number()]).nullable().optional(),
+      }),
+    )
+    .default([]),
+  notes: z.array(z.string()).default([]),
+});
+
+export type MepCandidate = z.infer<typeof candidateSchema>;
+export type MepLength = z.infer<typeof lengthSchema>;
+
+/** Разбор файла; чужая схема или битая форма - `null` (вызывающий скажет об этом человеку). */
+export const parseCandidate = (raw: unknown): MepCandidate | null => {
+  const parsed = candidateSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+};
+
+/** Системы в порядке показа и их названия. */
+export const MEP_SYSTEMS: readonly { readonly key: string; readonly label: string }[] = [
+  { key: 'heating', label: 'Отопление' },
+  { key: 'water', label: 'Водоснабжение' },
+  { key: 'fire', label: 'Пожаротушение' },
+  { key: 'sewer', label: 'Канализация' },
+];
+
+export const mepSystemLabel = (key: string): string =>
+  MEP_SYSTEMS.find((item) => item.key === key)?.label ?? key;
+
+/** Значение допущения для показа: число, строка или короткий JSON. */
+export const assumptionValueText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+/** Метры с двумя знаками, запятая как разделитель. */
+export const formatMeters = (value: number): string =>
+  value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

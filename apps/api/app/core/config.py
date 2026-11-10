@@ -133,6 +133,12 @@ class Settings(BaseSettings):
     cad_work_root: str = ""
     cad_total_timeout_seconds: int = Field(default=900, ge=10, le=7200)
     cad_max_memory_mb: int = Field(default=3072, ge=256, le=16384)
+    # Трассы механики (ADR-0036 п. 8): генератор `tools/cad_mep/run_mep.py` запускается тем же
+    # интерпретатором движка (`cad_engine_python`) в образе cad-worker. Файл параметров читают и
+    # API (только sha256 и версия генератора), и исполнитель; пусто — `tools/cad_mep/params/v1.json`
+    # в корне репозитория (/app в образах).
+    cad_mep_runner: str = ""
+    cad_mep_params: str = ""
 
     # --- вход в портал ---
     #

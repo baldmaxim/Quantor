@@ -2,6 +2,7 @@
 
 from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
+from app.models.cad_decision import CadDecision
 from app.models.cad_remark import CadRemark
 from app.models.calc import (
     CalcFact,
@@ -36,6 +37,7 @@ from app.models.worker import Worker
 __all__ = [
     "AuditEvent",
     "AuthSession",
+    "CadDecision",
     "CadRemark",
     "CalcExpectedQuantity",
     "CalcFact",

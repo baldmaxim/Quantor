@@ -9,9 +9,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.domain import JobStatus
+from app.contracts.cad_mep import CadJobType, CadViewMepRead, view_mep_read
+from app.domain import JobStatus, JobType
 from app.models import Job
 from app.services import cad as cad_service
+from app.services import cad_mep as cad_mep_service
 from app.services import cad_progress
 
 
@@ -50,7 +52,9 @@ class CadArtifactRead(BaseModel):
     size: int
 
 
-class CadViewRead(BaseModel):
+class CadViewRead(CadViewMepRead):
+    """Вид результата; решения человека (одобрение, принятие трасс) и route-задания - в базе."""
+
     view: int
     status: str
     scale_status: str | None
@@ -210,13 +214,25 @@ class CadEventsRead(BaseModel):
 
 
 def _requested_pages(job: Job) -> list[int] | None:
+    if job.job_type is JobType.CAD_MEP_ROUTE:
+        page_index = cad_mep_service.payload_int(job, "page_index")
+        return None if page_index is None else [page_index]
     params = job.payload.get("params")
     pages = params.get("pages") if isinstance(params, dict) else None
     return [int(p) for p in pages] if isinstance(pages, list) else None
 
 
+def _job_type_of(job: Job) -> CadJobType:
+    return "cad_mep_route" if job.job_type is JobType.CAD_MEP_ROUTE else "cad_pdf_convert"
+
+
 class CadJobSummaryRead(BaseModel):
     job_id: UUID
+    # `cad_mep_route` - трассы механики по одобренному виду родителя (ADR-0036 п. 8).
+    job_type: CadJobType
+    parent_job_id: UUID | None
+    page_index: int | None
+    view: int | None
     status: JobStatus
     attempt: int
     created_at: datetime
@@ -233,7 +249,16 @@ class CadJobListRead(BaseModel):
 
 class CadJobRead(BaseModel):
     job_id: UUID
+    job_type: CadJobType
     revision_id: UUID
+    # Только у `cad_mep_route`: родитель, его попытка, вид и ввод человека (отметки).
+    parent_job_id: UUID | None
+    parent_attempt: int | None
+    page_index: int | None
+    view: int | None
+    floor_elevation_mm: int | None
+    floor_height_mm: int | None
+    generator_version: str | None
     status: JobStatus
     stage: str | None
     attempt: int
@@ -258,13 +283,41 @@ class CadJobRead(BaseModel):
     retry_blocked_reason: str | None
 
     @classmethod
-    def of(cls, job: Job) -> CadJobRead:
+    def of(cls, job: Job, state: cad_mep_service.MepState | None = None) -> CadJobRead:
         # Только итог текущей попытки: прошлый результат текущим не выдаётся.
         result: dict[str, Any] = cad_service.current_result(job)
         retryable, reason = cad_service.retry_state(job)
+        result_attempt = result.get("attempt") if result else None
+        pages = [
+            CadPageRead.model_validate(
+                {
+                    **page,
+                    "views": [
+                        {
+                            **row,
+                            **view_mep_read(
+                                job, result_attempt, int(page["index"]), int(row["view"]), state
+                            ).model_dump(),
+                        }
+                        for row in page.get("views", [])
+                    ],
+                }
+            )
+            for page in result.get("pages", [])
+        ]
+        version = job.payload.get("generator_version")
+        parent = cad_mep_service.parent_job_id_of(job)
         return cls(
             job_id=job.id,
+            job_type=_job_type_of(job),
             revision_id=UUID(str(job.payload["revision_id"])),
+            parent_job_id=parent,
+            parent_attempt=cad_mep_service.payload_int(job, "parent_attempt") if parent else None,
+            page_index=cad_mep_service.payload_int(job, "page_index") if parent else None,
+            view=cad_mep_service.payload_int(job, "view") if parent else None,
+            floor_elevation_mm=cad_mep_service.payload_int(job, "floor_elevation_mm"),
+            floor_height_mm=cad_mep_service.payload_int(job, "floor_height_mm"),
+            generator_version=version if isinstance(version, str) else None,
             status=job.status,
             stage=job.stage,
             attempt=job.attempt,
@@ -275,7 +328,7 @@ class CadJobRead(BaseModel):
             # Любой результат движка — кандидат: проверка инженером обязательна всегда.
             review_required=True,
             known_limitation=result.get("known_limitation"),
-            pages=[CadPageRead.model_validate(page) for page in result.get("pages", [])],
+            pages=pages,
             artifacts=[
                 CadArtifactRead(name=row["name"], sha256=row["sha256"], size=row["size"])
                 for row in result.get("artifacts", [])
@@ -285,7 +338,7 @@ class CadJobRead(BaseModel):
             finished_at=job.finished_at,
             server_time=datetime.now(UTC),
             requested_pages=_requested_pages(job),
-            result_attempt=result.get("attempt") if result else None,
+            result_attempt=result_attempt,
             attempts=[CadAttemptRead.of(job, row) for row in cad_progress.attempts_of(job.payload)],
             retryable=retryable,
             retry_blocked_reason=reason,
@@ -294,8 +347,13 @@ class CadJobRead(BaseModel):
 
 def summary_of(job: Job) -> CadJobSummaryRead:
     result = cad_service.current_result(job)
+    parent = cad_mep_service.parent_job_id_of(job)
     return CadJobSummaryRead(
         job_id=job.id,
+        job_type=_job_type_of(job),
+        parent_job_id=parent,
+        page_index=cad_mep_service.payload_int(job, "page_index") if parent else None,
+        view=cad_mep_service.payload_int(job, "view") if parent else None,
         status=job.status,
         attempt=job.attempt,
         created_at=job.created_at,
@@ -384,7 +442,7 @@ class CadChecksRead(BaseModel):
     quantity_release_allowed: bool
 
 
-class CadViewDiagnosticsRead(BaseModel):
+class CadViewDiagnosticsRead(CadViewMepRead):
     job_id: UUID
     attempt: int
     page_index: int
@@ -447,6 +505,7 @@ CadRemarkType = Literal[
     "monolith",
     "room_boundary",
     "wrong_class",
+    "route",
     "other",
 ]
 CadRemarkStatus = Literal["open", "resolved"]

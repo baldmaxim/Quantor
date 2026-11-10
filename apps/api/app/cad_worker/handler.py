@@ -13,11 +13,12 @@ import contextlib
 import hashlib
 import json
 import os
+import resource
 import shutil
 import signal
 import tempfile
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -92,8 +93,22 @@ class EngineCommand:
         ]
 
 
-async def _run(argv: list[str], limit_seconds: float) -> tuple[int, bytes]:
-    """Подпроцесс в своей группе: по таймауту убивается вся группа, включая worker движка."""
+def _memory_limiter(limit_mb: int) -> Callable[[], None]:
+    def apply() -> None:
+        limit = limit_mb * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+
+    return apply
+
+
+async def _run(
+    argv: list[str], limit_seconds: float, *, memory_limit_mb: int | None = None
+) -> tuple[int, bytes]:
+    """Подпроцесс в своей группе: по таймауту убивается вся группа, включая worker движка.
+
+    `memory_limit_mb` - предел адресного пространства процесса (RLIMIT_AS) для генераторов без
+    собственного контроля памяти; runner движка следит за памятью сам и предела не получает.
+    """
     process = await asyncio.create_subprocess_exec(
         *argv,
         stdin=asyncio.subprocess.DEVNULL,
@@ -101,6 +116,7 @@ async def _run(argv: list[str], limit_seconds: float) -> tuple[int, bytes]:
         stderr=asyncio.subprocess.STDOUT,
         env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
         start_new_session=True,
+        preexec_fn=_memory_limiter(memory_limit_mb) if memory_limit_mb else None,
     )
     try:
         async with asyncio.timeout(limit_seconds):
@@ -307,8 +323,9 @@ async def _run_while_owned(
     limit_seconds: float,
     poll_interval: float,
     progress_path: Path | None = None,
+    memory_limit_mb: int | None = None,
 ) -> tuple[int, bytes] | None:
-    running = asyncio.create_task(_run(argv, limit_seconds))
+    running = asyncio.create_task(_run(argv, limit_seconds, memory_limit_mb=memory_limit_mb))
     loop = asyncio.get_running_loop()
     next_lease_check = loop.time()
     lease_every = min(_LEASE_CHECK_SECONDS, poll_interval)

@@ -151,6 +151,12 @@ class ErrorCode(StrEnum):
     CAD_REMARKS_BINDING_MISMATCH = "CAD_REMARKS_BINDING_MISMATCH"
     # У выбранной страницы нет действующей калибровки листа (ADR-0018, ADR-0036 п. 4).
     CAD_CALIBRATION_REQUIRED = "CAD_CALIBRATION_REQUIRED"
+    # Трассы механики (ADR-0036 п. 8): гейты решений человека и отказ генератора.
+    CAD_OPEN_REMARKS = "CAD_OPEN_REMARKS"
+    CAD_ALREADY_DECIDED = "CAD_ALREADY_DECIDED"
+    CAD_VIEW_NOT_APPROVED = "CAD_VIEW_NOT_APPROVED"
+    CAD_ROUTES_NOT_ACCEPTED = "CAD_ROUTES_NOT_ACCEPTED"
+    CAD_MEP_NOT_BUILT = "CAD_MEP_NOT_BUILT"
 
     # --- поставщики моделей ---
     MODEL_PROVIDER_NOT_CONFIGURED = "MODEL_PROVIDER_NOT_CONFIGURED"
@@ -288,6 +294,11 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_REMARKS_BINDING_MISMATCH: "Замечания относятся к другому результату CAD",
     ErrorCode.CAD_CALIBRATION_REQUIRED: "Откалибруйте масштаб выбранных листов перед "
     "преобразованием в CAD",
+    ErrorCode.CAD_OPEN_REMARKS: "Есть неисправленные замечания к этому результату",
+    ErrorCode.CAD_ALREADY_DECIDED: "Решение по этому результату уже принято",
+    ErrorCode.CAD_VIEW_NOT_APPROVED: "Вид не одобрен для построения трасс",
+    ErrorCode.CAD_ROUTES_NOT_ACCEPTED: "Трассы не приняты: DXF трасс недоступен",
+    ErrorCode.CAD_MEP_NOT_BUILT: "Генератор не построил трассы",
     ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
     ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: "Поставщик моделей не настроен",
@@ -423,6 +434,11 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_RESULT_NOT_READY: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_REMARKS_BINDING_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_CALIBRATION_REQUIRED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_OPEN_REMARKS: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_ALREADY_DECIDED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_VIEW_NOT_APPROVED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_ROUTES_NOT_ACCEPTED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_MEP_NOT_BUILT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: status.HTTP_409_CONFLICT,

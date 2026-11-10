@@ -39,6 +39,7 @@ REMARK_TYPE_VALUES: tuple[str, ...] = (
     "monolith",
     "room_boundary",
     "wrong_class",
+    "route",
     "other",
 )
 REMARK_STATUS_VALUES: tuple[str, ...] = ("open", "resolved")

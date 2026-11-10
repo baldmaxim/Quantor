@@ -29,6 +29,11 @@ COPY apps/api/alembic.ini ./alembic.ini
 COPY apps/api/alembic ./alembic
 COPY apps/api/app ./app
 
+# Трассы механики (ADR-0036 п. 8): API читает только sha256 параметров и версию генератора.
+# Сам генератор (tools/cad_mep целиком) есть лишь в образе cad-worker.
+COPY tools/cad_mep/params/v1.json /app/tools/cad_mep/params/v1.json
+COPY tools/cad_mep/cad_mep/version.py /app/tools/cad_mep/cad_mep/version.py
+
 # Описание развёртывания едет вместе с кодом, которому соответствует: update.sh берёт
 # docker-compose.yml из образа того же коммита, а не из копии, правленной руками.
 COPY deploy/docker-compose.yml deploy/update.sh /app/deploy/

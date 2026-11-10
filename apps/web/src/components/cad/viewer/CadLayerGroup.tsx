@@ -14,6 +14,8 @@ interface ICadLayerGroupProps {
   onToggleLayer: (index: number) => void;
   /** Скрыть или показать все слои группы разом. */
   onSetLayersHidden: (indices: readonly number[], hidden: boolean) => void;
+  /** Цвет образца слоя; по умолчанию - токен палитры по порядку слоя. */
+  swatchColor?: (index: number) => string;
 }
 
 const CHECK = 'flex min-h-[44px] items-center gap-[var(--s-3)] text-sm';
@@ -25,6 +27,7 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
   visibleLayers,
   onToggleLayer,
   onSetLayersHidden,
+  swatchColor = layerColorVar,
 }) => {
   const [expanded, setExpanded] = useState(true);
   const master = useRef<HTMLInputElement>(null);
@@ -96,8 +99,8 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
                 aria-hidden="true"
                 data-testid="layer-swatch"
                 data-layer-on={on}
-                // Цвет слоя - динамическое значение: токен палитры по порядку слоя.
-                style={{ backgroundColor: layerColorVar(index) }}
+                // Цвет слоя - динамическое значение: токен темы.
+                style={{ backgroundColor: swatchColor(index) }}
                 className={cx(
                   'size-4 shrink-0 rounded-[var(--radius-xs)] border border-border-strong transition-opacity',
                   !on && 'opacity-30',

@@ -7,6 +7,9 @@ import type { ViewportSheet } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
 import { cropToNormalized } from '@/lib/cad/frame';
 import { readCadPaintColors } from '@/lib/cad/paint-colors';
+import { isRouteJob } from '@/lib/cad/mep-jobs';
+import { useMepLayerVisibility } from '@/lib/cad/mep-layers';
+import { mergeRoutePaint } from '@/lib/cad/mep-routes';
 import type { BboxPt, IRemarkBinding } from '@/lib/cad/remarks';
 import { composePainters, createRemarksPainter } from '@/lib/cad/remarks-painter';
 import { useStoredNumber } from '@/lib/cad/useStoredNumber';
@@ -20,7 +23,7 @@ import {
   type CadViewMode,
 } from '@/lib/cad/view-mode';
 import { sheetWorkspaceHref } from '@/lib/cad/sheets';
-import { overlayPaintData } from '@/lib/cad/workspace-cad';
+import { matchingPreview, overlayPaintData, remarkBindingOf } from '@/lib/cad/workspace-cad';
 import { pageForJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { useTheme } from '@/lib/theme';
 import type { Camera, Viewport } from '@/lib/viewer/camera';
@@ -28,6 +31,7 @@ import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 import { useWorkspaceStore } from '@/store/workspace';
 
 import { tabFromQuery } from './left-tab';
+import { mepLayersOf, mepOf } from './mep-side';
 import type {
   IWorkspaceCadBarProps,
   IWorkspaceCadLayers,
@@ -37,6 +41,7 @@ import type {
 } from './types';
 import { useWorkspaceCadJob } from './useWorkspaceCadJob';
 import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
+import { useWorkspaceCadRoutes } from './useWorkspaceCadRoutes';
 
 interface IUseWorkspaceCadInput {
   projectId: string;
@@ -138,6 +143,20 @@ export const useWorkspaceCad = ({
   });
   const { diagnostics, preview, frame, params, availability } = data;
 
+  // Трассы механики: выбранное route-задание рисуется поверх DXF вида его родителя.
+  const routes = useWorkspaceCadRoutes({
+    projectId,
+    revisionId,
+    load: enabled && opened && revisionId !== null,
+    pageIndex,
+    route: data.routeSummary,
+  });
+  const mepVisibility = useMepLayerVisibility();
+  const routePreview = useMemo(
+    () => (routes.diagnostics ? matchingPreview(routes.diagnostics, routes.preview ?? undefined) : null),
+    [routes.diagnostics, routes.preview],
+  );
+
   // DXF накладывается на PDF, только когда его уже можно нарисовать; иначе виден один PDF.
   const geometryReady = availability?.available === true && preview !== null && frame !== null;
   const mode: CadViewMode = resolveCadMode(geometryReady);
@@ -179,35 +198,51 @@ export const useWorkspaceCad = ({
     [active, cropAvailable, cropVisible, cropRect, cropColor],
   );
 
-  const paintData = useMemo(
-    () =>
-      overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
-        dxfVisible: render.dxfVisible,
-        hiddenLayers,
-        crop,
-      }),
-    [preview, frame, pageSize, colors.ink, colors.layers, render.dxfVisible, hiddenLayers, crop],
-  );
+  const paintData = useMemo(() => {
+    const base = overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
+      dxfVisible: render.dxfVisible,
+      hiddenLayers,
+      crop,
+    });
+    const route =
+      render.dxfVisible && routePreview
+        ? { preview: routePreview, colors: colors.mep, hiddenMask: mepVisibility.mask }
+        : null;
+    return mergeRoutePaint(base, layerNames.length, route, frame, pageSize, colors.ink);
+  }, [
+    preview,
+    frame,
+    pageSize,
+    colors.ink,
+    colors.layers,
+    colors.mep,
+    render.dxfVisible,
+    hiddenLayers,
+    crop,
+    routePreview,
+    mepVisibility.mask,
+    layerNames,
+  ]);
   const cadPainter = useMemo(() => (paintData ? createCadPainter(paintData) : null), [paintData]);
 
   // --- замечания ---
+  // Замечания принадлежат показанному заданию: вид родителя или, когда выбраны трассы, их задание.
+  const routeSelected = data.routeSummary !== null;
   const binding = useMemo<IRemarkBinding | null>(
     () =>
-      params && diagnostics
-        ? {
-            projectId: params.projectId,
-            revisionId: params.revisionId,
-            jobId: params.jobId,
-            attempt: params.attempt,
-            pageIndex: params.pageIndex,
-            legacyPdfPage: diagnostics.legacy_pdf_page,
-            view: params.view,
-            dxfSha256: diagnostics.dxf?.sha256 ?? null,
-          }
-        : null,
-    [params, diagnostics],
+      routeSelected
+        ? remarkBindingOf(routes.params, routes.diagnostics)
+        : remarkBindingOf(params, diagnostics),
+    [routeSelected, routes.params, routes.diagnostics, params, diagnostics],
   );
   const remarks = useWorkspaceCadRemarks({ binding, pageSize, camera, viewportSize, active });
+
+  // Открытые замечания показанного вида; пока список не прочитан - `null`, и решения заблокированы.
+  const remarkStore = remarks.remarks?.store ?? null;
+  const openRemarks =
+    remarkStore !== null && !remarkStore.loading && remarkStore.loadError === null
+      ? remarkStore.remarks.filter((item) => item.status === 'open').length
+      : null;
 
   const painter = useMemo<LayerPainter | null>(
     () =>
@@ -231,9 +266,9 @@ export const useWorkspaceCad = ({
   };
 
   // Задание выбрано (из списка или только что создано): рабочая область встаёт на его лист.
-  const openJob = (jobId: string, pages: readonly number[] | null) => {
+  const openJob = (jobId: string, pages: readonly number[] | null, jobView: number | null = null) => {
     const target = pageForJob({ requested_pages: pages ? [...pages] : null }, pageIndex);
-    const changes = { job: jobId, view: null };
+    const changes = { job: jobId, view: jobView !== null ? String(jobView) : null };
     if (target !== null && target !== pageIndex) goToSheet(target, changes);
     else navigate(changes);
   };
@@ -244,10 +279,13 @@ export const useWorkspaceCad = ({
           projectId,
           revisionId,
           activePage: pageIndex,
-          selectedJobId: data.jobId,
+          selectedJobId: data.routeSummary?.job_id ?? data.jobId,
           onOpenSheet: (target) => goToSheet(target, { job: null, view: null }),
-          onSelectJob: (jobId) =>
-            openJob(jobId, data.jobs.find((item) => item.job_id === jobId)?.requested_pages ?? null),
+          onSelectJob: (jobId) => {
+            const item = data.jobs.find((entry) => entry.job_id === jobId);
+            // Трассы открываются на своём виде: вид задан самим заданием.
+            openJob(jobId, item?.requested_pages ?? null, item && isRouteJob(item) ? item.view : null);
+          },
         }
       : null;
 
@@ -289,6 +327,11 @@ export const useWorkspaceCad = ({
   else state = data.jobId === null ? 'none' : 'ready';
 
   const layers: IWorkspaceCadLayers = {
+    mep: mepLayersOf(
+      render.dxfVisible && routePreview ? routePreview.layers : null,
+      mepVisibility.mask,
+      mepVisibility.setHidden,
+    ),
     layers: layerNames,
     visibleLayers,
     onToggleLayer: (index) =>
@@ -352,7 +395,23 @@ export const useWorkspaceCad = ({
     viewLoading:
       state === 'ready' && data.diagnosticsError === null && (data.job === null || data.diagnosticsPending),
     viewError: state === 'ready' ? data.diagnosticsError : null,
-    view: diagnostics ? { diagnostics, layers, remarks: remarks.remarks } : null,
+    view: diagnostics
+      ? {
+          diagnostics,
+          layers,
+          mep: mepOf({
+            parent: params,
+            diagnostics,
+            routeSummary: data.routeSummary,
+            routes,
+            openRemarks,
+            view: data.view,
+            navigate,
+            parentJobId: data.jobId,
+          }),
+          remarks: remarks.remarks,
+        }
+      : null,
   };
 
   return {

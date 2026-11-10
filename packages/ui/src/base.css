@@ -92,6 +92,19 @@
   --cad-layer-11: #3f6811;
   --cad-layer-12: #b41d43;
 
+  /* Трассы механики на листе (вкладка CAD): по системе на слой, различимы на бумаге листа и на
+     фоне панели (образец цвета в списке слоёв). */
+  --cad-mep-ov-t1: #c0261f;
+  --cad-mep-ov-t2: #1d5bb3;
+  --cad-mep-pt-vpv: #b45309;
+  --cad-mep-pt-aup: #a21caf;
+  --cad-mep-vk-v1: #0b78b0;
+  --cad-mep-vk-t3: #1a7f37;
+  --cad-mep-vk-t4: #7a4a1d;
+  --cad-mep-vk-k1: #6d3fd1;
+  --cad-mep-node: #5b6573;
+  --cad-mep-riser: #1f2937;
+
   /* --- вспомогательное --- */
   --tooltip-bg: #2b323b;
   --tooltip-text: #ffffff;
@@ -228,6 +241,18 @@
     --cad-layer-11: #507f1a;
     --cad-layer-12: #d53059;
 
+    /* Трассы механики: на светлой бумаге листа и на тёмной панели одновременно. */
+    --cad-mep-ov-t1: #d53631;
+    --cad-mep-ov-t2: #2b71d3;
+    --cad-mep-pt-vpv: #c26a14;
+    --cad-mep-pt-aup: #b83fc4;
+    --cad-mep-vk-v1: #1b86bd;
+    --cad-mep-vk-t3: #1b843e;
+    --cad-mep-vk-t4: #9a6234;
+    --cad-mep-vk-k1: #775dde;
+    --cad-mep-node: #7a8594;
+    --cad-mep-riser: #5d6877;
+
     --tooltip-bg: #c8d2de;
     --tooltip-text: #0f141a;
     --skeleton: #232932;
@@ -292,6 +317,18 @@
   --cad-layer-10: #775dde;
   --cad-layer-11: #507f1a;
   --cad-layer-12: #d53059;
+
+  /* Трассы механики: на светлой бумаге листа и на тёмной панели одновременно. */
+  --cad-mep-ov-t1: #d53631;
+  --cad-mep-ov-t2: #2b71d3;
+  --cad-mep-pt-vpv: #c26a14;
+  --cad-mep-pt-aup: #b83fc4;
+  --cad-mep-vk-v1: #1b86bd;
+  --cad-mep-vk-t3: #1b843e;
+  --cad-mep-vk-t4: #9a6234;
+  --cad-mep-vk-k1: #775dde;
+  --cad-mep-node: #7a8594;
+  --cad-mep-riser: #5d6877;
 
   --tooltip-bg: #c8d2de;
   --tooltip-text: #0f141a;

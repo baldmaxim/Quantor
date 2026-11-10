@@ -76,6 +76,7 @@ class TestStageBoundaries:
             "legacy_import",
             "pdf_geometry_extract",
             "cad_pdf_convert",
+            "cad_mep_route",
         ]
 
     def test_no_job_type_invokes_a_model(self) -> None:

@@ -3,6 +3,7 @@
 import { useMemo, type FC } from 'react';
 
 import { groupLayers } from '@/lib/cad/layer-groups';
+import { mepColorVar } from '@/lib/cad/mep-layers';
 import { formatInt } from '@/lib/cad/view-format';
 import { MAX_PDF_OPACITY, MIN_PDF_OPACITY } from '@/lib/cad/view-mode';
 
@@ -28,7 +29,19 @@ interface ICadLayersPanelProps {
   cropAvailable: boolean;
   cropVisible: boolean;
   onCropChange: (visible: boolean) => void;
+  /** Трассы механики выбранного route-задания; нет - группы нет. */
+  mep?: {
+    /** Имена слоёв DXF трасс. */
+    names: readonly string[];
+    /** Подписи пунктов, по одной на имя. */
+    titles: readonly string[];
+    visible: ReadonlySet<number>;
+    onToggle: (index: number) => void;
+    onSetHidden: (indices: readonly number[], hidden: boolean) => void;
+  } | null;
 }
+
+const MEP_GROUP = 'mep';
 
 const CHECK = 'flex min-h-[44px] items-center gap-[var(--s-3)] text-sm';
 
@@ -47,6 +60,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   cropAvailable,
   cropVisible,
   onCropChange,
+  mep = null,
 }) => {
   const groups = useMemo(() => groupLayers(layers), [layers]);
 
@@ -91,7 +105,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
 
       {cadShown && layers.length > 0 && (
         <fieldset className="min-w-0 border-0 p-0">
-          <legend className="mb-[var(--s-2)] text-xs text-muted">Слои DXF</legend>
+          <legend className="mb-[var(--s-2)] text-xs text-muted">Чертёж (DXF вида)</legend>
           <div className="flex flex-col">
             {groups.map((group) => (
               <CadLayerGroup
@@ -104,6 +118,24 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
               />
             ))}
           </div>
+        </fieldset>
+      )}
+
+      {mep && (
+        <fieldset className="min-w-0 border-0 p-0" data-testid="mep-layers">
+          <legend className="sr-only">Слои трасс механики</legend>
+          <CadLayerGroup
+            group={{
+              key: MEP_GROUP,
+              label: 'Трассы механики',
+              indices: mep.names.map((_, index) => index),
+            }}
+            layers={mep.titles}
+            visibleLayers={mep.visible}
+            onToggleLayer={mep.onToggle}
+            onSetLayersHidden={(indices, hidden) => mep.onSetHidden(indices, hidden)}
+            swatchColor={(index) => mepColorVar(mep.names[index] ?? '')}
+          />
         </fieldset>
       )}
 

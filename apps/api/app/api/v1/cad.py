@@ -44,10 +44,12 @@ from app.contracts.cad import (
     CadViewDiagnosticsRead,
     summary_of,
 )
-from app.domain import JobStatus
+from app.contracts.cad_mep import view_mep_read
+from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, http_error, not_found
 from app.models import CadRemark, DocumentRevision, Job, Project
 from app.services import cad as cad_service
+from app.services import cad_mep as cad_mep_service
 from app.services import cad_progress, cad_remarks, cad_views
 from app.services import jobs as jobs_service
 from app.services import projects as projects_service
@@ -96,6 +98,43 @@ async def _job(
     return job
 
 
+async def job_read(session: SessionDep, job: Job) -> CadJobRead:
+    """Задание вместе с решениями человека и route-заданиями его видов."""
+    return CadJobRead.of(job, await cad_mep_service.load_state(session, [job]))
+
+
+async def _frame_source(
+    session: SessionDep,
+    context: AuthContext,
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job: Job,
+    attempt: int,
+) -> tuple[Job, int]:
+    """Где лежат scale.json и cad_checks.json вида: у route-задания - у его родителя.
+
+    Трассы строятся в тех же координатах (мм), что DXF вида родителя; кадр PDF -> DXF тот же.
+    """
+    if job.job_type is not JobType.CAD_MEP_ROUTE:
+        return job, attempt
+    parent_id = cad_mep_service.parent_job_id_of(job)
+    parent_attempt = cad_mep_service.payload_int(job, "parent_attempt")
+    parent = (
+        await cad_service.get_cad_job(
+            session,
+            workspace_id=context.tenant,
+            project_id=project_id,
+            revision_id=revision_id,
+            job_id=parent_id,
+        )
+        if parent_id is not None
+        else None
+    )
+    if parent is None or parent_attempt is None:
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "родительский результат трасс недоступен")
+    return parent, parent_attempt
+
+
 @router.post(
     "",
     response_model=CadJobRead,
@@ -119,7 +158,7 @@ async def create_cad_job(
         session, project=project, revision=revision, pages=pages, settings=settings
     )
     await session.commit()
-    return CadJobRead.of(job)
+    return await job_read(session, job)
 
 
 @router.get(
@@ -135,7 +174,7 @@ async def read_cad_job(
     session: SessionDep,
     context: AuthDep,
 ) -> CadJobRead:
-    return CadJobRead.of(await _job(session, context, project_id, revision_id, job_id))
+    return await job_read(session, await _job(session, context, project_id, revision_id, job_id))
 
 
 @router.get(
@@ -165,6 +204,11 @@ async def download_cad_artifact(
     key = cad_service.artifact_storage_key(revision_id, job.id, attempt, name)
     if artifact.get("key") != key:
         raise not_found("Файл")
+    # DXF трасс - только после принятия человеком; превью и candidate.json - кандидат для проверки.
+    if name.endswith("/" + cad_mep_service.ROUTES_DXF) and not (
+        await cad_mep_service.routes_download_allowed(session, job)
+    ):
+        raise DomainError(ErrorCode.CAD_ROUTES_NOT_ACCEPTED)
     try:
         await storage.stat(key)
     except ObjectNotFoundError as error:
@@ -223,7 +267,7 @@ async def retry_cad_job(
         raise DomainError(ErrorCode.JOB_NOT_RETRYABLE, reason or "Повтор недоступен")
     await jobs_service.retry(session, job=job)
     await session.commit()
-    return CadJobRead.of(job)
+    return await job_read(session, job)
 
 
 @router.get(
@@ -325,19 +369,33 @@ async def read_cad_view(
         folder = cad_service.view_folder(page_index, view)
     except ValueError as error:
         raise not_found("Вид") from error
+    is_route = job.job_type is JobType.CAD_MEP_ROUTE
     files = [
         CadArtifactRead(name=a["name"], sha256=a["sha256"], size=a["size"])
         for a in result.get("artifacts", [])
         if str(a.get("name", "")).startswith(folder + "/")
     ]
+    # Масштаб и кадр координат у route-задания - родительские (те же мм, что в DXF вида).
+    source, source_attempt = await _frame_source(
+        session, context, project_id, revision_id, job, attempt
+    )
     scale = cad_views.scale_from(
-        await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/scale.json")
+        await _read_artifact_json(
+            storage, source, revision_id, source_attempt, f"{folder}/scale.json"
+        )
     )
     cad_checks = await _read_artifact_json(
-        storage, job, revision_id, attempt, f"{folder}/cad_checks.json"
+        storage, source, revision_id, source_attempt, f"{folder}/cad_checks.json"
     )
-    checks = await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/checks.json")
-    dxf_name = f"{folder}/plan_candidates.dxf"
+    checks = (
+        None
+        if is_route
+        else await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/checks.json")
+    )
+    dxf_name = f"{folder}/{cad_mep_service.ROUTES_DXF if is_route else 'plan_candidates.dxf'}"
+    mep = view_mep_read(
+        job, attempt, page_index, view, await cad_mep_service.load_state(session, [job])
+    )
     return CadViewDiagnosticsRead(
         job_id=job.id,
         attempt=attempt,
@@ -352,9 +410,12 @@ async def read_cad_view(
         preview_available=any(f.name == f"{folder}/preview.json" for f in files),
         scale=scale,
         frame=cad_views.frame_from(scale, cad_checks),
-        checks=cad_views.checks_from(cad_checks, checks),
+        checks=None if is_route else cad_views.checks_from(cad_checks, checks),
         review_required=True,
         engineering_acceptance="not_accepted",
+        approval=mep.approval,
+        acceptance=mep.acceptance,
+        route_jobs=mep.route_jobs,
     )
 
 
@@ -381,17 +442,21 @@ async def read_cad_preview(
         folder = cad_service.view_folder(page_index, view)
     except ValueError as error:
         raise not_found("Вид") from error
-    dxf = cad_service.find_artifact(job, f"{folder}/plan_candidates.dxf")
+    is_route = job.job_type is JobType.CAD_MEP_ROUTE
+    dxf_name = f"{folder}/{cad_mep_service.ROUTES_DXF if is_route else 'plan_candidates.dxf'}"
+    dxf = cad_service.find_artifact(job, dxf_name)
     raw = await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/preview.json")
     if dxf is None or raw is None:
         raise not_found("Предпросмотр")
-    # Предпросмотр обязан описывать ровно тот DXF, что выпущен этой попыткой.
+    # Предпросмотр обязан описывать ровно тот DXF, что выпущен этой попыткой. У трасс генератор
+    # может не указывать DXF в превью: тогда оно привязано к заданию, но уж если указал -
+    # сверяется так же строго.
     if (
         not isinstance(raw, dict)
         or raw.get("schema") != "quantor.cad_engine.preview.v1"
         or raw.get("units") != "mm"
-        or raw.get("dxf") != f"{folder}/plan_candidates.dxf"
-        or raw.get("dxf_sha256") != dxf.get("sha256")
+        or (("dxf" in raw or not is_route) and raw.get("dxf") != dxf_name)
+        or (("dxf_sha256" in raw or not is_route) and raw.get("dxf_sha256") != dxf.get("sha256"))
     ):
         raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр не относится к DXF попытки")
     layers = [str(name)[:64] for name in raw.get("layers", []) if isinstance(name, str)]
@@ -401,11 +466,16 @@ async def read_cad_preview(
         raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр вне контракта") from error
     if any(p.layer >= len(layers) or len(p.points) % 2 or len(p.points) < 4 for p in paths):
         raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр вне контракта")
+    source, source_attempt = await _frame_source(
+        session, context, project_id, revision_id, job, attempt
+    )
     scale = cad_views.scale_from(
-        await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/scale.json")
+        await _read_artifact_json(
+            storage, source, revision_id, source_attempt, f"{folder}/scale.json"
+        )
     )
     cad_checks = await _read_artifact_json(
-        storage, job, revision_id, attempt, f"{folder}/cad_checks.json"
+        storage, source, revision_id, source_attempt, f"{folder}/cad_checks.json"
     )
     bbox = raw.get("bbox")
     return CadPreviewRead(

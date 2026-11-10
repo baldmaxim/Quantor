@@ -164,6 +164,24 @@ export const workspaceMarks = (
   return list;
 };
 
+/** Привязка замечаний к виду по параметрам чтения и диагностике; `null` - вид ещё не получен. */
+export const remarkBindingOf = (
+  params: ICadViewParams | null,
+  diagnostics: Pick<CadViewDiagnosticsRead, 'legacy_pdf_page' | 'dxf'> | null,
+): IRemarkBinding | null =>
+  params && diagnostics
+    ? {
+        projectId: params.projectId,
+        revisionId: params.revisionId,
+        jobId: params.jobId,
+        attempt: params.attempt,
+        pageIndex: params.pageIndex,
+        legacyPdfPage: diagnostics.legacy_pdf_page,
+        view: params.view,
+        dxfSha256: diagnostics.dxf?.sha256 ?? null,
+      }
+    : null;
+
 /** Привязка «ничего не читать»: пустые идентификаторы под выключенными запросами замечаний. */
 export const IDLE_REMARK_BINDING: IRemarkBinding = {
   projectId: '',

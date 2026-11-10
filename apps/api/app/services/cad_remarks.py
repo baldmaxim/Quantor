@@ -24,6 +24,7 @@ from app.contracts.cad import (
     CadRemarksFile,
     CadRemarkWrite,
 )
+from app.domain import JobType
 from app.errors import DomainError, ErrorCode
 from app.models import CadRemark, Job
 from app.services import cad as cad_service
@@ -55,7 +56,9 @@ def check_dxf(
     result = cad_service.result_of(job)
     if result.get("attempt") != attempt:
         return
-    artifact = cad_service.find_artifact(job, f"{folder}/plan_candidates.dxf")
+    # У route-задания замечания относятся к DXF трасс, а не к DXF вида родителя.
+    dxf_name = "mep_routes.dxf" if job.job_type is JobType.CAD_MEP_ROUTE else "plan_candidates.dxf"
+    artifact = cad_service.find_artifact(job, f"{folder}/{dxf_name}")
     expected = str(artifact["sha256"]) if artifact is not None else None
     if dxf_sha256 != expected:
         raise _mismatch("DXF (sha256) не совпадает с результатом этой попытки")

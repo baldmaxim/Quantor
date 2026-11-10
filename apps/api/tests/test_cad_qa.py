@@ -191,7 +191,9 @@ def test_pins_agree_with_service() -> None:
 def test_main_worker_never_claims_cad_and_cad_worker_claims_only_cad() -> None:
     assert JobType.CAD_PDF_CONVERT.value not in registry.supported_types()
     worker = Worker(clean_settings(), HANDLERS)
-    assert worker._supported_types() == [JobType.CAD_PDF_CONVERT.value]
+    assert sorted(worker._supported_types()) == sorted(
+        [JobType.CAD_PDF_CONVERT.value, JobType.CAD_MEP_ROUTE.value]
+    )
 
 
 def _scales(*indexes: int, factor: float = 70.5556) -> dict[int, cad_service.PageScale]:

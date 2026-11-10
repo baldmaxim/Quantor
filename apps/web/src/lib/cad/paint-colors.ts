@@ -1,4 +1,5 @@
 import { CAD_LAYER_PALETTE_SIZE, layerColorToken } from './layer-colors';
+import { readMepColors } from './mep-layers';
 import type { IRemarkColors } from './remarks-painter';
 
 /** Токены палитры слоёв по порядку; значения читаются из темы. */
@@ -13,6 +14,7 @@ export const readCadPaintColors = () => {
       layers: paletteOf(() => 'CanvasText'),
       paper: 'Canvas',
       crop: 'CanvasText',
+      mep: readMepColors(() => 'CanvasText'),
       remarks: { open: 'CanvasText', resolved: 'CanvasText', onOpen: 'Canvas', paper: 'Canvas' },
     };
   }
@@ -23,6 +25,7 @@ export const readCadPaintColors = () => {
     layers: paletteOf((name) => token(name, 'CanvasText')),
     paper: token('--canvas', 'Canvas'),
     crop: token('--region-stamp', 'CanvasText'),
+    mep: readMepColors((name) => token(name, 'CanvasText')),
     // Отметки лежат на светлом листе в обеих темах, поэтому берутся токены чернил листа, а не
     // тематические --danger/--success: те в тёмной теме светлеют и на бумаге не видны.
     // Проверенное отличается от открытого ещё и пунктиром с галочкой.

@@ -1,0 +1,512 @@
+{
+ "wall_fill_colors": {
+  "value": [
+   [
+    1,
+    1,
+    1
+   ],
+   [
+    0.75,
+    0.75,
+    0.75
+   ],
+   [
+    0.2,
+    0.2,
+    0.2
+   ],
+   [
+    0.15,
+    0.15,
+    0.15
+   ],
+   [
+    0,
+    0,
+    0
+   ],
+   [
+    0.32,
+    0.35,
+    0.36
+   ]
+  ],
+  "unit": "rgb",
+  "source": "derived",
+  "note": "цвета заливок стен в стиле АР «Камень» (стр. 81 корп. 9): белые — стены, 0.75 — монолит, 0.2 — шахты, остальное — рама фасада"
+ },
+ "big_white_fill_pt2": {
+  "value": 1000,
+  "unit": "пт²",
+  "source": "derived",
+  "note": "белая заливка крупнее — не стена (техническая ниша, фон)"
+ },
+ "plan_zone_pad_mm": {
+  "value": 3000,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "зона плана на листе для текста и заливок = рамка preview.json вида + этот запас"
+ },
+ "plan_bbox_pad_mm": {
+  "value": 300,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "контур здания — выпуклая оболочка заливок стен внутри рамки вида + этот запас (отсекает марки разрезов и выносные знаки)"
+ },
+ "dxf_wall_layers": {
+  "value": [
+   "01_КОНТУРЫ_СТЕН"
+  ],
+  "unit": "слои",
+  "source": "observed",
+  "note": "слои DXF движка с контурами стен: опора привязки PDF->DXF и подложка A-WALL"
+ },
+ "dxf_underlay_hatch_layers": {
+  "value": [
+   "02_МОНОЛИТ",
+   "01_КЛАДКА_И_ПЕРЕГОРОДКИ"
+  ],
+  "unit": "слои",
+  "source": "observed",
+  "note": "слои штриховок DXF движка для подложки A-WALL"
+ },
+ "tie_vote_samples": {
+  "value": 20,
+  "unit": "шт",
+  "source": "algorithm",
+  "note": "число точек DXF, голосующих за начало координат при привязке"
+ },
+ "tie_vote_bin_pt": {
+  "value": 0.1,
+  "unit": "пт",
+  "source": "algorithm",
+  "note": "размер ячейки голосования за начало"
+ },
+ "tie_min_votes": {
+  "value": 6,
+  "unit": "шт",
+  "source": "algorithm",
+  "note": "минимум совпавших голосов, иначе frame_mismatch"
+ },
+ "tie_check_points": {
+  "value": 300,
+  "unit": "шт",
+  "source": "algorithm",
+  "note": "контрольных точек DXF для проверки привязки"
+ },
+ "tie_refine_radius_mm": {
+  "value": 20,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "при уточнении начала учитываются совпадения ближе этого"
+ },
+ "tie_max_err_mm": {
+  "value": 50,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "допуск привязки PDF->DXF (ТЗ прототипа)"
+ },
+ "tie_min_share": {
+  "value": 0.95,
+  "unit": "доля",
+  "source": "assumed",
+  "note": "доля контрольных точек в допуске, иначе frame_mismatch"
+ },
+ "tie_median_max_mm": {
+  "value": 5,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "медианная ошибка привязки не больше"
+ },
+ "grid_room_mm": {
+  "value": 25,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "шаг растра помещений (ТЗ: 50 мм, но стены 80 мм при 50 мм не растрируются)"
+ },
+ "grid_route_mm": {
+  "value": 50,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "шаг растра трассировки (ТЗ)"
+ },
+ "grid_margin_mm": {
+  "value": 1000,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "запас растра вокруг рамки вида"
+ },
+ "door_pad_mm": {
+  "value": 75,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "запас закрытия дверного проёма вдоль створа"
+ },
+ "door_leaf_near_mm": {
+  "value": 120,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "конец дуги ближе этого к полотну — это конец открытого полотна"
+ },
+ "door_arc_min_points": {
+  "value": 6,
+  "unit": "шт",
+  "source": "algorithm",
+  "note": "дуга двери в блоке движка — полилиния не короче"
+ },
+ "min_room_area_m2": {
+  "value": 0.6,
+  "unit": "м²",
+  "source": "assumed",
+  "note": "меньше — не помещение (щель, ниша)"
+ },
+ "comp_min_area_m2": {
+  "value": 0.05,
+  "unit": "м²",
+  "source": "algorithm",
+  "note": "области меньше отбрасываются как шум растра"
+ },
+ "shaft_max_area_m2": {
+  "value": 4.0,
+  "unit": "м²",
+  "source": "assumed",
+  "note": "контур шахты по подписи не больше"
+ },
+ "shaft_label_snap_mm": {
+  "value": 600,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "подпись шахты ищет контур в пределах"
+ },
+ "shaft_mop_adj_mm": {
+  "value": 450,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "шахта выходит в МОП, если МОП ближе квартиры и не дальше"
+ },
+ "shaft_apt_adj_mm": {
+  "value": 1200,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "шахта внутри квартиры, если квартира ближе и не дальше"
+ },
+ "room_label_snap_mm": {
+  "value": 400,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "подпись помещения на стене — ищем свободную клетку в пределах"
+ },
+ "facade_band_mm": {
+  "value": 450,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "полоса фасада от внешнего контура считается стеной (перегородки доходят до внутренней грани)"
+ },
+ "room_id_regex": {
+  "value": "^(\\d+)-(\\d+)([/.])(\\d+)$",
+  "unit": "regex",
+  "source": "observed",
+  "note": "марка помещения «секция-квартира/комната»; разделитель «.» — помещение МОП («секция-N.M»)"
+ },
+ "area_regex": {
+  "value": "^\\d+,\\d{2}$",
+  "unit": "regex",
+  "source": "observed",
+  "note": "площадь в экспликации: «18,54»"
+ },
+ "shaft_codes": {
+  "value": [
+   "КДУ",
+   "ЭО",
+   "СС",
+   "ОВ",
+   "ВК",
+   "ПК",
+   "ДУ"
+  ],
+  "unit": "шифры",
+  "source": "observed",
+  "note": "шифры подписей шахт; составные («ОВВК», «ЭО/СС») разбираются по ним"
+ },
+ "expl_row_y_tol_pt": {
+  "value": 2.2,
+  "unit": "пт",
+  "source": "algorithm",
+  "note": "слова одной строки экспликации: допуск по вертикали"
+ },
+ "expl_row_max_dx_pt": {
+  "value": 150,
+  "unit": "пт",
+  "source": "algorithm",
+  "note": "название и площадь — правее номера не дальше"
+ },
+ "elevation_mark_regex": {
+  "value": "^[+-]\\d{1,3}[,.]\\d{3}$",
+  "unit": "regex",
+  "source": "observed",
+  "note": "отметка вида «+47,600» на листе (м)"
+ },
+ "apartment_tag_regex": {
+  "value": "^Кв\\.?$",
+  "unit": "regex",
+  "source": "observed",
+  "note": "метка «Кв» перед номером квартиры"
+ },
+ "apartment_number_regex": {
+  "value": "^\\d{3,5}$",
+  "unit": "regex",
+  "source": "observed",
+  "note": "номер квартиры после метки «Кв»"
+ },
+ "apartment_tag_gap_pt": {
+  "value": 30,
+  "unit": "пт",
+  "source": "algorithm",
+  "note": "номер правее метки «Кв» не дальше"
+ },
+ "turn_penalty_mm": {
+  "value": 500,
+  "unit": "мм-экв",
+  "source": "assumed",
+  "note": "штраф за поворот на 90° в стоимости пути: ортогональные трассы с минимумом изломов"
+ },
+ "door_zone_half_t_mm": {
+  "value": 450,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "проходимая зона дверного проёма при трассировке: полутолщина вдоль нормали"
+ },
+ "wall_clear_mm": {
+  "value": 150,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "отступ трасс от стен (ТЗ)"
+ },
+ "axis_pull_mm": {
+  "value": 900,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "стоимость тянет к оси коридора: штраф растёт при расстоянии до стен меньше этого"
+ },
+ "wall_penalty": {
+  "value": 12.0,
+  "unit": "коэфф.",
+  "source": "algorithm",
+  "note": "вес штрафа за близость к стене (< wall_clear_mm)"
+ },
+ "axis_weight_mop": {
+  "value": 1.2,
+  "unit": "коэфф.",
+  "source": "algorithm",
+  "note": "вес притяжения к оси в МОП"
+ },
+ "axis_weight_other": {
+  "value": 0.25,
+  "unit": "коэфф.",
+  "source": "algorithm",
+  "note": "вес притяжения к оси в остальных помещениях"
+ },
+ "layer_offset_mm": {
+  "value": {
+   "M-OV-T1": -50,
+   "M-OV-T2": 50,
+   "M-VK-V1": 150,
+   "M-VK-T3": 250,
+   "M-VK-T4": 350,
+   "M-PT-VPV": -150,
+   "M-PT-AUP": -250
+  },
+  "unit": "мм",
+  "source": "assumed",
+  "note": "смещение линий от оси: пучок с шагом 100 мм внутри системы; системы в коридоре разнесены (+Y вода, -Y пожарка) при ориентации цепочки вдоль +X (или +Y)"
+ },
+ "chain_simplify_mm": {
+  "value": 60,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "упрощение цепочек трасс"
+ },
+ "path_simplify_mm": {
+  "value": 60,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "упрощение пути при подсчёте длины до узла"
+ },
+ "collector_offset_mm": {
+  "value": 300,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "коллектор у входной двери — на этом расстоянии от стены (ТЗ)"
+ },
+ "collector_fallback_mm": {
+  "value": 200,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "запасное расстояние от стен для коллектора"
+ },
+ "collector_door_clear_mm": {
+  "value": 450,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "коллектор не ближе этого к центру проёма"
+ },
+ "water_entry_mm": {
+  "value": 300,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "ввод ВК в квартиру на столько внутрь (ТЗ)"
+ },
+ "device_offset_mm": {
+  "value": 200,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "прибор отопления у наружной стены с отступом (ТЗ)"
+ },
+ "device_ring_min_cells": {
+  "value": 8,
+  "unit": "клеток",
+  "source": "algorithm",
+  "note": "минимум клеток кольца у наружной стены для постановки прибора"
+ },
+ "device_node_radius_mm": {
+  "value": 150,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "радиус поиска узла сетки для прибора"
+ },
+ "heated_room_words": {
+  "value": [
+   "спальня",
+   "общая",
+   "жилая",
+   "кухня",
+   "гостиная"
+  ],
+  "unit": "слова",
+  "source": "assumed",
+  "note": "помещения с приборами отопления: название в экспликации начинается с (ТЗ)"
+ },
+ "corridor_words": {
+  "value": [
+   "коридор"
+  ],
+  "unit": "слова",
+  "source": "assumed",
+  "note": "АУП прокладывается по МОП, название которых начинается с"
+ },
+ "aup_end_clearance_mm": {
+  "value": 600,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "торцы коридора ищутся среди клеток не ближе этого к стенам"
+ },
+ "near_pk_dist_mm": {
+  "value": 800,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "шахта ВК с подписью «ПК» не дальше этого — источник ВПВ"
+ },
+ "pk_node_radius_mm": {
+  "value": 800,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "радиус поиска МОП у шкафа ПК"
+ },
+ "shaft_node_radius_mm": {
+  "value": 600,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "радиус поиска узла МОП у выхода шахты"
+ },
+ "door_side_radius_mm": {
+  "value": 250,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "радиус поиска узла у входной двери"
+ },
+ "entry_node_radius_mm": {
+  "value": 150,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "радиус поиска узла ввода внутри квартиры"
+ },
+ "virtual_max_gap_mm": {
+  "value": 1500,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "помещения квартиры без двери соединяются проходом, если зазор не больше"
+ },
+ "virtual_strip_half_mm": {
+  "value": 400,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "полуширина виртуального прохода"
+ },
+ "z_heat_mm": {
+  "value": 50,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "отопление в стяжке: от пола этажа"
+ },
+ "ceiling_below_slab_mm": {
+  "value": 400,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "ВК и ПТ в МОП идут под потолком: на столько ниже перекрытия (при высоте 3300 мм — +2900)"
+ },
+ "z_meter_mm": {
+  "value": 1000,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "узел учёта ВК: от пола этажа"
+ },
+ "riser_step_mm": {
+  "value": 100,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "разнос стояков разных систем в шахте"
+ },
+ "check_sample_mm": {
+  "value": 25,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "шаг выборки при проверке пересечений трассами стен"
+ },
+ "check_zone_dilate_cells": {
+  "value": 2,
+  "unit": "клеток",
+  "source": "algorithm",
+  "note": "допуск у края дверного проёма при проверке пересечений"
+ },
+ "preview_diamond_mm": {
+  "value": 120,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "половина диагонали ромба узла/стояка в превью"
+ },
+ "anno_height_apt_mm": {
+  "value": 300,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "высота текста номера квартиры в DXF"
+ },
+ "anno_height_shaft_mm": {
+  "value": 150,
+  "unit": "мм",
+  "source": "algorithm",
+  "note": "высота текста подписи шахты в DXF"
+ },
+ "check_wall_touch_cells": {
+  "value": 1,
+  "unit": "клеток",
+  "source": "algorithm",
+  "note": "касание кромки стены трассой в пределах этого числа клеток растра помещений нарушением не считается"
+ },
+ "check_shaft_exit_mm": {
+  "value": 400,
+  "unit": "мм",
+  "source": "assumed",
+  "note": "окрестность контура шахты в МОП, где проверка пересечений стен не применяется: выход из шахты через одну её стену (ТЗ)"
+ }
+}

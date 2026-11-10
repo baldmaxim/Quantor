@@ -3,6 +3,7 @@
 import { useState, type FC } from 'react';
 
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
+import { CadMepPanel } from '@/components/cad/mep/CadMepPanel';
 import { CadResult } from '@/components/cad/CadResult';
 import { CadFilesSection } from '@/components/cad/viewer/CadFilesSection';
 import { CadLayersPanel } from '@/components/cad/viewer/CadLayersPanel';
@@ -18,8 +19,8 @@ import { WorkspaceCadConvert } from './WorkspaceCadConvert';
 const HINT = 'p-[var(--s-5)] text-xs text-muted';
 
 /**
- * Правая панель вкладки CAD: слои, замечания, масштаб, файлы (с результатом) и задание листа
- * рабочей области.
+ * Правая панель вкладки CAD: слои, замечания, масштаб, файлы (с результатом), трассы механики и
+ * задание листа рабочей области.
  *
  * Показано только задание открытого листа. Лист без задания получает кнопку «Преобразовать лист
  * в CAD», с идущим или упавшим заданием - только раздел «Задание» (у упавшего та же кнопка):
@@ -149,6 +150,9 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
             </div>
           ),
         },
+        ...(view.mep
+          ? [{ id: 'mep', label: 'Трассы', content: <CadMepPanel {...view.mep} /> }]
+          : []),
         jobTab,
       ]
     : [jobTab];

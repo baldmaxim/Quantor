@@ -18,6 +18,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from app import API_VERSION
 from app.api import health
 from app.api.v1.cad import qa_router as cad_qa_router
+from app.api.v1.cad_mep import qa_router as cad_mep_qa_router
 from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
@@ -89,6 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(api_v1_router)
     # PDF -> CAD (ADR-0036): маршруты есть всегда, закрывает их флаг пространства `cad.export`.
     app.include_router(cad_qa_router)
+    app.include_router(cad_mep_qa_router)
     return app
 
 

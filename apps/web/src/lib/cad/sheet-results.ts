@@ -4,6 +4,7 @@ import { READABLE_RESULTS } from './selection';
 
 /**
  * Что известно о листе по заданиям ревизии: берётся самое новое задание, в котором лист есть.
+ * Задания трасс механики (`cad_mep_route`) не считаются.
  * `recognized` — итог выпущен (DXF или только диагностика), `running` — в очереди или идёт,
  * `failed` — отказ, ошибка или отмена.
  */
@@ -21,7 +22,8 @@ export interface ISheetResult {
 export type JobForSheets = Pick<
   CadJobSummaryRead,
   'job_id' | 'status' | 'result_status' | 'requested_pages' | 'created_at'
->;
+> &
+  Partial<Pick<CadJobSummaryRead, 'job_type'>>;
 
 /** Вид итога задания; `null` - задание завершено без понятного итога. */
 export const jobResultKind = (job: JobForSheets): SheetResultKind | null => {
@@ -53,6 +55,8 @@ const timeOf = (job: JobForSheets): number => {
 export const latestSheetJobs = (jobs: readonly JobForSheets[]): Map<number, ISheetResult> => {
   const newest = new Map<number, JobForSheets>();
   for (const job of jobs) {
+    // Трассы механики - надстройка над видом, а не итог преобразования листа.
+    if (job.job_type === 'cad_mep_route') continue;
     for (const page of job.requested_pages ?? []) {
       const current = newest.get(page);
       if (current === undefined || timeOf(job) > timeOf(current)) {
