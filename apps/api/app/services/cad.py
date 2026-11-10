@@ -29,8 +29,8 @@ from app.models import Document, DocumentRevision, Job, Project, ScaleCalibratio
 from app.services import jobs as jobs_service
 
 # Закрепление движка: архив сверяется и здесь (передаётся runner'у), и в tools/cad_engine/pins.json.
-ENGINE_VERSION: Final = "2026.11.09+3e53ca9bd05d"
-ENGINE_ARCHIVE_SHA256: Final = "0e9589cfdd50518fd446ecdf2d33e1e38952594bc66c74c2702ef40b099f15e7"
+ENGINE_VERSION: Final = "2026.11.10+e37b347ff1a4"
+ENGINE_ARCHIVE_SHA256: Final = "8daba71dc7d81dffe564408eea68984974ecbeff71d25317d9046b20fe0ca275"
 PARAMS_SCHEMA: Final = "quantor.cad_engine.params.v2"
 PAGE_SELECTION: Final = "operator"
 MAX_PAGES: Final = 50

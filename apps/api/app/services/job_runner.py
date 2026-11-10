@@ -164,6 +164,7 @@ async def execute_legacy_import(
         sheets=result.sheet_count,
         regions=result.region_count,
         already_imported=result.already_imported,
+        attached_to_existing=result.attached_to_existing,
     )
     return await jobs_service.succeed(
         session,
@@ -174,6 +175,7 @@ async def execute_legacy_import(
             "sheet_count": result.sheet_count,
             "region_count": result.region_count,
             "artifact_count": result.artifact_count,
+            "attached_to_existing": result.attached_to_existing,
         },
     )
 

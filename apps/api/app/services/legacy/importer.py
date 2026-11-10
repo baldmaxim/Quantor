@@ -18,11 +18,15 @@ Document(pdf)                         то, что открывает просм
 Импорт идемпотентен: идентификаторы производных объектов детерминированно выводятся из
 идентификатора ревизии пакета, поэтому повторный запуск не создаёт вторую копию, а
 завершается сразу.
+
+Если PDF пакета уже загружен в тот же проект (совпал SHA-256), второй документ не создаётся:
+листы, области и артефакты прикрепляются к существующей ревизии (ADR-0037).
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import tempfile
 import uuid
 import zipfile
@@ -48,6 +52,7 @@ from app.errors import DomainError, ErrorCode
 from app.models import Document, DocumentRevision, Project, RecognitionArtifact, Region, Sheet
 from app.services import documents as documents_service
 from app.services import geometry
+from app.services import uploads as uploads_service
 from app.services.legacy import archive as archive_reader
 from app.services.legacy import markdown, package
 from app.services.legacy.archive import ArchiveLimits, ArchiveMember
@@ -88,6 +93,8 @@ class ImportResult:
     region_count: int
     artifact_count: int
     already_imported: bool
+    # True — пакет прикреплён к ранее загруженной ревизии того же PDF, а не создал свою (ADR-0037).
+    attached_to_existing: bool = False
 
 
 def derived_document_id(package_revision_id: uuid.UUID) -> uuid.UUID:
@@ -151,6 +158,7 @@ async def import_package(
             region_count=await _count_regions(session, revision_id),
             artifact_count=await _count_artifacts(session, revision_id),
             already_imported=True,
+            attached_to_existing=False,
         )
 
     with tempfile.TemporaryDirectory(prefix="quantor-import-") as workdir:
@@ -163,6 +171,23 @@ async def import_package(
 
         pdf_path = Path(workdir) / "source.pdf"
         await asyncio.to_thread(_extract_member, archive_path, layout.pdf, pdf_path, settings)
+
+        pdf_sha256 = await asyncio.to_thread(_sha256_of, pdf_path)
+        loaded = await uploads_service.find_project_revision_by_hash(
+            session, project_id=project.id, source_sha256=pdf_sha256
+        )
+        if loaded is not None and loaded.id not in (package_revision.id, revision_id):
+            return await _attach(
+                session,
+                storage,
+                project=project,
+                package_revision=package_revision,
+                target=loaded,
+                blocks=blocks,
+                sections=sections,
+                layout=layout,
+                archive_path=archive_path,
+            )
 
         return await _persist(
             session,
@@ -218,6 +243,15 @@ def _extract_member(
             archive, member, chunk_size=CHUNK_SIZE, max_bytes=settings.archive_max_file_bytes
         ):
             output.write(chunk)
+
+
+def _sha256_of(path: Path) -> str:
+    """SHA-256 файла, считается потоково."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(CHUNK_SIZE):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 async def _download(storage: ObjectStorage, key: str, target: Path) -> None:
@@ -314,22 +348,11 @@ async def _persist(
 
     for block in blocks.blocks:
         session.add(
-            Region(
-                id=_region_id(revision_id, block.block_id),
+            _build_region(
+                block,
+                revision_id=revision_id,
                 sheet_id=sheets_by_index[block.page_index],
-                external_block_id=block.block_id,
-                ordinal=block.ordinal,
-                block_type=block.block_type,
-                shape_type=block.shape_type,
-                coords_norm=block.coords_norm,
-                polygon_points=block.polygon_points
-                if block.shape_type is RegionShape.POLYGON
-                else None,
-                recognition_status=block.status,
-                # Сырой текст секции сохраняется как есть: семантику Summary/Description
-                # разбирать на этом этапе нельзя — формат ещё изменится.
-                raw_content_md=sections.get(block.block_id),
-                legacy_metadata=block.legacy_metadata,
+                sections=sections,
             )
         )
 
@@ -354,6 +377,130 @@ async def _persist(
         region_count=len(blocks.blocks),
         artifact_count=artifact_count,
         already_imported=False,
+    )
+
+
+def _build_region(
+    block: package.BlockRecord,
+    *,
+    revision_id: uuid.UUID,
+    sheet_id: uuid.UUID,
+    sections: dict[str, str],
+) -> Region:
+    return Region(
+        id=_region_id(revision_id, block.block_id),
+        sheet_id=sheet_id,
+        external_block_id=block.block_id,
+        ordinal=block.ordinal,
+        block_type=block.block_type,
+        shape_type=block.shape_type,
+        coords_norm=block.coords_norm,
+        polygon_points=block.polygon_points if block.shape_type is RegionShape.POLYGON else None,
+        recognition_status=block.status,
+        # Сырой текст секции сохраняется как есть: семантику Summary/Description
+        # разбирать на этом этапе нельзя — формат ещё изменится.
+        raw_content_md=sections.get(block.block_id),
+        legacy_metadata=block.legacy_metadata,
+    )
+
+
+async def _attach(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    *,
+    project: Project,
+    package_revision: DocumentRevision,
+    target: DocumentRevision,
+    blocks: package.BlocksDocument,
+    sections: dict[str, str],
+    layout: package.PackageLayout,
+    archive_path: Path,
+) -> ImportResult:
+    """Прикрепляет распознанное к ревизии уже загруженного PDF (ADR-0037).
+
+    Новых документов и ревизий нет, PDF не копируется, `source_metadata` ревизии не
+    меняется (ADR-0003): связь видна по областям и артефактам на этой ревизии и по
+    payload задания.
+    """
+    if await _count_regions(session, target.id) > 0 or await _count_artifacts(session, target.id):
+        # Второе распознавание того же PDF с первым не сливается.
+        await documents_service.set_processing_status(
+            session, revision=package_revision, status=ProcessingStatus.READY
+        )
+        await session.flush()
+        return ImportResult(
+            document_id=target.document_id,
+            revision_id=target.id,
+            sheet_count=await _count_sheets(session, target.id),
+            region_count=await _count_regions(session, target.id),
+            artifact_count=await _count_artifacts(session, target.id),
+            already_imported=True,
+            attached_to_existing=True,
+        )
+
+    sheets = list(
+        (await session.execute(select(Sheet).where(Sheet.revision_id == target.id))).scalars()
+    )
+    existing_by_index = {sheet.page_index: sheet for sheet in sheets}
+    package_indexes = {page.page_index for page in blocks.pages}
+    if sheets and set(existing_by_index) != package_indexes:
+        raise DomainError(
+            ErrorCode.PDF_PAGE_COUNT_MISMATCH,
+            f"В пакете {len(package_indexes)} стр., в загруженном PDF — {len(sheets)}",
+        )
+
+    sheets_by_index: dict[int, uuid.UUID] = {}
+    for page in blocks.pages:
+        sheet = existing_by_index.get(page.page_index)
+        if sheet is None:
+            sheet = Sheet(
+                id=_sheet_id(target.id, page.page_index),
+                revision_id=target.id,
+                page_index=page.page_index,
+                page_label=str(page.page_index + 1),
+                width_px=page.width_px,
+                height_px=page.height_px,
+                rotation=page.rotation,
+            )
+            session.add(sheet)
+        else:
+            # Размер растра распознавалки заполняется, только если он пуст.
+            if sheet.width_px is None:
+                sheet.width_px = page.width_px
+            if sheet.height_px is None:
+                sheet.height_px = page.height_px
+        sheets_by_index[page.page_index] = sheet.id
+    await session.flush()
+
+    for block in blocks.blocks:
+        session.add(
+            _build_region(
+                block,
+                revision_id=target.id,
+                sheet_id=sheets_by_index[block.page_index],
+                sections=sections,
+            )
+        )
+
+    artifact_count = await _store_artifacts(
+        session, storage, revision_id=target.id, layout=layout, archive_path=archive_path
+    )
+
+    await documents_service.set_processing_status(
+        session, revision=package_revision, status=ProcessingStatus.READY
+    )
+    if target.geometry_status is GeometryStatus.PENDING:
+        await geometry.schedule_extract(session, project=project, revision=target)
+    await session.flush()
+
+    return ImportResult(
+        document_id=target.document_id,
+        revision_id=target.id,
+        sheet_count=len(blocks.pages),
+        region_count=len(blocks.blocks),
+        artifact_count=artifact_count,
+        already_imported=False,
+        attached_to_existing=True,
     )
 
 
