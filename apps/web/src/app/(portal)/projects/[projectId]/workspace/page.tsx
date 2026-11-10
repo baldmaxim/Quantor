@@ -9,9 +9,13 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
 
+import { CadRemarkCapture } from '@/components/cad/viewer/CadRemarkCapture';
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
+import { resolveLeftTab } from '@/components/workspace/cad/left-tab';
+import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
+import { WorkspaceCadPanel } from '@/components/workspace/cad/WorkspaceCadPanel';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
 import { TakeoffPanel, type TakeoffGeometry } from '@/components/workspace/TakeoffPanel';
 import { takeoffAccess, type ITakeoffAccess } from '@/components/workspace/takeoff-access';
@@ -38,6 +42,7 @@ import {
 import { ToolButton, ToolDivider, ToolField } from '@/components/workspace/Toolbar';
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { env } from '@/lib/env';
+import { cadEnabled } from '@/lib/cad/access';
 import { errorMessage } from '@/lib/errors';
 import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
 import { REGIONS_FORMS, blockType, countOf, revisionTitle } from '@/lib/format';
@@ -78,11 +83,14 @@ interface IPageProps {
 
 const leftTabs = (
   takeoff: ITakeoffAccess,
+  cad: boolean,
 ): readonly { id: LeftTab; label: string; enabled: boolean; hint?: string }[] => [
   { id: 'documents', label: 'Листы', enabled: true },
   { id: 'recognition', label: 'Распознавание', enabled: true },
   // Обмер — пилотная возможность: вкладка следует тому же флагу, что и сервер (ADR-0023).
   { id: 'takeoff', label: 'Обмеры', enabled: takeoff.enabled, hint: takeoff.hint },
+  // CAD без флага `cad.export` не показывается вовсе (ADR-0036).
+  ...(cad ? [{ id: 'cad' as const, label: 'CAD', enabled: true }] : []),
 ];
 
 const WorkspacePage = ({ params }: IPageProps) => {
@@ -116,8 +124,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
   // вкладка обмеров и выбранный инструмент масштаба при этом не открывают возможность, а
   // уступают место листам и указателю — хранилище не переписывается, чтобы включение пилота
   // вернуло пользователя туда, где он был.
-  const takeoff = takeoffAccess(useFeatures());
-  const activeTab: LeftTab = leftTab === 'takeoff' && !takeoff.enabled ? 'documents' : leftTab;
+  const features = useFeatures();
+  const takeoff = takeoffAccess(features);
+  const cadOn = cadEnabled(features);
+  const activeTab: LeftTab = resolveLeftTab(leftTab, { takeoff: takeoff.enabled, cad: cadOn });
   const activeTool = tool === 'scale' && !takeoff.enabled ? 'pointer' : tool;
 
   const camera = useMemo(() => new Camera(), []);
@@ -412,6 +422,18 @@ const WorkspacePage = ({ params }: IPageProps) => {
     [sheetPageIndex, pageWidth, pageHeight],
   );
 
+  const cad = useWorkspaceCad({
+    projectId,
+    revisionId,
+    sheet,
+    page: viewportSheet,
+    camera,
+    viewportSize,
+    enabled: cadOn,
+    active: activeTab === 'cad',
+    tabParam: searchParams.get('tab'),
+  });
+
   const failure = renderError ?? errorCode ?? null;
 
   return (
@@ -649,9 +671,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
               <div
                 role="tablist"
                 aria-label="Разделы панели"
-                className="flex border-b border-border"
+                className="scroll-area flex overflow-x-auto border-b border-border"
               >
-                {leftTabs(takeoff).map((tab) => (
+                {leftTabs(takeoff, cadOn).map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
@@ -661,7 +683,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                     title={tab.hint ? `${tab.label} — ${tab.hint}` : tab.label}
                     onClick={() => tab.enabled && setLeftTab(tab.id)}
                     className={cx(
-                      'flex-1 border-r border-border py-[var(--s-3)] text-xs transition-colors last:border-r-0',
+                      'flex-1 border-r border-border px-[var(--s-3)] py-[var(--s-3)] text-xs whitespace-nowrap transition-colors last:border-r-0',
                       activeTab === tab.id
                         ? 'text-text shadow-[inset_0_-2px_0_var(--accent)]'
                         : 'text-muted',
@@ -699,6 +721,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
                     onSelect={(id) => setQuery({ region: id })}
                   />
                 )}
+
+                {activeTab === 'cad' && <WorkspaceCadPanel {...cad.panel} />}
 
                 {activeTab === 'takeoff' && (
                   <TakeoffPanel
@@ -768,9 +792,11 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 scaleDraft={scaleDraft}
                 measurements={overlayMeasurements}
                 tools={activeTab === 'takeoff' ? tools : null}
+                extraPainter={cad.painter}
                 onViewChange={(state) => setZoomPercent(Math.round(state.scale * 100))}
                 onError={setRenderError}
               />
+              {cad.capture && <CadRemarkCapture {...cad.capture} />}
               {draftPhase === 'complete' && draftA && draftB && sheetId && (
                 <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">
                   <ScaleDialog

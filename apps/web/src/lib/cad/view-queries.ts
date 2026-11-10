@@ -77,9 +77,13 @@ const path = (params: ICadViewParams) => ({
 const retryNetwork = (count: number, error: Error): boolean =>
   extractCode(error) === 'NETWORK_ERROR' && count < 2;
 
-export const useCadView = (params: ICadViewParams): UseQueryResult<CadViewDiagnosticsRead> =>
+export const useCadView = (
+  params: ICadViewParams,
+  enabled = true,
+): UseQueryResult<CadViewDiagnosticsRead> =>
   useQuery({
     queryKey: cadViewKeys.diagnostics(params),
+    enabled,
     queryFn: async () => {
       const data = unwrap(await readCadView({ throwOnError: true, path: path(params) }));
       if (!sameView(data, params)) throw mismatch();

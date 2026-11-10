@@ -235,9 +235,13 @@ const remarkQuery = (binding: IRemarkBinding) => ({
 });
 
 /** Замечания вида и попытки с сервера в порядке номеров. */
-export const useCadRemarksList = (binding: IRemarkBinding): UseQueryResult<CadRemarkRead[]> =>
+export const useCadRemarksList = (
+  binding: IRemarkBinding,
+  enabled = true,
+): UseQueryResult<CadRemarkRead[]> =>
   useQuery({
     queryKey: cadKeys.remarks(binding),
+    enabled,
     queryFn: async () =>
       sortRemarks(
         unwrap(

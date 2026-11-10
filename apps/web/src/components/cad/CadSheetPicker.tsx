@@ -1,15 +1,15 @@
 'use client';
 
-import type { SheetRead } from '@quantor/api-client';
-import Link from 'next/link';
 import { useMemo, useRef, useState, type FC } from 'react';
 
 import { takeoffAccess } from '@/components/workspace/takeoff-access';
-import { Button, ErrorState, SkeletonRows, StatusBadge, cx } from '@/components/ui';
+import { CadSheetRow } from '@/components/cad/CadSheetRow';
+import { Button, ErrorState, SkeletonRows } from '@/components/ui';
 import { cadErrorText } from '@/lib/cad/errors';
 import { pageLabel } from '@/lib/cad/format';
-import { useCreateCadJob } from '@/lib/cad/queries';
+import { useCadJobs, useCreateCadJob } from '@/lib/cad/queries';
 import { useSheetCalibrationStates } from '@/lib/cad/sheet-queries';
+import { latestSheetJobs } from '@/lib/cad/sheet-results';
 import {
   CALIBRATION_UNAVAILABLE_TEXT,
   MAX_CAD_PAGES,
@@ -28,6 +28,11 @@ interface ICadSheetPickerProps {
   revisionId: string;
   /** Задание создано (или найдено идущее). */
   onJobCreated: (jobId: string) => void;
+  /** Открытое справа задание и страница: подсветка строки листа. */
+  openJobId: string | null;
+  openPage: number | null;
+  /** Открыть результат листа: задание, страница и вид (`null` — открыть только задание). */
+  onOpenResult: (jobId: string, page: number | null, view: number | null) => void;
 }
 
 /**
@@ -40,8 +45,14 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
   projectId,
   revisionId,
   onJobCreated,
+  openJobId,
+  openPage,
+  onOpenResult,
 }) => {
   const sheets = useSheets(revisionId);
+  const jobs = useCadJobs(projectId, revisionId);
+  // Самое новое задание по каждому листу: по нему строка открывает результат.
+  const results = useMemo(() => latestSheetJobs(jobs.data?.items ?? []), [jobs.data]);
   const manualEnabled = takeoffAccess(useFeatures()).enabled;
   const items = useMemo(() => sheets.data?.items ?? [], [sheets.data]);
   const create = useCreateCadJob(projectId, revisionId);
@@ -91,8 +102,8 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
   };
 
   return (
-    <section className="flex flex-col gap-[var(--s-4)] rounded-[var(--radius-md)] border border-border-strong bg-surface p-[var(--s-6)]">
-      <h2 className="text-sm font-medium">Листы для преобразования</h2>
+    // Рамка и заголовок — у вкладки «Листы» в CadScreen.
+    <div className="flex flex-col gap-[var(--s-4)]">
       <p className="text-xs text-muted">
         Выберите листы вручную. Масштаб берётся из калибровки листа; лист без калибровки запустить
         нельзя.
@@ -130,9 +141,16 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
           )}
           <ul className="flex max-h-[min(60dvh,28rem)] flex-col overflow-auto overscroll-contain rounded-[var(--radius-md)] border border-border">
             {items.map((sheet, position) => (
-              <SheetRow
+              <CadSheetRow
                 key={sheet.id}
                 sheet={sheet}
+                result={results.get(sheet.page_index) ?? null}
+                open={
+                  openJobId !== null &&
+                  results.get(sheet.page_index)?.jobId === openJobId &&
+                  openPage === sheet.page_index
+                }
+                onOpenResult={onOpenResult}
                 href={sheetWorkspaceHref(projectId, revisionId, position)}
                 state={states.get(sheet.page_index) ?? 'unknown'}
                 manualEnabled={manualEnabled}
@@ -177,84 +195,6 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
           {problem}
         </p>
       )}
-    </section>
-  );
-};
-
-interface ISheetRowProps {
-  sheet: SheetRead;
-  href: string;
-  state: SheetCalibrationState;
-  manualEnabled: boolean;
-  checked: boolean;
-  limitReached: boolean;
-  onToggle: () => void;
-}
-
-const SheetRow: FC<ISheetRowProps> = ({
-  sheet,
-  href,
-  state,
-  manualEnabled,
-  checked,
-  limitReached,
-  onToggle,
-}) => {
-  const extraLabel =
-    sheet.page_label && sheet.page_label !== String(sheet.page_index + 1) ? sheet.page_label : null;
-
-  return (
-    <li
-      className={cx(
-        'flex flex-wrap items-center gap-x-[var(--s-5)] gap-y-[var(--s-2)] border-b border-border px-[var(--s-5)] last:border-b-0',
-        checked && 'bg-accent-soft',
-      )}
-    >
-      <label className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-[var(--s-4)] text-sm">
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={!checked && limitReached}
-          onChange={onToggle}
-          className="h-[18px] w-[18px] shrink-0 accent-accent"
-        />
-        <span className="[overflow-wrap:anywhere]">
-          {pageLabel(sheet.page_index)}
-          {extraLabel && <span className="text-muted"> · {extraLabel}</span>}
-        </span>
-      </label>
-
-      {state === 'calibrated' && (
-        <StatusBadge tone="success" dot={false}>
-          Калибровка есть
-        </StatusBadge>
-      )}
-      {state === 'loading' && <span className="text-xs text-muted">Проверка калибровки…</span>}
-      {checked && state === 'unknown' && !manualEnabled && (
-        <span className="text-xs text-muted">Калибровка не проверена</span>
-      )}
-      {checked && state === 'unknown' && manualEnabled && (
-        <span className="text-xs text-muted">Калибровка не прочитана</span>
-      )}
-      {state === 'missing' && (
-        <>
-          <StatusBadge tone="warning" dot={false}>
-            Нет калибровки
-          </StatusBadge>
-          {manualEnabled ? (
-            <Link
-              href={href}
-              target="_blank"
-              rel="noopener"
-              className="inline-flex min-h-[44px] items-center text-xs text-accent underline underline-offset-4"
-            >
-              Откалибровать
-            </Link>
-          ) : (
-            <span className="text-xs text-muted">{CALIBRATION_UNAVAILABLE_TEXT}</span>
-          )}
-        </>
-      )}
-    </li>
+    </div>
   );
 };

@@ -6,13 +6,9 @@ import { useCallback, useMemo, useRef, useState, type FC } from 'react';
 import { ErrorState, Skeleton, type ISegmentedOption } from '@/components/ui';
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
+import { readCadPaintColors } from '@/lib/cad/paint-colors';
 import { bboxPtToNormalized, type BboxPt, type IRemarkBinding } from '@/lib/cad/remarks';
-import {
-  composePainters,
-  createRemarksPainter,
-  type IRemarkColors,
-  type IRemarkMark,
-} from '@/lib/cad/remarks-painter';
+import { composePainters, createRemarksPainter, type IRemarkMark } from '@/lib/cad/remarks-painter';
 import {
   cropToNormalized,
   frameOf,
@@ -51,34 +47,6 @@ const DEFAULT_OPACITY = 0.85;
 /** Идентификатор несохранённого участка на листе. */
 const DRAFT_ID = '__draft__';
 
-/** Цвета слоя - из токенов темы: лист чертежа светлый в обеих темах, чернила не зависят от неё. */
-const readColors = () => {
-  if (typeof window === 'undefined') {
-    return {
-      ink: 'CanvasText',
-      paper: 'Canvas',
-      crop: 'CanvasText',
-      remarks: { open: 'CanvasText', resolved: 'CanvasText', onOpen: 'Canvas', paper: 'Canvas' },
-    };
-  }
-  const style = getComputedStyle(document.documentElement);
-  const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
-  return {
-    ink: token('--sheet-ink', 'CanvasText'),
-    paper: token('--canvas', 'Canvas'),
-    crop: token('--region-stamp', 'CanvasText'),
-    // Отметки лежат на светлом листе в обеих темах, поэтому берутся токены чернил листа, а не
-    // тематические --danger/--success: те в тёмной теме светлеют и на бумаге не видны.
-    // Проверенное отличается от открытого ещё и пунктиром с галочкой.
-    remarks: {
-      open: token('--sheet-ink-danger', 'CanvasText'),
-      resolved: token('--region-image', 'CanvasText'),
-      onOpen: token('--region-tag-text', 'Canvas'),
-      paper: token('--canvas', 'Canvas'),
-    } satisfies IRemarkColors,
-  };
-};
-
 const NOTICE =
   'rounded-[var(--radius-sm)] border border-warning-soft bg-warning-soft px-[var(--s-5)] py-[var(--s-3)] text-xs [overflow-wrap:anywhere]';
 
@@ -94,7 +62,7 @@ export const CadViewerPane: FC<ICadViewerPaneProps> = ({ params, diagnostics }) 
   const theme = useTheme();
   const colors = useMemo(() => {
     void theme;
-    return readColors();
+    return readCadPaintColors();
   }, [theme]);
 
   const [pdfCamera] = useState(() => new Camera());

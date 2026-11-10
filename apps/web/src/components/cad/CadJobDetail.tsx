@@ -10,7 +10,7 @@ import { CadResult } from '@/components/cad/CadResult';
 import { ErrorState, Skeleton, SkeletonRows, StatusBadge } from '@/components/ui';
 import { serverOffsetMs } from '@/lib/cad/format';
 import { isActiveStatus, useCadEvents, useCadJob } from '@/lib/cad/queries';
-import { viewSelectionKind } from '@/lib/cad/selection';
+import { effectiveView, viewSelectionKind } from '@/lib/cad/selection';
 import { jobLabel, jobTone } from '@/lib/cad/stages';
 import { useTicker } from '@/lib/cad/useServerClock';
 import { extractCode } from '@/lib/errors';
@@ -85,7 +85,9 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
   // открыт без бегущей попытки, тик пришёл секундой раньше). Время не бывает раньше ответа:
   // иначе таймер стартует с нуля и шагает назад на каждом ответе.
   const clockMs = Math.max(nowMs, query.dataUpdatedAt);
-  const selectionKind = viewSelectionKind(job, attempt, selectedPage, selectedView);
+  // Лист открыт без вида (из списка листов): показываем его первый вид.
+  const shownView = effectiveView(job, selectedPage, selectedView);
+  const selectionKind = viewSelectionKind(job, attempt, selectedPage, shownView);
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-6)]">
@@ -113,7 +115,7 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
           eventsLoading={events.isPending}
           eventsFailed={events.isError}
           selectedPage={selectedPage}
-          selectedView={selectedView}
+          selectedView={shownView}
           onSelectView={onSelectView}
         />
       )}
@@ -147,13 +149,13 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
           Просмотр доступен только у видов выпущенного результата выбранной попытки.
         </p>
       )}
-      {selectionKind === 'panel' && selectedPage !== null && selectedView !== null && (
+      {selectionKind === 'panel' && selectedPage !== null && shownView !== null && (
         <CadViewPanel
           projectId={projectId}
           revisionId={revisionId}
           job={job}
           pageIndex={selectedPage}
-          view={selectedView}
+          view={shownView}
         />
       )}
     </div>

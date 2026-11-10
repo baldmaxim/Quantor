@@ -6,6 +6,7 @@ import {
   selectionQuery,
   viewSelectionKind,
   withJob,
+  withJobView,
   withRevision,
   withView,
 } from './selection';
@@ -42,6 +43,32 @@ describe('выбор в адресе', () => {
       job: JOB,
       page: 3,
       view: 2,
+    });
+  });
+});
+
+describe('открытие результата листа', () => {
+  const base = { revision: REV, job: null, page: null, view: null };
+
+  it('страница и вид попадают в адрес и читаются обратно', () => {
+    const next = withJobView(base, JOB, 3, 1);
+    expect(next).toEqual({ revision: REV, job: JOB, page: 3, view: 1 });
+    expect(parseSelection(new URLSearchParams(selectionQuery(next)))).toEqual(next);
+  });
+
+  it('вид опускается, если неизвестен: страница остаётся', () => {
+    const next = withJobView(base, JOB, 3, null);
+    const query = selectionQuery(next);
+    expect(query).toBe(`revision=${REV}&job=${JOB}&page=3`);
+    expect(parseSelection(new URLSearchParams(query))).toEqual(next);
+  });
+
+  it('без страницы открывается только задание, вид отбрасывается', () => {
+    expect(withJobView({ ...base, page: 2, view: 1 }, JOB, null, 5)).toEqual({
+      revision: REV,
+      job: JOB,
+      page: null,
+      view: null,
     });
   });
 });

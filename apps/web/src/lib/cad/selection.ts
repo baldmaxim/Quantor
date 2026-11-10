@@ -38,7 +38,8 @@ export const parseSelection = (params: IParamsReader): ICadSelection => {
   const job = asUuid(params.get('job'));
   const page = job ? asIndex(params.get('page')) : null;
   const view = page !== null ? asIndex(params.get('view')) : null;
-  return { revision, job, page: view !== null ? page : null, view };
+  // Страница без вида допустима: лист открыт из списка, вид выберет человек в ходе задания.
+  return { revision, job, page, view };
 };
 
 export const withRevision = (revision: string | null): ICadSelection => ({
@@ -53,6 +54,19 @@ export const withJob = (selection: ICadSelection, job: string | null): ICadSelec
   view: null,
 });
 
+/** Открыть результат листа: страница задания и, если он известен, вид. Без страницы — только задание. */
+export const withJobView = (
+  selection: ICadSelection,
+  job: string,
+  page: number | null,
+  view: number | null,
+): ICadSelection => ({
+  revision: selection.revision,
+  job,
+  page,
+  view: page !== null ? view : null,
+});
+
 export const withView = (selection: ICadSelection, page: number, view: number): ICadSelection => ({
   ...selection,
   page,
@@ -65,9 +79,11 @@ export const selectionQuery = (selection: ICadSelection): string => {
     params.set('revision', selection.revision);
     if (selection.job) {
       params.set('job', selection.job);
-      if (selection.page !== null && selection.view !== null) {
+      if (selection.page !== null) {
         params.set('page', String(selection.page));
-        params.set('view', String(selection.view));
+        if (selection.view !== null) {
+          params.set('view', String(selection.view));
+        }
       }
     }
   }
@@ -75,10 +91,21 @@ export const selectionQuery = (selection: ICadSelection): string => {
 };
 
 /** Итоги, при которых у вида есть диагностика (`GET .../views/...` отвечает 200). */
-const READABLE_RESULTS: ReadonlySet<string> = new Set([
+export const READABLE_RESULTS: ReadonlySet<string> = new Set([
   'completed_requires_review',
   'no_cad_review_required',
 ]);
+
+/** Вид для показа: выбранный, а если выбран только лист — первый вид этого листа в задании. */
+export const effectiveView = (
+  job: Pick<CadJobRead, 'pages'>,
+  page: number | null,
+  view: number | null,
+): number | null => {
+  if (page === null || view !== null) return view;
+  const views = job.pages.find((item) => item.index === page)?.views ?? [];
+  return views.length > 0 ? Math.min(...views.map((entry) => entry.view)) : null;
+};
 
 export type ViewSelectionKind =
   /** Вид не выбран. */

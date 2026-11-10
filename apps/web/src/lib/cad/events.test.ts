@@ -1,7 +1,13 @@
 import type { CadEventRead, CadEventsRead } from '@quantor/api-client';
 import { describe, expect, it } from 'vitest';
 
-import { documentEvents, emptyEventLog, isEventLogComplete, mergeEvents } from './events';
+import {
+  documentEvents,
+  emptyEventLog,
+  eventDisplayStatuses,
+  isEventLogComplete,
+  mergeEvents,
+} from './events';
 
 const JOB = '11111111-1111-4111-8111-111111111111';
 
@@ -81,5 +87,55 @@ describe('mergeEvents', () => {
       response([event(1), event(2, { scope: 'view', view: 1, page_index: 0 })], 2),
     );
     expect(documentEvents(log).map((item) => item.seq)).toEqual([1]);
+  });
+});
+
+describe('статус строки события', () => {
+  const phases = ['claimed', 'download', 'verify', 'worker', 'publish'];
+  const started = (): CadEventRead[] =>
+    phases.map((phase, index) => event(index + 1, { phase, status: 'running' }));
+
+  it('начатые этапы с продолжением показываются выполненными, последний - по исходу', () => {
+    expect(eventDisplayStatuses(started(), 'running')).toEqual([
+      'done',
+      'done',
+      'done',
+      'done',
+      'running',
+    ]);
+    expect(eventDisplayStatuses(started(), 'succeeded')).toEqual(Array(5).fill('done'));
+  });
+
+  it('последний этап оборванной попытки - ошибка, не «выполнено»', () => {
+    expect(eventDisplayStatuses(started(), 'failed').at(-1)).toBe('error');
+    expect(eventDisplayStatuses(started(), 'lost').at(-1)).toBe('error');
+  });
+
+  it('итоговые статусы не перекрашиваются', () => {
+    const events = [
+      event(1, { phase: 'worker', status: 'running' }),
+      event(2, { phase: 'published', status: 'done' }),
+      event(3, { phase: 'failed', status: 'failed' }),
+      event(4, { phase: 'failed', status: 'error' }),
+    ];
+    expect(eventDisplayStatuses(events, 'failed')).toEqual(['done', 'done', 'failed', 'error']);
+  });
+
+  it('повторные события одного этапа закрываются вместе с ним', () => {
+    const events = [
+      event(1, { phase: 'worker' }),
+      event(2, { phase: 'worker' }),
+      event(3, { phase: 'collect' }),
+    ];
+    expect(eventDisplayStatuses(events, 'running')).toEqual(['done', 'done', 'running']);
+  });
+
+  it('события видов показываются со своим статусом и не закрывают этапы документа', () => {
+    const events = [
+      event(1, { phase: 'worker', status: 'running' }),
+      event(2, { scope: 'view', stage: 'regions', status: 'needs_review', page_index: 0, view: 1 }),
+      event(3, { scope: 'view', stage: 'scale', status: 'running', page_index: 0, view: 1 }),
+    ];
+    expect(eventDisplayStatuses(events, 'running')).toEqual(['running', 'needs_review', 'running']);
   });
 });

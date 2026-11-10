@@ -1,20 +1,29 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { FC } from 'react';
+import { useState, type FC } from 'react';
 
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
 import { CadJobList } from '@/components/cad/CadJobList';
 import { CadSheetPicker } from '@/components/cad/CadSheetPicker';
 import { CadSourcePicker } from '@/components/cad/CadSourcePicker';
+import { CadTabs, type ICadTab } from '@/components/cad/CadTabs';
 import {
   parseSelection,
   selectionQuery,
   withJob,
+  withJobView,
   withRevision,
   withView,
   type ICadSelection,
 } from '@/lib/cad/selection';
+
+type LeftTab = 'sheets' | 'jobs';
+
+const LEFT_TABS: readonly ICadTab<LeftTab>[] = [
+  { id: 'sheets', label: 'Листы' },
+  { id: 'jobs', label: 'Задания' },
+];
 
 interface ICadScreenProps {
   projectId: string;
@@ -25,6 +34,8 @@ export const CadScreen: FC<ICadScreenProps> = ({ projectId }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selection = parseSelection(searchParams);
+  // Вкладка живёт только в состоянии: в адрес не пишем, чтобы ссылка не меняла раскладку.
+  const [leftTab, setLeftTab] = useState<LeftTab>('sheets');
 
   // replace, а не push: переключение вида не должно засорять историю браузера.
   const navigate = (next: ICadSelection) => {
@@ -41,23 +52,39 @@ export const CadScreen: FC<ICadScreenProps> = ({ projectId }) => {
           onSelect={(revisionId) => navigate(withRevision(revisionId))}
         />
         {selection.revision && (
-          <CadSheetPicker
-            // Ключ по ревизии: выбор листов другого документа не переиспользуется.
-            key={`sheets:${selection.revision}`}
-            projectId={projectId}
-            revisionId={selection.revision}
-            onJobCreated={(jobId) => navigate(withJob(selection, jobId))}
-          />
-        )}
-        {selection.revision && (
-          <CadJobList
-            // Ключ по ревизии: список другого документа не переиспользуется.
-            key={selection.revision}
-            projectId={projectId}
-            revisionId={selection.revision}
-            selectedJobId={selection.job}
-            onSelect={(jobId) => navigate(withJob(selection, jobId))}
-          />
+          <CadTabs
+            idPrefix="cad-left"
+            label="Листы и задания ревизии"
+            tabs={LEFT_TABS}
+            active={leftTab}
+            onChange={setLeftTab}
+          >
+            {/* Листы не размонтируются при переключении: иначе сбросится выбор отмеченных. */}
+            <div hidden={leftTab !== 'sheets'}>
+              <CadSheetPicker
+                // Ключ по ревизии: выбор листов другого документа не переиспользуется.
+                key={`sheets:${selection.revision}`}
+                projectId={projectId}
+                revisionId={selection.revision}
+                onJobCreated={(jobId) => navigate(withJob(selection, jobId))}
+                openJobId={selection.job}
+                openPage={selection.page}
+                onOpenResult={(jobId, page, view) =>
+                  navigate(withJobView(selection, jobId, page, view))
+                }
+              />
+            </div>
+            {leftTab === 'jobs' && (
+              <CadJobList
+                // Ключ по ревизии: список другого документа не переиспользуется.
+                key={selection.revision}
+                projectId={projectId}
+                revisionId={selection.revision}
+                selectedJobId={selection.job}
+                onSelect={(jobId) => navigate(withJob(selection, jobId))}
+              />
+            )}
+          </CadTabs>
         )}
       </div>
 

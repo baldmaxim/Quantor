@@ -26,8 +26,8 @@ export const CadJobList: FC<ICadJobListProps> = ({
   const jobs = useCadJobs(projectId, revisionId);
 
   return (
-    <section className="flex flex-col gap-[var(--s-4)] rounded-[var(--radius-md)] border border-border-strong bg-surface p-[var(--s-6)]">
-      <h2 className="text-sm font-medium">Задания ревизии</h2>
+    // Рамка и заголовок — у вкладки «Задания» в CadScreen.
+    <div className="flex flex-col gap-[var(--s-4)]">
       {jobs.isPending ? (
         <SkeletonRows rows={3} />
       ) : jobs.isError ? (
@@ -50,7 +50,7 @@ export const CadJobList: FC<ICadJobListProps> = ({
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 };
 

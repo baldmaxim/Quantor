@@ -65,3 +65,35 @@ export const mergeEvents = (log: ICadEventLog, incoming: CadEventsRead): ICadEve
 /** События документа целиком (без событий отдельных видов). */
 export const documentEvents = (log: ICadEventLog): readonly CadEventRead[] =>
   log.events.filter((event) => event.scope === 'document');
+
+/**
+ * Статусы строк хронологии документа (`documentEvents`) по порядку событий.
+ *
+ * Событие `running` - запись о начале этапа, а не его итог. Оно показывается завершённым
+ * (`done`), если после него есть событие другого этапа или с иным статусом. Если оно последнее:
+ * идущая попытка - `running`, успешная - `done`, отказ или потеря исполнителя - `error`
+ * (этап не завершён). Остальные статусы (`done`, `needs_review`, `error`, `failed`…) и все
+ * события по видам (`scope=view`) показываются как есть.
+ */
+export const eventDisplayStatuses = (
+  events: readonly CadEventRead[],
+  attemptOutcome: string,
+): readonly string[] =>
+  events.map((event, index) => {
+    if (event.scope !== 'document' || event.status !== 'running') {
+      return event.status;
+    }
+    const closed = events
+      .slice(index + 1)
+      .some(
+        (next) =>
+          next.scope === 'document' && (next.phase !== event.phase || next.status !== 'running'),
+      );
+    if (closed) {
+      return 'done';
+    }
+    if (attemptOutcome === 'succeeded') {
+      return 'done';
+    }
+    return attemptOutcome === 'failed' || attemptOutcome === 'lost' ? 'error' : 'running';
+  });

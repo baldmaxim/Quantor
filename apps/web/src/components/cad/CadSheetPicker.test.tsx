@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   calibrations: new Map<number, string>(),
   features: { 'takeoff.manual': true } as Record<string, boolean>,
+  jobs: [] as unknown[],
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -28,17 +29,41 @@ vi.mock('@/lib/cad/sheet-queries', () => ({
 }));
 vi.mock('@/lib/cad/queries', () => ({
   useCreateCadJob: () => ({ mutate: mocks.mutate, isPending: false }),
+  useCadJobs: () => ({ data: { items: mocks.jobs, server_time: '' } }),
 }));
 
 import { CadSheetPicker } from './CadSheetPicker';
 
-const mount = (onJobCreated = vi.fn()) =>
-  render(<CadSheetPicker projectId="p" revisionId="r" onJobCreated={onJobCreated} />);
+const mount = (
+  onJobCreated = vi.fn(),
+  onOpenResult = vi.fn(),
+  open: { jobId: string | null; page: number | null } = { jobId: null, page: null },
+) =>
+  render(
+    <CadSheetPicker
+      projectId="p"
+      revisionId="r"
+      onJobCreated={onJobCreated}
+      openJobId={open.jobId}
+      openPage={open.page}
+      onOpenResult={onOpenResult}
+    />,
+  );
+
+const job = (patch: Record<string, unknown>) => ({
+  job_id: 'j1',
+  status: 'succeeded',
+  result_status: 'completed_requires_review',
+  requested_pages: [0],
+  created_at: '2026-11-10T10:00:00Z',
+  ...patch,
+});
 
 const launchButton = () => screen.getByRole('button', { name: /Запустить преобразование/ });
 
 beforeEach(() => {
   mocks.mutate.mockReset();
+  mocks.jobs = [];
   mocks.features = { 'takeoff.manual': true };
   mocks.calibrations = new Map([
     [0, 'calibrated'],
@@ -100,5 +125,45 @@ describe('CadSheetPicker', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('стр. 1');
     expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
     expect(launchButton()).toBeDisabled();
+  });
+
+  it('распознанный лист: бейдж, открытие результата по строке, чекбокс отдельно', () => {
+    mocks.jobs = [job({})];
+    const onOpenResult = vi.fn();
+    mount(vi.fn(), onOpenResult);
+    expect(screen.getByText('DXF есть · проверка')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Стр. 1/ }));
+    expect(onOpenResult).toHaveBeenCalledWith('j1', 0, null);
+    expect(screen.getByRole('checkbox', { name: 'Стр. 1' })).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Стр. 1' }));
+    expect(screen.getByRole('checkbox', { name: 'Стр. 1' })).toBeChecked();
+    expect(onOpenResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('идущее и упавшее задание открывают задание без страницы', () => {
+    mocks.jobs = [
+      job({ job_id: 'run', status: 'running', result_status: null, requested_pages: [0] }),
+      job({ job_id: 'bad', status: 'failed', result_status: 'failed', requested_pages: [1] }),
+    ];
+    const onOpenResult = vi.fn();
+    mount(vi.fn(), onOpenResult);
+    expect(screen.getByText('Выполняется')).toBeInTheDocument();
+    expect(screen.getByText('Ошибка')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Стр. 2/ }));
+    expect(onOpenResult).toHaveBeenCalledWith('bad', null, null);
+  });
+
+  it('открытый сейчас лист помечен aria-current', () => {
+    mocks.jobs = [job({})];
+    mount(vi.fn(), vi.fn(), { jobId: 'j1', page: 0 });
+    expect(screen.getByRole('button', { name: /Стр. 1/ })).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('лист без задания: подпись переключает чекбокс', () => {
+    mount();
+    fireEvent.click(screen.getByText('Стр. 1'));
+    expect(screen.getByRole('checkbox', { name: /Стр. 1/ })).toBeChecked();
   });
 });

@@ -14,7 +14,7 @@ import { create } from 'zustand';
  * ссылка на конкретный лист работала.
  */
 
-export type LeftTab = 'documents' | 'recognition' | 'takeoff';
+export type LeftTab = 'documents' | 'recognition' | 'takeoff' | 'cad';
 export type Tool = 'pointer' | 'pan' | 'scale';
 
 const MIN_LEFT = 200;
@@ -34,6 +34,8 @@ interface WorkspaceState {
   overlayVisible: boolean;
   /** Типы областей, скрытые пользователем. Пустое множество — показаны все. */
   hiddenTypes: ReadonlySet<string>;
+  /** DXF поверх чертежа (вкладка CAD). Живёт здесь, чтобы наложение держалось на других вкладках. */
+  cadOverlay: boolean;
 
   setLeftTab: (tab: LeftTab) => void;
   setLeftWidth: (width: number) => void;
@@ -43,6 +45,7 @@ interface WorkspaceState {
   setTool: (tool: Tool) => void;
   toggleOverlay: () => void;
   toggleType: (type: string) => void;
+  setCadOverlay: (value: boolean) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -56,6 +59,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   tool: 'pointer',
   overlayVisible: true,
   hiddenTypes: new Set<string>(),
+  cadOverlay: true,
 
   setLeftTab: (leftTab) => set({ leftTab }),
   setLeftWidth: (width) => set({ leftWidth: clamp(width, MIN_LEFT, MAX_LEFT) }),
@@ -63,6 +67,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   toggleLeft: () => set((state) => ({ leftCollapsed: !state.leftCollapsed })),
   toggleRight: () => set((state) => ({ rightCollapsed: !state.rightCollapsed })),
   setTool: (tool) => set({ tool }),
+  setCadOverlay: (cadOverlay) => set({ cadOverlay }),
   toggleOverlay: () => set((state) => ({ overlayVisible: !state.overlayVisible })),
   toggleType: (type) =>
     set((state) => {

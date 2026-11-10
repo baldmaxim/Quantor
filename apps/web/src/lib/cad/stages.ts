@@ -24,6 +24,7 @@ const STATE_LABELS: Readonly<Record<string, string>> = {
   done: 'Выполнено',
   needs_review: 'Нужна проверка',
   error: 'Ошибка',
+  failed: 'Отказ',
   unknown: 'Неизвестно',
 };
 
@@ -33,6 +34,7 @@ const STATE_TONES: Readonly<Record<string, CadBadgeTone>> = {
   done: 'success',
   needs_review: 'warning',
   error: 'danger',
+  failed: 'danger',
   unknown: 'neutral',
 };
 
@@ -115,14 +117,21 @@ export const resultInfo = (
 ): { label: string; tone: CadBadgeTone; hint: string } | null =>
   status ? (RESULT_LABELS[status] ?? { label: status, tone: 'neutral', hint: '' }) : null;
 
+/**
+ * Длительность: до 10 с - с десятой долей, дальше секунды целые. Округление - один раз по
+ * общему числу секунд, до деления на минуты (иначе 119,6 с давало «1 мин 60 с»).
+ */
 export const formatElapsed = (seconds: number | null | undefined): string => {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) {
     return '—';
   }
-  if (seconds < 60) {
-    return `${seconds.toFixed(seconds < 10 ? 1 : 0)} с`;
+  const tenths = Math.round(seconds * 10) / 10;
+  if (tenths < 10) {
+    return `${tenths.toFixed(1)} с`;
   }
-  const minutes = Math.floor(seconds / 60);
-  const rest = Math.round(seconds - minutes * 60);
-  return `${minutes} мин ${rest} с`;
+  const total = Math.round(seconds);
+  if (total < 60) {
+    return `${total} с`;
+  }
+  return `${Math.floor(total / 60)} мин ${total % 60} с`;
 };

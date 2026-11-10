@@ -18,3 +18,7 @@ export const cadAccess = (
   }
   return features[CAD_FEATURE] === true ? 'open' : 'hidden';
 };
+
+/** Флаг включён: для мест, где мета уже учтена через `useFeatures` (рабочая область). */
+export const cadEnabled = (features: Readonly<Record<string, boolean>>): boolean =>
+  features[CAD_FEATURE] === true;

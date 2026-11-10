@@ -76,8 +76,8 @@ const writeReviewer = (value: string): void => {
   }
 };
 
-export const useCadRemarks = (binding: IRemarkBinding): ICadRemarks => {
-  const list = useCadRemarksList(binding);
+export const useCadRemarks = (binding: IRemarkBinding, enabled = true): ICadRemarks => {
+  const list = useCadRemarksList(binding, enabled);
   const { mutateAsync: saveRemark, isPending: saveBusy } = useSaveCadRemark(binding);
   const { mutateAsync: deleteRemark, isPending: deleteBusy } = useDeleteCadRemark(binding);
   const { mutateAsync: importRemarks } = useImportCadRemarks(binding);
