@@ -527,7 +527,7 @@ describe('вкладка «Трассы»: пересчёт и история', 
     });
   });
 
-  it('те же значения, что у текущей попытки, не пересчитываются', () => {
+  it('те же значения, что у текущей попытки: пересчёт доступен с подсказкой (решает сервер)', () => {
     mount(
       routeWith({
         route_attempts: [
@@ -536,8 +536,8 @@ describe('вкладка «Трассы»: пересчёт и история', 
       }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Пересчитать…' }));
-    expect(screen.getByRole('button', { name: 'Пересчитать' })).toBeDisabled();
-    expect(screen.getByText(/результат не изменится/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Пересчитать' })).toBeEnabled();
+    expect(screen.getByText(/только если обновился/)).toBeInTheDocument();
   });
 
   it('приняты, считаются или одобрение отозвано - пересчёт закрыт с причиной', () => {

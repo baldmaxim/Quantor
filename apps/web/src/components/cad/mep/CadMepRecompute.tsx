@@ -129,7 +129,7 @@ export const CadMepRecompute: FC<ICadMepRecomputeProps> = ({ target, job, accept
           onSubmit={(event) => {
             event.preventDefault();
             setTouched(true);
-            if (valid && !unchanged) setConfirm(true);
+            if (valid) setConfirm(true);
           }}
         >
           <CadMepFloorFields
@@ -143,14 +143,14 @@ export const CadMepRecompute: FC<ICadMepRecomputeProps> = ({ target, job, accept
           />
           {unchanged && valid && (
             <p className="text-xs text-muted" role="note">
-              Те же значения, что в текущей попытке: результат не изменится.
+              Те же значения, что в текущей попытке: пересчёт пройдёт, только если обновился
+              генератор трасс.
             </p>
           )}
           <div className="flex min-w-0 flex-wrap gap-[var(--s-3)]">
             <Button
               type="submit"
               variant="primary"
-              disabled={unchanged && valid}
               className="max-md:h-[44px] max-md:w-full"
             >
               Пересчитать
