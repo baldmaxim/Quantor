@@ -564,12 +564,14 @@ async def recompute_routes(
     ):
         raise DomainError(ErrorCode.CAD_ROUTES_ACCEPTED)
     await _require_active_approval(session, job)
+    params = load_params(settings)
     if (
         payload_int(job, "floor_elevation_mm") == floor_elevation_mm
         and payload_int(job, "floor_height_mm") == floor_height_mm
+        and job.payload.get("generator_version") == params.generator_version
+        and job.payload.get("params_sha256") == params.sha256
     ):
         raise DomainError(ErrorCode.CAD_RECOMPUTE_SAME_PARAMS)
-    params = load_params(settings)
 
     payload = dict(job.payload)
     result = cad_service.result_of(job)
