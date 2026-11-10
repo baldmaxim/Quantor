@@ -28,12 +28,13 @@ export const WorkspaceCadLeft: FC<IWorkspaceCadLeftProps> = ({
   selectedJobId,
   onOpenSheet,
   onSelectJob,
+  onWideChange,
 }) => {
   const [tab, setTab] = useState<LeftTab>('sheets');
 
   return (
     <div
-      className="flex min-w-0 flex-col gap-[var(--s-4)] p-[var(--s-4)]"
+      className="flex h-full min-h-0 min-w-0 flex-col gap-[var(--s-4)] p-[var(--s-4)]"
       data-testid="workspace-cad-left"
     >
       <CadTabs
@@ -45,7 +46,10 @@ export const WorkspaceCadLeft: FC<IWorkspaceCadLeftProps> = ({
         onChange={setTab}
       >
         {/* Листы не размонтируются при переключении: список не перечитывается заново. */}
-        <div hidden={tab !== 'sheets'}>
+        <div
+          hidden={tab !== 'sheets'}
+          className="min-h-0 flex-1 [&:not([hidden])]:flex [&:not([hidden])]:flex-col"
+        >
           <CadSheetPicker
             // Ключ по ревизии: выбор листов другого документа не переиспользуется.
             key={`sheets:${revisionId}`}
@@ -53,6 +57,7 @@ export const WorkspaceCadLeft: FC<IWorkspaceCadLeftProps> = ({
             revisionId={revisionId}
             activePage={activePage}
             onOpenSheet={onOpenSheet}
+            onWideChange={onWideChange}
           />
         </div>
         {tab === 'jobs' && (

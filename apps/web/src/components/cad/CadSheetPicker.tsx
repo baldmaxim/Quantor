@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type FC } from 'react';
+import { useEffect, useMemo, type FC } from 'react';
 
 import { CadSheetRow } from '@/components/cad/CadSheetRow';
 import { takeoffAccess } from '@/components/workspace/takeoff-access';
@@ -19,6 +19,8 @@ interface ICadSheetPickerProps {
   activePage: number | null;
   /** Открыть лист в рабочей области; результат CAD, если он есть, выберет сама область. */
   onOpenSheet: (pageIndex: number) => void;
+  /** Сообщает, показывает ли хотя бы одна строка бейдж: тогда панели нужна широкая колонка. */
+  onWideChange?: (wide: boolean) => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
   revisionId,
   activePage,
   onOpenSheet,
+  onWideChange,
 }) => {
   const sheets = useSheets(revisionId);
   const jobs = useCadJobs(projectId, revisionId);
@@ -45,8 +48,21 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
   );
   const states = useSheetCalibrationStates(openSheets, manualEnabled);
 
+  // Бейджи в строках: результат CAD или калибровка. Без них хватает узкой колонки с названием.
+  const wide =
+    items.some((sheet) => results.has(sheet.page_index)) ||
+    openSheets.some((sheet) => {
+      const state = states.get(sheet.page_index);
+      return state === 'calibrated' || state === 'missing';
+    });
+
+  useEffect(() => {
+    onWideChange?.(wide);
+    return () => onWideChange?.(false);
+  }, [wide, onWideChange]);
+
   return (
-    <div className="flex flex-col gap-[var(--s-4)]">
+    <div className="flex min-h-0 flex-1 flex-col gap-[var(--s-4)]">
       <p className="text-xs text-muted">Нажмите на лист, чтобы открыть его в рабочей области.</p>
 
       {sheets.isPending ? (
@@ -73,7 +89,7 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
         </div>
       ) : (
         <>
-          <ul className="flex max-h-[min(60dvh,28rem)] flex-col overflow-auto overscroll-contain rounded-[var(--radius-md)] border border-border">
+          <ul className="flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain rounded-[var(--radius-md)] border border-border">
             {items.map((sheet, position) => (
               <CadSheetRow
                 key={sheet.id}

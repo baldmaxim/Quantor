@@ -44,7 +44,7 @@ export const CadSheetRow: FC<ICadSheetRowProps> = ({ sheet, href, state, result,
         aria-current={open ? 'true' : undefined}
         className="flex min-h-[44px] w-full min-w-0 flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)] px-[var(--s-5)] py-[var(--s-2)] text-left text-sm hover:text-accent"
       >
-        <span className="[overflow-wrap:anywhere]">
+        <span className="max-w-full truncate whitespace-nowrap">
           {pageLabel(sheet.page_index)}
           {extraLabel && <span className="text-muted"> · {extraLabel}</span>}
         </span>

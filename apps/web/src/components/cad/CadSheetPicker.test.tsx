@@ -35,13 +35,18 @@ vi.mock('@/lib/cad/queries', () => ({
 
 import { CadSheetPicker } from './CadSheetPicker';
 
-const mount = (onOpenSheet = vi.fn(), activePage: number | null = null) =>
+const mount = (
+  onOpenSheet = vi.fn(),
+  activePage: number | null = null,
+  onWideChange?: (wide: boolean) => void,
+) =>
   render(
     <CadSheetPicker
       projectId="p"
       revisionId="r"
       activePage={activePage}
       onOpenSheet={onOpenSheet}
+      onWideChange={onWideChange}
     />,
   );
 
@@ -114,6 +119,26 @@ describe('CadSheetPicker', () => {
       'href',
       '/projects/p/workspace?revision=r&page=2',
     );
+  });
+
+  it('нет бейджей: колонка узкая', () => {
+    const onWideChange = vi.fn();
+    mount(vi.fn(), null, onWideChange);
+    expect(onWideChange).toHaveBeenLastCalledWith(false);
+    expect(onWideChange).not.toHaveBeenCalledWith(true);
+  });
+
+  it('есть бейдж результата: колонка широкая', () => {
+    mocks.jobs = [job({})];
+    const onWideChange = vi.fn();
+    mount(vi.fn(), null, onWideChange);
+    expect(onWideChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it('есть бейдж калибровки у открытого листа: колонка широкая', () => {
+    const onWideChange = vi.fn();
+    mount(vi.fn(), 1, onWideChange);
+    expect(onWideChange).toHaveBeenLastCalledWith(true);
   });
 
   it('открытого листа нет: калибровка не читается ни у одного', () => {

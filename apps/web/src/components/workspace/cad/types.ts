@@ -36,6 +36,8 @@ export interface IWorkspaceCadLeftProps {
   readonly selectedJobId: string | null;
   readonly onOpenSheet: (pageIndex: number) => void;
   readonly onSelectJob: (jobId: string) => void;
+  /** Нужна ли панели широкая колонка: хотя бы в одной строке листа есть бейдж. */
+  readonly onWideChange?: (wide: boolean) => void;
 }
 
 /** Строка над холстом: заголовок вида, переключатель видов, «Вписать» для камеры рабочей области. */

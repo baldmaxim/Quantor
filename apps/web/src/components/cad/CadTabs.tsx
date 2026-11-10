@@ -49,7 +49,8 @@ export const CadTabs = <TId extends string>({
     <section
       className={cx(
         'flex flex-col',
-        !bare && 'rounded-[var(--radius-md)] border border-border-strong bg-surface',
+        // Узкая панель занимает всю высоту родителя: содержимое вкладки тянется до низа.
+        bare ? 'min-h-0 flex-1' : 'rounded-[var(--radius-md)] border border-border-strong bg-surface',
       )}
     >
       <div role="tablist" aria-label={label} className="flex border-b border-border">
@@ -86,7 +87,10 @@ export const CadTabs = <TId extends string>({
         role="tabpanel"
         id={`${idPrefix}-panel-${active}`}
         aria-labelledby={`${idPrefix}-tab-${active}`}
-        className={cx('flex flex-col', bare ? 'pt-[var(--s-5)]' : 'p-[var(--s-6)]')}
+        className={cx(
+          'flex flex-col',
+          bare ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain pt-[var(--s-5)]' : 'p-[var(--s-6)]',
+        )}
       >
         {children}
       </div>

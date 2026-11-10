@@ -10,6 +10,7 @@ vi.mock('@/components/cad/CadSheetPicker', () => ({
   CadSheetPicker: (props: {
     activePage: number | null;
     onOpenSheet: (page: number) => void;
+    onWideChange?: (wide: boolean) => void;
   }) => {
     mocks.picker(props);
     return (
@@ -84,6 +85,23 @@ describe('WorkspaceCadLeft', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Листы' }));
     expect(screen.getByText('лист')).toBeVisible();
+  });
+
+  it('признак широкой колонки от списка листов уходит наружу', () => {
+    const onWideChange = vi.fn();
+    render(
+      <WorkspaceCadLeft
+        projectId="p1"
+        revisionId="r1"
+        activePage={2}
+        selectedJobId={null}
+        onOpenSheet={vi.fn()}
+        onSelectJob={vi.fn()}
+        onWideChange={onWideChange}
+      />,
+    );
+    mocks.picker.mock.calls.at(-1)?.[0].onWideChange?.(true);
+    expect(onWideChange).toHaveBeenCalledWith(true);
   });
 
   it('блока «Исходный PDF» нет', () => {

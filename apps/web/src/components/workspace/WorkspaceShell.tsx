@@ -28,11 +28,23 @@ interface IWorkspaceShellProps {
   /** Подпись над левой панелью — обычно название открытого документа. */
   leftTitle: ReactNode;
   left: ReactNode;
+  /**
+   * Ширина левой панели от содержимого, пока пользователь не тянул разделитель: `narrow` и
+   * `wide` задают колонку на планшете и десктопе, на телефоне раскладка прежняя.
+   */
+  leftSize?: 'narrow' | 'wide' | null;
   center: ReactNode;
   rightTitle: ReactNode;
   right: ReactNode;
   status: ReactNode;
 }
+
+/** Ширина левой панели по содержимому (CSS-переменные контейнера, только от md). */
+const LEFT_SIZE_CLASS = {
+  narrow: 'md:[--w-pane-left:13.25rem]',
+  wide: 'md:[--w-pane-left:19.5rem]',
+} as const;
+const LEFT_SIZE_PX = { narrow: 212, wide: 312 } as const;
 
 /** Ширина свёрнутой панели: остаётся полоса с кнопкой разворачивания. */
 const COLLAPSED_WIDTH = 30;
@@ -42,6 +54,7 @@ export const WorkspaceShell = ({
   toolbar,
   leftTitle,
   left,
+  leftSize = null,
   center,
   rightTitle,
   right,
@@ -65,7 +78,10 @@ export const WorkspaceShell = ({
   return (
     <div
       ref={container}
-      className="grid min-h-0 flex-1 grid-rows-[var(--h-ws-tabs)_var(--h-ws-toolbar)_1fr_var(--h-ws-status)] bg-surface-sunken text-text"
+      className={cx(
+        'grid min-h-0 flex-1 grid-rows-[var(--h-ws-tabs)_var(--h-ws-toolbar)_1fr_var(--h-ws-status)] bg-surface-sunken text-text',
+        leftSize && LEFT_SIZE_CLASS[leftSize],
+      )}
       style={style}
     >
       <div className="flex min-w-0 items-stretch border-b border-border-strong bg-surface">
@@ -97,7 +113,7 @@ export const WorkspaceShell = ({
           <Splitter
             side="left"
             label="Ширина левой панели"
-            width={leftWidth ?? PANE_LIMITS.MIN_LEFT + 64}
+            width={leftWidth ?? (leftSize ? LEFT_SIZE_PX[leftSize] : PANE_LIMITS.MIN_LEFT + 64)}
             min={PANE_LIMITS.MIN_LEFT}
             max={PANE_LIMITS.MAX_LEFT}
             previewTarget={container}

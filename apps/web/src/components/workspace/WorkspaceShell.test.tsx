@@ -14,9 +14,10 @@ import { PANE_LIMITS, useWorkspaceStore } from '@/store/workspace';
 
 const initial = useWorkspaceStore.getState();
 
-const renderShell = () =>
+const renderShell = (leftSize?: 'narrow' | 'wide' | null) =>
   render(
     <WorkspaceShell
+      leftSize={leftSize}
       tabs={<span>вкладки</span>}
       toolbar={<span>инструменты</span>}
       leftTitle="документ.pdf"
@@ -113,6 +114,23 @@ describe('каркас рабочей области', () => {
 
       expect(useWorkspaceStore.getState().leftWidth).toBe(PANE_LIMITS.MAX_LEFT);
       expect(useWorkspaceStore.getState().rightWidth).toBe(PANE_LIMITS.MIN_RIGHT);
+    });
+  });
+
+  describe('ширина левой панели по содержимому', () => {
+    const shellRoot = () => screen.getByText('статус').parentElement?.parentElement;
+
+    it('без leftSize переменные ширины не переопределяются', () => {
+      renderShell();
+      expect(shellRoot()?.className).not.toContain('--w-pane-left');
+    });
+
+    it('narrow и wide задают разную ширину колонки от md', () => {
+      const { unmount } = renderShell('narrow');
+      expect(shellRoot()?.className).toContain('md:[--w-pane-left:13.25rem]');
+      unmount();
+      renderShell('wide');
+      expect(shellRoot()?.className).toContain('md:[--w-pane-left:19.5rem]');
     });
   });
 

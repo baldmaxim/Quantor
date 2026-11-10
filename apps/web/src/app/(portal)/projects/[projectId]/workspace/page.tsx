@@ -115,6 +115,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const content = useContentUrl(revisionId);
   const { backend, loading, errorCode } = useDocumentBackend(content.data?.url ?? null);
 
+  const [cadLeftWide, setCadLeftWide] = useState(false);
   const leftTab = useWorkspaceStore((state) => state.leftTab);
   const setLeftTab = useWorkspaceStore((state) => state.setLeftTab);
   const tool = useWorkspaceStore((state) => state.tool);
@@ -675,6 +676,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
             </>
           }
           leftTitle={project.data?.name ?? '…'}
+          leftSize={activeTab === 'cad' ? (cadLeftWide ? 'wide' : 'narrow') : null}
           left={
             <>
               <div
@@ -733,8 +735,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
                 {/* Вкладка CAD не размонтируется после первого открытия: отмеченные листы сохраняются. */}
                 {cad.left && cad.opened && (
-                  <div hidden={activeTab !== 'cad'}>
-                    <WorkspaceCadLeft {...cad.left} />
+                  <div hidden={activeTab !== 'cad'} className="h-full">
+                    <WorkspaceCadLeft {...cad.left} onWideChange={setCadLeftWide} />
                   </div>
                 )}
 
