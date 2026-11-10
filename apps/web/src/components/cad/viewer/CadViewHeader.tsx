@@ -4,7 +4,7 @@ import type { CadViewDiagnosticsRead } from '@quantor/api-client';
 import type { FC } from 'react';
 
 import { StatusBadge } from '@/components/ui';
-import { resultInfo, stateLabel, stateTone } from '@/lib/cad/stages';
+import { stateLabel, stateTone } from '@/lib/cad/stages';
 
 interface ICadViewHeaderProps {
   diagnostics: CadViewDiagnosticsRead;
@@ -27,21 +27,16 @@ const outcomeNote = (diagnostics: CadViewDiagnosticsRead): string | null => {
   return null;
 };
 
+/** Подробности итога вида для боковой панели (заголовок и бейдж итога над холстом - в `CadViewTitle`). */
 export const CadViewHeader: FC<ICadViewHeaderProps> = ({ diagnostics }) => {
-  const info = resultInfo(diagnostics.result_status);
   const note = outcomeNote(diagnostics);
   const pageDiffers = diagnostics.legacy_pdf_page !== diagnostics.page_index + 1;
 
   return (
     <header className="flex min-w-0 flex-col gap-[var(--s-4)]">
-      <div className="flex flex-wrap items-baseline gap-x-[var(--s-5)] gap-y-[var(--s-2)]">
-        <h3 className="text-md font-medium">
-          Стр. {diagnostics.legacy_pdf_page} · вид {diagnostics.view}
-        </h3>
-        {pageDiffers && (
-          <span className="text-xs text-muted">индекс страницы: {diagnostics.page_index + 1}</span>
-        )}
-        <span className="text-xs text-muted">попытка {diagnostics.attempt}</span>
+      <div className="flex flex-wrap items-baseline gap-x-[var(--s-5)] gap-y-[var(--s-2)] text-xs text-muted">
+        {pageDiffers && <span>индекс страницы: {diagnostics.page_index + 1}</span>}
+        <span>попытка {diagnostics.attempt}</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-[var(--s-3)]">
@@ -51,11 +46,6 @@ export const CadViewHeader: FC<ICadViewHeaderProps> = ({ diagnostics }) => {
         <StatusBadge tone="neutral" dot={false} wrap>
           Масштаб: {diagnostics.scale_status ?? '—'}
         </StatusBadge>
-        {info && (
-          <StatusBadge tone={info.tone} dot={false} wrap>
-            {info.label}
-          </StatusBadge>
-        )}
       </div>
 
       {note && <p className="text-xs [overflow-wrap:anywhere]">{note}</p>}

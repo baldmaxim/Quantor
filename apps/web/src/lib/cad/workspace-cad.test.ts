@@ -103,6 +103,17 @@ describe('наложение DXF', () => {
     expect(overlayAvailability(diagnostics(), preview(), null).available).toBe(false);
   });
 
+  it('данные слоя: слои получают цвета палитры по порядку', () => {
+    const frame = frameOf(FRAME_OK);
+    const data = overlayPaintData(preview(), frame, { width: 842, height: 595 }, 'ink', [
+      'c1',
+      'c2',
+      'c3',
+    ]);
+    // в предпросмотре два слоя
+    expect(data?.layerColors).toEqual(['c1', 'c2']);
+  });
+
   it('данные слоя: пути в долях листа, все слои видны, без бумаги и контекста', () => {
     const frame = frameOf(FRAME_OK);
     const data = overlayPaintData(preview(), frame, { width: 842, height: 595 }, 'ink');
@@ -113,6 +124,8 @@ describe('наложение DXF', () => {
     expect(data?.paper).toBeNull();
     expect(data?.crop).toBeNull();
     expect(data?.ink).toBe('ink');
+    // без палитры слои красятся чернилами
+    expect(data?.layerColors).toEqual([]);
     // начало DXF (0, 0) лежит в origin_pt кадра, нормализованном размером листа
     const first = data?.paths[0]?.points;
     expect(first?.[0]).toBeCloseTo(37.5 / 842, 9);

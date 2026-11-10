@@ -77,6 +77,21 @@
   --sheet-ink: #1a5fa8;
   --sheet-ink-danger: #a92318;
 
+  /* Слои DXF на листе: 12 различимых цветов, назначаются слою по порядку (lib/cad/layer-colors.ts).
+  Контраст >= 3:1 и на бумаге листа, и на фоне панели (образец цвета в списке слоёв). */
+  --cad-layer-1: #1d5bb3;
+  --cad-layer-2: #b4221d;
+  --cad-layer-3: #116b2f;
+  --cad-layer-4: #8c4e17;
+  --cad-layer-5: #8822d1;
+  --cad-layer-6: #116962;
+  --cad-layer-7: #ac1c77;
+  --cad-layer-8: #6f5c12;
+  --cad-layer-9: #156581;
+  --cad-layer-10: #5d3ddf;
+  --cad-layer-11: #3f6811;
+  --cad-layer-12: #b41d43;
+
   /* --- вспомогательное --- */
   --tooltip-bg: #2b323b;
   --tooltip-text: #ffffff;
@@ -199,6 +214,20 @@
     --canvas: #eceae4;
     --canvas-well: #0a0c0f;
 
+    /* Слои DXF: на светлой бумаге листа и на тёмной панели одновременно. */
+    --cad-layer-1: #2b71d3;
+    --cad-layer-2: #d53631;
+    --cad-layer-3: #1b843e;
+    --cad-layer-4: #a86122;
+    --cad-layer-5: #9d49da;
+    --cad-layer-6: #1a8078;
+    --cad-layer-7: #cf2a93;
+    --cad-layer-8: #86711c;
+    --cad-layer-9: #207b9d;
+    --cad-layer-10: #775dde;
+    --cad-layer-11: #507f1a;
+    --cad-layer-12: #d53059;
+
     --tooltip-bg: #c8d2de;
     --tooltip-text: #0f141a;
     --skeleton: #232932;
@@ -249,6 +278,20 @@
 
   --canvas: #eceae4;
   --canvas-well: #0a0c0f;
+
+  /* Слои DXF: на светлой бумаге листа и на тёмной панели одновременно. */
+  --cad-layer-1: #2b71d3;
+  --cad-layer-2: #d53631;
+  --cad-layer-3: #1b843e;
+  --cad-layer-4: #a86122;
+  --cad-layer-5: #9d49da;
+  --cad-layer-6: #1a8078;
+  --cad-layer-7: #cf2a93;
+  --cad-layer-8: #86711c;
+  --cad-layer-9: #207b9d;
+  --cad-layer-10: #775dde;
+  --cad-layer-11: #507f1a;
+  --cad-layer-12: #d53059;
 
   --tooltip-bg: #c8d2de;
   --tooltip-text: #0f141a;

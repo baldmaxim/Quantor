@@ -24,6 +24,7 @@ const data = (patch: Partial<ICadPaintData> = {}): ICadPaintData => ({
   paths: [path([0.1, 0.1, 0.2, 0.2])],
   visibleLayers: new Set([0]),
   opacity: 0.5,
+  layerColors: [],
   ink: 'ink',
   paper: null,
   crop: null,
@@ -57,7 +58,80 @@ const fakeContext = () => {
   return { context, calls };
 };
 
+/** Контекст, который запоминает цвет в момент каждой обводки и заливки. */
+const colorRecorder = () => {
+  const strokes: string[] = [];
+  const fills: string[] = [];
+  const context = {
+    canvas: { width: 1000, height: 500 },
+    strokeStyle: '',
+    fillStyle: '',
+    globalAlpha: 1,
+    lineWidth: 1,
+    lineJoin: 'miter',
+    setTransform: () => undefined,
+    save: () => undefined,
+    restore: () => undefined,
+    beginPath: () => undefined,
+    rect: () => undefined,
+    clip: () => undefined,
+    clearRect: () => undefined,
+    scale: () => undefined,
+    fillRect: () => undefined,
+    moveTo: () => undefined,
+    lineTo: () => undefined,
+    closePath: () => undefined,
+    stroke: () => void strokes.push(String(context.strokeStyle)),
+    fill: () => void fills.push(String(context.fillStyle)),
+    strokeRect: () => undefined,
+    setLineDash: () => undefined,
+  };
+  return { context: context as unknown as CanvasRenderingContext2D, strokes, fills };
+};
+
 describe('createCadPainter', () => {
+  it('каждый слой рисуется своим цветом, слой без цвета - чернилами', () => {
+    const { context, strokes } = colorRecorder();
+    createCadPainter(
+      data({
+        paths: [
+          path([0.1, 0.1, 0.2, 0.2], { layer: 0 }),
+          path([0.3, 0.1, 0.4, 0.2], { layer: 1 }),
+          path([0.5, 0.1, 0.6, 0.2], { layer: 2 }),
+          path([0.7, 0.1, 0.8, 0.2], { layer: 1 }),
+        ],
+        visibleLayers: new Set([0, 1, 2]),
+        layerColors: ['red', 'green'],
+      }),
+    ).paint(context, PLACEMENT, 1, null);
+    // Слои 0 и 1 - по обводке своего цвета (слой 1 - одна на два пути), слой 2 - чернила.
+    expect([...strokes].sort()).toEqual(['green', 'ink', 'red']);
+  });
+
+  it('скрытый слой не рисуется даже своим цветом', () => {
+    const { context, strokes } = colorRecorder();
+    createCadPainter(
+      data({
+        paths: [path([0.1, 0.1, 0.2, 0.2], { layer: 0 }), path([0.3, 0.1, 0.4, 0.2], { layer: 1 })],
+        visibleLayers: new Set([1]),
+        layerColors: ['red', 'green'],
+      }),
+    ).paint(context, PLACEMENT, 1, null);
+    expect(strokes).toEqual(['green']);
+  });
+
+  it('заливка берёт цвет своего слоя', () => {
+    const { context, fills } = colorRecorder();
+    createCadPainter(
+      data({
+        paths: [path([0.1, 0.1, 0.3, 0.1, 0.3, 0.3], { layer: 1, closed: true, fill: true })],
+        visibleLayers: new Set([1]),
+        layerColors: ['red', 'green'],
+      }),
+    ).paint(context, PLACEMENT, 1, null);
+    expect(fills).toEqual(['green']);
+  });
+
   it('рисует видимый слой и пропускает скрытый', () => {
     const shown = fakeContext();
     createCadPainter(data()).paint(shown.context, PLACEMENT, 1, null);

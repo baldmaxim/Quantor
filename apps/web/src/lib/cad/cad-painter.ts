@@ -23,7 +23,9 @@ export interface ICadPaintData {
   readonly visibleLayers: ReadonlySet<number>;
   /** Непрозрачность геометрии, 0-1. */
   readonly opacity: number;
-  /** Цвета приходят из токенов темы. */
+  /** Цвет каждого слоя по его индексу (из токенов темы); слой без цвета рисуется чернилами. */
+  readonly layerColors: readonly string[];
+  /** Чернила по умолчанию - из токенов темы. */
   readonly ink: string;
   /** Фон листа для автономного просмотра: у PDF бумага своя. `null` - не рисовать. */
   readonly paper: string | null;
@@ -99,6 +101,20 @@ const visiblePaths = (
     (path) => data.visibleLayers.has(path.layer) && hits(boxOf(path.bounds, placement), rects),
   );
 
+const groupByColor = (
+  paths: readonly INormalizedPath[],
+  data: ICadPaintData,
+): Map<string, INormalizedPath[]> => {
+  const groups = new Map<string, INormalizedPath[]>();
+  for (const path of paths) {
+    const color = data.layerColors[path.layer] ?? data.ink;
+    const group = groups.get(color);
+    if (group) group.push(path);
+    else groups.set(color, [path]);
+  }
+  return groups;
+};
+
 export const createCadPainter = (data: ICadPaintData): LayerPainter => ({
   paint: (context, placement, ratio, area) => {
     const rects = beginLayerPaint(context, ratio, area, MARGIN);
@@ -111,24 +127,30 @@ export const createCadPainter = (data: ICadPaintData): LayerPainter => ({
     const shown = visiblePaths(data, placement, rects);
     if (shown.length > 0) {
       context.globalAlpha = data.opacity;
-      context.strokeStyle = data.ink;
-      context.fillStyle = data.ink;
       context.lineWidth = LINE_WIDTH;
       context.lineJoin = 'round';
 
+      // Один проход на цвет слоя: путей тысячи, а смен цвета - не больше размера палитры.
+      const groups = groupByColor(shown, data);
+
       // Заливки отдельным проходом и с малой плотностью: под ними должны читаться линии.
-      const fills = shown.filter((path) => path.fill && path.closed);
-      if (fills.length > 0) {
-        context.globalAlpha = data.opacity * FILL_ALPHA;
+      context.globalAlpha = data.opacity * FILL_ALPHA;
+      for (const [color, paths] of groups) {
+        const fills = paths.filter((path) => path.fill && path.closed);
+        if (fills.length === 0) continue;
+        context.fillStyle = color;
         context.beginPath();
         for (const path of fills) tracePath(context, path, placement);
         context.fill();
-        context.globalAlpha = data.opacity;
       }
 
-      context.beginPath();
-      for (const path of shown) tracePath(context, path, placement);
-      context.stroke();
+      context.globalAlpha = data.opacity;
+      for (const [color, paths] of groups) {
+        context.strokeStyle = color;
+        context.beginPath();
+        for (const path of paths) tracePath(context, path, placement);
+        context.stroke();
+      }
     }
 
     if (data.crop) {

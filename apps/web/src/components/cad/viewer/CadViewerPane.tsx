@@ -1,11 +1,12 @@
 'use client';
 
 import type { CadViewDiagnosticsRead } from '@quantor/api-client';
-import { useCallback, useMemo, useRef, useState, type FC } from 'react';
+import { useCallback, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
 
 import { ErrorState, Skeleton, type ISegmentedOption } from '@/components/ui';
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
+import { assignLayerColors } from '@/lib/cad/layer-colors';
 import { readCadPaintColors } from '@/lib/cad/paint-colors';
 import { bboxPtToNormalized, type BboxPt, type IRemarkBinding } from '@/lib/cad/remarks';
 import { composePainters, createRemarksPainter, type IRemarkMark } from '@/lib/cad/remarks-painter';
@@ -17,7 +18,7 @@ import {
   type INormalizedPath,
 } from '@/lib/cad/frame';
 import { cadViewErrorText, useCadPreview, type ICadViewParams } from '@/lib/cad/view-queries';
-import { formatInt, formatNumber } from '@/lib/cad/view-format';
+import { formatNumber } from '@/lib/cad/view-format';
 import { errorMessage } from '@/lib/errors';
 import { useTheme } from '@/lib/theme';
 import { Camera, type CameraState } from '@/lib/viewer/camera';
@@ -25,8 +26,10 @@ import type { RenderBackend } from '@/lib/viewer/backend';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 import type { OverlayRegion } from '@/lib/viewer/overlay';
 
+import { CadLayersPanel } from './CadLayersPanel';
 import { CadRemarkCapture } from './CadRemarkCapture';
 import { CadRemarksPanel } from './CadRemarksPanel';
+import { CadSidePanel, type ICadSideTab } from './CadSidePanel';
 import { CadViewerControls, type CadViewerMode } from './CadViewerControls';
 import { useCadPdfPage } from './useCadPdfPage';
 import { useCadRemarks, type IRemarkDraft } from './useCadRemarks';
@@ -35,7 +38,17 @@ import { usePinchZoom } from './usePinchZoom';
 interface ICadViewerPaneProps {
   params: ICadViewParams;
   diagnostics: CadViewDiagnosticsRead;
+  /** Компактный заголовок над холстом (страница, вид, бейдж итога). */
+  heading: ReactNode;
+  /** Разделы боковой панели после «Слоёв» и «Замечаний»: масштаб, файлы, задание. */
+  extraTabs: readonly ICadSideTab[];
+  /** Открытый раздел боковой панели; без него панель помнит выбор сама. */
+  sideTab?: string;
+  onSideTabChange?: (id: string) => void;
 }
+
+/** Ключ localStorage: боковая панель вида свёрнута. */
+const SIDE_COLLAPSED_KEY = 'quantor.cad.side-collapsed';
 
 // Общие пустые значения: новый объект на каждый рендер пересоздавал бы слои холста.
 const NO_REGIONS: readonly OverlayRegion[] = [];
@@ -57,7 +70,14 @@ const NOTICE =
  * отдельно, а сравнивать его с PDF интерфейс не даёт. Панорама и зум - через камеру просмотрщика,
  * мимо состояния React (ADR-0004).
  */
-export const CadViewerPane: FC<ICadViewerPaneProps> = ({ params, diagnostics }) => {
+export const CadViewerPane: FC<ICadViewerPaneProps> = ({
+  params,
+  diagnostics,
+  heading,
+  extraTabs,
+  sideTab,
+  onSideTabChange,
+}) => {
   const { revisionId, pageIndex } = params;
   const theme = useTheme();
   const colors = useMemo(() => {
@@ -153,6 +173,11 @@ export const CadViewerPane: FC<ICadViewerPaneProps> = ({ params, diagnostics }) 
     [layerNames, hiddenLayers],
   );
 
+  const layerColors = useMemo(
+    () => assignLayerColors(colors.layers, layerNames.length),
+    [colors.layers, layerNames.length],
+  );
+
   const cadPainter = useMemo<LayerPainter | null>(() => {
     const crop = cropVisible && cropRect ? { rect: cropRect, color: colors.crop } : null;
     const paths = mode === 'cad' ? (standalone?.paths ?? null) : overlay;
@@ -161,11 +186,22 @@ export const CadViewerPane: FC<ICadViewerPaneProps> = ({ params, diagnostics }) 
       paths: paths ?? [],
       visibleLayers,
       opacity,
+      layerColors,
       ink: colors.ink,
       paper: mode === 'cad' ? colors.paper : null,
       crop,
     });
-  }, [mode, standalone, overlay, cropVisible, cropRect, visibleLayers, opacity, colors]);
+  }, [
+    mode,
+    standalone,
+    overlay,
+    cropVisible,
+    cropRect,
+    visibleLayers,
+    opacity,
+    layerColors,
+    colors,
+  ]);
 
   // Замечания и черновик участка - на листе PDF (режимы PDF и наложение), в чистом CAD их нет.
   const sheet = pdf.sheet;
@@ -280,152 +316,182 @@ export const CadViewerPane: FC<ICadViewerPaneProps> = ({ params, diagnostics }) 
   };
   const focusRemark = (state: CameraState) => pdfCamera.set(state);
 
+  const tabs: readonly ICadSideTab[] = [
+    {
+      id: 'layers',
+      label: 'Слои',
+      content: (
+        <CadLayersPanel
+          layers={layerNames}
+          visibleLayers={visibleLayers}
+          onToggleLayer={toggleLayer}
+          opacity={opacity}
+          onOpacityChange={setOpacity}
+          cadShown={mode !== 'pdf' && preview !== null}
+          previewAvailable={cadEnabled}
+          pointCount={preview ? preview.point_count : null}
+          cropAvailable={cropAvailable}
+          cropVisible={cropVisible}
+          onCropChange={setCropVisible}
+        />
+      ),
+    },
+    {
+      id: 'remarks',
+      label: 'Замечания',
+      content: (
+        <CadRemarksPanel
+          binding={binding}
+          store={store}
+          page={pdf.sheet}
+          marking={markingOn}
+          onMarkingChange={setMarking}
+          markDisabledReason={markDisabledReason}
+          draft={draft}
+          onDraftSave={(value) => void saveDraft(value)}
+          onDraftCancel={() => setDraft(null)}
+          activeId={activeRemark}
+          onActivate={setActiveRemark}
+          onFocusCamera={mode === 'cad' ? null : focusRemark}
+          viewport={hostSize}
+        />
+      ),
+    },
+    ...extraTabs,
+  ];
+
   return (
-    <section className="flex min-w-0 flex-col gap-[var(--s-5)]" aria-label="Просмотр вида">
-      <CadViewerControls
-        mode={mode}
-        options={options}
-        onModeChange={setPicked}
-        onZoomIn={() => activeCamera.zoomIn(hostSize())}
-        onZoomOut={() => activeCamera.zoomOut(hostSize())}
-        onFit={() => activeSheet && activeCamera.fitPage(activeSheet, hostSize())}
-        layers={layerNames}
-        visibleLayers={visibleLayers}
-        onToggleLayer={toggleLayer}
-        opacity={opacity}
-        onOpacityChange={setOpacity}
-        cadShown={mode !== 'pdf' && preview !== null}
-        cropAvailable={cropAvailable}
-        cropVisible={cropVisible}
-        onCropChange={setCropVisible}
-      />
-
-      {cadEnabled && !diagnostics.frame.confirmed && (
-        <p className={NOTICE} role="note">
-          Сравнение с PDF недоступно: кадр координат не подтверждён.
-          {diagnostics.frame.reason ? ` ${diagnostics.frame.reason}` : ''}
-        </p>
-      )}
-      {!cadEnabled && (
-        <p className="text-xs text-muted" role="note">
-          Предпросмотра DXF нет: показан только PDF страницы, диагностика - ниже.
-        </p>
-      )}
-      {preview?.truncated && (
-        <p className={NOTICE} role="note">
-          Показана упрощённая геометрия (flatten_mm {formatNumber(preview.flatten_mm, 3)}). Для
-          точных размеров используйте DXF.
-        </p>
-      )}
-      {preview && (
-        <p className="text-xs text-muted">
-          Точек в предпросмотре: <span className="tabular">{formatInt(preview.point_count)}</span>
-        </p>
-      )}
-      {previewMismatch && (
-        <ErrorState
-          title="Предпросмотр не относится к DXF этой попытки"
-          code="CAD_PREVIEW_SHA_MISMATCH"
+    <section
+      className="flex min-w-0 flex-col gap-[var(--s-4)] lg:h-full lg:min-h-0 lg:flex-row"
+      aria-label="Просмотр вида"
+    >
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-[var(--s-3)]">
+        <CadViewerControls
+          heading={heading}
+          mode={mode}
+          options={options}
+          onModeChange={setPicked}
+          onZoomIn={() => activeCamera.zoomIn(hostSize())}
+          onZoomOut={() => activeCamera.zoomOut(hostSize())}
+          onFit={() => activeSheet && activeCamera.fitPage(activeSheet, hostSize())}
         />
-      )}
-      {previewError && (
-        <ErrorState
-          title="Предпросмотр CAD не загружен"
-          code={previewError.code}
-          description={previewError.text}
-          onRetry={() => void previewQuery.refetch()}
-        />
-      )}
-      {shownFailure && (
-        <p className={NOTICE} role="alert">
-          Не удалось отрисовать страницу PDF ({shownFailure.code}).
-        </p>
-      )}
 
-      <div
-        ref={hostRef}
-        className="relative h-[min(60dvh,640px)] min-h-[280px] w-full touch-none overflow-hidden rounded-[var(--radius-md)] border border-border"
-      >
-        {mode === 'cad' ? (
-          previewQuery.isPending ? (
-            <Skeleton className="absolute inset-0" />
-          ) : standaloneView ? (
-            <DrawingViewport
-              key="cad"
-              backend={null}
-              sheet={standaloneView}
-              regions={NO_REGIONS}
-              hiddenTypes={NO_HIDDEN}
-              overlayVisible={false}
-              selectedId={null}
-              onSelect={noop}
-              camera={cadCamera}
-              tool="pan"
-              extraPainter={painter}
-            />
-          ) : (
-            <p className="p-[var(--s-6)] text-sm text-muted">В предпросмотре нет геометрии.</p>
-          )
-        ) : pdfError ? (
-          <div className="p-[var(--s-4)]">
+        <div className="flex flex-col gap-[var(--s-3)] empty:hidden lg:max-h-[132px] lg:overflow-auto lg:overscroll-contain">
+          {cadEnabled && !diagnostics.frame.confirmed && (
+            <p className={NOTICE} role="note">
+              Сравнение с PDF недоступно: кадр координат не подтверждён.
+              {diagnostics.frame.reason ? ` ${diagnostics.frame.reason}` : ''}
+            </p>
+          )}
+          {!cadEnabled && (
+            <p className="text-xs text-muted" role="note">
+              Предпросмотра DXF нет: показан только PDF страницы, диагностика - в боковой панели.
+            </p>
+          )}
+          {preview?.truncated && (
+            <p className={NOTICE} role="note">
+              Показана упрощённая геометрия (flatten_mm {formatNumber(preview.flatten_mm, 3)}). Для
+              точных размеров используйте DXF.
+            </p>
+          )}
+          {previewMismatch && (
             <ErrorState
-              title="PDF страницы не показан"
-              code={pdfError.code}
-              description={pdfError.text}
+              title="Предпросмотр не относится к DXF этой попытки"
+              code="CAD_PREVIEW_SHA_MISMATCH"
             />
-          </div>
-        ) : (
-          <>
-            <DrawingViewport
-              key="pdf"
-              backend={pdf.backend}
-              sheet={pdf.sheet}
-              regions={NO_REGIONS}
-              hiddenTypes={NO_HIDDEN}
-              overlayVisible={false}
-              selectedId={null}
-              onSelect={noop}
-              camera={pdfCamera}
-              tool="pan"
-              extraPainter={painter}
-              onError={(code) =>
-                setRenderFailure({
-                  code,
-                  backend: pdf.backend,
-                  pageIndex: pdf.sheet?.pageIndex ?? null,
-                })
-              }
-              onRendered={() => setRenderFailure(null)}
+          )}
+          {previewError && (
+            <ErrorState
+              title="Предпросмотр CAD не загружен"
+              code={previewError.code}
+              description={previewError.text}
+              onRetry={() => void previewQuery.refetch()}
             />
-            {markingOn && pdf.sheet && (
-              <CadRemarkCapture camera={pdfCamera} page={pdf.sheet} onDrawn={handleDrawn} />
-            )}
-            {(pdf.loading || (mode === 'overlay' && previewQuery.isPending)) && (
-              <div
-                role="status"
-                className="pointer-events-none absolute right-[var(--s-4)] bottom-[var(--s-4)] rounded-[var(--radius-sm)] bg-surface px-[var(--s-4)] py-[var(--s-2)] text-micro text-muted"
-              >
-                {pdf.loading ? 'Загрузка PDF…' : 'Загрузка геометрии CAD…'}
-              </div>
-            )}
-          </>
-        )}
+          )}
+          {shownFailure && (
+            <p className={NOTICE} role="alert">
+              Не удалось отрисовать страницу PDF ({shownFailure.code}).
+            </p>
+          )}
+        </div>
+
+        <div
+          ref={hostRef}
+          className="relative h-[70dvh] min-h-[60dvh] w-full touch-none overflow-hidden rounded-[var(--radius-md)] border border-border lg:h-auto lg:min-h-[240px] lg:flex-1"
+        >
+          {mode === 'cad' ? (
+            previewQuery.isPending ? (
+              <Skeleton className="absolute inset-0" />
+            ) : standaloneView ? (
+              <DrawingViewport
+                key="cad"
+                backend={null}
+                sheet={standaloneView}
+                regions={NO_REGIONS}
+                hiddenTypes={NO_HIDDEN}
+                overlayVisible={false}
+                selectedId={null}
+                onSelect={noop}
+                camera={cadCamera}
+                tool="pan"
+                extraPainter={painter}
+              />
+            ) : (
+              <p className="p-[var(--s-6)] text-sm text-muted">В предпросмотре нет геометрии.</p>
+            )
+          ) : pdfError ? (
+            <div className="p-[var(--s-4)]">
+              <ErrorState
+                title="PDF страницы не показан"
+                code={pdfError.code}
+                description={pdfError.text}
+              />
+            </div>
+          ) : (
+            <>
+              <DrawingViewport
+                key="pdf"
+                backend={pdf.backend}
+                sheet={pdf.sheet}
+                regions={NO_REGIONS}
+                hiddenTypes={NO_HIDDEN}
+                overlayVisible={false}
+                selectedId={null}
+                onSelect={noop}
+                camera={pdfCamera}
+                tool="pan"
+                extraPainter={painter}
+                onError={(code) =>
+                  setRenderFailure({
+                    code,
+                    backend: pdf.backend,
+                    pageIndex: pdf.sheet?.pageIndex ?? null,
+                  })
+                }
+                onRendered={() => setRenderFailure(null)}
+              />
+              {markingOn && pdf.sheet && (
+                <CadRemarkCapture camera={pdfCamera} page={pdf.sheet} onDrawn={handleDrawn} />
+              )}
+              {(pdf.loading || (mode === 'overlay' && previewQuery.isPending)) && (
+                <div
+                  role="status"
+                  className="pointer-events-none absolute right-[var(--s-4)] bottom-[var(--s-4)] rounded-[var(--radius-sm)] bg-surface px-[var(--s-4)] py-[var(--s-2)] text-micro text-muted"
+                >
+                  {pdf.loading ? 'Загрузка PDF…' : 'Загрузка геометрии CAD…'}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
-      <CadRemarksPanel
-        binding={binding}
-        store={store}
-        page={pdf.sheet}
-        marking={markingOn}
-        onMarkingChange={setMarking}
-        markDisabledReason={markDisabledReason}
-        draft={draft}
-        onDraftSave={(value) => void saveDraft(value)}
-        onDraftCancel={() => setDraft(null)}
-        activeId={activeRemark}
-        onActivate={setActiveRemark}
-        onFocusCamera={mode === 'cad' ? null : focusRemark}
-        viewport={hostSize}
+      <CadSidePanel
+        label="Панель вида"
+        tabs={tabs}
+        storageKey={SIDE_COLLAPSED_KEY}
+        active={sideTab}
+        onActiveChange={onSideTabChange}
       />
     </section>
   );

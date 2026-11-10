@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as Queries from '@/lib/cad/view-queries';
@@ -11,12 +12,40 @@ vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof Queries>()),
   useCadView: () => view.current,
 }));
-vi.mock('./CadViewerPane', () => ({ CadViewerPane: () => <div data-testid="pane" /> }));
+// Холст проверяется отдельно (CadViewerPane.test.tsx): здесь панель отдаёт ему заголовок и
+// разделы боковой панели, а заглушка выводит их все, чтобы проверить их содержимое.
+vi.mock('./CadViewerPane', () => ({
+  CadViewerPane: ({
+    heading,
+    extraTabs,
+  }: {
+    heading: ReactNode;
+    extraTabs: readonly { id: string; label: string; content: ReactNode }[];
+  }) => (
+    <div data-testid="pane">
+      {heading}
+      {extraTabs.map((tab) => (
+        <section key={tab.id} aria-label={tab.label}>
+          {tab.content}
+        </section>
+      ))}
+    </div>
+  ),
+}));
 
 import { CadViewPanel } from './CadViewPanel';
 
 const mount = (patch: Parameters<typeof job>[0] = {}) =>
-  render(<CadViewPanel projectId="p1" revisionId="r1" job={job(patch)} pageIndex={0} view={1} />);
+  render(
+    <CadViewPanel
+      projectId="p1"
+      revisionId="r1"
+      job={job(patch)}
+      pageIndex={0}
+      view={1}
+      jobContent={<p>содержимое задания</p>}
+    />,
+  );
 
 const ready = (data: ReturnType<typeof diagnostics>) => {
   view.current = { isPending: false, isError: false, data, refetch: vi.fn() };

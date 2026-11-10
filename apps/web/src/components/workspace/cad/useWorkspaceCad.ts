@@ -160,8 +160,10 @@ export const useWorkspaceCad = ({
   );
   const paintData = useMemo(
     () =>
-      overlayOn && overlayAvailable ? overlayPaintData(preview, frame, pageSize, colors.ink) : null,
-    [overlayOn, overlayAvailable, preview, frame, pageSize, colors.ink],
+      overlayOn && overlayAvailable
+        ? overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers)
+        : null,
+    [overlayOn, overlayAvailable, preview, frame, pageSize, colors.ink, colors.layers],
   );
   const cadPainter = useMemo(() => (paintData ? createCadPainter(paintData) : null), [paintData]);
 

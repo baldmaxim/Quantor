@@ -2,6 +2,7 @@ import type { CadJobRead, CadPreviewRead, CadViewDiagnosticsRead } from '@quanto
 
 import type { ICadPaintData } from './cad-painter';
 import { overlayPaths, type ICadFrame, type IPageSize } from './frame';
+import { assignLayerColors } from './layer-colors';
 import { bboxPtToNormalized, type BboxPt, type IRemark, type IRemarkBinding } from './remarks';
 import type { IRemarkMark } from './remarks-painter';
 import { READABLE_RESULTS, selectionQuery, withJobView, EMPTY_SELECTION } from './selection';
@@ -104,12 +105,14 @@ export const overlayPaintData = (
   frame: ICadFrame | null,
   page: IPageSize | null,
   ink: string,
+  layerPalette: readonly string[] = [],
 ): ICadPaintData | null => {
   if (!preview || !frame || !page) return null;
   return {
     paths: overlayPaths(preview.paths, frame, page),
     visibleLayers: new Set(preview.layers.map((_, index) => index)),
     opacity: WORKSPACE_CAD_OPACITY,
+    layerColors: assignLayerColors(layerPalette, preview.layers.length),
     ink,
     paper: null,
     crop: null,

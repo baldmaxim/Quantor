@@ -133,7 +133,14 @@ const shell = (params = PARAMS, patch: Parameters<typeof diagnostics>[0] = {}) =
       })
     }
   >
-    <CadViewerPane params={params} diagnostics={diagnostics(patch)} />
+    <CadViewerPane
+      params={params}
+      diagnostics={diagnostics(patch)}
+      heading={<h3>Стр. 1 · вид 1</h3>}
+      extraTabs={[]}
+      // Замечания лежат в своём разделе боковой панели: открываем его сразу.
+      sideTab="remarks"
+    />
   </QueryClientProvider>
 );
 

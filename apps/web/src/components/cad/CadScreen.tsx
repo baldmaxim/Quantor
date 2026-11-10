@@ -3,6 +3,9 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, type FC } from 'react';
 
+import { Button, cx } from '@/components/ui';
+import { IconChevronLeft, IconChevronRight } from '@/components/ui/icons';
+import { useStoredFlag } from '@/lib/cad/useStoredFlag';
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
 import { CadJobList } from '@/components/cad/CadJobList';
 import { CadSheetPicker } from '@/components/cad/CadSheetPicker';
@@ -29,13 +32,25 @@ interface ICadScreenProps {
   projectId: string;
 }
 
-/** Экран PDF → CAD: выбор источника слева, ход и результат выбранного задания справа. */
+/** Ключ localStorage: левая колонка (источник, листы, задания) свёрнута при открытом виде. */
+const LEFT_COLLAPSED_KEY = 'quantor.cad.left-collapsed';
+
+/**
+ * Экран PDF → CAD: выбор источника слева, ход и результат выбранного задания справа.
+ *
+ * На широком экране (от 1024 px) страница занимает область под шапкой целиком и не
+ * прокручивается: прокручиваются только блоки внутри. Когда открыт вид листа, чертёж получает
+ * всю правую часть, а левая колонка сужается и сворачивается в полосу.
+ */
 export const CadScreen: FC<ICadScreenProps> = ({ projectId }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selection = parseSelection(searchParams);
   // Вкладка живёт только в состоянии: в адрес не пишем, чтобы ссылка не меняла раскладку.
   const [leftTab, setLeftTab] = useState<LeftTab>('sheets');
+  const [leftCollapsed, setLeftCollapsed] = useStoredFlag(LEFT_COLLAPSED_KEY);
+  const viewOpen = Boolean(selection.revision && selection.job) && selection.page !== null;
+  const collapsed = viewOpen && leftCollapsed;
 
   // replace, а не push: переключение вида не должно засорять историю браузера.
   const navigate = (next: ICadSelection) => {
@@ -44,8 +59,35 @@ export const CadScreen: FC<ICadScreenProps> = ({ projectId }) => {
   };
 
   return (
-    <div className="mx-auto grid w-full max-w-[1400px] items-start gap-[var(--s-6)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]">
-      <div className="flex min-w-0 flex-col gap-[var(--s-6)]">
+    <div
+      className={cx(
+        'mx-auto grid w-full items-start gap-[var(--s-6)]',
+        'lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] lg:items-stretch',
+        !viewOpen && 'max-w-[1400px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]',
+        viewOpen && !collapsed && 'lg:grid-cols-[clamp(260px,22vw,340px)_minmax(0,1fr)]',
+        collapsed && 'lg:grid-cols-[44px_minmax(0,1fr)]',
+      )}
+    >
+      <div
+        className={cx(
+          'flex min-w-0 flex-col gap-[var(--s-6)] lg:min-h-0 lg:overflow-auto lg:overscroll-contain',
+          collapsed && 'lg:hidden',
+        )}
+      >
+        {viewOpen && (
+          <div className="flex justify-end max-lg:hidden">
+            <Button
+              iconOnly
+              variant="ghost"
+              onClick={() => setLeftCollapsed(true)}
+              aria-expanded="true"
+              aria-label="Свернуть колонку источника и листов"
+              title="Свернуть колонку источника и листов"
+            >
+              <IconChevronLeft width={16} height={16} />
+            </Button>
+          </div>
+        )}
         <CadSourcePicker
           projectId={projectId}
           selectedRevisionId={selection.revision}
@@ -88,7 +130,25 @@ export const CadScreen: FC<ICadScreenProps> = ({ projectId }) => {
         )}
       </div>
 
-      <div className="min-w-0">
+      {collapsed && (
+        <div
+          data-testid="cad-left-collapsed"
+          className="hidden flex-col items-center rounded-[var(--radius-md)] border border-border-strong bg-surface py-[var(--s-3)] lg:flex"
+        >
+          <Button
+            iconOnly
+            variant="ghost"
+            onClick={() => setLeftCollapsed(false)}
+            aria-expanded="false"
+            aria-label="Показать колонку источника и листов"
+            title="Показать колонку источника и листов"
+          >
+            <IconChevronRight width={16} height={16} />
+          </Button>
+        </div>
+      )}
+
+      <div className="min-w-0 lg:min-h-0">
         {selection.revision && selection.job ? (
           <CadJobDetail
             key={`${selection.revision}:${selection.job}`}

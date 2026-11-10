@@ -54,8 +54,21 @@ const PARAMS = {
   view: 1,
 };
 
+const EXTRA_TABS = [
+  { id: 'scale', label: 'Масштаб', content: <p>содержимое масштаба</p> },
+  { id: 'job', label: 'Задание', content: <p>содержимое задания</p> },
+];
+
 const mount = (props: Partial<ComponentProps<typeof CadViewerPane>> = {}) =>
-  render(<CadViewerPane params={PARAMS} diagnostics={diagnostics()} {...props} />);
+  render(
+    <CadViewerPane
+      params={PARAMS}
+      diagnostics={diagnostics()}
+      heading={<h3>Стр. 1 · вид 1</h3>}
+      extraTabs={EXTRA_TABS}
+      {...props}
+    />,
+  );
 
 const loaded = (data: ReturnType<typeof preview> | undefined) => {
   state.preview = {
@@ -210,5 +223,65 @@ describe('CadViewerPane', () => {
     ) as unknown as CanvasRenderingContext2D;
     painter.paint(context, PLACEMENT, 1, null);
     expect(calls).toContain('strokeRect');
+  });
+
+  it('слои рисуются цветами палитры темы: на холсте тот же цвет, что в образце списка', () => {
+    const root = document.documentElement;
+    root.style.setProperty('--cad-layer-1', 'rgb(1, 2, 3)');
+    root.style.setProperty('--cad-layer-2', 'rgb(4, 5, 6)');
+    try {
+      mount();
+      const painter = state.lastViewport?.extraPainter as LayerPainter;
+      const strokes: string[] = [];
+      let current = '';
+      const context = new Proxy(
+        { canvas: { width: 1000, height: 800 } },
+        {
+          get: (target, key) => {
+            if (key in target) return Reflect.get(target, key);
+            if (key === 'stroke') return () => void strokes.push(current);
+            return () => undefined;
+          },
+          set: (_target, key, value) => {
+            if (key === 'strokeStyle') current = String(value);
+            return true;
+          },
+        },
+      ) as unknown as CanvasRenderingContext2D;
+      painter.paint(context, PLACEMENT, 1, null);
+      expect(strokes).toEqual(['rgb(1, 2, 3)', 'rgb(4, 5, 6)']);
+
+      const swatches = screen.getAllByTestId('layer-swatch');
+      expect(swatches[0]?.getAttribute('style')).toContain('--cad-layer-1');
+      expect(swatches[1]?.getAttribute('style')).toContain('--cad-layer-2');
+    } finally {
+      root.style.removeProperty('--cad-layer-1');
+      root.style.removeProperty('--cad-layer-2');
+    }
+  });
+
+  it('раскладка: заголовок и режимы над холстом, остальное - в боковой панели с разделами', () => {
+    mount();
+    expect(screen.getByRole('heading', { name: 'Стр. 1 · вид 1' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Что показывать' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Вписать' })).toBeInTheDocument();
+
+    const panel = screen.getByRole('complementary', { name: 'Панель вида' });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Слои',
+      'Замечания',
+      'Масштаб',
+      'Задание',
+    ]);
+    // Слои и непрозрачность - в панели, не над холстом.
+    expect(panel).toContainElement(screen.getByRole('slider'));
+    expect(panel).toContainElement(screen.getByRole('checkbox', { name: 'WALLS' }));
+    expect(panel).not.toContainElement(screen.getByRole('button', { name: 'Вписать' }));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Задание' }));
+    expect(screen.getByText('содержимое задания')).toBeVisible();
+    expect(screen.queryByRole('slider')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Замечания' }));
+    expect(screen.getByRole('button', { name: 'Отметить участок' })).toBeInTheDocument();
   });
 });

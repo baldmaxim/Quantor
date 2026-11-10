@@ -51,7 +51,9 @@ const CadPage = ({ params }: IPageProps) => {
         ]}
         status={<StatusBadge tone="warning">QA · кандидат движка</StatusBadge>}
       />
-      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
+      {/* От 1024 px страница не прокручивается: main ровно в остаток под шапкой, а прокручиваются
+          блоки внутри CadScreen. Ниже - обычная страница с прокруткой. */}
+      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)] lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:py-[var(--s-5)]">
         {/* useSearchParams требует границы приостановки (иначе маршрут не предрендерить). */}
         <Suspense fallback={<SkeletonRows rows={6} />}>
           <CadScreen projectId={projectId} />

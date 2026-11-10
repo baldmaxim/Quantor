@@ -21,7 +21,7 @@ import { extractCode } from '@/lib/errors';
  */
 const CadViewPanel = dynamic(
   () => import('@/components/cad/viewer/CadViewPanel').then((module) => module.CadViewPanel),
-  { ssr: false, loading: () => <Skeleton className="h-[320px]" /> },
+  { ssr: false, loading: () => <Skeleton className="h-[60dvh] lg:h-full" /> },
 );
 
 interface ICadJobDetailProps {
@@ -89,7 +89,7 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
   const shownView = effectiveView(job, selectedPage, selectedView);
   const selectionKind = viewSelectionKind(job, attempt, selectedPage, shownView);
 
-  return (
+  const jobContent = (
     <div className="flex min-w-0 flex-col gap-[var(--s-6)]">
       <CadAttemptSwitcher
         attempts={attempts}
@@ -149,15 +149,23 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
           Просмотр доступен только у видов выпущенного результата выбранной попытки.
         </p>
       )}
-      {selectionKind === 'panel' && selectedPage !== null && shownView !== null && (
-        <CadViewPanel
-          projectId={projectId}
-          revisionId={revisionId}
-          job={job}
-          pageIndex={selectedPage}
-          view={shownView}
-        />
-      )}
     </div>
+  );
+
+  if (selectionKind === 'panel' && selectedPage !== null && shownView !== null) {
+    return (
+      <CadViewPanel
+        projectId={projectId}
+        revisionId={revisionId}
+        job={job}
+        pageIndex={selectedPage}
+        view={shownView}
+        jobContent={jobContent}
+      />
+    );
+  }
+
+  return (
+    <div className="lg:h-full lg:min-h-0 lg:overflow-auto lg:overscroll-contain">{jobContent}</div>
   );
 };
