@@ -29,6 +29,11 @@ interface ICadLayersPanelProps {
   cropAvailable: boolean;
   cropVisible: boolean;
   onCropChange: (visible: boolean) => void;
+  /** Показаны ли распознанные блоки (области распознавания) поверх PDF. */
+  regionsVisible: boolean;
+  onRegionsVisibleChange: (visible: boolean) => void;
+  /** Слой распознавания включён на панели инструментов; нет - флажок недоступен. */
+  regionsAvailable: boolean;
   /** Трассы механики выбранного route-задания; нет - группы нет. */
   mep?: {
     /** Имена слоёв DXF трасс. */
@@ -60,12 +65,33 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   cropAvailable,
   cropVisible,
   onCropChange,
+  regionsVisible,
+  onRegionsVisibleChange,
+  regionsAvailable,
   mep = null,
 }) => {
   const groups = useMemo(() => groupLayers(layers), [layers]);
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-4)]">
+      <div className="flex min-w-0 flex-col">
+        <label className={CHECK}>
+          <input
+            type="checkbox"
+            checked={regionsAvailable && regionsVisible}
+            disabled={!regionsAvailable}
+            onChange={(event) => onRegionsVisibleChange(event.target.checked)}
+            className="size-5 shrink-0"
+          />
+          Распознанные блоки
+        </label>
+        <p className="text-xs text-muted">
+          {regionsAvailable
+            ? 'Области распознавания поверх PDF'
+            : 'Слой распознавания выключен на панели инструментов'}
+        </p>
+      </div>
+
       {previewAvailable && (
         <div className="flex min-w-0 flex-col">
           <label className="flex min-h-[44px] flex-wrap items-center gap-x-[var(--s-4)] text-sm">

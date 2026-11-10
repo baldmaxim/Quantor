@@ -45,6 +45,7 @@ import { ToolButton, ToolDivider, ToolField } from '@/components/workspace/Toolb
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
+import { regionsVisible } from '@/lib/cad/workspace-cad';
 import { parseWorkspaceJob } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
 import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
@@ -798,7 +799,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 sheet={viewportSheet}
                 regions={overlayRegions}
                 hiddenTypes={hiddenTypes}
-                overlayVisible={overlayVisible}
+                overlayVisible={regionsVisible(overlayVisible, activeTab, cad.regionsVisible)}
                 selectedId={selectedRegionId}
                 onSelect={(id) => setQuery({ region: id })}
                 camera={camera}

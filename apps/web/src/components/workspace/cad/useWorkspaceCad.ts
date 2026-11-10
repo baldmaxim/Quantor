@@ -12,9 +12,11 @@ import { useMepLayerVisibility } from '@/lib/cad/mep-layers';
 import { mergeRoutePaint } from '@/lib/cad/mep-routes';
 import type { BboxPt, IRemarkBinding } from '@/lib/cad/remarks';
 import { composePainters, createRemarksPainter } from '@/lib/cad/remarks-painter';
+import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import { useStoredNumber } from '@/lib/cad/useStoredNumber';
 import { formatNumber } from '@/lib/cad/view-format';
 import {
+  CAD_REGIONS_VISIBLE_KEY,
   DEFAULT_PDF_OPACITY,
   PDF_OPACITY_KEY,
   cadRender,
@@ -72,6 +74,8 @@ export interface IWorkspaceCad {
   painter: LayerPainter | null;
   /** Непрозрачность подложки PDF для `<DrawingViewport pageOpacity>`. */
   pageOpacity: number;
+  /** Выбор «Распознанные блоки» на вкладке CAD (по умолчанию выключен). */
+  regionsVisible: boolean;
   /** Данные слоя захвата рамки; `null` - режим отметки выключен. */
   capture: {
     camera: Camera;
@@ -119,6 +123,8 @@ export const useWorkspaceCad = ({
 
   const setLeftTab = useWorkspaceStore((state) => state.setLeftTab);
   const [sliderOpacity, setSliderOpacity] = useStoredNumber(PDF_OPACITY_KEY, DEFAULT_PDF_OPACITY);
+  const [cadRegionsVisible, setCadRegionsVisible] = useStoredBoolean(CAD_REGIONS_VISIBLE_KEY, false);
+  const overlayVisible = useWorkspaceStore((state) => state.overlayVisible);
 
   // `?tab=cad` открывает вкладку один раз на значение адреса. Вкладку закрывает флаг в странице,
   // поэтому выбор можно сохранить и до прихода меты.
@@ -359,6 +365,9 @@ export const useWorkspaceCad = ({
     cropAvailable,
     cropVisible,
     onCropChange: setCropVisible,
+    regionsVisible: cadRegionsVisible,
+    onRegionsVisibleChange: setCadRegionsVisible,
+    regionsAvailable: overlayVisible,
   };
 
   const side: IWorkspaceCadSideProps = {
@@ -418,6 +427,7 @@ export const useWorkspaceCad = ({
     opened,
     painter,
     pageOpacity: render.pdfOpacity,
+    regionsVisible: cadRegionsVisible,
     capture:
       remarks.capturing && pageSize
         ? { camera, page: pageSize, onDrawn: remarks.onDrawn }

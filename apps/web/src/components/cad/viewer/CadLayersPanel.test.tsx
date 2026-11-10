@@ -7,6 +7,7 @@ const mount = (patch: Partial<Parameters<typeof CadLayersPanel>[0]> = {}) => {
   const onToggleLayer = vi.fn();
   const onSetLayersHidden = vi.fn();
   const onPdfOpacityChange = vi.fn();
+  const onRegionsVisibleChange = vi.fn();
   render(
     <CadLayersPanel
       layers={['WALLS', 'DOORS', 'TEXT']}
@@ -22,10 +23,13 @@ const mount = (patch: Partial<Parameters<typeof CadLayersPanel>[0]> = {}) => {
       cropAvailable
       cropVisible={false}
       onCropChange={vi.fn()}
+      regionsVisible={false}
+      onRegionsVisibleChange={onRegionsVisibleChange}
+      regionsAvailable
       {...patch}
     />,
   );
-  return { onToggleLayer, onSetLayersHidden, onPdfOpacityChange };
+  return { onToggleLayer, onSetLayersHidden, onPdfOpacityChange, onRegionsVisibleChange };
 };
 
 describe('CadLayersPanel', () => {
@@ -144,5 +148,28 @@ describe('CadLayersPanel', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('checkbox', { name: 'DOORS', hidden: true })).not.toBeVisible();
     expect(onSetLayersHidden).not.toHaveBeenCalled();
+  });
+
+  it('флажок «Распознанные блоки» отражает состояние и вызывает обработчик', () => {
+    const { onRegionsVisibleChange } = mount();
+    const box = screen.getByRole('checkbox', { name: 'Распознанные блоки' });
+    expect(box).not.toBeChecked();
+    expect(box).toBeEnabled();
+    expect(screen.getByText('Области распознавания поверх PDF')).toBeInTheDocument();
+    fireEvent.click(box);
+    expect(onRegionsVisibleChange).toHaveBeenCalledWith(true);
+  });
+
+  it('флажок «Распознанные блоки» показан и без DXF', () => {
+    mount({ layers: [], cadShown: false, previewAvailable: false, regionsVisible: true });
+    expect(screen.getByRole('checkbox', { name: 'Распознанные блоки' })).toBeChecked();
+  });
+
+  it('при выключенном слое распознавания флажок недоступен и объясняет причину', () => {
+    mount({ regionsAvailable: false, regionsVisible: true });
+    const box = screen.getByRole('checkbox', { name: 'Распознанные блоки' });
+    expect(box).toBeDisabled();
+    expect(box).not.toBeChecked();
+    expect(screen.getByText('Слой распознавания выключен на панели инструментов')).toBeInTheDocument();
   });
 });

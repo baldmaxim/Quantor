@@ -1,6 +1,7 @@
 import type { CadJobRead, CadPreviewRead, CadViewDiagnosticsRead } from '@quantor/api-client';
 
 import type { NormalizedRect } from '@/lib/viewer/coordinates';
+import type { LeftTab } from '@/store/workspace';
 
 import type { ICadPaintData } from './cad-painter';
 import { overlayPaths, type ICadFrame, type IPageSize } from './frame';
@@ -193,3 +194,13 @@ export const IDLE_REMARK_BINDING: IRemarkBinding = {
   view: 0,
   dxfSha256: null,
 };
+
+/**
+ * Рисуются ли и ловят ли указатель распознанные блоки: общий переключатель панели инструментов
+ * действует везде, а на вкладке CAD блоки к тому же скрыты, пока их не включили в «Слоях».
+ */
+export const regionsVisible = (
+  overlayVisible: boolean,
+  activeTab: LeftTab,
+  cadRegionsVisible: boolean,
+): boolean => overlayVisible && (activeTab !== 'cad' || cadRegionsVisible);

@@ -25,6 +25,9 @@ const mount = (visible: number[] = [0, 1, 2]) => {
       cropAvailable={false}
       cropVisible={false}
       onCropChange={vi.fn()}
+      regionsVisible={false}
+      onRegionsVisibleChange={vi.fn()}
+      regionsAvailable
       mep={{
         names: defs.map((def) => def.name),
         titles: defs.map(mepLayerTitle),
@@ -93,6 +96,9 @@ describe('CadLayersPanel: группа «Трассы механики»', () =>
         cropAvailable={false}
         cropVisible={false}
         onCropChange={vi.fn()}
+        regionsVisible={false}
+        onRegionsVisibleChange={vi.fn()}
+        regionsAvailable
       />,
     );
     expect(screen.queryByTestId('mep-layers')).toBeNull();
