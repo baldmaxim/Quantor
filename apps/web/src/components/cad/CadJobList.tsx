@@ -26,7 +26,6 @@ export const CadJobList: FC<ICadJobListProps> = ({
   const jobs = useCadJobs(projectId, revisionId);
 
   return (
-    // Рамка и заголовок — у вкладки «Задания» в CadScreen.
     <div className="flex flex-col gap-[var(--s-4)]">
       {jobs.isPending ? (
         <SkeletonRows rows={3} />

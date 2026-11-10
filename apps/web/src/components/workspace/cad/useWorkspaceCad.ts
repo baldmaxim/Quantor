@@ -3,45 +3,45 @@
 import type { SheetRead } from '@quantor/api-client';
 import { useEffect, useMemo, useState } from 'react';
 
-import { useCadRemarks, type IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { ViewportSheet } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
-import { frameOf } from '@/lib/cad/frame';
+import { cropToNormalized } from '@/lib/cad/frame';
 import { readCadPaintColors } from '@/lib/cad/paint-colors';
-import { useCadJob, useCadJobs } from '@/lib/cad/queries';
 import type { BboxPt, IRemarkBinding } from '@/lib/cad/remarks';
 import { composePainters, createRemarksPainter } from '@/lib/cad/remarks-painter';
-import { latestSheetJobs } from '@/lib/cad/sheet-results';
-import { cadErrorText } from '@/lib/cad/errors';
+import { useStoredNumber } from '@/lib/cad/useStoredNumber';
+import { formatNumber } from '@/lib/cad/view-format';
 import {
-  cadViewErrorText,
-  useCadPreview,
-  useCadView,
-  type ICadViewParams,
-} from '@/lib/cad/view-queries';
-import {
-  IDLE_REMARK_BINDING,
-  IDLE_VIEW_PARAMS,
-  WORKSPACE_DRAFT_ID,
-  cadPageHref,
-  matchingPreview,
-  overlayAvailability,
-  overlayPaintData,
-  pickWorkspaceView,
-  workspaceMarks,
-  workspaceViewParams,
-} from '@/lib/cad/workspace-cad';
+  DEFAULT_PDF_OPACITY,
+  PDF_OPACITY_KEY,
+  cadRender,
+  clampPdfOpacity,
+  resolveCadMode,
+  type CadViewMode,
+} from '@/lib/cad/view-mode';
+import { overlayPaintData } from '@/lib/cad/workspace-cad';
+import { pageForJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { useTheme } from '@/lib/theme';
 import type { Camera, Viewport } from '@/lib/viewer/camera';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 import { useWorkspaceStore } from '@/store/workspace';
 
 import { tabFromQuery } from './left-tab';
-import type { IWorkspaceCadPanelProps, IWorkspaceCadRemarks, WorkspaceCadState } from './types';
+import type {
+  IWorkspaceCadBarProps,
+  IWorkspaceCadLayers,
+  IWorkspaceCadLeftProps,
+  IWorkspaceCadSideProps,
+  WorkspaceCadState,
+} from './types';
+import { useWorkspaceCadJob } from './useWorkspaceCadJob';
+import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
 
 interface IUseWorkspaceCadInput {
   projectId: string;
   revisionId: string | null;
+  /** Листы ревизии в порядке рабочей области: позиция листа в адресе - номер с 1. */
+  sheets: readonly Pick<SheetRead, 'page_index'>[];
   sheet: Pick<SheetRead, 'page_index' | 'page_label'> | null;
   /** Размер листа у отрисовщика (pt при масштабе 1); `null` - ещё не известен. */
   page: ViewportSheet | null;
@@ -51,35 +51,49 @@ interface IUseWorkspaceCadInput {
   enabled: boolean;
   /** Открыта вкладка CAD. */
   active: boolean;
-  /** Значение `?tab=` из адреса. */
+  /** Значения из адреса рабочей области. */
   tabParam: string | null;
+  jobParam: string | null;
+  viewParam: number | null;
+  /** Изменить адрес рабочей области: `null` убирает параметр. */
+  navigate: (changes: Record<string, string | null>) => void;
 }
 
 export interface IWorkspaceCad {
+  /** Вкладка открывалась: её левая панель смонтирована и дальше не размонтируется. */
+  opened: boolean;
   /** Слой DXF и рамок замечаний для `<DrawingViewport extraPainter>`. */
   painter: LayerPainter | null;
+  /** Непрозрачность подложки PDF для `<DrawingViewport pageOpacity>`. */
+  pageOpacity: number;
   /** Данные слоя захвата рамки; `null` - режим отметки выключен. */
   capture: {
     camera: Camera;
     page: { width: number; height: number };
     onDrawn: (bbox: BboxPt) => void;
   } | null;
-  panel: IWorkspaceCadPanelProps;
+  /** Левая панель; `null` - ревизия не открыта. */
+  left: IWorkspaceCadLeftProps | null;
+  /** Строка над холстом; `null` - у листа нет диагностики вида. */
+  bar: IWorkspaceCadBarProps | null;
+  side: IWorkspaceCadSideProps;
 }
 
+const NO_LAYERS: ReadonlySet<number> = new Set<number>();
+
 /**
- * CAD текущего листа в рабочей области: последнее задание по листу, вид, наложение DXF и
- * замечания. Один хук связывает вкладку и холст, чтобы страница получила лишь painter,
- * слой захвата и пропсы панели.
+ * CAD текущего листа в рабочей области: задание и вид листа, DXF на камере рабочей области,
+ * замечания, левая и правая панели вкладки. Один хук связывает вкладку и единственный холст.
  *
- * Запросы идут только при включённом `cad.export` и только после первого открытия вкладки:
- * наложение при этом остаётся и на других вкладках (переключатель в хранилище рабочей области),
- * а рамки замечаний рисуются, пока вкладка открыта. Панорама и зум по-прежнему идут мимо
- * состояния React: камера передаётся холсту как есть (ADR-0004).
+ * Запросы идут только при включённом `cad.export` и только после первого открытия вкладки: DXF
+ * при этом остаётся и на других вкладках (режим в хранилище рабочей области), а рамки замечаний
+ * рисуются, пока вкладка открыта. Панорама и зум идут мимо состояния React: камера передаётся
+ * холсту как есть (ADR-0004), непрозрачность PDF ставится CSS на стопку страницы.
  */
 export const useWorkspaceCad = ({
   projectId,
   revisionId,
+  sheets,
   sheet,
   page,
   camera,
@@ -87,6 +101,9 @@ export const useWorkspaceCad = ({
   enabled,
   active,
   tabParam,
+  jobParam,
+  viewParam,
+  navigate,
 }: IUseWorkspaceCadInput): IWorkspaceCad => {
   const theme = useTheme();
   const colors = useMemo(() => {
@@ -95,8 +112,9 @@ export const useWorkspaceCad = ({
   }, [theme]);
 
   const setLeftTab = useWorkspaceStore((state) => state.setLeftTab);
-  const overlayOn = useWorkspaceStore((state) => state.cadOverlay);
-  const setOverlayOn = useWorkspaceStore((state) => state.setCadOverlay);
+  const picked = useWorkspaceStore((state) => state.cadMode);
+  const setPicked = useWorkspaceStore((state) => state.setCadMode);
+  const [sliderOpacity, setSliderOpacity] = useStoredNumber(PDF_OPACITY_KEY, DEFAULT_PDF_OPACITY);
 
   // `?tab=cad` открывает вкладку один раз на значение адреса. Вкладку закрывает флаг в странице,
   // поэтому выбор можно сохранить и до прихода меты.
@@ -105,65 +123,72 @@ export const useWorkspaceCad = ({
     if (tab) setLeftTab(tab);
   }, [tabParam, setLeftTab]);
 
-  // Данные грузятся после первого открытия вкладки и дальше не выключаются: так наложение
-  // держится на других вкладках, а тому, кто CAD не открывал, запросы не уходят.
+  // Данные грузятся после первого открытия вкладки и дальше не выключаются: так DXF держится на
+  // других вкладках, а тому, кто CAD не открывал, запросы не уходят.
   const [opened, setOpened] = useState(false);
   if (enabled && active && !opened) setOpened(true);
-  const load = enabled && opened && revisionId !== null;
-  const loadRevision = load ? revisionId : null;
 
   const pageIndex = sheet?.page_index ?? null;
-  const jobs = useCadJobs(projectId, loadRevision);
-  const results = useMemo(() => latestSheetJobs(jobs.data?.items ?? []), [jobs.data]);
-  const result = pageIndex !== null ? (results.get(pageIndex) ?? null) : null;
-  const recognizedJobId = result?.kind === 'recognized' ? result.jobId : null;
-  const jobQuery = useCadJob(projectId, loadRevision, recognizedJobId);
-  const job = jobQuery.data ?? null;
+  const data = useWorkspaceCadJob({
+    projectId,
+    revisionId,
+    load: enabled && opened && revisionId !== null,
+    pageIndex,
+    jobParam,
+    viewParam,
+  });
+  const { diagnostics, preview, frame, params, availability } = data;
 
-  const [chosen, setChosen] = useState<{ readonly key: string; readonly view: number } | null>(
-    null,
-  );
-  const chosenKey = `${recognizedJobId}:${pageIndex}`;
-  const chosenView = chosen !== null && chosen.key === chosenKey ? chosen.view : null;
-  const pick = useMemo(
-    () => (job && pageIndex !== null ? pickWorkspaceView(job, pageIndex, chosenView) : null),
-    [job, pageIndex, chosenView],
-  );
-  const view = pick?.view ?? null;
-
-  const params = useMemo<ICadViewParams | null>(
-    () =>
-      job && pageIndex !== null && revisionId !== null
-        ? workspaceViewParams(projectId, revisionId, job, pageIndex, view)
-        : null,
-    [job, pageIndex, revisionId, projectId, view],
-  );
-
-  const diagnosticsQuery = useCadView(params ?? IDLE_VIEW_PARAMS, params !== null);
-  const diagnostics = params !== null ? (diagnosticsQuery.data ?? null) : null;
-  const previewQuery = useCadPreview(
-    params ?? IDLE_VIEW_PARAMS,
-    params !== null && diagnostics?.preview_available === true,
-  );
-  const preview = diagnostics ? matchingPreview(diagnostics, previewQuery.data) : null;
-  const frameConfirmed = diagnostics?.frame.confirmed === true;
-  const frame = useMemo(
-    () => (preview && frameConfirmed ? frameOf(preview.frame) : null),
-    [preview, frameConfirmed],
-  );
-  const availability = diagnostics ? overlayAvailability(diagnostics, preview, frame) : null;
-  const overlayAvailable = availability?.available === true;
+  // Режим «CAD» прячет PDF, поэтому честно показывается только когда DXF уже можно нарисовать.
+  const geometryReady = availability?.available === true && preview !== null && frame !== null;
+  const mode: CadViewMode = resolveCadMode(picked, geometryReady);
+  const render = cadRender(mode, sliderOpacity, active);
 
   const pageSize = useMemo(
     () => (page ? { width: page.width, height: page.height } : null),
     [page],
   );
+
+  // --- слои DXF и область проверки масштаба: выбор принадлежит виду ---
+  const scope = params ? `${params.jobId}:${params.pageIndex}:${params.view}` : null;
+  const [seenScope, setSeenScope] = useState(scope);
+  const [hiddenLayers, setHiddenLayers] = useState<ReadonlySet<number>>(NO_LAYERS);
+  const [cropVisible, setCropVisible] = useState(false);
+  if (seenScope !== scope) {
+    setSeenScope(scope);
+    setHiddenLayers(NO_LAYERS);
+    setCropVisible(false);
+  }
+
+  const layerNames = useMemo(() => preview?.layers ?? [], [preview]);
+  const visibleLayers = useMemo<ReadonlySet<number>>(
+    () => new Set(layerNames.map((_, index) => index).filter((index) => !hiddenLayers.has(index))),
+    [layerNames, hiddenLayers],
+  );
+  const cropContext = diagnostics?.scale?.context_crop_pt;
+  const cropRect = useMemo(
+    () => (pageSize ? cropToNormalized(cropContext, pageSize) : null),
+    [pageSize, cropContext],
+  );
+  // Область проверки масштаба лежит на PDF: в режиме «CAD» подложки нет, и рамка не нужна.
+  const cropAvailable = cropRect !== null && mode !== 'cad';
+  const cropColor = colors.crop;
+  const crop = useMemo(
+    () =>
+      active && cropRect !== null && cropAvailable && cropVisible
+        ? { rect: cropRect, color: cropColor }
+        : null,
+    [active, cropAvailable, cropVisible, cropRect, cropColor],
+  );
+
   const paintData = useMemo(
     () =>
-      overlayOn && overlayAvailable
-        ? overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers)
-        : null,
-    [overlayOn, overlayAvailable, preview, frame, pageSize, colors.ink, colors.layers],
+      overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
+        dxfVisible: render.dxfVisible,
+        hiddenLayers,
+        crop,
+      }),
+    [preview, frame, pageSize, colors.ink, colors.layers, render.dxfVisible, hiddenLayers, crop],
   );
   const cadPainter = useMemo(() => (paintData ? createCadPainter(paintData) : null), [paintData]);
 
@@ -184,154 +209,152 @@ export const useWorkspaceCad = ({
         : null,
     [params, diagnostics],
   );
-  const store = useCadRemarks(binding ?? IDLE_REMARK_BINDING, binding !== null);
+  const remarks = useWorkspaceCadRemarks({ binding, pageSize, camera, viewportSize, active });
 
-  const [marking, setMarking] = useState(false);
-  const [draft, setDraft] = useState<BboxPt | null>(null);
-  const [activeRemark, setActiveRemark] = useState<string | null>(null);
-
-  // Участок и выбор принадлежат виду: на другом листе или виде они означали бы другое место.
-  // Закрытая вкладка тоже гасит режим отметки, чтобы он не включился сам при возвращении.
-  const scope = binding ? `${binding.jobId}:${binding.pageIndex}:${binding.view}` : null;
-  const [seenScope, setSeenScope] = useState(scope);
-  if (seenScope !== scope) {
-    setSeenScope(scope);
-    setMarking(false);
-    setDraft(null);
-    setActiveRemark(null);
-  }
-  if (!active && marking) setMarking(false);
-
-  const markDisabledReason =
-    page === null ? 'Отметка станет доступна, когда загрузится страница PDF.' : null;
-  const markingOn = marking && active && markDisabledReason === null;
-
-  // Esc отменяет режим отметки, пока он включён.
-  useEffect(() => {
-    if (!markingOn) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMarking(false);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [markingOn]);
-
-  const marks = useMemo(
-    () => (active ? workspaceMarks(store.remarks, draft, pageSize) : []),
-    [active, store.remarks, draft, pageSize],
-  );
   const painter = useMemo<LayerPainter | null>(
     () =>
       composePainters(
         cadPainter,
-        marks.length > 0
+        remarks.marks.length > 0
           ? createRemarksPainter(
-              {
-                marks,
-                colors: colors.remarks,
-                activeId: draft ? WORKSPACE_DRAFT_ID : activeRemark,
-              },
+              { marks: remarks.marks, colors: colors.remarks, activeId: remarks.activeId },
               { clear: cadPainter === null },
             )
           : null,
       ),
-    [cadPainter, marks, colors.remarks, draft, activeRemark],
+    [cadPainter, remarks.marks, remarks.activeId, colors.remarks],
   );
 
-  // Участок нарисован: режим отметки гаснет, чтобы лист снова можно было двигать.
-  const handleDrawn = (bbox: BboxPt) => {
-    setDraft(bbox);
-    setMarking(false);
-  };
-  // Черновик закрывается только после ответа сервера: при отказе участок и текст остаются.
-  const saveDraft = async (value: IRemarkDraft) => {
-    if (!draft) return;
-    const created = await store.add(draft, value);
-    if (!created) return;
-    setActiveRemark(created.id);
-    setDraft(null);
+  // --- переходы: всё в адрес рабочей области ---
+  const goToSheet = (target: number, changes: Record<string, string | null>) => {
+    const position = sheetPosition(sheets, target);
+    if (position === null) return;
+    navigate({ page: String(position), region: null, ...changes });
   };
 
-  const remarks: IWorkspaceCadRemarks | null = binding
-    ? {
-        binding,
-        store,
-        page: pageSize,
-        marking: markingOn,
-        onMarkingChange: setMarking,
-        markDisabledReason,
-        draft,
-        onDraftSave: (value) => void saveDraft(value),
-        onDraftCancel: () => setDraft(null),
-        activeId: activeRemark,
-        onActivate: setActiveRemark,
-        onFocusCamera: (state) => camera.set(state),
-        viewport: viewportSize,
-      }
-    : null;
+  // Задание выбрано (из списка или только что создано): рабочая область встаёт на его лист.
+  const openJob = (jobId: string, pages: readonly number[] | null) => {
+    const target = pageForJob({ requested_pages: pages ? [...pages] : null }, pageIndex);
+    const changes = { job: jobId, view: null };
+    if (target !== null && target !== pageIndex) goToSheet(target, changes);
+    else navigate(changes);
+  };
 
-  // --- панель ---
-  let state: WorkspaceCadState;
-  if (pageIndex === null || revisionId === null) state = 'no-sheet';
-  else if (jobs.isPending) state = 'loading';
-  else if (jobs.isError) state = 'error';
-  else state = result === null ? 'none' : result.kind;
-
-  const cadHref = cadPageHref(
-    projectId,
-    revisionId ?? '',
-    result === null
-      ? null
-      : {
-          jobId: result.jobId,
-          page: result.kind === 'recognized' ? pageIndex : null,
-          view: result.kind === 'recognized' ? view : null,
-        },
-  );
-
-  const diagnosticsError = diagnosticsQuery.isError
-    ? cadViewErrorText(diagnosticsQuery.error)
-    : jobQuery.isError
-      ? { code: 'CAD_JOB', text: cadErrorText(jobQuery.error) }
+  const left: IWorkspaceCadLeftProps | null =
+    revisionId !== null
+      ? {
+          projectId,
+          revisionId,
+          activePage: pageIndex,
+          selectedJobId: data.jobId,
+          onOpenSheet: (target) => goToSheet(target, { job: null, view: null }),
+          onSelectJob: (jobId) =>
+            openJob(jobId, data.jobs.find((item) => item.job_id === jobId)?.requested_pages ?? null),
+          onJobCreated: (jobId, pages) => openJob(jobId, pages),
+          onSourceSelect: (revision) =>
+            navigate({ revision, page: '1', region: null, job: null, view: null }),
+        }
       : null;
 
-  const panel: IWorkspaceCadPanelProps = {
+  // --- строка над холстом ---
+  const notices: { tone: 'note' | 'alert'; text: string }[] = [];
+  if (diagnostics && availability?.reason) {
+    const frameReason = diagnostics.preview_available ? diagnostics.frame.reason : null;
+    notices.push({
+      tone: 'note',
+      text: frameReason ? `${availability.reason} ${frameReason}` : availability.reason,
+    });
+  }
+  if (preview?.truncated) {
+    notices.push({
+      tone: 'note',
+      text: `Показана упрощённая геометрия (flatten_mm ${formatNumber(preview.flatten_mm, 3)}). Для точных размеров используйте DXF.`,
+    });
+  }
+  if (data.previewError) notices.push({ tone: 'alert', text: data.previewError });
+
+  const bar: IWorkspaceCadBarProps | null =
+    active && diagnostics
+      ? {
+          diagnostics,
+          views: data.views,
+          view: data.view,
+          onViewChange: (next) => navigate({ job: data.jobId, view: String(next) }),
+          mode,
+          dxfAvailable: availability?.available === true,
+          dxfReason: availability?.reason ?? null,
+          onModeChange: setPicked,
+          onZoomIn: () => camera.zoomIn(viewportSize()),
+          onZoomOut: () => camera.zoomOut(viewportSize()),
+          onFit: () => page && camera.fitPage(page, viewportSize()),
+          notices,
+          loading: diagnostics.preview_available && preview === null && data.previewPending,
+        }
+      : null;
+
+  // --- правая панель ---
+  let state: WorkspaceCadState;
+  if (pageIndex === null || revisionId === null) state = 'no-sheet';
+  else if (data.jobsPending) state = 'loading';
+  else if (data.jobsError !== null) state = 'error';
+  else state = data.jobId === null ? 'none' : 'ready';
+
+  const layers: IWorkspaceCadLayers = {
+    layers: layerNames,
+    visibleLayers,
+    onToggleLayer: (index) =>
+      setHiddenLayers((current) => {
+        const next = new Set(current);
+        if (next.has(index)) next.delete(index);
+        else next.add(index);
+        return next;
+      }),
+    pdfOpacity: sliderOpacity,
+    onPdfOpacityChange: (value) => setSliderOpacity(clampPdfOpacity(value)),
+    pdfOpacityActive: mode === 'overlay',
+    cadShown: mode !== 'pdf' && preview !== null,
+    previewAvailable: diagnostics?.preview_available === true,
+    pointCount: preview ? preview.point_count : null,
+    cropAvailable,
+    cropVisible,
+    onCropChange: setCropVisible,
+  };
+
+  const side: IWorkspaceCadSideProps = {
     state,
     sheetLabel: sheet ? (sheet.page_label ?? String(sheet.page_index + 1)) : null,
-    cadHref,
-    loadError: jobs.isError ? cadErrorText(jobs.error) : null,
-    onRetry: () => void jobs.refetch(),
-    recognized:
-      state === 'recognized'
+    loadError: data.jobsError,
+    onRetry: data.refetchJobs,
+    job:
+      state === 'ready' && data.jobId !== null && revisionId !== null
         ? {
-            resultStatus: job?.result_status ?? null,
-            loading:
-              diagnosticsError === null &&
-              (job === null || (view !== null && diagnostics === null)),
-            error: diagnosticsError,
-            diagnostics,
-            views: pick?.views ?? [],
-            view,
-            onViewChange: (next) => setChosen({ key: chosenKey, view: next }),
-            overlay: overlayOn,
-            overlayAvailable,
-            overlayReason: availability?.reason ?? null,
-            overlayLoading:
-              overlayAvailable && overlayOn && preview === null && previewQuery.isPending,
-            overlayError: previewQuery.isError
-              ? cadViewErrorText(previewQuery.error).text
-              : previewQuery.data !== undefined && preview === null
-                ? 'Предпросмотр не относится к DXF этой попытки.'
-                : null,
-            onOverlayChange: setOverlayOn,
-            remarks,
+            projectId,
+            revisionId,
+            jobId: data.jobId,
+            page: pageIndex,
+            view: data.view,
+            onSelectView: (target, next) => {
+              goToSheet(target, { job: data.jobId, view: String(next) });
+            },
+            onJobCreated: (jobId) => openJob(jobId, null),
           }
         : null,
+    viewLoading:
+      state === 'ready' && data.diagnosticsError === null && (data.job === null || data.diagnosticsPending),
+    viewError: state === 'ready' ? data.diagnosticsError : null,
+    view: diagnostics ? { diagnostics, layers, remarks: remarks.remarks } : null,
   };
 
   return {
+    opened,
     painter,
-    capture: markingOn && pageSize ? { camera, page: pageSize, onDrawn: handleDrawn } : null,
-    panel,
+    pageOpacity: render.pdfOpacity,
+    capture:
+      remarks.capturing && pageSize
+        ? { camera, page: pageSize, onDrawn: remarks.onDrawn }
+        : null,
+    left,
+    bar,
+    side,
   };
 };

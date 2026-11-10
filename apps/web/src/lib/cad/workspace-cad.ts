@@ -1,21 +1,23 @@
 import type { CadJobRead, CadPreviewRead, CadViewDiagnosticsRead } from '@quantor/api-client';
 
+import type { NormalizedRect } from '@/lib/viewer/coordinates';
+
 import type { ICadPaintData } from './cad-painter';
 import { overlayPaths, type ICadFrame, type IPageSize } from './frame';
 import { assignLayerColors } from './layer-colors';
 import { bboxPtToNormalized, type BboxPt, type IRemark, type IRemarkBinding } from './remarks';
 import type { IRemarkMark } from './remarks-painter';
-import { READABLE_RESULTS, selectionQuery, withJobView, EMPTY_SELECTION } from './selection';
+import { READABLE_RESULTS } from './selection';
 import type { ICadViewParams } from './view-queries';
 
 /**
  * Чистые правила CAD во вкладке рабочей области: какой вид показать, можно ли наложение,
- * как собрать данные слоя и ссылку на страницу CAD. Без DOM и React, чтобы ошибки «DXF не лёг
+ * как собрать данные слоя и замечания. Без DOM и React, чтобы ошибки «DXF не лёг
  * на чертёж» ловились тестами, а не глазами.
  */
 
-/** Непрозрачность DXF в рабочей области: та же, что по умолчанию на странице CAD. */
-export const WORKSPACE_CAD_OPACITY = 0.85;
+/** Непрозрачность DXF в рабочей области: геометрия всегда непрозрачная, гаснет только подложка PDF. */
+export const WORKSPACE_CAD_OPACITY = 1;
 
 /** Идентификатор несохранённого участка на листе. */
 export const WORKSPACE_DRAFT_ID = '__draft__';
@@ -99,23 +101,42 @@ export const overlayAvailability = (
   return { available: true, reason: null };
 };
 
-/** Данные слоя DXF на листе; `null` - рисовать нечего. Поворот страницы не применяется (ADR-0008). */
+export interface IOverlayPaintOptions {
+  /** Геометрия DXF рисуется; `false` - остаётся только область проверки масштаба. */
+  readonly dxfVisible?: boolean;
+  /** Индексы слоёв DXF, скрытых человеком. */
+  readonly hiddenLayers?: ReadonlySet<number>;
+  /** Область проверки масштаба на листе. */
+  readonly crop?: { readonly rect: NormalizedRect; readonly color: string } | null;
+}
+
+/**
+ * Данные слоя DXF на листе; `null` - рисовать нечего. Поворот страницы не применяется (ADR-0008).
+ * Область проверки масштаба рисуется и без геометрии: она относится к PDF.
+ */
 export const overlayPaintData = (
   preview: CadPreviewRead | null,
   frame: ICadFrame | null,
   page: IPageSize | null,
   ink: string,
   layerPalette: readonly string[] = [],
+  options: IOverlayPaintOptions = {},
 ): ICadPaintData | null => {
-  if (!preview || !frame || !page) return null;
+  const { dxfVisible = true, hiddenLayers, crop = null } = options;
+  if (!page) return null;
+  const geometry = dxfVisible && preview !== null && frame !== null ? { preview, frame } : null;
+  if (geometry === null && crop === null) return null;
+  const layers = preview?.layers ?? [];
   return {
-    paths: overlayPaths(preview.paths, frame, page),
-    visibleLayers: new Set(preview.layers.map((_, index) => index)),
+    paths: geometry ? overlayPaths(geometry.preview.paths, geometry.frame, page) : [],
+    visibleLayers: new Set(
+      layers.map((_, index) => index).filter((index) => !hiddenLayers?.has(index)),
+    ),
     opacity: WORKSPACE_CAD_OPACITY,
-    layerColors: assignLayerColors(layerPalette, preview.layers.length),
+    layerColors: assignLayerColors(layerPalette, layers.length),
     ink,
     paper: null,
-    crop: null,
+    crop,
   };
 };
 
@@ -142,25 +163,6 @@ export const workspaceMarks = (
   }
   return list;
 };
-
-/** Ссылка на страницу CAD: ревизия, затем при наличии задание, лист и вид. */
-export const cadPageHref = (
-  projectId: string,
-  revisionId: string,
-  job: {
-    readonly jobId: string;
-    readonly page: number | null;
-    readonly view: number | null;
-  } | null,
-): string => {
-  const base = { ...EMPTY_SELECTION, revision: revisionId };
-  const selection = job ? withJobView(base, job.jobId, job.page, job.view) : base;
-  return `/projects/${projectId}/cad?${selectionQuery(selection)}`;
-};
-
-/** Ссылка со страницы CAD в рабочую область на вкладку CAD. */
-export const withCadTab = (workspaceHref: string): string =>
-  `${workspaceHref}${workspaceHref.includes('?') ? '&' : '?'}tab=cad`;
 
 /** Привязка «ничего не читать»: пустые идентификаторы под выключенными запросами замечаний. */
 export const IDLE_REMARK_BINDING: IRemarkBinding = {

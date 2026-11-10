@@ -74,6 +74,11 @@ interface IDrawingViewportProps {
    * объект перерисовывает слой целиком; `null` - слоя нет.
    */
   extraPainter?: LayerPainter | null;
+  /**
+   * Непрозрачность подложки PDF, 0-1 (по умолчанию 1). Ставится CSS-свойством на стопку страницы:
+   * ни перерисовки растра, ни слоёв, ни кадров камеры значение не требует.
+   */
+  pageOpacity?: number;
   onViewChange?: (state: CameraState) => void;
   onError?: (code: string) => void;
   /** Растр листа поставлен: ошибка отрисовки, о которой сообщал `onError`, больше не актуальна. */
@@ -108,6 +113,7 @@ export const DrawingViewport = ({
   tools = null,
   measurementColors = NO_COLORS,
   extraPainter = null,
+  pageOpacity = 1,
   onViewChange,
   onError,
   onRendered,
@@ -156,6 +162,14 @@ export const DrawingViewport = ({
         : null,
     [pageIndex, pageWidth, pageHeight],
   );
+
+  // Стопка страницы двигается императивно, поэтому и непрозрачность - императивно, мимо React.
+  useEffect(() => {
+    const element = stack.current;
+    if (!element) return;
+    if (pageOpacity >= 1) element.style.removeProperty('opacity');
+    else element.style.opacity = String(Math.max(pageOpacity, 0));
+  }, [pageOpacity]);
 
   const reportError = useCallback((code: string) => failed.current?.(code), []);
 

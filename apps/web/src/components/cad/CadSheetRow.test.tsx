@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ISheetResult } from '@/lib/cad/sheet-results';
@@ -7,7 +7,9 @@ import { CadSheetRow } from './CadSheetRow';
 
 const HREF = '/projects/p/workspace?revision=r&page=3';
 
-const mount = (result: ISheetResult | null) =>
+const mount = (result: ISheetResult | null, open = false) => {
+  const onOpen = vi.fn();
+  const onToggle = vi.fn();
   render(
     <ul>
       <CadSheetRow
@@ -18,29 +20,38 @@ const mount = (result: ISheetResult | null) =>
         checked={false}
         limitReached={false}
         result={result}
-        open={false}
-        onToggle={vi.fn()}
-        onOpenResult={vi.fn()}
+        open={open}
+        onToggle={onToggle}
+        onOpen={onOpen}
       />
     </ul>,
   );
+  return { onOpen, onToggle };
+};
 
-describe('CadSheetRow: переход в рабочую область', () => {
-  it('у распознанного листа есть ссылка на вкладку CAD рабочей области', () => {
+describe('CadSheetRow', () => {
+  it.each([
+    ['распознанный', { jobId: 'j', kind: 'recognized', view: null, dxf: true } as const],
+    ['идущий', { jobId: 'j', kind: 'running', view: null, dxf: false } as const],
+    ['упавший', { jobId: 'j', kind: 'failed', view: null, dxf: false } as const],
+    ['без заданий', null],
+  ])('лист %s: строка открывает лист, чекбокс - отдельная цель', (_, result) => {
+    const { onOpen, onToggle } = mount(result);
+    fireEvent.click(screen.getByRole('button', { name: /Стр. 3/ }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onToggle).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Стр. 3' }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('ссылки «В рабочей области» нет: строка и есть рабочая область', () => {
     mount({ jobId: 'j', kind: 'recognized', view: null, dxf: true });
-    expect(screen.getByRole('link', { name: 'В рабочей области' })).toHaveAttribute(
-      'href',
-      `${HREF}&tab=cad`,
-    );
-  });
-
-  it.each(['running', 'failed'] as const)('у листа в состоянии %s ссылки нет', (kind) => {
-    mount({ jobId: 'j', kind, view: null, dxf: false });
     expect(screen.queryByRole('link', { name: 'В рабочей области' })).toBeNull();
   });
 
-  it('у листа без заданий ссылки нет', () => {
-    mount(null);
-    expect(screen.queryByRole('link', { name: 'В рабочей области' })).toBeNull();
+  it('открытый лист подсвечен и помечен aria-current', () => {
+    mount(null, true);
+    expect(screen.getByRole('button', { name: /Стр. 3/ })).toHaveAttribute('aria-current', 'true');
   });
 });

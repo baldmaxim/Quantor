@@ -1,65 +1,67 @@
 'use client';
 
-import { Suspense, use } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, use, useEffect } from 'react';
 
-import { CadScreen } from '@/components/cad/CadScreen';
-import { TopBar } from '@/components/shell/TopBar';
-import { EmptyState, SkeletonRows, StatusBadge } from '@/components/ui';
+import { EmptyState, SkeletonRows } from '@/components/ui';
 import { cadAccess } from '@/lib/cad/access';
-import { useFeatures, useMeta, useProject } from '@/lib/queries';
+import { parseSelection } from '@/lib/cad/selection';
+import { cadRedirectHref } from '@/lib/cad/workspace-url';
+import { useFeatures, useMeta, useSheets } from '@/lib/queries';
 
 /**
- * PDF → CAD (QA-контур, флаг `cad.export`).
- *
- * Закрыто флагом: при выключенном флаге страницы нет. Результат — кандидат движка, не
- * инженерная приёмка. Выбор ревизии, задания и вида хранится в адресе.
+ * Старый адрес страницы PDF → CAD. Весь интерфейс CAD живёт во вкладке «CAD» рабочей области
+ * (флаг `cad.export`, ADR-0036), поэтому маршрут только переводит адрес:
+ * `?revision&job&page=<индекс>&view` -> `/workspace?revision&page=<позиция листа>&tab=cad&job&view`.
  */
 
 interface IPageProps {
   params: Promise<{ projectId: string }>;
 }
 
+const SHELL = 'min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)]';
+
+const Redirect = ({ projectId }: { projectId: string }) => {
+  const router = useRouter();
+  const selection = parseSelection(useSearchParams());
+  // Позиция листа в рабочей области - не индекс страницы PDF: нужен список листов ревизии.
+  const needSheets = selection.revision !== null && selection.page !== null;
+  const sheets = useSheets(needSheets ? selection.revision : null);
+  const waiting = needSheets && sheets.isPending;
+  // Строка адреса: эффект зависит от неё, а не от объекта выбора, который новый на каждый рендер.
+  const href = waiting ? null : cadRedirectHref(projectId, selection, sheets.data?.items ?? null);
+
+  useEffect(() => {
+    if (href !== null) router.replace(href, { scroll: false });
+  }, [href, router]);
+
+  return <SkeletonRows rows={6} />;
+};
+
 const CadPage = ({ params }: IPageProps) => {
   const { projectId } = use(params);
   const meta = useMeta();
   const access = cadAccess(meta.isSuccess, useFeatures());
-  const project = useProject(projectId);
-
-  if (access === 'pending') {
-    return (
-      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)]">
-        <SkeletonRows rows={6} />
-      </main>
-    );
-  }
 
   if (access === 'hidden') {
     return (
-      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)]">
+      <main className={SHELL}>
         <EmptyState title="Страница не найдена" />
       </main>
     );
   }
 
   return (
-    <>
-      <TopBar
-        crumbs={[
-          { label: 'Проекты', href: '/projects' },
-          { label: project.data?.name ?? '…', href: `/projects/${projectId}` },
-          { label: 'PDF → CAD' },
-        ]}
-        status={<StatusBadge tone="warning">QA · кандидат движка</StatusBadge>}
-      />
-      {/* От 1024 px страница не прокручивается: main ровно в остаток под шапкой, а прокручиваются
-          блоки внутри CadScreen. Ниже - обычная страница с прокруткой. */}
-      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)] lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:py-[var(--s-5)]">
-        {/* useSearchParams требует границы приостановки (иначе маршрут не предрендерить). */}
+    <main className={SHELL}>
+      {access === 'pending' ? (
+        <SkeletonRows rows={6} />
+      ) : (
+        // useSearchParams требует границы приостановки (иначе маршрут не предрендерить).
         <Suspense fallback={<SkeletonRows rows={6} />}>
-          <CadScreen projectId={projectId} />
+          <Redirect projectId={projectId} />
         </Suspense>
-      </main>
-    </>
+      )}
+    </main>
   );
 };
 

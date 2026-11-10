@@ -1,28 +1,18 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useState, type FC } from 'react';
 
 import { CadAttemptSwitcher } from '@/components/cad/CadAttemptSwitcher';
 import { CadJobActions } from '@/components/cad/CadJobActions';
 import { CadPipeline } from '@/components/cad/CadPipeline';
 import { CadResult } from '@/components/cad/CadResult';
-import { ErrorState, Skeleton, SkeletonRows, StatusBadge } from '@/components/ui';
+import { ErrorState, SkeletonRows, StatusBadge } from '@/components/ui';
 import { serverOffsetMs } from '@/lib/cad/format';
 import { isActiveStatus, useCadEvents, useCadJob } from '@/lib/cad/queries';
 import { effectiveView, viewSelectionKind } from '@/lib/cad/selection';
 import { jobLabel, jobTone } from '@/lib/cad/stages';
 import { useTicker } from '@/lib/cad/useServerClock';
 import { extractCode } from '@/lib/errors';
-
-/**
- * Просмотр вида (часть B) тянет pdfjs: грузится только когда вид выбран и только на этом
- * маршруте, без серверного рендера.
- */
-const CadViewPanel = dynamic(
-  () => import('@/components/cad/viewer/CadViewPanel').then((module) => module.CadViewPanel),
-  { ssr: false, loading: () => <Skeleton className="h-[60dvh] lg:h-full" /> },
-);
 
 interface ICadJobDetailProps {
   projectId: string;
@@ -34,7 +24,7 @@ interface ICadJobDetailProps {
   onJobCreated: (jobId: string) => void;
 }
 
-/** Выбранное задание: ход, действия, результат и просмотр вида. */
+/** Выбранное задание: попытки, ход, действия и итог. Чертёж вида показывает рабочая область. */
 export const CadJobDetail: FC<ICadJobDetailProps> = ({
   projectId,
   revisionId,
@@ -89,7 +79,7 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
   const shownView = effectiveView(job, selectedPage, selectedView);
   const selectionKind = viewSelectionKind(job, attempt, selectedPage, shownView);
 
-  const jobContent = (
+  return (
     <div className="flex min-w-0 flex-col gap-[var(--s-6)]">
       <CadAttemptSwitcher
         attempts={attempts}
@@ -150,22 +140,5 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
         </p>
       )}
     </div>
-  );
-
-  if (selectionKind === 'panel' && selectedPage !== null && shownView !== null) {
-    return (
-      <CadViewPanel
-        projectId={projectId}
-        revisionId={revisionId}
-        job={job}
-        pageIndex={selectedPage}
-        view={shownView}
-        jobContent={jobContent}
-      />
-    );
-  }
-
-  return (
-    <div className="lg:h-full lg:min-h-0 lg:overflow-auto lg:overscroll-contain">{jobContent}</div>
   );
 };

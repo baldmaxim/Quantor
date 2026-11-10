@@ -1,11 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
-
-import { resetStoredFlags } from '@/lib/cad/useStoredFlag';
+import { describe, expect, it } from 'vitest';
 
 import { CadSidePanel, type ICadSideTab } from './CadSidePanel';
-
-const KEY = 'test:side-collapsed';
 
 const TABS: readonly ICadSideTab[] = [
   { id: 'layers', label: 'Слои', content: <p>панель слоёв</p> },
@@ -15,14 +11,9 @@ const TABS: readonly ICadSideTab[] = [
   { id: 'job', label: 'Задание', content: <p>панель задания</p> },
 ];
 
-beforeEach(() => {
-  window.localStorage.clear();
-  resetStoredFlags();
-});
-
 describe('CadSidePanel', () => {
   it('пять разделов в заданном порядке, открыт первый', () => {
-    render(<CadSidePanel label="Панель вида" tabs={TABS} storageKey={KEY} />);
+    render(<CadSidePanel label="Панель вида" tabs={TABS} />);
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Слои',
       'Замечания',
@@ -35,7 +26,7 @@ describe('CadSidePanel', () => {
   });
 
   it('клик и стрелки переключают раздел; видна только открытая панель', () => {
-    render(<CadSidePanel label="Панель вида" tabs={TABS} storageKey={KEY} />);
+    render(<CadSidePanel label="Панель вида" tabs={TABS} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Масштаб' }));
     expect(screen.getByRole('tabpanel')).toHaveTextContent('панель масштаба');
     expect(screen.queryByText('панель слоёв')).not.toBeVisible();
@@ -47,7 +38,7 @@ describe('CadSidePanel', () => {
   });
 
   it('скрытые разделы остаются смонтированными: введённый текст не теряется', () => {
-    render(<CadSidePanel label="Панель вида" tabs={TABS} storageKey={KEY} />);
+    render(<CadSidePanel label="Панель вида" tabs={TABS} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Замечания' }));
     fireEvent.change(screen.getByLabelText('Черновик'), { target: { value: 'текст' } });
     fireEvent.click(screen.getByRole('tab', { name: 'Файлы' }));
@@ -61,7 +52,7 @@ describe('CadSidePanel', () => {
       <CadSidePanel
         label="Панель вида"
         tabs={TABS}
-        storageKey={KEY}
+       
         active="job"
         onActiveChange={(id) => chosen.push(id)}
       />,
@@ -71,28 +62,15 @@ describe('CadSidePanel', () => {
     expect(chosen).toEqual(['files']);
   });
 
-  it('сворачивается кнопкой, состояние пишется в localStorage и возвращается кнопкой полосы', () => {
-    render(<CadSidePanel label="Панель вида" tabs={TABS} storageKey={KEY} />);
-    const aside = screen.getByRole('complementary', { name: 'Панель вида' });
-    expect(aside).toHaveAttribute('data-collapsed', 'false');
-    expect(screen.queryByTestId('cad-side-collapsed')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Свернуть боковую панель' }));
-    expect(window.localStorage.getItem(KEY)).toBe('1');
-    expect(screen.getByTestId('cad-side-collapsed')).toBeInTheDocument();
-    expect(screen.getByTestId('cad-side-collapsed').className).toContain('lg:flex');
-    expect(aside).toHaveAttribute('data-collapsed', 'true');
-    expect(aside.className).toContain('lg:hidden');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Показать боковую панель' }));
-    expect(window.localStorage.getItem(KEY)).toBe('0');
-    expect(screen.queryByTestId('cad-side-collapsed')).toBeNull();
-    expect(aside).toHaveAttribute('data-collapsed', 'false');
+  it('собственных рамок и кнопки сворачивания нет: ими ведает каркас рабочей области', () => {
+    render(<CadSidePanel label="Панель вида" tabs={TABS} />);
+    expect(screen.getByRole('region', { name: 'Панель вида' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Свернуть/ })).toBeNull();
+    expect(screen.queryByRole('complementary')).toBeNull();
   });
 
-  it('свёрнутость переживает перемонтирование', () => {
-    window.localStorage.setItem(KEY, '1');
-    render(<CadSidePanel label="Панель вида" tabs={TABS} storageKey={KEY} />);
-    expect(screen.getByTestId('cad-side-collapsed')).toBeInTheDocument();
+  it('раздела, которого нет в списке, не открывает: берётся первый', () => {
+    render(<CadSidePanel label="Панель вида" tabs={TABS.slice(4)} active="layers" />);
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('панель задания');
   });
 });

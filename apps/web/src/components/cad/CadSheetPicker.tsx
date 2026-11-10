@@ -26,13 +26,12 @@ import { useFeatures, useSheets } from '@/lib/queries';
 interface ICadSheetPickerProps {
   projectId: string;
   revisionId: string;
-  /** Задание создано (или найдено идущее). */
-  onJobCreated: (jobId: string) => void;
-  /** Открытое справа задание и страница: подсветка строки листа. */
-  openJobId: string | null;
-  openPage: number | null;
-  /** Открыть результат листа: задание, страница и вид (`null` — открыть только задание). */
-  onOpenResult: (jobId: string, page: number | null, view: number | null) => void;
+  /** Задание создано (или найдено идущее); `pages` - листы, с которыми оно запущено. */
+  onJobCreated: (jobId: string, pages: readonly number[]) => void;
+  /** Лист, открытый сейчас в рабочей области (индекс страницы): подсветка строки. */
+  activePage: number | null;
+  /** Открыть лист в рабочей области; результат CAD, если он есть, выберет сама область. */
+  onOpenSheet: (pageIndex: number) => void;
 }
 
 /**
@@ -45,9 +44,8 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
   projectId,
   revisionId,
   onJobCreated,
-  openJobId,
-  openPage,
-  onOpenResult,
+  activePage,
+  onOpenSheet,
 }) => {
   const sheets = useSheets(revisionId);
   const jobs = useCadJobs(projectId, revisionId);
@@ -89,7 +87,7 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
     create.mutate(
       { pages: selected },
       {
-        onSuccess: (job) => onJobCreated(job.job_id),
+        onSuccess: (job) => onJobCreated(job.job_id, job.requested_pages ?? selected),
         onError: (error) => {
           setServerMissing(calibrationPagesOf(error));
           setProblem(cadErrorText(error));
@@ -102,7 +100,6 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
   };
 
   return (
-    // Рамка и заголовок — у вкладки «Листы» в CadScreen.
     <div className="flex flex-col gap-[var(--s-4)]">
       <p className="text-xs text-muted">
         Выберите листы вручную. Масштаб берётся из калибровки листа; лист без калибровки запустить
@@ -145,12 +142,8 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
                 key={sheet.id}
                 sheet={sheet}
                 result={results.get(sheet.page_index) ?? null}
-                open={
-                  openJobId !== null &&
-                  results.get(sheet.page_index)?.jobId === openJobId &&
-                  openPage === sheet.page_index
-                }
-                onOpenResult={onOpenResult}
+                open={activePage === sheet.page_index}
+                onOpen={() => onOpenSheet(sheet.page_index)}
                 href={sheetWorkspaceHref(projectId, revisionId, position)}
                 state={states.get(sheet.page_index) ?? 'unknown'}
                 manualEnabled={manualEnabled}

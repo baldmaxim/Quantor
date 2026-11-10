@@ -8,7 +8,6 @@ import { StatusBadge, cx } from '@/components/ui';
 import { pageLabel } from '@/lib/cad/format';
 import type { ISheetResult } from '@/lib/cad/sheet-results';
 import { CALIBRATION_UNAVAILABLE_TEXT, type SheetCalibrationState } from '@/lib/cad/sheets';
-import { withCadTab } from '@/lib/cad/workspace-cad';
 
 interface ICadSheetRowProps {
   sheet: SheetRead;
@@ -19,15 +18,16 @@ interface ICadSheetRowProps {
   limitReached: boolean;
   /** Последнее задание по листу; `null` — листа в заданиях ещё не было. */
   result: ISheetResult | null;
-  /** Результат этого листа сейчас открыт справа. */
+  /** Этот лист сейчас открыт в рабочей области. */
   open: boolean;
   onToggle: () => void;
-  onOpenResult: (jobId: string, page: number | null, view: number | null) => void;
+  /** Открыть лист в рабочей области (с результатом или без). */
+  onOpen: () => void;
 }
 
 /**
- * Строка листа. Есть задание — текст строки открывает результат (или ход задания), а чекбокс
- * остаётся отдельной тап-целью для повторного запуска. Нет задания — подпись переключает чекбокс.
+ * Строка листа. Текст строки открывает лист в рабочей области (с результатом CAD, если он есть),
+ * а чекбокс остаётся отдельной тап-целью выбора для запуска преобразования.
  */
 export const CadSheetRow: FC<ICadSheetRowProps> = ({
   sheet,
@@ -39,7 +39,7 @@ export const CadSheetRow: FC<ICadSheetRowProps> = ({
   result,
   open,
   onToggle,
-  onOpenResult,
+  onOpen,
 }) => {
   const extraLabel =
     sheet.page_label && sheet.page_label !== String(sheet.page_index + 1) ? sheet.page_label : null;
@@ -55,7 +55,7 @@ export const CadSheetRow: FC<ICadSheetRowProps> = ({
       checked={checked}
       disabled={!checked && limitReached}
       onChange={onToggle}
-      aria-label={result ? pageLabel(sheet.page_index) : undefined}
+      aria-label={pageLabel(sheet.page_index)}
       className="h-[18px] w-[18px] shrink-0 accent-accent"
     />
   );
@@ -68,40 +68,18 @@ export const CadSheetRow: FC<ICadSheetRowProps> = ({
         open && 'shadow-[inset_3px_0_0_var(--accent)]',
       )}
     >
-      {result === null ? (
-        <label className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-[var(--s-4)] text-sm">
-          {checkbox}
-          {title}
-        </label>
-      ) : (
-        <>
-          <label className="-ml-[var(--s-3)] flex h-[44px] w-[44px] shrink-0 cursor-pointer items-center justify-center">
-            {checkbox}
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              result.kind === 'recognized'
-                ? onOpenResult(result.jobId, sheet.page_index, result.view)
-                : onOpenResult(result.jobId, null, null)
-            }
-            aria-current={open ? 'true' : undefined}
-            className="flex min-h-[44px] min-w-0 flex-1 flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)] text-left text-sm hover:text-accent"
-          >
-            {title}
-            <ResultBadge result={result} />
-          </button>
-        </>
-      )}
-
-      {result?.kind === 'recognized' && (
-        <Link
-          href={withCadTab(href)}
-          className="inline-flex min-h-[44px] items-center text-xs text-accent underline underline-offset-4"
-        >
-          В рабочей области
-        </Link>
-      )}
+      <label className="-ml-[var(--s-3)] flex h-[44px] w-[44px] shrink-0 cursor-pointer items-center justify-center">
+        {checkbox}
+      </label>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-current={open ? 'true' : undefined}
+        className="flex min-h-[44px] min-w-0 flex-1 flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)] text-left text-sm hover:text-accent"
+      >
+        {title}
+        {result && <ResultBadge result={result} />}
+      </button>
 
       {state === 'calibrated' && (
         <StatusBadge tone="success" dot={false}>

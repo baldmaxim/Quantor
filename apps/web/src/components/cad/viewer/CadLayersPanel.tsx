@@ -5,14 +5,18 @@ import type { FC } from 'react';
 import { cx } from '@/components/ui';
 import { layerColorVar } from '@/lib/cad/layer-colors';
 import { formatInt } from '@/lib/cad/view-format';
+import { MAX_PDF_OPACITY, MIN_PDF_OPACITY } from '@/lib/cad/view-mode';
 
 interface ICadLayersPanelProps {
   /** Слои DXF; пусто - блока слоёв нет. */
   layers: readonly string[];
   visibleLayers: ReadonlySet<number>;
   onToggleLayer: (index: number) => void;
-  opacity: number;
-  onOpacityChange: (value: number) => void;
+  /** Непрозрачность подложки PDF, 0-1: DXF всегда непрозрачный. */
+  pdfOpacity: number;
+  onPdfOpacityChange: (value: number) => void;
+  /** Ползунок действует только в режиме «Наложение»: в остальных PDF показан целиком или скрыт. */
+  pdfOpacityActive: boolean;
   /** Рисуется ли сейчас геометрия CAD (режим PDF её не рисует). */
   cadShown: boolean;
   /** Есть ли вообще предпросмотр DXF. */
@@ -25,13 +29,14 @@ interface ICadLayersPanelProps {
 
 const CHECK = 'flex min-h-[44px] items-center gap-[var(--s-3)] text-sm';
 
-/** Раздел «Слои»: непрозрачность CAD, область проверки масштаба, слои DXF с цветом. */
+/** Раздел «Слои»: непрозрачность PDF, область проверки масштаба, слои DXF с цветом. */
 export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   layers,
   visibleLayers,
   onToggleLayer,
-  opacity,
-  onOpacityChange,
+  pdfOpacity,
+  onPdfOpacityChange,
+  pdfOpacityActive,
   cadShown,
   previewAvailable,
   pointCount,
@@ -40,21 +45,29 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   onCropChange,
 }) => (
   <div className="flex min-w-0 flex-col gap-[var(--s-4)]">
-    {cadShown && (
-      <label className="flex min-h-[44px] flex-wrap items-center gap-x-[var(--s-4)] text-sm">
-        <span>Непрозрачность CAD</span>
-        <input
-          type="range"
-          min={0.1}
-          max={1}
-          step={0.05}
-          value={opacity}
-          onChange={(event) => onOpacityChange(Number(event.target.value))}
-          aria-valuetext={`${Math.round(opacity * 100)} %`}
-          className="h-[44px] min-w-[120px] flex-1"
-        />
-        <span className="tabular w-[4ch] text-xs text-muted">{Math.round(opacity * 100)} %</span>
-      </label>
+    {previewAvailable && (
+      <div className="flex min-w-0 flex-col">
+        <label className="flex min-h-[44px] flex-wrap items-center gap-x-[var(--s-4)] text-sm">
+          <span>Непрозрачность PDF</span>
+          <input
+            type="range"
+            min={MIN_PDF_OPACITY}
+            max={MAX_PDF_OPACITY}
+            step={0.05}
+            value={pdfOpacity}
+            disabled={!pdfOpacityActive}
+            onChange={(event) => onPdfOpacityChange(Number(event.target.value))}
+            aria-valuetext={`${Math.round(pdfOpacity * 100)} %`}
+            className="h-[44px] min-w-[120px] flex-1"
+          />
+          <span className="tabular w-[4ch] text-xs text-muted">
+            {Math.round(pdfOpacity * 100)} %
+          </span>
+        </label>
+        {!pdfOpacityActive && (
+          <p className="text-xs text-muted">Ползунок действует в режиме «Наложение».</p>
+        )}
+      </div>
     )}
 
     {cropAvailable && (

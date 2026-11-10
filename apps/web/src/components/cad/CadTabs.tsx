@@ -16,6 +16,8 @@ interface ICadTabsProps<TId extends string> {
   tabs: readonly ICadTab<TId>[];
   active: TId;
   onChange: (id: TId) => void;
+  /** Без рамки и больших отступов: вкладки внутри узкой панели, у которой рамка уже есть. */
+  bare?: boolean;
   /** Содержимое активной вкладки; неактивные не рендерятся. */
   children: ReactNode;
 }
@@ -27,6 +29,7 @@ export const CadTabs = <TId extends string>({
   tabs,
   active,
   onChange,
+  bare = false,
   children,
 }: ICadTabsProps<TId>): ReactElement => {
   const refs = useRef(new Map<TId, HTMLButtonElement>());
@@ -43,7 +46,12 @@ export const CadTabs = <TId extends string>({
   };
 
   return (
-    <section className="flex flex-col rounded-[var(--radius-md)] border border-border-strong bg-surface">
+    <section
+      className={cx(
+        'flex flex-col',
+        !bare && 'rounded-[var(--radius-md)] border border-border-strong bg-surface',
+      )}
+    >
       <div role="tablist" aria-label={label} className="flex border-b border-border">
         {tabs.map((tab, index) => {
           const selected = tab.id === active;
@@ -78,7 +86,7 @@ export const CadTabs = <TId extends string>({
         role="tabpanel"
         id={`${idPrefix}-panel-${active}`}
         aria-labelledby={`${idPrefix}-tab-${active}`}
-        className="flex flex-col p-[var(--s-6)]"
+        className={cx('flex flex-col', bare ? 'pt-[var(--s-5)]' : 'p-[var(--s-6)]')}
       >
         {children}
       </div>

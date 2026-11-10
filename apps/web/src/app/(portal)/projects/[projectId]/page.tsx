@@ -35,6 +35,7 @@ import {
   type OpenState,
 } from '@/lib/openability';
 import { CAD_FEATURE } from '@/lib/cad/access';
+import { workspaceCadHref } from '@/lib/cad/workspace-url';
 import { CALC_FEATURE } from '@/lib/calc/access';
 import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 import { useDocumentsRevisions, useFeatures, useProject, useProjectDocuments } from '@/lib/queries';
@@ -54,6 +55,10 @@ interface IPageProps {
 
 const workspaceHref = (projectId: string, revisionId: string): string =>
   `/projects/${projectId}/workspace?revision=${revisionId}`;
+
+// CAD живёт во вкладке рабочей области: сюда ведёт и кнопка «PDF → CAD».
+const cadWorkspaceHref = (projectId: string, revisionId: string): string =>
+  workspaceCadHref(projectId, { revision: revisionId, position: null, job: null, view: null });
 
 const ProjectPage = ({ params }: IPageProps) => {
   const { projectId } = use(params);
@@ -105,11 +110,19 @@ const ProjectPage = ({ params }: IPageProps) => {
                 Расчёты
               </ButtonLink>
             )}
-            {features[CAD_FEATURE] === true && (
-              <ButtonLink href={`/projects/${projectId}/cad`} transitionTypes={['nav-forward']}>
-                PDF → CAD
-              </ButtonLink>
-            )}
+            {features[CAD_FEATURE] === true &&
+              (target ? (
+                <ButtonLink
+                  href={cadWorkspaceHref(projectId, target.revision.id)}
+                  transitionTypes={['nav-forward']}
+                >
+                  PDF → CAD
+                </ButtonLink>
+              ) : (
+                <Button disabled title={noTargetReason(states)}>
+                  PDF → CAD
+                </Button>
+              ))}
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
             {target ? (
               <ButtonLink href={workspaceHref(projectId, target.revision.id)} variant="primary">

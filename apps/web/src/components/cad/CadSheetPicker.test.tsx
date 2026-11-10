@@ -36,17 +36,16 @@ import { CadSheetPicker } from './CadSheetPicker';
 
 const mount = (
   onJobCreated = vi.fn(),
-  onOpenResult = vi.fn(),
-  open: { jobId: string | null; page: number | null } = { jobId: null, page: null },
+  onOpenSheet = vi.fn(),
+  activePage: number | null = null,
 ) =>
   render(
     <CadSheetPicker
       projectId="p"
       revisionId="r"
       onJobCreated={onJobCreated}
-      openJobId={open.jobId}
-      openPage={open.page}
-      onOpenResult={onOpenResult}
+      activePage={activePage}
+      onOpenSheet={onOpenSheet}
     />,
   );
 
@@ -127,43 +126,63 @@ describe('CadSheetPicker', () => {
     expect(launchButton()).toBeDisabled();
   });
 
-  it('распознанный лист: бейдж, открытие результата по строке, чекбокс отдельно', () => {
+  it('распознанный лист: бейдж, открытие по строке, чекбокс отдельно', () => {
     mocks.jobs = [job({})];
-    const onOpenResult = vi.fn();
-    mount(vi.fn(), onOpenResult);
+    const onOpenSheet = vi.fn();
+    mount(vi.fn(), onOpenSheet);
     expect(screen.getByText('DXF есть · проверка')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Стр. 1/ }));
-    expect(onOpenResult).toHaveBeenCalledWith('j1', 0, null);
+    expect(onOpenSheet).toHaveBeenCalledWith(0);
     expect(screen.getByRole('checkbox', { name: 'Стр. 1' })).not.toBeChecked();
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Стр. 1' }));
     expect(screen.getByRole('checkbox', { name: 'Стр. 1' })).toBeChecked();
-    expect(onOpenResult).toHaveBeenCalledTimes(1);
+    expect(onOpenSheet).toHaveBeenCalledTimes(1);
   });
 
-  it('идущее и упавшее задание открывают задание без страницы', () => {
+  it('идущее и упавшее задание: бейджи; строка открывает лист', () => {
     mocks.jobs = [
       job({ job_id: 'run', status: 'running', result_status: null, requested_pages: [0] }),
       job({ job_id: 'bad', status: 'failed', result_status: 'failed', requested_pages: [1] }),
     ];
-    const onOpenResult = vi.fn();
-    mount(vi.fn(), onOpenResult);
+    const onOpenSheet = vi.fn();
+    mount(vi.fn(), onOpenSheet);
     expect(screen.getByText('Выполняется')).toBeInTheDocument();
     expect(screen.getByText('Ошибка')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Стр. 2/ }));
-    expect(onOpenResult).toHaveBeenCalledWith('bad', null, null);
+    expect(onOpenSheet).toHaveBeenCalledWith(1);
+  });
+
+  it('лист без задания тоже открывается по строке, а не только отмечается', () => {
+    const onOpenSheet = vi.fn();
+    mount(vi.fn(), onOpenSheet);
+    fireEvent.click(screen.getByRole('button', { name: /Стр. 1/ }));
+    expect(onOpenSheet).toHaveBeenCalledWith(0);
+    expect(screen.getByRole('checkbox', { name: /Стр. 1/ })).not.toBeChecked();
   });
 
   it('открытый сейчас лист помечен aria-current', () => {
-    mocks.jobs = [job({})];
-    mount(vi.fn(), vi.fn(), { jobId: 'j1', page: 0 });
+    mount(vi.fn(), vi.fn(), 0);
     expect(screen.getByRole('button', { name: /Стр. 1/ })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: /Стр. 2/ })).not.toHaveAttribute('aria-current');
   });
 
-  it('лист без задания: подпись переключает чекбокс', () => {
+  it('создание задания сообщает его номер и листы запуска', () => {
+    const onJobCreated = vi.fn();
+    mount(onJobCreated);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Стр. 1/ }));
+    fireEvent.click(launchButton());
+    const options = mocks.mutate.mock.calls[0]?.[1] as {
+      onSuccess: (job: unknown) => void;
+    };
+    act(() => options.onSuccess({ job_id: 'new', requested_pages: [0] }));
+    expect(onJobCreated).toHaveBeenCalledWith('new', [0]);
+  });
+
+  it('чекбокс листа переключается', () => {
     mount();
-    fireEvent.click(screen.getByText('Стр. 1'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Стр. 1/ }));
     expect(screen.getByRole('checkbox', { name: /Стр. 1/ })).toBeChecked();
   });
 });

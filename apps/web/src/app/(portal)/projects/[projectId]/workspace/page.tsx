@@ -15,7 +15,9 @@ import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
 import { resolveLeftTab } from '@/components/workspace/cad/left-tab';
 import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
-import { WorkspaceCadPanel } from '@/components/workspace/cad/WorkspaceCadPanel';
+import { WorkspaceCadBar } from '@/components/workspace/cad/WorkspaceCadBar';
+import { WorkspaceCadLeft } from '@/components/workspace/cad/WorkspaceCadLeft';
+import { WorkspaceCadSide } from '@/components/workspace/cad/WorkspaceCadSide';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
 import { TakeoffPanel, type TakeoffGeometry } from '@/components/workspace/TakeoffPanel';
 import { takeoffAccess, type ITakeoffAccess } from '@/components/workspace/takeoff-access';
@@ -43,6 +45,7 @@ import { ToolButton, ToolDivider, ToolField } from '@/components/workspace/Toolb
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
+import { parseWorkspaceJob } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
 import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
 import { REGIONS_FORMS, blockType, countOf, revisionTitle } from '@/lib/format';
@@ -422,9 +425,11 @@ const WorkspacePage = ({ params }: IPageProps) => {
     [sheetPageIndex, pageWidth, pageHeight],
   );
 
+  const cadSelection = parseWorkspaceJob(searchParams);
   const cad = useWorkspaceCad({
     projectId,
     revisionId,
+    sheets: pages,
     sheet,
     page: viewportSheet,
     camera,
@@ -432,6 +437,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
     enabled: cadOn,
     active: activeTab === 'cad',
     tabParam: searchParams.get('tab'),
+    jobParam: cadSelection.job,
+    viewParam: cadSelection.view,
+    navigate: setQuery,
   });
 
   const failure = renderError ?? errorCode ?? null;
@@ -722,7 +730,12 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   />
                 )}
 
-                {activeTab === 'cad' && <WorkspaceCadPanel {...cad.panel} />}
+                {/* Вкладка CAD не размонтируется после первого открытия: отмеченные листы сохраняются. */}
+                {cad.left && cad.opened && (
+                  <div hidden={activeTab !== 'cad'}>
+                    <WorkspaceCadLeft {...cad.left} />
+                  </div>
+                )}
 
                 {activeTab === 'takeoff' && (
                   <TakeoffPanel
@@ -778,6 +791,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               contentError={content.isError}
               projectId={projectId}
               onRetry={() => void content.refetch()}
+              top={activeTab === 'cad' && cad.bar ? <WorkspaceCadBar {...cad.bar} /> : null}
             >
               <DrawingViewport
                 backend={backend}
@@ -793,6 +807,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 measurements={overlayMeasurements}
                 tools={activeTab === 'takeoff' ? tools : null}
                 extraPainter={cad.painter}
+                pageOpacity={cad.pageOpacity}
                 onViewChange={(state) => setZoomPercent(Math.round(state.scale * 100))}
                 onError={setRenderError}
               />
@@ -833,10 +848,23 @@ const WorkspacePage = ({ params }: IPageProps) => {
               )}
             </ViewportArea>
           }
-          rightTitle={activeTab === 'takeoff' ? 'Свойства измерения' : 'Свойства области'}
+          rightTitle={
+            activeTab === 'takeoff'
+              ? 'Свойства измерения'
+              : activeTab === 'cad'
+                ? 'CAD'
+                : 'Свойства области'
+          }
           right={
-            <div className="flex min-h-0 flex-1 flex-col gap-[var(--s-5)] overflow-auto overscroll-contain p-[var(--s-4)]">
-              {activeTab === 'takeoff' ? (
+            <div
+              className={cx(
+                'flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain',
+                activeTab !== 'cad' && 'gap-[var(--s-5)] p-[var(--s-4)]',
+              )}
+            >
+              {activeTab === 'cad' ? (
+                <WorkspaceCadSide {...cad.side} />
+              ) : activeTab === 'takeoff' ? (
                 <MeasurementInspector
                   measurement={selectedMeasurement}
                   item={
@@ -1040,6 +1068,8 @@ interface IViewportAreaProps {
   contentError: boolean;
   projectId: string;
   onRetry: () => void;
+  /** Строка над холстом (вкладка CAD); холст остаётся один. */
+  top?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -1050,6 +1080,7 @@ const ViewportArea = ({
   contentError,
   projectId,
   onRetry,
+  top = null,
   children,
 }: IViewportAreaProps) => {
   if (!revisionId) {
@@ -1085,16 +1116,19 @@ const ViewportArea = ({
   }
 
   return (
-    <>
-      {children}
-      {loading && (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <span className="rounded-[var(--radius-sm)] bg-surface px-[var(--s-5)] py-[var(--s-3)] text-xs text-muted">
-            Открываем документ…
-          </span>
-        </div>
-      )}
-    </>
+    <div className="flex h-full min-h-0 flex-col">
+      {top}
+      <div className="relative min-h-0 flex-1">
+        {children}
+        {loading && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center">
+            <span className="rounded-[var(--radius-sm)] bg-surface px-[var(--s-5)] py-[var(--s-3)] text-xs text-muted">
+              Открываем документ…
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

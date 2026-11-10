@@ -3,22 +3,26 @@ import { describe, expect, it } from 'vitest';
 import {
   EMPTY_SELECTION,
   parseSelection,
-  selectionQuery,
   viewSelectionKind,
-  withJob,
-  withJobView,
-  withRevision,
-  withView,
 } from './selection';
 
 const REV = '11111111-1111-4111-8111-111111111111';
 const JOB = '22222222-2222-4222-8222-222222222222';
 
 describe('выбор в адресе', () => {
-  it('разбирает и собирает адрес без потерь', () => {
-    const selection = { revision: REV, job: JOB, page: 2, view: 1 };
-    const params = new URLSearchParams(selectionQuery(selection));
-    expect(parseSelection(params)).toEqual(selection);
+  it('разбирает адрес прежней страницы CAD', () => {
+    const params = new URLSearchParams(`revision=${REV}&job=${JOB}&page=2&view=1`);
+    expect(parseSelection(params)).toEqual({ revision: REV, job: JOB, page: 2, view: 1 });
+  });
+
+  it('страница без вида допустима, вид без страницы отбрасывается', () => {
+    expect(parseSelection(new URLSearchParams(`revision=${REV}&job=${JOB}&page=3`))).toEqual({
+      revision: REV,
+      job: JOB,
+      page: 3,
+      view: null,
+    });
+    expect(parseSelection(new URLSearchParams(`revision=${REV}&job=${JOB}&view=3`)).view).toBeNull();
   });
 
   it('отбрасывает невалидные значения', () => {
@@ -32,44 +36,6 @@ describe('выбор в адресе', () => {
     expect(
       parseSelection(new URLSearchParams(`revision=${REV}&job=${JOB}&page=-1&view=1`)).page,
     ).toBeNull();
-  });
-
-  it('смена ревизии сбрасывает задание и вид, смена задания — вид', () => {
-    const full = { revision: REV, job: JOB, page: 0, view: 1 };
-    expect(withRevision('другая')).toEqual({ ...EMPTY_SELECTION, revision: 'другая' });
-    expect(withJob(full, null)).toEqual({ revision: REV, job: null, page: null, view: null });
-    expect(withView(withJob(full, JOB), 3, 2)).toEqual({
-      revision: REV,
-      job: JOB,
-      page: 3,
-      view: 2,
-    });
-  });
-});
-
-describe('открытие результата листа', () => {
-  const base = { revision: REV, job: null, page: null, view: null };
-
-  it('страница и вид попадают в адрес и читаются обратно', () => {
-    const next = withJobView(base, JOB, 3, 1);
-    expect(next).toEqual({ revision: REV, job: JOB, page: 3, view: 1 });
-    expect(parseSelection(new URLSearchParams(selectionQuery(next)))).toEqual(next);
-  });
-
-  it('вид опускается, если неизвестен: страница остаётся', () => {
-    const next = withJobView(base, JOB, 3, null);
-    const query = selectionQuery(next);
-    expect(query).toBe(`revision=${REV}&job=${JOB}&page=3`);
-    expect(parseSelection(new URLSearchParams(query))).toEqual(next);
-  });
-
-  it('без страницы открывается только задание, вид отбрасывается', () => {
-    expect(withJobView({ ...base, page: 2, view: 1 }, JOB, null, 5)).toEqual({
-      revision: REV,
-      job: JOB,
-      page: null,
-      view: null,
-    });
   });
 });
 

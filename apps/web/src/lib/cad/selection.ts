@@ -1,6 +1,7 @@
 /**
- * Выбор на странице CAD живёт в адресе: `?revision=<uuid>&job=<uuid>&page=<индекс>&view=<n>`.
- * Перезагрузка возвращает тот же вид. `page` — индекс страницы PDF с 0, как в API.
+ * Адрес прежней страницы CAD: `?revision=<uuid>&job=<uuid>&page=<индекс>&view=<n>`. Страницы больше
+ * нет, адрес только переводится в рабочую область (`workspace-url.ts`). `page` — индекс страницы
+ * PDF с 0, как в API.
  */
 
 import type { CadAttemptRead, CadJobRead } from '@quantor/api-client';
@@ -16,9 +17,9 @@ export const EMPTY_SELECTION: ICadSelection = { revision: null, job: null, page:
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const asUuid = (value: string | null): string | null => (value && UUID.test(value) ? value : null);
+export const asUuid = (value: string | null): string | null => (value && UUID.test(value) ? value : null);
 
-const asIndex = (value: string | null): number | null => {
+export const asIndex = (value: string | null): number | null => {
   if (value === null || !/^\d{1,6}$/.test(value)) {
     return null;
   }
@@ -40,54 +41,6 @@ export const parseSelection = (params: IParamsReader): ICadSelection => {
   const view = page !== null ? asIndex(params.get('view')) : null;
   // Страница без вида допустима: лист открыт из списка, вид выберет человек в ходе задания.
   return { revision, job, page, view };
-};
-
-export const withRevision = (revision: string | null): ICadSelection => ({
-  ...EMPTY_SELECTION,
-  revision,
-});
-
-export const withJob = (selection: ICadSelection, job: string | null): ICadSelection => ({
-  revision: selection.revision,
-  job,
-  page: null,
-  view: null,
-});
-
-/** Открыть результат листа: страница задания и, если он известен, вид. Без страницы — только задание. */
-export const withJobView = (
-  selection: ICadSelection,
-  job: string,
-  page: number | null,
-  view: number | null,
-): ICadSelection => ({
-  revision: selection.revision,
-  job,
-  page,
-  view: page !== null ? view : null,
-});
-
-export const withView = (selection: ICadSelection, page: number, view: number): ICadSelection => ({
-  ...selection,
-  page,
-  view,
-});
-
-export const selectionQuery = (selection: ICadSelection): string => {
-  const params = new URLSearchParams();
-  if (selection.revision) {
-    params.set('revision', selection.revision);
-    if (selection.job) {
-      params.set('job', selection.job);
-      if (selection.page !== null) {
-        params.set('page', String(selection.page));
-        if (selection.view !== null) {
-          params.set('view', String(selection.view));
-        }
-      }
-    }
-  }
-  return params.toString();
 };
 
 /** Итоги, при которых у вида есть диагностика (`GET .../views/...` отвечает 200). */

@@ -5,13 +5,15 @@ import { CadLayersPanel } from './CadLayersPanel';
 
 const mount = (patch: Partial<Parameters<typeof CadLayersPanel>[0]> = {}) => {
   const onToggleLayer = vi.fn();
+  const onPdfOpacityChange = vi.fn();
   render(
     <CadLayersPanel
       layers={['WALLS', 'DOORS', 'TEXT']}
       visibleLayers={new Set([0, 2])}
       onToggleLayer={onToggleLayer}
-      opacity={0.85}
-      onOpacityChange={vi.fn()}
+      pdfOpacity={0.4}
+      onPdfOpacityChange={onPdfOpacityChange}
+      pdfOpacityActive
       cadShown
       previewAvailable
       pointCount={12345}
@@ -21,7 +23,7 @@ const mount = (patch: Partial<Parameters<typeof CadLayersPanel>[0]> = {}) => {
       {...patch}
     />,
   );
-  return { onToggleLayer };
+  return { onToggleLayer, onPdfOpacityChange };
 };
 
 describe('CadLayersPanel', () => {
@@ -55,25 +57,43 @@ describe('CadLayersPanel', () => {
     expect(onToggleLayer).toHaveBeenCalledWith(1);
   });
 
-  it('непрозрачность, область проверки масштаба и число точек', () => {
+  it('ползунок называется «Непрозрачность PDF» и меняет прозрачность подложки', () => {
+    const { onPdfOpacityChange } = mount();
+    expect(screen.getByText('Непрозрачность PDF')).toBeInTheDocument();
+    expect(screen.queryByText('Непрозрачность CAD')).toBeNull();
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('aria-valuetext', '40 %');
+    expect(slider).toBeEnabled();
+    fireEvent.change(slider, { target: { value: '0.7' } });
+    expect(onPdfOpacityChange).toHaveBeenCalledWith(0.7);
+  });
+
+  it('вне режима «Наложение» ползунок заблокирован и объясняет почему', () => {
+    mount({ pdfOpacityActive: false });
+    expect(screen.getByRole('slider')).toBeDisabled();
+    expect(screen.getByText(/действует в режиме «Наложение»/)).toBeInTheDocument();
+  });
+
+  it('область проверки масштаба и число точек', () => {
     mount();
-    expect(screen.getByRole('slider')).toBeInTheDocument();
     expect(
       screen.getByRole('checkbox', { name: 'Область проверки масштаба на PDF' }),
     ).not.toBeChecked();
     expect(screen.getByText(/Точек в предпросмотре/)).toHaveTextContent('12');
   });
 
-  it('геометрия CAD не показана: слоёв и ползунка нет, причина названа', () => {
-    mount({ cadShown: false });
-    expect(screen.queryByRole('slider')).toBeNull();
+  it('геометрия CAD не показана: слоёв нет, причина названа', () => {
+    mount({ cadShown: false, pdfOpacityActive: false });
     expect(screen.queryByTestId('layer-swatch')).toBeNull();
-    expect(screen.getByRole('note')).toHaveTextContent('режимах «CAD» и «Наложение»');
+    expect(screen.getByText(/Геометрия CAD не показана/)).toHaveTextContent(
+      'режимах «CAD» и «Наложение»',
+    );
   });
 
-  it('предпросмотра нет совсем: другая причина', () => {
+  it('предпросмотра нет совсем: другая причина, ползунка нет', () => {
     mount({ cadShown: false, previewAvailable: false, layers: [], pointCount: null });
-    expect(screen.getByRole('note')).toHaveTextContent('предпросмотр геометрии не получен');
+    expect(screen.getByText(/предпросмотр геометрии не получен/)).toBeInTheDocument();
+    expect(screen.queryByRole('slider')).toBeNull();
     expect(screen.queryByText(/Точек в предпросмотре/)).toBeNull();
   });
 });

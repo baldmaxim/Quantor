@@ -6,13 +6,11 @@ import { frameOf } from './frame';
 import {
   WORKSPACE_CAD_OPACITY,
   WORKSPACE_DRAFT_ID,
-  cadPageHref,
   isReadableJob,
   matchingPreview,
   overlayAvailability,
   overlayPaintData,
   pickWorkspaceView,
-  withCadTab,
   workspaceMarks,
   workspaceViewParams,
 } from './workspace-cad';
@@ -132,6 +130,29 @@ describe('наложение DXF', () => {
     expect(first?.[1]).toBeCloseTo(700 / 595, 9);
   });
 
+  it('DXF всегда непрозрачный: прозрачность подложки задаётся не здесь', () => {
+    expect(WORKSPACE_CAD_OPACITY).toBe(1);
+  });
+
+  it('скрытые слои не попадают в видимые', () => {
+    const frame = frameOf(FRAME_OK);
+    const data = overlayPaintData(preview(), frame, { width: 842, height: 595 }, 'i', [], {
+      hiddenLayers: new Set([0]),
+    });
+    expect([...(data?.visibleLayers ?? [])]).toEqual([1]);
+  });
+
+  it('DXF скрыт: путей нет, а область проверки масштаба остаётся', () => {
+    const frame = frameOf(FRAME_OK);
+    const page = { width: 842, height: 595 };
+    const crop = { rect: [0, 0, 0.5, 0.5] as const, color: 'c' };
+    const data = overlayPaintData(preview(), frame, page, 'i', [], { dxfVisible: false, crop });
+    expect(data?.paths).toEqual([]);
+    expect(data?.crop).toEqual(crop);
+    // ни геометрии, ни области - рисовать нечего
+    expect(overlayPaintData(preview(), frame, page, 'i', [], { dxfVisible: false })).toBeNull();
+  });
+
   it('нет предпросмотра, кадра или размера листа - слоя нет', () => {
     const frame = frameOf(FRAME_OK);
     const page = { width: 842, height: 595 };
@@ -160,29 +181,5 @@ describe('отметки замечаний', () => {
     expect(
       workspaceMarks([{ id: 'a', status: 'open', bbox_pt: [1, 1, 5, 5] }], null, null),
     ).toEqual([]);
-  });
-});
-
-describe('ссылки', () => {
-  it('без задания - страница CAD ревизии', () => {
-    expect(cadPageHref('p1', 'r1', null)).toBe('/projects/p1/cad?revision=r1');
-  });
-
-  it('задание без листа (идёт или ошибка) - только задание', () => {
-    expect(cadPageHref('p1', 'r1', { jobId: JOB_ID, page: null, view: null })).toBe(
-      `/projects/p1/cad?revision=r1&job=${JOB_ID}`,
-    );
-  });
-
-  it('распознанный лист - задание, страница и вид', () => {
-    expect(cadPageHref('p1', 'r1', { jobId: JOB_ID, page: 2, view: 3 })).toBe(
-      `/projects/p1/cad?revision=r1&job=${JOB_ID}&page=2&view=3`,
-    );
-  });
-
-  it('вкладка CAD в адресе рабочей области', () => {
-    expect(withCadTab('/projects/p/workspace?revision=r&page=2')).toBe(
-      '/projects/p/workspace?revision=r&page=2&tab=cad',
-    );
   });
 });

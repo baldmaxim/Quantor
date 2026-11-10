@@ -18,12 +18,13 @@ export interface ISheetResult {
   readonly dxf: boolean;
 }
 
-type JobForSheets = Pick<
+export type JobForSheets = Pick<
   CadJobSummaryRead,
   'job_id' | 'status' | 'result_status' | 'requested_pages' | 'created_at'
 >;
 
-const kindOf = (job: JobForSheets): SheetResultKind | null => {
+/** Вид итога задания; `null` - задание завершено без понятного итога. */
+export const jobResultKind = (job: JobForSheets): SheetResultKind | null => {
   if (job.status === 'queued' || job.status === 'running') {
     return 'running';
   }
@@ -62,7 +63,7 @@ export const latestSheetJobs = (jobs: readonly JobForSheets[]): Map<number, IShe
 
   const result = new Map<number, ISheetResult>();
   newest.forEach((job, page) => {
-    const kind = kindOf(job);
+    const kind = jobResultKind(job);
     if (kind !== null) {
       result.set(page, {
         jobId: job.job_id,

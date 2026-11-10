@@ -2,9 +2,10 @@ import type { CadViewDiagnosticsRead } from '@quantor/api-client';
 
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
+import type { CadViewMode } from '@/lib/cad/view-mode';
 import type { CameraState, Viewport } from '@/lib/viewer/camera';
 
-/** Замечания вида: всё, что нужно разделу «Замечания» (тот же, что на странице CAD). */
+/** Замечания вида: всё, что нужно разделу «Замечания» (тот же, что был на странице CAD). */
 export interface IWorkspaceCadRemarks {
   readonly binding: IRemarkBinding;
   readonly store: ICadRemarks;
@@ -21,26 +22,71 @@ export interface IWorkspaceCadRemarks {
   readonly viewport: () => Viewport;
 }
 
-/** Лист распознан: вид, диагностика, наложение и замечания. */
-export interface IWorkspaceCadRecognized {
-  /** Итог задания (`result_status`) для бейджа; `null` - задание ещё читается. */
-  readonly resultStatus: string | null;
-  /** Задание или диагностика вида ещё читаются. */
-  readonly loading: boolean;
-  /** Отказ чтения задания или диагностики. */
-  readonly error: { readonly code: string; readonly text: string } | null;
-  readonly diagnostics: CadViewDiagnosticsRead | null;
+/** Левая панель вкладки CAD: источник, листы и задания ревизии рабочей области. */
+export interface IWorkspaceCadLeftProps {
+  readonly projectId: string;
+  readonly revisionId: string;
+  /** Индекс страницы листа, открытого в рабочей области. */
+  readonly activePage: number | null;
+  readonly selectedJobId: string | null;
+  readonly onOpenSheet: (pageIndex: number) => void;
+  readonly onSelectJob: (jobId: string) => void;
+  readonly onJobCreated: (jobId: string, pages: readonly number[]) => void;
+  readonly onSourceSelect: (revisionId: string) => void;
+}
+
+/** Строка над холстом: заголовок вида, режим показа, масштаб камеры рабочей области. */
+export interface IWorkspaceCadBarProps {
+  readonly diagnostics: CadViewDiagnosticsRead;
   readonly views: readonly number[];
   readonly view: number | null;
   readonly onViewChange: (view: number) => void;
-  readonly overlay: boolean;
-  readonly overlayAvailable: boolean;
-  readonly overlayReason: string | null;
-  readonly overlayLoading: boolean;
-  readonly overlayError: string | null;
-  readonly onOverlayChange: (value: boolean) => void;
-  /** `null` - замечания пока недоступны (диагностика не получена). */
+  readonly mode: CadViewMode;
+  /** DXF можно показать на листе (кадр координат подтверждён, предпросмотр получен). */
+  readonly dxfAvailable: boolean;
+  /** Почему DXF нельзя показать; `null` - можно или ещё грузится. */
+  readonly dxfReason: string | null;
+  readonly onModeChange: (mode: CadViewMode) => void;
+  readonly onZoomIn: () => void;
+  readonly onZoomOut: () => void;
+  readonly onFit: () => void;
+  /** Предупреждения о показанной геометрии (упрощена, предпросмотр не принят). */
+  readonly notices: readonly { readonly tone: 'note' | 'alert'; readonly text: string }[];
+  readonly loading: boolean;
+}
+
+export interface IWorkspaceCadLayers {
+  readonly layers: readonly string[];
+  readonly visibleLayers: ReadonlySet<number>;
+  readonly onToggleLayer: (index: number) => void;
+  readonly pdfOpacity: number;
+  readonly onPdfOpacityChange: (value: number) => void;
+  readonly pdfOpacityActive: boolean;
+  readonly cadShown: boolean;
+  readonly previewAvailable: boolean;
+  readonly pointCount: number | null;
+  readonly cropAvailable: boolean;
+  readonly cropVisible: boolean;
+  readonly onCropChange: (visible: boolean) => void;
+}
+
+/** Вид листа с диагностикой: слои, замечания, масштаб и файлы. */
+export interface IWorkspaceCadView {
+  readonly diagnostics: CadViewDiagnosticsRead;
+  readonly layers: IWorkspaceCadLayers;
+  /** `null` - замечания пока недоступны. */
   readonly remarks: IWorkspaceCadRemarks | null;
+}
+
+/** Задание листа: то, что нужно разделу «Задание». */
+export interface IWorkspaceCadJob {
+  readonly projectId: string;
+  readonly revisionId: string;
+  readonly jobId: string;
+  readonly page: number | null;
+  readonly view: number | null;
+  readonly onSelectView: (page: number, view: number) => void;
+  readonly onJobCreated: (jobId: string) => void;
 }
 
 export type WorkspaceCadState =
@@ -52,17 +98,19 @@ export type WorkspaceCadState =
   | 'error'
   /** По листу заданий не было. */
   | 'none'
-  | 'running'
-  | 'failed'
-  | 'recognized';
+  /** У листа есть задание. */
+  | 'ready';
 
-export interface IWorkspaceCadPanelProps {
+export interface IWorkspaceCadSideProps {
   readonly state: WorkspaceCadState;
   /** Подпись листа для подсказок. */
   readonly sheetLabel: string | null;
-  /** Куда ведёт ссылка на страницу CAD в текущем состоянии. */
-  readonly cadHref: string;
   readonly loadError: string | null;
   readonly onRetry: () => void;
-  readonly recognized: IWorkspaceCadRecognized | null;
+  readonly job: IWorkspaceCadJob | null;
+  /** Диагностика вида ещё читается. */
+  readonly viewLoading: boolean;
+  /** Отказ чтения задания или диагностики. */
+  readonly viewError: { readonly code: string; readonly text: string } | null;
+  readonly view: IWorkspaceCadView | null;
 }

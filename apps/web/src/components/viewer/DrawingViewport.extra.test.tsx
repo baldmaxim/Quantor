@@ -31,7 +31,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const mount = (extraPainter?: LayerPainter | null) =>
+const mount = (extraPainter?: LayerPainter | null, pageOpacity?: number) =>
   render(
     <DrawingViewport
       backend={null}
@@ -44,6 +44,7 @@ const mount = (extraPainter?: LayerPainter | null) =>
       camera={new Camera()}
       tool="pan"
       extraPainter={extraPainter}
+      pageOpacity={pageOpacity}
     />,
   );
 
@@ -100,5 +101,41 @@ describe('дополнительный слой DrawingViewport', () => {
     });
 
     expect(second.paint).toHaveBeenCalled();
+  });
+});
+
+describe('непрозрачность подложки PDF', () => {
+  const stackOf = () => screen.getByTestId('viewport').firstElementChild as HTMLElement;
+
+  it('по умолчанию подложка непрозрачна: свойство не ставится', () => {
+    mount();
+    expect(stackOf().style.opacity).toBe('');
+  });
+
+  it('значение ставится CSS на стопку страницы; слои наложения остаются непрозрачными', () => {
+    mount(null, 0.4);
+    expect(stackOf().style.opacity).toBe('0.4');
+    expect(screen.getByTestId('extra-layer').style.opacity).toBe('');
+    expect(screen.getByTestId('regions-layer').style.opacity).toBe('');
+  });
+
+  it('ноль скрывает подложку, единица возвращает', () => {
+    const view = mount(null, 0);
+    expect(stackOf().style.opacity).toBe('0');
+    view.rerender(
+      <DrawingViewport
+        backend={null}
+        sheet={SHEET}
+        regions={[]}
+        hiddenTypes={new Set()}
+        overlayVisible={false}
+        selectedId={null}
+        onSelect={vi.fn()}
+        camera={new Camera()}
+        tool="pan"
+        pageOpacity={1}
+      />,
+    );
+    expect(stackOf().style.opacity).toBe('');
   });
 });
