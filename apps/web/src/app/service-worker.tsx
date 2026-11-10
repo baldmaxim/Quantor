@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
 import { Button } from '@/components/ui';
+import { useAppUpdate } from '@/lib/useAppUpdate';
 
 /**
- * Регистрация service worker и предложение обновиться.
+ * Тост «Доступна новая версия портала». Логика — в useAppUpdate.
  *
  * Обновление не применяется молча: пользователь может в этот момент грузить
  * пятидесятимегабайтный пакет, и подмена кода под работающей вкладкой оборвала бы
@@ -15,46 +14,9 @@ import { Button } from '@/components/ui';
  */
 
 export const ServiceWorkerBridge = () => {
-  const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const { visible, dismiss, apply } = useAppUpdate();
 
-  useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') return;
-    if (!('serviceWorker' in navigator)) return;
-
-    let cancelled = false;
-
-    const watch = (registration: ServiceWorkerRegistration) => {
-      if (registration.waiting) setWaiting(registration.waiting);
-
-      registration.addEventListener('updatefound', () => {
-        const installing = registration.installing;
-        if (!installing) return;
-
-        installing.addEventListener('statechange', () => {
-          // Установился при уже работающем worker'е — значит, это новая версия.
-          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-            setWaiting(installing);
-          }
-        });
-      });
-    };
-
-    void navigator.serviceWorker
-      .register('/sw.js')
-      .then((registration) => {
-        if (!cancelled) watch(registration);
-      })
-      .catch(() => {
-        /* без service worker портал работает так же, просто без офлайн-страницы */
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!waiting || dismissed) return null;
+  if (!visible) return null;
 
   return (
     <div
@@ -66,14 +28,8 @@ export const ServiceWorkerBridge = () => {
       <p className="min-w-0 flex-1 text-sm">Доступна новая версия портала</p>
       {/* Отложить можно: обновление перезагружает страницу, а пользователь мог
           в этот момент заполнять форму. */}
-      <Button onClick={() => setDismissed(true)}>Позже</Button>
-      <Button
-        variant="primary"
-        onClick={() => {
-          waiting.postMessage('SKIP_WAITING');
-          window.location.reload();
-        }}
-      >
+      <Button onClick={dismiss}>Позже</Button>
+      <Button variant="primary" onClick={apply}>
         Обновить
       </Button>
     </div>
