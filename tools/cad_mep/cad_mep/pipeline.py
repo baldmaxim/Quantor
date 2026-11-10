@@ -11,12 +11,25 @@ from pathlib import Path
 import shapely
 from shapely.geometry import Polygon
 
-from cad_mep import candidate, checks, dxfin, dxfout, elevations, pdfsrc, rooms, route
+from cad_mep import (
+    assign,
+    candidate,
+    checks,
+    dxfin,
+    dxfout,
+    elevations,
+    facade,
+    pdfsrc,
+    rooms,
+    route,
+)
 from cad_mep import frame as frame_mod
 from cad_mep import labels as labels_mod
 from cad_mep.errors import EXIT_NO_ROUTES, MepError
+from cad_mep.issues import Issue
 from cad_mep.params import load_params
-from cad_mep.systems import Issue, Planner
+from cad_mep.raster import raster_polys
+from cad_mep.systems import Planner
 from cad_mep.version import GENERATOR_VERSION
 
 HEIGHT_MIN_MM = 2000
@@ -128,9 +141,8 @@ def generate(args: Args) -> dict[str, object]:
 
     page = pdfsrc.read_page(args.pdf, args.page_index, params)
     view_doc = dxfin.read_dxf(args.view_dxf)
-    base_frame, tie = frame_mod.find_frame(
-        page.vertices, dxfin.wall_points(view_doc, params), scale, params
-    )
+    tie_points, tie_by_name = dxfin.wall_points(view_doc, params)
+    base_frame, tie = frame_mod.find_frame(page.vertices, tie_points, scale, params)
 
     # локальная система растров: рамка плана с запасом, кратная шагу сетки трассировки
     align = params.num("grid_route_mm")
@@ -174,23 +186,40 @@ def generate(args: Args) -> dict[str, object]:
     model = rooms.build(wall_polys, lab, doors, bbox_local, extent, params)
     rooms.door_links(model, doors)
     rooms.build_apartments(model, lab, params)
-    rooms.classify_shafts(model, params)
     if not model.apts:
         raise MepError(
             "no_apartments", "квартиры на плане не найдены (нет марок помещений)", EXIT_NO_ROUTES
         )
+    assigned = assign.by_area(model, lab, params, (fx0, fy0))
+    rooms.classify_shafts(model, params)
     rg = route.build_grid(model, doors, params)
-    res = Planner(model, lab, doors, rg, params, float(floor_elevation), float(floor_height)).run()
+    # простенки фасада: заливки стен PDF и штриховки сплошных конструкций DXF вида
+    piers = dxfin.hatch_polys(view_doc, set(params.texts("dxf_pier_layers")), (fx0, fy0))
+    prof = facade.build_profile(model, model.walls | raster_polys(model.gr, piers), params)
+    planner = Planner(
+        model, lab, doors, rg, params, float(floor_elevation), float(floor_height), prof
+    )
+    res = planner.run()
+    res.issues[:0] = assigned
     # без стояков, питающих квартиры, остаются лишь лучи внутри квартир — это не результат
     if not any(ln.kind == "leadin" for ln in res.lines):
         reasons = "; ".join(i.message for i in res.issues[:5])
         raise MepError("routes_not_built", f"трассы не построены: {reasons}", EXIT_NO_ROUTES)
     res.issues.extend(Issue(code, message) for code, message in resolved.issues)
+    if not tie_by_name:
+        res.issues.append(
+            Issue(
+                "dxf_wall_layers_unknown",
+                "в DXF вида нет слоёв контуров стен из параметров (dxf_wall_layers): привязка "
+                "выполнена по всем полилиниям DXF, подложка A-WALL может быть неполной",
+            )
+        )
     if not lab.expl:
         res.issues.append(
             Issue(
                 "no_explication",
-                "экспликация на листе не найдена: нет сверки площадей и приборов отопления",
+                "экспликация на листе не найдена: нет сверки площадей, отапливаемые комнаты "
+                "приняты по наружному остеклению",
             )
         )
 
@@ -204,6 +233,16 @@ def generate(args: Args) -> dict[str, object]:
                     f"первая (мм DXF): {info['first_dxf_mm']}",
                 )
             )
+    beams = checks.beam_trees(model, res)
+    if not beams["passed"]:
+        res.issues.append(
+            Issue(
+                "heat_beam_loops",
+                f"лучи отопления не дерево: петли {beams['loops_area_m2']} м², квартиры "
+                f"{beams['apartments_not_tree']}, точек в чужих квартирах "
+                f"{beams['points_in_other_apartments']}",
+            )
+        )
     folder = args.out / "views" / args.view_folder
     folder.mkdir(parents=True, exist_ok=True)
     dxf_path = folder / "mep_routes.dxf"
@@ -249,6 +288,7 @@ def generate(args: Args) -> dict[str, object]:
         res,
         crossings,
         dxf_info,
+        beams,
     )
     _dump(folder / "preview.json", preview)
     _dump(folder / "candidate.json", cand)

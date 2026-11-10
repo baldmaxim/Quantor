@@ -2,7 +2,8 @@
 
 Здание 24 x 12 м: сквозной коридор шириной 1,88 м, по две квартиры (спальня, прихожая, кухня)
 с каждой стороны, шахты ОВ/ВК и шкафы ПК на стене коридора, канализационная шахта ВК в квартире.
-Данные придуманы, к чертежам заказчика отношения не имеют.
+Продольные фасады — остекление между простенками с шагом 3 м (по два модуля на комнату), торцы —
+глухие стены. Данные придуманы, к чертежам заказчика отношения не имеют.
 """
 
 from __future__ import annotations
@@ -47,6 +48,8 @@ class Floor:
     # подписи: (текст, x, y) в мм здания
     labels: list[tuple[str, float, float]] = field(default_factory=list)
     shaft_inner: list[Rect] = field(default_factory=list)
+    # экспликация: (марка, название, площадь)
+    expl: list[tuple[str, str, float]] = field(default_factory=list)
 
 
 def _hwall(floor: Floor, y: float, x0: float, x1: float, gaps: list[tuple[float, float]]) -> None:
@@ -97,10 +100,61 @@ def _shaft(
     )
 
 
-def build_floor(with_shafts: bool = True) -> Floor:
+PIER_STEP = 3000.0  # шаг простенков продольного фасада
+PIER_HALF = 300.0
+CORNER = 800.0  # угловой простенок
+FRAME = 40.0  # рама остекления: тонкая заливка у наружной грани
+
+
+def _facade(f: Floor, y0: float, y1: float, glazing: bool) -> None:
+    """Продольная наружная стена: сплошная либо простенки с остеклением между ними."""
+    if not glazing:
+        f.walls.append((0, y0, W, y1))
+        return
+    edges = [0.0, CORNER]  # угловой простенок, затем простенки по шагу
+    x = PIER_STEP
+    while x < W:
+        edges += [x - PIER_HALF, x + PIER_HALF]
+        x += PIER_STEP
+    edges += [W - CORNER, W]
+    for a, b in zip(edges[::2], edges[1::2], strict=True):
+        f.walls.append((a, y0, b, y1))
+    outer = y0 if y0 == 0 else y1 - FRAME
+    for a, b in zip(edges[1:-1:2], edges[2::2], strict=True):
+        f.walls.append((a, outer, b, outer + FRAME))
+
+
+def glazing_spans() -> list[tuple[float, float]]:
+    """Участки остекления продольного фасада по x (между простенками)."""
+    spans = [(CORNER, PIER_STEP - PIER_HALF)]
+    x = PIER_STEP
+    while x + PIER_STEP < W:
+        spans.append((x + PIER_HALF, x + PIER_STEP - PIER_HALF))
+        x += PIER_STEP
+    spans.append((x + PIER_HALF, W - CORNER))
+    return spans
+
+
+def apartment_no(flip_x: bool, flip_y: bool) -> int:
+    """Квартиры: 1 — юго-запад, 2 — юго-восток, 3 — северо-запад, 4 — северо-восток."""
+    return 1 + int(flip_x) + 2 * int(flip_y)
+
+
+def build_floor(
+    with_shafts: bool = True,
+    glazing: bool = True,
+    hall: bool = False,
+    open_kitchen: int | None = None,
+    closed_bedroom: int | None = None,
+) -> Floor:
+    """Этаж; варианты: hall — лифтовой холл в западном торце коридора за дверью;
+    open_kitchen — квартира без стены между прихожей и кухней; closed_bedroom — квартира, у
+    спальни которой нет двери."""
     f = Floor()
-    # наружные стены
-    f.walls += [(0, 0, W, 500), (0, H - 500, W, H), (0, 0, 500, H), (W - 500, 0, W, H)]
+    # наружные стены: продольные (юг, север) и глухие торцы
+    _facade(f, 0, 500, glazing)
+    _facade(f, H - 500, H, glazing)
+    f.walls += [(0, 0, 500, H), (W - 500, 0, W, H)]
     # стены коридора (с проёмами входных дверей)
     gaps = [(8550.0, 9450.0), (mx(9450.0), mx(8550.0))]
     _hwall(f, 5000, 500, W - 500, gaps)
@@ -113,16 +167,21 @@ def build_floor(with_shafts: bool = True) -> Floor:
         for flip_y in (False, True):
             fx = mx if flip_x else (lambda v: v)
             fy = my if flip_y else (lambda v: v)
+            k = apartment_no(flip_x, flip_y)
             x_part = fx(6000.0)
             y_lo, y_hi = (500.0, 4940.0) if not flip_y else (my(4940.0), my(500.0))
             door_y = (3800.0, 4700.0)
             gy = (fy(door_y[0]), fy(door_y[1]))
-            _vwall(f, x_part, y_lo, y_hi, [(min(gy), max(gy))])
-            hx0, hx1 = (6060.0, 11940.0) if not flip_x else (mx(11940.0), mx(6060.0))
-            gx = (fx(8550.0), fx(9450.0))
-            _hwall(f, fy(3000.0), hx0, hx1, [(min(gx), max(gx))])
-            f.doors.append(Door((x_part, fy(door_y[0])), (x_part, fy(door_y[1]))))
-            f.doors.append(Door((fx(8550.0), fy(3000.0)), (fx(9450.0), fy(3000.0))))
+            if k == closed_bedroom:
+                _vwall(f, x_part, y_lo, y_hi, [])
+            else:
+                _vwall(f, x_part, y_lo, y_hi, [(min(gy), max(gy))])
+                f.doors.append(Door((x_part, fy(door_y[0])), (x_part, fy(door_y[1]))))
+            if k != open_kitchen:
+                hx0, hx1 = (6060.0, 11940.0) if not flip_x else (mx(11940.0), mx(6060.0))
+                gx = (fx(8550.0), fx(9450.0))
+                _hwall(f, fy(3000.0), hx0, hx1, [(min(gx), max(gx))])
+                f.doors.append(Door((fx(8550.0), fy(3000.0)), (fx(9450.0), fy(3000.0))))
             f.doors.append(Door((fx(8550.0), fy(5000.0)), (fx(9450.0), fy(5000.0))))
     if with_shafts:
         # ОВ и ПК — на северной стене коридора, ВК и ПК рядом с ним — на южной; короб выступает
@@ -132,8 +191,8 @@ def build_floor(with_shafts: bool = True) -> Floor:
         for x0, x1 in ((12300.0, 13300.0), (13000.0, 14000.0)):
             _shaft(f, x0, 5060, x1, 5460, sides="WEN", t_we=300)
             f.walls.append((x0, 4740, x1, 4940))  # утолщение стены со стороны квартиры
-        # канализационный стояк в кухне юго-западной квартиры (стена снизу — наружная)
-        _shaft(f, 10800, 500, 11400, 1100, sides="WEN")
+        # канализационный стояк в кухне юго-западной квартиры, у остекления фасада
+        _shaft(f, 10800, 500, 11400, 1100)
         for text, (x0, y0, x1, y1) in zip(
             ["ОВ", "ПК", "ОВ", "ВК", "ПК", "ВК"], f.shaft_inner, strict=True
         ):
@@ -148,12 +207,27 @@ def build_floor(with_shafts: bool = True) -> Floor:
     for k, pts in marks.items():
         for n, (x, y) in enumerate(pts, start=1):
             f.labels.append((f"1-{k}/{n}", x, y))
+            f.expl.append((f"1-{k}/{n}", EXPL_NAMES[n], EXPL_AREAS[n]))
     f.labels.append(("1-0.1", 7000.0, 6000.0))
+    if hall:
+        # лифтовой холл: западный торец коридора за стеной с дверью
+        _vwall(f, HALL_X, 5060, 6940, [(5550.0, 6450.0)])
+        f.doors.append(Door((HALL_X, 5550.0), (HALL_X, 6450.0)))
+        f.labels.append(("1-0.2", 1000.0, 5700.0))
+        f.expl += [("1-0.1", "Коридор", 37.0), ("1-0.2", "Лифтовой холл", 4.2)]
+    else:
+        f.expl.append(("1-0.1", "Коридор", 41.3))
     return f
+
+
+def drop_labels(floor: Floor, ids: set[str]) -> None:
+    """Убрать марки с плана; в экспликации комнаты остаются."""
+    floor.labels = [lab for lab in floor.labels if lab[0] not in ids]
 
 
 EXPL_NAMES = {1: "Спальня", 2: "Прихожая", 3: "Кухня"}
 EXPL_AREAS = {1: 24.15, 2: 11.05, 3: 14.35}
+HALL_X = 3000.0
 
 
 def _pt(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -209,15 +283,11 @@ def write_pdf(
         _text(tw, elevation_text, px, py)
     # экспликация правее плана
     y = 60.0
-    for k in range(1, 5):
-        for n in (1, 2, 3):
-            _text(tw, f"1-{k}/{n}", 450, y)
-            _text(tw, EXPL_NAMES[n], 500, y)
-            _text(tw, f"{EXPL_AREAS[n]:.2f}".replace(".", ","), 580, y)
-            y += 10.0
-    _text(tw, "1-0.1", 450, y)
-    _text(tw, "Коридор", 500, y)
-    _text(tw, "41,30", 580, y)
+    for room_id, name, area in floor.expl:
+        _text(tw, room_id, 450, y)
+        _text(tw, name, 500, y)
+        _text(tw, f"{area:.2f}".replace(".", ","), 580, y)
+        y += 10.0
     tw.write_text(page)
     for title in neighbor_titles:
         other = doc.new_page(width=900, height=500)
@@ -228,16 +298,20 @@ def write_pdf(
     doc.close()
 
 
-def write_view_dxf(floor: Floor, path: Path) -> None:
+WALL_LAYER = "01_КОНТУРЫ_СТЕН"  # движок до 2026.11.10
+WALL_LAYER_AUX = "AUX_КОНТУРЫ_СТЕН"  # движок с 2026.11.10
+
+
+def write_view_dxf(floor: Floor, path: Path, wall_layer: str = WALL_LAYER) -> None:
     doc = new_dxf("R2018")
     doc.units = 4
-    doc.layers.new("01_КОНТУРЫ_СТЕН")
+    doc.layers.new(wall_layer)
     doc.layers.new("03_ДВЕРИ_БЛОКИ")
     msp = doc.modelspace()
     sx, sy = SHIFT
     for x0, y0, x1, y1 in floor.walls:
         pts = [(x0 + sx, y0 + sy), (x1 + sx, y0 + sy), (x1 + sx, y1 + sy), (x0 + sx, y1 + sy)]
-        msp.add_lwpolyline(pts, close=True, dxfattribs={"layer": "01_КОНТУРЫ_СТЕН"})
+        msp.add_lwpolyline(pts, close=True, dxfattribs={"layer": wall_layer})
     for i, d in enumerate(floor.doors):
         name = f"AR_DOOR_BLOCK_{i:03d}"
         blk = doc.blocks.new(name)
@@ -262,11 +336,12 @@ def write_inputs(
     folder: Path,
     elevation_text: str | None = PLAN_TITLE,
     neighbor_titles: tuple[str, ...] = NEIGHBOR_TITLES,
+    wall_layer: str = WALL_LAYER,
 ) -> dict[str, Path]:
     folder.mkdir(parents=True, exist_ok=True)
     pdf, dxf = folder / "floor.pdf", folder / "plan_candidates.dxf"
     write_pdf(floor, pdf, elevation_text, neighbor_titles)
-    write_view_dxf(floor, dxf)
+    write_view_dxf(floor, dxf, wall_layer)
     scale = folder / "scale.json"
     scale.write_text(
         json.dumps({"status": "passed", "scale_used_for_geometry": SCALE}), encoding="utf-8"
@@ -279,7 +354,7 @@ def write_inputs(
                 "schema": "quantor.cad_engine.preview.v1",
                 "units": "mm",
                 "bbox": bbox,
-                "layers": ["01_КОНТУРЫ_СТЕН"],
+                "layers": [wall_layer],
                 "paths": [],
                 "points": 0,
                 "flatten_mm": 5.0,

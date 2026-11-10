@@ -58,6 +58,7 @@ def build_candidate(
     res: Result,
     crossings: dict[str, dict[str, object]],
     dxf_info: dict[str, int],
+    beams: JsonObj,
 ) -> JsonObj:
     dx, dy = frame.x0, frame.y0
 
@@ -65,9 +66,12 @@ def build_candidate(
         return [round(p[0] + dx), round(p[1] + dy)]
 
     comp_ids: dict[str, list[int]] = defaultdict(list)
+    by_area: set[str] = set()
     for c in m.comps.values():
         for rl in c.room_labels:
             comp_ids[rl.room_id].append(c.id)
+            if rl.assigned:
+                by_area.add(rl.room_id)
     rooms_out: list[object] = []
     for rid, e in labels.expl.items():
         cids = sorted(set(comp_ids.get(rid, [])))
@@ -77,6 +81,8 @@ def build_candidate(
             "expl_area_m2": e.area_m2,
             "plan_labels": sum(1 for rl in labels.rooms if rl.room_id == rid),
             "comp": cids[0] if cids else None,
+            # марки на плане нет: помещение найдено по остатку площади
+            "assigned_by_area": rid in by_area,
         }
         if cids:
             c = m.comps[cids[0]]
@@ -104,17 +110,35 @@ def build_candidate(
         if mm and mm.group(3) == "/":
             exp_by_k[(mm.group(1), int(mm.group(2)))] += r.area_m2
 
-    heat_by_apt: dict[int, list[object]] = defaultdict(list)
+    heat_rooms: dict[int, list[JsonObj]] = defaultdict(list)
+    heat_devices: dict[int, list[object]] = defaultdict(list)
+    no_device: list[str] = []
     for h in res.heat_rooms:
-        heat_by_apt[h.apt].append(
+        heat_rooms[h.apt].append(
             {
                 "room_id": h.room_id,
                 "name": h.name,
+                "comp": h.comp,
+                "placed_by": h.placed_by,
+                "heating": h.heating,
                 "status": h.status,
-                "device_dxf_mm": dxf_xy(h.device) if h.device else None,
-                "outer_ring_len_m": h.outer_ring_len_m,
+                "facade_m": h.facade_m,
+                "devices": len(h.devices),
             }
         )
+        if not h.devices:
+            no_device.append(f"{m.apts[h.apt].number}: {h.room_id}")
+        heat_devices[h.apt] += [
+            {
+                "room_id": d.room_id,
+                "name": h.name,
+                "device_dxf_mm": dxf_xy(d.xy),
+                "glazing_m": d.span_m,
+                "modules_assumed": d.assumed,
+                "path_from_collector_m": d.path_m,
+            }
+            for d in h.devices
+        ]
     apts_out: list[object] = []
     for ap in m.apts.values():
         info = res.per_apt.get(ap.idx, {})
@@ -137,8 +161,15 @@ def build_candidate(
                 "heat": {
                     "shaft": info.get("heat_shaft"),
                     "path_shaft_to_collector_m": info.get("heat_path_to_collector_m"),
+                    # лучи — дерево от коллектора: длина осей дерева в плане
                     "beams_plan_m": info.get("heat_beams_m"),
-                    "devices": heat_by_apt.get(ap.idx, []),
+                    "heated_rooms": len(heat_rooms.get(ap.idx, [])),
+                    "rooms_with_devices": sum(
+                        1 for r in heat_rooms.get(ap.idx, []) if r["devices"]
+                    ),
+                    "devices_count": len(heat_devices.get(ap.idx, [])),
+                    "rooms": heat_rooms.get(ap.idx, []),
+                    "devices": heat_devices.get(ap.idx, []),
                 },
                 "water": {
                     "shaft": info.get("water_shaft"),
@@ -192,11 +223,15 @@ def build_candidate(
         - params.num("ceiling_below_slab_mm"),
         "meter_m": prov.floor_elevation.value_mm + params.num("z_meter_mm"),
     }
-    complete = all(
-        res.per_apt.get(a.idx, {}).get("heat_shaft")
-        and res.per_apt.get(a.idx, {}).get("water_shaft")
+    no_shaft = [
+        a.number
         for a in m.apts.values()
-    )
+        if not res.per_apt.get(a.idx, {}).get("heat_shaft")
+        or not res.per_apt.get(a.idx, {}).get("water_shaft")
+    ]
+    cover = res.fire.get("aup_coverage") if res.fire else None
+    cover_rows = [r for r in cover if isinstance(r, dict)] if isinstance(cover, list) else []
+    cover_min = params.num("aup_cover_min_share")
     checks: JsonObj = {
         "tie_pdf_to_dxf": {
             "passed": True,
@@ -217,9 +252,22 @@ def build_candidate(
             "expl_rooms_total": len(labels.expl),
             "found_on_plan": len(labels.expl) - len(missing_ids),
             "missing_ids": list(missing_ids),
+            "assigned_by_area": sorted(by_area),
             "unknown_plan_labels": list(extra_labels),
         },
-        "each_apt_has_heat_and_water": {"passed": bool(complete)},
+        # у каждой квартиры есть шахты отопления и воды и нет отапливаемой комнаты без прибора
+        "each_apt_has_heat_and_water": {
+            "passed": not no_shaft and not no_device,
+            "apartments_without_shaft": list(no_shaft),
+            "heated_rooms_without_device": list(no_device),
+        },
+        "heat_beams_are_trees": beams,
+        "aup_coverage": {
+            "passed": bool(cover_rows)
+            and all(float(str(r["covered_share"])) >= cover_min for r in cover_rows),
+            "min_share": cover_min,
+            "rooms": list(cover_rows),
+        },
         "dxf": dict(dxf_info),
     }
     provenance: JsonObj = {

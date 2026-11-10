@@ -43,6 +43,7 @@ class RoomLabel:
     section: str
     apt_index: int | None  # номер квартиры в секции; None для МОП
     mop: bool
+    assigned: bool = False  # марки на плане нет: комната отнесена к помещению по площади
 
 
 @dataclass(frozen=True)

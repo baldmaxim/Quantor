@@ -89,6 +89,7 @@ class Model:
     edist: FloatArr  # расстояние до внешнего контура здания, мм
     notes: list[str] = field(default_factory=list)
     virtual_openings: list[dict[str, object]] = field(default_factory=list)
+    orphans: list[int] = field(default_factory=list)  # помещения без марок вне квартир
 
 
 def build_hull(
@@ -318,8 +319,10 @@ def build_apartments(m: Model, labels: Labels, params: Params) -> None:
     apts: dict[int, Apartment] = {}
     n = 0
     ordered = sorted(groups, key=lambda s: min(m.comps[c].centroid[0] for c in s))
+    orphans: list[int] = []
     for comp_set in ordered:
         if not any(m.comps[c].room_labels for c in comp_set):
+            orphans += comp_set  # марок нет: к квартире отнесёт привязка по площади (assign)
             continue
         n += 1
         ks = [
@@ -338,6 +341,7 @@ def build_apartments(m: Model, labels: Labels, params: Params) -> None:
         for c in comp_set:
             m.comps[c].apt = n
     m.apts = apts
+    m.orphans = sorted(orphans)
     mop_ids = {c.id for c in m.comps.values() if c.kind == "mop"}
     for lk in m.door_links:
         for x, y in ((lk.a, lk.b), (lk.b, lk.a)):

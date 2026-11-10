@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 from ezdxf.document import Drawing
+from ezdxf.entities import Hatch, PolylinePath
 from ezdxf.entities.insert import Insert
 from ezdxf.entities.line import Line
 from ezdxf.entities.lwpolyline import LWPolyline
@@ -17,6 +18,7 @@ from numpy.typing import NDArray
 from shapely.geometry import LineString, Polygon
 
 from cad_mep.errors import MepError
+from cad_mep.frame import MIN_TIE_POINTS
 from cad_mep.params import Params
 
 Arr2 = NDArray[np.float64]
@@ -63,14 +65,41 @@ def read_dxf(path: Path) -> Drawing:
         raise MepError("dxf_unreadable", f"DXF вида не читается: {exc}") from exc
 
 
-def wall_points(doc: Drawing, params: Params) -> Arr2:
-    """Вершины контуров стен в мм DXF — для привязки к векторам PDF."""
+def wall_points(doc: Drawing, params: Params) -> tuple[Arr2, bool]:
+    """Вершины полилиний DXF (мм) для привязки к векторам PDF: (точки, слои найдены по именам).
+
+    Сначала — слои контуров стен из параметров (имена всех известных версий движка). Если таких
+    слоёв в DXF нет (движок переименовал слои), берутся все полилинии модели: геометрия DXF вида
+    получена из векторов того же PDF, а саму привязку find_frame проверяет по совпадению вершин.
+    """
     layers = set(params.texts("dxf_wall_layers"))
-    pts: list[tuple[float, float]] = []
+    named: list[tuple[float, float]] = []
+    other: list[tuple[float, float]] = []
     for e in doc.modelspace():
-        if isinstance(e, LWPolyline) and e.dxf.layer in layers:
-            pts += [(float(p[0]), float(p[1])) for p in e.get_points()]
-    return np.array(pts, dtype=np.float64).reshape(-1, 2)
+        if isinstance(e, LWPolyline):
+            target = named if e.dxf.layer in layers else other
+            target += [(float(p[0]), float(p[1])) for p in e.get_points()]
+    by_name = len(named) >= MIN_TIE_POINTS
+    pts = named if by_name else [*named, *other]
+    return np.array(pts, dtype=np.float64).reshape(-1, 2), by_name
+
+
+def hatch_polys(doc: Drawing, layers: set[str], shift: tuple[float, float]) -> list[Polygon]:
+    """Штриховки слоёв (монолит, кладка, утеплитель) многоугольниками в локальных координатах."""
+    out: list[Polygon] = []
+    for e in doc.modelspace():
+        if not isinstance(e, Hatch) or e.dxf.layer not in layers:
+            continue
+        for path in e.paths:
+            if not isinstance(path, PolylinePath) or len(path.vertices) < 3:
+                continue
+            ring = [(float(v[0]) - shift[0], float(v[1]) - shift[1]) for v in path.vertices]
+            poly = Polygon(ring)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+            if not poly.is_empty:
+                out.append(poly)
+    return out
 
 
 def _fit_circle(pts: Arr2) -> tuple[Arr2, float]:
@@ -104,7 +133,11 @@ def load_doors(doc: Drawing, params: Params, shift: tuple[float, float]) -> list
             if isinstance(x, Line):
                 leaf_pts += [(x.dxf.start.x, x.dxf.start.y), (x.dxf.end.x, x.dxf.end.y)]
         leaf = np.array(leaf_pts, dtype=np.float64).reshape(-1, 2)
-        arcs = [x for x in blk if isinstance(x, LWPolyline) and len(x) >= min_arc_pts]
+        # дуга створки — незамкнутая полилиния; у двустворчатой двери дуг две (у малой створки
+        # точек меньше), замкнутые полилинии блока — прямоугольники полотна и порога
+        arcs = [
+            x for x in blk if isinstance(x, LWPolyline) and not x.closed and len(x) >= min_arc_pts
+        ]
         for k, arc in enumerate(arcs):
             pts = np.array([(p[0], p[1]) for p in arc.get_points()], dtype=np.float64)
             c, _ = _fit_circle(pts)

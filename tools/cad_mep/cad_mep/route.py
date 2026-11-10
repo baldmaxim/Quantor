@@ -44,7 +44,15 @@ class RouteGrid:
     weight: list[float]  # вес узла
     turn: float
 
-    def node(self, x: float, y: float, r_mm: float = 600.0, only_mop: bool = False) -> int | None:
+    def node(
+        self,
+        x: float,
+        y: float,
+        r_mm: float = 600.0,
+        only_mop: bool = False,
+        comp: int | None = None,
+    ) -> int | None:
+        """Ближайший узел в радиусе; only_mop — только в МОП, comp — только в этом помещении."""
         iy, ix = int(y // self.step), int(x // self.step)
         r = int(r_mm // self.step)
         y0, y1 = max(iy - r, 0), min(iy + r + 1, self.pas.shape[0])
@@ -53,6 +61,8 @@ class RouteGrid:
         ok = sub >= 0
         if only_mop:
             ok &= self.mop[y0:y1, x0:x1]
+        if comp is not None:
+            ok &= self.comp_of[y0:y1, x0:x1] == comp
         ys, xs = np.nonzero(ok)
         if len(ys) == 0:
             return None
@@ -148,11 +158,17 @@ class Tree:
         return min(self.dist4[4 * i : 4 * i + 4])
 
 
-def spt(rg: RouteGrid, sources: Sequence[int], targets: Collection[int] | None = None) -> Tree:
+def spt(
+    rg: RouteGrid,
+    sources: Sequence[int],
+    targets: Collection[int] | None = None,
+    first: bool = False,
+) -> Tree:
     """Дейкстра по состояниям (клетка, направление): ход вперёд и поворот на 90° со штрафом.
 
     Несколько источников — одно «лесное» дерево: путь к цели идёт от ближайшего источника.
-    Обход прекращается, когда достигнуты все targets (значения в остальных клетках не итоговые).
+    Обход прекращается, когда достигнуты все targets (значения в остальных клетках не итоговые);
+    first — уже на первой достигнутой цели, то есть на ближайшей к источникам.
     """
     n = len(rg.weight)
     inf = math.inf
@@ -175,7 +191,7 @@ def spt(rg: RouteGrid, sources: Sequence[int], targets: Collection[int] | None =
         c, k = s >> 2, s & 3
         if remaining is not None and c in remaining:
             remaining.discard(c)
-            if not remaining:
+            if first or not remaining:
                 break
         nb = nbr[k][c]
         if nb >= 0:

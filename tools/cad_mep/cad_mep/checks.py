@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import math
+from itertools import pairwise
 
 from shapely.geometry import LineString
+from shapely.ops import polygonize, unary_union
 
 from cad_mep.dxfin import Door
 from cad_mep.layers import SYSTEM_OF_LAYER
@@ -61,6 +63,41 @@ def wall_crossings(
             d["lines_with_crossing"] = int(str(d["lines_with_crossing"])) + 1
             d["first_dxf_mm"] = d["first_dxf_mm"] or first
     return per_layer
+
+
+def beam_trees(m: Model, res: Result) -> dict[str, object]:
+    """Лучи отопления каждой квартиры — дерево: без петель и без захода в чужие квартиры.
+
+    Петли ищутся дважды: по осям (граф узлов сетки: рёбер на одно меньше, чем узлов) и по
+    начерченным линиям подачи и обратки (площадь замкнутых контуров).
+    """
+    not_tree: list[str] = []
+    foreign = 0
+    for ai, paths in sorted(res.beam_paths.items()):
+        nodes = {pt for path in paths for pt in path}
+        edges = {frozenset(pair) for path in paths for pair in pairwise(path)}
+        if nodes and len(edges) != len(nodes) - 1:
+            not_tree.append(m.apts[ai].number)
+        for x, y in nodes:
+            iy, ix = m.gr.ij(x, y)
+            comp = m.comps.get(int(m.lab[iy, ix])) if m.gr.inside(iy, ix) else None
+            if comp is not None and comp.apt not in (None, ai):
+                foreign += 1
+    area = 0.0
+    for ai in sorted(res.beam_paths):
+        for layer in ("M-OV-T1", "M-OV-T2"):
+            lines = [
+                LineString([(x, y) for x, y, _ in ln.pts])
+                for ln in res.lines
+                if ln.layer == layer and ln.apt == ai and len(ln.pts) > 1
+            ]
+            area += sum(face.area for face in polygonize(unary_union(lines)))
+    return {
+        "passed": not not_tree and foreign == 0 and area == 0.0,
+        "apartments_not_tree": not_tree,
+        "loops_area_m2": round(area / 1e6, 4),
+        "points_in_other_apartments": foreign,
+    }
 
 
 def lengths_by_layer(res: Result) -> dict[str, dict[str, float]]:

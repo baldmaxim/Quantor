@@ -12,6 +12,8 @@ from cad_mep.errors import MepError
 from cad_mep.params import Params
 
 Arr2 = NDArray[np.float64]
+# меньше точек — привязывать не по чему
+MIN_TIE_POINTS = 4
 
 
 @dataclass(frozen=True)
@@ -77,7 +79,7 @@ def find_frame(
     случайным точкам: ошибка меньше допуска у подавляющего большинства, иначе frame_mismatch.
     """
     limit = params.num("tie_max_err_mm")
-    if len(dxf_pts) < 4 or len(vertices_pt) < 4:
+    if len(dxf_pts) < MIN_TIE_POINTS or len(vertices_pt) < MIN_TIE_POINTS:
         raise MepError("frame_mismatch", "нет контуров стен DXF или векторов PDF для привязки")
     verts = np.unique(np.round(vertices_pt, 2), axis=0)
     bin_pt = params.num("tie_vote_bin_pt")
