@@ -10,6 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
 
 import { CadRemarkCapture } from '@/components/cad/viewer/CadRemarkCapture';
+import { CadZoneCapture } from '@/components/cad/viewer/CadZoneCapture';
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
@@ -815,6 +816,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 onError={setRenderError}
               />
               {cad.capture && <CadRemarkCapture {...cad.capture} />}
+              {cad.zoneCapture && <CadZoneCapture {...cad.zoneCapture} />}
               {draftPhase === 'complete' && draftA && draftB && sheetId && (
                 <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">
                   <ScaleDialog

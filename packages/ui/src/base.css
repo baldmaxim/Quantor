@@ -105,6 +105,11 @@
   --cad-mep-node: #5b6573;
   --cad-mep-riser: #1f2937;
 
+  /* Зоны листа (вкладка CAD): помещения квартир, МОП, двери; читаются на светлой бумаге чертежа */
+  --cad-zone-apartment: #1d5bb3;
+  --cad-zone-mop: #116b2f;
+  --cad-zone-door: #b45309;
+
   /* --- вспомогательное --- */
   --tooltip-bg: #2b323b;
   --tooltip-text: #ffffff;
@@ -252,6 +257,9 @@
     --cad-mep-vk-k1: #775dde;
     --cad-mep-node: #7a8594;
     --cad-mep-riser: #5d6877;
+    --cad-zone-apartment: #2b71d3;
+    --cad-zone-mop: #1b843e;
+    --cad-zone-door: #c26a14;
 
     --tooltip-bg: #c8d2de;
     --tooltip-text: #0f141a;
@@ -329,6 +337,9 @@
   --cad-mep-vk-k1: #775dde;
   --cad-mep-node: #7a8594;
   --cad-mep-riser: #5d6877;
+  --cad-zone-apartment: #2b71d3;
+  --cad-zone-mop: #1b843e;
+  --cad-zone-door: #c26a14;
 
   --tooltip-bg: #c8d2de;
   --tooltip-text: #0f141a;

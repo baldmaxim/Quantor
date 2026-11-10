@@ -157,6 +157,13 @@ class ErrorCode(StrEnum):
     CAD_VIEW_NOT_APPROVED = "CAD_VIEW_NOT_APPROVED"
     CAD_ROUTES_NOT_ACCEPTED = "CAD_ROUTES_NOT_ACCEPTED"
     CAD_MEP_NOT_BUILT = "CAD_MEP_NOT_BUILT"
+    # Отзыв решений и отметки этажа из документации (ADR-0036 п. 8).
+    CAD_ALREADY_REVOKED = "CAD_ALREADY_REVOKED"
+    CAD_ROUTES_ACCEPTED = "CAD_ROUTES_ACCEPTED"
+    CAD_VIEW_APPROVAL_REVOKED = "CAD_VIEW_APPROVAL_REVOKED"
+    CAD_ELEVATION_NOT_FOUND = "CAD_ELEVATION_NOT_FOUND"
+    CAD_FLOOR_HEIGHT_NOT_FOUND = "CAD_FLOOR_HEIGHT_NOT_FOUND"
+    CAD_RECOMPUTE_SAME_PARAMS = "CAD_RECOMPUTE_SAME_PARAMS"
 
     # --- поставщики моделей ---
     MODEL_PROVIDER_NOT_CONFIGURED = "MODEL_PROVIDER_NOT_CONFIGURED"
@@ -299,6 +306,18 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_VIEW_NOT_APPROVED: "Вид не одобрен для построения трасс",
     ErrorCode.CAD_ROUTES_NOT_ACCEPTED: "Трассы не приняты: DXF трасс недоступен",
     ErrorCode.CAD_MEP_NOT_BUILT: "Генератор не построил трассы",
+    ErrorCode.CAD_ALREADY_REVOKED: "Решение уже отозвано",
+    ErrorCode.CAD_ROUTES_ACCEPTED: "По этому одобрению приняты трассы: сначала отзовите принятие",
+    ErrorCode.CAD_VIEW_APPROVAL_REVOKED: "Одобрение вида отозвано",
+    ErrorCode.CAD_ELEVATION_NOT_FOUND: (
+        "Отметка пола не найдена в документации: введите её вручную"
+    ),
+    ErrorCode.CAD_FLOOR_HEIGHT_NOT_FOUND: (
+        "Высота этажа не определена по документации: введите её вручную"
+    ),
+    ErrorCode.CAD_RECOMPUTE_SAME_PARAMS: (
+        "Пересчёт с теми же отметкой и высотой даст тот же результат"
+    ),
     ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
     ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: "Поставщик моделей не настроен",
@@ -439,6 +458,12 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_VIEW_NOT_APPROVED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_ROUTES_NOT_ACCEPTED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_MEP_NOT_BUILT: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_ALREADY_REVOKED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_ROUTES_ACCEPTED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_VIEW_APPROVAL_REVOKED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_ELEVATION_NOT_FOUND: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_FLOOR_HEIGHT_NOT_FOUND: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_RECOMPUTE_SAME_PARAMS: status.HTTP_409_CONFLICT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: status.HTTP_409_CONFLICT,

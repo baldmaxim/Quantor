@@ -5,7 +5,7 @@ import type { ICadPaintData } from './cad-painter';
 import type { ICadFrame } from './frame';
 import { withMepLayersHidden } from './mep-layers';
 import { mergeRoutePaint } from './mep-routes';
-import { isRouteJob, routeJobLabel } from './mep-jobs';
+import { dedupeRouteJobs, isRouteJob, routeJobLabel } from './mep-jobs';
 import { latestSheetJobs } from './sheet-results';
 
 const frame: ICadFrame = { originX: 0, originY: 100, mmPerPt: 10 };
@@ -99,5 +99,25 @@ describe('route-задания в списках', () => {
     ]);
     expect(results.get(3)?.jobId).toBe('convert');
     expect(results.get(3)?.kind).toBe('recognized');
+  });
+});
+
+describe('список заданий без дублей трасс', () => {
+  const job = (id: string, type: 'cad_pdf_convert' | 'cad_mep_route', view: number | null) => ({
+    job_id: id,
+    job_type: type,
+    parent_job_id: type === 'cad_mep_route' ? 'parent' : null,
+    page_index: 0,
+    view,
+  });
+
+  it('одно route-задание на вид (новое сверху), преобразования не трогаются', () => {
+    const items = [
+      job('r2', 'cad_mep_route', 1),
+      job('c1', 'cad_pdf_convert', null),
+      job('r1', 'cad_mep_route', 1),
+      job('r3', 'cad_mep_route', 2),
+    ];
+    expect(dedupeRouteJobs(items).map((item) => item.job_id)).toEqual(['r2', 'c1', 'r3']);
   });
 });

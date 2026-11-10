@@ -5,6 +5,8 @@ import {
   approveCadView,
   createCadMepRoutes,
   downloadCadArtifact,
+  recomputeCadMepRoutes,
+  revokeCadDecision,
   type CadDecisionRead,
   type CadJobRead,
 } from '@quantor/api-client';
@@ -27,7 +29,8 @@ import { cadViewKeys, type ICadViewParams } from './view-queries';
 
 /**
  * Решения человека и трассы механики (ADR-0036 п. 8): одобрить вид, построить трассы, принять их
- * этаж целиком; `candidate.json` route-задания. Запросы идут через клиент из OpenAPI.
+ * этаж целиком, отозвать решение, пересчитать трассы новой попыткой; `candidate.json`
+ * route-задания. Запросы идут через клиент из OpenAPI.
  */
 
 /** Ошибка разбора `candidate.json`: файл есть, но форма не та. */
@@ -72,12 +75,18 @@ export const useApproveCadView = (
   });
 };
 
-interface IBuildInput {
-  readonly floorElevationMm: number;
-  readonly floorHeightMm: number;
+/** Отметка пола и высота этажа: `null` - определить по документации. */
+export interface IFloorInput {
+  readonly floorElevationMm: number | null;
+  readonly floorHeightMm: number | null;
 }
 
-/** Построить трассы по одобренному виду: возвращает поставленное route-задание. */
+type IBuildInput = IFloorInput;
+
+/**
+ * Построить трассы по одобренному виду: возвращает поставленное route-задание. Для вида, где
+ * задание по действующему одобрению уже есть, сервер возвращает его же (правят пересчётом).
+ */
 export const useBuildMepRoutes = (
   params: ICadViewParams,
 ): UseMutationResult<CadJobRead, unknown, IBuildInput> => {
@@ -96,6 +105,69 @@ export const useBuildMepRoutes = (
         }),
       ),
     onSettled: () => refresh(client, params),
+  });
+};
+
+interface IRevokeInput {
+  readonly decisionId: string;
+  readonly reason?: string;
+}
+
+/**
+ * Отозвать решение (одобрение вида или принятие трасс): запись остаётся с отметкой отзыва.
+ * `params` - вид, на котором стоит решение (обновляются его списки).
+ */
+export const useRevokeCadDecision = (
+  params: ICadViewParams,
+): UseMutationResult<CadDecisionRead, unknown, IRevokeInput> => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ decisionId, reason }) =>
+      unwrap(
+        await revokeCadDecision({
+          throwOnError: true,
+          path: {
+            project_id: params.projectId,
+            revision_id: params.revisionId,
+            decision_id: decisionId,
+          },
+          body: { reason: reason?.trim() ? reason.trim() : null },
+        }),
+      ),
+    onSettled: () => {
+      refresh(client, params);
+      // Одобрение отозвано - у родителя и у route-заданий меняется состояние.
+      void client.invalidateQueries({ queryKey: ['cad-view'] });
+    },
+  });
+};
+
+/**
+ * Пересчитать трассы: новая попытка того же route-задания с другими отметкой и высотой
+ * (`null` - по документации). `params` - route-задание, его лист и вид.
+ */
+export const useRecomputeMepRoutes = (
+  params: ICadViewParams,
+): UseMutationResult<CadJobRead, unknown, IFloorInput> => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ floorElevationMm, floorHeightMm }) =>
+      unwrap(
+        await recomputeCadMepRoutes({
+          throwOnError: true,
+          path: {
+            project_id: params.projectId,
+            revision_id: params.revisionId,
+            job_id: params.jobId,
+          },
+          body: { floor_elevation_mm: floorElevationMm, floor_height_mm: floorHeightMm },
+        }),
+      ),
+    onSettled: () => {
+      refresh(client, params);
+      void client.invalidateQueries({ queryKey: ['cad-view'] });
+      void client.invalidateQueries({ queryKey: ['cad-mep'] });
+    },
   });
 };
 
@@ -121,13 +193,17 @@ export const useAcceptMepRoutes = (
   });
 };
 
-/** `candidate.json` route-задания: длины, проблемы и допущения. Результат попытки неизменяем. */
+/**
+ * `candidate.json` route-задания: длины, проблемы и допущения. Результат попытки неизменяем.
+ * `attempt` - прошлая попытка (только просмотр); без него - текущая.
+ */
 export const useCadCandidate = (
   params: ICadViewParams,
   enabled: boolean,
+  attempt?: number,
 ): UseQueryResult<MepCandidate> =>
   useQuery({
-    queryKey: ['cad-mep', 'candidate', params] as const,
+    queryKey: ['cad-mep', 'candidate', params, attempt ?? null] as const,
     enabled,
     staleTime: 5 * 60_000,
     retry: (count, error) => extractCode(error) === 'NETWORK_ERROR' && count < 2,
@@ -141,6 +217,7 @@ export const useCadCandidate = (
             job_id: params.jobId,
             name: `${viewFolder(params.pageIndex, params.view)}/candidate.json`,
           },
+          query: attempt === undefined ? undefined : { attempt },
         }),
       );
       const candidate = parseCandidate(raw);

@@ -667,6 +667,22 @@ export type CadDecisionRead = {
      */
     page_index: number;
     /**
+     * Revoke Reason
+     */
+    revoke_reason?: string | null;
+    /**
+     * Revoked At
+     */
+    revoked_at?: string | null;
+    /**
+     * Revoked By
+     */
+    revoked_by?: string | null;
+    /**
+     * Revoked By Name
+     */
+    revoked_by_name?: string | null;
+    /**
      * View
      */
     view: number;
@@ -831,6 +847,14 @@ export type CadJobListRead = {
  */
 export type CadJobRead = {
     /**
+     * Approval Id
+     */
+    approval_id?: string | null;
+    /**
+     * Approval Revoked
+     */
+    approval_revoked?: boolean;
+    /**
      * Artifacts
      */
     artifacts: Array<CadArtifactRead>;
@@ -863,13 +887,29 @@ export type CadJobRead = {
      */
     finished_at: string | null;
     /**
+     * Floor Elevation Evidence
+     */
+    floor_elevation_evidence?: string | null;
+    /**
      * Floor Elevation Mm
      */
     floor_elevation_mm: number | null;
     /**
+     * Floor Elevation Source
+     */
+    floor_elevation_source?: string | null;
+    /**
+     * Floor Height Evidence
+     */
+    floor_height_evidence?: string | null;
+    /**
      * Floor Height Mm
      */
     floor_height_mm: number | null;
+    /**
+     * Floor Height Source
+     */
+    floor_height_source?: string | null;
     /**
      * Generator Version
      */
@@ -930,6 +970,10 @@ export type CadJobRead = {
      * Revision Id
      */
     revision_id: string;
+    /**
+     * Route Attempts
+     */
+    route_attempts?: Array<CadMepAttemptRead>;
     /**
      * Server Time
      */
@@ -1001,9 +1045,73 @@ export type CadJobSummaryRead = {
 };
 
 /**
+ * CadMepAttemptRead
+ *
+ * Попытка route-задания: что запросил человек и что получилось (история расчётов).
+ */
+export type CadMepAttemptRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm: number | null;
+    /**
+     * Floor Elevation Source
+     */
+    floor_elevation_source: string | null;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number | null;
+    /**
+     * Floor Height Source
+     */
+    floor_height_source: string | null;
+    /**
+     * Requested At
+     */
+    requested_at: string | null;
+    /**
+     * Requested Elevation Mm
+     */
+    requested_elevation_mm: number | null;
+    /**
+     * Requested Height Mm
+     */
+    requested_height_mm: number | null;
+    /**
+     * Status
+     */
+    status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+};
+
+/**
+ * CadMepRecomputeCreate
+ *
+ * Пересчёт трасс новой попыткой того же задания: пусто - по документации.
+ */
+export type CadMepRecomputeCreate = {
+    /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm?: number | null;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm?: number | null;
+};
+
+/**
  * CadMepRoutesCreate
  *
- * Постановка трасс. Отметка пола и высота этажа - ввод человека, обе обязательны.
+ * Постановка трасс по одобренному виду. Попытка - та, чей результат одобрен.
  */
 export type CadMepRoutesCreate = {
     /**
@@ -1013,11 +1121,11 @@ export type CadMepRoutesCreate = {
     /**
      * Floor Elevation Mm
      */
-    floor_elevation_mm: number;
+    floor_elevation_mm?: number | null;
     /**
      * Floor Height Mm
      */
-    floor_height_mm: number;
+    floor_height_mm?: number | null;
 };
 
 /**
@@ -1384,6 +1492,18 @@ export type CadRemarksImportRead = {
 };
 
 /**
+ * CadRevokeCreate
+ *
+ * Отзыв решения; причина необязательна.
+ */
+export type CadRevokeCreate = {
+    /**
+     * Reason
+     */
+    reason?: string | null;
+};
+
+/**
  * CadRouteJobRead
  *
  * Route-задание вида в списке у родителя.
@@ -1393,6 +1513,14 @@ export type CadRouteJobRead = {
      * Accepted
      */
     accepted: boolean;
+    /**
+     * Approval Id
+     */
+    approval_id?: string | null;
+    /**
+     * Approval Revoked
+     */
+    approval_revoked?: boolean;
     /**
      * Attempt
      */
@@ -1665,6 +1793,10 @@ export type CadViewDiagnosticsRead = {
      */
     review_required: boolean;
     /**
+     * Revoked Decisions
+     */
+    revoked_decisions?: Array<CadDecisionRead>;
+    /**
      * Route Jobs
      */
     route_jobs?: Array<CadRouteJobRead>;
@@ -1708,6 +1840,10 @@ export type CadViewRead = {
      */
     failure_reason?: string | null;
     /**
+     * Revoked Decisions
+     */
+    revoked_decisions?: Array<CadDecisionRead>;
+    /**
      * Route Jobs
      */
     route_jobs?: Array<CadRouteJobRead>;
@@ -1731,6 +1867,157 @@ export type CadViewRead = {
      * View
      */
     view: number;
+};
+
+/**
+ * CadZoneCreate
+ *
+ * Новая зона. Вид-зависимые поля и топологию проверяет сервис.
+ */
+export type CadZoneCreate = {
+    /**
+     * Apartment No
+     */
+    apartment_no?: string | null;
+    /**
+     * Door Height Mm
+     */
+    door_height_mm?: number | null;
+    /**
+     * Kind
+     */
+    kind: 'room_apartment' | 'room_mop' | 'door';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Points
+     */
+    points: Array<[
+        number,
+        number
+    ]>;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Room Mark
+     */
+    room_mark?: string | null;
+};
+
+/**
+ * CadZoneRead
+ */
+export type CadZoneRead = {
+    /**
+     * Apartment No
+     */
+    apartment_no: string | null;
+    /**
+     * Area M2
+     */
+    area_m2: number | null;
+    /**
+     * Calibration Missing
+     */
+    calibration_missing: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Door Height Mm
+     */
+    door_height_mm: number | null;
+    /**
+     * Geometry Issue
+     */
+    geometry_issue: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'room_apartment' | 'room_mop' | 'door';
+    /**
+     * Name
+     */
+    name: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Perimeter M
+     */
+    perimeter_m: number | null;
+    /**
+     * Points
+     */
+    points: Array<[
+        number,
+        number
+    ]>;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Room Mark
+     */
+    room_mark: string | null;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Width M
+     */
+    width_m: number | null;
+};
+
+/**
+ * CadZoneUpdate
+ *
+ * Частичная правка: переданные поля заменяют хранимые, итог проверяется целиком.
+ */
+export type CadZoneUpdate = {
+    /**
+     * Apartment No
+     */
+    apartment_no?: string | null;
+    /**
+     * Door Height Mm
+     */
+    door_height_mm?: number | null;
+    /**
+     * Kind
+     */
+    kind?: 'room_apartment' | 'room_mop' | 'door' | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Points
+     */
+    points?: Array<[
+        number,
+        number
+    ]> | null;
+    /**
+     * Room Mark
+     */
+    room_mark?: string | null;
 };
 
 /**
@@ -12445,6 +12732,66 @@ export type ReadSessionResponses = {
 
 export type ReadSessionResponse = ReadSessionResponses[keyof ReadSessionResponses];
 
+export type DeleteCadZoneData = {
+    body?: never;
+    path: {
+        /**
+         * Zone Id
+         */
+        zone_id: string;
+    };
+    query?: never;
+    url: '/api/v1/cad/zones/{zone_id}';
+};
+
+export type DeleteCadZoneErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteCadZoneError = DeleteCadZoneErrors[keyof DeleteCadZoneErrors];
+
+export type DeleteCadZoneResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteCadZoneResponse = DeleteCadZoneResponses[keyof DeleteCadZoneResponses];
+
+export type UpdateCadZoneData = {
+    body: CadZoneUpdate;
+    path: {
+        /**
+         * Zone Id
+         */
+        zone_id: string;
+    };
+    query?: never;
+    url: '/api/v1/cad/zones/{zone_id}';
+};
+
+export type UpdateCadZoneErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateCadZoneError = UpdateCadZoneErrors[keyof UpdateCadZoneErrors];
+
+export type UpdateCadZoneResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadZoneRead;
+};
+
+export type UpdateCadZoneResponse = UpdateCadZoneResponses[keyof UpdateCadZoneResponses];
+
 export type ListCalcCalculatorsData = {
     body?: never;
     path?: never;
@@ -14817,6 +15164,77 @@ export type UpdateProjectResponses = {
 
 export type UpdateProjectResponse = UpdateProjectResponses[keyof UpdateProjectResponses];
 
+export type ListCadZonesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index?: number | null;
+    };
+    url: '/api/v1/projects/{project_id}/cad/zones';
+};
+
+export type ListCadZonesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCadZonesError = ListCadZonesErrors[keyof ListCadZonesErrors];
+
+export type ListCadZonesResponses = {
+    /**
+     * Response List Cad Zones
+     *
+     * Successful Response
+     */
+    200: Array<CadZoneRead>;
+};
+
+export type ListCadZonesResponse = ListCadZonesResponses[keyof ListCadZonesResponses];
+
+export type CreateCadZoneData = {
+    body: CadZoneCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/zones';
+};
+
+export type CreateCadZoneErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCadZoneError = CreateCadZoneErrors[keyof CreateCadZoneErrors];
+
+export type CreateCadZoneResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadZoneRead;
+};
+
+export type CreateCadZoneResponse = CreateCadZoneResponses[keyof CreateCadZoneResponses];
+
 export type ListProjectDocumentsData = {
     body?: never;
     path: {
@@ -14971,6 +15389,44 @@ export type CreateCadJobResponses = {
 
 export type CreateCadJobResponse = CreateCadJobResponses[keyof CreateCadJobResponses];
 
+export type RevokeCadDecisionData = {
+    body: CadRevokeCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Decision Id
+         */
+        decision_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/decisions/{decision_id}/revoke';
+};
+
+export type RevokeCadDecisionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RevokeCadDecisionError = RevokeCadDecisionErrors[keyof RevokeCadDecisionErrors];
+
+export type RevokeCadDecisionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadDecisionRead;
+};
+
+export type RevokeCadDecisionResponse = RevokeCadDecisionResponses[keyof RevokeCadDecisionResponses];
+
 export type ReadCadJobData = {
     body?: never;
     path: {
@@ -15067,7 +15523,12 @@ export type DownloadCadArtifactData = {
          */
         name: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Attempt
+         */
+        attempt?: number | null;
+    };
     url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/artifacts/{name}';
 };
 
@@ -15137,6 +15598,44 @@ export type ReadCadEventsResponses = {
 };
 
 export type ReadCadEventsResponse = ReadCadEventsResponses[keyof ReadCadEventsResponses];
+
+export type RecomputeCadMepRoutesData = {
+    body: CadMepRecomputeCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/recompute';
+};
+
+export type RecomputeCadMepRoutesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RecomputeCadMepRoutesError = RecomputeCadMepRoutesErrors[keyof RecomputeCadMepRoutesErrors];
+
+export type RecomputeCadMepRoutesResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadJobRead;
+};
+
+export type RecomputeCadMepRoutesResponse = RecomputeCadMepRoutesResponses[keyof RecomputeCadMepRoutesResponses];
 
 export type ListCadRemarksData = {
     body?: never;
@@ -15401,7 +15900,12 @@ export type ReadCadViewData = {
          */
         view: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Attempt
+         */
+        attempt?: number | null;
+    };
     url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}';
 };
 
@@ -15539,7 +16043,12 @@ export type ReadCadPreviewData = {
          */
         view: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Attempt
+         */
+        attempt?: number | null;
+    };
     url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/preview';
 };
 

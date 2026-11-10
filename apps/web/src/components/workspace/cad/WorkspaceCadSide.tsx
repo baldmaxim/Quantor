@@ -11,6 +11,7 @@ import { CadRemarksPanel } from '@/components/cad/viewer/CadRemarksPanel';
 import { CadScaleSection } from '@/components/cad/viewer/CadScaleSection';
 import { CadSidePanel, type ICadSideTab } from '@/components/cad/viewer/CadSidePanel';
 import { CadViewHeader } from '@/components/cad/viewer/CadViewHeader';
+import { CadZonesPanel } from '@/components/cad/viewer/CadZonesPanel';
 import { Button, ErrorState, Skeleton, SkeletonRows } from '@/components/ui';
 
 import type { IWorkspaceCadSideProps } from './types';
@@ -22,6 +23,7 @@ const HINT = 'p-[var(--s-5)] text-xs text-muted';
  * Правая панель вкладки CAD: слои, замечания, масштаб, файлы (с результатом), трассы механики и
  * задание листа рабочей области.
  *
+ * Раздел «Зоны» - разметка помещений и дверей листа - есть и у листа без задания.
  * Показано только задание открытого листа. Лист без задания получает кнопку «Преобразовать лист
  * в CAD», с идущим или упавшим заданием - только раздел «Задание» (у упавшего та же кнопка):
  * диагностики вида у него нет. Ширину и сворачивание панели ведёт каркас рабочей области.
@@ -36,6 +38,7 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
   viewLoading,
   viewError,
   view,
+  zones = null,
 }) => {
   // Раздел живёт здесь: при переходе на другой лист панель остаётся на выбранном разделе.
   const [sideTab, setSideTab] = useState('layers');
@@ -61,8 +64,12 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
     );
   }
 
+  const zonesTab: ICadSideTab | null = zones
+    ? { id: 'zones', label: 'Зоны', content: <CadZonesPanel {...zones} /> }
+    : null;
+
   if (state === 'none' || job === null) {
-    return (
+    const none = (
       <div className="flex flex-col gap-[var(--s-3)] p-[var(--s-5)]" data-testid="workspace-cad-none">
         {sheetLabel !== null && (
           <p className="text-xs text-muted">
@@ -73,6 +80,16 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
         <p className="text-xs text-muted">Запустите преобразование: результат появится здесь.</p>
         {convert && <WorkspaceCadConvert key={convert.pageIndex} {...convert} />}
       </div>
+    );
+    // Зоны размечают и лист без задания: эталон для движка нужен до преобразования.
+    if (zonesTab === null) return none;
+    return (
+      <CadSidePanel
+        label="Панель CAD"
+        tabs={[{ id: 'job', label: 'Задание', content: none }, zonesTab]}
+        active={sideTab}
+        onActiveChange={setSideTab}
+      />
     );
   }
 
@@ -153,9 +170,10 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
         ...(view.mep
           ? [{ id: 'mep', label: 'Трассы', content: <CadMepPanel {...view.mep} /> }]
           : []),
+        ...(zonesTab ? [zonesTab] : []),
         jobTab,
       ]
-    : [jobTab];
+    : [...(zonesTab ? [zonesTab] : []), jobTab];
 
   return (
     <CadSidePanel label="Панель CAD" tabs={tabs} active={sideTab} onActiveChange={setSideTab} />

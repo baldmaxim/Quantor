@@ -46,8 +46,8 @@ def _run(
     out: Path,
     *,
     page_index: int = 0,
-    elevation: int = ELEVATION,
-    height: int = HEIGHT,
+    elevation: int | None = None,
+    height: int | None = None,
     scale: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     cmd = [
@@ -68,11 +68,11 @@ def _run(
         str(out),
         "--view-folder",
         FOLDER,
-        "--floor-elevation-mm",
-        str(elevation),
-        "--floor-height-mm",
-        str(height),
     ]
+    if elevation is not None:
+        cmd += ["--floor-elevation-mm", str(elevation)]
+    if height is not None:
+        cmd += ["--floor-height-mm", str(height)]
     return subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=300)
 
 
@@ -154,7 +154,7 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
     assert candidate["schema"] == "quantor.cad_mep.candidate.v1"
     prov = candidate["provenance"]
     assert isinstance(prov, dict)
-    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v1"
+    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v2"
     assert prov["pdf_sha256"] == _sha(inputs["pdf"])
     assert prov["view_dxf_sha256"] == _sha(inputs["dxf"])
     params = load_params(None)
@@ -163,9 +163,20 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
     assert prov["approval_id"] is None
     elevation = candidate["elevation"]
     assert isinstance(elevation, dict)
-    assert elevation["floor_elevation_mm"] == {"value": ELEVATION, "source": "operator"}
-    assert elevation["floor_height_mm"] == {"value": HEIGHT, "source": "operator"}
+    # без ручного ввода: отметка - из заголовка плана, высота - по соседним этажам
+    assert elevation["floor_elevation_mm"] == {"value": ELEVATION, "source": "observed"}
+    assert elevation["floor_height_mm"] == {"value": HEIGHT, "source": "derived"}
     assert elevation["sheet_marks_mm"] == [ELEVATION]
+    assert prov["floor_elevation"] == {
+        "value_mm": ELEVATION,
+        "source": "observed",
+        "evidence": f'стр. 1: "{synth.PLAN_TITLE}"',
+    }
+    assert prov["floor_height"] == {
+        "value_mm": HEIGHT,
+        "source": "derived",
+        "evidence": "стр. 1 +47,600 → стр. 2 +50,900",
+    }
     assert candidate["issues"] == []
     assert isinstance(candidate["assumptions"], list) and candidate["assumptions"]
     routes = candidate["routes"]
@@ -224,15 +235,73 @@ def test_deterministic(
         assert _sha(run_a / name) == _sha(b / name), name
 
 
+def _candidate_of(out: Path) -> dict[str, object]:
+    data = json.loads((out / "views" / FOLDER / "candidate.json").read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    return data
+
+
 def test_elevation_mismatch_is_issue(
     inputs: dict[str, Path], tmp_path_factory: pytest.TempPathFactory
 ) -> None:
     out = tmp_path_factory.mktemp("out_elev")
     proc = _run(inputs, out, elevation=40000)
     assert proc.returncode == 0, proc.stderr
-    data = json.loads((out / "views" / FOLDER / "candidate.json").read_text(encoding="utf-8"))
-    assert [i["code"] for i in data["issues"]] == ["elevation_mismatch"]
-    assert data["elevation"]["floor_elevation_mm"]["value"] == 40000
+    data = _candidate_of(out)
+    issues = data["issues"]
+    assert isinstance(issues, list)
+    assert [i["code"] for i in issues] == ["elevation_mismatch"]
+    assert "+40,000" in issues[0]["message"] and "+47,600" in issues[0]["message"]
+    prov = data["provenance"]
+    assert isinstance(prov, dict)
+    assert prov["floor_elevation"]["source"] == "operator"
+    assert prov["floor_elevation"]["value_mm"] == 40000
+    assert prov["floor_height"]["source"] == "derived"
+
+
+def test_manual_values_equal_to_document_have_no_issues(
+    inputs: dict[str, Path], tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    out = tmp_path_factory.mktemp("out_manual")
+    proc = _run(inputs, out, elevation=ELEVATION, height=HEIGHT)
+    assert proc.returncode == 0, proc.stderr
+    data = _candidate_of(out)
+    assert data["issues"] == []
+    prov = data["provenance"]
+    assert isinstance(prov, dict)
+    assert prov["floor_height"] == {
+        "value_mm": HEIGHT,
+        "source": "operator",
+        "evidence": "введено вручную",
+    }
+
+
+def test_height_mismatch_is_issue(
+    inputs: dict[str, Path], tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    out = tmp_path_factory.mktemp("out_height")
+    proc = _run(inputs, out, height=3000)
+    assert proc.returncode == 0, proc.stderr
+    issues = _candidate_of(out)["issues"]
+    assert isinstance(issues, list)
+    assert [i["code"] for i in issues] == ["floor_height_mismatch"]
+
+
+def test_no_title_asks_for_manual_elevation(tmp_path: Path) -> None:
+    files = synth.write_inputs(synth.build_floor(), tmp_path / "in", None, ())
+    proc = _run(files, tmp_path / "out")
+    assert proc.returncode == 2
+    err = _error(proc)
+    assert err["code"] == "elevation_not_found"
+    assert "вручную" in err["message"]
+    assert not (tmp_path / "out" / "views").exists()
+    # отметку ввели, высоты в документации нет - просим высоту
+    proc = _run(files, tmp_path / "out2", elevation=ELEVATION)
+    assert proc.returncode == 2
+    assert _error(proc)["code"] == "floor_height_not_found"
+    # обе введены - документация не нужна
+    proc = _run(files, tmp_path / "out3", elevation=ELEVATION, height=HEIGHT)
+    assert proc.returncode == 0, proc.stderr
 
 
 def _error(proc: subprocess.CompletedProcess[str]) -> dict[str, str]:
@@ -243,13 +312,13 @@ def _error(proc: subprocess.CompletedProcess[str]) -> dict[str, str]:
 
 
 def test_page_out_of_range(inputs: dict[str, Path], tmp_path: Path) -> None:
-    proc = _run(inputs, tmp_path, page_index=5)
+    proc = _run(inputs, tmp_path, page_index=5, elevation=ELEVATION, height=HEIGHT)
     assert proc.returncode == 2
     assert _error(proc)["code"] == "page_out_of_range"
 
 
 def test_height_out_of_range(inputs: dict[str, Path], tmp_path: Path) -> None:
-    proc = _run(inputs, tmp_path, height=1500)
+    proc = _run(inputs, tmp_path, elevation=ELEVATION, height=1500)
     assert proc.returncode == 2
     assert _error(proc)["code"] == "height_invalid"
 
@@ -257,7 +326,7 @@ def test_height_out_of_range(inputs: dict[str, Path], tmp_path: Path) -> None:
 def test_frame_mismatch(inputs: dict[str, Path], tmp_path: Path) -> None:
     wrong = tmp_path / "scale_wrong.json"
     wrong.write_text(json.dumps({"scale_used_for_geometry": synth.SCALE * 1.04}), encoding="utf-8")
-    proc = _run(inputs, tmp_path / "out", scale=wrong)
+    proc = _run(inputs, tmp_path / "out", scale=wrong, elevation=ELEVATION, height=HEIGHT)
     assert proc.returncode == 2
     assert _error(proc)["code"] == "frame_mismatch"
 
@@ -265,7 +334,7 @@ def test_frame_mismatch(inputs: dict[str, Path], tmp_path: Path) -> None:
 def test_missing_scale_value(inputs: dict[str, Path], tmp_path: Path) -> None:
     bad = tmp_path / "scale_bad.json"
     bad.write_text(json.dumps({"status": "passed"}), encoding="utf-8")
-    proc = _run(inputs, tmp_path / "out", scale=bad)
+    proc = _run(inputs, tmp_path / "out", scale=bad, elevation=ELEVATION, height=HEIGHT)
     assert proc.returncode == 2
     assert _error(proc)["code"] == "scale_invalid"
 

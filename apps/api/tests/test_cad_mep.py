@@ -3,7 +3,9 @@
 Движок и настоящий генератор не нужны: родитель `cad_pdf_convert` выставляется прямо в базе и
 хранилище, как его оставил бы исполнитель, а генератор подменён скриптом-заглушкой, которая пишет
 файлы по CLI-контракту. Результат заглушки выбирает отметка пола: 99999 - код выхода 2, 88888 -
-код 3, 77777 - не хватает файла, остальное - успех.
+код 3, 77777 - не хватает файла, остальное - успех. Без отметки/высоты заглушка «находит» их в
+документации (47600 observed, 3300 derived); файл `not_found` рядом со скриптом с кодом внутри
+(`elevation_not_found` / `floor_height_not_found`) заставляет её отказать, как генератор.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ from app.cad_worker.mep_handler import execute_cad_mep_route
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.main import create_app
-from app.models import CadDecision, Job, Workspace
+from app.models import CadDecision, CadRemark, Job, Workspace
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
 from app.services import jobs as jobs_service
@@ -49,7 +51,16 @@ for name in ("pdf", "view_dxf", "scale", "preview", "params"):
     if not pathlib.Path(getattr(args, name)).is_file():
         print(json.dumps({"code": "input_missing", "message": name}), file=sys.stderr)
         sys.exit(2)
-elevation = int(args.floor_elevation_mm)
+auto = args.floor_elevation_mm is None or args.floor_height_mm is None
+marker = pathlib.Path(__file__).parent / "not_found"
+if auto and marker.exists():
+    print(json.dumps({"code": marker.read_text().strip(), "message": "введите значение вручную"}),
+          file=sys.stderr)
+    sys.exit(2)
+elevation = 47600 if args.floor_elevation_mm is None else int(args.floor_elevation_mm)
+height = 3300 if args.floor_height_mm is None else int(args.floor_height_mm)
+elevation_source = "observed" if args.floor_elevation_mm is None else "operator"
+height_source = "derived" if args.floor_height_mm is None else "operator"
 if elevation == 99999:
     print(json.dumps({"code": "scale_missing", "message": "Нет масштаба вида"}), file=sys.stderr)
     sys.exit(2)
@@ -67,8 +78,13 @@ folder.mkdir(parents=True)
 if elevation != 77777:
     (folder / "candidate.json").write_text(json.dumps({
         "schema": "quantor.cad_mep.candidate.v1",
-        "floor_elevation_mm": elevation, "floor_height_mm": int(args.floor_height_mm),
-        "page_index": int(args.page_index)}))
+        "floor_elevation_mm": elevation, "floor_height_mm": height,
+        "page_index": int(args.page_index),
+        "provenance": {
+            "floor_elevation": {"value_mm": elevation, "source": elevation_source,
+                                "evidence": "стр. 1: заголовок"},
+            "floor_height": {"value_mm": height, "source": height_source,
+                             "evidence": "стр. 1 -> стр. 2"}}}))
 """
 
 
@@ -167,16 +183,25 @@ async def _parent(
 APPROVAL = {"attempt": 1, "comment": "Вид проверен"}
 
 
-def _routes_body(elevation: int = 47600, height: int = 3300) -> dict[str, int]:
-    return {"attempt": 1, "floor_elevation_mm": elevation, "floor_height_mm": height}
+def _routes_body(elevation: int | None = 47600, height: int | None = 3300) -> dict[str, int]:
+    body = {"attempt": 1}
+    if elevation is not None:
+        body["floor_elevation_mm"] = elevation
+    if height is not None:
+        body["floor_height_mm"] = height
+    return body
 
 
 async def _approve_and_queue(
-    api: AsyncClient, base: str, job_id: str, elevation: int = 47600
+    api: AsyncClient,
+    base: str,
+    job_id: str,
+    elevation: int | None = 47600,
+    height: int | None = 3300,
 ) -> str:
     view = f"{base}/{job_id}/views/0/1"
     assert (await api.post(f"{view}/approval", json=APPROVAL)).status_code == 201
-    queued = await api.post(f"{view}/mep-routes", json=_routes_body(elevation))
+    queued = await api.post(f"{view}/mep-routes", json=_routes_body(elevation, height))
     assert queued.status_code == 202, queued.text
     return str(queued.json()["job_id"])
 
@@ -216,6 +241,11 @@ def test_new_routes_are_in_openapi_and_job_type_is_registered() -> None:
     assert f"{base}/views/{{page_index}}/{{view}}/approval" in paths
     assert f"{base}/views/{{page_index}}/{{view}}/mep-routes" in paths
     assert f"{base}/acceptance" in paths
+    assert f"{base}/recompute" in paths
+    assert (
+        "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/decisions/{decision_id}/revoke"
+        in paths
+    )
     assert set(HANDLERS) == {JobType.CAD_PDF_CONVERT, JobType.CAD_MEP_ROUTE}
     assert JobType.CAD_MEP_ROUTE.value == "cad_mep_route"
 
@@ -277,12 +307,11 @@ async def test_approval_gates_and_route_scheduling(
         assert refused.status_code == 409
         assert refused.json()["detail"]["code"] == "CAD_VIEW_NOT_APPROVED"
 
-        # Отметки - ввод человека, обе обязательны и в пределах.
+        # Отметки необязательны (определит генератор), но заданные - в пределах.
         for body in (
-            {"attempt": 1, "floor_elevation_mm": 1000},
-            {"attempt": 1, "floor_height_mm": 3000},
             _routes_body(height=1999),
             _routes_body(height=6001),
+            _routes_body(elevation=2_000_000),
             {**_routes_body(), "extra": 1},
         ):
             assert (await api.post(f"{view}/mep-routes", json=body)).status_code == 422, body
@@ -331,11 +360,14 @@ async def test_approval_gates_and_route_scheduling(
         assert stored.payload["params_sha256"] == cad_service.params_sha256(PARAMS)
         assert stored.payload["view_dxf_sha256"] == _sha(PARENT_DXF)
 
-        # Идемпотентность: то же одобрение, параметры, версия и отметки - то же задание.
+        # Идемпотентность: то же одобрение, параметры и версия - то же задание; другие отметки
+        # нового задания не создают (их правят пересчётом).
         again = await api.post(f"{view}/mep-routes", json=_routes_body())
         assert again.json()["job_id"] == route["job_id"]
         other = await api.post(f"{view}/mep-routes", json=_routes_body(elevation=50900))
-        assert other.status_code == 202 and other.json()["job_id"] != route["job_id"]
+        assert other.status_code == 202 and other.json()["job_id"] == route["job_id"]
+        auto = await api.post(f"{view}/mep-routes", json={"attempt": 1})
+        assert auto.json()["job_id"] == route["job_id"]
 
         # Родитель показывает одобрение и route-задания вида; список - тип и родителя.
         parent = (await api.get(f"{base}/{job_id}")).json()
@@ -343,7 +375,9 @@ async def test_approval_gates_and_route_scheduling(
         [row] = parent["pages"][0]["views"]
         assert row["approval"]["id"] == decision["id"]
         assert row["acceptance"] is None
-        assert {r["job_id"] for r in row["route_jobs"]} == {route["job_id"], other.json()["job_id"]}
+        assert [r["job_id"] for r in row["route_jobs"]] == [route["job_id"]]
+        assert row["route_jobs"][0]["approval_revoked"] is False
+        assert row["revoked_decisions"] == []
         listed = {i["job_id"]: i for i in (await api.get(base)).json()["items"]}
         assert listed[route["job_id"]]["job_type"] == "cad_mep_route"
         assert listed[route["job_id"]]["parent_job_id"] == job_id
@@ -561,3 +595,316 @@ async def test_worker_fails_closed_when_the_generator_is_not_configured(
         broken = settings.model_copy(update={"cad_mep_runner": str(tools / "нет.py")})
         job = await _run_route_worker(db_session, fake_storage, broken, route_id)
         assert job.status is JobStatus.FAILED and job.error_code == "CAD_ENGINE_UNAVAILABLE"
+
+
+# ------------------------------------------------------------------ отзыв решений
+
+
+async def test_revoking_the_approval_blocks_routes_and_allows_a_new_approval(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, job_id, base = await _parent(api, db_session, fake_storage)
+        view = f"{base}/{job_id}/views/0/1"
+        approval = (await api.post(f"{view}/approval", json=APPROVAL)).json()
+        route_id = str((await api.post(f"{view}/mep-routes", json=_routes_body())).json()["job_id"])
+
+        assert (
+            await api.post(f"{base}/decisions/{uuid.uuid4()}/revoke", json={})
+        ).status_code == 404
+        revoked = await api.post(
+            f"{base}/decisions/{approval['id']}/revoke", json={"reason": " Кликнул случайно "}
+        )
+        assert revoked.status_code == 200, revoked.text
+        body = revoked.json()
+        assert body["id"] == approval["id"] and body["revoked_at"] and body["revoked_by"]
+        assert body["revoke_reason"] == "Кликнул случайно"
+        again = await api.post(f"{base}/decisions/{approval['id']}/revoke", json={})
+        assert again.status_code == 409
+        assert again.json()["detail"]["code"] == "CAD_ALREADY_REVOKED"
+        # запись не удалена
+        assert await db_session.scalar(select(func.count()).select_from(CadDecision)) == 1
+
+        # В чтении - только действующее решение, история отдельно.
+        [row] = (await api.get(f"{base}/{job_id}")).json()["pages"][0]["views"]
+        assert row["approval"] is None
+        [old] = row["revoked_decisions"]
+        assert old["id"] == approval["id"] and old["revoke_reason"] == "Кликнул случайно"
+        assert row["route_jobs"][0]["approval_revoked"] is True
+        assert (await api.get(f"{base}/{route_id}")).json()["approval_revoked"] is True
+
+        # Без действующего одобрения трассы не строятся; поставленное задание не запускается.
+        refused = await api.post(f"{view}/mep-routes", json=_routes_body())
+        assert refused.status_code == 409
+        assert refused.json()["detail"]["code"] == "CAD_VIEW_APPROVAL_REVOKED"
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.FAILED and job.error_code == "CAD_VIEW_APPROVAL_REVOKED"
+
+        # После отзыва вид одобряется заново - новой записью; трассы - новым заданием.
+        second = await api.post(f"{view}/approval", json=APPROVAL)
+        assert second.status_code == 201 and second.json()["id"] != approval["id"]
+        [row] = (await api.get(f"{base}/{job_id}")).json()["pages"][0]["views"]
+        assert row["approval"]["id"] == second.json()["id"] and len(row["revoked_decisions"]) == 1
+        fresh = await api.post(f"{view}/mep-routes", json=_routes_body())
+        assert fresh.status_code == 202 and fresh.json()["job_id"] != route_id
+        assert await db_session.scalar(select(func.count()).select_from(CadDecision)) == 2
+
+
+async def test_acceptance_revoke_and_the_approval_it_depends_on(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    second_workspace: Workspace,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    second_id = second_workspace.id
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, job_id, base = await _parent(api, db_session, fake_storage)
+        view = f"{base}/{job_id}/views/0/1"
+        approval = (await api.post(f"{view}/approval", json=APPROVAL)).json()
+        route_id = str((await api.post(f"{view}/mep-routes", json=_routes_body())).json()["job_id"])
+        await _run_route_worker(db_session, fake_storage, settings, route_id)
+        route = f"{base}/{route_id}"
+        accepted = (await api.post(f"{route}/acceptance", json=APPROVAL)).json()
+
+        # Одобрение отзывается, только пока нет принятых трасс.
+        blocked = await api.post(f"{base}/decisions/{approval['id']}/revoke", json={})
+        assert blocked.status_code == 409
+        assert blocked.json()["detail"]["code"] == "CAD_ROUTES_ACCEPTED"
+
+        stranger = make_context(platform_admin=False, workspace_id=second_id)
+        async with build_api(stranger, settings=settings) as foreign:
+            gone = await foreign.post(f"{base}/decisions/{accepted['id']}/revoke", json={})
+            assert gone.status_code == 404
+
+        revoked = await api.post(f"{base}/decisions/{accepted['id']}/revoke", json={})
+        assert revoked.status_code == 200 and revoked.json()["kind"] == "mep_acceptance"
+        closed = await api.get(f"{route}/artifacts/{FOLDER}/mep_routes.dxf")
+        assert closed.status_code == 409
+        assert closed.json()["detail"]["code"] == "CAD_ROUTES_NOT_ACCEPTED"
+        [row] = (await api.get(route)).json()["pages"][0]["views"]
+        assert row["acceptance"] is None and len(row["revoked_decisions"]) == 1
+        [ref] = (await api.get(f"{base}/{job_id}")).json()["pages"][0]["views"][0]["route_jobs"]
+        assert ref["accepted"] is False
+
+        assert (
+            await api.post(f"{base}/decisions/{approval['id']}/revoke", json={})
+        ).status_code == 200
+        # Принять трассы по отозванному одобрению нельзя; просмотр и кандидат работают.
+        late = await api.post(f"{route}/acceptance", json=APPROVAL)
+        assert late.status_code == 409
+        assert late.json()["detail"]["code"] == "CAD_VIEW_APPROVAL_REVOKED"
+        assert (await api.get(f"{route}/artifacts/{FOLDER}/candidate.json")).status_code == 200
+        assert (await api.get(f"{route}/artifacts/{FOLDER}/preview.json")).status_code == 200
+        assert (await api.get(f"{route}/views/0/1/preview")).status_code == 200
+        assert (await api.get(f"{route}/views/0/1")).status_code == 200
+        assert (await api.get(f"{route}/remarks?attempt=1&page_index=0&view=1")).status_code == 200
+
+
+# ------------------------------------------------------------------ отметки из документации
+
+
+async def test_floor_values_come_from_the_generator_result(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, job_id, base = await _parent(api, db_session, fake_storage)
+        route_id = await _approve_and_queue(api, base, job_id, None, None)
+        queued = (await api.get(f"{base}/{route_id}")).json()
+        assert queued["floor_elevation_mm"] is None and queued["floor_height_mm"] is None
+        assert queued["floor_elevation_source"] is None
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        read = (await api.get(f"{base}/{route_id}")).json()
+        assert (read["floor_elevation_mm"], read["floor_elevation_source"]) == (47600, "observed")
+        assert (read["floor_height_mm"], read["floor_height_source"]) == (3300, "derived")
+        assert read["floor_elevation_evidence"] and read["floor_height_evidence"]
+        [attempt] = read["route_attempts"]
+        assert attempt["attempt"] == 1 and attempt["status"] == "succeeded"
+        assert attempt["requested_elevation_mm"] is None and attempt["requested_height_mm"] is None
+        assert attempt["floor_height_source"] == "derived"
+
+
+@pytest.mark.parametrize(
+    ("generator_code", "error_code"),
+    [
+        ("elevation_not_found", "CAD_ELEVATION_NOT_FOUND"),
+        ("floor_height_not_found", "CAD_FLOOR_HEIGHT_NOT_FOUND"),
+    ],
+)
+async def test_generator_without_floor_values_asks_for_manual_input(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+    generator_code: str,
+    error_code: str,
+) -> None:
+    (tools / "not_found").write_text(generator_code)
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, job_id, base = await _parent(api, db_session, fake_storage)
+        route_id = await _approve_and_queue(api, base, job_id, None, None)
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.FAILED and job.error_code == error_code
+        assert "вручную" in (job.error_message or "")
+        read = (await api.get(f"{base}/{route_id}")).json()
+        assert read["status"] == "failed" and read["error_code"] == error_code
+        [attempt] = read["route_attempts"]
+        assert attempt["status"] == "failed" and attempt["error_code"] == error_code
+
+        # Ручной ввод даёт результат: пересчёт той же попыткой задания.
+        done = await api.post(
+            f"{base}/{route_id}/recompute",
+            json={"floor_elevation_mm": 47600, "floor_height_mm": 3300},
+        )
+        assert done.status_code == 202, done.text
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+
+
+# ------------------------------------------------------------------ пересчёт трасс
+
+
+async def test_recompute_is_a_new_attempt_that_carries_open_remarks(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, job_id, base = await _parent(api, db_session, fake_storage)
+        view = f"{base}/{job_id}/views/0/1"
+        route_id = await _approve_and_queue(api, base, job_id)
+        route = f"{base}/{route_id}"
+        recompute = f"{route}/recompute"
+
+        # Пока задание в очереди - нельзя.
+        busy = await api.post(recompute, json={"floor_elevation_mm": 50900})
+        assert busy.status_code == 409
+        assert busy.json()["detail"]["code"] == "JOB_NOT_RETRYABLE"
+
+        await _run_route_worker(db_session, fake_storage, settings, route_id)
+        routes_sha = (await api.get(f"{route}/views/0/1")).json()["dxf"]["sha256"]
+        open_key, done_key = uuid.uuid4(), uuid.uuid4()
+        for key, status in ((open_key, "open"), (done_key, "resolved")):
+            url = f"{route}/remarks/{key}?attempt=1&page_index=0&view=1"
+            assert (await api.put(url, json=_remark(routes_sha, status))).status_code == 200
+
+        # Те же параметры - тот же результат.
+        same = await api.post(
+            recompute, json={"floor_elevation_mm": 47600, "floor_height_mm": 3300}
+        )
+        assert same.status_code == 409
+        assert same.json()["detail"]["code"] == "CAD_RECOMPUTE_SAME_PARAMS"
+
+        jobs_before = await db_session.scalar(select(func.count()).select_from(Job))
+        queued = await api.post(
+            recompute, json={"floor_elevation_mm": 50900, "floor_height_mm": 3300}
+        )
+        assert queued.status_code == 202, queued.text
+        body = queued.json()
+        assert body["job_id"] == route_id and body["status"] == "queued"
+        assert [a["attempt"] for a in body["route_attempts"]] == [1, 2]
+        assert [a["status"] for a in body["route_attempts"]] == ["succeeded", "queued"]
+        assert body["route_attempts"][1]["requested_elevation_mm"] == 50900
+        assert await db_session.scalar(select(func.count()).select_from(Job)) == jobs_before
+
+        # В новую попытку перешло только открытое замечание; привязка к DXF - после расчёта.
+        db_session.expire_all()
+        carried = list(
+            await db_session.scalars(
+                select(CadRemark).where(
+                    CadRemark.job_id == uuid.UUID(route_id), CadRemark.attempt == 2
+                )
+            )
+        )
+        assert [(r.remark_key, r.status, r.dxf_sha256) for r in carried] == [
+            (str(open_key), "open", None)
+        ]
+        again_busy = await api.post(recompute, json={"floor_elevation_mm": 51000})
+        assert again_busy.status_code == 409
+
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.SUCCEEDED and job.attempt == 2
+        db_session.expire_all()
+        carried = list(
+            await db_session.scalars(
+                select(CadRemark).where(
+                    CadRemark.job_id == uuid.UUID(route_id), CadRemark.attempt == 2
+                )
+            )
+        )
+        assert [r.dxf_sha256 for r in carried] == [routes_sha]
+
+        read = (await api.get(route)).json()
+        assert read["result_attempt"] == 2 and read["attempt"] == 2
+        assert (read["floor_elevation_mm"], read["floor_elevation_source"]) == (50900, "operator")
+        assert [a["status"] for a in read["route_attempts"]] == ["succeeded", "succeeded"]
+        assert read["route_attempts"][0]["floor_elevation_mm"] == 47600
+        assert any(f"/attempt-2/{FOLDER}/" in k for k in fake_storage.objects if route_id in k)
+        assert any(f"/attempt-1/{FOLDER}/" in k for k in fake_storage.objects if route_id in k)
+
+        # Прошлая попытка открывается для просмотра: файлы, превью, диагностика.
+        old = await api.get(f"{route}/artifacts/{FOLDER}/candidate.json?attempt=1")
+        assert old.status_code == 200 and old.json()["floor_elevation_mm"] == 47600
+        new = await api.get(f"{route}/artifacts/{FOLDER}/candidate.json")
+        assert new.json()["floor_elevation_mm"] == 50900
+        assert (await api.get(f"{route}/views/0/1/preview?attempt=1")).status_code == 200
+        assert (await api.get(f"{route}/views/0/1?attempt=1")).json()["attempt"] == 1
+        assert (await api.get(f"{route}/views/0/1?attempt=7")).status_code == 404
+
+        # Повторная постановка на тот же вид возвращает то же задание.
+        rebuilt = await api.post(f"{view}/mep-routes", json=_routes_body(elevation=40000))
+        assert rebuilt.json()["job_id"] == route_id and rebuilt.json()["attempt"] == 2
+
+
+async def test_recompute_refused_when_accepted_or_approval_revoked(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, job_id, base = await _parent(api, db_session, fake_storage)
+        view = f"{base}/{job_id}/views/0/1"
+        approval = (await api.post(f"{view}/approval", json=APPROVAL)).json()
+        route_id = str((await api.post(f"{view}/mep-routes", json=_routes_body())).json()["job_id"])
+        await _run_route_worker(db_session, fake_storage, settings, route_id)
+        route = f"{base}/{route_id}"
+        accepted = (await api.post(f"{route}/acceptance", json=APPROVAL)).json()
+
+        refused = await api.post(f"{route}/recompute", json={})
+        assert refused.status_code == 409
+        assert refused.json()["detail"]["code"] == "CAD_ROUTES_ACCEPTED"
+
+        await api.post(f"{base}/decisions/{accepted['id']}/revoke", json={})
+        await api.post(f"{base}/decisions/{approval['id']}/revoke", json={})
+        no_approval = await api.post(f"{route}/recompute", json={})
+        assert no_approval.status_code == 409
+        assert no_approval.json()["detail"]["code"] == "CAD_VIEW_APPROVAL_REVOKED"
+        # Только для трасс.
+        assert (await api.post(f"{base}/{job_id}/recompute", json={})).status_code == 404
+
+        # Пустое тело - «по документации»: отличается от введённых вручную значений.
+        again = await api.post(f"{view}/approval", json=APPROVAL)
+        assert again.status_code == 201
+        fresh = await api.post(f"{view}/mep-routes", json=_routes_body(None, None))
+        assert fresh.json()["job_id"] != route_id

@@ -17,6 +17,7 @@ import { CadMepRouteList } from './CadMepRouteList';
 export const CadMepPanel: FC<IWorkspaceCadMep> = ({
   parent,
   approval,
+  revokedDecisions,
   routeJobs,
   route,
   openRemarks,
@@ -29,12 +30,18 @@ export const CadMepPanel: FC<IWorkspaceCadMep> = ({
         approval={approval}
         // На трассах открытые замечания относятся к route-заданию, а вид к тому времени одобрен.
         openRemarks={route ? null : openRemarks}
+        revoked={revokedDecisions}
+        routeJobs={routeJobs}
       />
     </InspectorSection>
 
     <InspectorSection title="2. Построить трассы">
       {approval ? (
-        <CadMepBuild parent={parent} onCreated={onSelectRoute} />
+        <CadMepBuild
+          parent={parent}
+          onCreated={onSelectRoute}
+          hasRoutes={routeJobs.some((item) => item.approval_id === approval.id)}
+        />
       ) : (
         <p className="text-xs text-muted">Трассы строятся только по одобренному виду.</p>
       )}
@@ -55,7 +62,7 @@ export const CadMepPanel: FC<IWorkspaceCadMep> = ({
             Закрыть трассы
           </Button>
         )}
-        {route && <CadMepRoute route={route} openRemarks={openRemarks} />}
+        {route && <CadMepRoute route={route} parent={parent} openRemarks={openRemarks} />}
       </div>
     </InspectorSection>
   </div>

@@ -6,7 +6,7 @@ import type { FC } from 'react';
 import { ErrorState, SkeletonRows, StatusBadge, cx } from '@/components/ui';
 import { formatTime, requestedPagesLabel } from '@/lib/cad/format';
 import { useCadJobs } from '@/lib/cad/queries';
-import { isRouteJob, routeJobLabel } from '@/lib/cad/mep-jobs';
+import { dedupeRouteJobs, isRouteJob, routeJobLabel } from '@/lib/cad/mep-jobs';
 import { jobLabel, jobTone, resultInfo } from '@/lib/cad/stages';
 import { extractCode } from '@/lib/errors';
 
@@ -40,7 +40,7 @@ export const CadJobList: FC<ICadJobListProps> = ({
         <p className="text-xs text-muted">Заданий пока нет.</p>
       ) : (
         <ul className="flex flex-col rounded-[var(--radius-md)] border border-border">
-          {jobs.data.items.map((job) => (
+          {dedupeRouteJobs(jobs.data.items).map((job) => (
             <JobRow
               key={job.job_id}
               job={job}

@@ -13,7 +13,7 @@ interface ICadMepRouteListProps {
   onSelect: (jobId: string) => void;
 }
 
-/** Построенные трассы этого вида: каждая постановка - своё задание со своими отметками. */
+/** Построенные трассы этого вида: задание на каждое одобрение, попытки - внутри задания. */
 export const CadMepRouteList: FC<ICadMepRouteListProps> = ({ routeJobs, selectedId, onSelect }) => {
   if (routeJobs.length === 0) {
     return <p className="text-xs text-muted">Трассы для этого вида ещё не строились.</p>;
@@ -41,11 +41,18 @@ export const CadMepRouteList: FC<ICadMepRouteListProps> = ({ routeJobs, selected
                   Приняты
                 </StatusBadge>
               )}
+              {route.approval_revoked && (
+                <StatusBadge tone="warning" dot={false}>
+                  Одобрение вида отозвано
+                </StatusBadge>
+              )}
               {route.error_code && <span className="mono text-xs text-danger">{route.error_code}</span>}
             </span>
             <span className="text-xs text-muted [overflow-wrap:anywhere]">
-              {formatTime(route.created_at)} · пол {route.floor_elevation_mm ?? '—'} мм · этаж{' '}
-              {route.floor_height_mm ?? '—'} мм
+              {formatTime(route.created_at)}
+              {route.floor_elevation_mm !== null || route.floor_height_mm !== null
+                ? ` · запрос: пол ${route.floor_elevation_mm ?? 'по документации'} · этаж ${route.floor_height_mm ?? 'по документации'}`
+                : ' · отметки по документации'}
             </span>
           </button>
         </li>

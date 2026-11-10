@@ -7,7 +7,10 @@ import {
   elevationError,
   floorHeightError,
   mepErrorText,
+  needsManualFloor,
+  optionalMm,
   parseMm,
+  recomputeBlock,
 } from './mep-gates';
 
 const decision = { id: 'd1' } as unknown as CadDecisionRead;
@@ -23,9 +26,11 @@ describe('вводы человека', () => {
     expect(parseMm('12345678')).toBeNull();
   });
 
-  it('пустая отметка и высота - ошибка, а не умолчание', () => {
-    expect(elevationError('')).toMatch(/Введите отметку/);
-    expect(floorHeightError('  ')).toMatch(/Введите высоту/);
+  it('пустая отметка и высота - «по документации», а не ошибка', () => {
+    expect(elevationError('')).toBeNull();
+    expect(floorHeightError('  ')).toBeNull();
+    expect(optionalMm('')).toBeNull();
+    expect(optionalMm(' 3300 ')).toBe(3300);
     expect(elevationError('47600')).toBeNull();
     expect(floorHeightError('3300')).toBeNull();
   });
@@ -56,6 +61,24 @@ describe('кнопки решений', () => {
     expect(acceptBlock(null, 0)).toBeNull();
     expect(acceptBlock(null, 1)).toMatch(/открытые замечания/);
     expect(acceptBlock(decision, 0)).toBe('Трассы уже приняты.');
+    expect(acceptBlock(null, 0, true)).toMatch(/Одобрение вида отозвано/);
+  });
+
+  it('пересчёт: закрыт в работе, при принятии и отозванном одобрении', () => {
+    const ok = { status: 'succeeded', accepted: false, approvalRevoked: false };
+    expect(recomputeBlock(ok)).toBeNull();
+    expect(recomputeBlock({ ...ok, status: 'failed' })).toBeNull();
+    expect(recomputeBlock({ ...ok, status: 'running' })).toMatch(/считаются/);
+    expect(recomputeBlock({ ...ok, status: 'queued' })).toMatch(/считаются/);
+    expect(recomputeBlock({ ...ok, accepted: true })).toMatch(/отзовите принятие/);
+    expect(recomputeBlock({ ...ok, approvalRevoked: true })).toMatch(/Одобрение вида отозвано/);
+  });
+
+  it('ручной ввод нужен после отказов «не найдено в документации»', () => {
+    expect(needsManualFloor('CAD_ELEVATION_NOT_FOUND')).toBe(true);
+    expect(needsManualFloor('CAD_FLOOR_HEIGHT_NOT_FOUND')).toBe(true);
+    expect(needsManualFloor('CAD_MEP_NOT_BUILT')).toBe(false);
+    expect(needsManualFloor(null)).toBe(false);
   });
 });
 

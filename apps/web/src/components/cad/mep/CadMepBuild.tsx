@@ -3,47 +3,50 @@
 import { useState, type FC } from 'react';
 
 import { Button } from '@/components/ui';
-import { ClearableInput } from '@/components/ui/ClearableInput';
 import {
   elevationError,
   floorHeightError,
   mepErrorText,
-  parseMm,
+  optionalMm,
 } from '@/lib/cad/mep-gates';
 import { useBuildMepRoutes } from '@/lib/cad/mep-queries';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 
+import { CadMepFloorFields } from './CadMepFloorFields';
+
 interface ICadMepBuildProps {
   parent: ICadViewParams;
-  /** Задание поставлено (или найдено прежнее с теми же параметрами): открыть его. */
+  /** Задание поставлено (или найдено прежнее по этому одобрению): открыть его. */
   onCreated: (routeJobId: string) => void;
+  /** По действующему одобрению трассы уже строились: правят их пересчётом. */
+  hasRoutes?: boolean;
 }
 
-const LABEL = 'flex min-w-0 flex-col gap-[var(--s-2)] text-sm';
-
 /**
- * Шаг 2: «Построить трассы». Отметка пола и высота этажа - ввод человека, обязательные, без
- * умолчаний: генератор не подставляет их сам.
+ * Шаг 2: «Построить трассы». По умолчанию отметку пола и высоту этажа генератор определяет сам
+ * по документации (с источником и цитатой в итогах); «Задать вручную» - переопределение человека.
  */
-export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated }) => {
+export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated, hasRoutes = false }) => {
   const build = useBuildMepRoutes(parent);
+  const [manual, setManual] = useState(false);
   const [elevation, setElevation] = useState('');
   const [height, setHeight] = useState('');
   const [touched, setTouched] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const elevationProblem = elevationError(elevation);
-  const heightProblem = floorHeightError(height);
+  const elevationProblem = manual ? elevationError(elevation) : null;
+  const heightProblem = manual ? floorHeightError(height) : null;
   const valid = elevationProblem === null && heightProblem === null;
 
   const submit = () => {
     setTouched(true);
-    const floorElevationMm = parseMm(elevation);
-    const floorHeightMm = parseMm(height);
-    if (!valid || floorElevationMm === null || floorHeightMm === null || build.isPending) return;
+    if (!valid || build.isPending) return;
     setProblem(null);
     build.mutate(
-      { floorElevationMm, floorHeightMm },
+      {
+        floorElevationMm: manual ? optionalMm(elevation) : null,
+        floorHeightMm: manual ? optionalMm(height) : null,
+      },
       {
         onSuccess: (job) => onCreated(job.job_id),
         onError: (error) => setProblem(mepErrorText(error)),
@@ -61,42 +64,37 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated }) => {
         submit();
       }}
     >
-      <label className={LABEL}>
-        <span>Отметка пола, мм</span>
-        <ClearableInput
-          label="Отметка пола, мм"
-          inputMode="numeric"
-          autoComplete="off"
-          placeholder="например, 47600"
-          value={elevation}
-          onChange={(event) => setElevation(event.target.value)}
-          onClear={() => setElevation('')}
-          aria-invalid={touched && elevationProblem !== null}
+      {manual ? (
+        <CadMepFloorFields
+          elevation={elevation}
+          height={height}
+          onElevation={setElevation}
+          onHeight={setHeight}
+          elevationProblem={elevationProblem}
+          heightProblem={heightProblem}
+          showProblems={touched}
         />
-        {touched && elevationProblem && (
-          <span role="alert" className="text-xs text-danger">
-            {elevationProblem}
-          </span>
-        )}
-      </label>
-      <label className={LABEL}>
-        <span>Высота этажа, мм</span>
-        <ClearableInput
-          label="Высота этажа, мм"
-          inputMode="numeric"
-          autoComplete="off"
-          placeholder="например, 3300"
-          value={height}
-          onChange={(event) => setHeight(event.target.value)}
-          onClear={() => setHeight('')}
-          aria-invalid={touched && heightProblem !== null}
-        />
-        {touched && heightProblem && (
-          <span role="alert" className="text-xs text-danger">
-            {heightProblem}
-          </span>
-        )}
-      </label>
+      ) : (
+        <p className="text-xs text-muted">
+          Отметка и высота этажа будут определены по документации.
+        </p>
+      )}
+      <Button
+        onClick={() => {
+          setManual((value) => !value);
+          setTouched(false);
+        }}
+        className="self-start max-md:h-[44px] max-md:w-full"
+        aria-expanded={manual}
+      >
+        {manual ? 'Определить по документации' : 'Задать вручную'}
+      </Button>
+      {hasRoutes && (
+        <p className="text-xs text-muted" role="note">
+          Для этого одобрения трассы уже построены: «Построить» откроет их, а менять отметку и
+          высоту нужно кнопкой «Пересчитать» в разделе 3.
+        </p>
+      )}
       <Button
         type="submit"
         variant="primary"

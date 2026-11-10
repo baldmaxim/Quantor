@@ -28,6 +28,19 @@ vi.mock('@/lib/cad/queries', () => ({
     return { isError: false, data: mocks.jobData.current };
   },
 }));
+vi.mock('@/lib/cad/zones-queries', () => ({
+  useCadZones: () => ({
+    data: undefined,
+    isPending: false,
+    fetchStatus: 'idle',
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useCreateCadZone: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateCadZone: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteCadZone: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof ViewQueries>()),
   useCadView: (...args: unknown[]) => {

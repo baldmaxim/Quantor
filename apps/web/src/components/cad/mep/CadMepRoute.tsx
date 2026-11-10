@@ -6,18 +6,23 @@ import type { IWorkspaceCadMepRoute } from '@/components/workspace/cad/types';
 import { StatusBadge } from '@/components/ui';
 import { cadCodeText } from '@/lib/cad/errors';
 import { jobLabel, jobTone } from '@/lib/cad/stages';
+import type { ICadViewParams } from '@/lib/cad/view-queries';
 
 import { CadMepAccept } from './CadMepAccept';
 import { CadMepCandidate } from './CadMepCandidate';
+import { CadMepHistory } from './CadMepHistory';
+import { CadMepRecompute } from './CadMepRecompute';
 
 interface ICadMepRouteProps {
   route: IWorkspaceCadMepRoute;
+  /** Вид родителя: проект и ревизия для пересчёта. */
+  parent: ICadViewParams;
   /** Открытые замечания на route-задании; `null` - ещё не прочитаны. */
   openRemarks: number | null;
 }
 
 /** Выбранное route-задание: ход, отказ, итоги генератора, принятие и скачивание. */
-export const CadMepRoute: FC<ICadMepRouteProps> = ({ route, openRemarks }) => {
+export const CadMepRoute: FC<ICadMepRouteProps> = ({ route, parent, openRemarks }) => {
   const { job, params, acceptance, error } = route;
   const running = job !== null && (job.status === 'queued' || job.status === 'running');
 
@@ -50,19 +55,36 @@ export const CadMepRoute: FC<ICadMepRouteProps> = ({ route, openRemarks }) => {
               {job.error_message ? ` ${job.error_message}` : ''}
             </p>
           )}
-          <p className="text-xs text-muted">
-            Отметка пола {job.floor_elevation_mm ?? '—'} мм · высота этажа{' '}
-            {job.floor_height_mm ?? '—'} мм
-            {job.generator_version ? ` · ${job.generator_version}` : ''}
-          </p>
+          {job.generator_version && (
+            <p className="mono text-xs text-muted">{job.generator_version}</p>
+          )}
+          {job.approval_revoked && (
+            <p role="note" className="text-xs text-danger" data-testid="mep-approval-revoked">
+              Одобрение вида отозвано: принять эти трассы нельзя, просмотр доступен.
+            </p>
+          )}
         </div>
+      )}
+      {job && (
+        <CadMepRecompute
+          target={{ ...parent, jobId: route.summaryId, attempt: job.attempt }}
+          job={job}
+          accepted={acceptance !== null}
+        />
       )}
       {params && (
         <>
           <CadMepCandidate params={params} />
-          <CadMepAccept params={params} acceptance={acceptance} openRemarks={openRemarks} />
+          <CadMepAccept
+            params={params}
+            acceptance={acceptance}
+            openRemarks={openRemarks}
+            approvalRevoked={job?.approval_revoked ?? false}
+            revoked={route.revokedDecisions}
+          />
         </>
       )}
+      {job && <CadMepHistory params={params} job={job} />}
     </div>
   );
 };

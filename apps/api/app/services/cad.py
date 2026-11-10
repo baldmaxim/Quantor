@@ -249,8 +249,23 @@ def result_of(job: Job) -> dict[str, Any]:
     return result if isinstance(result, dict) else {}
 
 
-def find_artifact(job: Job, name: str) -> dict[str, Any] | None:
-    artifacts = result_of(job).get("artifacts")
+def result_for_attempt(job: Job, attempt: int) -> dict[str, Any]:
+    """Итог указанной попытки: текущий или сохранённый при пересчёте (`cad_results`).
+
+    Прошлая попытка route-задания остаётся только для просмотра; итога нет - пустой словарь.
+    """
+    result = result_of(job)
+    if result.get("attempt") == attempt:
+        return result
+    stash = job.payload.get("cad_results")
+    row = stash.get(str(attempt)) if isinstance(stash, dict) else None
+    return row if isinstance(row, dict) else {}
+
+
+def find_artifact(job: Job, name: str, attempt: int | None = None) -> dict[str, Any] | None:
+    """Файл итога: текущего или, если указана попытка, этой попытки."""
+    result = result_of(job) if attempt is None else result_for_attempt(job, attempt)
+    artifacts = result.get("artifacts")
     if not isinstance(artifacts, list):
         return None
     for item in artifacts:

@@ -5,7 +5,9 @@ import type { FC } from 'react';
 import { InspectorSection } from '@/components/ui';
 import {
   assumptionValueText,
+  floorSourceLabel,
   formatMeters,
+  isFloorMismatch,
   mepSystemLabel,
   type MepCandidate,
   MEP_SYSTEMS,
@@ -58,8 +60,32 @@ const LengthTable: FC<{
   </div>
 );
 
-const Body: FC<{ candidate: MepCandidate }> = ({ candidate }) => {
-  const { routes, apartments, issues, assumptions, notes, elevation } = candidate;
+const FloorValue: FC<{
+  title: string;
+  value: number;
+  source: string;
+  evidence: string;
+}> = ({ title, value, source, evidence }) => (
+  <li className="[overflow-wrap:anywhere]">
+    <span className="font-medium">{title}: </span>
+    {value} мм · {floorSourceLabel(source)}
+    {evidence && <span className="block text-muted">{evidence}</span>}
+  </li>
+);
+
+/** Итоги одной попытки: отметка и высота с источником, длины, проблемы, допущения. */
+export const CadMepCandidateBody: FC<{ candidate: MepCandidate }> = ({ candidate }) => {
+  const { routes, apartments, issues, assumptions, notes, elevation, provenance } = candidate;
+  const floorElevation = provenance?.floor_elevation ?? {
+    value_mm: elevation.floor_elevation_mm.value,
+    source: elevation.floor_elevation_mm.source,
+    evidence: '',
+  };
+  const floorHeight = provenance?.floor_height ?? {
+    value_mm: elevation.floor_height_mm.value,
+    source: elevation.floor_height_mm.source,
+    evidence: '',
+  };
 
   const systems = MEP_SYSTEMS.filter((item) => routes.by_system[item.key] !== undefined).map(
     (item) => ({
@@ -82,10 +108,22 @@ const Body: FC<{ candidate: MepCandidate }> = ({ candidate }) => {
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-5)]" data-testid="mep-candidate">
       <p className="text-xs text-muted">
-        Кандидат генератора: до принятия человеком в работу не идёт. Отметка пола{' '}
-        {elevation.floor_elevation_mm.value} мм, высота этажа {elevation.floor_height_mm.value} мм
-        (ввод оператора).
+        Кандидат генератора: до принятия человеком в работу не идёт.
       </p>
+      <ul className="flex flex-col gap-[var(--s-2)] text-xs" aria-label="Отметка и высота этажа">
+        <FloorValue
+          title="Отметка пола"
+          value={floorElevation.value_mm}
+          source={floorElevation.source}
+          evidence={floorElevation.evidence}
+        />
+        <FloorValue
+          title="Высота этажа"
+          value={floorHeight.value_mm}
+          source={floorHeight.source}
+          evidence={floorHeight.evidence}
+        />
+      </ul>
 
       <LengthTable
         caption="Итого по системам"
@@ -118,7 +156,11 @@ const Body: FC<{ candidate: MepCandidate }> = ({ candidate }) => {
             {issues.map((issue, index) => (
               <li
                 key={`${issue.code}-${index}`}
-                className="rounded-[var(--radius-sm)] border border-warning-soft bg-warning-soft px-[var(--s-4)] py-[var(--s-3)] text-xs [overflow-wrap:anywhere]"
+                className={
+                  isFloorMismatch(issue.code)
+                    ? 'rounded-[var(--radius-sm)] border border-danger bg-warning-soft px-[var(--s-4)] py-[var(--s-3)] text-xs font-medium [overflow-wrap:anywhere]'
+                    : 'rounded-[var(--radius-sm)] border border-warning-soft bg-warning-soft px-[var(--s-4)] py-[var(--s-3)] text-xs [overflow-wrap:anywhere]'
+                }
               >
                 <span className="mono">{issue.code}</span>
                 {issue.apartment !== null && issue.apartment !== undefined && (
@@ -179,7 +221,7 @@ export const CadMepCandidate: FC<ICadMepCandidateProps> = ({ params }) => {
             : cadViewErrorText(query.error).text}
         </p>
       ) : (
-        <Body candidate={query.data} />
+        <CadMepCandidateBody candidate={query.data} />
       )}
     </InspectorSection>
   );

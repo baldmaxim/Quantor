@@ -3,11 +3,13 @@ import type {
   CadJobRead,
   CadRouteJobRead,
   CadViewDiagnosticsRead,
+  CadZoneRead,
 } from '@quantor/api-client';
 
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
+import type { ZoneKind } from '@/lib/cad/zones';
 import type { CameraState, Viewport } from '@/lib/viewer/camera';
 
 /** Замечания вида: всё, что нужно разделу «Замечания» (тот же, что был на странице CAD). */
@@ -25,6 +27,38 @@ export interface IWorkspaceCadRemarks {
   readonly onActivate: (id: string | null) => void;
   readonly onFocusCamera: (state: CameraState) => void;
   readonly viewport: () => Viewport;
+}
+
+/** Раздел «Зоны»: помещения квартир, МОП и двери открытого листа. */
+export interface IWorkspaceCadZones {
+  readonly zones: readonly CadZoneRead[];
+  readonly loading: boolean;
+  readonly loadError: string | null;
+  readonly onReload: () => void;
+  /** Вид зоны, которую рисуют. */
+  readonly kind: ZoneKind;
+  readonly onKindChange: (kind: ZoneKind) => void;
+  readonly apartmentNo: string;
+  readonly onApartmentNoChange: (value: string) => void;
+  readonly roomMark: string;
+  readonly onRoomMarkChange: (value: string) => void;
+  /** Высота проёма двери, мм: текст поля. */
+  readonly doorHeight: string;
+  readonly onDoorHeightChange: (value: string) => void;
+  /** Режим рисования включён: поверх холста лежит слой захвата. */
+  readonly drawing: boolean;
+  /** Почему рисовать нельзя (не заполнено поле, страница не загружена); `null` - можно. */
+  readonly drawDisabledReason: string | null;
+  readonly onStartDrawing: () => void;
+  readonly onStopDrawing: () => void;
+  readonly activeId: string | null;
+  readonly onActivate: (id: string | null) => void;
+  /** Запись или удаление идёт. */
+  readonly saving: boolean;
+  /** Отказ последней операции. */
+  readonly error: string | null;
+  readonly onRename: (id: string, name: string) => void;
+  readonly onDelete: (id: string) => void;
 }
 
 /** Левая панель вкладки CAD: листы и задания ревизии рабочей области. */
@@ -98,6 +132,8 @@ export interface IWorkspaceCadMepRoute {
   readonly params: ICadViewParams | null;
   /** Принятие трасс; `null` - не приняты. */
   readonly acceptance: CadDecisionRead | null;
+  /** Отозванные принятия этого вида, старые сверху. */
+  readonly revokedDecisions: readonly CadDecisionRead[];
   /** Отказ чтения задания, вида или превью. */
   readonly error: string | null;
 }
@@ -107,6 +143,8 @@ export interface IWorkspaceCadMep {
   /** Родитель: задание преобразования, попытка с результатом, лист и вид. */
   readonly parent: ICadViewParams;
   readonly approval: CadDecisionRead | null;
+  /** Отозванные одобрения этого вида, старые сверху. */
+  readonly revokedDecisions: readonly CadDecisionRead[];
   /** Route-задания этого вида, новые сверху. */
   readonly routeJobs: readonly CadRouteJobRead[];
   readonly route: IWorkspaceCadMepRoute | null;
@@ -179,4 +217,6 @@ export interface IWorkspaceCadSideProps {
   /** Отказ чтения задания или диагностики. */
   readonly viewError: { readonly code: string; readonly text: string } | null;
   readonly view: IWorkspaceCadView | null;
+  /** Раздел «Зоны»; `null` или нет - раздела нет. */
+  readonly zones?: IWorkspaceCadZones | null;
 }

@@ -69,6 +69,19 @@ vi.mock('@/lib/cad/queries', () => ({
     data: jobId === ROUTE ? routeDetail : jobId === PARENT ? parentDetail : undefined,
   }),
 }));
+vi.mock('@/lib/cad/zones-queries', () => ({
+  useCadZones: () => ({
+    data: undefined,
+    isPending: false,
+    fetchStatus: 'idle',
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useCreateCadZone: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateCadZone: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteCadZone: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof ViewQueries>()),
   useCadView: (params: { jobId: string; attempt: number; view: number }, enabled: boolean) => {

@@ -18,10 +18,22 @@ export const CANDIDATE_SCHEMA = 'quantor.cad_mep.candidate.v1';
 const lengthSchema = z.object({ plan_m: z.number(), len3d_m: z.number() });
 const layerLengthSchema = lengthSchema.extend({ polylines: z.number().optional() });
 const sourcedSchema = z.object({ value: z.number(), source: z.string() });
+/** Отметка пола / высота этажа в происхождении: значение, источник и цитата из документации. */
+const provenanceValueSchema = z.object({
+  value_mm: z.number(),
+  source: z.string(),
+  evidence: z.string().default(''),
+});
 
 const candidateSchema = z.object({
   schema: z.literal(CANDIDATE_SCHEMA),
   status: z.string(),
+  provenance: z
+    .object({
+      floor_elevation: provenanceValueSchema.optional(),
+      floor_height: provenanceValueSchema.optional(),
+    })
+    .optional(),
   elevation: z.object({
     floor_elevation_mm: sourcedSchema,
     floor_height_mm: sourcedSchema,
@@ -71,6 +83,20 @@ export const parseCandidate = (raw: unknown): MepCandidate | null => {
   const parsed = candidateSchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
 };
+
+/** Источники отметки и высоты: подписи для человека. */
+export const FLOOR_SOURCE_LABELS: Readonly<Record<string, string>> = {
+  observed: 'из документации',
+  derived: 'по соседним этажам',
+  operator: 'введено вручную',
+};
+
+export const floorSourceLabel = (source: string | null | undefined): string =>
+  (source && FLOOR_SOURCE_LABELS[source]) || 'источник не указан';
+
+/** Замечания генератора о расхождении с документацией: показываются заметнее прочих. */
+export const isFloorMismatch = (code: string): boolean =>
+  code === 'elevation_mismatch' || code === 'floor_height_mismatch';
 
 /** Системы в порядке показа и их названия. */
 export const MEP_SYSTEMS: readonly { readonly key: string; readonly label: string }[] = [

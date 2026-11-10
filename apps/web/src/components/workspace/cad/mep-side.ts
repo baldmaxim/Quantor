@@ -70,6 +70,7 @@ export const mepOf = ({
   return {
     parent,
     approval: diagnostics.approval ?? null,
+    revokedDecisions: diagnostics.revoked_decisions ?? [],
     routeJobs: diagnostics.route_jobs ?? [],
     route: routeSummary
       ? {
@@ -77,6 +78,7 @@ export const mepOf = ({
           job: routes.job,
           params: routes.params,
           acceptance: routes.diagnostics?.acceptance ?? null,
+          revokedDecisions: routes.diagnostics?.revoked_decisions ?? [],
           error: routes.error,
         }
       : null,

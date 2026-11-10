@@ -27,13 +27,16 @@ vi.mock('./WorkspaceCadConvert', () => ({
 vi.mock('@/components/cad/viewer/CadRemarksPanel', () => ({
   CadRemarksPanel: () => <p>панель замечаний</p>,
 }));
+vi.mock('@/components/cad/viewer/CadZonesPanel', () => ({
+  CadZonesPanel: () => <p>панель зон</p>,
+}));
 vi.mock('@/components/cad/viewer/CadFilesSection', () => ({
   CadFilesSection: () => <p>панель файлов</p>,
 }));
 
 import type { CadJobRead } from '@quantor/api-client';
 
-import type { IWorkspaceCadSideProps } from './types';
+import type { IWorkspaceCadSideProps, IWorkspaceCadZones } from './types';
 import { WorkspaceCadSide } from './WorkspaceCadSide';
 
 const DETAIL = { job_id: 'j1', attempt: 2, result_attempt: 1 } as CadJobRead;
@@ -81,6 +84,8 @@ const VIEW: NonNullable<IWorkspaceCadSideProps['view']> = {
   },
   remarks: {} as never,
 };
+
+const ZONES = {} as IWorkspaceCadZones;
 
 const mount = (patch: Partial<IWorkspaceCadSideProps> = {}) =>
   render(
@@ -212,5 +217,27 @@ describe('WorkspaceCadSide', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('нет связи');
     fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('с разделом зон: «Зоны» среди разделов листа с результатом, перед «Заданием»', () => {
+    mount({ zones: ZONES });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Слои',
+      'Замечания',
+      'Масштаб',
+      'Файлы',
+      'Зоны',
+      'Задание',
+    ]);
+    fireEvent.click(screen.getByRole('tab', { name: 'Зоны' }));
+    expect(screen.getByText('панель зон')).toBeVisible();
+  });
+
+  it('лист без задания: зоны доступны рядом с запуском преобразования', () => {
+    mount({ state: 'none', job: null, view: null, zones: ZONES });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Задание', 'Зоны']);
+    expect(screen.getByText('Лист не преобразовывался')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Зоны' }));
+    expect(screen.getByText('панель зон')).toBeVisible();
   });
 });

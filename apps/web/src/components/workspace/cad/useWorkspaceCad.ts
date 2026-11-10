@@ -14,6 +14,7 @@ import type { BboxPt, IRemarkBinding } from '@/lib/cad/remarks';
 import { composePainters, createRemarksPainter } from '@/lib/cad/remarks-painter';
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import { useStoredNumber } from '@/lib/cad/useStoredNumber';
+import { createZonesPainter } from '@/lib/cad/zones-painter';
 import { formatNumber } from '@/lib/cad/view-format';
 import {
   CAD_REGIONS_VISIBLE_KEY,
@@ -44,6 +45,7 @@ import type {
 import { useWorkspaceCadJob } from './useWorkspaceCadJob';
 import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
 import { useWorkspaceCadRoutes } from './useWorkspaceCadRoutes';
+import { useWorkspaceCadZones, type IWorkspaceCadZonesState } from './useWorkspaceCadZones';
 
 interface IUseWorkspaceCadInput {
   projectId: string;
@@ -87,6 +89,8 @@ export interface IWorkspaceCad {
   /** Строка над холстом; `null` - у листа нет диагностики вида. */
   bar: IWorkspaceCadBarProps | null;
   side: IWorkspaceCadSideProps;
+  /** Данные слоя рисования зоны; `null` - режим рисования выключен. */
+  zoneCapture: IWorkspaceCadZonesState['capture'];
 }
 
 const NO_LAYERS: ReadonlySet<number> = new Set<number>();
@@ -250,18 +254,38 @@ export const useWorkspaceCad = ({
       ? remarkStore.remarks.filter((item) => item.status === 'open').length
       : null;
 
+  // --- зоны листа: помещения и двери ---
+  const zonesState = useWorkspaceCadZones({
+    projectId,
+    revisionId,
+    pageIndex,
+    pageSize,
+    camera,
+    load: enabled && opened && revisionId !== null,
+    active,
+    remarksCapturing: remarks.capturing,
+  });
+  const zonesPainter = useMemo(
+    () =>
+      zonesState.paintData
+        ? createZonesPainter(zonesState.paintData, { clear: cadPainter === null })
+        : null,
+    [zonesState.paintData, cadPainter],
+  );
+
   const painter = useMemo<LayerPainter | null>(
     () =>
       composePainters(
         cadPainter,
+        zonesPainter,
         remarks.marks.length > 0
           ? createRemarksPainter(
               { marks: remarks.marks, colors: colors.remarks, activeId: remarks.activeId },
-              { clear: cadPainter === null },
+              { clear: cadPainter === null && zonesPainter === null },
             )
           : null,
       ),
-    [cadPainter, remarks.marks, remarks.activeId, colors.remarks],
+    [cadPainter, zonesPainter, remarks.marks, remarks.activeId, colors.remarks],
   );
 
   // --- переходы: всё в адрес рабочей области ---
@@ -421,6 +445,7 @@ export const useWorkspaceCad = ({
           remarks: remarks.remarks,
         }
       : null,
+    zones: zonesState.zones,
   };
 
   return {
@@ -435,5 +460,6 @@ export const useWorkspaceCad = ({
     left,
     bar,
     side,
+    zoneCapture: zonesState.capture,
   };
 };

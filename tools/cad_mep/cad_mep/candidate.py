@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 
 from cad_mep.checks import lengths_by_layer, lengths_by_system
+from cad_mep.elevations import Value
 from cad_mep.frame import Frame, TieStats
 from cad_mep.labels import Labels
 from cad_mep.layers import MARK_LAYERS, ROUTE_LAYERS
@@ -30,8 +31,12 @@ class Provenance:
     params_sha256: str
     approval_id: str | None
     view_folder: str
-    floor_elevation_mm: int
-    floor_height_mm: int
+    floor_elevation: Value
+    floor_height: Value
+
+
+def _value_out(v: Value) -> JsonObj:
+    return {"value_mm": v.value_mm, "source": v.source, "evidence": v.evidence}
 
 
 def _r(v: float, nd: int = 1) -> float:
@@ -181,11 +186,11 @@ def build_candidate(
     }
     wall_viol = sum(int(str(v["bad_samples"])) for v in crossings.values())
     z: JsonObj = {
-        "heating_m": prov.floor_elevation_mm + params.num("z_heat_mm"),
-        "ceiling_m": prov.floor_elevation_mm
-        + prov.floor_height_mm
+        "heating_m": prov.floor_elevation.value_mm + params.num("z_heat_mm"),
+        "ceiling_m": prov.floor_elevation.value_mm
+        + prov.floor_height.value_mm
         - params.num("ceiling_below_slab_mm"),
-        "meter_m": prov.floor_elevation_mm + params.num("z_meter_mm"),
+        "meter_m": prov.floor_elevation.value_mm + params.num("z_meter_mm"),
     }
     complete = all(
         res.per_apt.get(a.idx, {}).get("heat_shaft")
@@ -226,6 +231,8 @@ def build_candidate(
         "params_sha256": prov.params_sha256,
         "approval_id": prov.approval_id,
         "view_folder": prov.view_folder,
+        "floor_elevation": _value_out(prov.floor_elevation),
+        "floor_height": _value_out(prov.floor_height),
         "scale": {"mm_per_pt": frame.scale, "source": scale_source},
         "frame": {"origin_pt": [_r(frame.ox, 4), _r(frame.oy, 4)]},
         "params": params.dump(),
@@ -235,8 +242,14 @@ def build_candidate(
         "status": "candidate_requires_review",
         "provenance": provenance,
         "elevation": {
-            "floor_elevation_mm": {"value": prov.floor_elevation_mm, "source": "operator"},
-            "floor_height_mm": {"value": prov.floor_height_mm, "source": "operator"},
+            "floor_elevation_mm": {
+                "value": prov.floor_elevation.value_mm,
+                "source": prov.floor_elevation.source,
+            },
+            "floor_height_mm": {
+                "value": prov.floor_height.value_mm,
+                "source": prov.floor_height.source,
+            },
             "sheet_marks_mm": list(labels.elevation_marks_mm),
             "levels_mm": z,
         },

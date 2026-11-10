@@ -191,14 +191,20 @@ async def download_cad_artifact(
     session: SessionDep,
     context: AuthDep,
     storage: StorageDep,
+    # Прошлая попытка route-задания (после пересчёта) - только просмотр.
+    attempt_no: int | None = Query(default=None, ge=1, alias="attempt"),
 ) -> StreamingResponse:
     job = await _job(session, context, project_id, revision_id, job_id)
-    if job.status is not JobStatus.SUCCEEDED:
+    if attempt_no is None and job.status is not JobStatus.SUCCEEDED:
         raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
-    artifact = cad_service.find_artifact(job, name)
+    artifact = cad_service.find_artifact(job, name, attempt_no)
     if artifact is None:
         raise not_found("Файл")
-    attempt = cad_service.result_of(job).get("attempt")
+    attempt = (
+        cad_service.result_of(job).get("attempt")
+        if attempt_no is None
+        else cad_service.result_for_attempt(job, attempt_no).get("attempt")
+    )
     if type(attempt) is not int or attempt < 1:
         raise not_found("Файл")
     key = cad_service.artifact_storage_key(revision_id, job.id, attempt, name)
@@ -206,7 +212,7 @@ async def download_cad_artifact(
         raise not_found("Файл")
     # DXF трасс - только после принятия человеком; превью и candidate.json - кандидат для проверки.
     if name.endswith("/" + cad_mep_service.ROUTES_DXF) and not (
-        await cad_mep_service.routes_download_allowed(session, job)
+        await cad_mep_service.routes_download_allowed(session, job, attempt)
     ):
         raise DomainError(ErrorCode.CAD_ROUTES_NOT_ACCEPTED)
     try:
@@ -313,11 +319,22 @@ def _now() -> datetime:
     return cad_progress.now()
 
 
-def _succeeded_view(job: Job, page_index: int, view: int) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Итог и вид текущей успешной попытки. Чужие или прошлые попытки сюда не попадают."""
-    if job.status is not JobStatus.SUCCEEDED:
-        raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
-    result = cad_service.current_result(job)
+def _succeeded_view(
+    job: Job, page_index: int, view: int, attempt: int | None = None
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Итог и вид текущей успешной попытки.
+
+    Прошлая попытка берётся только по явному номеру (просмотр после пересчёта трасс) и только
+    если у неё есть успешный итог.
+    """
+    if attempt is None:
+        if job.status is not JobStatus.SUCCEEDED:
+            raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
+        result = cad_service.current_result(job)
+    else:
+        result = cad_service.result_for_attempt(job, attempt)
+        if not result or result.get("result_status") == "failed":
+            raise not_found("Попытка")
     for page in result.get("pages", []):
         if page.get("index") != page_index:
             continue
@@ -330,7 +347,7 @@ def _succeeded_view(job: Job, page_index: int, view: int) -> tuple[dict[str, Any
 async def _read_artifact_json(
     storage: ObjectStorage, job: Job, revision_id: uuid.UUID, attempt: int, name: str
 ) -> Any:
-    artifact = cad_service.find_artifact(job, name)
+    artifact = cad_service.find_artifact(job, name, attempt)
     if artifact is None:
         return None
     key = cad_service.artifact_storage_key(revision_id, job.id, attempt, name)
@@ -361,9 +378,10 @@ async def read_cad_view(
     session: SessionDep,
     context: AuthDep,
     storage: StorageDep,
+    attempt_no: int | None = Query(default=None, ge=1, alias="attempt"),
 ) -> CadViewDiagnosticsRead:
     job = await _job(session, context, project_id, revision_id, job_id)
-    result, row = _succeeded_view(job, page_index, view)
+    result, row = _succeeded_view(job, page_index, view, attempt_no)
     attempt = int(result["attempt"])
     try:
         folder = cad_service.view_folder(page_index, view)
@@ -416,6 +434,7 @@ async def read_cad_view(
         approval=mep.approval,
         acceptance=mep.acceptance,
         route_jobs=mep.route_jobs,
+        revoked_decisions=mep.revoked_decisions,
     )
 
 
@@ -434,9 +453,10 @@ async def read_cad_preview(
     session: SessionDep,
     context: AuthDep,
     storage: StorageDep,
+    attempt_no: int | None = Query(default=None, ge=1, alias="attempt"),
 ) -> CadPreviewRead:
     job = await _job(session, context, project_id, revision_id, job_id)
-    result, _row = _succeeded_view(job, page_index, view)
+    result, _row = _succeeded_view(job, page_index, view, attempt_no)
     attempt = int(result["attempt"])
     try:
         folder = cad_service.view_folder(page_index, view)
@@ -444,7 +464,7 @@ async def read_cad_preview(
         raise not_found("Вид") from error
     is_route = job.job_type is JobType.CAD_MEP_ROUTE
     dxf_name = f"{folder}/{cad_mep_service.ROUTES_DXF if is_route else 'plan_candidates.dxf'}"
-    dxf = cad_service.find_artifact(job, dxf_name)
+    dxf = cad_service.find_artifact(job, dxf_name, attempt)
     raw = await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/preview.json")
     if dxf is None or raw is None:
         raise not_found("Предпросмотр")

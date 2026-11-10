@@ -4,7 +4,10 @@
 окружение, новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
     <python> -I run_mep.py --pdf --page-index --view-dxf --scale --preview --params --out
-        --view-folder --floor-elevation-mm --floor-height-mm
+        --view-folder [--floor-elevation-mm] [--floor-height-mm]
+
+Отметка пола и высота этажа в аргументы попадают только если их задал человек (запрос или
+пересчёт); иначе генератор определяет их по тексту документации.
 
 Коды выхода: 0 - готово; 2 - ошибка входа; 3 - трассы не построены (причина - одной строкой JSON
 `{"code", "message"}` в stderr). Общие части (аренда, загрузка, отказ задания) - из `handler`.
@@ -24,6 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cad_worker.handler import (
@@ -40,7 +44,7 @@ from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.errors import ErrorCode
-from app.models import CadDecision, DocumentRevision, Job
+from app.models import CadDecision, CadRemark, DocumentRevision, Job
 from app.models.cad_decision import DECISION_VIEW_APPROVAL
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
@@ -77,6 +81,14 @@ def _generator_argv(
     python, runner = settings.cad_engine_python.strip(), settings.cad_mep_runner.strip()
     if not (python and runner) or not (Path(python).is_file() and Path(runner).is_file()):
         raise CadError(ErrorCode.CAD_ENGINE_UNAVAILABLE, "генератор трасс механики не настроен")
+    manual: list[str] = []
+    for flag, key in (
+        ("--floor-elevation-mm", "floor_elevation_mm"),
+        ("--floor-height-mm", "floor_height_mm"),
+    ):
+        value = cad_mep_service.payload_int(job, key)
+        if value is not None:
+            manual += [flag, str(value)]
     return [
         python,
         "-I",
@@ -97,10 +109,7 @@ def _generator_argv(
         str(out),
         "--view-folder",
         folder.removeprefix("views/"),
-        "--floor-elevation-mm",
-        str(job.payload["floor_elevation_mm"]),
-        "--floor-height-mm",
-        str(job.payload["floor_height_mm"]),
+        *manual,
         "--approval-id",
         str(job.payload["approval_id"]),
     ]
@@ -115,8 +124,8 @@ async def _checked_input(session: AsyncSession, job: Job) -> _Input:
     if parent_id is None or page_index is None or view is None or parent_attempt is None:
         raise CadError(ErrorCode.CAD_PARAMS_INVALID, "задание трасс заполнено не полностью")
     for key in ("floor_elevation_mm", "floor_height_mm"):
-        if cad_mep_service.payload_int(job, key) is None:
-            raise CadError(ErrorCode.CAD_PARAMS_INVALID, "не заданы отметки этажа")
+        if key not in payload or (payload[key] is not None and type(payload[key]) is not int):
+            raise CadError(ErrorCode.CAD_PARAMS_INVALID, "отметки этажа заданы неверно")
     parent = await session.get(Job, parent_id)
     if (
         parent is None
@@ -143,6 +152,8 @@ async def _checked_input(session: AsyncSession, job: Job) -> _Input:
         or approval.artifact_sha256 != payload.get("view_dxf_sha256")
     ):
         raise CadError(ErrorCode.CAD_INPUT_INVALID, "вид не одобрен для построения трасс")
+    if approval.revoked_at is not None:
+        raise CadError(ErrorCode.CAD_VIEW_APPROVAL_REVOKED, "одобрение вида отозвано")
     return _Input(job, parent, folder, page_index, view)
 
 
@@ -193,9 +204,14 @@ def _generator_failure(code: int, output: bytes) -> CadError:
     generator_code = str(parsed.get("code") or f"exit_{code}")[:64]
     message = str(parsed.get("message") or tail[-_ERROR_MESSAGE_LIMIT:] or f"код {code}")
     message = message[:_ERROR_MESSAGE_LIMIT]
-    mapped = {2: ErrorCode.CAD_INPUT_INVALID, 3: ErrorCode.CAD_MEP_NOT_BUILT}.get(
-        code, ErrorCode.CAD_ENGINE_FAILED
-    )
+    by_generator_code = {
+        "elevation_not_found": ErrorCode.CAD_ELEVATION_NOT_FOUND,
+        "floor_height_not_found": ErrorCode.CAD_FLOOR_HEIGHT_NOT_FOUND,
+    }
+    mapped = by_generator_code.get(generator_code) or {
+        2: ErrorCode.CAD_INPUT_INVALID,
+        3: ErrorCode.CAD_MEP_NOT_BUILT,
+    }.get(code, ErrorCode.CAD_ENGINE_FAILED)
     return CadError(mapped, message, {"generator_error": generator_code})
 
 
@@ -209,9 +225,22 @@ def _read_json_file(path: Path) -> dict[str, Any]:
     return value
 
 
+def _provenance_value(candidate: dict[str, Any], key: str) -> dict[str, Any] | None:
+    """Отметка или высота из candidate.json: значение, источник и доказательство."""
+    provenance = candidate.get("provenance")
+    raw = provenance.get(key) if isinstance(provenance, dict) else None
+    if not isinstance(raw, dict) or type(raw.get("value_mm")) is not int:
+        return None
+    return {
+        "value_mm": raw["value_mm"],
+        "source": str(raw.get("source", ""))[:32],
+        "evidence": str(raw.get("evidence", ""))[:400],
+    }
+
+
 def _verified_route_outputs(
     out: Path, source: _Input, revision: DocumentRevision, params_sha: str
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Состав out/ строго по контракту; пишет report.json и manifest.json исполнителя.
 
     Обязательны три файла вида: `mep_routes.dxf` (R2018), `preview.json` и `candidate.json`
@@ -252,8 +281,8 @@ def _verified_route_outputs(
             "parent_job_id": str(source.parent.id),
             "page_index": source.page_index,
             "view": source.view,
-            "floor_elevation_mm": source.job.payload.get("floor_elevation_mm"),
-            "floor_height_mm": source.job.payload.get("floor_height_mm"),
+            "floor_elevation": _provenance_value(candidate, "floor_elevation"),
+            "floor_height": _provenance_value(candidate, "floor_height"),
             "finished_at": datetime.now(UTC).isoformat(),
         }
         (out / "report.json").write_text(
@@ -283,7 +312,7 @@ def _verified_route_outputs(
             "size": manifest_path.stat().st_size,
         }
     )
-    return files
+    return files, candidate
 
 
 def _parent_view_row(parent: Job, page_index: int, view: int) -> dict[str, Any]:
@@ -294,6 +323,33 @@ def _parent_view_row(parent: Job, page_index: int, view: int) -> dict[str, Any]:
             if isinstance(row, dict) and row.get("view") == view:
                 return row
     return {}
+
+
+async def _bind_remarks_to_result(
+    session: AsyncSession, job: Job, source: _Input, attempt: int, result: dict[str, Any]
+) -> None:
+    """Замечания, перенесённые пересчётом, привязываются к DXF трасс новой попытки."""
+    artifact = next(
+        (
+            a
+            for a in result["artifacts"]
+            if a["name"] == f"{source.folder}/{cad_mep_service.ROUTES_DXF}"
+        ),
+        None,
+    )
+    if artifact is None:
+        return
+    await session.execute(
+        update(CadRemark)
+        .where(
+            CadRemark.job_id == job.id,
+            CadRemark.attempt == attempt,
+            CadRemark.page_index == source.page_index,
+            CadRemark.view == source.view,
+            CadRemark.dxf_sha256.is_(None),
+        )
+        .values(dxf_sha256=str(artifact["sha256"]))
+    )
 
 
 async def execute_cad_mep_route(
@@ -381,7 +437,7 @@ async def execute_cad_mep_route(
         code, output = outcome
         if code != 0:
             raise _generator_failure(code, output)
-        files = _verified_route_outputs(out, source, revision, params.sha256)
+        files, candidate = _verified_route_outputs(out, source, revision, params.sha256)
         if not await _still_owned(session, job, owner, attempt):
             log.warning("cad_lease_lost", job_id=str(job.id))
             return job
@@ -416,6 +472,9 @@ async def execute_cad_mep_route(
         "params_sha256": job.payload["params_sha256"],
         "view_dxf_sha256": job.payload["view_dxf_sha256"],
         "approval_id": job.payload["approval_id"],
+        # Итог генератора: отметка пола и высота этажа с источником и доказательством.
+        "floor_elevation": _provenance_value(candidate, "floor_elevation"),
+        "floor_height": _provenance_value(candidate, "floor_height"),
         "attempt": attempt,
         "dxf_count": 1,
         "pages": [
@@ -448,4 +507,5 @@ async def execute_cad_mep_route(
         outcome="succeeded",
         result_status=cad_service.RESULT_WITH_CAD,
     )
+    await _bind_remarks_to_result(session, job, source, attempt, result)
     return await jobs_service.succeed(session, job=job, payload={"cad_result": result})

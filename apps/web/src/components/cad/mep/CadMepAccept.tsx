@@ -8,7 +8,8 @@ import { acceptBlock, mepErrorText } from '@/lib/cad/mep-gates';
 import { routesDxfUrl, useAcceptMepRoutes } from '@/lib/cad/mep-queries';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 
-import { CadMepDecision } from './CadMepDecision';
+import { CadMepDecision, CadMepRevoked } from './CadMepDecision';
+import { CadMepRevoke } from './CadMepRevoke';
 
 interface ICadMepAcceptProps {
   /** Route-задание, его попытка с результатом, лист и вид. */
@@ -16,6 +17,10 @@ interface ICadMepAcceptProps {
   acceptance: CadDecisionRead | null;
   /** Открытые замечания на route-задании; `null` - ещё не прочитаны. */
   openRemarks: number | null;
+  /** Одобрение вида, по которому построены трассы, отозвано: принять нельзя. */
+  approvalRevoked?: boolean;
+  /** Отозванные принятия этого вида, старые сверху. */
+  revoked?: readonly CadDecisionRead[];
 }
 
 const DOWNLOAD =
@@ -25,25 +30,40 @@ const DOWNLOAD =
  * Принятие трасс этажа целиком и скачивание 3D DXF. Файл отдаётся сервером только после принятия;
  * до него кнопки скачивания нет.
  */
-export const CadMepAccept: FC<ICadMepAcceptProps> = ({ params, acceptance, openRemarks }) => {
+export const CadMepAccept: FC<ICadMepAcceptProps> = ({
+  params,
+  acceptance,
+  openRemarks,
+  approvalRevoked = false,
+  revoked = [],
+}) => {
   const accept = useAcceptMepRoutes(params);
   const [problem, setProblem] = useState<string | null>(null);
 
   if (acceptance) {
     return (
       <div className="flex min-w-0 flex-col gap-[var(--s-3)]">
-        <CadMepDecision title="Трассы приняты (этаж целиком)" decision={acceptance} />
+        <CadMepDecision title="Трассы приняты (этаж целиком)" decision={acceptance}>
+          <CadMepRevoke
+            params={params}
+            decision={acceptance}
+            label="Отозвать принятие"
+            consequence="Скачивание 3D DXF закроется до нового принятия. Запись о принятии сохранится; после отзыва трассы можно пересчитать."
+          />
+        </CadMepDecision>
         <a href={routesDxfUrl(params)} download className={DOWNLOAD}>
           Скачать 3D DXF
         </a>
+        <CadMepRevoked decisions={revoked} />
       </div>
     );
   }
 
-  const block = acceptBlock(acceptance, openRemarks);
+  const block = acceptBlock(acceptance, openRemarks, approvalRevoked);
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-[var(--s-3)]">
+      <CadMepRevoked decisions={revoked} />
       <Button
         variant="primary"
         loading={accept.isPending}

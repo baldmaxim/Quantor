@@ -11,12 +11,12 @@ from pathlib import Path
 import shapely
 from shapely.geometry import Polygon
 
-from cad_mep import candidate, checks, dxfin, dxfout, pdfsrc, rooms, route
+from cad_mep import candidate, checks, dxfin, dxfout, elevations, pdfsrc, rooms, route
 from cad_mep import frame as frame_mod
 from cad_mep import labels as labels_mod
 from cad_mep.errors import EXIT_NO_ROUTES, MepError
 from cad_mep.params import load_params
-from cad_mep.systems import Issue, Planner, Result
+from cad_mep.systems import Issue, Planner
 from cad_mep.version import GENERATOR_VERSION
 
 HEIGHT_MIN_MM = 2000
@@ -33,8 +33,9 @@ class Args:
     params: Path | None
     out: Path
     view_folder: str
-    floor_elevation_mm: int
-    floor_height_mm: int
+    # None - определить по тексту документации; число - переопределение человека
+    floor_elevation_mm: int | None = None
+    floor_height_mm: int | None = None
     approval_id: str | None = None
 
 
@@ -83,15 +84,14 @@ def _read_preview_bbox(path: Path) -> list[float]:
 
 
 def _validate(args: Args) -> None:
-    if not (HEIGHT_MIN_MM <= args.floor_height_mm <= HEIGHT_MAX_MM):
+    height = args.floor_height_mm
+    if height is not None and not (HEIGHT_MIN_MM <= height <= HEIGHT_MAX_MM):
         raise MepError(
-            "height_invalid",
-            f"высота этажа {args.floor_height_mm} мм вне {HEIGHT_MIN_MM}…{HEIGHT_MAX_MM}",
+            "height_invalid", f"высота этажа {height} мм вне {HEIGHT_MIN_MM}…{HEIGHT_MAX_MM}"
         )
-    if abs(args.floor_elevation_mm) > 1_000_000:
-        raise MepError(
-            "elevation_invalid", f"отметка пола {args.floor_elevation_mm} мм вне допустимого"
-        )
+    elevation = args.floor_elevation_mm
+    if elevation is not None and abs(elevation) > elevations.ELEVATION_LIMIT_MM:
+        raise MepError("elevation_invalid", f"отметка пола {elevation} мм вне допустимого")
     for p, code in ((args.pdf, "pdf_unreadable"), (args.view_dxf, "dxf_unreadable")):
         if not p.is_file():
             raise MepError(code, f"нет файла {p.name}")
@@ -145,6 +145,17 @@ def generate(args: Args) -> dict[str, object]:
     px0, py1 = frame.dxf_to_pt(bbox[0] - pad, bbox[1] - pad)
     px1, py0 = frame.dxf_to_pt(bbox[2] + pad, bbox[3] + pad)
     zone = (px0, py0, px1, py1)
+    # отметка и высота - до тяжёлых шагов: не нашлись - сразу «введите вручную»
+    resolved = elevations.resolve(
+        args.pdf,
+        args.page_index,
+        ((px0 + px1) / 2, (py0 + py1) / 2),
+        params,
+        args.floor_elevation_mm,
+        args.floor_height_mm,
+    )
+    floor_elevation = resolved.elevation.value_mm
+    floor_height = resolved.height.value_mm
     wall_polys = _wall_polys(page, frame, zone)
     if not wall_polys:
         raise MepError("plan_not_found", "в рамке плана нет заливок стен", EXIT_NO_ROUTES)
@@ -169,14 +180,12 @@ def generate(args: Args) -> dict[str, object]:
             "no_apartments", "квартиры на плане не найдены (нет марок помещений)", EXIT_NO_ROUTES
         )
     rg = route.build_grid(model, doors, params)
-    res = Planner(
-        model, lab, doors, rg, params, float(args.floor_elevation_mm), float(args.floor_height_mm)
-    ).run()
+    res = Planner(model, lab, doors, rg, params, float(floor_elevation), float(floor_height)).run()
     # без стояков, питающих квартиры, остаются лишь лучи внутри квартир — это не результат
     if not any(ln.kind == "leadin" for ln in res.lines):
         reasons = "; ".join(i.message for i in res.issues[:5])
         raise MepError("routes_not_built", f"трассы не построены: {reasons}", EXIT_NO_ROUTES)
-    _issue_elevation(res, lab.elevation_marks_mm, args.floor_elevation_mm)
+    res.issues.extend(Issue(code, message) for code, message in resolved.issues)
     if not lab.expl:
         res.issues.append(
             Issue(
@@ -206,7 +215,7 @@ def generate(args: Args) -> dict[str, object]:
         wall_polys,
         params,
         (fx0, fy0),
-        float(args.floor_elevation_mm),
+        float(floor_elevation),
     )
     dxf_sha = sha256_file(dxf_path)
     preview = candidate.build_preview(
@@ -226,8 +235,8 @@ def generate(args: Args) -> dict[str, object]:
         params.sha256,
         args.approval_id,
         args.view_folder,
-        args.floor_elevation_mm,
-        args.floor_height_mm,
+        resolved.elevation,
+        resolved.height,
     )
     cand = candidate.build_candidate(
         prov,
@@ -249,19 +258,6 @@ def generate(args: Args) -> dict[str, object]:
         "polylines": len(res.lines),
         "issues": len(res.issues),
     }
-
-
-def _issue_elevation(res: Result, marks: list[int], entered: int) -> None:
-    """Отметка с листа не совпадает с введённой — замечание, не ошибка."""
-    if marks and entered not in marks:
-        found = ", ".join(f"{v / 1000:+.3f}".replace(".", ",") for v in marks)
-        res.issues.append(
-            Issue(
-                "elevation_mismatch",
-                f"введённая отметка пола {entered / 1000:+.3f} м не найдена среди отметок листа "
-                f"({found})",
-            )
-        )
 
 
 def _dump(path: Path, data: object) -> None:

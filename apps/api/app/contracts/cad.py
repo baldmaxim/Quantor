@@ -9,7 +9,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.contracts.cad_mep import CadJobType, CadViewMepRead, view_mep_read
+from app.contracts.cad_mep import (
+    CadJobType,
+    CadMepAttemptRead,
+    CadViewMepRead,
+    attempts_read,
+    view_mep_read,
+)
 from app.domain import JobStatus, JobType
 from app.models import Job
 from app.services import cad as cad_service
@@ -226,6 +232,21 @@ def _job_type_of(job: Job) -> CadJobType:
     return "cad_mep_route" if job.job_type is JobType.CAD_MEP_ROUTE else "cad_pdf_convert"
 
 
+def _mep_value(
+    raw: object, job: Job, payload_key: str
+) -> tuple[int | None, str | None, str | None]:
+    """Отметка или высота: итог генератора (значение, источник, доказательство) либо запрос."""
+    if isinstance(raw, dict) and type(raw.get("value_mm")) is int:
+        source, evidence = raw.get("source"), raw.get("evidence")
+        return (
+            raw["value_mm"],
+            source if isinstance(source, str) else None,
+            evidence if isinstance(evidence, str) else None,
+        )
+    requested = cad_mep_service.payload_int(job, payload_key)
+    return requested, ("operator" if requested is not None else None), None
+
+
 class CadJobSummaryRead(BaseModel):
     job_id: UUID
     # `cad_mep_route` - трассы механики по одобренному виду родителя (ADR-0036 п. 8).
@@ -256,8 +277,19 @@ class CadJobRead(BaseModel):
     parent_attempt: int | None
     page_index: int | None
     view: int | None
+    # Итог генератора (из candidate.json), а не только запрос: отметка пола - из документации
+    # (`observed`), высота этажа - по соседним этажам (`derived`) или ввод человека (`operator`).
     floor_elevation_mm: int | None
     floor_height_mm: int | None
+    floor_elevation_source: str | None = None
+    floor_elevation_evidence: str | None = None
+    floor_height_source: str | None = None
+    floor_height_evidence: str | None = None
+    # Только у `cad_mep_route`: одобрение вида, по которому построены трассы, и действует ли оно.
+    approval_id: UUID | None = None
+    approval_revoked: bool = False
+    # Только у `cad_mep_route`: история расчётов (параметры и итог каждой попытки).
+    route_attempts: list[CadMepAttemptRead] = Field(default_factory=list)
     generator_version: str | None
     status: JobStatus
     stage: str | None
@@ -307,6 +339,12 @@ class CadJobRead(BaseModel):
         ]
         version = job.payload.get("generator_version")
         parent = cad_mep_service.parent_job_id_of(job)
+        elevation = _mep_value(result.get("floor_elevation"), job, "floor_elevation_mm")
+        height = _mep_value(result.get("floor_height"), job, "floor_height_mm")
+        approval_id = cad_mep_service.approval_id_of(job)
+        approval = (
+            None if state is None or approval_id is None else state.approval_by_id.get(approval_id)
+        )
         return cls(
             job_id=job.id,
             job_type=_job_type_of(job),
@@ -315,8 +353,15 @@ class CadJobRead(BaseModel):
             parent_attempt=cad_mep_service.payload_int(job, "parent_attempt") if parent else None,
             page_index=cad_mep_service.payload_int(job, "page_index") if parent else None,
             view=cad_mep_service.payload_int(job, "view") if parent else None,
-            floor_elevation_mm=cad_mep_service.payload_int(job, "floor_elevation_mm"),
-            floor_height_mm=cad_mep_service.payload_int(job, "floor_height_mm"),
+            floor_elevation_mm=elevation[0],
+            floor_elevation_source=elevation[1],
+            floor_elevation_evidence=elevation[2],
+            floor_height_mm=height[0],
+            floor_height_source=height[1],
+            floor_height_evidence=height[2],
+            approval_id=approval_id,
+            approval_revoked=approval is not None and approval.revoked_at is not None,
+            route_attempts=attempts_read(job) if parent else [],
             generator_version=version if isinstance(version, str) else None,
             status=job.status,
             stage=job.stage,

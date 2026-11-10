@@ -1324,6 +1324,52 @@
             "title": "Page Index",
             "type": "integer"
           },
+          "revoke_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoke Reason"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By"
+          },
+          "revoked_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By Name"
+          },
           "view": {
             "title": "View",
             "type": "integer"
@@ -1645,6 +1691,23 @@
       },
       "CadJobRead": {
         "properties": {
+          "approval_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Id"
+          },
+          "approval_revoked": {
+            "default": false,
+            "title": "Approval Revoked",
+            "type": "boolean"
+          },
           "artifacts": {
             "items": {
               "$ref": "#/components/schemas/CadArtifactRead"
@@ -1706,6 +1769,17 @@
             ],
             "title": "Finished At"
           },
+          "floor_elevation_evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Evidence"
+          },
           "floor_elevation_mm": {
             "anyOf": [
               {
@@ -1717,6 +1791,28 @@
             ],
             "title": "Floor Elevation Mm"
           },
+          "floor_elevation_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Source"
+          },
+          "floor_height_evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Evidence"
+          },
           "floor_height_mm": {
             "anyOf": [
               {
@@ -1727,6 +1823,17 @@
               }
             ],
             "title": "Floor Height Mm"
+          },
+          "floor_height_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Source"
           },
           "generator_version": {
             "anyOf": [
@@ -1863,6 +1970,13 @@
             "format": "uuid",
             "title": "Revision Id",
             "type": "string"
+          },
+          "route_attempts": {
+            "items": {
+              "$ref": "#/components/schemas/CadMepAttemptRead"
+            },
+            "title": "Route Attempts",
+            "type": "array"
           },
           "server_time": {
             "format": "date-time",
@@ -2069,9 +2183,166 @@
         "title": "CadJobSummaryRead",
         "type": "object"
       },
+      "CadMepAttemptRead": {
+        "description": "Попытка route-задания: что запросил человек и что получилось (история расчётов).",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
+          },
+          "floor_elevation_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Source"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Mm"
+          },
+          "floor_height_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Source"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "requested_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Elevation Mm"
+          },
+          "requested_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Height Mm"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempt",
+          "requested_elevation_mm",
+          "requested_height_mm",
+          "requested_at",
+          "status",
+          "error_code",
+          "floor_elevation_mm",
+          "floor_elevation_source",
+          "floor_height_mm",
+          "floor_height_source"
+        ],
+        "title": "CadMepAttemptRead",
+        "type": "object"
+      },
+      "CadMepRecomputeCreate": {
+        "additionalProperties": false,
+        "description": "Пересчёт трасс новой попыткой того же задания: пусто - по документации.",
+        "properties": {
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": -100000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 6000.0,
+                "minimum": 2000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Mm"
+          }
+        },
+        "title": "CadMepRecomputeCreate",
+        "type": "object"
+      },
       "CadMepRoutesCreate": {
         "additionalProperties": false,
-        "description": "Постановка трасс. Отметка пола и высота этажа - ввод человека, обе обязательны.",
+        "description": "Постановка трасс по одобренному виду. Попытка - та, чей результат одобрен.",
         "properties": {
           "attempt": {
             "minimum": 1.0,
@@ -2079,22 +2350,34 @@
             "type": "integer"
           },
           "floor_elevation_mm": {
-            "maximum": 1000000.0,
-            "minimum": -100000.0,
-            "title": "Floor Elevation Mm",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": -100000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
           },
           "floor_height_mm": {
-            "maximum": 6000.0,
-            "minimum": 2000.0,
-            "title": "Floor Height Mm",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 6000.0,
+                "minimum": 2000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Mm"
           }
         },
         "required": [
-          "attempt",
-          "floor_elevation_mm",
-          "floor_height_mm"
+          "attempt"
         ],
         "title": "CadMepRoutesCreate",
         "type": "object"
@@ -2722,11 +3005,48 @@
         "title": "CadRemarksImportRead",
         "type": "object"
       },
+      "CadRevokeCreate": {
+        "additionalProperties": false,
+        "description": "Отзыв решения; причина необязательна.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "CadRevokeCreate",
+        "type": "object"
+      },
       "CadRouteJobRead": {
         "description": "Route-задание вида в списке у родителя.",
         "properties": {
           "accepted": {
             "title": "Accepted",
+            "type": "boolean"
+          },
+          "approval_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Id"
+          },
+          "approval_revoked": {
+            "default": false,
+            "title": "Approval Revoked",
             "type": "boolean"
           },
           "attempt": {
@@ -3355,6 +3675,13 @@
             "title": "Review Required",
             "type": "boolean"
           },
+          "revoked_decisions": {
+            "items": {
+              "$ref": "#/components/schemas/CadDecisionRead"
+            },
+            "title": "Revoked Decisions",
+            "type": "array"
+          },
           "route_jobs": {
             "items": {
               "$ref": "#/components/schemas/CadRouteJobRead"
@@ -3480,6 +3807,13 @@
             ],
             "title": "Failure Reason"
           },
+          "revoked_decisions": {
+            "items": {
+              "$ref": "#/components/schemas/CadDecisionRead"
+            },
+            "title": "Revoked Decisions",
+            "type": "array"
+          },
           "route_jobs": {
             "items": {
               "$ref": "#/components/schemas/CadRouteJobRead"
@@ -3537,6 +3871,368 @@
           "dxf_entities"
         ],
         "title": "CadViewRead",
+        "type": "object"
+      },
+      "CadZoneCreate": {
+        "additionalProperties": false,
+        "description": "Новая зона. Вид-зависимые поля и топологию проверяет сервис.",
+        "properties": {
+          "apartment_no": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartment No"
+          },
+          "door_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Height Mm"
+          },
+          "kind": {
+            "enum": [
+              "room_apartment",
+              "room_mop",
+              "door"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "page_index": {
+            "minimum": 0.0,
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "points": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "maxItems": 10000,
+            "minItems": 2,
+            "title": "Points",
+            "type": "array"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "room_mark": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Mark"
+          }
+        },
+        "required": [
+          "revision_id",
+          "page_index",
+          "kind",
+          "points"
+        ],
+        "title": "CadZoneCreate",
+        "type": "object"
+      },
+      "CadZoneRead": {
+        "properties": {
+          "apartment_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartment No"
+          },
+          "area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area M2"
+          },
+          "calibration_missing": {
+            "title": "Calibration Missing",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "door_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Height Mm"
+          },
+          "geometry_issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geometry Issue"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "room_apartment",
+              "room_mop",
+              "door"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "perimeter_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Perimeter M"
+          },
+          "points": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "room_mark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Mark"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "width_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width M"
+          }
+        },
+        "required": [
+          "id",
+          "revision_id",
+          "page_index",
+          "kind",
+          "apartment_no",
+          "room_mark",
+          "name",
+          "points",
+          "door_height_mm",
+          "area_m2",
+          "perimeter_m",
+          "width_m",
+          "calibration_missing",
+          "geometry_issue",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CadZoneRead",
+        "type": "object"
+      },
+      "CadZoneUpdate": {
+        "additionalProperties": false,
+        "description": "Частичная правка: переданные поля заменяют хранимые, итог проверяется целиком.",
+        "properties": {
+          "apartment_no": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartment No"
+          },
+          "door_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Height Mm"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "room_apartment",
+                  "room_mop",
+                  "door"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "maxItems": 10000,
+                "minItems": 2,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
+          },
+          "room_mark": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Mark"
+          }
+        },
+        "title": "CadZoneUpdate",
         "type": "object"
       },
       "CalcAmount": {
@@ -23357,6 +24053,93 @@
         ]
       }
     },
+    "/api/v1/cad/zones/{zone_id}": {
+      "delete": {
+        "operationId": "delete_cad_zone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "zone_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Zone Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить зону листа",
+        "tags": [
+          "cad-zones"
+        ]
+      },
+      "patch": {
+        "operationId": "update_cad_zone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "zone_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Zone Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadZoneUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadZoneRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Изменить зону листа",
+        "tags": [
+          "cad-zones"
+        ]
+      }
+    },
     "/api/v1/calc/calculators": {
       "get": {
         "description": "Что можно запустить: версии, система, стадия, сценарии, нужные факты и правила.\n\nДемонстрационные калькуляторы скрыты; `include_demo=true` — отладочный режим.",
@@ -27256,6 +28039,131 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/cad/zones": {
+      "get": {
+        "operationId": "list_cad_zones",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CadZoneRead"
+                  },
+                  "title": "Response List Cad Zones",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Зоны ревизии (помещения и двери) с площадью, периметром и шириной",
+        "tags": [
+          "cad-zones"
+        ]
+      },
+      "post": {
+        "operationId": "create_cad_zone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadZoneCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadZoneRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать зону листа",
+        "tags": [
+          "cad-zones"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/documents": {
       "get": {
         "operationId": "list_project_documents",
@@ -27510,6 +28418,79 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/decisions/{decision_id}/revoke": {
+      "post": {
+        "operationId": "revoke_cad_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadRevokeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadDecisionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отозвать решение (одобрение вида или принятие трасс); запись остаётся",
+        "tags": [
+          "cad-mep"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}": {
       "get": {
         "operationId": "read_cad_job",
@@ -27688,6 +28669,23 @@
               "title": "Name",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "attempt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attempt"
+            }
           }
         ],
         "responses": {
@@ -27811,6 +28809,79 @@
         "summary": "События попытки по порядку номеров, после курсора (QA)",
         "tags": [
           "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/recompute": {
+      "post": {
+        "operationId": "recompute_cad_mep_routes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadMepRecomputeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Пересчитать трассы: новая попытка того же задания с другими отметкой и высотой",
+        "tags": [
+          "cad-mep"
         ]
       }
     },
@@ -28307,6 +29378,23 @@
               "title": "View",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "attempt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attempt"
+            }
           }
         ],
         "responses": {
@@ -28569,6 +29657,23 @@
             "schema": {
               "title": "View",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attempt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attempt"
             }
           }
         ],

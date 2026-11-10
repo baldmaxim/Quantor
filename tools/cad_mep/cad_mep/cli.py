@@ -34,8 +34,8 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--params", type=Path, default=None)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--view-folder", required=True)
-    p.add_argument("--floor-elevation-mm", type=int, required=True)
-    p.add_argument("--floor-height-mm", type=int, required=True)
+    p.add_argument("--floor-elevation-mm", type=int, default=None)
+    p.add_argument("--floor-height-mm", type=int, default=None)
     p.add_argument("--approval-id", default=None)
     return p
 

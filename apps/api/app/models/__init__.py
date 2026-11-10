@@ -4,6 +4,7 @@ from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
 from app.models.cad_decision import CadDecision
 from app.models.cad_remark import CadRemark
+from app.models.cad_zone import CadZone
 from app.models.calc import (
     CalcFact,
     CalcFactConflict,
@@ -39,6 +40,7 @@ __all__ = [
     "AuthSession",
     "CadDecision",
     "CadRemark",
+    "CadZone",
     "CalcExpectedQuantity",
     "CalcFact",
     "CalcFactConflict",

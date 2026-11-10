@@ -175,7 +175,21 @@ def _put(tw: pymupdf.TextWriter, text: str, cx: float, cy: float) -> None:
     _text(tw, text, cx - width / 2, cy + 2.0)
 
 
-def write_pdf(floor: Floor, path: Path, elevation_text: str | None = "+47,600") -> None:
+PLAN_TITLE = "Корпус 9. Секция 3. План 14 этажа на отм. +47,600"
+# листы-соседи в том же PDF: этаж выше, этаж ниже и чужой корпус (не должен влиять)
+NEIGHBOR_TITLES: tuple[str, ...] = (
+    "Корпус 9. Секция 3. План 15 этажа на отм. +50,900",
+    "Корпус 9. Секция 3. План 13 этажа на отм. +44,300",
+    "Корпус 1. Секция 1. План 15 этажа на отм. +99,999",
+)
+
+
+def write_pdf(
+    floor: Floor,
+    path: Path,
+    elevation_text: str | None = PLAN_TITLE,
+    neighbor_titles: tuple[str, ...] = NEIGHBOR_TITLES,
+) -> None:
     doc = pymupdf.open()
     page = doc.new_page(width=900, height=500)
     for x0, y0, x1, y1 in floor.walls:
@@ -205,6 +219,11 @@ def write_pdf(floor: Floor, path: Path, elevation_text: str | None = "+47,600") 
     _text(tw, "Коридор", 500, y)
     _text(tw, "41,30", 580, y)
     tw.write_text(page)
+    for title in neighbor_titles:
+        other = doc.new_page(width=900, height=500)
+        other_tw = pymupdf.TextWriter(other.rect)
+        _text(other_tw, title, 100.0, 450.0)
+        other_tw.write_text(other)
     doc.save(str(path))
     doc.close()
 
@@ -239,11 +258,14 @@ def write_view_dxf(floor: Floor, path: Path) -> None:
 
 
 def write_inputs(
-    floor: Floor, folder: Path, elevation_text: str | None = "+47,600"
+    floor: Floor,
+    folder: Path,
+    elevation_text: str | None = PLAN_TITLE,
+    neighbor_titles: tuple[str, ...] = NEIGHBOR_TITLES,
 ) -> dict[str, Path]:
     folder.mkdir(parents=True, exist_ok=True)
     pdf, dxf = folder / "floor.pdf", folder / "plan_candidates.dxf"
-    write_pdf(floor, pdf, elevation_text)
+    write_pdf(floor, pdf, elevation_text, neighbor_titles)
     write_view_dxf(floor, dxf)
     scale = folder / "scale.json"
     scale.write_text(
