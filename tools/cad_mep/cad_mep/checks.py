@@ -12,8 +12,8 @@ from cad_mep.dxfin import Door
 from cad_mep.layers import SYSTEM_OF_LAYER
 from cad_mep.params import Params
 from cad_mep.raster import dilate, erode, raster_polys
+from cad_mep.result import Result, len3, plan_len
 from cad_mep.rooms import Model
-from cad_mep.systems import Result, len3, plan_len
 
 
 def wall_crossings(

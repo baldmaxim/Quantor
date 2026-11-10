@@ -1,59 +1,23 @@
-"""Трассы отопления, пожаротушения, водоснабжения, канализации и их 3D (шаги 4–5 ТЗ прототипа)."""
+"""Планировщик трасс: общие узлы и помощники, водоснабжение, канализация, стояки и их 3D.
+
+Отопление — heating.py, пожаротушение — fire.py (шаги 4–5 ТЗ прототипа).
+"""
 
 from __future__ import annotations
-
-import math
-from dataclasses import dataclass, field
-from itertools import pairwise
 
 import numpy as np
 from shapely.errors import GEOSException
 from shapely.geometry import LineString
 
-from cad_mep import aup, facade, heatdev
+from cad_mep import facade, fire, heating
 from cad_mep.dxfin import Door
-from cad_mep.heatdev import HeatRoom
 from cad_mep.issues import Issue
 from cad_mep.labels import Labels
 from cad_mep.layers import SYSTEM_OF_LAYER
 from cad_mep.params import Params
+from cad_mep.result import Line3D, NodeMark, Pt, Pt3, Result
 from cad_mep.rooms import Apartment, Model, Shaft
 from cad_mep.route import RouteGrid, Tree, node_path, spt, tree_chains
-
-Pt = tuple[float, float]
-Pt3 = tuple[float, float, float]
-
-
-@dataclass
-class Line3D:
-    layer: str
-    pts: list[Pt3]
-    apt: int | None = None  # None — общий участок / стояк
-    kind: str = "route"  # route | riser | leadin
-
-
-@dataclass
-class NodeMark:
-    layer: str  # M-NODE | M-RISER
-    kind: str  # collector | device | meter | riser
-    xy: Pt
-    z: float
-    apt: int | None = None
-    system: str | None = None
-    room: str | None = None
-
-
-@dataclass
-class Result:
-    lines: list[Line3D] = field(default_factory=list)
-    nodes: list[NodeMark] = field(default_factory=list)
-    per_apt: dict[int, dict[str, object]] = field(default_factory=dict)
-    fire: dict[str, object] | None = None
-    shaft_use: dict[str, list[str]] = field(default_factory=dict)
-    issues: list[Issue] = field(default_factory=list)
-    heat_rooms: list[HeatRoom] = field(default_factory=list)
-    # осевые пути лучей по квартирам (узлы сетки): проверка «дерево без петель»
-    beam_paths: dict[int, list[list[Pt]]] = field(default_factory=dict)
 
 
 def _offset(chain: list[Pt], dist: float) -> list[Pt]:
@@ -79,24 +43,6 @@ def _offset(chain: list[Pt], dist: float) -> list[Pt]:
     if d_same > d_flip:
         out = out[::-1]
     return out[::-1] if rev else out
-
-
-def _names(row: dict[str, object]) -> list[object]:
-    names = row.get("names")
-    return list(names) if isinstance(names, list) and names else [f"помещение #{row['comp']}"]
-
-
-def len3(pts: list[Pt3]) -> float:
-    return float(
-        sum(
-            math.sqrt(sum((a - b) ** 2 for a, b in zip(p, q, strict=True)))
-            for p, q in pairwise(pts)
-        )
-    )
-
-
-def plan_len(pts: list[Pt3]) -> float:
-    return float(sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in pairwise(pts)))
 
 
 class Planner:
@@ -126,8 +72,8 @@ class Planner:
         self.heat_targets: set[int] = set()
         self.water_targets: set[int] = set()
         self.fire_targets: set[int] = set()
-        self._vk_mop: list[Shaft] = []
-        self._ov_mop: list[Shaft] = []
+        self.vk_mop: list[Shaft] = []
+        self.ov_mop: list[Shaft] = []
         self.coll: dict[int, tuple[int, Pt]] = {}
         self.entry: dict[int, tuple[int, Pt, int]] = {}
         self.pk_nodes: list[int] = []
@@ -229,12 +175,12 @@ class Planner:
     # ---------- подготовка узлов (чтобы деревья путей считались один раз с общим набором целей)
     def _prepare(self) -> None:
         m, rg = self.m, self.rg
-        self._ov_mop = [
+        self.ov_mop = [
             s
             for s in m.shafts
             if "ОВ" in s.systems and s.place == "mop" and s.contour_status == "found"
         ]
-        self._vk_mop = [
+        self.vk_mop = [
             s
             for s in m.shafts
             if "ВК" in s.systems and s.place == "mop" and s.contour_status == "found"
@@ -301,117 +247,10 @@ class Planner:
         k = int(np.argmin(dd))
         return int(rg.idx[ys[k], xs[k]]), (float(px[k]), float(py[k]))
 
-    def beam_tree(
-        self, root: int, targets: list[int]
-    ) -> tuple[list[list[int]], dict[int, float], list[int]]:
-        """Дерево лучей квартиры от коллектора.
-
-        Каждый следующий прибор — ближайший к уже построенному дереву — подключается к ближайшей
-        его точке. Путь касается дерева только началом, поэтому петель нет. Возвращает пути,
-        длину по дереву от коллектора до каждой клетки (мм) и приборы, до которых пути нет.
-        """
-        along: dict[int, float] = {root: 0.0}
-        paths: list[list[int]] = []
-        left = sorted(set(targets) - {root})
-        while left:
-            tree = spt(self.rg, sorted(along), left, first=True)
-            best = min(left, key=lambda n: (tree[n], n))
-            if not math.isfinite(tree[best]):
-                break
-            path = node_path(tree, best)
-            base = along[path[0]]
-            for i, cell in enumerate(path):
-                along.setdefault(cell, base + i * self.rg.step)
-            paths.append(path)
-            left.remove(best)
-        return paths, along, left
-
-    # ---------- отопление
-    def heating(self) -> None:
-        m, rg, res = self.m, self.rg, self.res
-        shafts = self._ov_mop
-        pick, forest, node_of = self.assign(shafts, {a: v[0] for a, v in self.coll.items()})
-        shaft_node = {sh.id: n for n, sh in node_of.items()}
-        by_shaft: dict[str, list[int]] = {}
-        for ai, sh in pick.items():
-            by_shaft.setdefault(sh.id, []).append(ai)
-        for ai in self.coll:
-            if ai not in pick:
-                self.issue(
-                    "heat_no_path",
-                    f"{m.apts[ai].number}: отопление — путь от шахты ОВ до коллектора не найден",
-                    m.apts[ai],
-                )
-        for sid in sorted(by_shaft):
-            apt_ids = by_shaft[sid]
-            sh = next(s for s in shafts if s.id == sid)
-            n0 = shaft_node[sid]
-            paths = {a: node_path(forest, self.coll[a][0]) for a in apt_ids}
-            for lay in ("M-OV-T1", "M-OV-T2"):
-                self.riser(sh, lay)
-                self.leadin(sh, lay, self.z_heat, n0)
-            chains = tree_chains(rg, list(paths.values()), self.simplify)
-            for lay in ("M-OV-T1", "M-OV-T2"):
-                self.add_chains(lay, chains, self.z_heat, None)
-            for a in apt_ids:
-                info = self.apt_info(m.apts[a])
-                info["heat_shaft"] = sh.id
-                info["heat_path_to_collector_m"] = round(self.path_len_mm(paths[a]) / 1000, 2)
-        # приборы и лучи внутри квартир
-        for ap in m.apts.values():
-            rooms, issues = heatdev.place(m, self.L, rg, self.prof, self.p, ap)
-            res.heat_rooms += rooms
-            res.issues += issues
-            if ap.idx in self.coll:
-                self.beams(ap, rooms)
-            for room in rooms:
-                if room.devices:
-                    continue
-                why = heatdev.NO_DEVICE_REASON[room.status]
-                if room.status == "glazing_of_neighbour":
-                    near = sorted(r.room_id for r in rooms if r.devices and r.comp == room.comp)
-                    why += f" ({', '.join(near)})"
-                self.issue(
-                    "heated_room_without_device",
-                    f"{ap.number}: {room.room_id} {room.name} — отапливаемая комната без "
-                    f"прибора: {why}",
-                    ap,
-                )
-
-    def beams(self, ap: Apartment, rooms: list[HeatRoom]) -> None:
-        """Лучи квартиры: дерево от коллектора до приборов, подача и обратка парой."""
-        rg, res = self.rg, self.res
-        root, xy = self.coll[ap.idx]
-        info = self.apt_info(ap)
-        res.nodes.append(NodeMark("M-NODE", "collector", xy, self.z_heat, ap.idx, "heating"))
-        paths, along, lost = self.beam_tree(root, [d.node for r in rooms for d in r.devices])
-        if lost:
-            self.issue(
-                "heat_beam_unreachable",
-                f"{ap.number}: луч отопления — путь до {len(lost)} приборов не найден",
-                ap,
-            )
-        for room in rooms:
-            if room.devices and all(d.node in lost for d in room.devices):
-                room.status = "unreachable"
-            room.devices = [d for d in room.devices if d.node not in lost]
-            for d in room.devices:
-                d.path_m = round(along[d.node] / 1000, 2)
-                res.nodes.append(
-                    NodeMark("M-NODE", "device", d.xy, self.z_heat, ap.idx, "heating", room.room_id)
-                )
-        chains = tree_chains(rg, paths, self.simplify)
-        for lay in ("M-OV-T1", "M-OV-T2"):
-            self.add_chains(lay, chains, self.z_heat, ap.idx)
-        info["heat_beams_m"] = round(sum(self.path_len_mm(p) for p in paths) / 1000, 2)
-        res.beam_paths[ap.idx] = [
-            [(float(rg.xy[n][0]), float(rg.xy[n][1])) for n in p] for p in paths
-        ]
-
     # ---------- водоснабжение
     def water(self) -> None:
         m, rg, res = self.m, self.rg, self.res
-        shafts = self._vk_mop
+        shafts = self.vk_mop
         entry = self.entry
         pick, forest, node_of = self.assign(shafts, {a: v[0] for a, v in entry.items()})
         shaft_node = {sh.id: n for n, sh in node_of.items()}
@@ -458,68 +297,6 @@ class Planner:
                 info["water_path_m"] = round(self.path_len_mm(paths[a]) / 1000, 2)
                 res.nodes.append(NodeMark("M-NODE", "meter", entry[a][1], self.z_meter, a, "water"))
 
-    # ---------- пожаротушение
-    def fire(self) -> None:
-        rg, res = self.rg, self.res
-        vk = self._vk_mop
-        if not self.pk_nodes or not vk:
-            self.issue("fire_no_source", "пожаротушение: нет ПК или шахты ВК в МОП")
-            return
-        near_r = self.p.num("near_pk_dist_mm")
-        near_pk = [
-            s
-            for s in vk
-            if any(
-                math.hypot(s.centroid[0] - p.c[0], s.centroid[1] - p.c[1]) < near_r
-                for p in self.L.pk
-            )
-        ]
-        best: Shaft | None = None
-        bsum = math.inf
-        btree: Tree | None = None
-        bn0 = -1
-        for sh in near_pk or vk:
-            n0 = self.shaft_node(sh)
-            if n0 is None:
-                continue
-            tree = spt(rg, [n0], self.fire_targets)
-            total = float(sum(tree[n] for n in self.pk_nodes))
-            if math.isfinite(total) and total < bsum:
-                best, bsum, btree, bn0 = sh, total, tree, n0
-        if best is None or btree is None:
-            self.issue("fire_no_path", "пожаротушение: путь от шахт ВК до ПК не найден")
-            return
-        paths = [p for p in (node_path(btree, n) for n in self.pk_nodes) if p]
-        self.riser(best, "M-PT-VPV")
-        self.leadin(best, "M-PT-VPV", self.z_ceil, bn0)
-        self.add_chains("M-PT-VPV", tree_chains(rg, paths, self.simplify), self.z_ceil, None)
-        # АУП: ветка от той же шахты до дальних точек каждого внеквартирного помещения
-        aup_rooms = aup.regions(rg, self.m, self.expl, self.p)
-        ap_paths = aup.extend(rg, bn0, aup_rooms, self.p)
-        if ap_paths:
-            self.riser(best, "M-PT-AUP")
-            self.leadin(best, "M-PT-AUP", self.z_ceil, bn0)
-            self.add_chains("M-PT-AUP", tree_chains(rg, ap_paths, self.simplify), self.z_ceil, None)
-        else:
-            self.issue("fire_aup_no_ends", "АУП: внеквартирные помещения для ветки не найдены")
-        cover = aup.coverage(rg, aup_rooms, ap_paths, self.p)
-        need = self.p.num("aup_cover_min_share")
-        for row in cover:
-            share = row["covered_share"]
-            if isinstance(share, float) and share < need:
-                self.issue(
-                    "aup_coverage_low",
-                    f"АУП: {', '.join(str(n) for n in _names(row))} — ветка покрывает "
-                    f"{share * 100:.0f} % площади (нужно не меньше {need * 100:.0f} %)",
-                )
-        res.fire = {
-            "source_shaft": best.id,
-            "pk_count": len(self.pk_nodes),
-            "vpv_paths_m": [round(self.path_len_mm(p) / 1000, 2) for p in paths],
-            "aup_paths_m": [round(self.path_len_mm(p) / 1000, 2) for p in ap_paths],
-            "aup_coverage": cover,
-        }
-
     # ---------- канализация
     def sewer(self) -> None:
         for sh in self.m.shafts:
@@ -555,9 +332,9 @@ class Planner:
 
     def run(self) -> Result:
         self._prepare()
-        self.heating()
+        heating.route(self)
         self.water()
-        self.fire()
+        fire.route(self)
         self.sewer()
         self.finalize_risers()
         return self.res

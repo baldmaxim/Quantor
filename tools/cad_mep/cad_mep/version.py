@@ -1,3 +1,3 @@
 """Версия генератора: входит в provenance и в ключ идемпотентности задания."""
 
-GENERATOR_VERSION = "cad_mep.v3"
+GENERATOR_VERSION = "cad_mep.v4"

@@ -24,6 +24,8 @@ NO_DEVICE_REASON = {
     "no_node": "у наружной стены нет проходимой точки для прибора",
     "unreachable": "путь от коллектора до прибора не найден",
 }
+# комната без своего остекления в общем помещении с комнатами, у которых приборы есть
+HEATED_BY_ADJACENT = "heated_by_adjacent"
 
 
 @dataclass
@@ -44,7 +46,7 @@ class HeatRoom:
     comp: int | None
     placed_by: str  # label — марка на плане, area — по площади, none — марки нет
     heating: str  # listed — по списку названий, assumed — название неизвестно, есть остекление
-    status: str  # ok либо ключ NO_DEVICE_REASON
+    status: str  # ok, HEATED_BY_ADJACENT либо ключ NO_DEVICE_REASON
     facade_m: float | None = None  # наружная стена помещения (общая для слитых комнат)
     devices: list[Device] = field(default_factory=list)
 

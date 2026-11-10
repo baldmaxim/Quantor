@@ -158,7 +158,7 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
     assert candidate["schema"] == "quantor.cad_mep.candidate.v1"
     prov = candidate["provenance"]
     assert isinstance(prov, dict)
-    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v3"
+    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v4"
     assert prov["pdf_sha256"] == _sha(inputs["pdf"])
     assert prov["view_dxf_sha256"] == _sha(inputs["dxf"])
     params = load_params(None)
@@ -581,6 +581,45 @@ def test_heated_room_criterion_and_completeness(tmp_path: Path) -> None:
         "passed": False,
         "apartments_without_shaft": [],
         "heated_rooms_without_device": ["Кв 1011: 1-1/3"],
+    }
+
+
+def test_niche_open_to_heated_room_needs_no_device(tmp_path: Path) -> None:
+    """Ниша без окна в общем помещении с кухней — без прибора, с замечанием; глухая — FAIL."""
+    floor = synth.build_floor()
+    # Кв 1011: ниша в помещении кухни, марка дальше от фасада, чем марка кухни
+    floor.labels.append(("1-1/4", 9000.0, 2600.0))
+    floor.expl.append(("1-1/4", "Кухня-ниша", 3.0))
+    # Кв 1012: отапливаемая комната за дверью без наружной стены
+    floor.expl = [
+        (rid, "Кухня-ниша" if rid == "1-2/2" else name, area) for rid, name, area in floor.expl
+    ]
+    data = _variant(tmp_path, floor)
+    issues = data["issues"]
+    assert isinstance(issues, list)
+    by_code: dict[str, list[str]] = {}
+    for i in issues:
+        by_code.setdefault(i["code"], []).append(i["message"])
+    assert sorted(by_code) == ["heated_room_without_device", "room_heated_by_adjacent"]
+    assert by_code["room_heated_by_adjacent"] == [
+        "Кв 1011: 1-1/4 Кухня-ниша — своего остекления нет, открыта в 1-1/3: прибор не "
+        "ставится, обогрев от соседних приборов"
+    ]
+    assert len(by_code["heated_room_without_device"]) == 1
+    assert "1-2/2 Кухня-ниша" in by_code["heated_room_without_device"][0]
+    assert "нет наружной стены" in by_code["heated_room_without_device"][0]
+    apts = _apartments(data)
+    assert _heat_counts(apts["Кв 1011"]) == (3, 2, 4)
+    status = {r["room_id"]: r["status"] for r in _heat(apts["Кв 1011"])["rooms"]}
+    assert status["1-1/4"] == "heated_by_adjacent"
+    by_id = {r["room_id"]: r for r in _heat(apts["Кв 1011"])["rooms"]}
+    assert by_id["1-1/4"]["comp"] == by_id["1-1/3"]["comp"]
+    checks = data["checks"]
+    assert isinstance(checks, dict)
+    assert checks["each_apt_has_heat_and_water"] == {
+        "passed": False,
+        "apartments_without_shaft": [],
+        "heated_rooms_without_device": ["Кв 1012: 1-2/2"],
     }
 
 

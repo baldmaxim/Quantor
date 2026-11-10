@@ -19,8 +19,8 @@ from cad_mep.layers import (
     WALL_PDF_LAYER,
 )
 from cad_mep.params import Params
+from cad_mep.result import Result
 from cad_mep.rooms import Model
-from cad_mep.systems import Result
 
 DXF_UNITS_MM = 4
 

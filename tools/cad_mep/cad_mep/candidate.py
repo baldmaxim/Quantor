@@ -9,11 +9,12 @@ from dataclasses import dataclass
 from cad_mep.checks import lengths_by_layer, lengths_by_system
 from cad_mep.elevations import Value
 from cad_mep.frame import Frame, TieStats
+from cad_mep.heatdev import HEATED_BY_ADJACENT
 from cad_mep.labels import Labels
 from cad_mep.layers import MARK_LAYERS, ROUTE_LAYERS
 from cad_mep.params import Params
+from cad_mep.result import Result
 from cad_mep.rooms import Model
-from cad_mep.systems import Result
 
 CANDIDATE_SCHEMA = "quantor.cad_mep.candidate.v1"
 PREVIEW_SCHEMA = "quantor.cad_engine.preview.v1"
@@ -126,7 +127,7 @@ def build_candidate(
                 "devices": len(h.devices),
             }
         )
-        if not h.devices:
+        if not h.devices and h.status != HEATED_BY_ADJACENT:
             no_device.append(f"{m.apts[h.apt].number}: {h.room_id}")
         heat_devices[h.apt] += [
             {
