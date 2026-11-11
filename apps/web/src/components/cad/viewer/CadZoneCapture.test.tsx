@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { CadZoneRead } from '@quantor/api-client';
+
 import { Camera } from '@/lib/viewer/camera';
 
 import { CadZoneCapture } from './CadZoneCapture';
@@ -8,13 +10,44 @@ import { CadZoneCapture } from './CadZoneCapture';
 // Лист 1000 x 1000 при масштабе 1 и нулевом смещении: пиксель = 1/1000 листа.
 const PAGE = { width: 1000, height: 1000 };
 
-const tap = (layer: HTMLElement, x: number, y: number) => {
+const zone = (patch: Partial<CadZoneRead>): CadZoneRead => ({
+  id: 'z1',
+  revision_id: 'r1',
+  page_index: 0,
+  kind: 'room_mop',
+  apartment_no: null,
+  room_mark: null,
+  name: null,
+  points: [
+    [0.5, 0.5],
+    [0.8, 0.5],
+    [0.8, 0.8],
+    [0.5, 0.8],
+  ],
+  door_height_mm: null,
+  area_m2: null,
+  perimeter_m: null,
+  width_m: null,
+  calibration_missing: true,
+  geometry_issue: null,
+  created_at: '2026-11-10T00:00:00Z',
+  updated_at: '2026-11-10T00:00:00Z',
+  ...patch,
+});
+
+interface ITapOptions {
+  shiftKey?: boolean;
+  altKey?: boolean;
+}
+
+const tap = (layer: HTMLElement, x: number, y: number, modifiers: ITapOptions = {}) => {
   fireEvent.pointerDown(layer, {
     pointerId: 1,
     clientX: x,
     clientY: y,
     button: 0,
     pointerType: 'mouse',
+    ...modifiers,
   });
   fireEvent.pointerUp(layer, {
     pointerId: 1,
@@ -22,6 +55,7 @@ const tap = (layer: HTMLElement, x: number, y: number) => {
     clientY: y,
     button: 0,
     pointerType: 'mouse',
+    ...modifiers,
   });
 };
 
@@ -34,7 +68,7 @@ describe('CadZoneCapture', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  const mount = (kind: 'room_apartment' | 'door') => {
+  const mount = (kind: 'room_apartment' | 'door', zones: readonly CadZoneRead[] = []) => {
     const camera = new Camera();
     const onComplete = vi.fn();
     const onExit = vi.fn();
@@ -43,6 +77,7 @@ describe('CadZoneCapture', () => {
         camera={camera}
         page={PAGE}
         kind={kind}
+        zones={zones}
         onComplete={onComplete}
         onExit={onExit}
       />,
@@ -137,5 +172,67 @@ describe('CadZoneCapture', () => {
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(onExit).not.toHaveBeenCalled();
     input.remove();
+  });
+
+  describe('привязка', () => {
+    const ZONES = [zone({})];
+
+    it('вершина ставится в вершину готовой зоны, если щелчок рядом', () => {
+      const { layer, onComplete } = mount('door', ZONES);
+      tap(layer, 505, 496); // 5 px и 4 px от вершины (0.5, 0.5)
+      tap(layer, 200, 200);
+      expect(onComplete).toHaveBeenCalledWith([
+        [0.5, 0.5],
+        [0.2, 0.2],
+      ]);
+    });
+
+    it('вершина ставится на ребро готовой зоны', () => {
+      const { layer, onComplete } = mount('door', ZONES);
+      tap(layer, 650, 495); // у ребра y = 0.5
+      tap(layer, 200, 200);
+      const first = onComplete.mock.calls[0]?.[0]?.[0];
+      expect(first?.[0]).toBeCloseTo(0.65, 10);
+      expect(first?.[1]).toBeCloseTo(0.5, 10);
+    });
+
+    it('Alt отключает привязку', () => {
+      const { layer, onComplete } = mount('door', ZONES);
+      tap(layer, 505, 496, { altKey: true });
+      tap(layer, 200, 200);
+      expect(onComplete).toHaveBeenCalledWith([
+        [0.505, 0.496],
+        [0.2, 0.2],
+      ]);
+    });
+
+    it('Shift: вторая точка двери строго по горизонтали от первой', () => {
+      const { layer, onComplete } = mount('door');
+      tap(layer, 100, 300);
+      tap(layer, 400, 320, { shiftKey: true });
+      expect(onComplete).toHaveBeenCalledWith([
+        [0.1, 0.3],
+        [0.4, 0.3],
+      ]);
+    });
+
+    it('привязка к вершине своего черновика', () => {
+      const { layer, onComplete } = mount('room_apartment');
+      tap(layer, 100, 100);
+      tap(layer, 400, 100);
+      tap(layer, 400, 400);
+      tap(layer, 700, 700);
+      // Рядом со второй вершиной (400, 100), но вне радиуса замыкания первой: точка = вершина.
+      tap(layer, 404, 103);
+      fireEvent.keyDown(document, { key: 'Enter' });
+      expect(onComplete.mock.calls[0]?.[0]?.[4]).toEqual([0.4, 0.1]);
+    });
+
+    it('колесо с Shift в режиме рисования масштабирует, а не панорамирует', () => {
+      const { layer, camera } = mount('door');
+      fireEvent.wheel(layer, { deltaY: 100, shiftKey: true, clientX: 10, clientY: 10 });
+      // Масштаб изменился: сработал зум слоя захвата, а не горизонтальная панорама viewport.
+      expect(camera.getState().scale).toBeLessThan(1);
+    });
   });
 });

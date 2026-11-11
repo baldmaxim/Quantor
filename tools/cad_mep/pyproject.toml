@@ -28,7 +28,7 @@ known-first-party = ["cad_mep"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-files = ["cad_mep", "run_mep.py", "tests"]
+files = ["cad_mep", "run_mep.py", "run_zones.py", "tests"]
 
 [[tool.mypy.overrides]]
 # У PyMuPDF нет полных аннотаций.

@@ -50,6 +50,7 @@ export interface IWorkspaceCadZonesState {
     camera: Camera;
     page: { width: number; height: number };
     kind: ZoneKind;
+    zones: IWorkspaceCadZones['zones'];
     onComplete: (points: [number, number][]) => void;
     onExit: () => void;
   } | null;
@@ -201,6 +202,7 @@ export const useWorkspaceCadZones = ({
             camera,
             page: pageSize,
             kind,
+            zones: zoneList,
             onComplete,
             onExit: () => setDrawing(false),
           }

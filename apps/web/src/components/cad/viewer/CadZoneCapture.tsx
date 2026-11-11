@@ -9,6 +9,15 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 
+import type { CadZoneRead } from '@quantor/api-client';
+
+import {
+  buildSnapIndex,
+  snapPoint,
+  zonesToSnapShapes,
+  type ISnapResult,
+} from '@/lib/cad/zone-snap';
+import { drawSnapMarker } from '@/lib/cad/zone-snap-marker';
 import { readZoneColors, zoneColor } from '@/lib/cad/zones-painter';
 import {
   CLOSE_RADIUS_PX,
@@ -18,7 +27,12 @@ import {
   type ZoneKind,
 } from '@/lib/cad/zones';
 import type { Camera } from '@/lib/viewer/camera';
-import { placeViewportPage, toNormalizedPoint, toScreenPoint } from '@/lib/viewer/coordinates';
+import {
+  placeViewportPage,
+  toNormalizedPoint,
+  toScreenPoint,
+  type ScreenPoint,
+} from '@/lib/viewer/coordinates';
 import { resizeOverlay } from '@/lib/viewer/overlay';
 import { ToolController } from '@/lib/viewer/tool-controller';
 
@@ -27,6 +41,8 @@ interface ICadZoneCaptureProps {
   /** Размер страницы у отрисовщика (pt при масштабе 1) - единицы листа в камере. */
   page: { readonly width: number; readonly height: number };
   kind: ZoneKind;
+  /** Готовые зоны листа: их вершины и рёбра - цели привязки. */
+  zones: readonly CadZoneRead[];
   /** Контур или линия двери готовы: точки [x, y] в долях листа от левого верхнего угла. */
   onComplete: (points: [number, number][]) => void;
   /** Esc при пустом черновике: режим рисования закрыт. */
@@ -66,6 +82,7 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
   camera,
   page,
   kind,
+  zones,
   onComplete,
   onExit,
 }) => {
@@ -73,12 +90,42 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
   const canvas = useRef<HTMLCanvasElement>(null);
   const gesture = useRef<IGesture | null>(null);
   const controller = useMemo(() => new ToolController(zoneToolMode(kind)), [kind]);
-  const color = useMemo(() => zoneColor(readZoneColors(), kind), [kind]);
+  const colors = useMemo(() => readZoneColors(), []);
+  const color = useMemo(() => zoneColor(colors, kind), [colors, kind]);
+  // Индекс привязки строится один раз на смену набора зон, не на каждое движение.
+  const snapIndex = useMemo(() => buildSnapIndex(zonesToSnapShapes(zones)), [zones]);
+  // Привязка и модификаторы живут вне React: меняются на каждом движении указателя.
+  const snap = useRef<ISnapResult | null>(null);
+  const pointer = useRef<ScreenPoint | null>(null);
+  const modifiers = useRef({ shift: false, alt: false });
 
   // Свежие обработчики без пересоздания контроллера и подписок.
   const callbacks = useRef({ onComplete, onExit });
   useEffect(() => {
     callbacks.current = { onComplete, onExit };
+  });
+
+  // Привязка точки экрана к зонам листа и черновику; масштаб - текущий размер листа в пикселях.
+  const snapAt = (screen: ScreenPoint): ISnapResult => {
+    const placement = placeViewportPage(page, camera.getState());
+    return snapPoint(toNormalizedPoint(screen, placement), {
+      index: snapIndex,
+      scale: { x: placement.width, y: placement.height },
+      placed: controller.getState().points,
+      shift: modifiers.current.shift,
+      alt: modifiers.current.alt,
+    });
+  };
+
+  // Указатель двинулся (или сменился модификатор): пересчитать привязку и предварительное звено.
+  const track = useRef<(screen: ScreenPoint | null) => void>(() => undefined);
+  useEffect(() => {
+    track.current = (screen) => {
+      pointer.current = screen;
+      const result = screen ? snapAt(screen) : null;
+      snap.current = result;
+      controller.send({ type: 'pointerMove', point: result ? result.point : null });
+    };
   });
 
   const draw = useRef<() => void>(() => undefined);
@@ -97,7 +144,11 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
       const placement = placeViewportPage(page, camera.getState());
       const vertices = state.points.map((point) => toScreenPoint(point, placement));
       const hover = state.hover ? toScreenPoint(state.hover, placement) : null;
-      if (vertices.length === 0) return;
+      const extent = { width: host.clientWidth, height: host.clientHeight };
+      if (vertices.length === 0) {
+        if (hover) drawSnapMarker(context, colors, snap.current, hover, null, extent);
+        return;
+      }
 
       context.strokeStyle = color;
       context.fillStyle = color;
@@ -125,6 +176,10 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
         context.arc(point.x, point.y, VERTEX_RADIUS, 0, Math.PI * 2);
         context.fill();
       }
+      if (hover) {
+        const anchor = vertices[vertices.length - 1] ?? null;
+        drawSnapMarker(context, colors, snap.current, hover, anchor, extent);
+      }
       const first = vertices[0];
       if (kind !== 'door' && first && vertices.length >= 3) {
         // Кольцо у первой вершины: щелчок в него замыкает контур.
@@ -146,7 +201,14 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(redraw) : null;
     if (host) observer?.observe(host);
 
+    // Shift - ortho, Alt - без привязки: перерисовать метку, не дожидаясь движения мыши.
+    const onModifier = (event: KeyboardEvent) => {
+      if (event.key !== 'Shift' && event.key !== 'Alt') return;
+      modifiers.current = { shift: event.shiftKey, alt: event.altKey };
+      if (pointer.current) track.current(pointer.current);
+    };
     const onKeyDown = (event: KeyboardEvent) => {
+      onModifier(event);
       if (isTyping(event.target)) return;
       if (event.key === 'Enter') {
         controller.send({ type: 'finish' });
@@ -160,9 +222,11 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
       }
     };
     document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onModifier);
     redraw();
     return () => {
       document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onModifier);
       unsubscribeTool();
       unsubscribeCamera();
       observer?.disconnect();
@@ -194,11 +258,8 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const current = gesture.current;
     if (current === null || current.pointerId !== event.pointerId) {
-      const point = local(event);
-      controller.send({
-        type: 'pointerMove',
-        point: toNormalizedPoint(point, placeViewportPage(page, camera.getState())),
-      });
+      modifiers.current = { shift: event.shiftKey, alt: event.altKey };
+      track.current(local(event));
       return;
     }
     if (
@@ -235,7 +296,8 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
       controller.send({ type: 'finish' });
       return;
     }
-    controller.send({ type: 'pointerDown', point: toNormalizedPoint(click, placement) });
+    modifiers.current = { shift: event.shiftKey, alt: event.altKey };
+    controller.send({ type: 'pointerDown', point: snapAt(click).point });
   };
 
   const onPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -259,7 +321,7 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      onPointerLeave={() => controller.send({ type: 'pointerMove', point: null })}
+      onPointerLeave={() => track.current(null)}
       onWheel={onWheel}
       className="absolute inset-0 z-10 cursor-crosshair touch-none"
     >

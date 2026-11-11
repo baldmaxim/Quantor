@@ -14,18 +14,18 @@ from cad_mep.errors import EXIT_INPUT, MepError
 from cad_mep.pipeline import Args, generate
 
 
-class _JsonArgumentParser(argparse.ArgumentParser):
+class JsonArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> NoReturn:
-        _fail("bad_arguments", message)
+        fail("bad_arguments", message)
         raise SystemExit(EXIT_INPUT)
 
 
-def _fail(code: str, message: str) -> None:
+def fail(code: str, message: str) -> None:
     sys.stderr.write(json.dumps({"code": code, "message": message}, ensure_ascii=False) + "\n")
 
 
 def _parser() -> argparse.ArgumentParser:
-    p = _JsonArgumentParser(prog="run_mep.py", description="Трассы механики по плану этажа")
+    p = JsonArgumentParser(prog="run_mep.py", description="Трассы механики по плану этажа")
     p.add_argument("--pdf", type=Path, required=True)
     p.add_argument("--page-index", type=int, required=True)
     p.add_argument("--view-dxf", type=Path, required=True)
@@ -59,7 +59,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         summary = generate(args)
     except MepError as exc:
-        _fail(exc.code, exc.message)
+        fail(exc.code, exc.message)
         return exc.exit_code
     summary["runtime_s"] = round(time.monotonic() - started, 1)
     sys.stdout.write(json.dumps(summary, ensure_ascii=False) + "\n")

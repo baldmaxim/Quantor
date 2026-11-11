@@ -15,7 +15,8 @@ from pathlib import Path
 
 import pymupdf
 from ezdxf.filemanagement import new as new_dxf
-from shapely.geometry import Polygon, box
+from shapely.geometry import Point, Polygon, box
+from shapely.geometry.base import BaseGeometry
 
 SCALE = 70.0  # мм на пункт PDF
 OX_PT, OY_PT = 40.0, 420.0  # начало DXF на листе (пт)
@@ -50,6 +51,9 @@ class Floor:
     shaft_inner: list[Rect] = field(default_factory=list)
     # экспликация: (марка, название, площадь)
     expl: list[tuple[str, str, float]] = field(default_factory=list)
+    # стены произвольной формы (вершины в мм здания) и тонкие чёрные линии плана (x0, y0, x1, y1)
+    poly_walls: list[list[tuple[float, float]]] = field(default_factory=list)
+    lines: list[Rect] = field(default_factory=list)
 
 
 def _hwall(floor: Floor, y: float, x0: float, x1: float, gaps: list[tuple[float, float]]) -> None:
@@ -269,6 +273,13 @@ def write_pdf(
     for x0, y0, x1, y1 in floor.walls:
         a, b = _pt(x0, y1), _pt(x1, y0)
         page.draw_rect(pymupdf.Rect(a[0], a[1], b[0], b[1]), color=None, fill=WALL_FILL)
+    for ring in floor.poly_walls:
+        pts = [pymupdf.Point(*_pt(x, y)) for x, y in ring]
+        page.draw_polyline(pts, color=None, fill=WALL_FILL, closePath=True)
+    for x0, y0, x1, y1 in floor.lines:
+        page.draw_line(
+            pymupdf.Point(*_pt(x0, y0)), pymupdf.Point(*_pt(x1, y1)), color=(0, 0, 0), width=0.24
+        )
     tw = pymupdf.TextWriter(page.rect)
     for text, x, y in floor.labels:
         px, py = _pt(x, y)
@@ -312,6 +323,10 @@ def write_view_dxf(floor: Floor, path: Path, wall_layer: str = WALL_LAYER) -> No
     for x0, y0, x1, y1 in floor.walls:
         pts = [(x0 + sx, y0 + sy), (x1 + sx, y0 + sy), (x1 + sx, y1 + sy), (x0 + sx, y1 + sy)]
         msp.add_lwpolyline(pts, close=True, dxfattribs={"layer": wall_layer})
+    for ring in floor.poly_walls:
+        msp.add_lwpolyline(
+            [(x + sx, y + sy) for x, y in ring], close=True, dxfattribs={"layer": wall_layer}
+        )
     for i, d in enumerate(floor.doors):
         name = f"AR_DOOR_BLOCK_{i:03d}"
         blk = doc.blocks.new(name)
@@ -377,3 +392,52 @@ def wall_union_polys(floor: Floor) -> list[Polygon]:
 def shaft_inner_boxes(floor: Floor) -> list[Polygon]:
     sx, sy = SHIFT
     return [box(x0 + sx, y0 + sy, x1 + sx, y1 + sy) for x0, y0, x1, y1 in floor.shaft_inner]
+
+
+# --- этаж для зон помещений: открытая планировка и скруглённый угол ---------------------------
+ARC_CENTER = (9000.0, 3000.0)
+ARC_R_IN, ARC_R_OUT = 2700.0, 3000.0
+SPLIT_Y = 5000.0  # граница кухни и прихожей — тонкая чёрная линия на плане, стены нет
+
+
+@dataclass
+class ZoneTruth:
+    """Идеальные области помещений (мм здания): по внутренним граням стен и линии плана."""
+
+    shapes: dict[str, BaseGeometry]
+
+
+def build_zones_floor() -> tuple[Floor, ZoneTruth]:
+    """Квартира 1-1: спальня (стена, без двери) и открытая пара «кухня + прихожая» с дугой в углу.
+
+    Кухня и прихожая не разделены стеной — только тонкой чёрной линией плана на y = SPLIT_Y;
+    юго-восточный угол здания скруглён дугой (многоугольник из вершин через 5 градусов).
+    """
+    f = Floor()
+    cx, cy = ARC_CENTER
+    f.walls += [
+        (0, 0, 9000, 300),
+        (0, 7700, 12000, 8000),
+        (0, 0, 300, 8000),
+        (11700, 3000, 12000, 8000),
+        (5940, 300, 6060, 7700),
+    ]
+    angles = [math.radians(a) for a in range(-90, 1, 5)]
+    outer = [(cx + ARC_R_OUT * math.cos(a), cy + ARC_R_OUT * math.sin(a)) for a in angles]
+    inner = [(cx + ARC_R_IN * math.cos(a), cy + ARC_R_IN * math.sin(a)) for a in angles]
+    f.poly_walls.append(outer + inner[::-1])
+    f.lines.append((6060.0, SPLIT_Y, 11700.0, SPLIT_Y))
+    room = box(6060, 300, 11700, 7700)
+    corner = box(cx, 300, 11700, cy).difference(Point(cx, cy).buffer(ARC_R_IN, quad_segs=64))
+    free = room.difference(corner)
+    shapes = {
+        "1-1/1": box(300, 300, 5940, 7700),
+        "1-1/2": free.intersection(box(0, SPLIT_Y, 12000, 8000)),
+        "1-1/3": free.intersection(box(0, 0, 12000, SPLIT_Y)),
+    }
+    names = {"1-1/1": "Спальня", "1-1/2": "Прихожая", "1-1/3": "Кухня"}
+    marks = {"1-1/1": (3000.0, 4000.0), "1-1/2": (9000.0, 6300.0), "1-1/3": (8500.0, 2500.0)}
+    for mark, (x, y) in marks.items():
+        f.labels.append((mark, x, y))
+        f.expl.append((mark, names[mark], round(shapes[mark].area / 1e6, 2)))
+    return f, ZoneTruth(shapes)
