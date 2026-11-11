@@ -9,12 +9,13 @@ import {
   DOOR_HEIGHT_MIN_MM,
   ZONE_KINDS,
   ZONE_KIND_LABELS,
-  isRoomKind,
+  hasRoomMark,
   type ZoneKind,
 } from '@/lib/cad/zones';
 import type { IWorkspaceCadZones } from '@/components/workspace/cad/types';
 
 import { CadZoneList } from './CadZoneList';
+import { ParkingTypeSelect } from './ParkingTypeSelect';
 
 const KIND_OPTIONS: readonly ISegmentedOption<ZoneKind>[] = ZONE_KINDS.map((kind) => ({
   value: kind,
@@ -37,6 +38,9 @@ export const CadZonesPanel: FC<IWorkspaceCadZones> = ({
   onRoomMarkChange,
   doorHeight,
   onDoorHeightChange,
+  parkingType,
+  onParkingTypeChange,
+  onSetParkingType,
   drawing,
   drawDisabledReason,
   onStartDrawing,
@@ -88,7 +92,7 @@ export const CadZonesPanel: FC<IWorkspaceCadZones> = ({
               />
             </label>
           )}
-          {isRoomKind(kind) && (
+          {hasRoomMark(kind) && (
             <label className={LABEL}>
               Марка помещения (необязательно)
               <ClearableInput
@@ -99,6 +103,16 @@ export const CadZonesPanel: FC<IWorkspaceCadZones> = ({
                 wrapperClassName="w-full"
                 onChange={(event) => onRoomMarkChange(event.target.value)}
                 onClear={() => onRoomMarkChange('')}
+              />
+            </label>
+          )}
+          {kind === 'parking_space' && (
+            <label className={LABEL}>
+              Тип места
+              <ParkingTypeSelect
+                label="Тип машино-места"
+                value={parkingType}
+                onChange={onParkingTypeChange}
               />
             </label>
           )}
@@ -177,6 +191,7 @@ export const CadZonesPanel: FC<IWorkspaceCadZones> = ({
           onActivate={onActivate}
           onRename={onRename}
           onDelete={onDelete}
+          onSetParkingType={onSetParkingType}
         />
       )}
     </div>

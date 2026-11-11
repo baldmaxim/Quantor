@@ -7,14 +7,19 @@ import type { CadZoneRead } from '@quantor/api-client';
 import { ClearableInput } from '@/components/ui/ClearableInput';
 import { Button, cx } from '@/components/ui';
 import {
+  PARKING_TYPE_LABELS,
   ZONE_KIND_LABELS,
   doorSizeText,
   formatZoneArea,
   formatZoneLength,
   groupZones,
+  parkingSummary,
   zoneUndefinedReason,
   type IZoneSum,
+  type ParkingType,
 } from '@/lib/cad/zones';
+
+import { ParkingTypeSelect } from './ParkingTypeSelect';
 
 interface ICadZoneListProps {
   zones: readonly CadZoneRead[];
@@ -23,6 +28,8 @@ interface ICadZoneListProps {
   onActivate: (id: string | null) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  /** Сменить тип у машино-места; не передан - тип в списке не правится. */
+  onSetParkingType?: (id: string, type: ParkingType) => void;
 }
 
 const sumText = (sum: IZoneSum): string =>
@@ -38,7 +45,10 @@ const zoneValues = (zone: CadZoneRead): string => {
   if (zone.kind === 'door') return doorSizeText(zone);
   const reason = zoneUndefinedReason(zone);
   if (reason !== null) return reason;
-  return `${formatZoneArea(zone.area_m2)} · периметр ${formatZoneLength(zone.perimeter_m)}`;
+  const measures = `${formatZoneArea(zone.area_m2)} · периметр ${formatZoneLength(zone.perimeter_m)}`;
+  return zone.kind === 'parking_space'
+    ? `${PARKING_TYPE_LABELS[zone.parking_type ?? 'unknown']} · ${measures}`
+    : measures;
 };
 
 interface IGroupProps {
@@ -68,6 +78,7 @@ export const CadZoneList: FC<ICadZoneListProps> = ({
   onActivate,
   onRename,
   onDelete,
+  onSetParkingType,
 }) => {
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -118,6 +129,15 @@ export const CadZoneList: FC<ICadZoneListProps> = ({
             <span className="min-w-0 text-sm break-words">{zoneTitle(zone)}</span>
             <span className="text-xs text-muted">{zoneValues(zone)}</span>
           </button>
+        )}
+
+        {zone.kind === 'parking_space' && onSetParkingType && editing?.id !== zone.id && (
+          <ParkingTypeSelect
+            label={`Тип места: ${zoneTitle(zone)}`}
+            value={zone.parking_type ?? 'unknown'}
+            disabled={saving}
+            onChange={(type) => onSetParkingType(zone.id, type)}
+          />
         )}
 
         {confirming === zone.id ? (
@@ -184,6 +204,29 @@ export const CadZoneList: FC<ICadZoneListProps> = ({
         <Group title="МОП" summary={sumText(groups.mop)}>
           {groups.mop.zones.map(row)}
         </Group>
+      )}
+      {groups.parking.zones.length > 0 && (
+        <div className="flex min-w-0 flex-col gap-[var(--s-2)]" data-testid="cad-parking-summary">
+          <Group
+            title={`Машино-места: ${groups.parking.zones.length}`}
+            summary={sumText(groups.parking)}
+          >
+            {parkingSummary(zones).map((item) => (
+              <li
+                key={item.type}
+                className="flex items-baseline justify-between gap-[var(--s-3)] text-xs"
+              >
+                <span className="min-w-0 break-words">{PARKING_TYPE_LABELS[item.type]}</span>
+                <span className="shrink-0 text-muted">
+                  {item.count} шт. · {sumText(item)}
+                </span>
+              </li>
+            ))}
+          </Group>
+          <Group title="Места на плане" summary="">
+            {groups.parking.zones.map(row)}
+          </Group>
+        </div>
       )}
       {groups.doors.length > 0 && (
         <Group title="Двери" summary={`${groups.doors.length} шт.`}>

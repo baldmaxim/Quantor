@@ -1,4 +1,4 @@
-"""Контракты зон листа во вкладке CAD: помещения квартир, помещения МОП, двери."""
+"""Контракты зон листа во вкладке CAD: помещения квартир, помещения МОП, двери, машино-места."""
 
 from __future__ import annotations
 
@@ -10,7 +10,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain import MAX_MEASUREMENT_POINTS
 
-CadZoneKind = Literal["room_apartment", "room_mop", "door"]
+CadZoneKind = Literal["room_apartment", "room_mop", "door", "parking_space"]
+CadParkingType = Literal[
+    "permanent",
+    "temporary",
+    "guest",
+    "medium",
+    "medium_guest",
+    "large",
+    "large_guest",
+    "mgn_m1_3",
+    "mgn_m4",
+    "unknown",
+]
 
 MAX_TEXT = 200
 ZonePoint = tuple[float, float]
@@ -29,6 +41,7 @@ class CadZoneCreate(BaseModel):
     name: str | None = Field(default=None, max_length=MAX_TEXT)
     points: list[ZonePoint] = Field(min_length=2, max_length=MAX_MEASUREMENT_POINTS)
     door_height_mm: int | None = None
+    parking_type: CadParkingType | None = None
 
 
 class CadZoneUpdate(BaseModel):
@@ -44,6 +57,7 @@ class CadZoneUpdate(BaseModel):
         default=None, min_length=2, max_length=MAX_MEASUREMENT_POINTS
     )
     door_height_mm: int | None = None
+    parking_type: CadParkingType | None = None
 
 
 class CadZoneRead(BaseModel):
@@ -56,6 +70,7 @@ class CadZoneRead(BaseModel):
     name: str | None
     points: list[ZonePoint]
     door_height_mm: int | None
+    parking_type: CadParkingType | None
     # Площадь и периметр помещения, ширина двери: сервер, по геометрии страницы и действующей
     # калибровке листа. `null` — не определено (не 0): причина в `calibration_missing`
     # или `geometry_issue`.

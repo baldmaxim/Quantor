@@ -7283,7 +7283,8 @@
             "enum": [
               "room_apartment",
               "room_mop",
-              "door"
+              "door",
+              "parking_space"
             ],
             "title": "Kind",
             "type": "string"
@@ -7304,6 +7305,29 @@
             "minimum": 0.0,
             "title": "Page Index",
             "type": "integer"
+          },
+          "parking_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "permanent",
+                  "temporary",
+                  "guest",
+                  "medium",
+                  "medium_guest",
+                  "large",
+                  "large_guest",
+                  "mgn_m1_3",
+                  "mgn_m4",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parking Type"
           },
           "points": {
             "items": {
@@ -7415,7 +7439,8 @@
             "enum": [
               "room_apartment",
               "room_mop",
-              "door"
+              "door",
+              "parking_space"
             ],
             "title": "Kind",
             "type": "string"
@@ -7434,6 +7459,29 @@
           "page_index": {
             "title": "Page Index",
             "type": "integer"
+          },
+          "parking_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "permanent",
+                  "temporary",
+                  "guest",
+                  "medium",
+                  "medium_guest",
+                  "large",
+                  "large_guest",
+                  "mgn_m1_3",
+                  "mgn_m4",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parking Type"
           },
           "perimeter_m": {
             "anyOf": [
@@ -7506,6 +7554,7 @@
           "name",
           "points",
           "door_height_mm",
+          "parking_type",
           "area_m2",
           "perimeter_m",
           "width_m",
@@ -7550,7 +7599,8 @@
                 "enum": [
                   "room_apartment",
                   "room_mop",
-                  "door"
+                  "door",
+                  "parking_space"
                 ],
                 "type": "string"
               },
@@ -7571,6 +7621,29 @@
               }
             ],
             "title": "Name"
+          },
+          "parking_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "permanent",
+                  "temporary",
+                  "guest",
+                  "medium",
+                  "medium_guest",
+                  "large",
+                  "large_guest",
+                  "mgn_m1_3",
+                  "mgn_m4",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parking Type"
           },
           "points": {
             "anyOf": [

@@ -176,6 +176,60 @@ async def test_validation_by_kind(
             assert response.status_code == 422, (patch, response.text)
 
 
+def _parking(revision_id: str, **patch: Any) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "revision_id": revision_id,
+        "page_index": 0,
+        "kind": "parking_space",
+        "parking_type": "permanent",
+        "points": RECT,
+    }
+    body.update(patch)
+    return body
+
+
+async def test_parking_space_crud_and_validation(
+    db_session: AsyncSession, build_api: Callable[..., AsyncClient], tmp_path: Path
+) -> None:
+    async with build_api(make_context(), settings=cad_settings(tmp_path)) as api:
+        project_id, revision_id = await _upload_calibrated(api, db_session, BROKEN_PDF)
+        url = f"/api/v1/projects/{project_id}/cad/zones"
+
+        created = await api.post(url, json=_parking(revision_id, name="М/м 12"))
+        assert created.status_code == 201, created.text
+        space = created.json()
+        assert (space["kind"], space["parking_type"], space["name"]) == (
+            "parking_space",
+            "permanent",
+            "М/м 12",
+        )
+        assert space["apartment_no"] is None and space["area_m2"] is not None
+
+        bad: list[dict[str, Any]] = [
+            _parking(revision_id, parking_type=None),  # место без типа
+            _parking(revision_id, parking_type="electric"),  # тип вне списка
+            _parking(revision_id, apartment_no="1"),  # номер квартиры месту не задаётся
+            _room(revision_id, parking_type="guest"),  # тип не у места
+            _door(revision_id, parking_type="guest"),
+            _parking(revision_id, points=BOW_TIE),
+        ]
+        for body in bad:
+            response = await api.post(url, json=body)
+            assert response.status_code == 422, (body, response.text)
+
+        zone_url = f"/api/v1/cad/zones/{space['id']}"
+        changed = await api.patch(zone_url, json={"parking_type": "mgn_m4"})
+        assert changed.status_code == 200 and changed.json()["parking_type"] == "mgn_m4"
+        assert (await api.patch(zone_url, json={"parking_type": None})).status_code == 422
+        assert (await api.patch(zone_url, json={"kind": "room_mop"})).status_code == 200
+        reverted = (await api.get(f"{url}?revision_id={revision_id}")).json()[0]
+        assert reverted["kind"] == "room_mop" and reverted["parking_type"] is None
+        # Обратная смена: тип обязателен.
+        assert (await api.patch(zone_url, json={"kind": "parking_space"})).status_code == 422
+        back = await api.patch(zone_url, json={"kind": "parking_space", "parking_type": "large"})
+        assert back.status_code == 200 and back.json()["parking_type"] == "large"
+
+
 async def test_flag_off_closes_every_zone_route(
     db_session: AsyncSession, build_api: Callable[..., AsyncClient], tmp_path: Path
 ) -> None:

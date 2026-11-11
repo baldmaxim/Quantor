@@ -2,11 +2,20 @@ import type { CadZoneRead } from '@quantor/api-client';
 
 /**
  * Категория зоны для цвета и скрытия на листе: по названию помещения квартиры (эвристика по
- * подстрокам), МОП и двери - свои категории. Чистая логика без DOM.
+ * подстрокам), МОП и двери - свои категории, машино-места - категория «parking». Чистая логика без DOM.
  */
 
 export type ZoneCategory =
-  'wet' | 'kitchen' | 'living' | 'hall' | 'storage' | 'outdoor' | 'other' | 'mop' | 'door';
+  | 'wet'
+  | 'kitchen'
+  | 'living'
+  | 'hall'
+  | 'storage'
+  | 'outdoor'
+  | 'other'
+  | 'mop'
+  | 'door'
+  | 'parking';
 
 /** Порядок категорий в панели «Слои». */
 export const ZONE_CATEGORIES: readonly ZoneCategory[] = [
@@ -19,6 +28,7 @@ export const ZONE_CATEGORIES: readonly ZoneCategory[] = [
   'other',
   'mop',
   'door',
+  'parking',
 ];
 
 export const ZONE_CATEGORY_LABELS: Readonly<Record<ZoneCategory, string>> = {
@@ -31,6 +41,7 @@ export const ZONE_CATEGORY_LABELS: Readonly<Record<ZoneCategory, string>> = {
   other: 'Прочие помещения',
   mop: 'МОП',
   door: 'Двери',
+  parking: 'Машино-места',
 };
 
 /** Токен цвета категории (`--cad-zone-<категория>`). */
@@ -50,6 +61,7 @@ const NAME_RULES: readonly (readonly [ZoneCategory, readonly string[]])[] = [
 export const zoneCategory = (zone: Pick<CadZoneRead, 'kind' | 'name'>): ZoneCategory => {
   if (zone.kind === 'door') return 'door';
   if (zone.kind === 'room_mop') return 'mop';
+  if (zone.kind === 'parking_space') return 'parking';
   if (zone.name === null) return 'other';
   const name = zone.name.toLowerCase().replaceAll('ё', 'е');
   for (const [category, patterns] of NAME_RULES) {

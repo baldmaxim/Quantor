@@ -1,6 +1,6 @@
 import type { CadZoneRead } from '@quantor/api-client';
 
-import { formatZoneArea } from './zones';
+import { PARKING_TYPE_SHORT, formatZoneArea } from './zones';
 
 /**
  * Подписи зон на холсте: какие строки показать и помещаются ли они в экранный охват помещения.
@@ -20,7 +20,14 @@ const FIT = 0.9;
 
 type ZoneLabelSource = Pick<
   CadZoneRead,
-  'kind' | 'apartment_no' | 'room_mark' | 'name' | 'area_m2' | 'width_m' | 'door_height_mm'
+  | 'kind'
+  | 'apartment_no'
+  | 'room_mark'
+  | 'name'
+  | 'area_m2'
+  | 'width_m'
+  | 'door_height_mm'
+  | 'parking_type'
 >;
 
 /** Строки подписи помещения: «кв. N · марка · название» и площадь; пустые не возвращаются. */
@@ -28,6 +35,13 @@ export const roomLabelLines = (
   zone: ZoneLabelSource,
   options: IZoneLabelOptions,
 ): { readonly head: string; readonly area: string } => {
+  if (zone.kind === 'parking_space') {
+    // Место подписывается кратким типом; название (подпись легенды) на плане не помещается.
+    return {
+      head: PARKING_TYPE_SHORT[zone.parking_type ?? 'unknown'],
+      area: options.area && zone.area_m2 !== null ? formatZoneArea(zone.area_m2) : '',
+    };
+  }
   const parts: string[] = [];
   if (options.apartment && zone.kind === 'room_apartment' && zone.apartment_no !== null) {
     parts.push(`кв. ${zone.apartment_no}`);

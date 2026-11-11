@@ -26,6 +26,7 @@ const zone = (patch: Partial<CadZoneRead>): CadZoneRead => ({
     [0.5, 0.8],
   ],
   door_height_mm: null,
+  parking_type: null,
   area_m2: null,
   perimeter_m: null,
   width_m: null,

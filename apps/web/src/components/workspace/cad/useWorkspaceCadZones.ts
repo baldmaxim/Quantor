@@ -12,9 +12,11 @@ import { presentZoneCategories } from '@/lib/cad/zone-categories';
 import { readStoredNumber, writeStoredNumber } from '@/lib/cad/useStoredNumber';
 import {
   DEFAULT_DOOR_HEIGHT_MM,
-  isRoomKind,
+  DEFAULT_PARKING_TYPE,
+  hasRoomMark,
   parseDoorHeight,
   zoneInputProblem,
+  type ParkingType,
   type ZoneKind,
 } from '@/lib/cad/zones';
 import { readZoneColors, type IZonePaintData } from '@/lib/cad/zones-painter';
@@ -108,6 +110,7 @@ export const useWorkspaceCadZones = ({
   const [doorHeight, setDoorHeight] = useState(() =>
     String(readStoredNumber(DOOR_HEIGHT_KEY, DEFAULT_DOOR_HEIGHT_MM)),
   );
+  const [parkingType, setParkingType] = useState<ParkingType>(DEFAULT_PARKING_TYPE);
   const [drawing, setDrawing] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -172,9 +175,10 @@ export const useWorkspaceCadZones = ({
         pageIndex,
         kind,
         apartmentNo: kind === 'room_apartment' ? apartmentNo.trim() : null,
-        roomMark: isRoomKind(kind) && roomMark.trim() !== '' ? roomMark.trim() : null,
+        roomMark: hasRoomMark(kind) && roomMark.trim() !== '' ? roomMark.trim() : null,
         points,
         doorHeightMm: kind === 'door' ? parseDoorHeight(doorHeight) : null,
+        parkingType: kind === 'parking_space' ? parkingType : null,
       },
       {
         onSuccess: (created) => {
@@ -205,6 +209,15 @@ export const useWorkspaceCadZones = ({
       setDoorHeight(value);
       const parsed = parseDoorHeight(value);
       if (parsed !== null) writeStoredNumber(DOOR_HEIGHT_KEY, parsed);
+    },
+    parkingType,
+    onParkingTypeChange: setParkingType,
+    onSetParkingType: (id, type) => {
+      setError(null);
+      update.mutate(
+        { id, patch: { parking_type: type } },
+        { onError: (failure) => setError(cadErrorText(failure)) },
+      );
     },
     drawing: drawingOn,
     drawDisabledReason,

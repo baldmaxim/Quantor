@@ -17,7 +17,13 @@ from typing import Final
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.contracts.cad_zones import CadZoneCreate, CadZoneKind, CadZoneRead, CadZoneUpdate
+from app.contracts.cad_zones import (
+    CadParkingType,
+    CadZoneCreate,
+    CadZoneKind,
+    CadZoneRead,
+    CadZoneUpdate,
+)
 from app.domain import GeometryType, QuantityState
 from app.errors import DomainError, ErrorCode
 from app.models import CadZone, Measurement, PageGeometry, ScaleCalibration, Sheet
@@ -45,6 +51,7 @@ class ZoneFields:
     name: str | None
     points: list[list[float]]
     door_height_mm: int | None
+    parking_type: str | None = None
 
 
 def _clean(value: str | None) -> str | None:
@@ -83,6 +90,13 @@ def validate_fields(fields: ZoneFields) -> ZoneFields:
             raise _invalid("Помещение квартиры: № квартиры обязателен")
         if fields.kind == "room_mop" and apartment_no is not None:
             raise _invalid("Помещение МОП: № квартиры не задаётся")
+        if fields.kind == "parking_space" and apartment_no is not None:
+            raise _invalid("Машино-место: № квартиры не задаётся")
+    if fields.kind == "parking_space":
+        if fields.parking_type is None:
+            raise _invalid("Машино-место: тип обязателен")
+    elif fields.parking_type is not None:
+        raise _invalid("Тип задаётся только машино-месту")
     return ZoneFields(
         kind=fields.kind,
         apartment_no=apartment_no,
@@ -90,6 +104,7 @@ def validate_fields(fields: ZoneFields) -> ZoneFields:
         name=_clean(fields.name),
         points=points,
         door_height_mm=fields.door_height_mm if fields.kind == "door" else None,
+        parking_type=fields.parking_type,
     )
 
 
@@ -101,6 +116,7 @@ def _fields_of(zone: CadZone) -> ZoneFields:
         name=zone.name,
         points=[[float(x), float(y)] for x, y in zone.points],
         door_height_mm=zone.door_height_mm,
+        parking_type=zone.parking_type,
     )
 
 
@@ -111,6 +127,7 @@ def _apply(zone: CadZone, fields: ZoneFields) -> None:
     zone.name = fields.name
     zone.points = fields.points
     zone.door_height_mm = fields.door_height_mm
+    zone.parking_type = fields.parking_type
 
 
 async def list_zones(
@@ -149,6 +166,7 @@ async def create_zone(
             name=body.name,
             points=[[x, y] for x, y in body.points],
             door_height_mm=body.door_height_mm,
+            parking_type=body.parking_type,
         )
     )
     zone = CadZone(
@@ -173,6 +191,7 @@ def _fields_dict(fields: ZoneFields) -> dict[str, object]:
         "name": fields.name,
         "points": fields.points,
         "door_height_mm": fields.door_height_mm,
+        "parking_type": fields.parking_type,
     }
 
 
@@ -200,6 +219,11 @@ async def update_zone(session: AsyncSession, *, zone: CadZone, body: CadZoneUpda
             body.door_height_mm
             if "door_height_mm" in sent
             else (None if changed else current.door_height_mm)
+        ),
+        parking_type=(
+            body.parking_type
+            if "parking_type" in sent
+            else (None if changed else current.parking_type)
         ),
     )
     _apply(zone, validate_fields(merged))
@@ -297,6 +321,7 @@ def zone_read(zone: CadZone, scale: PageScale) -> CadZoneRead:
         name=zone.name,
         points=[(x, y) for x, y in points],
         door_height_mm=zone.door_height_mm,
+        parking_type=_parking_type(zone.parking_type),
         area_m2=area,
         perimeter_m=perimeter,
         width_m=width,
@@ -315,7 +340,29 @@ def _kind(value: str) -> CadZoneKind:
             return "room_mop"
         case "door":
             return "door"
+        case "parking_space":
+            return "parking_space"
     raise DomainError(ErrorCode.VALIDATION_FAILED, f"Неизвестный вид зоны: {value}")
+
+
+def _parking_type(value: str | None) -> CadParkingType | None:
+    match value:
+        case None:
+            return None
+        case (
+            "permanent"
+            | "temporary"
+            | "guest"
+            | "medium"
+            | "medium_guest"
+            | "large"
+            | "large_guest"
+            | "mgn_m1_3"
+            | "mgn_m4"
+            | "unknown"
+        ):
+            return value
+    raise DomainError(ErrorCode.VALIDATION_FAILED, f"Неизвестный тип машино-места: {value}")
 
 
 async def zones_read(session: AsyncSession, zones: list[CadZone]) -> list[CadZoneRead]:

@@ -3593,7 +3593,7 @@ export type CadZoneCreate = {
     /**
      * Kind
      */
-    kind: 'room_apartment' | 'room_mop' | 'door';
+    kind: 'room_apartment' | 'room_mop' | 'door' | 'parking_space';
     /**
      * Name
      */
@@ -3602,6 +3602,10 @@ export type CadZoneCreate = {
      * Page Index
      */
     page_index: number;
+    /**
+     * Parking Type
+     */
+    parking_type?: 'permanent' | 'temporary' | 'guest' | 'medium' | 'medium_guest' | 'large' | 'large_guest' | 'mgn_m1_3' | 'mgn_m4' | 'unknown' | null;
     /**
      * Points
      */
@@ -3654,7 +3658,7 @@ export type CadZoneRead = {
     /**
      * Kind
      */
-    kind: 'room_apartment' | 'room_mop' | 'door';
+    kind: 'room_apartment' | 'room_mop' | 'door' | 'parking_space';
     /**
      * Name
      */
@@ -3663,6 +3667,10 @@ export type CadZoneRead = {
      * Page Index
      */
     page_index: number;
+    /**
+     * Parking Type
+     */
+    parking_type: 'permanent' | 'temporary' | 'guest' | 'medium' | 'medium_guest' | 'large' | 'large_guest' | 'mgn_m1_3' | 'mgn_m4' | 'unknown' | null;
     /**
      * Perimeter M
      */
@@ -3709,11 +3717,15 @@ export type CadZoneUpdate = {
     /**
      * Kind
      */
-    kind?: 'room_apartment' | 'room_mop' | 'door' | null;
+    kind?: 'room_apartment' | 'room_mop' | 'door' | 'parking_space' | null;
     /**
      * Name
      */
     name?: string | null;
+    /**
+     * Parking Type
+     */
+    parking_type?: 'permanent' | 'temporary' | 'guest' | 'medium' | 'medium_guest' | 'large' | 'large_guest' | 'mgn_m1_3' | 'mgn_m4' | 'unknown' | null;
     /**
      * Points
      */

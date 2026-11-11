@@ -4,7 +4,7 @@ import type { NormalizedPoint } from '@/lib/viewer/coordinates';
 import type { ToolMode } from '@/lib/viewer/tool-machine';
 
 /**
- * Зоны листа во вкладке CAD: помещения квартир, помещения МОП, двери.
+ * Зоны листа во вкладке CAD: помещения квартир, помещения МОП, двери, машино-места паркинга.
  *
  * Чистая логика без DOM и сети: подписи, группировка с суммами, правила ввода и решения
  * машины рисования. Площадь, периметр и ширину считает сервер; здесь они только складываются
@@ -13,13 +13,64 @@ import type { ToolMode } from '@/lib/viewer/tool-machine';
 
 export type ZoneKind = CadZoneRead['kind'];
 
-export const ZONE_KINDS: readonly ZoneKind[] = ['room_apartment', 'room_mop', 'door'];
+export const ZONE_KINDS: readonly ZoneKind[] = [
+  'room_apartment',
+  'room_mop',
+  'door',
+  'parking_space',
+];
 
 export const ZONE_KIND_LABELS: Readonly<Record<ZoneKind, string>> = {
   room_apartment: 'Помещение квартиры',
   room_mop: 'МОП',
   door: 'Дверь',
+  parking_space: 'Машино-место',
 };
+
+/** Тип машино-места по легенде листа. */
+export type ParkingType = NonNullable<CadZoneRead['parking_type']>;
+
+export const PARKING_TYPES: readonly ParkingType[] = [
+  'permanent',
+  'temporary',
+  'guest',
+  'medium',
+  'medium_guest',
+  'large',
+  'large_guest',
+  'mgn_m1_3',
+  'mgn_m4',
+  'unknown',
+];
+
+export const PARKING_TYPE_LABELS: Readonly<Record<ParkingType, string>> = {
+  permanent: 'Постоянное хранение',
+  temporary: 'Временное хранение',
+  guest: 'Гостевое',
+  medium: 'Medium',
+  medium_guest: 'Medium гостевое',
+  large: 'Large',
+  large_guest: 'Large гостевое',
+  mgn_m1_3: 'МГН М1–3',
+  mgn_m4: 'МГН М4',
+  unknown: 'Тип не определён',
+};
+
+/** Краткий тип для подписи на плане: места мелкие, полное название не поместится. */
+export const PARKING_TYPE_SHORT: Readonly<Record<ParkingType, string>> = {
+  permanent: 'Пост.',
+  temporary: 'Врем.',
+  guest: 'Гост.',
+  medium: 'M',
+  medium_guest: 'M гост.',
+  large: 'L',
+  large_guest: 'L гост.',
+  mgn_m1_3: 'МГН 1–3',
+  mgn_m4: 'МГН 4',
+  unknown: '?',
+};
+
+export const DEFAULT_PARKING_TYPE: ParkingType = 'permanent';
 
 /** Пределы высоты проёма на сервере. */
 export const DOOR_HEIGHT_MIN_MM = 1500;
@@ -29,6 +80,10 @@ export const DEFAULT_DOOR_HEIGHT_MM = 2100;
 export const NO_CALIBRATION_TEXT = 'нет калибровки';
 
 export const isRoomKind = (kind: ZoneKind): boolean => kind !== 'door';
+
+/** Марка помещения есть у квартир и МОП; у машино-места её нет. */
+export const hasRoomMark = (kind: ZoneKind): boolean =>
+  kind === 'room_apartment' || kind === 'room_mop';
 
 // --- форматирование ---
 
@@ -86,6 +141,10 @@ export const zoneCanvasLabel = (zone: CadZoneRead): string => {
     const width = zone.width_m === null ? '?' : String(Math.round(zone.width_m * 1000));
     return `${width} × ${zone.door_height_mm ?? '?'}`;
   }
+  if (zone.kind === 'parking_space') {
+    const type = PARKING_TYPE_SHORT[zone.parking_type ?? 'unknown'];
+    return zone.area_m2 !== null ? `${type} · ${formatZoneArea(zone.area_m2)}` : type;
+  }
   const parts: string[] = [];
   if (zone.kind === 'room_apartment' && zone.apartment_no !== null)
     parts.push(`кв. ${zone.apartment_no}`);
@@ -114,6 +173,13 @@ export interface IZoneGroups {
   readonly apartments: readonly IApartmentGroup[];
   readonly mop: IZoneSum & { readonly zones: readonly CadZoneRead[] };
   readonly doors: readonly CadZoneRead[];
+  readonly parking: IZoneSum & { readonly zones: readonly CadZoneRead[] };
+}
+
+/** Строка сводки машино-мест: тип, число и сумма площади. */
+export interface IParkingTypeSum extends IZoneSum {
+  readonly type: ParkingType;
+  readonly count: number;
 }
 
 /** Сумма площадей: неопределённая площадь в сумму не идёт и не превращается в 0. */
@@ -140,8 +206,10 @@ export const groupZones = (zones: readonly CadZoneRead[]): IZoneGroups => {
   const byApartment = new Map<string, CadZoneRead[]>();
   const mop: CadZoneRead[] = [];
   const doors: CadZoneRead[] = [];
+  const parking: CadZoneRead[] = [];
   for (const zone of zones) {
     if (zone.kind === 'door') doors.push(zone);
+    else if (zone.kind === 'parking_space') parking.push(zone);
     else if (zone.kind === 'room_mop') mop.push(zone);
     else {
       const key = zone.apartment_no ?? '';
@@ -151,7 +219,26 @@ export const groupZones = (zones: readonly CadZoneRead[]): IZoneGroups => {
   const apartments = [...byApartment.entries()]
     .sort(([first], [second]) => compareApartment(first, second))
     .map(([apartmentNo, items]) => ({ apartmentNo, zones: items, ...sumAreas(items) }));
-  return { apartments, mop: { zones: mop, ...sumAreas(mop) }, doors };
+  return {
+    apartments,
+    mop: { zones: mop, ...sumAreas(mop) },
+    doors,
+    parking: { zones: parking, ...sumAreas(parking) },
+  };
+};
+
+/** Сводка машино-мест по типам (в порядке легенды): число и площадь; пустые типы не выводятся. */
+export const parkingSummary = (zones: readonly CadZoneRead[]): readonly IParkingTypeSum[] => {
+  const byType = new Map<ParkingType, CadZoneRead[]>();
+  for (const zone of zones) {
+    if (zone.kind !== 'parking_space') continue;
+    const type = zone.parking_type ?? 'unknown';
+    byType.set(type, [...(byType.get(type) ?? []), zone]);
+  }
+  return PARKING_TYPES.filter((type) => byType.has(type)).map((type) => {
+    const items = byType.get(type) ?? [];
+    return { type, count: items.length, ...sumAreas(items) };
+  });
 };
 
 /** Размер двери: ширина × высота в мм; нет калибровки - ширина не определена. */

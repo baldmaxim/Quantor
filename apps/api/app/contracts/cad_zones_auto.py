@@ -8,8 +8,22 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.contracts.cad_zones import ZonePoint
+from app.contracts.cad_zones import CadParkingType, ZonePoint
 from app.domain import MAX_MEASUREMENT_POINTS, JobStatus
+
+# Подписи типов по легенде листа: имя места, если генератор не передал подпись.
+PARKING_TYPE_LABELS: dict[str, str] = {
+    "permanent": "Постоянное хранение",
+    "temporary": "Временное хранение",
+    "guest": "Гостевое",
+    "medium": "Medium",
+    "medium_guest": "Medium гостевое",
+    "large": "Large",
+    "large_guest": "Large гостевое",
+    "mgn_m1_3": "МГН М1–3",
+    "mgn_m4": "МГН М4",
+    "unknown": "Тип не определён",
+}
 
 
 class ZonesFileZone(BaseModel):
@@ -24,6 +38,16 @@ class ZonesFileZone(BaseModel):
     points: list[ZonePoint] = Field(min_length=3, max_length=MAX_MEASUREMENT_POINTS)
 
 
+class ZonesFileParkingSpace(BaseModel):
+    """Машино-место из `zones.json`: кандидат; размеры и площадь генератора сервер не читает."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    parking_type: CadParkingType
+    label: str | None = None
+    points: list[ZonePoint] = Field(min_length=3, max_length=MAX_MEASUREMENT_POINTS)
+
+
 class ZonesFile(BaseModel):
     """`zones.json` схемы `quantor.cad_mep.zones.v1`."""
 
@@ -32,6 +56,7 @@ class ZonesFile(BaseModel):
     schema_name: str = Field(alias="schema")
     page_index: int
     zones: list[ZonesFileZone]
+    parking_spaces: list[ZonesFileParkingSpace] = Field(default_factory=list)
 
 
 class CadZonesJobRead(BaseModel):

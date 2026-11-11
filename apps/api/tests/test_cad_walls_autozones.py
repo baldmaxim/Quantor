@@ -131,6 +131,33 @@ async def test_auto_enqueue_without_zones_is_as_before(
         assert "zones_warning" not in job.payload
 
 
+async def test_parking_spaces_are_not_passed_to_the_walls_job(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    settings: Settings,
+) -> None:
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        created = await api.post(
+            f"/api/v1/projects/{project_id}/cad/zones",
+            json={
+                "revision_id": revision_id,
+                "page_index": 0,
+                "kind": "parking_space",
+                "parking_type": "guest",
+                "points": [[0.1, 0.2], [0.3, 0.2], [0.3, 0.5], [0.1, 0.5]],
+            },
+        )
+        assert created.status_code == 201, created.text
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        (job,) = await cad_walls_service.enqueue_after_convert(
+            db_session, fake_storage, parent, settings
+        )
+        assert job.payload["zones_count"] == 0 and job.payload["zones_sha256"] == ""
+
+
 async def test_auto_enqueue_without_view_frame_reports_why(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],

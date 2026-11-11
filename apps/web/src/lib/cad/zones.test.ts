@@ -7,6 +7,7 @@ import {
   doorSizeText,
   formatZoneArea,
   groupZones,
+  parkingSummary,
   parseDoorHeight,
   pointsToPairs,
   sumAreas,
@@ -37,6 +38,7 @@ const zone = (patch: Partial<CadZoneRead>): CadZoneRead => ({
     [0, 1],
   ],
   door_height_mm: null,
+  parking_type: null,
   area_m2: 10,
   perimeter_m: 12,
   width_m: null,
@@ -233,5 +235,41 @@ describe('замыкание щелчком', () => {
       false,
     );
     expect(clickClosesPolygon('line', vertices, { x: 100, y: 100 })).toBe(false);
+  });
+});
+
+describe('машино-места', () => {
+  const space = (patch: Partial<CadZoneRead>) =>
+    zone({ kind: 'parking_space', apartment_no: null, parking_type: 'permanent', ...patch });
+
+  it('сводка по типам: число и площадь в порядке легенды, пустые типы не выводятся', () => {
+    const summary = parkingSummary([
+      space({ id: 'a', parking_type: 'guest', area_m2: 12 }),
+      space({ id: 'b', parking_type: 'permanent', area_m2: 13.25 }),
+      space({ id: 'c', parking_type: 'permanent', area_m2: 13.25 }),
+      space({ id: 'd', parking_type: 'guest', area_m2: null, calibration_missing: true }),
+      zone({ id: 'e' }),
+    ]);
+    expect(summary.map((item) => [item.type, item.count])).toEqual([
+      ['permanent', 2],
+      ['guest', 2],
+    ]);
+    expect(summary[0]?.areaM2).toBe(26.5);
+    expect(summary[1]).toMatchObject({ areaM2: 12, partial: true });
+  });
+
+  it('места собираются в свою группу и не попадают в квартиры и МОП', () => {
+    const groups = groupZones([space({ id: 'a', area_m2: 10 }), space({ id: 'b', area_m2: 5 })]);
+    expect(groups.apartments).toEqual([]);
+    expect(groups.mop.zones).toEqual([]);
+    expect(groups.parking.zones).toHaveLength(2);
+    expect(groups.parking.areaM2).toBe(15);
+  });
+
+  it('подпись на плане: краткий тип и площадь', () => {
+    expect(zoneCanvasLabel(space({ parking_type: 'mgn_m4', area_m2: 18 }))).toBe(
+      'МГН 4 · 18,00 м²',
+    );
+    expect(zoneCanvasLabel(space({ parking_type: null, area_m2: null }))).toBe('?');
   });
 });

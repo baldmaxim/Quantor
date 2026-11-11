@@ -18,7 +18,7 @@ import {
 
 import { unwrap } from '@/lib/queries';
 
-import type { ZoneKind } from './zones';
+import type { ParkingType, ZoneKind } from './zones';
 
 /**
  * Обращения к зонам листа (флаг `cad.export`, ADR-0036). Ключ содержит проект, ревизию и лист:
@@ -58,8 +58,12 @@ export interface INewZone {
   readonly kind: ZoneKind;
   readonly apartmentNo: string | null;
   readonly roomMark: string | null;
+  /** Название; не задано - зона без названия. */
+  readonly name?: string | null;
   readonly points: readonly (readonly [number, number])[];
   readonly doorHeightMm: number | null;
+  /** Тип машино-места; задан у вида `parking_space` и только у него. */
+  readonly parkingType?: ParkingType | null;
 }
 
 export const useCreateCadZone = (
@@ -78,8 +82,10 @@ export const useCreateCadZone = (
             kind: zone.kind,
             apartment_no: zone.apartmentNo,
             room_mark: zone.roomMark,
+            ...(zone.name !== undefined ? { name: zone.name } : {}),
             points: zone.points.map(([x, y]) => [x, y] as [number, number]),
             door_height_mm: zone.doorHeightMm,
+            ...(zone.parkingType != null ? { parking_type: zone.parkingType } : {}),
           },
         }),
       ),

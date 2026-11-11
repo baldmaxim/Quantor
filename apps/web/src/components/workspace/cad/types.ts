@@ -20,7 +20,7 @@ import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { CadExtraCategory } from '@/lib/cad/layer-categories';
 import type { IVorSource } from '@/lib/cad/vor-queries';
-import type { ZoneKind } from '@/lib/cad/zones';
+import type { ParkingType, ZoneKind } from '@/lib/cad/zones';
 import type { Camera, CameraState, Viewport } from '@/lib/viewer/camera';
 
 /** Замечания вида: всё, что нужно разделу «Замечания» (тот же, что был на странице CAD). */
@@ -56,6 +56,11 @@ export interface IWorkspaceCadZones {
   /** Высота проёма двери, мм: текст поля. */
   readonly doorHeight: string;
   readonly onDoorHeightChange: (value: string) => void;
+  /** Тип машино-места, которое рисуют. */
+  readonly parkingType: ParkingType;
+  readonly onParkingTypeChange: (type: ParkingType) => void;
+  /** Сменить тип у готового машино-места. */
+  readonly onSetParkingType: (id: string, type: ParkingType) => void;
   /** Режим рисования включён: поверх холста лежит слой захвата. */
   readonly drawing: boolean;
   /** Почему рисовать нельзя (не заполнено поле, страница не загружена); `null` - можно. */

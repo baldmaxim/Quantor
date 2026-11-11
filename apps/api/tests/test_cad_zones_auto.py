@@ -67,6 +67,14 @@ zones = [
 doc = {"schema": "quantor.cad_mep.zones.v1", "generator_version": "cad_mep.v1",
        "page_index": int(args.page_index), "scale_mm_per_pt": 35.0, "zones": zones,
        "unmatched_marks": [], "summary": []}
+if mode == "parking":
+    doc["zones"] = []
+    doc["parking_spaces"] = [
+        {"parking_type": "permanent", "label": "Места постоянное хранение", "points": rect,
+         "width_m": 2.5, "length_m": 5.3, "area_m2": 13.25, "type_margin": 0.17, "notes": []},
+        {"parking_type": "medium", "label": None, "points": rect, "notes": ["тип под вопросом"]},
+        {"parking_type": "guest", "label": "Гостевое", "points": bow},
+    ]
 out = pathlib.Path(args.out)
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
@@ -296,6 +304,39 @@ async def test_handler_inserts_zones_through_the_zone_service_and_stores_zones_j
         # Разметка уже есть - второй запуск вручную закрыт.
         again = await api.post(_zones_url(project_id, job_id))
         assert again.status_code == 409 and again.json()["detail"]["code"] == "CAD_ZONES_NOT_EMPTY"
+
+
+async def test_handler_inserts_parking_spaces_when_there_are_no_room_zones(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    zones_tools: Path,
+    tmp_path: Path,
+) -> None:
+    (zones_tools / "mode").write_text("parking")
+    settings = zones_settings(zones_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        zones_id = (await api.post(_zones_url(project_id, job_id))).json()["job_id"]
+        job = await _run_zones_worker(db_session, fake_storage, settings, zones_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        result = cad_service.result_of(job)
+        # Самопересекающееся место отклонено сервисом зон, как и у квартир.
+        assert result["counts"] == {"in_file": 3, "created": 2, "rejected": 1}
+
+        listed = await api.get(f"/api/v1/projects/{project_id}/cad/zones?revision_id={revision_id}")
+        zones = listed.json()
+        assert {(z["kind"], z["parking_type"], z["name"]) for z in zones} == {
+            ("parking_space", "permanent", "Места постоянное хранение"),
+            ("parking_space", "medium", "Medium"),
+        }
+        assert all(z["apartment_no"] is None and z["room_mark"] is None for z in zones)
+        assert all(z["area_m2"] is not None for z in zones)
+
+        # Места - разметка листа: повторный автозапуск их не дублирует.
+        again = await api.post(_zones_url(project_id, job_id))
+        assert again.status_code == 409 and again.json()["detail"]["code"] == "CAD_ZONES_NOT_EMPTY"
+        assert len(await _zones_of(db_session)) == 2
 
 
 async def test_handler_skips_when_zones_exist_before_start(

@@ -20,6 +20,7 @@ const zone = (patch: Partial<CadZoneRead>): CadZoneRead => ({
     [0.3, 0.3],
   ],
   door_height_mm: null,
+  parking_type: null,
   area_m2: 12.5,
   perimeter_m: 14,
   width_m: null,
@@ -43,6 +44,9 @@ const props = (patch: Partial<IWorkspaceCadZones> = {}): IWorkspaceCadZones => (
   onRoomMarkChange: vi.fn(),
   doorHeight: '2100',
   onDoorHeightChange: vi.fn(),
+  parkingType: 'permanent',
+  onParkingTypeChange: vi.fn(),
+  onSetParkingType: vi.fn(),
   drawing: false,
   drawDisabledReason: null,
   onStartDrawing: vi.fn(),
@@ -164,6 +168,60 @@ describe('CadZonesPanel', () => {
     expect(within(list).getByText('Удалить зону?')).toBeInTheDocument();
     fireEvent.click(within(list).getAllByRole('button', { name: 'Удалить' })[0] as HTMLElement);
     expect(onDelete).toHaveBeenCalledWith('a');
+  });
+
+  it('у машино-места при рисовании - выбор типа, без № квартиры и марки', () => {
+    const onParkingTypeChange = vi.fn();
+    render(
+      <CadZonesPanel
+        {...props({ kind: 'parking_space', parkingType: 'guest', onParkingTypeChange })}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Отрисовать зону' }));
+    expect(screen.getByRole('button', { name: 'Машино-место' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '№ квартиры' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Марка помещения' })).toBeNull();
+    const select = screen.getByRole('combobox', { name: 'Тип машино-места' });
+    expect(select).toHaveValue('guest');
+    expect(within(select).getAllByRole('option')).toHaveLength(10);
+    fireEvent.change(select, { target: { value: 'mgn_m1_3' } });
+    expect(onParkingTypeChange).toHaveBeenCalledWith('mgn_m1_3');
+  });
+
+  it('список: сводка «Машино-места: N» по типам и смена типа у места', () => {
+    const onSetParkingType = vi.fn();
+    const space = (id: string, type: CadZoneRead['parking_type'], area: number) =>
+      zone({
+        id,
+        kind: 'parking_space',
+        apartment_no: null,
+        room_mark: null,
+        parking_type: type,
+        area_m2: area,
+      });
+    render(
+      <CadZonesPanel
+        {...props({
+          zones: [
+            space('a', 'permanent', 13.25),
+            space('b', 'permanent', 13.25),
+            space('c', 'guest', 12),
+          ],
+          onSetParkingType,
+        })}
+      />,
+    );
+    const summary = screen.getByTestId('cad-parking-summary');
+    expect(screen.getByRole('heading', { name: /Машино-места: 3/ })).toHaveTextContent('38,50');
+    const [byPermanent, byGuest] = within(summary).getAllByRole('listitem');
+    expect(byPermanent).toHaveTextContent('Постоянное хранение');
+    expect(byPermanent).toHaveTextContent('2 шт. · 26,50');
+    expect(byGuest).toHaveTextContent('Гостевое');
+    expect(byGuest).toHaveTextContent('1 шт. · 12,00');
+
+    const [first] = within(summary).getAllByRole('combobox');
+    fireEvent.change(first as HTMLElement, { target: { value: 'medium' } });
+    expect(onSetParkingType).toHaveBeenCalledWith('a', 'medium');
   });
 
   it('отказ сервера и ошибка загрузки показываются, повтор перечитывает список', () => {

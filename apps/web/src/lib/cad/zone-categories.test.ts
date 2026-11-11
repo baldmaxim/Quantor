@@ -56,3 +56,15 @@ describe('presentZoneCategories', () => {
     ]);
   });
 });
+
+describe('машино-место', () => {
+  it('своя категория «parking»', () => {
+    expect(zoneCategory({ kind: 'parking_space', name: 'Кухня' })).toBe('parking');
+    expect(
+      presentZoneCategories([
+        { kind: 'parking_space', name: null },
+        { kind: 'parking_space', name: null },
+      ]),
+    ).toEqual([{ category: 'parking', count: 2 }]);
+  });
+});

@@ -42,7 +42,7 @@ from app.cad_worker.handler import (
 )
 from app.cad_worker.mep_handler import _download_artifact, _generator_failure, _read_json_file
 from app.contracts.cad_zones import MAX_TEXT, CadZoneCreate
-from app.contracts.cad_zones_auto import ZonesFile
+from app.contracts.cad_zones_auto import PARKING_TYPE_LABELS, ZonesFile
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
@@ -173,20 +173,46 @@ async def _insert_zones(
     project_id: uuid.UUID,
     revision: DocumentRevision,
     document: ZonesFile,
-) -> tuple[int, int]:
-    """Зоны файла -> зоны листа через сервис зон; невалидная для сервера зона пропускается."""
-    created = rejected = 0
+) -> tuple[int, int, int]:
+    """Зоны и машино-места файла -> зоны листа через сервис зон.
+
+    Невалидная для сервера зона пропускается. Возвращает: создано всего, отклонено, из созданных -
+    помещений квартир (машино-места на стены и конструкции не влияют).
+    """
+    created = rejected = rooms = 0
+    bodies: list[CadZoneCreate] = []
     for zone in document.zones:
         try:
-            body = CadZoneCreate(
-                revision_id=revision.id,
-                page_index=document.page_index,
-                kind=zone.kind,
-                apartment_no=zone.apartment_no[:MAX_TEXT],
-                room_mark=None if zone.room_mark is None else zone.room_mark[:MAX_TEXT],
-                name=None if zone.name is None else zone.name[:MAX_TEXT],
-                points=zone.points,
+            bodies.append(
+                CadZoneCreate(
+                    revision_id=revision.id,
+                    page_index=document.page_index,
+                    kind=zone.kind,
+                    apartment_no=zone.apartment_no[:MAX_TEXT],
+                    room_mark=None if zone.room_mark is None else zone.room_mark[:MAX_TEXT],
+                    name=None if zone.name is None else zone.name[:MAX_TEXT],
+                    points=zone.points,
+                )
             )
+        except ValidationError:
+            rejected += 1
+    for space in document.parking_spaces:
+        label = None if space.label is None else space.label.strip()[:MAX_TEXT]
+        try:
+            bodies.append(
+                CadZoneCreate(
+                    revision_id=revision.id,
+                    page_index=document.page_index,
+                    kind="parking_space",
+                    name=label or PARKING_TYPE_LABELS[space.parking_type],
+                    parking_type=space.parking_type,
+                    points=space.points,
+                )
+            )
+        except ValidationError:
+            rejected += 1
+    for body in bodies:
+        try:
             await cad_zones_service.create_zone(
                 session,
                 workspace_id=workspace_id,
@@ -194,11 +220,13 @@ async def _insert_zones(
                 body=body,
                 user_id=None,
             )
-        except (DomainError, ValidationError):
+        except DomainError:
             rejected += 1
             continue
         created += 1
-    return created, rejected
+        if body.kind == "room_apartment":
+            rooms += 1
+    return created, rejected, rooms
 
 
 async def execute_cad_zones(
@@ -322,8 +350,8 @@ async def execute_cad_zones(
     skipped = bool(
         await auto.page_zone_count(session, revision_id=revision.id, page_index=source.page_index)
     )
-    created, rejected = (
-        (0, 0)
+    created, rejected, rooms = (
+        (0, 0, 0)
         if skipped
         else await _insert_zones(
             session,
@@ -333,7 +361,7 @@ async def execute_cad_zones(
             document=document,
         )
     )
-    if created:
+    if rooms:
         await _recompute_walls(session, storage, source, settings)
     return await _finish(
         session,
@@ -343,7 +371,11 @@ async def execute_cad_zones(
         attempt,
         skipped=skipped,
         files=files,
-        counts={"in_file": len(document.zones), "created": created, "rejected": rejected},
+        counts={
+            "in_file": len(document.zones) + len(document.parking_spaces),
+            "created": created,
+            "rejected": rejected,
+        },
         artifacts=artifacts,
     )
 

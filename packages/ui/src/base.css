@@ -116,6 +116,7 @@
   --cad-zone-storage: #7e3fb8;
   --cad-zone-outdoor: #0a8a8a;
   --cad-zone-other: #5f6b7a;
+  --cad-zone-parking: #2f6f8f;
   --cad-zone-apt-1: #1d5bb3;
   --cad-zone-apt-2: #c0392b;
   --cad-zone-apt-3: #1e8a3c;
@@ -289,6 +290,7 @@
     --cad-zone-storage: #a06ad8;
     --cad-zone-outdoor: #20b0b0;
     --cad-zone-other: #8593a3;
+    --cad-zone-parking: #6fb0cf;
     --cad-zone-apt-1: #3a82de;
     --cad-zone-apt-2: #e0584a;
     --cad-zone-apt-3: #32a655;
@@ -389,6 +391,7 @@
   --cad-zone-storage: #a06ad8;
   --cad-zone-outdoor: #20b0b0;
   --cad-zone-other: #8593a3;
+  --cad-zone-parking: #6fb0cf;
   --cad-zone-apt-1: #3a82de;
   --cad-zone-apt-2: #e0584a;
   --cad-zone-apt-3: #32a655;

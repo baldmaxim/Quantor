@@ -85,7 +85,13 @@ export const readZoneColors = (): IZoneColors => {
 };
 
 export const zoneColor = (colors: IZoneColors, kind: ZoneKind): string =>
-  kind === 'room_apartment' ? colors.apartment : kind === 'room_mop' ? colors.mop : colors.door;
+  kind === 'room_apartment'
+    ? colors.apartment
+    : kind === 'room_mop'
+      ? colors.mop
+      : kind === 'parking_space'
+        ? colors.categories.parking
+        : colors.door;
 
 interface IShape {
   readonly zone: CadZoneRead;

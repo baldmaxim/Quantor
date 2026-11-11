@@ -13,6 +13,7 @@ const zone = {
   area_m2: 10.5,
   width_m: null,
   door_height_mm: null,
+  parking_type: null,
 };
 const DEFAULTS: IZoneLabelOptions = { apartment: false, mark: true, name: false, area: true };
 
@@ -75,5 +76,13 @@ describe('doorLabelFits', () => {
   it('влезает в длину проёма', () => {
     expect(doorLabelFits('900 × 2100', 80, measure)).toBe(true);
     expect(doorLabelFits('900 × 2100', 40, measure)).toBe(false);
+  });
+});
+
+describe('roomLabelLines: машино-место', () => {
+  it('подпись - краткий тип независимо от настроек названия и марки', () => {
+    const space = { ...zone, kind: 'parking_space' as const, parking_type: 'large' as const };
+    expect(roomLabelLines(space, DEFAULTS)).toEqual({ head: 'L', area: '10,50 м²' });
+    expect(roomLabelLines(space, { ...DEFAULTS, area: false })).toEqual({ head: 'L', area: '' });
   });
 });
