@@ -332,6 +332,12 @@ async def _still_owned(
     )
 
 
+async def _raise_progress(session: AsyncSession, job: Job, value: float) -> None:
+    """Монотонно поднимает `Job.progress`: меньшее или равное значение игнорируется."""
+    if job.status is JobStatus.RUNNING and value > (job.progress or 0.0):
+        await jobs_service.report_progress(session, job=job, progress=value, stage=None)
+
+
 async def _sync_progress(
     session: AsyncSession, job: Job, attempt: int, progress_path: Path | None
 ) -> None:
@@ -348,6 +354,7 @@ async def _sync_progress(
     payload, added = cad_progress.apply_snapshot(job.payload, attempt, snapshot, cad_progress.now())
     if added:
         job.payload = payload
+    await _raise_progress(session, job, cad_progress.progress_fraction(snapshot))
 
 
 async def _run_while_owned(
@@ -417,6 +424,7 @@ async def execute_cad_pdf_convert(
             "Исходный PDF ревизии: чтение из хранилища и сверка SHA256",
             cad_progress.now(),
         )
+        await _raise_progress(session, job, cad_progress.PHASE_FRACTIONS["download"])
         await session.commit()
         await _download(storage, revision, source)
         raw_params = cad_service.params_bytes(params)
@@ -478,6 +486,7 @@ async def execute_cad_pdf_convert(
             f"Манифест сверен, загрузка файлов попытки: {len(files)}",
             cad_progress.now(),
         )
+        await _raise_progress(session, job, cad_progress.PHASE_FRACTIONS["publish"])
         await session.commit()
         artifacts = await _upload(storage, job, revision.id, attempt, out, files)
         if not await _still_owned(session, job, owner, attempt, lock=True):

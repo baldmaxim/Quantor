@@ -35,6 +35,28 @@ PHASES: Final = (
     "publish",
     "published",
 )
+# Доли `Job.progress` по фазам попытки. Фаза `worker` считается по этапам видов в диапазоне
+# [WORKER_BASE, WORKER_BASE + WORKER_SPAN]; `failed` и `published` долей не имеют: завершение
+# задания ставят jobs.succeed/fail.
+PHASE_FRACTIONS: Final[dict[str, float]] = {
+    "claimed": 0.0,
+    "download": 0.02,
+    "starting": 0.04,
+    "verify": 0.05,
+    "intake": 0.08,
+    "collect": 0.92,
+    "finished": 0.94,
+    "publish": 0.96,
+}
+WORKER_BASE: Final = 0.10
+WORKER_SPAN: Final = 0.80
+MAX_PROGRESS_FRACTION: Final = 0.99
+_STAGE_WEIGHTS: Final[dict[str, float]] = {
+    "done": 1.0,
+    "needs_review": 1.0,
+    "error": 1.0,
+    "running": 0.5,
+}
 MAX_EVENTS_PER_ATTEMPT: Final = 1000
 MAX_PHASES: Final = 32
 MAX_PROGRESS_BYTES: Final = 4 * 1024 * 1024
@@ -166,6 +188,43 @@ def _view(item: Any) -> dict[str, Any] | None:
         "ready": item.get("ready") is True,
         "stages": stages,
     }
+
+
+# ------------------------------------------------------------------ доля выполнения
+
+
+def _stage_weight(stage: dict[str, Any]) -> float:
+    """Вес этапа; у выполняющегося — доля `completed/total`, если движок её записал."""
+    status = str(stage.get("status"))
+    completed, total = _int(stage.get("completed")), _int(stage.get("total"))
+    if status == "running" and completed is not None and total:
+        return min(max(completed / total, 0.0), 0.95)
+    return _STAGE_WEIGHTS.get(status, 0.0)
+
+
+def _views_fraction(snapshot: dict[str, Any]) -> float:
+    """Доля по этапам всех видов: WORKER_BASE + WORKER_SPAN * w; без видов - WORKER_BASE."""
+    views = _as_list(snapshot.get("views"))
+    if not views:
+        return WORKER_BASE
+    total = sum(
+        _stage_weight(stage)
+        for view in views
+        for stage in _as_list(_as_dict(view).get("stages"))
+        if isinstance(stage, dict)
+    )
+    return WORKER_BASE + WORKER_SPAN * total / (len(STAGE_KEYS) * len(views))
+
+
+def progress_fraction(snapshot: dict[str, Any]) -> float:
+    """Доля [0, 0.99] для `Job.progress` по проверенному снимку (`parse_snapshot`)."""
+    phase = snapshot.get("phase")
+    if phase in PHASE_FRACTIONS and PHASES.index(str(phase)) < PHASES.index("worker"):
+        value = PHASE_FRACTIONS[str(phase)]
+    else:
+        value = _views_fraction(snapshot)
+        value = max(value, PHASE_FRACTIONS.get(str(phase), 0.0))
+    return min(max(value, 0.0), MAX_PROGRESS_FRACTION)
 
 
 # ------------------------------------------------------------------ события
