@@ -77,6 +77,41 @@ describe('CadLayersPanel: группа «Трассы механики»', () =>
     expect(onSetHidden).toHaveBeenCalledWith([0, 1, 2], false);
   });
 
+  it('в режиме 3D слои трасс доступны для переключения, подписи «только план» нет', () => {
+    const onToggle = vi.fn();
+    render(
+      <CadLayersPanel
+        layers={['WALLS']}
+        visibleLayers={new Set([0])}
+        onToggleLayer={vi.fn()}
+        onSetLayersHidden={vi.fn()}
+        pdfOpacity={1}
+        onPdfOpacityChange={vi.fn()}
+        pdfOpacityActive
+        cadShown
+        previewAvailable
+        pointCount={null}
+        cropAvailable={false}
+        cropVisible={false}
+        onCropChange={vi.fn()}
+        mode3d
+        mep={{
+          names: defs.map((def) => def.name),
+          titles: defs.map(mepLayerTitle),
+          visible: new Set([0, 1, 2]),
+          onToggle,
+          onSetHidden: vi.fn(),
+        }}
+      />,
+    );
+    const group = screen.getByTestId('mep-layers');
+    const checkbox = within(group).getByRole('checkbox', { name: 'Отопление обратка · M-OV-T2' });
+    expect(checkbox).not.toBeDisabled();
+    fireEvent.click(checkbox);
+    expect(onToggle).toHaveBeenCalledWith(1);
+    expect(screen.queryByText('Трассы механики: только план')).toBeNull();
+  });
+
   it('без трасс группы нет', () => {
     render(
       <CadLayersPanel

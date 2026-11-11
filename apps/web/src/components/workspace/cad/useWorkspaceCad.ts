@@ -456,7 +456,8 @@ export const useWorkspaceCad = ({
 
   const layers: IWorkspaceCadLayers = {
     mep: mepLayersOf(
-      render.dxfVisible && routePreview ? routePreview.layers : null,
+      // 3D рисует трассы по той же маске: слои трасс переключаются и в 3D, даже при режиме «PDF».
+      (render.dxfVisible || view3d) && routePreview ? routePreview.layers : null,
       mepVisibility.mask,
       mepVisibility.setHidden,
     ),

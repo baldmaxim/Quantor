@@ -217,11 +217,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
       )}
 
       {mep && (
-        <fieldset
-          disabled={mode3d}
-          className="min-w-0 border-0 p-0 disabled:opacity-60"
-          data-testid="mep-layers"
-        >
+        <fieldset className="min-w-0 border-0 p-0" data-testid="mep-layers">
           <legend className="sr-only">Слои трасс механики</legend>
           <CadLayerGroup
             group={{
@@ -235,7 +231,6 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
             onSetLayersHidden={(indices, hidden) => mep.onSetHidden(indices, hidden)}
             swatchColor={(index) => mepColorVar(mep.names[index] ?? '')}
           />
-          {mode3d && <p className="text-xs text-muted">Трассы механики: только план</p>}
         </fieldset>
       )}
 
