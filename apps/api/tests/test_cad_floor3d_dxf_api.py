@@ -1,16 +1,17 @@
 """3D DXF этажа (ADR-0036 п. 6, ADR-0039): постановка, идемпотентность, исполнитель, скачивание.
 
-Настоящий скрипт `tools/cad_walls/run_floor3d_dxf.py` в окружении API не запускается (ezdxf только
-в образе cad-worker): он подменён заглушкой по CLI-контракту, а его собственные тесты лежат в
-`tools/cad_walls/tests/test_floor3d_dxf.py`. Режим заглушки задаёт файл `mode` рядом со скриптом:
-`fail` — код выхода 2, `badsha` — DXF другого хеша, `badgen` — чужая версия скрипта, `extra` —
-лишний файл, `empty` — пустой DXF.
+Настоящий скрипт `cad_walls/run_floor3d_dxf.py` (репозиторий движка) в окружении API не запускается
+(ezdxf только в образе cad-worker): он подменён заглушкой по CLI-контракту, а его собственные тесты
+лежат в `generators/cad_walls/tests/test_floor3d_dxf.py` репозитория движка. Режим заглушки
+задаёт файл `mode` рядом со скриптом: `fail` — код выхода 2, `badsha` — DXF другого хеша,
+`badgen` — чужая версия скрипта, `extra` — лишний файл, `empty` — пустой DXF.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import uuid
 from collections.abc import Callable
@@ -28,6 +29,7 @@ from app.main import create_app
 from app.models import Job, Workspace
 from app.services import cad as cad_service
 from app.services import cad_floor3d_dxf as floor3d_service
+from app.services import cad_pins
 from app.services import jobs as jobs_service
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_constructions_api import _ready_sheet, _url, walls_settings
@@ -35,7 +37,11 @@ from tests.test_cad_floor3d_api import floor_tools  # noqa: F401  фикстур
 from tests.test_cad_mep import FOLDER
 
 DXF_BODY = b"0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1032\n0\nENDSEC\n0\nEOF\n"
-SCRIPT = Path(__file__).resolve().parents[3] / "tools/cad_walls/cad_walls/floor3d_dxf.py"
+# Исходник движка: `CAD_ENGINE_SRC` или соседний с Quantor каталог `CAD_engine`.
+ENGINE_SRC = Path(
+    os.environ.get("CAD_ENGINE_SRC") or Path(__file__).resolve().parents[4] / "CAD_engine"
+)
+SCRIPT = ENGINE_SRC / "generators" / "cad_walls" / "cad_walls" / "floor3d_dxf.py"
 
 STUB = """
 import argparse, hashlib, json, pathlib, sys
@@ -124,9 +130,12 @@ def test_route_job_type_and_handler_are_registered() -> None:
 
 
 def test_generator_version_matches_the_script() -> None:
+    """Версия скрипта в pins.json репозитория совпадает с исходником движка."""
+    if not SCRIPT.is_file():
+        pytest.skip(f"нет исходника движка {SCRIPT} (задайте CAD_ENGINE_SRC)")
     found = re.search(r'^GENERATOR_VERSION: Final = "([^"]+)"', SCRIPT.read_text("utf-8"), re.M)
     assert found is not None
-    assert found.group(1) == floor3d_service.GENERATOR_VERSION
+    assert found.group(1) == cad_pins.floor3d_dxf_version(clean_settings())
 
 
 def test_artifact_name_is_closed() -> None:

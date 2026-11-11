@@ -178,7 +178,7 @@ services:
       CAD_ENGINE_PYTHON: /opt/cad-engine/venv/bin/python
       CAD_ENGINE_RUNNER: /opt/cad-engine/runner/quantor_cad_runner.py
       CAD_ENGINE_ARCHIVE: /opt/cad-engine/engine.zip
-      CAD_MEP_RUNNER: /app/tools/cad_mep/run_mep.py
+      CAD_GENERATORS_ROOT: /opt/cad-engine/generators
       CAD_WORK_ROOT: /var/tmp/quantor-cad
       CAD_MAX_MEMORY_MB: ${CAD_MAX_MEMORY_MB:-6144}
     command: ['python', '-m', 'app.cad_worker']

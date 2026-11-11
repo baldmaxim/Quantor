@@ -1,8 +1,9 @@
 """Задание `cad_floor3d_dxf`: 3D-модель этажа в 3D DXF для AutoCAD (ADR-0036 п. 6, ADR-0039).
 
 API собирает ту же модель этажа, что отдаёт `GET .../floor3d`, кладёт её JSON в хранилище как вход
-и ставит задание. DXF пишет cad-worker скриптом `tools/cad_walls/run_floor3d_dxf.py` (ezdxf в
-процессе API запрещён). Модуль стандартный: ни ezdxf, ни Shapely сюда не импортируются.
+и ставит задание. DXF пишет cad-worker скриптом `cad_walls/run_floor3d_dxf.py` репозитория
+движка (ezdxf в процессе API запрещён); версия скрипта - из pins.json (`floor3d_dxf_version`).
+Модуль стандартный: ни ezdxf, ни Shapely сюда не импортируются.
 
 Вход адресуется содержимым: ключ объекта содержит sha256 канонического JSON модели, поэтому та же
 модель — тот же объект, а повторная постановка находит прежнее задание.
@@ -18,17 +19,15 @@ from typing import Final
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contracts.cad_floor3d import CadFloor3dRead
+from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, http_error, not_found
 from app.models import Job
 from app.services import cad as cad_service
+from app.services import cad_pins
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectStorage, StorageUnavailableError
 
-# Версия скрипта `tools/cad_walls/cad_walls/floor3d_dxf.py` (`GENERATOR_VERSION`). В образе API
-# файла скрипта нет, поэтому константа дублируется; исполнитель сверяет её с ответом скрипта, а
-# тест репозитория — с исходником.
-GENERATOR_VERSION: Final = "cad_floor3d_dxf.v2"
 DXF_NAME: Final = "floor3d.dxf"
 # Сколько раз за ту же модель можно заново ставить отказавшее или отменённое задание.
 _MAX_SEQUENCE: Final = 20
@@ -62,6 +61,7 @@ def idempotency_key(
     page_index: int,
     view: int,
     sha256: str,
+    generator_version: str,
     sequence: int,
 ) -> str:
     """Тот же вид, модель и версия скрипта — то же задание; новая попытка после отказа — номер."""
@@ -73,7 +73,7 @@ def idempotency_key(
                 str(page_index),
                 str(view),
                 sha256,
-                GENERATOR_VERSION,
+                generator_version,
                 str(sequence),
             )
         ).encode()
@@ -84,6 +84,7 @@ def idempotency_key(
 async def schedule(
     session: AsyncSession,
     storage: ObjectStorage,
+    settings: Settings,
     *,
     parent: Job,
     page_index: int,
@@ -95,6 +96,7 @@ async def schedule(
     Идемпотентно: пока есть задание с той же моделью и версией скрипта (в очереди, выполняется
     или успешное) — возвращается оно. Отказавшее или отменённое не мешает: ставится новое.
     """
+    generator_version = cad_pins.floor3d_dxf_version(settings)
     attempt = cad_service.result_of(parent).get("attempt")
     revision_id = parent.payload.get("revision_id")
     if type(attempt) is not int or not isinstance(revision_id, str):
@@ -124,6 +126,7 @@ async def schedule(
                 page_index=page_index,
                 view=view,
                 sha256=sha256,
+                generator_version=generator_version,
                 sequence=sequence,
             ),
         )
@@ -143,6 +146,7 @@ async def schedule(
             page_index=page_index,
             view=view,
             sha256=sha256,
+            generator_version=generator_version,
             sequence=sequence,
         ),
         payload={
@@ -153,7 +157,7 @@ async def schedule(
             "view": view,
             "model_sha256": sha256,
             "model_size": len(raw),
-            "generator_version": GENERATOR_VERSION,
-            "engine_version": GENERATOR_VERSION,
+            "generator_version": generator_version,
+            "engine_version": generator_version,
         },
     )

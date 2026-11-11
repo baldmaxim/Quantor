@@ -25,6 +25,7 @@ from app.services import cad_mep as cad_mep_service
 from app.services import cad_walls as cad_walls_service
 from app.services import cad_walls_zones, cad_zones_auto
 from app.storage.base import StorageUnavailableError
+from tests.cad_pins_helper import write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_constructions_api import PARAMS as WALLS_PARAMS
 from tests.test_cad_constructions_api import STUB as WALLS_STUB
@@ -42,13 +43,11 @@ def settings(tmp_path: Path) -> Settings:
     (walls / "params").mkdir(parents=True)
     (walls / "cad_walls").mkdir()
     (walls / "params" / "v1.json").write_text(json.dumps(WALLS_PARAMS), encoding="utf-8")
-    (walls / "cad_walls" / "version.py").write_text('GENERATOR_VERSION = "cad_walls.v1"\n')
     (walls / "run_walls.py").write_text(WALLS_STUB, encoding="utf-8")
     mep = tmp_path / "tools" / "cad_mep"
     (mep / "params").mkdir(parents=True)
     (mep / "cad_mep").mkdir()
     (mep / "params" / "v1.json").write_text(json.dumps(MEP_PARAMS), encoding="utf-8")
-    (mep / "cad_mep" / "version.py").write_text('GENERATOR_VERSION = "cad_mep.v1"\n')
     (mep / "run_mep.py").write_text("", encoding="utf-8")
     (mep / "run_zones.py").write_text(ZONES_STUB, encoding="utf-8")
     return clean_settings(
@@ -59,6 +58,9 @@ def settings(tmp_path: Path) -> Settings:
         cad_walls_params=str(walls / "params" / "v1.json"),
         cad_mep_runner=str(mep / "run_mep.py"),
         cad_mep_params=str(mep / "params" / "v1.json"),
+        cad_engine_pins=write_pins(
+            tmp_path, mep=mep / "params" / "v1.json", walls=walls / "params" / "v1.json"
+        ),
         cad_work_root=str(tmp_path / "work"),
         cad_total_timeout_seconds=60,
     )

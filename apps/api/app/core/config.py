@@ -133,15 +133,18 @@ class Settings(BaseSettings):
     cad_work_root: str = ""
     cad_total_timeout_seconds: int = Field(default=900, ge=10, le=7200)
     cad_max_memory_mb: int = Field(default=3072, ge=256, le=16384)
-    # Трассы механики (ADR-0036 п. 8): генератор `tools/cad_mep/run_mep.py` запускается тем же
-    # интерпретатором движка (`cad_engine_python`) в образе cad-worker. Файл параметров читают и
-    # API (только sha256 и версия генератора), и исполнитель; пусто — `tools/cad_mep/params/v1.json`
-    # в корне репозитория (/app в образах).
+    # Генераторы CAD (трассы и зоны `cad_mep`, конструкции `cad_walls`) живут в репозитории движка
+    # и закреплены в `tools/cad_engine/pins.json` (раздел `generators`, ADR-0036 п. 8, ADR-0038).
+    # API читает оттуда только версию генератора и sha256 параметров; пусто — pins.json в корне
+    # репозитория (/app в образах). Каталог генераторов `cad_generators_root` (в нём лежат
+    # `cad_mep/` и `cad_walls/`, как в репозитории движка) нужен только исполнителю: пусто и нет
+    # явного `cad_mep_runner` / `cad_walls_runner` — генератор не настроен. Файл параметров
+    # исполнитель читает по `cad_mep_params` / `cad_walls_params` (пусто — внутри
+    # `cad_generators_root`) и сверяет с pins: генератор в образе не совпал с пином - отказ задания.
+    cad_engine_pins: str = ""
+    cad_generators_root: str = ""
     cad_mep_runner: str = ""
     cad_mep_params: str = ""
-    # Конструкции кладки и монолита (ADR-0038): скрипт `tools/cad_walls/run_walls.py` запускается
-    # тем же интерпретатором движка в образе cad-worker. API читает только sha256 параметров и
-    # версию скрипта; пусто — `tools/cad_walls/params/v1.json` в корне репозитория (/app в образах).
     cad_walls_runner: str = ""
     cad_walls_params: str = ""
 

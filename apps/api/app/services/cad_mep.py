@@ -7,16 +7,14 @@
 остаётся с отметкой отзыва): одобрение - пока по нему нет принятых трасс, принятие - всегда;
 по умолчанию ничего не принимается и не одобряется.
 
-Модуль стандартный: генератор (`tools/cad_mep`, PyMuPDF/Shapely/ezdxf) запускает только
-cad-worker подпроцессом; сюда эти пакеты не импортируются. Файл параметров генератора читается
-только ради sha256 и версии.
+Модуль стандартный: генератор (`generators/cad_mep` репозитория движка, PyMuPDF/Shapely/ezdxf)
+запускает только cad-worker подпроцессом; сюда эти пакеты не импортируются. Версия генератора и
+sha256 параметров берутся из pins.json.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
-import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -34,12 +32,9 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.models import CadDecision, CadRemark, Job, Project, UserIdentity
 from app.models.cad_decision import DECISION_MEP_ACCEPTANCE, DECISION_VIEW_APPROVAL
 from app.services import cad as cad_service
-from app.services import cad_risers
+from app.services import cad_pins, cad_risers
 from app.services import jobs as jobs_service
 
-_VERSION_LINE: Final = re.compile(
-    r'^GENERATOR_VERSION\s*(?::[^=]+)?=\s*"([A-Za-z0-9._-]{1,48})"', re.M
-)
 DECISION_KEY: Final = ("kind", "job_id", "attempt", "page_index", "view")
 
 ROUTES_DXF: Final = "mep_routes.dxf"
@@ -66,38 +61,28 @@ class MepParams:
     generator_version: str
 
 
-def params_path(settings: Settings) -> Path:
-    if settings.cad_mep_params.strip():
-        return Path(settings.cad_mep_params)
-    # .../<корень>/apps/api/app/services/cad_mep.py -> <корень>/tools/cad_mep/params/v1.json
-    return Path(__file__).resolve().parents[4] / "tools" / "cad_mep" / "params" / "v1.json"
-
-
-def version_path(params: Path) -> Path:
-    """`<tools>/cad_mep/params/v1.json` -> `<tools>/cad_mep/cad_mep/version.py`."""
-    return params.parent.parent / "cad_mep" / "version.py"
+def runner_path(settings: Settings) -> Path | None:
+    """Скрипт трасс: `CAD_MEP_RUNNER` или `<CAD_GENERATORS_ROOT>/cad_mep/`, иначе `None`."""
+    return cad_pins.generator_runner(
+        settings, explicit=settings.cad_mep_runner, package="cad_mep", script="run_mep.py"
+    )
 
 
 def load_params(settings: Settings) -> MepParams:
-    """sha256 считается по каноническому JSON, как у параметров движка (`params_sha256`).
+    """Версия генератора и sha256 параметров берутся из `pins.json` (раздел `generators`).
 
-    Версия генератора - константа `GENERATOR_VERSION` в `cad_mep/version.py` рядом с параметрами
-    (в файле параметров лежат только константы с источником, версии там нет). Не нашлась - отказ,
-    а не умолчание: задание нельзя привязать к неизвестной версии.
+    sha256 - канонического JSON параметров (как у параметров движка и самого генератора).
+    Файл параметров (`path`) читает только исполнитель; если он настроен (`CAD_MEP_PARAMS` или
+    `CAD_GENERATORS_ROOT`), его байты сверяются с пином: генератор в образе не совпал с пином -
+    отказ, а не работа по чужим параметрам. Нет закрепления - отказ: задание нельзя привязать к
+    неизвестной версии.
     """
-    path = params_path(settings)
-    unavailable = DomainError(
-        ErrorCode.CAD_ENGINE_UNAVAILABLE, "Параметры трасс механики не найдены"
-    )
-    try:
-        raw = json.loads(path.read_bytes())
-        found = _VERSION_LINE.search(version_path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        raise unavailable from error
-    if not isinstance(raw, dict) or found is None:
-        raise unavailable
+    pin = cad_pins.load_generator_pin(settings, "cad_mep")
+    path, configured = cad_pins.params_file(settings, settings.cad_mep_params, pin)
+    if configured:
+        cad_pins.verify_params_file(path, pin, "cad_mep")
     return MepParams(
-        path=path, sha256=cad_service.params_sha256(raw), generator_version=found.group(1)
+        path=path, sha256=pin.params_canonical_sha256, generator_version=pin.generator_version
     )
 
 

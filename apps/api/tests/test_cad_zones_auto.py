@@ -1,7 +1,7 @@
 """Авторазметка зон (`cad_zones`) и общий статус конвейера CAD ревизии.
 
 Движок и настоящий CLI не нужны: родитель `cad_pdf_convert` выставляется прямо в базе и хранилище
-(как у тестов трасс), а `tools/cad_mep/run_zones.py` подменён заглушкой, которая пишет `zones.json`
+(как у тестов трасс), а `cad_mep/run_zones.py` подменён заглушкой, которая пишет `zones.json`
 по CLI-контракту. Режим заглушки задаёт файл `mode` рядом со скриптом: `fail` - код выхода 2.
 """
 
@@ -31,6 +31,7 @@ from app.services import cad as cad_service
 from app.services import cad_zones as cad_zones_service
 from app.services import cad_zones_auto
 from app.services import jobs as jobs_service
+from tests.cad_pins_helper import write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_mep import APPROVAL, FOLDER, PARAMS, _parent
 from tests.test_cad_qa import BROKEN_PDF, _upload_calibrated
@@ -92,24 +93,28 @@ out.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
 
 @pytest.fixture
 def zones_tools(tmp_path: Path) -> Path:
-    """Параметры, версия и заглушка CLI зон: то, что в образе лежит в tools/cad_mep."""
+    """Параметры, версия и заглушка CLI зон: то, что в образе лежит в generators/cad_mep."""
     root = tmp_path / "tools" / "cad_mep"
     (root / "params").mkdir(parents=True)
     (root / "cad_mep").mkdir()
     (root / "params" / "v1.json").write_text(json.dumps(PARAMS), encoding="utf-8")
-    (root / "cad_mep" / "version.py").write_text('GENERATOR_VERSION = "cad_mep.v1"\n')
     (root / "run_mep.py").write_text("", encoding="utf-8")
     (root / "run_zones.py").write_text(STUB, encoding="utf-8")
     return root
 
 
 def zones_settings(tools: Path, tmp_path: Path, *, flag: bool = True) -> Settings:
+    # Конвейер листа ставит и `cad_walls` (его заглушки здесь нет): в pins нужен и этот генератор.
+    walls_params = tmp_path / "pinned" / "cad_walls" / "params" / "v1.json"
+    walls_params.parent.mkdir(parents=True, exist_ok=True)
+    walls_params.write_text(json.dumps(PARAMS), encoding="utf-8")
     return clean_settings(
         environment="test",
         feature_flags="cad.export=true" if flag else "",
         cad_engine_python=sys.executable,
         cad_mep_runner=str(tools / "run_mep.py"),
         cad_mep_params=str(tools / "params" / "v1.json"),
+        cad_engine_pins=write_pins(tmp_path, mep=tools / "params" / "v1.json", walls=walls_params),
         cad_work_root=str(tmp_path / "work"),
         cad_total_timeout_seconds=60,
     )

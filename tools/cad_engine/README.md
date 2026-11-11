@@ -42,3 +42,33 @@ API отвечает 409 `CAD_CALIBRATION_REQUIRED`.
 
 Боевое включение — флаг пространства `cad.export` (ADR-0036); лицензии PyMuPDF/Shapely допущены только
 в образе CAD-исполнителя. `CAD_QA_ENABLED` — только QA-режим в локальном и тестовом окружении.
+
+## Генераторы CAD (`cad_mep`, `cad_walls`)
+
+Код генераторов трасс, зон, конструкций и 3D DXF в Quantor не хранится: он лежит в репозитории
+движка (`generators/cad_mep`, `generators/cad_walls`) и берётся по пину. В `pins.json` раздел
+`generators` фиксирует версии генераторов (`cad_mep.vN`, `cad_walls.vN.M`, `cad_floor3d_dxf.vN`)
+и sha256 файлов параметров: `params_sha256` — байты файла (по нему CI сверяет файл движка),
+`params_canonical_sha256` — канонический JSON (так считают API и генератор, он идёт в ключи заданий).
+API читает из pins только это (`CAD_ENGINE_PINS`, по умолчанию `tools/cad_engine/pins.json`);
+исполнитель берёт скрипты из `CAD_GENERATORS_ROOT` (в образе `/opt/cad-engine/generators`) и при
+`CAD_MEP_PARAMS` / `CAD_WALLS_PARAMS` сверяет параметры с пином. Нет `CAD_GENERATORS_ROOT` и явных
+`CAD_MEP_RUNNER` / `CAD_WALLS_RUNNER` — генератор не настроен, задание отказывает.
+
+### Обновление пина
+
+1. Правки генераторов коммитятся и пушатся в репозиторий движка (CAD_engine), не в Quantor.
+2. В чистом checkout CAD_engine на запушенном коммите:
+   `python tools/cad_engine/pin_engine.py --engine <путь к checkout CAD_engine>`
+   — скрипт пишет `engine.repo_ref` и раздел `generators` (версии из исходников, sha256 параметров).
+   Архив движка только сверяется: при расхождении обновите поля `engine.archive_*` вручную по
+   `engine/dist/<имя>.json`.
+3. `python tools/cad_engine/pin_engine.py --engine <путь> --check` — сверка без записи, код выхода 1
+   при расхождении (грязный checkout тоже ошибка).
+4. Коммит `tools/cad_engine/pins.json` в Quantor. Образ `quantor-cad-worker` собирает `publish.yml`:
+   берёт движок и `generators/` по `repo_ref` и сверяет sha256 параметров с pins.
+
+Локальная сборка образа: скопируйте `generators/cad_mep` и `generators/cad_walls` из checkout движка
+в `deploy/cad-engine/generators/` (без `tests/`) — см. шапку `deploy/Dockerfile.cad-worker`.
+Тесты API, которым нужен настоящий исходник движка, ищут его в `CAD_ENGINE_SRC` (по умолчанию
+`../CAD_engine` рядом с Quantor) и без него пропускаются.

@@ -35,7 +35,6 @@ def tools(tmp_path: Path) -> Path:
     (root / "params").mkdir(parents=True)
     (root / "cad_mep").mkdir()
     (root / "params" / "v1.json").write_text(json.dumps(PARAMS), encoding="utf-8")
-    (root / "cad_mep" / "version.py").write_text('GENERATOR_VERSION = "cad_mep.v1"\n')
     (root / "run_mep.py").write_text(STUB, encoding="utf-8")
     return root
 

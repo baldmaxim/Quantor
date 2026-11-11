@@ -2,15 +2,13 @@
 
 Задание строит `walls.json` по DXF вида результата `cad_pdf_convert`. Ставится автоматически
 после успешной конвертации (для каждого вида с DXF) и вручную — пересчётом. Модуль стандартный:
-скрипт `tools/cad_walls` (Shapely, ezdxf, PyMuPDF) запускает только cad-worker подпроцессом.
-Файл параметров и версия скрипта читаются здесь лишь ради sha256 и версии.
+скрипт `generators/cad_walls` репозитория движка (Shapely, ezdxf, PyMuPDF) запускает только
+cad-worker подпроцессом. Версия скрипта и sha256 параметров берутся из pins.json.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
-import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,16 +23,13 @@ from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
-from app.services import cad_walls_zones
+from app.services import cad_pins, cad_walls_zones
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectStorage
 
 log = get_logger(__name__)
 
 WALLS_JSON: Final = "walls.json"
-_VERSION_LINE: Final = re.compile(
-    r'^GENERATOR_VERSION\s*(?::[^=]+)?=\s*"([A-Za-z0-9._-]{1,48})"', re.M
-)
 _ACTIVE: Final = (JobStatus.QUEUED, JobStatus.RUNNING)
 
 
@@ -48,40 +43,29 @@ class WallsParams:
     params_version: str
 
 
-def params_path(settings: Settings) -> Path:
-    if settings.cad_walls_params.strip():
-        return Path(settings.cad_walls_params)
-    # .../<корень>/apps/api/app/services/cad_walls.py -> <корень>/tools/cad_walls/params/v1.json
-    return Path(__file__).resolve().parents[4] / "tools" / "cad_walls" / "params" / "v1.json"
-
-
-def version_path(params: Path) -> Path:
-    """`<tools>/cad_walls/params/v1.json` -> `<tools>/cad_walls/cad_walls/version.py`."""
-    return params.parent.parent / "cad_walls" / "version.py"
+def runner_path(settings: Settings) -> Path | None:
+    """Скрипт конструкций: `CAD_WALLS_RUNNER` или `<CAD_GENERATORS_ROOT>/cad_walls/run_walls.py`."""
+    return cad_pins.generator_runner(
+        settings, explicit=settings.cad_walls_runner, package="cad_walls", script="run_walls.py"
+    )
 
 
 def load_params(settings: Settings) -> WallsParams:
-    """sha256 считается по каноническому JSON, как у скрипта и у параметров движка.
+    """Версия скрипта и sha256 параметров берутся из `pins.json` (раздел `generators`).
 
-    Версия скрипта — константа `GENERATOR_VERSION` в `cad_walls/version.py` рядом с параметрами;
-    версия параметров — имя файла без расширения (так её пишет скрипт в walls.json). Не нашлись —
-    отказ, а не умолчание: задание нельзя привязать к неизвестной версии.
+    sha256 - канонического JSON параметров (как у скрипта и у параметров движка); версия
+    параметров - имя файла без расширения (так её пишет скрипт в walls.json). Файл параметров
+    читает только исполнитель; если он настроен (`CAD_WALLS_PARAMS` или `CAD_GENERATORS_ROOT`), его
+    байты сверяются с пином. Нет закрепления - отказ, а не умолчание.
     """
-    path = params_path(settings)
-    unavailable = DomainError(
-        ErrorCode.CAD_ENGINE_UNAVAILABLE, "Параметры подсчёта конструкций не найдены"
-    )
-    try:
-        raw = json.loads(path.read_bytes())
-        found = _VERSION_LINE.search(version_path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        raise unavailable from error
-    if not isinstance(raw, dict) or found is None:
-        raise unavailable
+    pin = cad_pins.load_generator_pin(settings, "cad_walls")
+    path, configured = cad_pins.params_file(settings, settings.cad_walls_params, pin)
+    if configured:
+        cad_pins.verify_params_file(path, pin, "cad_walls")
     return WallsParams(
         path=path,
-        sha256=cad_service.params_sha256(raw),
-        generator_version=found.group(1),
+        sha256=pin.params_canonical_sha256,
+        generator_version=pin.generator_version,
         params_version=path.stem,
     )
 

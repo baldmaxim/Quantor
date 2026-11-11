@@ -33,6 +33,7 @@ from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
 from app.services import cad_risers
 from app.services import jobs as jobs_service
+from tests.cad_pins_helper import write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_qa import BROKEN_PDF, _upload_calibrated
 
@@ -104,12 +105,11 @@ def _sha(data: bytes) -> str:
 
 @pytest.fixture
 def tools(tmp_path: Path) -> Path:
-    """Параметры, версия и заглушка генератора: то, что в образе лежит в tools/cad_mep."""
+    """Параметры, версия и заглушка генератора: то, что в образе лежит в generators/cad_mep."""
     root = tmp_path / "tools" / "cad_mep"
     (root / "params").mkdir(parents=True)
     (root / "cad_mep").mkdir()
     (root / "params" / "v1.json").write_text(json.dumps(PARAMS), encoding="utf-8")
-    (root / "cad_mep" / "version.py").write_text('GENERATOR_VERSION = "cad_mep.v1"\n')
     (root / "run_mep.py").write_text(STUB, encoding="utf-8")
     return root
 
@@ -121,6 +121,7 @@ def mep_settings(tools: Path, tmp_path: Path, *, flag: bool = True) -> Settings:
         cad_engine_python=sys.executable,
         cad_mep_runner=str(tools / "run_mep.py"),
         cad_mep_params=str(tools / "params" / "v1.json"),
+        cad_engine_pins=write_pins(tmp_path, mep=tools / "params" / "v1.json"),
         cad_work_root=str(tmp_path / "work"),
         cad_total_timeout_seconds=60,
     )
@@ -276,13 +277,24 @@ def test_route_artifact_names_are_closed_and_dxf_needs_the_route_pattern() -> No
             cad_service.artifact_storage_key(revision, job, 1, bad)
 
 
-def test_params_hash_and_version_come_from_files(tools: Path, tmp_path: Path) -> None:
+def test_params_hash_and_version_come_from_pins(tools: Path, tmp_path: Path) -> None:
     settings = mep_settings(tools, tmp_path)
     params = cad_mep_service.load_params(settings)
     assert params.generator_version == "cad_mep.v1"
     assert params.sha256 == cad_service.params_sha256(PARAMS)
-    (tools / "cad_mep" / "version.py").unlink()
-    with pytest.raises(Exception, match="не найдены"):
+
+    # Процесс API: файла параметров нет и не настроен - версия и sha256 всё равно из pins.
+    api_side = settings.model_copy(update={"cad_mep_params": ""})
+    assert cad_mep_service.load_params(api_side).sha256 == params.sha256
+
+    # Исполнитель: параметры в образе другие, чем в пине, - понятная ошибка.
+    (tools / "params" / "v1.json").write_text(json.dumps({**PARAMS, "extra": 1}), encoding="utf-8")
+    with pytest.raises(Exception, match="не совпадает с пином"):
+        cad_mep_service.load_params(settings)
+
+    # Нет pins.json - отказ, а не умолчание.
+    (tmp_path / "pins.json").unlink()
+    with pytest.raises(Exception, match=r"pins\.json"):
         cad_mep_service.load_params(settings)
 
 

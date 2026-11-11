@@ -1,7 +1,7 @@
 """Конструкции CAD (ADR-0038): задание cad_walls, автопостановка, API величин и параметров.
 
 Движок и настоящий скрипт не нужны: родитель `cad_pdf_convert` выставляется прямо в базе и
-хранилище (как у тестов трасс), а скрипт `tools/cad_walls` подменён заглушкой, которая пишет
+хранилище (как у тестов трасс), а скрипт `cad_walls` подменён заглушкой, которая пишет
 `walls.json` по CLI-контракту. Режим заглушки задаёт файл `mode` рядом со скриптом: `fail` — код
 выхода 2, `badsha` — walls.json другого DXF, `badschema` — чужая схема, `extra` — лишний файл.
 """
@@ -34,6 +34,7 @@ from app.services import cad as cad_service
 from app.services import cad_walls as cad_walls_service
 from app.services import cad_walls_zones
 from app.services import jobs as jobs_service
+from tests.cad_pins_helper import write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_mep import FOLDER, PARENT_DXF, _parent
 from tests.test_cad_qa import BROKEN_PDF, _upload_calibrated
@@ -122,12 +123,11 @@ def _sha(data: bytes) -> str:
 
 @pytest.fixture
 def walls_tools(tmp_path: Path) -> Path:
-    """Параметры, версия и заглушка скрипта: то, что в образе лежит в tools/cad_walls."""
+    """Параметры, версия и заглушка скрипта: то, что в образе лежит в generators/cad_walls."""
     root = tmp_path / "tools" / "cad_walls"
     (root / "params").mkdir(parents=True)
     (root / "cad_walls").mkdir()
     (root / "params" / "v1.json").write_text(json.dumps(PARAMS), encoding="utf-8")
-    (root / "cad_walls" / "version.py").write_text('GENERATOR_VERSION = "cad_walls.v1"\n')
     (root / "run_walls.py").write_text(STUB, encoding="utf-8")
     return root
 
@@ -139,6 +139,7 @@ def walls_settings(tools: Path, tmp_path: Path, *, flag: bool = True) -> Setting
         cad_engine_python=sys.executable,
         cad_walls_runner=str(tools / "run_walls.py"),
         cad_walls_params=str(tools / "params" / "v1.json"),
+        cad_engine_pins=write_pins(tmp_path, walls=tools / "params" / "v1.json"),
         cad_work_root=str(tmp_path / "work"),
         cad_total_timeout_seconds=60,
     )
@@ -210,19 +211,20 @@ def test_walls_artifact_name_is_closed() -> None:
             cad_service.artifact_storage_key(revision, job, 1, bad)
 
 
-def test_params_hash_and_versions_come_from_files(walls_tools: Path, tmp_path: Path) -> None:
+def test_params_hash_and_versions_come_from_pins(walls_tools: Path, tmp_path: Path) -> None:
     settings = walls_settings(walls_tools, tmp_path)
     params = cad_walls_service.load_params(settings)
     # Версия скрипта растёт аддитивно (cad_walls.v1, v1.1, …): проверяем семейство.
     assert params.generator_version.startswith("cad_walls.v1") and params.params_version == "v1"
     assert params.sha256 == cad_service.params_sha256(PARAMS)
-    (walls_tools / "cad_walls" / "version.py").unlink()
-    with pytest.raises(Exception, match="не найдены"):
+    # Параметры в образе исполнителя другие, чем в пине, - понятная ошибка.
+    (walls_tools / "params" / "v1.json").write_text(json.dumps({**PARAMS, "x": 1}), "utf-8")
+    with pytest.raises(Exception, match="не совпадает с пином"):
         cad_walls_service.load_params(settings)
 
 
 def test_repository_params_are_readable_by_the_api_service() -> None:
-    """Файл параметров и версия настоящего скрипта читаются без настройки путей."""
+    """Версия и sha256 параметров настоящего скрипта читаются из pins.json без настройки путей."""
     params = cad_walls_service.load_params(clean_settings())
     # Версия скрипта растёт аддитивно (cad_walls.v1, v1.1, …): проверяем семейство.
     assert params.generator_version.startswith("cad_walls.v1") and params.params_version == "v1"

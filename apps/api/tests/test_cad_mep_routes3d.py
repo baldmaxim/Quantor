@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.domain import JobStatus
 from app.models import Job, Workspace
+from tests.cad_pins_helper import write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_constructions_api import PARAMS as WALLS_PARAMS
 from tests.test_cad_constructions_api import STUB as WALLS_STUB
@@ -40,7 +41,6 @@ def mep_tools(tmp_path: Path) -> Path:
     (root / "params").mkdir(parents=True)
     (root / "cad_mep").mkdir()
     (root / "params" / "v1.json").write_text(json.dumps(MEP_PARAMS), encoding="utf-8")
-    (root / "cad_mep" / "version.py").write_text('GENERATOR_VERSION = "cad_mep.v1"\n')
     (root / "run_mep.py").write_text(MEP_STUB, encoding="utf-8")
     return root
 
@@ -51,7 +51,6 @@ def walls_tools(tmp_path: Path) -> Path:
     (root / "params").mkdir(parents=True)
     (root / "cad_walls").mkdir()
     (root / "params" / "v1.json").write_text(json.dumps(WALLS_PARAMS), encoding="utf-8")
-    (root / "cad_walls" / "version.py").write_text('GENERATOR_VERSION = "cad_walls.v1"\n')
     (root / "run_walls.py").write_text(WALLS_STUB, encoding="utf-8")
     return root
 
@@ -68,6 +67,11 @@ def both_settings(
         cad_mep_params=mep.cad_mep_params,
         cad_walls_runner=str(walls_tools / "run_walls.py"),
         cad_walls_params=str(walls_tools / "params" / "v1.json"),
+        cad_engine_pins=write_pins(
+            tmp_path,
+            mep=mep_tools / "params" / "v1.json",
+            walls=walls_tools / "params" / "v1.json",
+        ),
         cad_work_root=str(tmp_path / "work"),
         cad_total_timeout_seconds=60,
     )

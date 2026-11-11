@@ -15,7 +15,14 @@ from pydantic import ValidationError
 
 from app.api.v1.cad import _read_artifact_json
 from app.api.v1.cad_constructions import _load_walls, _Sheet, _sheet, _Walls
-from app.api.v1.deps import AuthDep, SessionDep, StorageDep, require, require_feature
+from app.api.v1.deps import (
+    AuthDep,
+    SessionDep,
+    SettingsDep,
+    StorageDep,
+    require,
+    require_feature,
+)
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
 from app.contracts.cad_constructions import CadWallsJobRead
@@ -212,13 +219,20 @@ async def create_cad_floor3d_dxf(
     session: SessionDep,
     context: AuthDep,
     storage: StorageDep,
+    settings: SettingsDep,
 ) -> CadWallsJobRead:
     """Модель собирается тем же сервисом, что у GET floor3d; DXF - файл `floor3d.dxf` задания."""
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
     model = await _floor3d(session, storage, sheet, walls)
     job = await cad_floor3d_dxf.schedule(
-        session, storage, parent=sheet.parent, page_index=page_index, view=view, model=model
+        session,
+        storage,
+        settings,
+        parent=sheet.parent,
+        page_index=page_index,
+        view=view,
+        model=model,
     )
     response = CadWallsJobRead(
         job_id=job.id,

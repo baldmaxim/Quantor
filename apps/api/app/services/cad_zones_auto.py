@@ -6,8 +6,8 @@
 здесь - лист без единой зоны. Сами зоны создаёт обработчик через общий сервис зон: площадь и
 периметр считает сервер, как у ручных зон.
 
-Модуль стандартный: CLI `tools/cad_mep/run_zones.py` (PyMuPDF, Shapely) запускает только
-cad-worker подпроцессом. Файл параметров читается здесь лишь ради sha256 и версии генератора.
+Модуль стандартный: CLI `cad_mep/run_zones.py` репозитория движка (PyMuPDF, Shapely) запускает
+только cad-worker подпроцессом. Версия генератора и sha256 параметров - из pins.json.
 """
 
 from __future__ import annotations
@@ -43,8 +43,8 @@ RUNNER_NAME: Final = "run_zones.py"
 
 def runner_path(settings: Settings) -> Path | None:
     """CLI зон лежит рядом с генератором трасс; генератор не настроен - зон тоже нет."""
-    configured = settings.cad_mep_runner.strip()
-    return Path(configured).with_name(RUNNER_NAME) if configured else None
+    mep_runner = cad_mep_service.runner_path(settings)
+    return mep_runner.with_name(RUNNER_NAME) if mep_runner is not None else None
 
 
 def idempotency_key(

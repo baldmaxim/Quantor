@@ -106,7 +106,8 @@ jobs:
 
   # CAD-исполнитель PDF -> DXF (ADR-0036): строится поверх образа quantor-api того же коммита,
   # поэтому ждёт сборки всех образов. Архив движка берётся из приватного репозитория по
-  # закреплённому в tools/cad_engine/pins.json коммиту; доступ — deploy-key только на чтение
+  # закреплённому в tools/cad_engine/pins.json коммиту (там же закреплены генераторы cad_mep и
+  # cad_walls из каталога generators/ того же коммита); доступ — deploy-key только на чтение
   # (секрет CAD_ENGINE_DEPLOY_KEY), в слои образа ключ не попадает.
   build-cad-worker:
     needs: build
@@ -135,7 +136,9 @@ jobs:
           ref: ${{ steps.pins.outputs.repo_ref }}
           ssh-key: ${{ secrets.CAD_ENGINE_DEPLOY_KEY }}
           path: .cad-engine-src
-          sparse-checkout: ${{ steps.pins.outputs.archive_path }}
+          sparse-checkout: |
+            ${{ steps.pins.outputs.archive_path }}
+            generators/
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
@@ -144,6 +147,23 @@ jobs:
           mkdir -p deploy/cad-engine
           cp ".cad-engine-src/${{ steps.pins.outputs.archive_path }}" deploy/cad-engine/engine.zip
           echo "${{ steps.pins.outputs.archive_sha256 }}  deploy/cad-engine/engine.zip" | sha256sum -c -
+
+      - name: Генераторы CAD в контекст сборки (без tests/, сверка sha256 параметров с pins.json)
+        run: |
+          pins=tools/cad_engine/pins.json
+          rm -rf deploy/cad-engine/generators
+          mkdir -p deploy/cad-engine/generators
+          for name in cad_mep cad_walls; do
+            src=".cad-engine-src/generators/$name"
+            [ -d "$src" ] || { echo "::error::В движке нет generators/$name"; exit 1; }
+            cp -r "$src" "deploy/cad-engine/generators/$name"
+            rm -rf "deploy/cad-engine/generators/$name/tests"
+            expected="$(jq -r --arg n "$name" '.generators[$n].params_sha256 // empty' "$pins")"
+            params_rel="$(jq -r --arg n "$name" '.generators[$n].params_path // empty' "$pins")"
+            [ -n "$expected" ] && [ -n "$params_rel" ] || { echo "::error::В $pins нет generators.$name"; exit 1; }
+            actual="$(sha256sum ".cad-engine-src/$params_rel" | cut -d' ' -f1)"
+            [ "$actual" = "$expected" ] || { echo "::error::Параметры $name в движке ($actual) не совпали с pins.json ($expected)"; exit 1; }
+          done
 
       - uses: docker/setup-buildx-action@v3
 

@@ -1,4 +1,4 @@
-"""Тело задания `cad_walls`: DXF вида -> скрипт tools/cad_walls -> проверка walls.json -> хранилище.
+"""Тело задания `cad_walls`: DXF вида -> скрипт cad_walls -> проверка walls.json -> хранилище.
 
 Скрипт не импортируется: он работает подпроцессом интерпретатора движка (`-I`, пустое окружение,
 новая группа процессов, пределы времени и памяти) по CLI-контракту:
@@ -78,13 +78,13 @@ def _argv(
     page_index: int,
     zones: Path | None = None,
 ) -> list[str]:
-    python, runner = settings.cad_engine_python.strip(), settings.cad_walls_runner.strip()
-    if not (python and runner) or not (Path(python).is_file() and Path(runner).is_file()):
+    python, runner = settings.cad_engine_python.strip(), cad_walls_service.runner_path(settings)
+    if not python or runner is None or not (Path(python).is_file() and runner.is_file()):
         raise CadError(ErrorCode.CAD_ENGINE_UNAVAILABLE, "скрипт подсчёта конструкций не настроен")
     argv = [
         python,
         "-I",
-        runner,
+        str(runner),
         "--dxf",
         str(dxf),
         "--params",

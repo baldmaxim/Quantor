@@ -44,12 +44,11 @@ ROWS: list[list[object]] = [
 
 @pytest.fixture
 def walls_tools(tmp_path: Path) -> Path:
-    """Параметры и заглушка скрипта конструкций: то, что в образе лежит в tools/cad_walls."""
+    """Параметры и заглушка скрипта конструкций: то, что в образе лежит в generators/cad_walls."""
     root = tmp_path / "tools" / "cad_walls"
     (root / "params").mkdir(parents=True)
     (root / "cad_walls").mkdir()
     (root / "params" / "v1.json").write_text(json.dumps(PARAMS), encoding="utf-8")
-    (root / "cad_walls" / "version.py").write_text('GENERATOR_VERSION = "cad_walls.v1"\n')
     (root / "run_walls.py").write_text(STUB, encoding="utf-8")
     return root
 

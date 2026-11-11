@@ -1,4 +1,4 @@
-"""Тело задания `cad_mep_route`: одобренный вид -> генератор tools/cad_mep -> проверка -> хранилище.
+"""Тело задания `cad_mep_route`: одобренный вид -> генератор cad_mep -> проверка -> хранилище.
 
 Генератор не импортируется: он работает подпроцессом интерпретатора движка (`-I`, пустое
 окружение, новая группа процессов, пределы времени и памяти) по CLI-контракту:
@@ -83,8 +83,8 @@ def _generator_argv(
     page_index: int,
     risers: Path | None = None,
 ) -> list[str]:
-    python, runner = settings.cad_engine_python.strip(), settings.cad_mep_runner.strip()
-    if not (python and runner) or not (Path(python).is_file() and Path(runner).is_file()):
+    python, runner = settings.cad_engine_python.strip(), cad_mep_service.runner_path(settings)
+    if not python or runner is None or not (Path(python).is_file() and runner.is_file()):
         raise CadError(ErrorCode.CAD_ENGINE_UNAVAILABLE, "генератор трасс механики не настроен")
     manual: list[str] = []
     for flag, key in (
@@ -99,7 +99,7 @@ def _generator_argv(
     return [
         python,
         "-I",
-        runner,
+        str(runner),
         "--pdf",
         str(source),
         "--page-index",

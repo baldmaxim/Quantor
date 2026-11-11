@@ -6,7 +6,7 @@
     "version": "2026.11.10+e37b347ff1a4",
     "archive_name": "Quantor_CAD_source_2026.11.10_e37b347ff1a4.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "c10110fea15f95fb9e4ce7bed44e298dca2cadbf",
+    "repo_ref": "8e885739804289e9ac6d1a3c4856b9969f843f25",
     "archive_path": "engine/dist/Quantor_CAD_source_2026.11.10_e37b347ff1a4.zip",
     "archive_sha256": "8daba71dc7d81dffe564408eea68984974ecbeff71d25317d9046b20fe0ca275",
     "manifest_sha256": "d25ddf9eec33291f76f1b72450a37f03cdf7e01a34d048b38bf129de29b03e73",
@@ -26,5 +26,21 @@
     "fonttools": "4.68.0",
     "pyparsing": "3.3.3",
     "typing-extensions": "4.16.0"
+  },
+  "generators": {
+    "path": "generators",
+    "cad_mep": {
+      "generator_version": "cad_mep.v8",
+      "params_path": "generators/cad_mep/params/v1.json",
+      "params_sha256": "654c5cf5dd3fe175215b78bcefc358f0d1dd3b5376d91433d4280cb3cfc9aa66",
+      "params_canonical_sha256": "2e0ae7826db477c7c195380edf6eca0e75b099ef294555346daefc252786ab27"
+    },
+    "cad_walls": {
+      "generator_version": "cad_walls.v1.7",
+      "params_path": "generators/cad_walls/params/v1.json",
+      "params_sha256": "7fd0ec162c0ea02199efc13f1800d4d77f95950e080b048a5d68c84a1a48d016",
+      "params_canonical_sha256": "dbcae6ccf5bc924aa7439aa2d88ab4542db374b9e77b67d661a7d7a391e1ec53",
+      "floor3d_dxf_version": "cad_floor3d_dxf.v2"
+    }
   }
 }

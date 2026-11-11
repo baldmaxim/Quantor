@@ -22,13 +22,8 @@
 !tools/cad_engine/pins.json
 !tools/cad_engine/requirements.linux-cp312.lock.txt
 !deploy/cad-engine/engine.zip
-# Генератор трасс механики: образ cad-worker копирует каталог целиком, образ API - только
-# params/v1.json и cad_mep/version.py (см. Dockerfile.api).
-!tools/cad_mep
-# Скрипт конструкций (ADR-0038): образ cad-worker копирует каталог целиком, образ API - только
-# params/v1.json и cad_walls/version.py (см. Dockerfile.api); тесты в образы не нужны.
-!tools/cad_walls
-tools/cad_walls/tests
+# Генераторы CAD (cad_mep, cad_walls) из репозитория движка, без tests/: кладёт publish.yml.
+!deploy/cad-engine/generators
 
 # Внутри разрешённого — только исходники, без артефактов сборки и окружений.
 **/node_modules

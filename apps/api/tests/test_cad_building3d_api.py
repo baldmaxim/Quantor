@@ -26,7 +26,6 @@ def floor_tools(tmp_path: Path) -> Path:
     (root / "params").mkdir(parents=True)
     (root / "cad_walls").mkdir()
     (root / "params" / "v1.json").write_text(json.dumps(PARAMS), encoding="utf-8")
-    (root / "cad_walls" / "version.py").write_text('GENERATOR_VERSION = "cad_walls.v1"\n')
     (root / "run_walls.py").write_text(FLOOR_STUB, encoding="utf-8")
     return root
 

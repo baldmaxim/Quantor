@@ -1,13 +1,14 @@
-"""Тело задания `cad_floor3d_dxf`: модель этажа -> скрипт tools/cad_walls -> DXF -> хранилище.
+"""Тело задания `cad_floor3d_dxf`: модель этажа -> скрипт cad_walls -> DXF -> хранилище.
 
 Скрипт не импортируется: он работает подпроцессом интерпретатора движка (`-I`, пустое окружение,
 новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
     <python> -I run_floor3d_dxf.py --model --out
 
-Скрипт лежит рядом со скриптом конструкций (тот же каталог `tools/cad_walls`), отдельной
-настройки пути нет. Код выхода 2 - ошибка входа, причина - одной строкой JSON `{"code", "message"}`
-в выводе. Общие части (аренда, загрузка, отказ задания) - из `handler`.
+Скрипт лежит рядом со скриптом конструкций (тот же каталог `cad_walls` в `CAD_GENERATORS_ROOT`
+репозитория движка), отдельной настройки пути нет. Код выхода 2 - ошибка входа, причина -
+одной строкой JSON `{"code", "message"}` в выводе. Общие части (аренда, загрузка, отказ
+задания) - из `handler`.
 
 Вход проверяется до запуска: родитель `cad_pdf_convert` успешен, модель из хранилища сверяется по
 sha256 с заданием. Результат проверяется после: в `out/` строго один DXF вида, версия скрипта и
@@ -40,12 +41,12 @@ from app.cad_worker.mep_handler import _generator_failure
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
-from app.errors import ErrorCode
+from app.errors import DomainError, ErrorCode
 from app.models import DocumentRevision, Job
 from app.services import cad as cad_service
 from app.services import cad_floor3d_dxf as floor3d_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_progress
+from app.services import cad_pins, cad_progress
 from app.services import cad_walls as cad_walls_service
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
@@ -68,14 +69,15 @@ class _Input:
 
 
 def _argv(settings: Settings, *, model: Path, out: Path) -> list[str]:
-    python, walls_runner = settings.cad_engine_python.strip(), settings.cad_walls_runner.strip()
-    runner = Path(walls_runner).with_name(SCRIPT_NAME) if walls_runner else None
+    python = settings.cad_engine_python.strip()
+    walls_runner = cad_walls_service.runner_path(settings)
+    runner = walls_runner.with_name(SCRIPT_NAME) if walls_runner is not None else None
     if not python or runner is None or not (Path(python).is_file() and runner.is_file()):
         raise CadError(ErrorCode.CAD_ENGINE_UNAVAILABLE, "скрипт выгрузки 3D DXF не настроен")
     return [python, "-I", str(runner), "--model", str(model), "--out", str(out)]
 
 
-async def _checked_input(session: AsyncSession, job: Job) -> _Input:
+async def _checked_input(session: AsyncSession, job: Job, settings: Settings) -> _Input:
     payload = job.payload
     try:
         parent_id = uuid.UUID(str(payload.get("parent_job_id")))
@@ -93,7 +95,13 @@ async def _checked_input(session: AsyncSession, job: Job) -> _Input:
         or size is None
     ):
         raise CadError(ErrorCode.CAD_PARAMS_INVALID, "задание 3D DXF заполнено не полностью")
-    if payload.get("generator_version") != floor3d_service.GENERATOR_VERSION:
+    try:
+        current_version = cad_pins.floor3d_dxf_version(settings)
+    except DomainError as error:
+        raise CadError(
+            ErrorCode.CAD_ENGINE_UNAVAILABLE, "версия скрипта 3D DXF не закреплена"
+        ) from error
+    if payload.get("generator_version") != current_version:
         raise CadError(ErrorCode.CAD_PARAMS_INVALID, "версия скрипта 3D DXF изменилась")
     parent = await session.get(Job, parent_id)
     if (
@@ -190,7 +198,7 @@ async def execute_cad_floor3d_dxf(
 
     attempt_dir: Path | None = None
     try:
-        source = await _checked_input(session, job)
+        source = await _checked_input(session, job, settings)
         name = floor3d_service.output_name(source.page_index, source.view)
         work_root = Path(settings.cad_work_root or Path(tempfile.gettempdir()) / "quantor-cad")
         await asyncio.to_thread(work_root.mkdir, parents=True, exist_ok=True, mode=0o700)
@@ -262,7 +270,7 @@ async def execute_cad_floor3d_dxf(
     result = {
         "result_status": RESULT_READY,
         "attempt": attempt,
-        "generator_version": floor3d_service.GENERATOR_VERSION,
+        "generator_version": job.payload["generator_version"],
         "model_sha256": job.payload["model_sha256"],
         "dxf_sha256": files[0]["sha256"],
         "input_sha256": revision.source_sha256,
