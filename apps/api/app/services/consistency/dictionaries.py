@@ -41,7 +41,7 @@ def _phrase_pattern(phrase: str) -> re.Pattern[str]:
 
 # --------------------------------------------------------------------------- разделы
 
-SECTION_MARKS_VERSION: Final = "consistency.dict.sections.v3"
+SECTION_MARKS_VERSION: Final = "consistency.dict.sections.v4"
 
 
 class SectionGroup(StrEnum):
@@ -127,6 +127,7 @@ SECTION_MARKS: Final[tuple[SectionMark, ...]] = (
     SectionMark("ДЛ", "Диспетчеризация лифтов", _G.MEP),
     SectionMark("ОЗДС", "Охранно-защитная дератизационная система", _G.MEP),
     SectionMark("ГПТ", "Газовое пожаротушение", _G.FIRE),
+    SectionMark("НВД", "Наружные водостоки и дренажи", _G.MEP),
 )
 
 
