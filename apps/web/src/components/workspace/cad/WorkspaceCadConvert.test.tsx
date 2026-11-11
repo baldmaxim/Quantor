@@ -19,9 +19,11 @@ vi.mock('@/lib/cad/queries', () => ({
   useCreateCadJob: () => ({ mutate: mocks.mutate, isPending: false }),
 }));
 
+import { useWorkspaceStore } from '@/store/workspace';
+
 import { WorkspaceCadConvert } from './WorkspaceCadConvert';
 
-const HREF = '/projects/p/workspace?revision=r&page=4';
+const onCalibrate = vi.fn();
 
 const mount = (onJobCreated = vi.fn()) => {
   render(
@@ -30,7 +32,7 @@ const mount = (onJobCreated = vi.fn()) => {
       revisionId="r"
       sheetId="s3"
       pageIndex={3}
-      calibrateHref={HREF}
+      onCalibrate={onCalibrate}
       onJobCreated={onJobCreated}
     />,
   );
@@ -43,6 +45,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.calibration.current = 'calibrated';
   mocks.features.current = { 'takeoff.manual': true };
+  useWorkspaceStore.setState({ tool: 'pointer' });
 });
 
 describe('WorkspaceCadConvert', () => {
@@ -63,28 +66,37 @@ describe('WorkspaceCadConvert', () => {
     expect(enabled).toBe(true);
   });
 
-  it('нет калибровки: метка и ссылка «Откалибровать», запуск закрыт', () => {
+  it('нет калибровки: метка и кнопка «Откалибровать», запуск закрыт', () => {
     mocks.calibration.current = 'missing';
     mount();
     expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Откалибровать' })).toHaveAttribute('href', HREF);
+    fireEvent.click(screen.getByRole('button', { name: 'Откалибровать' }));
+    expect(onCalibrate).toHaveBeenCalledTimes(1);
     expect(button()).toBeDisabled();
     fireEvent.click(button());
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
 
-  it('флаг ручного обмера выключен: вместо ссылки - пояснение', () => {
+  it('инструмент «Масштаб» включён: вместо кнопки подсказка', () => {
+    mocks.calibration.current = 'missing';
+    useWorkspaceStore.setState({ tool: 'scale' });
+    mount();
+    expect(screen.queryByRole('button', { name: 'Откалибровать' })).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Щёлкните две точки на листе с известным расстоянием');
+  });
+
+  it('флаг ручного обмера выключен: вместо кнопки - пояснение', () => {
     mocks.features.current = {};
     mocks.calibration.current = 'missing';
     mount();
-    expect(screen.queryByRole('link', { name: 'Откалибровать' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Откалибровать' })).toBeNull();
     expect(screen.getByText(/Калибровка недоступна: включите в пространстве флаг/)).toBeInTheDocument();
   });
 
   it('калибровка проверяется - запуск закрыт; статус не прочитан - решает сервер', () => {
     mocks.calibration.current = 'loading';
     const { unmount } = render(
-      <WorkspaceCadConvert projectId="p" revisionId="r" sheetId="s3" pageIndex={3} calibrateHref={HREF} onJobCreated={vi.fn()} />,
+      <WorkspaceCadConvert projectId="p" revisionId="r" sheetId="s3" pageIndex={3} onCalibrate={onCalibrate} onJobCreated={vi.fn()} />,
     );
     expect(button()).toBeDisabled();
     unmount();
@@ -94,7 +106,7 @@ describe('WorkspaceCadConvert', () => {
     expect(button()).toBeEnabled();
   });
 
-  it('ответ 409 по этой странице: метка, ссылка и закрытый запуск', () => {
+  it('ответ 409 по этой странице: метка, кнопка и закрытый запуск', () => {
     mocks.calibration.current = 'unknown';
     mount();
     fireEvent.click(button());
@@ -104,7 +116,7 @@ describe('WorkspaceCadConvert', () => {
     });
     expect(screen.getByRole('alert')).toHaveTextContent('стр. 4');
     expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Откалибровать' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Откалибровать' })).toBeInTheDocument();
     expect(button()).toBeDisabled();
   });
 

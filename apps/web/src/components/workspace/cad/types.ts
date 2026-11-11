@@ -281,8 +281,8 @@ export interface IWorkspaceCadConvert {
   readonly sheetId: string;
   /** Индекс страницы PDF открытого листа. */
   readonly pageIndex: number;
-  /** Ссылка на лист в рабочей области для калибровки. */
-  readonly calibrateHref: string;
+  /** Включает инструмент «Масштаб» на открытом листе в текущем окне. */
+  readonly onCalibrate: () => void;
   /** Задание создано: рабочая область открывает его. */
   readonly onJobCreated: (jobId: string, pages: readonly number[]) => void;
 }

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useRef, useState, type FC } from 'react';
 
 import { takeoffAccess } from '@/components/workspace/takeoff-access';
@@ -15,13 +14,15 @@ import {
   type SheetCalibrationState,
 } from '@/lib/cad/sheets';
 import { useFeatures } from '@/lib/queries';
+import { useWorkspaceStore } from '@/store/workspace';
 
 import type { IWorkspaceCadConvert } from './types';
 
 /**
  * Кнопка «Преобразовать лист в CAD»: задание на одну страницу открытого листа. Масштаб сервер
  * берёт из калибровки листа (ADR-0018), клиент его не передаёт. Лист без калибровки запустить
- * нельзя: рядом ссылка «Откалибровать».
+ * нельзя: рядом кнопка «Откалибровать» включает инструмент «Масштаб» на открытом листе в текущем
+ * окне; пока инструмент включён, вместо кнопки показана подсказка.
  *
  * Компонент привязан к листу: при смене листа его нужно монтировать заново (ключ по странице).
  */
@@ -30,10 +31,11 @@ export const WorkspaceCadConvert: FC<IWorkspaceCadConvert> = ({
   revisionId,
   sheetId,
   pageIndex,
-  calibrateHref,
+  onCalibrate,
   onJobCreated,
 }) => {
   const manualEnabled = takeoffAccess(useFeatures()).enabled;
+  const scaleToolActive = useWorkspaceStore((state) => state.tool === 'scale');
   const create = useCreateCadJob(projectId, revisionId);
   const sheets = useMemo(() => [{ id: sheetId, page_index: pageIndex }], [sheetId, pageIndex]);
   const loaded = useSheetCalibrationStates(sheets, manualEnabled);
@@ -84,14 +86,19 @@ export const WorkspaceCadConvert: FC<IWorkspaceCadConvert> = ({
             Нет калибровки
           </StatusBadge>
           {manualEnabled ? (
-            <Link
-              href={calibrateHref}
-              target="_blank"
-              rel="noopener"
-              className="inline-flex min-h-[44px] items-center text-xs text-accent underline underline-offset-4"
-            >
-              Откалибровать
-            </Link>
+            scaleToolActive ? (
+              <span role="status" className="text-xs text-muted">
+                Щёлкните две точки на листе с известным расстоянием
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={onCalibrate}
+                className="inline-flex min-h-[44px] items-center text-xs text-accent underline underline-offset-4"
+              >
+                Откалибровать
+              </button>
+            )
           ) : (
             <span className="text-xs text-muted">{CALIBRATION_UNAVAILABLE_TEXT}</span>
           )}

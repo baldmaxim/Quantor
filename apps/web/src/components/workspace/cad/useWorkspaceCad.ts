@@ -27,7 +27,6 @@ import {
   resolveCadMode,
   type CadViewMode,
 } from '@/lib/cad/view-mode';
-import { sheetWorkspaceHref } from '@/lib/cad/sheets';
 import { matchingPreview, overlayPaintData, remarkBindingOf } from '@/lib/cad/workspace-cad';
 import { pageForJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { useTheme } from '@/lib/theme';
@@ -461,7 +460,7 @@ export const useWorkspaceCad = ({
             revisionId,
             sheetId: sheet.id,
             pageIndex: sheet.page_index,
-            calibrateHref: sheetWorkspaceHref(projectId, revisionId, positionOf(sheet.page_index) - 1),
+            onCalibrate: () => useWorkspaceStore.getState().setTool('scale'),
             onJobCreated: (jobId, pages) => openJob(jobId, pages),
           }
         : null,

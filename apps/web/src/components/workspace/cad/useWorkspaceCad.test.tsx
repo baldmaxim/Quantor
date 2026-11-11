@@ -157,7 +157,7 @@ beforeEach(() => {
   mocks.jobsData.current = { items: [], server_time: '' };
   mocks.jobData.current = undefined;
   mocks.diagnosticsPatch.current = {};
-  useWorkspaceStore.setState({ leftTab: 'documents' });
+  useWorkspaceStore.setState({ leftTab: 'documents', tool: 'pointer' });
 });
 
 describe('useWorkspaceCad: запросы', () => {
@@ -321,7 +321,7 @@ describe('useWorkspaceCad: переходы', () => {
     expect(navigate).toHaveBeenCalledWith({ page: '2', region: null, job: JOB_ID, view: null });
   });
 
-  it('преобразование открытого листа: запуск на его страницу, ссылка калибровки, задание открывается', () => {
+  it('преобразование открытого листа: запуск на его страницу, калибровка включает «Масштаб», задание открывается', () => {
     const { result } = mount();
     const convert = result.current.side.convert;
     expect(convert).toMatchObject({
@@ -329,7 +329,6 @@ describe('useWorkspaceCad: переходы', () => {
       revisionId: 'r1',
       sheetId: 's0',
       pageIndex: 0,
-      calibrateHref: '/projects/p1/workspace?revision=r1&page=1',
     });
     act(() => convert?.onJobCreated(OTHER_JOB, [0]));
     // лист тот же - в адресе только задание
@@ -337,6 +336,8 @@ describe('useWorkspaceCad: переходы', () => {
   });
 
   it('созданное задание другого листа открывается на своём листе', () => {
+    act(() => convert?.onCalibrate());
+    expect(useWorkspaceStore.getState().tool).toBe('scale');
     const { result } = mount();
     act(() => result.current.side.convert?.onJobCreated(OTHER_JOB, [1]));
     expect(navigate).toHaveBeenCalledWith({ page: '2', region: null, job: OTHER_JOB, view: null });

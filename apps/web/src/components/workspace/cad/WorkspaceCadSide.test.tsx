@@ -62,7 +62,7 @@ const CONVERT: NonNullable<IWorkspaceCadSideProps['convert']> = {
   revisionId: 'r1',
   sheetId: 's0',
   pageIndex: 0,
-  calibrateHref: '/projects/p1/workspace?revision=r1&page=1',
+  onCalibrate: vi.fn(),
   onJobCreated: onConvertCreated,
 };
 
