@@ -21,7 +21,8 @@ from cad_mep import zones_const as zc
 from cad_mep.errors import EXIT_NO_ROUTES, MepError
 from cad_mep.labels import ExplRow, RoomLabel
 from cad_mep.params import Params
-from cad_mep.plan import PlanInput, PlanModel, build_plan_model, open_plan
+from cad_mep.parking import find_parking
+from cad_mep.plan import PlanInput, PlanModel, build_plan_model, open_plan, read_scale
 from cad_mep.version import GENERATOR_VERSION
 from cad_mep.zones_grow import (
     absorb_residual,
@@ -221,17 +222,30 @@ def _zone_notes(sp: Splitter, sid: int, mk: _Mark, group: list[str], shapes: _Sh
 def extract_zones(args: ZoneArgs) -> dict[str, object]:
     """Строит zones.json (словарь) по плану страницы."""
     _validate(args)
-    plan = open_plan(
-        args.pdf, args.page_index, args.view_dxf, args.scale, args.preview, args.params
-    )
+    try:
+        plan = open_plan(
+            args.pdf, args.page_index, args.view_dxf, args.scale, args.preview, args.params
+        )
+    except MepError as exc:
+        if exc.code != "frame_mismatch":
+            raise
+        # повёрнутый лист и т. п.: квартиры без привязки рамки не строим, места — по странице
+        scale = read_scale(args.scale)
+        parking = find_parking(args.pdf, args.page_index, None, scale)
+        if not parking["parking_spaces"]:
+            raise
+        return _output(args, scale, [], [], parking)
     pm = build_plan_model(plan)
     marks, extra = _apartment_marks(pm, plan.params)
+    parking = find_parking(args.pdf, args.page_index, plan.zone, plan.frame.scale)
     if not marks:
-        raise MepError(
-            "no_explication",
-            "в экспликации листа нет комнат квартир: зоны сопоставить не с чем",
-            EXIT_NO_ROUTES,
-        )
+        if not parking["parking_spaces"]:
+            raise MepError(
+                "no_explication",
+                "в экспликации листа нет комнат квартир: зоны сопоставить не с чем",
+                EXIT_NO_ROUTES,
+            )
+        return _output(args, plan.frame.scale, [], [], parking)  # лист автостоянки: только места
     fld, sp, absorbed_notes = _build_field(plan, pm, args)
     shapes = _shapes(sp, fld, absorbed_notes)
     polys = shapes.polys
@@ -287,6 +301,16 @@ def extract_zones(args: ZoneArgs) -> dict[str, object]:
                 "reason": "нет в экспликации",
             }
         )
+    return _output(args, scale, zones, unmatched, parking)
+
+
+def _output(
+    args: ZoneArgs,
+    scale: float,
+    zones: list[_Zone],
+    unmatched: list[dict[str, object]],
+    parking: dict[str, object],
+) -> dict[str, object]:
     return {
         "schema": SCHEMA,
         "generator_version": GENERATOR_VERSION,
@@ -295,6 +319,7 @@ def extract_zones(args: ZoneArgs) -> dict[str, object]:
         "zones": [z.as_json() for z in zones],
         "unmatched_marks": unmatched,
         "summary": _summary(zones),
+        **parking,
     }
 
 

@@ -37,7 +37,13 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # Вызовы PyMuPDF не аннотированы (чтение страницы и текста, синтетический PDF в тестах).
-module = ["cad_mep.pdfsrc", "cad_mep.elevations", "tests.synth", "tests.test_elevations"]
+module = [
+    "cad_mep.pdfsrc",
+    "cad_mep.elevations",
+    "tests.synth",
+    "tests.test_elevations",
+    "tests.test_parking",
+]
 disallow_untyped_calls = false
 
 [tool.pytest.ini_options]

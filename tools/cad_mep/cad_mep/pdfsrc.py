@@ -11,6 +11,7 @@ import numpy as np
 import pymupdf
 from numpy.typing import NDArray
 
+from cad_mep import parking_const as pc
 from cad_mep.errors import MepError
 from cad_mep.params import Params
 
@@ -207,3 +208,99 @@ def read_strokes(
         doc.close()
     arr = np.array(rows, dtype=np.float64).reshape(-1, 8)
     return Strokes(arr[:, :4], arr[:, 4], arr[:, 5] > 0, arr[:, 6] > 0, arr[:, 7] > 0, fills)
+
+
+@dataclass(frozen=True)
+class GrayPath:
+    """Серый (или штриховочный) штриховой путь страницы: рамка в пт и его линии.
+
+    segs — прямые отрезки (прямоугольник даёт четыре стороны), chords — кривые Безье хордой.
+    """
+
+    hatch: bool
+    bbox: tuple[float, float, float, float]
+    segs: NDArray[np.float64]  # (k, 4): x1, y1, x2, y2
+    chords: NDArray[np.float64]  # (m, 4)
+
+
+@dataclass
+class ParkingPage:
+    """Страница для поиска машиномест: серые пути и слова в НЕповёрнутых пт, поворот в экран."""
+
+    width: float  # размер страницы в экранной (повёрнутой) ориентации, пт
+    height: float
+    rotation: tuple[float, float, float, float, float, float]  # a, b, c, d, e, f: пт -> экран
+    paths: list[GrayPath] = field(default_factory=list)
+    words: list[WordPt] = field(default_factory=list)
+
+
+def _gray_kind(color: object) -> str | None:
+    """«gray» — серый штрих мест, «hatch» — серая штриховка, иначе None."""
+    if not isinstance(color, (tuple, list)) or len(color) != 3:
+        return None
+    r, g, b = (float(v) for v in color)
+    if max(r, g, b) - min(r, g, b) > pc.COLOR_SPREAD_MAX:
+        return None
+    if pc.GRAY_MIN <= r <= pc.GRAY_MAX:
+        return "gray"
+    return "hatch" if pc.HATCH_MIN <= r <= pc.HATCH_MAX else None
+
+
+def _split_items(items: list[Any]) -> tuple[list[tuple[float, ...]], list[tuple[float, ...]]]:
+    """Отрезки (линии, стороны прямоугольника) и хорды кривых одного пути."""
+    segs: list[tuple[float, ...]] = []
+    chords: list[tuple[float, ...]] = []
+    for it in items:
+        if it[0] == "l":
+            segs.append((it[1].x, it[1].y, it[2].x, it[2].y))
+        elif it[0] == "c":
+            chords.append((it[1].x, it[1].y, it[4].x, it[4].y))
+        elif it[0] == "re":
+            q = it[1]
+            cs = [(q.x0, q.y0), (q.x1, q.y0), (q.x1, q.y1), (q.x0, q.y1)]
+            segs += [(*cs[i], *cs[(i + 1) % 4]) for i in range(4)]
+    return segs, chords
+
+
+def read_parking_page(pdf: Path, page_index: int) -> ParkingPage:
+    """Серые штриховые пути и слова страницы (для поиска машиномест и легенды)."""
+    try:
+        doc = pymupdf.open(str(pdf))
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise MepError("pdf_unreadable", f"PDF не открывается: {exc}") from exc
+    try:
+        if page_index < 0 or page_index >= doc.page_count:
+            raise MepError(
+                "page_out_of_range", f"страницы {page_index} нет (страниц: {doc.page_count})"
+            )
+        page = doc[page_index]
+        m = page.rotation_matrix
+        out = ParkingPage(
+            float(page.rect.width),
+            float(page.rect.height),
+            (float(m.a), float(m.b), float(m.c), float(m.d), float(m.e), float(m.f)),
+        )
+        for dr in page.get_drawings():
+            kind = _gray_kind(dr.get("color")) if dr["type"] == "s" else None
+            if kind is None:
+                continue
+            segs, chords = _split_items(dr["items"])
+            r = dr["rect"]
+            out.paths.append(
+                GrayPath(
+                    kind == "hatch",
+                    (float(r.x0), float(r.y0), float(r.x1), float(r.y1)),
+                    np.array(segs, dtype=np.float64).reshape(-1, 4),
+                    np.array(chords, dtype=np.float64).reshape(-1, 4),
+                )
+            )
+        seen: set[tuple[str, int, int]] = set()
+        for w in page.get_text("words"):
+            x0, y0, x1, y1, text = w[:5]
+            key = (str(text), round(float(x0)), round(float(y0)))
+            if key not in seen:  # жирный шрифт рисуется дважды
+                seen.add(key)
+                out.words.append(WordPt(str(text), float(x0), float(y0), float(x1), float(y1)))
+        return out
+    finally:
+        doc.close()

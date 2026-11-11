@@ -42,11 +42,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     except OSError as exc:
         fail("out_unwritable", f"{out.name}: не записывается ({exc})")
         return 2
-    zones, unmatched = data["zones"], data["unmatched_marks"]
+    zones, unmatched, spaces = data["zones"], data["unmatched_marks"], data["parking_spaces"]
     summary = {
         "ok": True,
         "zones": len(zones) if isinstance(zones, list) else 0,
         "unmatched_marks": len(unmatched) if isinstance(unmatched, list) else 0,
+        "parking_spaces": len(spaces) if isinstance(spaces, list) else 0,
         "runtime_s": round(time.monotonic() - started, 1),
     }
     sys.stdout.write(json.dumps(summary, ensure_ascii=False) + "\n")
