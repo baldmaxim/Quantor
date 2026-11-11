@@ -4,13 +4,15 @@ import type { CadConstructionsRead, CadFloor3dRead } from '@quantor/api-client';
 import type { FC, ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
-import { KIND_LABELS } from '@/lib/cad/construction-labels';
+import { KIND_LABELS, constructionTitle } from '@/lib/cad/construction-labels';
 import { formatMeters } from '@/lib/cad/floor3d-geometry';
 import { heightSourceText } from '@/lib/cad/floor3d-heights';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
-import { wallQuantities } from '@/lib/cad/floor3d-volume';
+import { findConstruction, wallQuantities } from '@/lib/cad/floor3d-volume';
 import { formatNumber } from '@/lib/cad/view-format';
 
+/** Идентификатор плиты листа среди конструкций и призм 3D-плана. */
+const SLAB_ID = 'slab';
 const WIDTH_PX = 252;
 const HEIGHT_ESTIMATE_PX = 340;
 const GAP_PX = 12;
@@ -39,6 +41,8 @@ interface ICadFloor3dPopoverProps {
   readonly saving: boolean;
   readonly error: string | null;
   readonly onDecide: (key: string, enabled: boolean) => void;
+  /** Выбрать стену-владельца проёма: плашка переключается на неё. */
+  readonly onSelectHost?: (id: string) => void;
   readonly onClose: () => void;
 }
 
@@ -48,6 +52,12 @@ const Row: FC<{ readonly label: string; readonly value: string }> = ({ label, va
     {value}
   </p>
 );
+
+const WALL_FAMILY_TEXT = {
+  masonry: 'кладка',
+  monolith: 'монолит',
+  frame_partition: 'каркасная перегородка',
+} as const;
 
 /**
  * Карточка элемента у курсора: только просмотр (объёмов не считает), у отверстия - решение человека.
@@ -62,22 +72,44 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
   saving,
   error,
   onDecide,
+  onSelectHost,
   onClose,
 }) => {
   let title = '';
   let body: ReactNode = null;
 
-  if (pick.kind === 'prism' && (pick.category === 'masonry' || pick.category === 'monolith')) {
+  // Стена-владелец проёма: строка и кнопка только когда владелец известен и есть в списке конструкций.
+  const hostBlock = (hostId: string | null | undefined): ReactNode => {
+    const host = hostId ? findConstruction(constructions, hostId) : null;
+    if (host === null || !hostId) return null;
+    return (
+      <>
+        <Row label="Стена" value={constructionTitle(host)} />
+        <div className="flex flex-wrap gap-[var(--s-3)] pt-[var(--s-2)]">
+          <Button className="max-md:h-[44px]" onClick={() => onSelectHost?.(hostId)}>
+            Выбрать стену
+          </Button>
+        </div>
+      </>
+    );
+  };
+
+  if (
+    pick.kind === 'prism' &&
+    (pick.category === 'masonry' || pick.category === 'monolith' || pick.category === 'frame_partition')
+  ) {
     const wall = model.walls.find((item) => item.construction_key === pick.id);
     if (!wall) return null;
     title = KIND_LABELS[wall.kind];
     const top = wall.z_top_mm;
     const quantities = wallQuantities(constructions, wall.construction_key);
+    // Каркасная перегородка меряется площадью: объёма у неё нет, строку не показываем.
+    const framePartition = wall.family === 'frame_partition';
     const orUndefined = (value: number | null | undefined, digits: number, unit: string): string =>
       value === null || value === undefined ? 'не определено' : formatNumber(value, digits, unit);
     body = (
       <>
-        <Row label="Семейство" value={wall.family === 'monolith' ? 'монолит' : 'кладка'} />
+        <Row label="Семейство" value={WALL_FAMILY_TEXT[wall.family]} />
         <Row
           label="Толщина (номинал)"
           value={wall.thickness_nominal_mm === null ? 'не определена' : `${wall.thickness_nominal_mm} мм`}
@@ -88,7 +120,7 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
         <Row label="Длина по оси" value={orUndefined(quantities?.lengthM, 2, 'м')} />
         <Row label="Высота в расчёте" value={orUndefined(quantities?.heightMm, 0, 'мм')} />
         <Row label="Площадь стены" value={orUndefined(quantities?.wallAreaM2, 2, 'м²')} />
-        {quantities === null || quantities.volumeM3 === null ? (
+        {framePartition ? null : quantities === null || quantities.volumeM3 === null ? (
           <p className="text-xs text-muted">Объём не определён</p>
         ) : (
           <Row label="Объём" value={formatNumber(quantities.volumeM3, 3, 'м³')} />
@@ -98,6 +130,26 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
         )}
       </>
     );
+  } else if (pick.kind === 'prism' && pick.category === 'slab') {
+    // Величины плиты - из конструкций листа (id `slab`); вид ничего не считает.
+    const slab = findConstruction(constructions, SLAB_ID);
+    title = KIND_LABELS.floor_slab;
+    const orUndefined = (value: number | null | undefined, digits: number, unit: string): string =>
+      value === null || value === undefined ? 'не определена' : formatNumber(value, digits, unit);
+    body =
+      slab === null ? (
+        <p className="text-xs text-muted">Плита не посчитана</p>
+      ) : (
+        <>
+          <Row label="Площадь (нетто)" value={orUndefined(slab.computed.area_m2, 2, 'м²')} />
+          <Row label="Толщина" value={orUndefined(slab.computed.thickness_mm, 0, 'мм')} />
+          {slab.computed.volume_m3 === null || slab.computed.volume_m3 === undefined ? (
+            <p className="text-xs text-muted">Объём не определён</p>
+          ) : (
+            <Row label="Объём" value={formatNumber(slab.computed.volume_m3, 3, 'м³')} />
+          )}
+        </>
+      );
   } else if (pick.kind === 'prism' && pick.category === 'lintel') {
     const lintel = model.lintels.find((item) => item.opening_id === pick.id);
     if (!lintel) return null;
@@ -113,6 +165,7 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
         <Row label="Высота двери" value={`${lintel.door_height_mm} мм (${heightSourceText(lintel.door_height_source)})`} />
         <Row label="Низ, м" value={formatMeters(lintel.z_bottom_mm)} />
         <Row label="Верх, м" value={formatMeters(lintel.z_top_mm)} />
+        {hostBlock(lintel.host_id)}
       </>
     );
   } else if (pick.kind === 'prism' && pick.category === 'door') {
@@ -124,6 +177,7 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
         <Row label="Высота двери" value={`${door.door_height_mm} мм (${heightSourceText(door.door_height_source)})`} />
         <Row label="Низ, м" value={formatMeters(door.z_bottom_mm)} />
         <Row label="Верх, м" value={formatMeters(door.z_top_mm)} />
+        {hostBlock(door.host_id)}
       </>
     );
   } else if (pick.kind === 'hole') {

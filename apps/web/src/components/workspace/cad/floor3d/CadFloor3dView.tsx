@@ -16,6 +16,7 @@ import {
   useSetFloor3dHole,
 } from '@/lib/cad/floor3d-queries';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
+import type { CadLayerCategory } from '@/lib/cad/layer-categories';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
 
@@ -29,12 +30,36 @@ import { CadFloor3dPopover } from './CadFloor3dPopover';
 export interface ICadFloor3dViewProps {
   /** Лист и вид, которые показывает план: те же задание, страница и вид. */
   readonly params: ICadViewParams;
+  /** Общий выбор конструкций плана и 3D: подсвечиваются все его стены и плита. */
+  readonly selectedIds?: ReadonlySet<string>;
+  /** Клик по стене или плите - выбор этой конструкции; `null` - выбор снят (пустота, Esc, закрытие плашки). */
+  readonly onSelectConstruction?: (id: string | null) => void;
+  /** Скрытые категории вкладки «Слои». */
+  readonly hiddenCategories?: ReadonlySet<CadLayerCategory>;
 }
+
+/** Связь 3D-вида с общим выбором и слоями рабочей области: всё, кроме листа. */
+export type ICadFloor3dLink = Pick<
+  ICadFloor3dViewProps,
+  'selectedIds' | 'onSelectConstruction' | 'hiddenCategories'
+>;
+
+const NO_IDS: ReadonlySet<string> = new Set<string>();
+
+/** Стена, перегородка или плита: клик по ним меняет общий выбор; перемычки, двери и отверстия - только локально. */
+const isConstructionPick = (pick: IFloor3dPick): boolean =>
+  pick.kind === 'prism' &&
+  (pick.category === 'slab' ||
+    pick.category === 'masonry' ||
+    pick.category === 'monolith' ||
+    pick.category === 'frame_partition');
 
 const LEGEND: readonly { readonly label: string; readonly className: string }[] = [
   { label: 'Плита', className: 'bg-border-strong' },
   { label: 'Кладка', className: 'bg-[var(--cad-construction-masonry)]' },
   { label: 'Монолит', className: 'bg-[var(--cad-construction-monolith)]' },
+  // Цвет как у кладки (так же в 2D): перегородка отличается штрихом, отдельного токена нет.
+  { label: 'Перегородки ГКЛ', className: 'bg-[var(--cad-construction-masonry)]' },
   { label: 'Перемычки', className: 'bg-[var(--cad-construction-check)]' },
   { label: 'Двери', className: 'bg-[var(--cad-layer-6)]' },
   { label: 'Отверстие (кандидат)', className: 'bg-danger' },
@@ -54,7 +79,12 @@ const notReadyText = (error: unknown): string => {
  * проёмами, панель высот. Модель собирает сервер; вид только показывает и принимает решения
  * человека (отверстия, высоты листа, толщина плиты проекта). Грузится лениво вместе с three.js.
  */
-export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
+export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
+  params,
+  selectedIds = NO_IDS,
+  onSelectConstruction,
+  hiddenCategories,
+}) => {
   const query = useCadFloor3d(params, true);
   const projectLevels = useCadProjectLevels(params.projectId, true);
   const setHole = useSetFloor3dHole(params);
@@ -81,27 +111,39 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
   const [measuring, setMeasuring] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
 
-  const closePick = () => {
+  // Локальное: плашка и подсветка перемычки, двери, отверстия.
+  const closeLocal = () => {
     setPicked(null);
     setSelected(null);
     setPopoverError(null);
   };
+  // Плашка закрыта или выбор снят: общий выбор конструкций тоже очищается.
+  const closePick = () => {
+    closeLocal();
+    onSelectConstruction?.(null);
+  };
 
   const toggleMeasuring = () => {
-    closePick();
+    closeLocal();
     setMeasuring((on) => !on);
   };
 
   useEffect(() => {
-    if (picked === null && selected === null && !measuring) return undefined;
+    if (picked === null && selected === null && selectedIds.size === 0 && !measuring) return undefined;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (measuring) setMeasuring(false);
-      else closePick();
+      if (measuring) {
+        setMeasuring(false);
+        return;
+      }
+      setPicked(null);
+      setSelected(null);
+      setPopoverError(null);
+      onSelectConstruction?.(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [picked, selected, measuring]);
+  }, [picked, selected, selectedIds, measuring, onSelectConstruction]);
 
   const request = (kind: IFloor3dViewRequest['kind']) =>
     setViewRequest((current) => ({ kind, seq: (current?.seq ?? 0) + 1 }));
@@ -110,13 +152,40 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
     // В режиме измерения клик ставит точку замера и плашку не открывает.
     if (measuring) return;
     setPopoverError(null);
-    // Плита плашки не имеет - её не подсвечиваем.
-    setSelected(pick !== null && pick.category !== 'slab' ? pick : null);
+    // Стена и плита выбираются общим выбором (его подсвечивает холст), остальное - локально.
+    const construction = pick !== null && isConstructionPick(pick);
+    setSelected(pick !== null && !construction ? pick : null);
+    if (pick === null || construction) onSelectConstruction?.(pick === null ? null : pick.id);
     const rect = stage.current?.getBoundingClientRect();
     setPicked(
       pick === null || !rect ? null : { pick, anchor, bounds: { width: rect.width, height: rect.height } },
     );
   };
+
+  // «Выбрать стену» в плашке проёма: локальный выбор снимается, стена уходит в общий выбор,
+  // плашка переключается на неё в той же точке.
+  const selectHost = (id: string) => {
+    const prism = plan?.prisms.find(
+      (item) => item.id === id && item.category !== 'lintel' && item.category !== 'door',
+    );
+    setSelected(null);
+    setPopoverError(null);
+    setPicked((current) =>
+      prism === undefined || current === null
+        ? null
+        : { ...current, pick: { kind: 'prism', category: prism.category, id } },
+    );
+    onSelectConstruction?.(id);
+  };
+
+  // Плашка стены или плиты живёт, пока конструкция в общем выборе: выбор сняли в панели - плашка уходит.
+  const popup =
+    picked !== null &&
+    (onSelectConstruction === undefined ||
+      !isConstructionPick(picked.pick) ||
+      selectedIds.has(picked.pick.id))
+      ? picked
+      : null;
 
   const notReady = query.isError && extractCode(query.error) === WALLS_NOT_READY;
   const outdated = model?.warnings.some((item) => item.code === 'walls_outdated') ?? false;
@@ -166,6 +235,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
           showSlabCap={showSlabCap}
           viewRequest={viewRequest}
           selected={selected}
+          selectedIds={selectedIds}
+          hiddenCategories={hiddenCategories}
           measuring={measuring}
           onPick={onPick}
           // Камера пошла - плашка у курсора устарела, а выделение остаётся.
@@ -175,13 +246,13 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
           }}
           onError={setCanvasError}
         />
-        {picked !== null && (
+        {popup !== null && (
           <CadFloor3dPopover
-            pick={picked.pick}
+            pick={popup.pick}
             model={model}
             constructions={constructions.data}
-            anchor={picked.anchor}
-            bounds={picked.bounds}
+            anchor={popup.anchor}
+            bounds={popup.bounds}
             saving={setHole.isPending}
             error={popoverError}
             onDecide={(key, enabled) => {
@@ -191,6 +262,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
                 { onSuccess: closePick, onError: (error) => setPopoverError(cadErrorText(error)) },
               );
             }}
+            onSelectHost={selectHost}
             onClose={closePick}
           />
         )}

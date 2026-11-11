@@ -16,6 +16,10 @@ interface ICadLayerGroupProps {
   onSetLayersHidden: (indices: readonly number[], hidden: boolean) => void;
   /** Цвет образца слоя; по умолчанию - токен палитры по порядку слоя. */
   swatchColor?: (index: number) => string;
+  /** Слои, которые сейчас недоступны (в 3D - без категории конструкций): неактивны, с пометкой. */
+  disabledIndices?: ReadonlySet<number>;
+  /** Пометка у недоступного слоя. */
+  disabledNote?: string;
 }
 
 const CHECK = 'flex min-h-[44px] items-center gap-[var(--s-3)] text-sm';
@@ -28,13 +32,18 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
   onToggleLayer,
   onSetLayersHidden,
   swatchColor = layerColorVar,
+  disabledIndices,
+  disabledNote = '',
 }) => {
   const [expanded, setExpanded] = useState(true);
   const master = useRef<HTMLInputElement>(null);
 
+  // Переключатель группы действует только на доступные слои.
+  const enabled = group.indices.filter((index) => !disabledIndices?.has(index));
   const shown = group.indices.filter((index) => visibleLayers.has(index)).length;
-  const all = shown === group.indices.length;
-  const partial = shown > 0 && !all;
+  const shownEnabled = enabled.filter((index) => visibleLayers.has(index)).length;
+  const all = enabled.length > 0 && shownEnabled === enabled.length;
+  const partial = shownEnabled > 0 && !all;
 
   // Неопределённое состояние выставляется только через DOM-свойство.
   useEffect(() => {
@@ -50,7 +59,8 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
           ref={master}
           type="checkbox"
           checked={all}
-          onChange={() => onSetLayersHidden(group.indices, all)}
+          onChange={() => onSetLayersHidden(enabled, all)}
+          disabled={enabled.length === 0}
           aria-label={`Группа «${group.label}»`}
           className="size-5 shrink-0"
         />
@@ -87,11 +97,17 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
         {group.indices.map((index) => {
           const name = layers[index] ?? '';
           const on = visibleLayers.has(index);
+          const unavailable = disabledIndices?.has(index) === true;
           return (
-            <label key={`${index}-${name}`} className={CHECK}>
+            <label
+              key={`${index}-${name}`}
+              className={cx(CHECK, unavailable && 'opacity-60')}
+              data-unavailable={unavailable || undefined}
+            >
               <input
                 type="checkbox"
                 checked={on}
+                disabled={unavailable}
                 onChange={() => onToggleLayer(index)}
                 className="size-5 shrink-0"
               />
@@ -114,6 +130,9 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
               >
                 {name}
               </span>
+              {unavailable && disabledNote !== '' && (
+                <span className="ml-auto text-xs text-muted">{disabledNote}</span>
+              )}
             </label>
           );
         })}

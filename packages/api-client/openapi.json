@@ -3217,7 +3217,8 @@
           "family": {
             "enum": [
               "masonry",
-              "monolith"
+              "monolith",
+              "frame_partition"
             ],
             "title": "Family",
             "type": "string"
@@ -3875,6 +3876,17 @@
           "error_message",
           "engine_version",
           "result_status",
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Id"
+          },
           "review_required",
           "known_limitation",
           "pages",
@@ -3988,6 +4000,17 @@
             "title": "Result Status"
           },
           "status": {
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Id"
+          },
             "$ref": "#/components/schemas/JobStatus"
           },
           "view": {

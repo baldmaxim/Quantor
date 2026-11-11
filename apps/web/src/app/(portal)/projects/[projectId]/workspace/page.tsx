@@ -925,6 +925,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   onExit={() => cad.floor3dPending?.onExit()}
                 />
               )}
+                  link={cad.floor3d?.link ?? null}
               {draftPhase === 'complete' && draftA && draftB && sheetId && (
                 <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">
                   <ScaleDialog

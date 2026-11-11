@@ -24,6 +24,9 @@ import type { ICadViewParams } from './view-queries';
 /** Непрозрачность DXF в рабочей области: геометрия всегда непрозрачная, гаснет только подложка PDF. */
 export const WORKSPACE_CAD_OPACITY = 1;
 
+/** Непрозрачность подложки DXF при непустом выборе конструкций (рисуется через globalAlpha холста). */
+export const DIMMED_CAD_OPACITY = 0.35;
+
 /** Пустой набор путей: общий объект, чтобы кеш путей рисовальщика не плодил записи. */
 const NO_PATHS: readonly INormalizedPath[] = [];
 
@@ -148,6 +151,8 @@ export interface IOverlayPaintOptions {
    * не меняет ни одного из них, поэтому вызывающий считает пути отдельно и один раз.
    */
   readonly paths?: readonly INormalizedPath[];
+  /** Подложка приглушена: в плане есть выбранная конструкция, штриховка и чужие линии не должны читаться как выделение. */
+  readonly dimmed?: boolean;
 }
 
 /**
@@ -162,7 +167,7 @@ export const overlayPaintData = (
   layerPalette: readonly string[] = [],
   options: IOverlayPaintOptions = {},
 ): ICadPaintData | null => {
-  const { dxfVisible = true, hiddenLayers, crop = null, paths } = options;
+  const { dxfVisible = true, hiddenLayers, crop = null, paths, dimmed = false } = options;
   if (!page) return null;
   const geometry = dxfVisible && preview !== null && frame !== null ? { preview, frame } : null;
   if (geometry === null && crop === null) return null;
@@ -174,7 +179,7 @@ export const overlayPaintData = (
     visibleLayers: new Set(
       layers.map((_, index) => index).filter((index) => !hiddenLayers?.has(index)),
     ),
-    opacity: WORKSPACE_CAD_OPACITY,
+    opacity: dimmed ? DIMMED_CAD_OPACITY : WORKSPACE_CAD_OPACITY,
     layerColors: assignLayerColors(layerPalette, layers.length),
     ink,
     paper: null,

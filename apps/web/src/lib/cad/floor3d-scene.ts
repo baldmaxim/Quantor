@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 
 import type { IFloor3dHighlight, IFloor3dPlan, IHoleSpec, IPrismSpec, Point2, PrismCategory } from './floor3d-geometry';
 import { itemAtTriangle } from './floor3d-geometry';
+import type { CadLayerCategory } from './layer-categories';
 
 /**
  * Сцена 3D-вида этажа (ADR-0039): three.js-объекты по плану из `floor3d-geometry`. Модуль грузится
@@ -19,6 +20,7 @@ export interface IFloor3dColors {
   readonly slab: string;
   readonly masonry: string;
   readonly monolith: string;
+  readonly framePartition: string;
   readonly lintel: string;
   readonly door: string;
   readonly candidate: string;
@@ -41,6 +43,7 @@ export const readFloor3dColors = (): IFloor3dColors => {
       slab: FALLBACK_COLOR,
       masonry: FALLBACK_COLOR,
       monolith: FALLBACK_COLOR,
+      framePartition: FALLBACK_COLOR,
       lintel: FALLBACK_COLOR,
       door: FALLBACK_COLOR,
       candidate: FALLBACK_COLOR,
@@ -56,6 +59,8 @@ export const readFloor3dColors = (): IFloor3dColors => {
     slab: token('--border-strong'),
     masonry: token('--cad-construction-masonry'),
     monolith: token('--cad-construction-monolith'),
+    // Как в 2D (constructions-painter): перегородка красится цветом кладки, отличается штрихом.
+    framePartition: token('--cad-construction-masonry'),
     lintel: token('--cad-construction-check'),
     door: token('--cad-layer-6'),
     candidate: token('--danger'),
@@ -81,8 +86,10 @@ export interface IFloor3dScene {
   /** Меши, по которым работает клик. */
   readonly pickables: readonly THREE.Mesh[];
   readonly slabCap: THREE.Object3D | null;
-  /** Оверлей выделения поверх слитой геометрии; `null` - снять. Прежний освобождается. */
-  setHighlight: (target: IFloor3dHighlight | null) => void;
+  /** Оверлей выделения поверх слитой геометрии; пусто - снять. Прежний освобождается. */
+  setHighlight: (targets: readonly IFloor3dHighlight[]) => void;
+  /** Показать или скрыть категорию (Object3D.visible, без пересборки). Скрытое в клик не входит. */
+  setCategoryVisible: (category: CadLayerCategory, visible: boolean) => void;
   dispose: () => void;
 }
 
@@ -176,6 +183,14 @@ export const buildFloor3dScene = (
     return item;
   };
 
+  // Объекты по категориям видимости: меши, рёбра, отверстия и копия плиты сверху.
+  const byCategory = new Map<CadLayerCategory, THREE.Object3D[]>();
+  const register = (category: CadLayerCategory, object: THREE.Object3D): void => {
+    const list = byCategory.get(category);
+    if (list === undefined) byCategory.set(category, [object]);
+    else list.push(object);
+  };
+
   const solid = (color: string, opacity = 1) =>
     track(
       new THREE.MeshLambertMaterial({
@@ -199,6 +214,7 @@ export const buildFloor3dScene = (
     { category: 'slab', color: colors.slab, include: () => true },
     { category: 'masonry', color: colors.masonry, include: () => true },
     { category: 'monolith', color: colors.monolith, include: () => true },
+    { category: 'frame_partition', color: colors.framePartition, include: () => true },
     { category: 'lintel', color: colors.lintel, include: isUndefinedMaterial },
     { category: 'lintel', color: colors.monolith, include: (item) => item.material === 'monolith' },
     {
@@ -222,9 +238,12 @@ export const buildFloor3dScene = (
     mesh.userData.pick = merged.pick;
     group.add(mesh);
     pickables.push(mesh);
+    register(category, mesh);
     const edges = new THREE.EdgesGeometry(merged.geometry, 30);
     track(edges);
-    group.add(new THREE.LineSegments(edges, edgeMaterial));
+    const edgeLines = new THREE.LineSegments(edges, edgeMaterial);
+    group.add(edgeLines);
+    register(category, edgeLines);
   }
 
   // Отверстия плиты: кандидат - полупрозрачная заливка и контур, включённое - контур, «Не отверстие» -
@@ -255,6 +274,7 @@ export const buildFloor3dScene = (
     mesh.userData.pick = fill.pick;
     group.add(mesh);
     pickables.push(mesh);
+    register('slab', mesh);
   }
   const hidden = mergeItems(
     decided.map((hole) => ({ id: hole.key, geometry: holeGeometry(hole, lift) })),
@@ -269,11 +289,14 @@ export const buildFloor3dScene = (
     mesh.userData.pick = hidden.pick;
     group.add(mesh);
     pickables.push(mesh);
+    register('slab', mesh);
   }
   const outline = (hole: IHoleSpec, color: string): void => {
     const points = hole.contour.map(([u, v]) => new THREE.Vector3(u, hole.y + lift, -v));
     const geometry = track(new THREE.BufferGeometry().setFromPoints(points));
-    group.add(new THREE.LineLoop(geometry, track(new THREE.LineBasicMaterial({ color: new THREE.Color(color) }))));
+    const loop = new THREE.LineLoop(geometry, track(new THREE.LineBasicMaterial({ color: new THREE.Color(color) })));
+    group.add(loop);
+    register('slab', loop);
   };
   for (const hole of plan.holes) outline(hole, hole.state === 'candidate' ? colors.candidate : colors.enabled);
   for (const hole of plan.disabledHoles) outline(hole, colors.muted);
@@ -294,6 +317,7 @@ export const buildFloor3dScene = (
       );
       slabCap = new THREE.Mesh(geometry, material);
       group.add(slabCap);
+      register('slab', slabCap);
     }
   }
 
@@ -310,33 +334,44 @@ export const buildFloor3dScene = (
     overlayDisposables.push(item);
     return item;
   };
-  const setHighlight = (target: IFloor3dHighlight | null): void => {
+  const setHighlight = (targets: readonly IFloor3dHighlight[]): void => {
     clearOverlay();
-    if (target === null) return;
+    if (targets.length === 0) return;
     const accent = new THREE.Color(colors.accent);
     const next = new THREE.Group();
     const lineMaterial = own(new THREE.LineBasicMaterial({ color: accent, depthTest: false }));
-    if (target.kind === 'prism') {
-      const geometry = prismGeometry(target.spec);
-      if (geometry === null) return;
-      own(geometry);
-      const fillMaterial = own(
-        new THREE.MeshBasicMaterial({
-          color: accent,
-          transparent: true,
-          opacity: 0.45,
-          depthWrite: false,
-          polygonOffset: true,
-          polygonOffsetFactor: -2,
-          polygonOffsetUnits: -2,
-        }),
-      );
-      next.add(new THREE.Mesh(geometry, fillMaterial));
-      const edges = own(new THREE.EdgesGeometry(geometry, 30));
-      const lines = new THREE.LineSegments(edges, lineMaterial);
-      lines.renderOrder = 10;
-      next.add(lines);
-    } else {
+
+    // Призмы (стены, плита, перемычка, дверь) сливаются в одну геометрию: группа из сотен стен -
+    // два объекта оверлея, а не сотни.
+    const prisms = targets
+      .flatMap((target) => (target.kind === 'prism' ? [prismGeometry(target.spec)] : []))
+      .filter((geometry): geometry is THREE.BufferGeometry => geometry !== null);
+    if (prisms.length > 0) {
+      const merged = prisms.length === 1 ? prisms[0] : mergeGeometries(prisms, false);
+      if (prisms.length > 1) for (const item of prisms) item.dispose();
+      if (merged !== null && merged !== undefined) {
+        own(merged);
+        const fillMaterial = own(
+          new THREE.MeshBasicMaterial({
+            color: accent,
+            transparent: true,
+            opacity: 0.45,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
+          }),
+        );
+        next.add(new THREE.Mesh(merged, fillMaterial));
+        const edges = own(new THREE.EdgesGeometry(merged, 30));
+        const lines = new THREE.LineSegments(edges, lineMaterial);
+        lines.renderOrder = 10;
+        next.add(lines);
+      }
+    }
+
+    for (const target of targets) {
+      if (target.kind !== 'hole') continue;
       const spec = target.spec;
       const geometry = holeGeometry(spec, lift * 2);
       if (geometry !== null) {
@@ -361,8 +396,13 @@ export const buildFloor3dScene = (
       loop.renderOrder = 10;
       next.add(loop);
     }
+    if (next.children.length === 0) return;
     overlay = next;
     group.add(next);
+  };
+
+  const setCategoryVisible = (category: CadLayerCategory, visible: boolean): void => {
+    for (const object of byCategory.get(category) ?? []) object.visible = visible;
   };
 
   return {
@@ -370,6 +410,7 @@ export const buildFloor3dScene = (
     pickables,
     slabCap,
     setHighlight,
+    setCategoryVisible,
     dispose: () => {
       clearOverlay();
       for (const item of disposables) item.dispose();

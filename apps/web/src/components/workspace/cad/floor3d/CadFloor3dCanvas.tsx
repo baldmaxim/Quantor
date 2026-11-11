@@ -9,8 +9,9 @@ import {
   type IFloor3dMeasureState,
   type IFloor3dSnapState,
 } from '@/lib/cad/floor3d-engine';
-import { highlightOf, type IFloor3dPlan } from '@/lib/cad/floor3d-geometry';
+import { highlightOf, highlightsOf, visibilityOf, type IFloor3dPlan } from '@/lib/cad/floor3d-geometry';
 import { buildFloor3dScene, readFloor3dColors, type IFloor3dPick } from '@/lib/cad/floor3d-scene';
+import { EXTRA_CATEGORIES, type CadLayerCategory } from '@/lib/cad/layer-categories';
 import { useTheme } from '@/lib/theme';
 
 import { CadFloor3dMeasureLabel } from './CadFloor3dMeasureLabel';
@@ -28,6 +29,10 @@ interface ICadFloor3dCanvasProps {
   readonly viewRequest: IFloor3dViewRequest | null;
   /** Выбранный элемент: подсвечивается оверлеем. */
   readonly selected: IFloor3dPick | null;
+  /** Общий выбор конструкций (план и 3D): стены и плита подсвечиваются все. */
+  readonly selectedIds?: ReadonlySet<string>;
+  /** Скрытые категории (вкладка «Слои»): скрываются без пересборки сцены. */
+  readonly hiddenCategories?: ReadonlySet<CadLayerCategory>;
   /** Режим измерения: клики ставят точки, элемент не выбирается. */
   readonly measuring: boolean;
   readonly onPick: (pick: IFloor3dPick | null, anchor: { x: number; y: number }) => void;
@@ -35,6 +40,16 @@ interface ICadFloor3dCanvasProps {
   /** Холст создать не удалось (нет WebGL). */
   readonly onError: (message: string) => void;
 }
+
+const NO_IDS: ReadonlySet<string> = new Set<string>();
+const NO_CATEGORIES: ReadonlySet<CadLayerCategory> = new Set<CadLayerCategory>();
+const ALL_CATEGORIES: readonly CadLayerCategory[] = [
+  'masonry',
+  'monolith',
+  'frame_partition',
+  'door',
+  ...EXTRA_CATEGORIES,
+];
 
 /**
  * Холст three.js: владеет renderer'ом и освобождает его при размонтировании. Модель пересобирается
@@ -45,6 +60,8 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   showSlabCap,
   viewRequest,
   selected,
+  selectedIds = NO_IDS,
+  hiddenCategories = NO_CATEGORIES,
   measuring,
   onPick,
   onMove,
@@ -89,10 +106,23 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
     );
   }, [plan, showSlabCap, theme]);
 
-  // Выделение накладывается после пересборки модели (эффект выше) и при смене выбора.
+  // Видимость категорий - после пересборки модели (эффект выше); сцена при этом не пересобирается.
   useEffect(() => {
-    engine.current?.setHighlight(highlightOf(plan, selected));
-  }, [plan, showSlabCap, theme, selected]);
+    for (const category of ALL_CATEGORIES) {
+      engine.current?.setCategoryVisible(category, !hiddenCategories.has(category));
+    }
+  }, [plan, showSlabCap, theme, hiddenCategories]);
+
+  // Выделение накладывается после пересборки модели (эффект выше) и при смене выбора: общий выбор
+  // конструкций плюс локальный (перемычка, дверь, отверстие). Скрытое категорией не подсвечивается.
+  useEffect(() => {
+    const local = highlightOf(plan, selected);
+    const targets = [...highlightsOf(plan, selectedIds), ...(local === null ? [] : [local])].filter(
+      (target) =>
+        !hiddenCategories.has(target.kind === 'hole' ? 'slab' : visibilityOf(target.spec)),
+    );
+    engine.current?.setHighlight(targets);
+  }, [plan, showSlabCap, theme, selected, selectedIds, hiddenCategories]);
 
   useEffect(() => {
     engine.current?.setMeasuring(measuring);

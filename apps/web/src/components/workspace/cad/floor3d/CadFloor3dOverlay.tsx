@@ -8,11 +8,14 @@ import { CadBuilding3dLazy } from '@/components/workspace/cad/building3d/CadBuil
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 
 import { CadFloor3dLazy } from './CadFloor3dLazy';
+import type { ICadFloor3dLink } from './CadFloor3dView';
 
 export interface ICadFloor3dOverlayProps {
   projectId: string;
   /** Параметры показанного листа; `null` - новый этаж ещё грузится. */
   params: ICadViewParams | null;
+  /** Общий выбор конструкций и скрытые категории слоёв: общие с планом; нет - 3D живёт сам по себе. */
+  link?: ICadFloor3dLink | null;
   onSelectFloor: (floor: CadBuilding3dFloorRead) => void;
   /** Выход в «План», пока этаж грузится (панели вида ещё нет). */
   onExit: () => void;
@@ -24,7 +27,7 @@ const keyOf = (params: ICadViewParams) => `${params.jobId}:${params.pageIndex}:$
  * Оверлей «3D» поверх холста. Пока новый этаж грузится, оверлей не снимается: колонка «Здание»
  * остаётся на месте, вместо этажа - заглушка; 2D-план под ним не мелькает.
  */
-export const CadFloor3dOverlay: FC<ICadFloor3dOverlayProps> = ({ projectId, params, onSelectFloor, onExit }) => {
+export const CadFloor3dOverlay: FC<ICadFloor3dOverlayProps> = ({ projectId, params, link = null, onSelectFloor, onExit }) => {
   const [last, setLast] = useState<ICadViewParams | null>(params);
   if (params !== null && (last === null || keyOf(last) !== keyOf(params))) setLast(params);
   const current = params ?? last;
@@ -40,7 +43,7 @@ export const CadFloor3dOverlay: FC<ICadFloor3dOverlayProps> = ({ projectId, para
       )}
       <div className="relative min-h-0 min-w-0 flex-1">
         {params ? (
-          <CadFloor3dLazy key={keyOf(params)} params={params} />
+          <CadFloor3dLazy key={keyOf(params)} params={params} {...link} />
         ) : (
           <div role="status" className="absolute inset-0 grid place-items-center bg-bg text-sm text-muted">
             <div className="grid justify-items-center gap-[var(--s-3)]">

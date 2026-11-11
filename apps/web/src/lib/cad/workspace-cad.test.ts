@@ -4,6 +4,7 @@ import { diagnostics, FRAME_NO, FRAME_OK, JOB_ID, preview } from '@/components/c
 
 import { frameOf } from './frame';
 import {
+  DIMMED_CAD_OPACITY,
   WORKSPACE_CAD_OPACITY,
   WORKSPACE_DRAFT_ID,
   isReadableJob,
@@ -129,6 +130,17 @@ describe('наложение DXF', () => {
     const first = data?.paths[0]?.points;
     expect(first?.[0]).toBeCloseTo(37.5 / 842, 9);
     expect(first?.[1]).toBeCloseTo(700 / 595, 9);
+  });
+
+  it('выбрана конструкция - подложка DXF приглушается до DIMMED_CAD_OPACITY', () => {
+    const frame = frameOf(FRAME_OK);
+    const page = { width: 842, height: 595 };
+    const dimmed = overlayPaintData(preview(), frame, page, 'ink', [], { dimmed: true });
+    expect(dimmed?.opacity).toBe(DIMMED_CAD_OPACITY);
+    expect(DIMMED_CAD_OPACITY).toBe(0.35);
+    expect(overlayPaintData(preview(), frame, page, 'ink', [], { dimmed: false })?.opacity).toBe(
+      WORKSPACE_CAD_OPACITY,
+    );
   });
 
   it('DXF всегда непрозрачный: прозрачность подложки задаётся не здесь', () => {

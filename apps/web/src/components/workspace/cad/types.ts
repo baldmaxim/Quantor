@@ -18,6 +18,7 @@ import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRe
 import type { IConstructionIndex } from '@/lib/cad/constructions';
 import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
+import type { CadExtraCategory } from '@/lib/cad/layer-categories';
 import type { IVorSource } from '@/lib/cad/vor-queries';
 import type { ZoneKind } from '@/lib/cad/zones';
 import type { Camera, CameraState, Viewport } from '@/lib/viewer/camera';
@@ -233,6 +234,14 @@ export interface IWorkspaceCadMepRoute {
   readonly revokedDecisions: readonly CadDecisionRead[];
   /** Отказ чтения задания, вида или превью. */
   readonly error: string | null;
+  /** Открыт режим «3D»: слои без категории конструкций доступны только в плане. */
+  readonly mode3d?: boolean;
+  /** Строки «Плита» и «Перемычки» без слоя DXF: видимость в плане (плита) и в 3D. */
+  readonly categories?: {
+    readonly slab: boolean;
+    readonly lintel: boolean;
+    readonly onChange: (category: CadExtraCategory, visible: boolean) => void;
+  } | null;
 }
 
 /** Вкладка «Трассы»: одобрение вида, построение, принятие, скачивание. */

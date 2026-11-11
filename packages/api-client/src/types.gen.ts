@@ -1626,7 +1626,7 @@ export type CadFloor3dWallRead = {
     /**
      * Family
      */
-    family: 'masonry' | 'monolith';
+    family: 'masonry' | 'monolith' | 'frame_partition';
     /**
      * Holes
      */
@@ -1856,6 +1856,10 @@ export type CadJobRead = {
     parent_job_id: string | null;
     /**
      * Requested Pages
+    /**
+     * Host Id
+     */
+    host_id?: string | null;
      */
     requested_pages: Array<number> | null;
     /**
@@ -1926,6 +1930,10 @@ export type CadJobSummaryRead = {
      */
     finished_at: string | null;
     /**
+    /**
+     * Host Id
+     */
+    host_id?: string | null;
      * Job Id
      */
     job_id: string;

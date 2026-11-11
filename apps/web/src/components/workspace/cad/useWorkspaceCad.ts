@@ -34,6 +34,7 @@ import type { Camera, Viewport } from '@/lib/viewer/camera';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 import { useWorkspaceStore } from '@/store/workspace';
 
+import type { ICadFloor3dLink } from './floor3d/CadFloor3dView';
 import { tabFromQuery } from './left-tab';
 import { mepLayersOf, mepOf } from './mep-side';
 import type {
@@ -44,6 +45,7 @@ import type {
   IWorkspaceCadSideProps,
   WorkspaceCadState,
 } from './types';
+import { layerVisibilityKey, useCadLayerVisibility } from './useCadLayerVisibility';
 import { useWorkspaceCadConstructions } from './useWorkspaceCadConstructions';
 import { useWorkspaceCadJob } from './useWorkspaceCadJob';
 import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
@@ -97,12 +99,10 @@ export interface IWorkspaceCad {
   /** Выбор конструкции щелчком и её карточка; `null` - выбор выключен. */
   constructionPicker: IWorkspaceCadConstructionPicker | null;
   /** Вид «3D» открыт поверх холста (ADR-0039): параметры листа и вида; `null` - режим «План». */
-  floor3d: { readonly params: ICadViewParams } | null;
+  floor3d: { readonly params: ICadViewParams; readonly link: ICadFloor3dLink } | null;
   /** Режим «3D» включён, но лист или вид ещё грузится: оверлей держится, план не мелькает. */
   floor3dPending: { readonly onExit: () => void } | null;
 }
-
-const NO_LAYERS: ReadonlySet<number> = new Set<number>();
 
 /**
  * CAD текущего листа в рабочей области: задание и вид листа, DXF на камере рабочей области,
@@ -192,18 +192,22 @@ export const useWorkspaceCad = ({
   // --- слои DXF и область проверки масштаба: выбор принадлежит виду ---
   const scope = params ? `${params.jobId}:${params.pageIndex}:${params.view}` : null;
   const [seenScope, setSeenScope] = useState(scope);
-  const [hiddenLayers, setHiddenLayers] = useState<ReadonlySet<number>>(NO_LAYERS);
   const [cropVisible, setCropVisible] = useState(false);
   if (seenScope !== scope) {
     setSeenScope(scope);
-    setHiddenLayers(NO_LAYERS);
     setCropVisible(false);
   }
 
   const layerNames = useMemo(() => preview?.layers ?? [], [preview]);
   const visibleLayers = useMemo<ReadonlySet<number>>(
     () => new Set(layerNames.map((_, index) => index).filter((index) => !hiddenLayers.has(index))),
+  // Слои - один источник правды для плана и 3D: по именам, не сбрасываются при смене режима и вида.
     [layerNames, hiddenLayers],
+  const visibility = useCadLayerVisibility(
+    params ? layerVisibilityKey(params.jobId, params.pageIndex) : null,
+    layerNames,
+  );
+  const { hiddenLayers } = visibility;
   );
   const cropContext = diagnostics?.scale?.context_crop_pt;
   const cropRect = useMemo(
@@ -233,41 +237,6 @@ export const useWorkspaceCad = ({
         : undefined,
     [routePreview, frame, pageSize],
   );
-
-  const paintData = useMemo(() => {
-    const base = overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
-      dxfVisible: render.dxfVisible,
-      hiddenLayers,
-      crop,
-      paths: dxfPaths,
-    });
-    const route =
-      render.dxfVisible && routePreview
-        ? {
-            preview: routePreview,
-            colors: colors.mep,
-            hiddenMask: mepVisibility.mask,
-            paths: routePaths,
-          }
-        : null;
-    return mergeRoutePaint(base, layerNames.length, route, frame, pageSize, colors.ink);
-  }, [
-    preview,
-    frame,
-    pageSize,
-    colors.ink,
-    colors.layers,
-    colors.mep,
-    render.dxfVisible,
-    hiddenLayers,
-    crop,
-    routePreview,
-    mepVisibility.mask,
-    layerNames,
-    dxfPaths,
-    routePaths,
-  ]);
-  const cadPainter = useMemo(() => (paintData ? createCadPainter(paintData) : null), [paintData]);
 
   // --- замечания ---
   // Замечания принадлежат показанному заданию: вид родителя или, когда выбраны трассы, их задание.
@@ -320,6 +289,45 @@ export const useWorkspaceCad = ({
     [constructionsState.paintData, cadPainter],
   );
 
+  // Выбрана конструкция - подложка DXF приглушается, чтобы чужие линии не читались как выделение.
+  const dimmed = constructionsState.selection.selectedIds.size > 0;
+
+  const paintData = useMemo(() => {
+    const base = overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
+      dxfVisible: render.dxfVisible,
+      hiddenLayers,
+      crop,
+      paths: dxfPaths,
+      dimmed,
+    });
+    const route =
+      render.dxfVisible && routePreview
+        ? {
+            preview: routePreview,
+            colors: colors.mep,
+            hiddenMask: mepVisibility.mask,
+            paths: routePaths,
+          }
+        : null;
+    return mergeRoutePaint(base, layerNames.length, route, frame, pageSize, colors.ink);
+  }, [
+    preview,
+    frame,
+    pageSize,
+    colors.ink,
+    colors.layers,
+    colors.mep,
+    render.dxfVisible,
+    hiddenLayers,
+    dimmed,
+    crop,
+    routePreview,
+    mepVisibility.mask,
+    layerNames,
+    dxfPaths,
+    routePaths,
+  ]);
+  const cadPainter = useMemo(() => (paintData ? createCadPainter(paintData) : null), [paintData]);
   const zonesPainter = useMemo(
     () =>
       zonesState.paintData
@@ -342,6 +350,7 @@ export const useWorkspaceCad = ({
               {
                 clear:
                   cadPainter === null && constructionsPainter === null && zonesPainter === null,
+    hiddenCategories: visibility.hiddenCategories,
               },
             )
           : null,
@@ -444,22 +453,10 @@ export const useWorkspaceCad = ({
     ),
     layers: layerNames,
     visibleLayers,
-    onToggleLayer: (index) =>
-      setHiddenLayers((current) => {
-        const next = new Set(current);
-        if (next.has(index)) next.delete(index);
-        else next.add(index);
-        return next;
-      }),
-    onSetLayersHidden: (indices, hidden) =>
-      setHiddenLayers((current) => {
-        const next = new Set(current);
-        indices.forEach((index) => {
-          if (hidden) next.add(index);
-          else next.delete(index);
-        });
-        return next;
-      }),
+    onToggleLayer: visibility.toggleLayer,
+    onSetLayersHidden: visibility.setLayersHidden,
+    mode3d: view3d,
+    categories: visibility.categories,
     pdfOpacity: sliderOpacity,
     onPdfOpacityChange: (value) => setSliderOpacity(clampPdfOpacity(value)),
     pdfOpacityActive: mode === 'overlay',
@@ -531,7 +528,8 @@ export const useWorkspaceCad = ({
     constructions: constructionsState.side,
   };
 
-  const floor3d = bar !== null && view3d && params !== null ? { params } : null;
+  const link = { ...constructionsState.selection, hiddenCategories: visibility.hiddenCategories };
+  const floor3d = bar !== null && view3d && params !== null ? { params, link } : null;
 
   return {
     opened,

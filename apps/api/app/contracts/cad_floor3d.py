@@ -90,7 +90,7 @@ class WallsFloorExtras(BaseModel):
 # --------------------------------------------------------------------------- ответы
 
 CadFloor3dHoleState = Literal["candidate", "enabled", "disabled"]
-CadFloor3dFamily = Literal["masonry", "monolith"]
+CadFloor3dFamily = Literal["masonry", "monolith", "frame_partition"]
 CadFloor3dOpeningKind = Literal["door", "gap"]
 
 
@@ -135,6 +135,8 @@ class CadFloor3dLintelRead(BaseModel):
     """Перемычка над проёмом: от высоты двери до верха стены."""
 
     opening_id: str
+    # Конструкция-владелец проёма (`host_id` из walls.json); `None` — владельца нет.
+    host_id: str | None = None
     kind: CadFloor3dOpeningKind
     shell: list[list[float]]
     z_bottom_mm: int
@@ -150,6 +152,8 @@ class CadFloor3dDoorRead(BaseModel):
     """Полотно двери в разрыве стены: тонкая призма от отметки этажа до высоты двери."""
 
     opening_id: str
+    # Конструкция-владелец проёма (`host_id` из walls.json); `None` — владельца нет.
+    host_id: str | None = None
     shell: list[list[float]]
     z_bottom_mm: int
     z_top_mm: int

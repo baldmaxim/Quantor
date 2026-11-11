@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import type { IFloor3dHighlight } from './floor3d-geometry';
+import type { CadLayerCategory } from './layer-categories';
 import {
   buildFeatureEdges,
   midpoint,
@@ -37,7 +38,9 @@ export interface IFloor3dEngine {
   setView: (kind: Floor3dViewKind) => void;
   fit: () => void;
   /** Выделить элемент оверлеем; `null` - снять. Переживает пересборку модели только через повторный вызов. */
-  setHighlight: (target: IFloor3dHighlight | null) => void;
+  setHighlight: (targets: readonly IFloor3dHighlight[]) => void;
+  /** Показать или скрыть категорию без пересборки сцены; переживает пересборку модели. */
+  setCategoryVisible: (category: CadLayerCategory, visible: boolean) => void;
   /** Режим измерения: клики ставят точки, а не выбирают элемент; выход очищает замер. */
   setMeasuring: (on: boolean) => void;
   dispose: () => void;
@@ -148,7 +151,8 @@ export const createFloor3dEngine = (
 
   let model: IFloor3dScene | null = null;
   let fitted = false;
-  let highlight: IFloor3dHighlight | null = null;
+  let highlight: readonly IFloor3dHighlight[] = [];
+  const hiddenCategories = new Set<CadLayerCategory>();
 
   // Замер: маркеры и линия лежат в сцене отдельно от модели, поверх всего (depthTest выключен).
   let measuring = false;
@@ -271,7 +275,8 @@ export const createFloor3dEngine = (
     ndc.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
     const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    for (const hit of raycaster.intersectObjects([...model.pickables], false)) {
+    // Скрытое категорией в клик не входит: Raycaster флаг visible не проверяет.
+    for (const hit of raycaster.intersectObjects(model.pickables.filter((mesh) => mesh.visible), false)) {
       const pick = pickOf(hit.object, hit.faceIndex);
       if (pick !== null) {
         options.onPick(pick, anchor);
@@ -299,7 +304,9 @@ export const createFloor3dEngine = (
     if (rect.width === 0 || rect.height === 0) return null;
     ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
-    const prisms = model.pickables.filter((mesh) => (mesh.userData.pick as IFloor3dPickData).kind === 'prism');
+    const prisms = model.pickables.filter(
+      (mesh) => mesh.visible && (mesh.userData.pick as IFloor3dPickData).kind === 'prism',
+    );
     const hit = raycaster.intersectObjects(prisms, false)[0];
     if (hit === undefined || !(hit.object instanceof THREE.Mesh) || !hit.face) return null;
     const position = hit.object.geometry.getAttribute('position');
@@ -471,7 +478,10 @@ export const createFloor3dEngine = (
         model.dispose();
       }
       model = next;
-      if (next !== null) next.setHighlight(highlight);
+      if (next !== null) {
+        next.setHighlight(highlight);
+        for (const category of hiddenCategories) next.setCategoryVisible(category, false);
+      }
       if (next === null) {
         requestRender();
         return;
@@ -482,9 +492,15 @@ export const createFloor3dEngine = (
         place(ISO_DIRECTION);
       } else requestRender();
     },
-    setHighlight: (target) => {
-      highlight = target;
-      model?.setHighlight(target);
+    setHighlight: (targets) => {
+      highlight = targets;
+      model?.setHighlight(targets);
+      requestRender();
+    },
+    setCategoryVisible: (category, visible) => {
+      if (visible) hiddenCategories.delete(category);
+      else hiddenCategories.add(category);
+      model?.setCategoryVisible(category, visible);
       requestRender();
     },
     setMeasuring: (on) => {

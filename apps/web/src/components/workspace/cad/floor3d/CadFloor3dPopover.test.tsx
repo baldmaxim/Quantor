@@ -181,3 +181,48 @@ describe('плашка перемычки: материал', () => {
     expect(screen.getByRole('dialog', { name: 'Перемычка над дверью' })).toHaveTextContent('Материал: не определён');
   });
 });
+
+describe('плашка перемычки и двери: стена-владелец', () => {
+  const mountHosted = (
+    category: 'lintel' | 'door',
+    hostId: string | null,
+    list: ReturnType<typeof construction>[],
+    onSelectHost = vi.fn(),
+  ) => {
+    const base = floor3dFixture();
+    render(
+      <CadFloor3dPopover
+        pick={{ kind: 'prism', category, id: 'o1' }}
+        model={floor3dFixture({
+          lintels: [{ ...base.lintels[0]!, host_id: hostId }],
+          doors: [{ ...base.doors![0]!, host_id: hostId }],
+        })}
+        constructions={{ constructions: list }}
+        anchor={{ x: 10, y: 10 }}
+        bounds={{ width: 600, height: 400 }}
+        saving={false}
+        error={null}
+        onDecide={vi.fn()}
+        onSelectHost={onSelectHost}
+        onClose={vi.fn()}
+      />,
+    );
+    return onSelectHost;
+  };
+
+  it.each(['lintel', 'door'] as const)('%s: строка «Стена» и кнопка вызывают выбор владельца', (category) => {
+    const onSelectHost = mountHosted(category, 'w1', [construction({ id: 'w1' })]);
+    expect(screen.getByRole('dialog')).toHaveTextContent('Стена: Кладка, 120 мм');
+    fireEvent.click(screen.getByRole('button', { name: 'Выбрать стену' }));
+    expect(onSelectHost).toHaveBeenCalledWith('w1');
+  });
+
+  it.each([
+    ['host_id null', null, [construction({ id: 'w1' })]],
+    ['конструкции нет в списке', 'w9', [construction({ id: 'w1' })]],
+  ] as const)('%s - ни строки, ни кнопки', (_name, hostId, list) => {
+    mountHosted('lintel', hostId, [...list]);
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('Стена');
+    expect(screen.queryByRole('button', { name: 'Выбрать стену' })).toBeNull();
+  });
+});

@@ -517,13 +517,38 @@ describe('useWorkspaceCad: слои и область проверки масш�
     expect([...(result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([0, 1]);
   });
 
-  it('выбор слоёв принадлежит виду: на другом виде все слои снова видны', () => {
+  it('выбор слоёв принадлежит листу задания: на другом виде того же листа сохраняется', () => {
     recognized();
     const hook = mount({ jobParam: JOB_ID, viewParam: 1 });
     act(() => hook.result.current.side.view?.layers.onToggleLayer(0));
     expect([...(hook.result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([1]);
     hook.rerender(inputs({ jobParam: JOB_ID, viewParam: 2 }));
-    expect([...(hook.result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([0, 1]);
+    expect([...(hook.result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([1]);
+  });
+
+  it('скрытые слои хранятся по именам в localStorage и восстанавливаются', () => {
+    recognized();
+    const first = mount({ jobParam: JOB_ID, viewParam: 1 });
+    act(() => first.result.current.side.view?.layers.onToggleLayer(0));
+    const stored = Object.entries(window.localStorage).filter(([key]) =>
+      key.startsWith('quantor.cad.layers-hidden.v1:'),
+    );
+    expect(stored).toHaveLength(1);
+    first.unmount();
+    const second = mount({ jobParam: JOB_ID, viewParam: 1 });
+    expect([...(second.result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([1]);
+  });
+
+  it('режим 3D не сбрасывает выбор слоёв, строки «Плита» и «Перемычки» общие', () => {
+    recognized();
+    const { result } = mount({ jobParam: JOB_ID, viewParam: 1 });
+    act(() => result.current.side.view?.layers.onToggleLayer(1));
+    act(() => result.current.side.view?.layers.categories?.onChange('slab', false));
+    expect(result.current.side.view?.layers.categories).toMatchObject({ slab: false, lintel: true });
+    act(() => result.current.bar?.floor3d?.onModeChange('3d'));
+    expect(result.current.side.view?.layers.mode3d).toBe(true);
+    expect([...(result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([0]);
+    expect(result.current.floor3d?.link.hiddenCategories?.has('slab')).toBe(true);
   });
 
   it('область проверки масштаба: доступна, рисуется на PDF и без DXF', () => {

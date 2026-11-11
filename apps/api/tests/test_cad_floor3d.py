@@ -492,3 +492,90 @@ def test_model_carries_plan_title_from_walls_json() -> None:
 def test_model_without_plan_title_has_none() -> None:
     assert build().title is None
     assert build(heights_patch={"title": None}).title is None
+
+
+# ------------------------------------------------------------------ каркасные перегородки и host_id
+
+PARTITION_ID = "cccccccccccc"
+
+
+def document_with_partition() -> dict[str, Any]:
+    raw = raw_document()
+    partition = {
+        **raw["constructions"][0],
+        "id": PARTITION_ID,
+        "kind": "frame_partition",
+        "thickness_nominal_mm": 100.0,
+        "polygon": {
+            "shell": [[0.0, 3000.0], [3000.0, 3000.0], [3000.0, 3100.0], [0.0, 3100.0]],
+            "holes": [],
+        },
+    }
+    raw["frame_partitions"] = [partition]
+    return raw
+
+
+def build_with_partition(
+    props: dict[str, tuple[CadConstructionProps, bool]] | None = None,
+) -> Any:
+    return f3d.build_floor3d(
+        WallsDocument.model_validate(document_with_partition()),
+        WallsFloorExtras.model_validate(raw_extras()),
+        props_by_key=props or {},
+        overrides=NO_LEVELS,
+        project_slab=None,
+        hole_decisions={},
+        door_zones=[],
+    )
+
+
+def test_frame_partition_is_built_as_a_wall_with_its_own_family() -> None:
+    model = build_with_partition()
+    assert [w.construction_key for w in model.walls] == [
+        "aaaaaaaaaaaa",
+        "bbbbbbbbbbbb",
+        PARTITION_ID,
+    ]
+    partition = model.walls[2]
+    assert (partition.kind, partition.family) == ("frame_partition", "frame_partition")
+    assert partition.thickness_nominal_mm == 100.0
+    assert (partition.z_bottom_mm, partition.z_top_mm) == (BASE, BASE + 2800)
+    # Остальные виды семейство не меняют.
+    assert [w.family for w in model.walls[:2]] == ["masonry", "monolith"]
+    # Перегородка входит в рамку сцены.
+    assert model.bbox is not None and model.bbox[3] == 4000.0
+
+
+def test_frame_partition_height_override_is_honoured() -> None:
+    props = {PARTITION_ID: (CadConstructionProps(height_override_mm=2500), True)}
+    assert build_with_partition(props).walls[2].z_top_mm == BASE + 2500
+
+
+def test_lintel_over_a_frame_partition_ends_under_its_top() -> None:
+    raw = document_with_partition()
+    raw["openings"][0]["host_id"] = PARTITION_ID
+    model = f3d.build_floor3d(
+        WallsDocument.model_validate(raw),
+        WallsFloorExtras.model_validate(raw_extras()),
+        props_by_key={PARTITION_ID: (CadConstructionProps(height_override_mm=2500), True)},
+        overrides=NO_LEVELS,
+        project_slab=None,
+        hole_decisions={},
+        door_zones=[],
+    )
+    assert model.lintels[0].z_top_mm == BASE + 2500
+    assert model.lintels[0].host_id == PARTITION_ID
+
+
+def test_lintel_and_door_carry_the_host_id_of_the_opening() -> None:
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = LEAF
+    model = build(extras=extras)
+    assert model.lintels[0].host_id == "aaaaaaaaaaaa"
+    assert model.doors[0].host_id == "aaaaaaaaaaaa"
+
+
+def test_document_without_frame_partitions_builds_as_before() -> None:
+    model = build()
+    assert [w.family for w in model.walls] == ["masonry", "monolith"]
+    assert all(w.kind != "frame_partition" for w in model.walls)

@@ -229,7 +229,11 @@ def _zone_height_at(point: Point, zones: Sequence[DoorZoneMm]) -> int | None:
 
 
 def _family(kind: CadConstructionKind) -> CadFloor3dFamily:
-    return "masonry" if kind == "masonry" else "monolith"
+    if kind == "masonry":
+        return "masonry"
+    if kind == "frame_partition":
+        return "frame_partition"
+    return "monolith"
 
 
 def _bbox(rings: Sequence[Sequence[Sequence[float]]]) -> list[float] | None:
@@ -329,7 +333,9 @@ def build_floor3d(
     walls: list[CadFloor3dWallRead] = []
     top_by_id: dict[str, int | None] = {}
     wall_height_missing = False
-    for item in document.constructions:
+    # Каркасные перегородки ГКЛ лежат отдельно от конструкций; в 3D строятся так же, как стены.
+    wall_items = [*document.constructions, *document.frame_partitions]
+    for item in wall_items:
         props = props_by_key.get(item.id, (CadConstructionProps(), False))[0]
         height = props.height_override_mm if props.height_override_mm is not None else wall_height
         z_top = None if height is None else base + height
@@ -387,6 +393,7 @@ def build_floor3d(
             doors.append(
                 CadFloor3dDoorRead(
                     opening_id=opening.id,
+                    host_id=opening.host_id,
                     shell=leaf,
                     z_bottom_mm=base,
                     z_top_mm=z_bottom,
@@ -397,6 +404,7 @@ def build_floor3d(
         lintels.append(
             CadFloor3dLintelRead(
                 opening_id=opening.id,
+                host_id=opening.host_id,
                 kind=opening.kind,
                 shell=shell,
                 z_bottom_mm=z_bottom,
@@ -429,7 +437,7 @@ def build_floor3d(
             )
         )
 
-    rings: list[Sequence[Sequence[float]]] = [item.polygon.shell for item in document.constructions]
+    rings: list[Sequence[Sequence[float]]] = [item.polygon.shell for item in wall_items]
     if extras.slab is not None:
         rings.append(extras.slab.shell)
     return CadFloor3dRead(

@@ -13,6 +13,7 @@ import type { PixelRect } from '@/lib/viewer/layer-paint';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 
 import type { IConstructionShape } from './constructions';
+import { withoutHiddenCategories, type CadLayerCategory } from './layer-categories';
 
 export interface IConstructionColors {
   readonly masonry: string;
@@ -40,6 +41,8 @@ export interface IConstructionPaintData {
    * Рисуются только при полном показе.
    */
   readonly notInVor?: ReadonlySet<string>;
+  /** Скрытые категории вкладки «Слои»: их конструкции не рисуются (и не выбираются - индекс строится без них). */
+  readonly hiddenCategories?: ReadonlySet<CadLayerCategory>;
 }
 
 const FILL_ALPHA = 0.22;
@@ -61,8 +64,10 @@ const HATCH_MAX_LINES = 300;
 const MARGIN = 8;
 
 /** Конструкции, которые слой рисует: при полном показе все, иначе только выбранные. */
-const drawnShapes = (data: IConstructionPaintData): readonly IConstructionShape[] =>
-  data.showAll ? data.shapes : data.shapes.filter((shape) => data.selected.has(shape.id));
+const drawnShapes = (data: IConstructionPaintData): readonly IConstructionShape[] => {
+  const shapes = withoutHiddenCategories(data.shapes, data.hiddenCategories);
+  return data.showAll ? shapes : shapes.filter((shape) => data.selected.has(shape.id));
+};
 
 /** Читает цвета из токенов темы. */
 export const readConstructionColors = (): IConstructionColors => {

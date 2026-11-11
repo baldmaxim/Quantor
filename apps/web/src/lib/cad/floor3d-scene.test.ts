@@ -52,15 +52,15 @@ describe('сцена 3D-вида (без WebGL)', () => {
   it('выделение: оверлей поверх меша, в клик не входит, заменяется и снимается', () => {
     const own = buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap: false });
     const before = own.group.children.length;
-    own.setHighlight(highlightOf(plan, { kind: 'prism', category: 'masonry', id: 'w1' }));
+    own.setHighlight([highlightOf(plan, { kind: 'prism', category: 'masonry', id: 'w1' })!]);
     expect(own.group.children).toHaveLength(before + 1);
     const overlay = own.group.children[before] as THREE.Group;
     expect(overlay.children.some((child) => child instanceof THREE.LineSegments)).toBe(true);
-    own.setHighlight(highlightOf(plan, { kind: 'hole', category: 'hole', id: 'h2' }));
+    own.setHighlight([highlightOf(plan, { kind: 'hole', category: 'hole', id: 'h2' })!]);
     expect(own.group.children).toHaveLength(before + 1);
     expect((own.group.children[before] as THREE.Group).children.some((child) => child instanceof THREE.LineLoop)).toBe(true);
     expect(own.pickables).toHaveLength(scene.pickables.length);
-    own.setHighlight(null);
+    own.setHighlight([]);
     expect(own.group.children).toHaveLength(before);
     own.dispose();
   });

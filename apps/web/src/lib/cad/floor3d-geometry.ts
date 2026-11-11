@@ -1,5 +1,7 @@
 import type { CadFloor3dRead } from '@quantor/api-client';
 
+import type { CadLayerCategory } from './layer-categories';
+
 /**
  * План 3D-вида этажа (ADR-0039): чистые функции без DOM и без three.js.
  *
@@ -15,7 +17,7 @@ export const MM_IN_M = 1000;
 
 export type Point2 = readonly [number, number];
 
-export type PrismCategory = 'slab' | 'masonry' | 'monolith' | 'lintel' | 'door';
+export type PrismCategory = 'slab' | 'masonry' | 'monolith' | 'frame_partition' | 'lintel' | 'door';
 
 /** Материал перемычки от движка; `null` - не определён или файл старый. */
 export type LintelMaterial = 'monolith' | 'masonry' | 'frame_partition';
@@ -30,7 +32,12 @@ export interface IPrismSpec {
   readonly yTop: number;
   /** Только у перемычек: от него зависит цвет. */
   readonly material?: LintelMaterial | null;
+  /** Только у перемычек и дверей: конструкция-владелец проёма (`construction_key` стены); `null` - не определена. */
+  readonly hostId?: string | null;
 }
+
+/** Категория видимости призмы (слой вкладки «Слои»): совпадает с категорией призмы. */
+export const visibilityOf = (spec: Pick<IPrismSpec, 'category'>): CadLayerCategory => spec.category;
 
 /** Отверстие плиты для показа: контур на верхе плиты. */
 export interface IHoleSpec {
@@ -70,6 +77,10 @@ export interface IFloor3dPlan {
   /** Габарит модели в метрах: ширина (X), высота (Y), глубина (Z); 0 - модель пуста. */
   readonly extent: { readonly width: number; readonly height: number; readonly depth: number };
 }
+
+/** Категории стен: кладка, монолит и каркасная перегородка. */
+const isWallCategory = (category: PrismCategory): boolean =>
+  category === 'masonry' || category === 'monolith' || category === 'frame_partition';
 
 export const EMPTY_EXTENT = { width: 0, height: 0, depth: 0 } as const;
 
@@ -150,6 +161,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     zBottom: number;
     zTop: number;
     material?: LintelMaterial | null;
+    hostId?: string | null;
   }
   const raw: IRaw[] = [];
   let wallsWithoutTop = 0;
@@ -182,7 +194,12 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     if (shell === null) continue;
     raw.push({
       id: wall.construction_key,
-      category: wall.family === 'monolith' ? 'monolith' : 'masonry',
+      category:
+        wall.family === 'monolith'
+          ? 'monolith'
+          : wall.family === 'frame_partition'
+            ? 'frame_partition'
+            : 'masonry',
       shell,
       holes: wall.holes.flatMap((hole) => {
         const cleaned = ring(hole);
@@ -204,6 +221,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
       zBottom: lintel.z_bottom_mm,
       zTop: lintel.z_top_mm,
       material: lintel.material ?? null,
+      hostId: lintel.host_id ?? null,
     });
   }
 
@@ -218,6 +236,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
       holes: [],
       zBottom: door.z_bottom_mm,
       zTop: door.z_top_mm,
+      hostId: door.host_id ?? null,
     });
   }
 
@@ -251,6 +270,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     yBottom: (item.zBottom - center.z) / MM_IN_M,
     yTop: (item.zTop - center.z) / MM_IN_M,
     ...(item.category === 'lintel' ? { material: item.material ?? null } : {}),
+    ...(item.category === 'lintel' || item.category === 'door' ? { hostId: item.hostId ?? null } : {}),
   }));
 
   const slab = prisms.find((item) => item.category === 'slab') ?? null;
@@ -276,7 +296,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
 
   // «Плита сверху»: толщина та же, что у плиты этажа, лежит на верхе самых высоких стен.
   const wallTops = prisms
-    .filter((item) => item.category === 'masonry' || item.category === 'monolith')
+    .filter((item) => isWallCategory(item.category))
     .map((item) => item.yTop);
   const slabCap =
     slab !== null && wallTops.length > 0
@@ -342,6 +362,26 @@ export const highlightOf = (
   const prism = plan.prisms.find((item) => item.category === pick.category && item.id === pick.id);
   return prism === undefined ? null : { kind: 'prism', spec: prism };
 };
+
+/**
+ * Оверлеи общего выбора: все призмы стен, перегородок и плиты, чей id входит в `ids` (группа из
+ * панели - вся группа), и перемычки и двери этих стен (`hostId` в `ids`). Сами перемычки и двери
+ * в общий выбор не входят: у них свои ключи, совпадение по `id` для них не берётся.
+ */
+export const highlightsOf = (
+  plan: IFloor3dPlan,
+  ids: ReadonlySet<string>,
+): IFloor3dHighlight[] =>
+  ids.size === 0
+    ? []
+    : plan.prisms
+        .filter(
+          (item) =>
+            item.category === 'lintel' || item.category === 'door'
+              ? item.hostId != null && ids.has(item.hostId)
+              : ids.has(item.id) && (item.category === 'slab' || isWallCategory(item.category)),
+        )
+        .map((spec) => ({ kind: 'prism' as const, spec }));
 
 /** Метры с двумя знаками для отметок в карточке. */
 export const formatMeters = (valueMm: number): string =>

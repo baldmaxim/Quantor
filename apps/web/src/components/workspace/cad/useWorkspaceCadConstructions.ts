@@ -26,6 +26,7 @@ import {
 } from '@/lib/cad/constructions-queries';
 import { readConstructionColors, type IConstructionPaintData } from '@/lib/cad/constructions-painter';
 import type { ICadFrame } from '@/lib/cad/frame';
+import { withoutHiddenCategories, type CadLayerCategory } from '@/lib/cad/layer-categories';
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
@@ -52,6 +53,8 @@ interface IInput {
   active: boolean;
   /** Идёт отметка замечания или рисование зоны: они занимают холст. */
   blocked: boolean;
+  /** Скрытые категории вкладки «Слои»: не рисуются и не выбираются кликом. */
+  hiddenCategories?: ReadonlySet<CadLayerCategory>;
 }
 
 export interface IWorkspaceCadConstructionsState {
@@ -62,6 +65,11 @@ export interface IWorkspaceCadConstructionsState {
   readonly paintData: IConstructionPaintData | null;
   /** Данные выбора по клику и карточки; `null` - выбор выключен. */
   readonly picker: IWorkspaceCadConstructionPicker | null;
+  /** Общий выбор плана и 3D: множество id и выбор из 3D (`null` - снять). */
+  readonly selection: {
+    readonly selectedIds: ReadonlySet<string>;
+    readonly onSelectConstruction: (id: string | null) => void;
+  };
 }
 
 const notReadyText = (status: string | null): string =>
@@ -86,6 +94,7 @@ export const useWorkspaceCadConstructions = ({
   load,
   active,
   blocked,
+  hiddenCategories,
 }: IInput): IWorkspaceCadConstructionsState => {
   const theme = useTheme();
   const colors = useMemo(() => {
@@ -124,9 +133,14 @@ export const useWorkspaceCadConstructions = ({
   const bulkProps = useBulkConstructionProps(params);
   const saveLevels = useSaveSheetLevels(params);
 
-  const shapes = useMemo(
+  const allShapes = useMemo(
     () => (data && frame && pageSize ? buildShapes(data.constructions, frame, pageSize) : []),
     [data, frame, pageSize],
+  );
+  // Скрытая категория не попадает под клик (индекс и выбор строятся без неё); не рисует её сам рисовальщик.
+  const shapes = useMemo(
+    () => withoutHiddenCategories(allShapes, hiddenCategories),
+    [allShapes, hiddenCategories],
   );
   const index = useMemo(() => buildConstructionIndex(shapes), [shapes]);
 
@@ -139,9 +153,16 @@ export const useWorkspaceCadConstructions = ({
   const paintData = useMemo<IConstructionPaintData | null>(
     () =>
       active && shapes.length > 0
-        ? { shapes, colors, selected: live, showAll: visible, notInVor: vor.notInVor }
+        ? {
+            shapes: allShapes,
+            colors,
+            selected: live,
+            showAll: visible,
+            notInVor: vor.notInVor,
+            hiddenCategories,
+          }
         : null,
-    [active, visible, shapes, colors, live, vor.notInVor],
+    [active, visible, shapes.length, allShapes, colors, live, vor.notInVor, hiddenCategories],
   );
 
   // --- карточка ---
@@ -256,10 +277,19 @@ export const useWorkspaceCadConstructions = ({
       }
     : null;
 
+  // Выбор из 3D: как одиночный клик в плане, но без карточки плана (она привязана к точке холста).
+  const selectFrom3d = (id: string | null) => {
+    setPopoverError(null);
+    setGroupKey(null);
+    setActiveId(null);
+    setSelected(id === null ? NO_IDS : new Set([id]));
+  };
+
   return {
     side,
     layers: data !== null ? { visible, onVisibleChange: setVisible } : null,
     paintData,
     picker,
+    selection: { selectedIds: selected, onSelectConstruction: selectFrom3d },
   };
 };

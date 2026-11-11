@@ -2,6 +2,7 @@
 
 import { useMemo, type FC } from 'react';
 
+import { categoryOfLayer, type CadExtraCategory } from '@/lib/cad/layer-categories';
 import { groupLayers } from '@/lib/cad/layer-groups';
 import { mepColorVar } from '@/lib/cad/mep-layers';
 import { formatInt } from '@/lib/cad/view-format';
@@ -18,6 +19,14 @@ interface ICadLayersPanelProps {
   onToggleLayer: (index: number) => void;
   /** Скрыть или показать несколько слоёв разом (переключатель группы). */
   onSetLayersHidden: (indices: readonly number[], hidden: boolean) => void;
+  /** Открыт режим «3D»: слои без категории конструкций недоступны («только план»). */
+  mode3d?: boolean;
+  /** Строки «Плита» и «Перемычки» без слоя DXF; нет - строк нет. */
+  categories?: {
+    slab: boolean;
+    lintel: boolean;
+    onChange: (category: CadExtraCategory, visible: boolean) => void;
+  } | null;
   /** Непрозрачность подложки PDF, 0-1: DXF всегда непрозрачный. */
   pdfOpacity: number;
   onPdfOpacityChange: (value: number) => void;
@@ -60,6 +69,8 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   visibleLayers,
   onToggleLayer,
   onSetLayersHidden,
+  mode3d = false,
+  categories = null,
   pdfOpacity,
   onPdfOpacityChange,
   pdfOpacityActive,
@@ -74,6 +85,14 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   mep = null,
 }) => {
   const groups = useMemo(() => groupLayers(layers), [layers]);
+  // В 3D доступны только слои с категорией конструкций: остальные - «только план».
+  const planOnly = useMemo<ReadonlySet<number>>(
+    () =>
+      new Set(
+        mode3d ? layers.flatMap((name, index) => (categoryOfLayer(name) === null ? [index] : [])) : [],
+      ),
+    [mode3d, layers],
+  );
   // Показ распознанных блоков один на всё окно: тот же флаг, что у кнопки панели инструментов.
   const regionsVisible = useWorkspaceStore((state) => state.overlayVisible);
   const toggleRegions = useWorkspaceStore((state) => state.toggleOverlay);
@@ -145,6 +164,31 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
         </label>
       )}
 
+      {categories && (
+        <fieldset className="min-w-0 border-0 p-0" data-testid="category-layers">
+          <legend className="mb-[var(--s-2)] text-xs text-muted">Конструкции листа</legend>
+          <label className={CHECK}>
+            <input
+              type="checkbox"
+              checked={categories.slab}
+              onChange={(event) => categories.onChange('slab', event.target.checked)}
+              className="size-5 shrink-0"
+            />
+            Плита
+          </label>
+          <label className={CHECK}>
+            <input
+              type="checkbox"
+              checked={categories.lintel}
+              onChange={(event) => categories.onChange('lintel', event.target.checked)}
+              className="size-5 shrink-0"
+            />
+            Перемычки
+            {!mode3d && <span className="ml-auto text-xs text-muted">только 3D</span>}
+          </label>
+        </fieldset>
+      )}
+
       {cadShown && layers.length > 0 && (
         <fieldset className="min-w-0 border-0 p-0">
           <legend className="mb-[var(--s-2)] text-xs text-muted">Чертёж (DXF вида)</legend>
@@ -157,16 +201,27 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
                 visibleLayers={visibleLayers}
                 onToggleLayer={onToggleLayer}
                 onSetLayersHidden={onSetLayersHidden}
+                disabledIndices={planOnly}
+                disabledNote="только план"
               />
             ))}
           </div>
         </fieldset>
       )}
 
-      {zones && zones.categories.length > 0 && <CadZoneLayers {...zones} />}
+      {zones && zones.categories.length > 0 && (
+        <fieldset disabled={mode3d} className="min-w-0 border-0 p-0 disabled:opacity-60">
+          <CadZoneLayers {...zones} />
+          {mode3d && <p className="text-xs text-muted">Зоны: только план</p>}
+        </fieldset>
+      )}
 
       {mep && (
-        <fieldset className="min-w-0 border-0 p-0" data-testid="mep-layers">
+        <fieldset
+          disabled={mode3d}
+          className="min-w-0 border-0 p-0 disabled:opacity-60"
+          data-testid="mep-layers"
+        >
           <legend className="sr-only">Слои трасс механики</legend>
           <CadLayerGroup
             group={{
@@ -180,6 +235,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
             onSetLayersHidden={(indices, hidden) => mep.onSetHidden(indices, hidden)}
             swatchColor={(index) => mepColorVar(mep.names[index] ?? '')}
           />
+          {mode3d && <p className="text-xs text-muted">Трассы механики: только план</p>}
         </fieldset>
       )}
 
