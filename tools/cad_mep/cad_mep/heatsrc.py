@@ -179,8 +179,26 @@ def cabinets(pl: Planner) -> list[Root]:
                 f"секция {section or '?'}: шахты ВК в МОП нет, этажный шкаф поставлен у шахты ОВ "
                 f"{best[0].id}",
             )
+        if kind == "ВК":
+            pl.cabinet_shaft[section] = best[0]
         roots.append(Root(best[0], best[1], sorted(apts), True))
     return roots
+
+
+def vk_shaft_for(pl: Planner, section: str) -> Shaft | None:
+    """Шахта ВК в МОП для стояков воды секции: шахта этажного шкафа, иначе — по тому же критерию.
+
+    Критерий шкафа: наименьшая сумма путей от шахты до входов квартир секции.
+    """
+    found = pl.cabinet_shaft.get(section)
+    if found is not None:
+        return found
+    targets = sorted({pl.entry[a][2] for a in pl.entry if pl.m.apts[a].section == section})
+    cand = _candidates(pl, pl.vk_mop)
+    if not cand or not targets:
+        return None
+    best = min(cand, key=lambda c: (*_sum_to_entries(pl, c[1], targets), c[0].id))
+    return best[0]
 
 
 def ov_roots(pl: Planner) -> list[Root]:

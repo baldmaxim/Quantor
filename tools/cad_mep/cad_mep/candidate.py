@@ -34,6 +34,7 @@ class Provenance:
     view_folder: str
     floor_elevation: Value
     floor_height: Value
+    risers_sha256: str | None = None  # sha256 файла реестра стояков; None — реестра не было
 
 
 def _value_out(v: Value) -> JsonObj:
@@ -61,6 +62,7 @@ def build_candidate(
     dxf_info: dict[str, int],
     beams: JsonObj,
     topology: JsonObj,
+    risers_registry: JsonObj | None = None,
 ) -> JsonObj:
     dx, dy = frame.x0, frame.y0
 
@@ -197,7 +199,11 @@ def build_candidate(
                 "centroid_dxf_mm": dxf_xy(s.centroid),
                 "label_pt": [_r(v) for v in frame.dxf_to_pt(lx, ly)],
                 "apt": s.apt,
-                "risers": res.shaft_use.get(s.id),
+                "risers": (
+                    res.shaft_risers.get(s.id)
+                    if risers_registry is not None
+                    else res.shaft_use.get(s.id)
+                ),
             }
         )
     by_place: Counter[str] = Counter()
@@ -284,6 +290,7 @@ def build_candidate(
         "params_sha256": prov.params_sha256,
         "approval_id": prov.approval_id,
         "view_folder": prov.view_folder,
+        "risers_sha256": prov.risers_sha256,
         "floor_elevation": _value_out(prov.floor_elevation),
         "floor_height": _value_out(prov.floor_height),
         "scale": {"mm_per_pt": frame.scale, "source": scale_source},
@@ -306,6 +313,7 @@ def build_candidate(
             "sheet_marks_mm": list(labels.elevation_marks_mm),
             "levels_mm": z,
         },
+        "risers_registry": risers_registry,
         "assumptions": params.assumed(),
         "shafts": shafts_out,
         "shaft_summary": {

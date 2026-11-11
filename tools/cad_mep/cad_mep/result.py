@@ -30,6 +30,7 @@ class NodeMark:
     apt: int | None = None
     system: str | None = None
     room: str | None = None
+    label: str | None = None  # подпись узла в DXF (марка и диаметр стояка из реестра)
 
 
 @dataclass
@@ -39,6 +40,8 @@ class Result:
     per_apt: dict[int, dict[str, object]] = field(default_factory=dict)
     fire: dict[str, object] | None = None
     shaft_use: dict[str, list[str]] = field(default_factory=dict)
+    # стояки шахты по местам: слой, система, марка, роль, Ø (марка и др. — только по реестру)
+    shaft_risers: dict[str, list[dict[str, object]]] = field(default_factory=dict)
     issues: list[Issue] = field(default_factory=list)
     heat_rooms: list[HeatRoom] = field(default_factory=list)
     # осевые пути лучей по квартирам (узлы сетки): проверка «дерево без петель»

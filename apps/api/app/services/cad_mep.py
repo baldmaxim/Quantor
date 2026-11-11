@@ -34,6 +34,7 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.models import CadDecision, CadRemark, Job, Project, UserIdentity
 from app.models.cad_decision import DECISION_MEP_ACCEPTANCE, DECISION_VIEW_APPROVAL
 from app.services import cad as cad_service
+from app.services import cad_risers
 from app.services import jobs as jobs_service
 
 _VERSION_LINE: Final = re.compile(
@@ -103,8 +104,12 @@ def route_idempotency_key(
     *,
     params_sha256: str,
     generator_version: str,
+    risers_sha256: str = "",
 ) -> str:
-    """То же одобрение, параметры и версия генератора - то же задание.
+    """То же одобрение, параметры, версия генератора и реестр стояков - то же задание.
+
+    Реестр стояков (ADR-0041) входит в ключ своим sha256 (пустая строка - реестра нет): другой
+    реестр - новое задание, а не пересчёт старого.
 
     Отметка пола и высота этажа в ключ не входят: это параметры попытки, и их правят пересчётом
     (`recompute_routes`) - новой попыткой того же задания, а не новым заданием.
@@ -115,6 +120,7 @@ def route_idempotency_key(
                 str(approval_id),
                 params_sha256,
                 generator_version,
+                risers_sha256,
             )
         ).encode()
     ).hexdigest()
@@ -481,6 +487,16 @@ async def schedule_routes(
     if dxf is None or dxf.get("sha256") != approval.artifact_sha256:
         raise DomainError(ErrorCode.CAD_INPUT_INVALID, "DXF вида не совпадает с одобренным")
     params = load_params(settings)
+    # Реестр стояков листа (ADR-0041): непустой уходит в задание вместе с sha256 файла контракта.
+    risers = cad_risers.entries_to_json(
+        await cad_risers.load_risers(
+            session,
+            revision_id=uuid.UUID(str(job.payload["revision_id"])),
+            page_index=page_index,
+            view=view,
+        )
+    )
+    risers_sha256 = cad_risers.registry_sha256(risers) if risers else ""
     return await jobs_service.enqueue(
         session,
         job_type=JobType.CAD_MEP_ROUTE,
@@ -490,6 +506,7 @@ async def schedule_routes(
             approval.id,
             params_sha256=params.sha256,
             generator_version=params.generator_version,
+            risers_sha256=risers_sha256,
         ),
         payload={
             "revision_id": job.payload["revision_id"],
@@ -506,6 +523,7 @@ async def schedule_routes(
             "generator_version": params.generator_version,
             "engine_version": params.generator_version,
             "mep_attempts": [_attempt_entry(1, floor_elevation_mm, floor_height_mm, user_id)],
+            **({"risers": risers, "risers_sha256": risers_sha256} if risers else {}),
         },
     )
 

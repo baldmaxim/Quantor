@@ -8,13 +8,14 @@ from __future__ import annotations
 import numpy as np
 from shapely.geometry import LineString
 
-from cad_mep import facade, fire, heating, heatsrc
+from cad_mep import facade, fire, heating, heatsrc, riserplan
 from cad_mep.dxfin import Door
 from cad_mep.issues import Issue
 from cad_mep.labels import Labels
 from cad_mep.layers import SYSTEM_OF_LAYER
 from cad_mep.params import Params
 from cad_mep.result import Line3D, NodeMark, Pt, Pt3, Result
+from cad_mep.risers import RiserEntry
 from cad_mep.rooms import Apartment, Model, Shaft
 from cad_mep.route import RouteGrid, Tree, node_path, spt, tree_chains
 from cad_mep.treeoff import offset_tree
@@ -31,11 +32,18 @@ class Planner:
         floor_mm: float,
         height_mm: float,
         prof: facade.Profile,
+        registry: list[RiserEntry] | None = None,
     ) -> None:
         self.m, self.L, self.doors, self.rg, self.p = m, labels, doors, rg, params
         self.prof = prof
+        self.registry = registry  # None — реестра стояков нет: стояки по подписям шахт АР
         self.res = Result()
-        self.riser_x: dict[str, dict[str, float]] = {}  # шахта -> слой -> порядок
+        self.riser_x: dict[str, dict[str, float]] = {}  # шахта -> место стояка -> порядок
+        # место стояка по умолчанию называется слоем; в реестре — слой и номер записи
+        self.slot_layer: dict[tuple[str, str], str] = {}
+        self.slot_tag: dict[tuple[str, str], RiserEntry] = {}
+        self._leadins: list[tuple[Line3D, str, str]] = []
+        self.cabinet_shaft: dict[str, Shaft] = {}  # секция -> шахта ВК этажного шкафа
         self.expl = labels.expl
         self.zf = floor_mm
         self.h = height_mm
@@ -69,11 +77,21 @@ class Planner:
             return None
         return self.rg.node(*sh.mop_exit, r_mm=self.p.num("shaft_node_radius_mm"), only_mop=True)
 
-    def riser(self, sh: Shaft, layer: str) -> Pt:
-        """Точка стояка слоя в шахте; смещение применяется в finalize_risers."""
+    def riser(
+        self, sh: Shaft, layer: str, tag: RiserEntry | None = None, slot: str | None = None
+    ) -> Pt:
+        """Точка стояка слоя в шахте; смещение применяется в finalize_risers.
+
+        slot — отдельное место стояка (по реестру на слое бывает несколько стояков); без него
+        место стояка — слой.
+        """
+        key = slot or layer
         d = self.riser_x.setdefault(sh.id, {})
-        if layer not in d:
-            d[layer] = float(len(d))
+        if key not in d:
+            d[key] = float(len(d))
+            self.slot_layer[(sh.id, key)] = layer
+            if tag is not None:
+                self.slot_tag[(sh.id, key)] = tag
         return (sh.centroid[0], sh.centroid[1])
 
     def door_sides(self, door: Door) -> tuple[Pt, Pt]:
@@ -123,12 +141,12 @@ class Planner:
             self._foreign[apt] = dict.fromkeys(np.nonzero(bad)[0].tolist(), float("inf"))
         return self._foreign[apt]
 
-    def leadin(self, sh: Shaft, layer: str, z: float, node: int) -> None:
-        xy = self.riser(sh, layer)
+    def leadin(self, sh: Shaft, layer: str, z: float, node: int, slot: str | None = None) -> None:
+        xy = self.riser(sh, layer, slot=slot)
         tgt = (float(self.rg.xy[node][0]), float(self.rg.xy[node][1]))
-        self.res.lines.append(
-            Line3D(layer, [(xy[0], xy[1], z), (tgt[0], tgt[1], z)], None, "leadin")
-        )
+        line = Line3D(layer, [(xy[0], xy[1], z), (tgt[0], tgt[1], z)], None, "leadin")
+        self.res.lines.append(line)
+        self._leadins.append((line, sh.id, slot or layer))
 
     def apt_info(self, ap: Apartment) -> dict[str, object]:
         return self.res.per_apt.setdefault(ap.idx, {"number": ap.number})
@@ -298,30 +316,54 @@ class Planner:
             d = self.riser_x[sid]
             sh = by_id[sid]
             n = len(d)
-            for lay, k in d.items():
+            used: list[dict[str, object]] = []
+            for key, k in d.items():
+                lay = self.slot_layer[(sid, key)]
+                tag = self.slot_tag.get((sid, key))
                 dx = (k - (n - 1) / 2) * step
                 x, y = sh.centroid[0] + dx, sh.centroid[1]
                 self.res.lines.append(
                     Line3D(lay, [(x, y, self.zf), (x, y, self.zf + self.h)], None, "riser")
                 )
                 self.res.nodes.append(
-                    NodeMark("M-RISER", "riser", (x, y), self.zf, None, SYSTEM_OF_LAYER.get(lay))
+                    NodeMark(
+                        "M-RISER",
+                        "riser",
+                        (x, y),
+                        self.zf,
+                        None,
+                        SYSTEM_OF_LAYER.get(lay),
+                        label=tag.label() if tag else None,
+                    )
                 )
-                for ln in self.res.lines:
-                    if (
-                        ln.layer == lay
-                        and ln.kind == "leadin"
-                        and abs(ln.pts[0][0] - sh.centroid[0]) < 1e-6
-                        and abs(ln.pts[0][1] - sh.centroid[1]) < 1e-6
-                    ):
+                for ln, lead_sid, lead_key in self._leadins:
+                    if lead_sid == sid and lead_key == key:
                         ln.pts[0] = (x, y, ln.pts[0][2])
-            self.res.shaft_use[sid] = list(d)
+                used.append(
+                    {
+                        "layer": lay,
+                        "system": tag.system if tag else None,
+                        "mark": tag.mark if tag else None,
+                        "role": tag.role if tag else None,
+                        "dn_mm": tag.dn_mm if tag else None,
+                    }
+                )
+            self.res.shaft_use[sid] = [self.slot_layer[(sid, key)] for key in d]
+            self.res.shaft_risers[sid] = used
 
     def run(self) -> Result:
         self._prepare()
         heating.route(self)
-        self.water()
-        fire.route(self)
+        if self.registry is None:
+            self.water()
+            fire.route(self)
+            self.issue(
+                "risers_registry_missing",
+                "справка: реестр стояков не задан — стояки по подписям шахт АР",
+            )
+        else:
+            riserplan.place_water(self, self.registry)
+            riserplan.place_fire(self, self.registry)
         self.sewer()
         self.finalize_risers()
         return self.res

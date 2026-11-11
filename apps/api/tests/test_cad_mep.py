@@ -31,6 +31,7 @@ from app.main import create_app
 from app.models import CadDecision, CadRemark, Job, Workspace
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
+from app.services import cad_risers
 from app.services import jobs as jobs_service
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_qa import BROKEN_PDF, _upload_calibrated
@@ -44,13 +45,16 @@ import argparse, json, pathlib, sys
 
 parser = argparse.ArgumentParser()
 for name in ("pdf", "page-index", "view-dxf", "scale", "preview", "params", "out", "view-folder",
-             "floor-elevation-mm", "floor-height-mm", "approval-id"):
+             "floor-elevation-mm", "floor-height-mm", "approval-id", "risers"):
     parser.add_argument("--" + name)
 args = parser.parse_args()
 for name in ("pdf", "view_dxf", "scale", "preview", "params"):
     if not pathlib.Path(getattr(args, name)).is_file():
         print(json.dumps({"code": "input_missing", "message": name}), file=sys.stderr)
         sys.exit(2)
+seen = pathlib.Path(__file__).parent / "risers_seen.json"
+seen.write_text("none" if args.risers is None else pathlib.Path(args.risers).read_text("utf-8"),
+                encoding="utf-8")
 auto = args.floor_elevation_mm is None or args.floor_height_mm is None
 marker = pathlib.Path(__file__).parent / "not_found"
 if auto and marker.exists():
@@ -914,3 +918,149 @@ async def test_recompute_refused_when_accepted_or_approval_revoked(
         assert again.status_code == 201
         fresh = await api.post(f"{view}/mep-routes", json=_routes_body(None, None))
         assert fresh.json()["job_id"] != route_id
+
+
+# ------------------------------------------------------------------ реестр стояков (ADR-0041)
+
+RISERS = [
+    {
+        "system": "V1",
+        "mark": "В1.1.1",
+        "dn_mm": 50,
+        "role": "own",
+        "count": 1,
+        "shaft_id": None,
+        "source": "ИОС2.1 л.2",
+        "note": None,
+    },
+    {
+        "system": "VPV",
+        "mark": "В2.1",
+        "dn_mm": 65,
+        "role": "own",
+        "count": 2,
+        "shaft_id": "S12",
+        "source": None,
+        "note": None,
+    },
+]
+
+
+async def _put_risers(
+    api: AsyncClient, project_id: str, revision_id: str, risers: list[dict[str, Any]]
+) -> None:
+    url = f"/api/v1/projects/{project_id}/cad/risers"
+    query = f"?revision_id={revision_id}&page_index=0&view=1"
+    assert (await api.put(f"{url}{query}", json={"risers": risers})).status_code == 200
+
+
+def test_idempotency_key_includes_the_risers_hash() -> None:
+    approval = uuid.uuid4()
+    base = {"params_sha256": "p", "generator_version": "cad_mep.v6"}
+    plain = cad_mep_service.route_idempotency_key(approval, **base)
+    assert plain == cad_mep_service.route_idempotency_key(approval, risers_sha256="", **base)
+    one = cad_mep_service.route_idempotency_key(approval, risers_sha256="a" * 64, **base)
+    two = cad_mep_service.route_idempotency_key(approval, risers_sha256="b" * 64, **base)
+    assert len({plain, one, two}) == 3 and one.startswith("cadmep:")
+
+
+async def test_routes_without_the_registry_carry_no_risers(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, job_id, base = await _parent(api, db_session, fake_storage)
+        route_id = await _approve_and_queue(api, base, job_id)
+        stored = await db_session.get(Job, uuid.UUID(route_id))
+        assert stored is not None
+        assert "risers" not in stored.payload and "risers_sha256" not in stored.payload
+
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        assert (tools / "risers_seen.json").read_text(encoding="utf-8") == "none"
+
+
+async def test_registry_goes_into_the_job_changes_the_key_and_reaches_the_generator(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        view = f"{base}/{job_id}/views/0/1"
+        await _put_risers(api, project_id, revision_id, [])
+        assert (await api.post(f"{view}/approval", json=APPROVAL)).status_code == 201
+        plain = (await api.post(f"{view}/mep-routes", json=_routes_body())).json()["job_id"]
+
+        # Пустой реестр - как без реестра: то же задание.
+        again = (await api.post(f"{view}/mep-routes", json=_routes_body())).json()["job_id"]
+        assert again == plain
+
+        await _put_risers(api, project_id, revision_id, RISERS)
+        with_registry = (await api.post(f"{view}/mep-routes", json=_routes_body())).json()["job_id"]
+        assert with_registry != plain
+        # Тот же реестр - то же задание; другой реестр - новое.
+        repeated = (await api.post(f"{view}/mep-routes", json=_routes_body())).json()["job_id"]
+        assert repeated == with_registry
+        await _put_risers(api, project_id, revision_id, RISERS[:1])
+        other = (await api.post(f"{view}/mep-routes", json=_routes_body())).json()["job_id"]
+        assert other not in (plain, with_registry)
+
+        stored = await db_session.get(Job, uuid.UUID(with_registry))
+        assert stored is not None
+        expected = cad_risers.registry_bytes(RISERS)
+        assert stored.payload["risers"] == RISERS
+        assert stored.payload["risers_sha256"] == _sha(expected)
+        key = cad_mep_service.route_idempotency_key(
+            uuid.UUID(stored.payload["approval_id"]),
+            params_sha256=stored.payload["params_sha256"],
+            generator_version=stored.payload["generator_version"],
+            risers_sha256=_sha(expected),
+        )
+        assert stored.idempotency_key == key
+
+        # Очередь FIFO: первым выполняется задание без реестра, затем с реестром.
+        first = await _run_route_worker(db_session, fake_storage, settings, plain)
+        assert first.status is JobStatus.SUCCEEDED
+        assert (tools / "risers_seen.json").read_text(encoding="utf-8") == "none"
+        second = await _run_route_worker(db_session, fake_storage, settings, with_registry)
+        assert second.status is JobStatus.SUCCEEDED, (second.error_code, second.error_message)
+        assert (tools / "risers_seen.json").read_bytes() == expected
+        assert not any((tmp_path / "work").rglob("*")), "каталог попытки не удалён"
+
+
+async def test_worker_refuses_a_registry_that_does_not_match_its_hash(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        await _put_risers(api, project_id, revision_id, RISERS)
+        route_id = await _approve_and_queue(api, base, job_id)
+        route = await db_session.get(Job, uuid.UUID(route_id))
+        assert route is not None
+        tampered = [{**RISERS[0], "dn_mm": 80}, RISERS[1]]
+        await db_session.execute(
+            update(Job)
+            .where(Job.id == route.id)
+            .values(payload={**route.payload, "risers": tampered})
+        )
+        await db_session.commit()
+        db_session.expire_all()
+
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.FAILED and job.error_code == "CAD_PARAMS_INVALID"
+        assert "sha256" in (job.error_message or "")
+        assert not (tools / "risers_seen.json").exists()
+        assert not any((tmp_path / "work").rglob("*"))

@@ -5251,6 +5251,87 @@
         "title": "CadRevokeCreate",
         "type": "object"
       },
+      "CadRiserEntry": {
+        "additionalProperties": false,
+        "description": "Одна запись реестра; поля - как в файле `risers.json`, который читает генератор.",
+        "properties": {
+          "count": {
+            "default": 1,
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "dn_mm": {
+            "anyOf": [
+              {
+                "maximum": 400.0,
+                "minimum": 10.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dn Mm"
+          },
+          "mark": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Mark",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RiserRole"
+          },
+          "shaft_id": {
+            "anyOf": [
+              {
+                "pattern": "^S\\d{2,3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shaft Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "system": {
+            "$ref": "#/components/schemas/RiserSystem"
+          }
+        },
+        "required": [
+          "system",
+          "mark",
+          "role"
+        ],
+        "title": "CadRiserEntry",
+        "type": "object"
+      },
       "CadRouteJobRead": {
         "description": "Route-задание вида в списке у родителя.",
         "properties": {
@@ -5897,6 +5978,70 @@
           }
         },
         "title": "CadSheetLevelsWrite",
+        "type": "object"
+      },
+      "CadSheetRisersOut": {
+        "properties": {
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "risers": {
+            "items": {
+              "$ref": "#/components/schemas/CadRiserEntry"
+            },
+            "title": "Risers",
+            "type": "array"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision_id",
+          "page_index",
+          "view",
+          "risers",
+          "updated_at"
+        ],
+        "title": "CadSheetRisersOut",
+        "type": "object"
+      },
+      "CadSheetRisersPut": {
+        "additionalProperties": false,
+        "description": "Реестр листа заменяется целиком; пустой список = реестра нет.",
+        "properties": {
+          "risers": {
+            "items": {
+              "$ref": "#/components/schemas/CadRiserEntry"
+            },
+            "maxItems": 40,
+            "title": "Risers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "risers"
+        ],
+        "title": "CadSheetRisersPut",
         "type": "object"
       },
       "CadStageRead": {
@@ -22697,6 +22842,27 @@
         "title": "ReviewStatus",
         "type": "string"
       },
+      "RiserRole": {
+        "enum": [
+          "own",
+          "transit"
+        ],
+        "title": "RiserRole",
+        "type": "string"
+      },
+      "RiserSystem": {
+        "description": "Система стояка. Отопление и К1 в реестр v1 не входят: генерируются как в cad_mep.v5.",
+        "enum": [
+          "V1",
+          "T3",
+          "T4",
+          "VPV",
+          "AUP",
+          "FS"
+        ],
+        "title": "RiserSystem",
+        "type": "string"
+      },
       "Role": {
         "description": "Роль — именованный набор разрешений, а не проверяемая сущность.\n\nБизнес-код спрашивает разрешение (`Permission`), а не имя роли: состав набора меняется\nв одном месте, а не по всем обработчикам. Соответствие описано в `app/auth/permissions.py`.\n\n`PLATFORM_ADMIN` и `SERVICE` относятся к платформе и живут на самой личности; остальные\nвыдаются членством в конкретном рабочем пространстве.",
         "enum": [
@@ -31212,6 +31378,160 @@
         "summary": "Задать толщину плиты проекта из разрезов (применяется ко всем листам проекта)",
         "tags": [
           "cad-floor3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/risers": {
+      "get": {
+        "operationId": "read_cad_sheet_risers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadSheetRisersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Реестр стояков листа по проекту ИОС; не введён - пустой список",
+        "tags": [
+          "cad-risers"
+        ]
+      },
+      "put": {
+        "operationId": "put_cad_sheet_risers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadSheetRisersPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadSheetRisersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сохранить реестр стояков листа (заменяется целиком; пустой список - реестра нет)",
+        "tags": [
+          "cad-risers"
         ]
       }
     },

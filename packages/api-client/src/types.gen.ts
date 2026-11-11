@@ -2587,6 +2587,40 @@ export type CadRevokeCreate = {
 };
 
 /**
+ * CadRiserEntry
+ *
+ * Одна запись реестра; поля - как в файле `risers.json`, который читает генератор.
+ */
+export type CadRiserEntry = {
+    /**
+     * Count
+     */
+    count?: number;
+    /**
+     * Dn Mm
+     */
+    dn_mm?: number | null;
+    /**
+     * Mark
+     */
+    mark: string;
+    /**
+     * Note
+     */
+    note?: string | null;
+    role: RiserRole;
+    /**
+     * Shaft Id
+     */
+    shaft_id?: string | null;
+    /**
+     * Source
+     */
+    source?: string | null;
+    system: RiserSystem;
+};
+
+/**
  * CadRouteJobRead
  *
  * Route-задание вида в списке у родителя.
@@ -2878,6 +2912,44 @@ export type CadSheetLevelsWrite = {
      * Толщина плиты перекрытия, мм
      */
     slab_thickness_mm?: number | null;
+};
+
+/**
+ * CadSheetRisersOut
+ */
+export type CadSheetRisersOut = {
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Risers
+     */
+    risers: Array<CadRiserEntry>;
+    /**
+     * Updated At
+     */
+    updated_at: string | null;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadSheetRisersPut
+ *
+ * Реестр листа заменяется целиком; пустой список = реестра нет.
+ */
+export type CadSheetRisersPut = {
+    /**
+     * Risers
+     */
+    risers: Array<CadRiserEntry>;
 };
 
 /**
@@ -11810,6 +11882,18 @@ export type ReviewEvent = {
 export type ReviewStatus = 'unreviewed' | 'confirmed' | 'ambiguous' | 'rejected' | 'ignore_for_train';
 
 /**
+ * RiserRole
+ */
+export type RiserRole = 'own' | 'transit';
+
+/**
+ * RiserSystem
+ *
+ * Система стояка. Отопление и К1 в реестр v1 не входят: генерируются как в cad_mep.v5.
+ */
+export type RiserSystem = 'V1' | 'T3' | 'T4' | 'VPV' | 'AUP' | 'FS';
+
+/**
  * Role
  *
  * Роль — именованный набор разрешений, а не проверяемая сущность.
@@ -16813,6 +16897,92 @@ export type PutCadProjectLevelsResponses = {
 };
 
 export type PutCadProjectLevelsResponse = PutCadProjectLevelsResponses[keyof PutCadProjectLevelsResponses];
+
+export type ReadCadSheetRisersData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/risers';
+};
+
+export type ReadCadSheetRisersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadSheetRisersError = ReadCadSheetRisersErrors[keyof ReadCadSheetRisersErrors];
+
+export type ReadCadSheetRisersResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadSheetRisersOut;
+};
+
+export type ReadCadSheetRisersResponse = ReadCadSheetRisersResponses[keyof ReadCadSheetRisersResponses];
+
+export type PutCadSheetRisersData = {
+    body: CadSheetRisersPut;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/risers';
+};
+
+export type PutCadSheetRisersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutCadSheetRisersError = PutCadSheetRisersErrors[keyof PutCadSheetRisersErrors];
+
+export type PutCadSheetRisersResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadSheetRisersOut;
+};
+
+export type PutCadSheetRisersResponse = PutCadSheetRisersResponses[keyof PutCadSheetRisersResponses];
 
 export type ListCadVorDocumentsData = {
     body?: never;

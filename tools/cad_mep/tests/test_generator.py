@@ -51,6 +51,7 @@ def _run(
     height: int | None = None,
     scale: Path | None = None,
     params: Path | None = None,
+    risers: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     cmd = [
         sys.executable,
@@ -77,6 +78,8 @@ def _run(
         cmd += ["--floor-height-mm", str(height)]
     if params is not None:
         cmd += ["--params", str(params)]
+    if risers is not None:
+        cmd += ["--risers", str(risers)]
     return subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=300)
 
 
@@ -98,7 +101,10 @@ def run_a(inputs: dict[str, Path], tmp_path_factory: pytest.TempPathFactory) -> 
     return out / "views" / FOLDER
 
 
-INFO_ISSUES = {"heat_ov_shafts_unused"}  # справка, не замечание: проверяется отдельно
+INFO_ISSUES = {
+    "heat_ov_shafts_unused",
+    "risers_registry_missing",
+}  # справка, не замечание: проверяется отдельно
 
 
 def _load_candidate(path: Path, keep_info: bool = False) -> dict[str, object]:
@@ -167,7 +173,7 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
     assert candidate["schema"] == "quantor.cad_mep.candidate.v1"
     prov = candidate["provenance"]
     assert isinstance(prov, dict)
-    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v5"
+    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v6"
     assert prov["pdf_sha256"] == _sha(inputs["pdf"])
     assert prov["view_dxf_sha256"] == _sha(inputs["dxf"])
     params = load_params(None)
@@ -190,10 +196,10 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
         "source": "derived",
         "evidence": "стр. 1 +47,600 → стр. 2 +50,900",
     }
-    # единственное замечание — справка: шахты ОВ шкафом не используются; route_* нет
+    # замечаний нет, только справки: шахты ОВ шкафом не используются, реестра стояков нет
     issues = candidate["issues"]
     assert isinstance(issues, list)
-    assert [i["code"] for i in issues] == ["heat_ov_shafts_unused"]
+    assert [i["code"] for i in issues] == ["heat_ov_shafts_unused", "risers_registry_missing"]
     assert checks_topology_ok(candidate)
     assert isinstance(candidate["assumptions"], list) and candidate["assumptions"]
     routes = candidate["routes"]

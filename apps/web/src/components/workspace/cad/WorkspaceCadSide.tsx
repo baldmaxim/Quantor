@@ -5,6 +5,7 @@ import { useState, type FC } from 'react';
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
 import { CadJobList } from '@/components/cad/CadJobList';
 import { CadMepPanel } from '@/components/cad/mep/CadMepPanel';
+import { CadRisersPanel } from '@/components/cad/risers/CadRisersPanel';
 import { CadResult } from '@/components/cad/CadResult';
 import { CadFilesSection } from '@/components/cad/viewer/CadFilesSection';
 import { CadLayersPanel } from '@/components/cad/viewer/CadLayersPanel';
@@ -228,7 +229,15 @@ export const WorkspaceCadSide: FC<
           ),
         },
         ...(view.mep
-          ? [{ id: 'mep', label: 'Трассы', content: <CadMepPanel {...view.mep} /> }]
+          ? [
+              { id: 'mep', label: 'Трассы', content: <CadMepPanel {...view.mep} /> },
+              // Реестр стояков по ИОС - вход построения трасс (ADR-0041), рядом с «Трассами».
+              {
+                id: 'risers',
+                label: 'Стояки',
+                content: <CadRisersPanel parent={view.mep.parent} />,
+              },
+            ]
           : []),
         ...(zonesTab ? [zonesTab] : []),
         ...(constructions

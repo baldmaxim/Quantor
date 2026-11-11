@@ -37,6 +37,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--floor-elevation-mm", type=int, default=None)
     p.add_argument("--floor-height-mm", type=int, default=None)
     p.add_argument("--approval-id", default=None)
+    p.add_argument("--risers", type=Path, default=None, help="реестр стояков cad_risers.v1")
     return p
 
 
@@ -54,6 +55,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         floor_elevation_mm=ns.floor_elevation_mm,
         floor_height_mm=ns.floor_height_mm,
         approval_id=ns.approval_id,
+        risers=ns.risers,
     )
     started = time.monotonic()
     try:

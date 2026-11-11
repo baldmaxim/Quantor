@@ -4,10 +4,14 @@
 окружение, новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
     <python> -I run_mep.py --pdf --page-index --view-dxf --scale --preview --params --out
-        --view-folder [--floor-elevation-mm] [--floor-height-mm]
+        --view-folder [--floor-elevation-mm] [--floor-height-mm] [--risers]
 
 Отметка пола и высота этажа в аргументы попадают только если их задал человек (запрос или
 пересчёт); иначе генератор определяет их по тексту документации.
+
+Реестр стояков листа (ADR-0041) лежит в задании списком `risers` с `risers_sha256`; обработчик
+пишет его файлом `in/risers.json` (канонический JSON контракта `cad_risers.v1`), сверяет sha256 и
+передаёт генератору `--risers`. Реестра нет - флага нет: стояки по подписям шахт АР.
 
 Коды выхода: 0 - готово; 2 - ошибка входа; 3 - трассы не построены (причина - одной строкой JSON
 `{"code", "message"}` в stderr). Общие части (аренда, загрузка, отказ задания) - из `handler`.
@@ -48,7 +52,7 @@ from app.models import CadDecision, CadRemark, DocumentRevision, Job
 from app.models.cad_decision import DECISION_VIEW_APPROVAL
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_progress
+from app.services import cad_progress, cad_risers
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
@@ -77,6 +81,7 @@ def _generator_argv(
     job: Job,
     folder: str,
     page_index: int,
+    risers: Path | None = None,
 ) -> list[str]:
     python, runner = settings.cad_engine_python.strip(), settings.cad_mep_runner.strip()
     if not (python and runner) or not (Path(python).is_file() and Path(runner).is_file()):
@@ -89,6 +94,8 @@ def _generator_argv(
         value = cad_mep_service.payload_int(job, key)
         if value is not None:
             manual += [flag, str(value)]
+    if risers is not None:
+        manual += ["--risers", str(risers)]
     return [
         python,
         "-I",
@@ -113,6 +120,30 @@ def _generator_argv(
         "--approval-id",
         str(job.payload["approval_id"]),
     ]
+
+
+def _write_risers(job: Job, target: Path) -> Path | None:
+    """Файл реестра стояков из задания; в задании нет реестра - `None`.
+
+    Содержимое пересчитывается из `risers` и сверяется с `risers_sha256`: расхождение - отказ,
+    генератор не получает файл, не совпадающий с тем, что видел человек.
+    """
+    risers = job.payload.get("risers")
+    if risers is None:
+        return None
+    expected = job.payload.get("risers_sha256")
+    if (
+        not isinstance(risers, list)
+        or not risers
+        or not all(isinstance(item, dict) for item in risers)
+        or not isinstance(expected, str)
+    ):
+        raise CadError(ErrorCode.CAD_PARAMS_INVALID, "реестр стояков в задании заполнен неверно")
+    data = cad_risers.registry_bytes(risers)
+    if hashlib.sha256(data).hexdigest() != expected:
+        raise CadError(ErrorCode.CAD_PARAMS_INVALID, "реестр стояков изменён: sha256 не совпал")
+    target.write_bytes(data)
+    return target
 
 
 async def _checked_input(session: AsyncSession, job: Job) -> _Input:
@@ -410,6 +441,7 @@ async def execute_cad_mep_route(
             raise CadError(ErrorCode.CAD_PARAMS_INVALID, "параметры или версия генератора изменены")
         params_file = attempt_dir / "in" / "params.json"
         params_file.write_bytes(raw_params)
+        risers_file = _write_risers(job, attempt_dir / "in" / "risers.json")
 
         out = attempt_dir / "out"
         outcome = await _run_while_owned(
@@ -426,6 +458,7 @@ async def execute_cad_mep_route(
                 job=job,
                 folder=source.folder,
                 page_index=source.page_index,
+                risers=risers_file,
             ),
             limit_seconds=float(settings.cad_total_timeout_seconds),
             poll_interval=settings.worker_heartbeat_interval_seconds,

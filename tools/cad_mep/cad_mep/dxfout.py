@@ -91,6 +91,17 @@ def write(
         radius = 60 if nd.layer == "M-RISER" else (90 if nd.kind == "meter" else 70)
         msp.add_circle((nd.xy[0] + sx, nd.xy[1] + sy, nd.z), radius, dxfattribs={"layer": nd.layer})
     text_h_apt, text_h_shaft = params.num("anno_height_apt_mm"), params.num("anno_height_shaft_mm")
+    for nd in res.nodes:  # подпись стояка по реестру: марка и диаметр, вдоль стояка
+        if nd.label:
+            msp.add_text(
+                nd.label,
+                height=text_h_shaft,
+                dxfattribs={
+                    "layer": ANNO_LAYER,
+                    "insert": (nd.xy[0] + sx + text_h_shaft, nd.xy[1] + sy, floor_mm),
+                    "rotation": 90,
+                },
+            )
     for ap in m.apts.values():
         pts = [m.comps[c].centroid for c in ap.comps]
         msp.add_text(

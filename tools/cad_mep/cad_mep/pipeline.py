@@ -14,6 +14,7 @@ from cad_mep import (
     dxfout,
     elevations,
     facade,
+    risers,
     rooms,
     route,
     topology,
@@ -44,6 +45,8 @@ class Args:
     floor_elevation_mm: int | None = None
     floor_height_mm: int | None = None
     approval_id: str | None = None
+    # реестр стояков cad_risers.v1 (None — стояки по подписям шахт АР)
+    risers: Path | None = None
 
 
 def sha256_file(path: Path) -> str:
@@ -66,6 +69,8 @@ def _validate(args: Args) -> None:
     for p, code in ((args.pdf, "pdf_unreadable"), (args.view_dxf, "dxf_unreadable")):
         if not p.is_file():
             raise MepError(code, f"нет файла {p.name}")
+    if args.risers is not None and not args.risers.is_file():
+        raise MepError("risers_unreadable", f"нет файла реестра стояков {args.risers.name}")
     if not args.view_folder or "/" in args.view_folder or ".." in args.view_folder:
         raise MepError("view_folder_invalid", "view-folder: ожидалось имя вида вида pNNN_vNN")
 
@@ -97,6 +102,7 @@ def _topology_issues(res: Result, topo: dict[str, object]) -> None:
 def generate(args: Args) -> dict[str, object]:
     """Строит три файла в <out>/views/<view-folder>/. Возвращает краткую сводку."""
     _validate(args)
+    registry = risers.load_risers(args.risers) if args.risers is not None else []
     plan = open_plan(
         args.pdf, args.page_index, args.view_dxf, args.scale, args.preview, args.params
     )
@@ -122,7 +128,15 @@ def generate(args: Args) -> dict[str, object]:
     piers = dxfin.hatch_polys(view_doc, set(params.texts("dxf_pier_layers")), (fx0, fy0))
     prof = facade.build_profile(model, model.walls | raster_polys(model.gr, piers), params)
     planner = Planner(
-        model, lab, doors, rg, params, float(floor_elevation), float(floor_height), prof
+        model,
+        lab,
+        doors,
+        rg,
+        params,
+        float(floor_elevation),
+        float(floor_height),
+        prof,
+        registry or None,
     )
     res = planner.run()
     res.issues[:0] = assigned
@@ -203,6 +217,7 @@ def generate(args: Args) -> dict[str, object]:
         args.view_folder,
         resolved.elevation,
         resolved.height,
+        sha256_file(args.risers) if args.risers is not None else None,
     )
     cand = candidate.build_candidate(
         prov,
@@ -217,6 +232,7 @@ def generate(args: Args) -> dict[str, object]:
         dxf_info,
         beams,
         topo,
+        risers.registry_json(registry) if registry else None,
     )
     _dump(folder / "preview.json", preview)
     _dump(folder / "candidate.json", cand)

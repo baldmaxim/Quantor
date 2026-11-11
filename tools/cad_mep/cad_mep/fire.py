@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from cad_mep import aup
 from cad_mep.result import NodeMark
+from cad_mep.risers import RiserEntry
 from cad_mep.rooms import Shaft
 from cad_mep.route import Tree, node_path, spt, tree_chains
 
@@ -17,6 +18,42 @@ if TYPE_CHECKING:
 def _names(row: dict[str, object]) -> list[object]:
     names = row.get("names")
     return list(names) if isinstance(names, list) and names else [f"помещение #{row['comp']}"]
+
+
+def aup_branch(
+    pl: Planner, sh: Shaft, node: int, tag: RiserEntry | None = None, slot: str | None = None
+) -> tuple[list[list[int]], list[dict[str, object]]]:
+    """Ветка АУП от узла node шахты sh: пути, линии, замечания; возвращает пути и покрытие.
+
+    tag и slot — стояк АУП из реестра (иначе стояк слоя, как по подписям шахт АР).
+    """
+    rg = pl.rg
+    aup_rooms = aup.regions(rg, pl.m, pl.expl, pl.p)
+    ap_paths = aup.extend(rg, node, aup_rooms, pl.p)
+    if ap_paths:
+        pl.riser(sh, "M-PT-AUP", tag, slot)
+        pl.leadin(sh, "M-PT-AUP", pl.z_ceil, node, slot)
+        pl.add_chains(
+            "M-PT-AUP",
+            tree_chains(rg, ap_paths, pl.simplify),
+            pl.z_ceil,
+            None,
+            pl.node_xy(node),
+            tips=True,
+        )
+    else:
+        pl.issue("fire_aup_no_ends", "АУП: внеквартирные помещения для ветки не найдены")
+    cover = aup.coverage(rg, aup_rooms, ap_paths, pl.p)
+    need = pl.p.num("aup_cover_min_share")
+    for row in cover:
+        share = row["covered_share"]
+        if isinstance(share, float) and share < need:
+            pl.issue(
+                "aup_coverage_low",
+                f"АУП: {', '.join(str(n) for n in _names(row))} — ветка покрывает "
+                f"{share * 100:.0f} % площади (нужно не меньше {need * 100:.0f} %)",
+            )
+    return ap_paths, cover
 
 
 def route(pl: Planner) -> None:
@@ -56,26 +93,7 @@ def route(pl: Planner) -> None:
     root = pl.node_xy(bn0)
     pl.add_chains("M-PT-VPV", tree_chains(rg, paths, pl.simplify), pl.z_ceil, None, root)
     # АУП: ветка от той же шахты до дальних точек каждого внеквартирного помещения
-    aup_rooms = aup.regions(rg, pl.m, pl.expl, pl.p)
-    ap_paths = aup.extend(rg, bn0, aup_rooms, pl.p)
-    if ap_paths:
-        pl.riser(best, "M-PT-AUP")
-        pl.leadin(best, "M-PT-AUP", pl.z_ceil, bn0)
-        pl.add_chains(
-            "M-PT-AUP", tree_chains(rg, ap_paths, pl.simplify), pl.z_ceil, None, root, tips=True
-        )
-    else:
-        pl.issue("fire_aup_no_ends", "АУП: внеквартирные помещения для ветки не найдены")
-    cover = aup.coverage(rg, aup_rooms, ap_paths, pl.p)
-    need = pl.p.num("aup_cover_min_share")
-    for row in cover:
-        share = row["covered_share"]
-        if isinstance(share, float) and share < need:
-            pl.issue(
-                "aup_coverage_low",
-                f"АУП: {', '.join(str(n) for n in _names(row))} — ветка покрывает "
-                f"{share * 100:.0f} % площади (нужно не меньше {need * 100:.0f} %)",
-            )
+    ap_paths, cover = aup_branch(pl, best, bn0)
     res.fire = {
         "source_shaft": best.id,
         "pk_count": len(pl.pk_nodes),
