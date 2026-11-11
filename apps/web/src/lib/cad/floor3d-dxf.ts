@@ -43,6 +43,16 @@ const jobFailureText = (job: JobRead): string => {
   return job.status === 'cancelled' ? 'Задание выгрузки отменено.' : 'Не удалось подготовить DXF.';
 };
 
+/** Адрес файла готового 3D DXF этажа: файл лежит у задания выгрузки `jobId`. */
+export const floor3dDxfUrl = (
+  projectId: string,
+  revisionId: string,
+  jobId: string,
+  pageIndex: number,
+  view: number,
+): string =>
+  cadArtifactUrl(projectId, revisionId, jobId, `${viewFolder(pageIndex, view)}/floor3d.dxf`);
+
 /**
  * `resetKey` - то, от чего зависит DXF (модель этажа): при смене результат сбрасывается и
  * следующее нажатие ставит задание заново.
@@ -114,12 +124,7 @@ export const useFloor3dDxf = (
   const url =
     readyJobId === null
       ? null
-      : cadArtifactUrl(
-          params.projectId,
-          params.revisionId,
-          readyJobId,
-          `${viewFolder(params.pageIndex, params.view)}/floor3d.dxf`,
-        );
+      : floor3dDxfUrl(params.projectId, params.revisionId, readyJobId, params.pageIndex, params.view);
 
   return { phase, url, fileName, error, readyJobId, start };
 };

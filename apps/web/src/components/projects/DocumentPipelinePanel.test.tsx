@@ -6,16 +6,28 @@ import type {
   DocumentRevisionRead,
 } from '@quantor/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ pipeline: vi.fn(), sheets: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  pipeline: vi.fn(),
+  sheets: vi.fn(),
+  retry: vi.fn(),
+  createJob: vi.fn(),
+  readJob: vi.fn(),
+  events: vi.fn(),
+}));
 
 vi.mock('@quantor/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof ApiClient>()),
   readCadPipeline: mocks.pipeline,
   listRevisionSheets: mocks.sheets,
+  retryCadJob: mocks.retry,
+  createCadJob: mocks.createJob,
+  readCadJob: mocks.readJob,
+  readCadEvents: mocks.events,
 }));
 
 import { DocumentPipelinePanel } from './DocumentPipelinePanel';
@@ -87,6 +99,10 @@ describe('панель обработки документа', () => {
   beforeEach(() => {
     mocks.pipeline.mockReset();
     mocks.sheets.mockReset();
+    mocks.retry.mockReset();
+    mocks.createJob.mockReset();
+    mocks.readJob.mockReset();
+    mocks.events.mockReset();
     mocks.sheets.mockResolvedValue({
       data: { items: [{ page_index: 0 }, { page_index: 2 }], total: 2 },
     });
@@ -281,5 +297,167 @@ describe('панель обработки документа', () => {
       within(failed).getByText('Движок CAD не выдал проверенный результат.'),
     ).toBeInTheDocument();
     expect(within(failed).queryByText(/3D DXF/)).not.toBeInTheDocument();
+  });
+  describe('управление листом', () => {
+    const failedConvert = stage({
+      job_id: 'job-f',
+      status: 'failed',
+      error_code: 'CAD_ENGINE_FAILED',
+      result_status: null,
+    });
+    const failedSheet = {
+      page_index: 1,
+      page_label: '2',
+      calibrated: true,
+      convert: failedConvert,
+      views: [],
+    };
+
+    it('шапка листа раскрывает и сворачивает шаги', async () => {
+      const user = userEvent.setup();
+      mocks.pipeline.mockResolvedValue({
+        data: pipelineWith([
+          { page_index: 0, page_label: '1', calibrated: true, convert: null, views: [] },
+        ]),
+      });
+      renderPanel(panel());
+
+      const sheet = (await screen.findByText('Лист 1')).closest('li') as HTMLElement;
+      const toggle = within(sheet).getByRole('button', { expanded: false });
+      expect(within(sheet).queryByRole('list', { name: 'Шаги листа' })).not.toBeInTheDocument();
+
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(within(sheet).getByRole('list', { name: 'Шаги листа' })).toBeInTheDocument();
+      // Не начатое преобразование: главная кнопка следующего шага и «Запустить» у шага.
+      expect(
+        within(sheet).getByRole('button', { name: 'Следующий шаг: CAD' }),
+      ).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Запустить' })).toBeInTheDocument();
+      // «Открыть» не переключает раскрытие.
+      await user.click(within(sheet).getByRole('link', { name: 'Открыть Лист 1 в CAD' }));
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+      await user.click(toggle);
+      expect(within(sheet).queryByRole('list', { name: 'Шаги листа' })).not.toBeInTheDocument();
+    });
+
+    it('не откалиброван: вместо запуска - переход к калибровке', async () => {
+      const user = userEvent.setup();
+      mocks.pipeline.mockResolvedValue({
+        data: pipelineWith([
+          { page_index: 0, page_label: '1', calibrated: false, convert: null, views: [] },
+        ]),
+      });
+      renderPanel(panel());
+
+      const sheet = (await screen.findByText('Лист 1')).closest('li') as HTMLElement;
+      await user.click(within(sheet).getByRole('button', { expanded: false }));
+      expect(within(sheet).getByRole('link', { name: 'Перейти: Калибровка' })).toHaveAttribute(
+        'href',
+        '/projects/p-1/workspace?revision=rev-1&page=1&tab=cad',
+      );
+      expect(within(sheet).getByRole('link', { name: 'Откалибровать' })).toBeInTheDocument();
+    });
+
+    it('упавший шаг: «Повторить» вызывает повтор задания, обновляет конвейер', async () => {
+      const user = userEvent.setup();
+      mocks.pipeline.mockResolvedValue({ data: pipelineWith([failedSheet]) });
+      mocks.retry.mockResolvedValue({ data: { job_id: 'job-f' } });
+      renderPanel(panel());
+
+      const sheet = (await screen.findByText('Лист 2')).closest('li') as HTMLElement;
+      await user.click(within(sheet).getByRole('button', { expanded: false }));
+      expect(within(sheet).getByRole('button', { name: 'Подробнее' })).toBeInTheDocument();
+
+      await user.click(within(sheet).getByRole('button', { name: 'Повторить' }));
+      await waitFor(() => expect(mocks.retry).toHaveBeenCalledTimes(1));
+      expect(mocks.retry.mock.calls[0]?.[0]).toMatchObject({
+        path: { project_id: 'p-1', revision_id: 'rev-1', job_id: 'job-f' },
+      });
+      // Конвейер перечитан после запуска.
+      await waitFor(() => expect(mocks.pipeline.mock.calls.length).toBeGreaterThan(1));
+    });
+
+    it('отказ запуска показан под шагом', async () => {
+      const user = userEvent.setup();
+      mocks.pipeline.mockResolvedValue({ data: pipelineWith([failedSheet]) });
+      mocks.retry.mockRejectedValue({ detail: { code: 'JOB_NOT_RETRYABLE' } });
+      renderPanel(panel());
+
+      const sheet = (await screen.findByText('Лист 2')).closest('li') as HTMLElement;
+      await user.click(within(sheet).getByRole('button', { expanded: false }));
+      await user.click(within(sheet).getByRole('button', { name: 'Повторить' }));
+
+      expect(await within(sheet).findByRole('alert')).toHaveTextContent(
+        'Этот отказ повтором не чинится.',
+      );
+    });
+
+    it('«Подробнее» грузит задание только по нажатию и показывает код, задание и события', async () => {
+      const user = userEvent.setup();
+      mocks.pipeline.mockResolvedValue({ data: pipelineWith([failedSheet]) });
+      mocks.readJob.mockResolvedValue({
+        data: {
+          job_id: 'job-f',
+          revision_id: 'rev-1',
+          attempt: 1,
+          status: 'failed',
+          stage: 'convert',
+          error_code: 'CAD_ENGINE_FAILED',
+          error_message: 'engine exited with code 3',
+          finished_at: '2026-11-11T10:01:00Z',
+        },
+      });
+      mocks.events.mockResolvedValue({
+        data: {
+          job_id: 'job-f',
+          attempt: 1,
+          last_seq: 1,
+          finished: true,
+          events: [
+            { seq: 1, attempt: 1, at: '2026-11-11T10:00:30Z', scope: 'document', status: 'error', detail: 'сбой движка' },
+          ],
+        },
+      });
+      renderPanel(panel());
+
+      const sheet = (await screen.findByText('Лист 2')).closest('li') as HTMLElement;
+      await user.click(within(sheet).getByRole('button', { expanded: false }));
+      expect(mocks.readJob).not.toHaveBeenCalled();
+
+      await user.click(within(sheet).getByRole('button', { name: 'Подробнее' }));
+      expect(await within(sheet).findByText('engine exited with code 3')).toBeInTheDocument();
+      expect(within(sheet).getAllByText('CAD_ENGINE_FAILED').length).toBeGreaterThan(0);
+      expect(within(sheet).getByText('job-f')).toBeInTheDocument();
+      expect(await within(sheet).findByText(/сбой движка/)).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Копировать' })).toBeInTheDocument();
+    });
+
+    it('«Преобразовать заново» у готового CAD - только после подтверждения', async () => {
+      const user = userEvent.setup();
+      mocks.pipeline.mockResolvedValue({
+        data: pipelineWith([
+          { page_index: 0, page_label: '1', calibrated: true, convert: stage(), views: [] },
+        ]),
+      });
+      mocks.createJob.mockResolvedValue({
+        data: { job_id: 'job-new', requested_pages: [0] },
+      });
+      renderPanel(panel());
+
+      const sheet = (await screen.findByText('Лист 1')).closest('li') as HTMLElement;
+      await user.click(within(sheet).getByRole('button', { expanded: false }));
+      await user.click(within(sheet).getByRole('button', { name: 'Преобразовать заново' }));
+      expect(mocks.createJob).not.toHaveBeenCalled();
+
+      const dialog = await screen.findByRole('dialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Преобразовать заново' }));
+      await waitFor(() => expect(mocks.createJob).toHaveBeenCalledTimes(1));
+      expect(mocks.createJob.mock.calls[0]?.[0]).toMatchObject({
+        path: { project_id: 'p-1', revision_id: 'rev-1' },
+        body: { pages: [0] },
+      });
+    });
   });
 });

@@ -61,8 +61,8 @@ export const PIPELINE_STEP_LABELS: Readonly<Record<PipelineStepKey, string>> = {
   floor3d: '3D DXF',
 };
 
-const VIEW_KEYS = ['walls', 'zones', 'approval', 'routes', 'floor3d'] as const;
-type ViewStepKey = (typeof VIEW_KEYS)[number];
+export const VIEW_KEYS = ['walls', 'zones', 'approval', 'routes', 'floor3d'] as const;
+export type ViewStepKey = (typeof VIEW_KEYS)[number];
 
 const RESULT_NO_CAD = 'no_cad_review_required';
 const RESULT_ZONES_SKIPPED = 'zones_skipped_existing';
@@ -166,7 +166,8 @@ const floor3dStep = (view: CadPipelineViewRead): IPipelineStep => {
   return make('floor3d', view.routes_accepted ? 'todo' : 'blocked');
 };
 
-const viewSteps = (view: CadPipelineViewRead): Record<ViewStepKey, IPipelineStep> => {
+/** Шаги одного вида (для управления конвейером по видам). */
+export const viewSteps = (view: CadPipelineViewRead): Record<ViewStepKey, IPipelineStep> => {
   const walls = stageStep('walls', view.walls);
   const zones = zonesStep(view);
   return {
@@ -178,7 +179,7 @@ const viewSteps = (view: CadPipelineViewRead): Record<ViewStepKey, IPipelineStep
   };
 };
 
-const convertStep = (sheet: CadPipelineSheetRead): IPipelineStep => {
+export const convertStep = (sheet: CadPipelineSheetRead): IPipelineStep => {
   const stage = sheet.convert;
   if (stage === null) return make('convert', sheet.calibrated ? 'todo' : 'blocked');
   const step = stageStep('convert', stage);

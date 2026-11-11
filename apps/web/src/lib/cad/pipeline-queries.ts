@@ -1,6 +1,6 @@
 'use client';
 
-import { readCadPipeline, type CadPipelineRead } from '@quantor/api-client';
+import { readCadPipeline, readJob, type CadPipelineRead, type JobRead } from '@quantor/api-client';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/queries';
@@ -44,4 +44,25 @@ export const useCadPipeline = (
     },
     staleTime: (query) => (pipelineHasActive(query.state.data) ? 0 : SETTLED_STALE_MS),
     refetchInterval: (query) => (pipelineHasActive(query.state.data) ? CAD_PIPELINE_POLL_MS : false),
+  });
+
+/**
+ * Общее чтение задания этапа (`GET /jobs/{id}`): подходит любому типу задания конвейера, в том
+ * числе конструкциям, зонам и 3D DXF, которых нет в CAD-маршрутах заданий. Грузится только по
+ * `enabled` (подробности отказа открыты).
+ */
+export const useCadStageJob = (
+  projectId: string,
+  revisionId: string,
+  jobId: string,
+  enabled: boolean,
+): UseQueryResult<JobRead> =>
+  useQuery({
+    queryKey: ['cad', projectId, revisionId, 'stage-job', jobId] as const,
+    enabled,
+    queryFn: async () => {
+      const job = unwrap(await readJob({ throwOnError: true, path: { job_id: jobId } }));
+      if (job.id !== jobId) throw new Error('Ответ не относится к выбранному заданию');
+      return job;
+    },
   });

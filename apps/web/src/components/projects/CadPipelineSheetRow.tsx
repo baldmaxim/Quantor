@@ -1,8 +1,9 @@
 import type { CadPipelineSheetRead } from '@quantor/api-client';
-import type { FC } from 'react';
+import { useId, useState, type FC } from 'react';
 
 import { PipelineStepper } from '@/components/cad/pipeline/PipelineStepper';
-import { type BadgeTone, ButtonLink, StatusBadge } from '@/components/ui';
+import { type BadgeTone, ButtonLink, cx, StatusBadge } from '@/components/ui';
+import { IconChevronRight } from '@/components/ui/icons';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import {
   sheetProgress,
@@ -12,9 +13,12 @@ import {
 } from '@/lib/cad/pipeline';
 import { workspaceCadHref } from '@/lib/cad/workspace-url';
 
+import { CadPipelineSheetControls } from './CadPipelineSheetControls';
+
 /**
  * Лист в панели «Обработка»: итог одной строкой, дорожка шагов конвейера и переход в рабочую
- * область на вкладку CAD. Необязательный 3D DXF в дорожку не входит и показан отдельной меткой.
+ * область на вкладку CAD. Нажатие на шапку раскрывает управление шагами (запуск, повтор, причина
+ * отказа). Необязательный 3D DXF в дорожку не входит и показан отдельной меткой.
  */
 
 export interface ICadPipelineSheetRowProps {
@@ -37,6 +41,8 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   sheet,
   position,
 }) => {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
   const steps = sheetSteps(sheet);
   const summary = sheetSummary(sheet);
   const progress = sheetProgress(sheet);
@@ -48,6 +54,8 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   const floorTitle = formatFloorTitle(sheet.floor_title, '');
   const name = floorTitle || sheetName;
 
+  const toggle = () => setOpen((value) => !value);
+
   const href = workspaceCadHref(projectId, {
     revision: revisionId,
     position,
@@ -58,24 +66,38 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   return (
     <li className="flex flex-col gap-[var(--s-3)] border-b border-border py-[var(--s-4)] last:border-b-0">
       <div className="flex items-center gap-[var(--s-4)]">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
-          <span
-            className="text-sm font-medium [overflow-wrap:anywhere]"
-            title={formatFloorTitleFull(sheet.floor_title) ?? undefined}
-          >
-            {name}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={toggle}
+          className="flex min-h-[44px] min-w-0 flex-1 items-center gap-[var(--s-3)] text-left"
+        >
+          <IconChevronRight
+            className={cx(
+              'flex-none text-muted transition-transform duration-150 motion-reduce:transition-none',
+              open && 'rotate-90',
+            )}
+          />
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
+            <span
+              className="text-sm font-medium [overflow-wrap:anywhere]"
+              title={formatFloorTitleFull(sheet.floor_title) ?? undefined}
+            >
+              {name}
+            </span>
+            {floorTitle && <span className="text-xs text-muted">{sheetName}</span>}
+            <StatusBadge tone={summary.tone} wrap>
+              {summary.label}
+            </StatusBadge>
+            <span
+              className="font-mono text-xs text-muted"
+              title="Завершено основных шагов конвейера"
+            >
+              {`${progress.done} из ${progress.total}`}
+            </span>
           </span>
-          {floorTitle && <span className="text-xs text-muted">{sheetName}</span>}
-          <StatusBadge tone={summary.tone} wrap>
-            {summary.label}
-          </StatusBadge>
-          <span
-            className="font-mono text-xs text-muted"
-            title="Завершено основных шагов конвейера"
-          >
-            {`${progress.done} из ${progress.total}`}
-          </span>
-        </div>
+        </button>
         <ButtonLink
           href={href}
           compact
@@ -87,7 +109,10 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
         </ButtonLink>
       </div>
 
-      <PipelineStepper steps={steps} />
+      {/* Щелчок по дорожке тоже раскрывает лист; с клавиатуры - кнопка шапки. */}
+      <div onClick={toggle}>
+        <PipelineStepper steps={steps} />
+      </div>
 
       {(failed?.detail || floor3dBadge) && (
         <div className="flex flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
@@ -99,6 +124,17 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
           )}
         </div>
       )}
+
+      <div id={panelId}>
+        {open && (
+          <CadPipelineSheetControls
+            projectId={projectId}
+            revisionId={revisionId}
+            sheet={sheet}
+            position={position}
+          />
+        )}
+      </div>
     </li>
   );
 };
