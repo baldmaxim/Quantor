@@ -48,7 +48,7 @@ import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
 import { useCadJobs } from '@/lib/cad/queries';
-import { latestSheetJobs } from '@/lib/cad/sheet-results';
+import { latestSheetJobs, type ISheetResult } from '@/lib/cad/sheet-results';
 import { regionsVisible } from '@/lib/cad/workspace-cad';
 import { parseWorkspaceJob } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
@@ -88,6 +88,10 @@ import { useWorkspaceStore, type LeftTab } from '@/store/workspace';
 interface IPageProps {
   params: Promise<{ projectId: string }>;
 }
+
+/** Ярлык «CAD» в списке листов: только готовый DXF, результат «только диагностика» не в счёт. */
+const isReadyDxf = (result: ISheetResult | undefined): boolean =>
+  result?.kind === 'recognized' && result.dxf;
 
 const leftTabs = (
   takeoff: ITakeoffAccess,
@@ -721,7 +725,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       index: item.page_index,
                       label: item.page_label,
                       regionCount: item.region_count,
-                      cad: cadResults.get(item.page_index)?.kind === 'recognized',
+                      cad: isReadyDxf(cadResults.get(item.page_index)),
                     }))}
                     activeIndex={pageIndex}
                     onSelect={goToPage}
