@@ -16,6 +16,8 @@ from typing import BinaryIO
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select, update
+from sqlalchemy import text as sql_text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -26,6 +28,8 @@ from app.services import jobs as jobs_service
 from app.services import sheet_passports as passports_service
 from app.services.consistency.passport_process import REASON_FAILED, PassportParseError
 from app.services.consistency.sheet_passport import (
+    EvidenceSource,
+    FieldEvidence,
     PageInput,
     PassportCandidate,
     extract_pdf_pages,
@@ -621,3 +625,97 @@ async def test_rerun_skips_revision_parsed_by_current_parser(
         third = await _extract(api, db_session, fake_storage, project_id)
         assert third.payload["files_already_parsed"] == 1
         assert third.payload["files_parsed"] == 1 and third.payload["updated"] == 2
+
+
+async def test_upsert_strips_nul_from_text_fields_evidence_and_file_name(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    """PostgreSQL не принимает 0x00: запись чистит поля, свидетельства и имя файла."""
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        revision = await _add_pdf(db_session, fake_storage, project_id, PLAN_PDF)
+    candidate = PassportCandidate(
+        page_index=0,
+        title="План\x00 этажа",
+        code="ПД-00000001\x00-АР1",
+        evidence={"title": FieldEvidence(EvidenceSource.TITLE, "План\x00 этажа")},
+    )
+    created, _, _ = await passports_service._upsert_candidates(
+        db_session,
+        project_id=uuid.UUID(project_id),
+        revision_id=revision.id,
+        file_name="Фа\x00йл.pdf",
+        candidates=[candidate],
+    )
+    await db_session.commit()
+    assert created == 1
+    row = (
+        await db_session.scalars(
+            select(SheetPassport).where(SheetPassport.revision_id == revision.id)
+        )
+    ).one()
+    assert row.title == "План этажа"
+    assert row.code == "ПД-00000001-АР1"
+    assert row.file_name == "Файл.pdf"
+    assert row.evidence["title"]["snippet"] == "План этажа"
+
+
+@pytest.mark.parametrize("real_db_error", [False, True])
+async def test_db_failure_on_one_file_goes_to_errors_and_job_continues(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+    monkeypatch: pytest.MonkeyPatch,
+    real_db_error: bool,
+) -> None:
+    """Отказ базы на файле откатывает только его точку сохранения, остальные файлы пишутся."""
+    original = passports_service._upsert_candidates
+
+    async def failing(
+        session: AsyncSession,
+        *,
+        project_id: uuid.UUID,
+        revision_id: uuid.UUID,
+        file_name: str,
+        candidates: list[PassportCandidate],
+    ) -> tuple[int, int, int]:
+        if file_name != PLAN_PDF:
+            return await original(
+                session,
+                project_id=project_id,
+                revision_id=revision_id,
+                file_name=file_name,
+                candidates=candidates,
+            )
+        if real_db_error:
+            # Строки файла уже в сессии, затем настоящий отказ базы: откат точки сохранения
+            # должен убрать и их.
+            await original(
+                session,
+                project_id=project_id,
+                revision_id=revision_id,
+                file_name=file_name,
+                candidates=candidates,
+            )
+            await session.execute(sql_text("select 1/0"))
+        raise DBAPIError("insert into sheet_passports", {}, Exception("boom"))
+
+    monkeypatch.setattr(passports_service, "_upsert_candidates", failing)
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        await _add_pdf(db_session, fake_storage, project_id, PLAN_PDF)
+        await _add_pdf(db_session, fake_storage, project_id, SCHEME_PDF)
+        job = await _extract(api, db_session, fake_storage, project_id)
+
+        assert job.status is JobStatus.SUCCEEDED
+        assert job.payload["files_total"] == 2
+        assert job.payload["files_parsed"] == 1
+        assert job.payload["pages"] == 1 and job.payload["created"] == 1
+        assert job.payload["error_count"] == 1
+        assert job.payload["errors"] == [{"file_name": PLAN_PDF, "reason": "ParseStoreFailed"}]
+        listing = (await api.get(_url(project_id))).json()
+        assert [item["file_name"] for item in listing["items"]] == [SCHEME_PDF]

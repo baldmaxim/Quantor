@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contracts.sheet_passports import (
@@ -84,9 +85,14 @@ async def schedule_extract(session: AsyncSession, *, project: Project) -> Job:
 # --------------------------------------------------------------------------- исполнитель
 
 
+def _no_nul(text: str) -> str:
+    """PostgreSQL не принимает 0x00 ни в text, ни в jsonb."""
+    return text.replace("\x00", "")
+
+
 def _evidence_to_json(candidate: PassportCandidate) -> dict[str, dict[str, str]]:
     return {
-        name: {"source": item.source.value, "snippet": item.snippet}
+        name: {"source": item.source.value, "snippet": _no_nul(item.snippet)}
         for name, item in candidate.evidence.items()
     }
 
@@ -94,7 +100,8 @@ def _evidence_to_json(candidate: PassportCandidate) -> dict[str, dict[str, str]]
 def _field_value(candidate: PassportCandidate, name: str) -> object:
     value = getattr(candidate, name)
     # SheetKind - StrEnum, в базу идёт значением.
-    return value.value if hasattr(value, "value") else value
+    value = value.value if hasattr(value, "value") else value
+    return _no_nul(value) if isinstance(value, str) else value
 
 
 def _fill_row(row: SheetPassport, candidate: PassportCandidate, file_name: str) -> None:
@@ -111,7 +118,7 @@ def _fill_row(row: SheetPassport, candidate: PassportCandidate, file_name: str) 
         else:
             evidence.pop(name, None)
     row.evidence = evidence
-    row.file_name = file_name
+    row.file_name = _no_nul(file_name)
     row.versions = dictionary_versions()
 
 
@@ -250,13 +257,27 @@ async def execute_sheet_passport_extract(
             log.warning("sheet_passport_file_failed", job_id=str(job.id), reason=reason)
         else:
             reason = ""
-            made, changed, left = await _upsert_candidates(
-                session,
-                project_id=project_id,
-                revision_id=revision_id,
-                file_name=file_name,
-                candidates=candidates,
-            )
+            try:
+                # Своя точка сохранения: отказ базы на одном файле не валит задание целиком.
+                async with session.begin_nested():
+                    made, changed, left = await _upsert_candidates(
+                        session,
+                        project_id=project_id,
+                        revision_id=revision_id,
+                        file_name=file_name,
+                        candidates=candidates,
+                    )
+            except DBAPIError as error:
+                reason = "ParseStoreFailed"
+                log.warning(
+                    "sheet_passport_file_failed",
+                    job_id=str(job.id),
+                    reason=reason,
+                    db_error=type(error.orig).__name__,
+                )
+                made = changed = left = 0
+                candidates = []
+        if not reason:
             files += 1
             pages += len(candidates)
             created += made
