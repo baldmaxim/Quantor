@@ -28,6 +28,8 @@ from app.contracts.cad_constructions import (
 SLAB_SOURCE_REF_MAX = 200
 HOLE_KEY_MAX = 32
 
+CadLintelMaterial = Literal["monolith", "masonry", "frame_partition"]
+
 # --------------------------------------------------------------------------- walls.json
 
 
@@ -63,6 +65,8 @@ class WallsOpeningExtras(BaseModel):
     lintel: list[list[float]] | None = None
     # Полотно двери (cad_walls v1.4): нет у безымянных разрывов, дверей без разрыва и старых файлов.
     leaf: list[list[float]] | None = None
+    # Материал перемычки (движок): нет у старых файлов и при неопределённом материале.
+    lintel_material: CadLintelMaterial | None = None
 
 
 class WallsFloorExtras(BaseModel):
@@ -138,6 +142,8 @@ class CadFloor3dLintelRead(BaseModel):
     door_height_mm: int
     # `manual` — зона двери человека; иначе источник действующей высоты двери листа.
     door_height_source: CadValueSource | None
+    # Материал перемычки из walls.json; `None` — не определён или файл старый.
+    material: CadLintelMaterial | None = None
 
 
 class CadFloor3dDoorRead(BaseModel):

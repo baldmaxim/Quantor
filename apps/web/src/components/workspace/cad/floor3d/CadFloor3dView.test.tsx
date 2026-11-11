@@ -160,6 +160,7 @@ describe('3D-вид этажа', () => {
     );
     vi.mocked(client.putCadFloor3dHole).mockImplementation(() => ok(floor3dFixture()) as never);
     mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Высоты и отверстия плиты' }));
     const toggle = await screen.findByRole('button', { name: /Отверстия плиты \(3\)/ });
     expect(toggle).toHaveTextContent('отверстий 1, не отверстий 1');
     fireEvent.click(toggle);
@@ -239,5 +240,36 @@ describe('3D-вид этажа', () => {
     mount();
     await screen.findByTestId('floor3d-heights');
     expect(screen.queryByTestId('floor3d-title')).toBeNull();
+  });
+
+  it('высоты и отверстия - в поповере кнопки (i): закрыт по умолчанию, Esc, щелчок вне и повторное нажатие закрывают', async () => {
+    vi.mocked(client.readCadFloor3D).mockImplementation(() => ok(floor3dFixture()) as never);
+    mount();
+    const toggle = await screen.findByRole('button', { name: 'Высоты и отверстия плиты' });
+    expect(screen.queryByRole('complementary', { name: 'Высоты этажа' })).toBeNull();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('dialog', { name: 'Высоты и отверстия плиты' })).toBeNull();
+
+    fireEvent.click(toggle);
+    const panel = screen.getByRole('dialog', { name: 'Высоты и отверстия плиты' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(panel).getByTestId('floor3d-heights')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Редактировать' })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Высоты и отверстия плиты' })).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole('dialog', { name: 'Высоты и отверстия плиты' })).toBeInTheDocument();
+    fireEvent.pointerDown(within(panel).getByTestId('floor3d-heights'));
+    expect(screen.getByRole('dialog', { name: 'Высоты и отверстия плиты' })).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByTestId('canvas'));
+    expect(screen.queryByRole('dialog', { name: 'Высоты и отверстия плиты' })).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole('dialog', { name: 'Высоты и отверстия плиты' })).toBeInTheDocument();
+    fireEvent.pointerDown(toggle);
+    fireEvent.click(toggle);
+    expect(screen.queryByRole('dialog', { name: 'Высоты и отверстия плиты' })).toBeNull();
   });
 });
