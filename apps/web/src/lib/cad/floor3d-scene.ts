@@ -8,8 +8,8 @@ import { itemAtTriangle } from './floor3d-geometry';
  * Сцена 3D-вида этажа (ADR-0039): three.js-объекты по плану из `floor3d-geometry`. Модуль грузится
  * только вместе с видом «3D»: `three` не попадает в общий чанк маршрута.
  *
- * Меши и клик. Призмы одной категории сливаются в один меш (плита, кладка, монолит, перемычки -
- * четыре вызова отрисовки вместо сотен). Соответствие «треугольник -> элемент» хранится в
+ * Меши и клик. Призмы одной категории сливаются в один меш (плита, кладка, монолит, перемычки,
+ * двери - пять вызовов отрисовки вместо сотен). Соответствие «треугольник -> элемент» хранится в
  * `userData.pick`: у каждой призмы свой диапазон треугольников, клик находит элемент бинарным
  * поиском по номеру грани. Отдельных мешей на конструкцию нет - размер модели на скорость не влияет.
  */
@@ -20,6 +20,7 @@ export interface IFloor3dColors {
   readonly masonry: string;
   readonly monolith: string;
   readonly lintel: string;
+  readonly door: string;
   readonly candidate: string;
   readonly enabled: string;
   readonly edge: string;
@@ -31,6 +32,9 @@ export interface IFloor3dColors {
 
 const FALLBACK_COLOR = 'gray';
 
+/** Полотно двери слегка прозрачно: за ним видна планировка. */
+const DOOR_OPACITY = 0.8;
+
 export const readFloor3dColors = (): IFloor3dColors => {
   if (typeof document === 'undefined') {
     return {
@@ -38,6 +42,7 @@ export const readFloor3dColors = (): IFloor3dColors => {
       masonry: FALLBACK_COLOR,
       monolith: FALLBACK_COLOR,
       lintel: FALLBACK_COLOR,
+      door: FALLBACK_COLOR,
       candidate: FALLBACK_COLOR,
       enabled: FALLBACK_COLOR,
       edge: FALLBACK_COLOR,
@@ -52,6 +57,7 @@ export const readFloor3dColors = (): IFloor3dColors => {
     masonry: token('--cad-construction-masonry'),
     monolith: token('--cad-construction-monolith'),
     lintel: token('--cad-construction-check'),
+    door: token('--cad-layer-6'),
     candidate: token('--danger'),
     enabled: token('--success'),
     edge: token('--text'),
@@ -170,8 +176,13 @@ export const buildFloor3dScene = (
     return item;
   };
 
-  const solid = (color: string) =>
-    track(new THREE.MeshLambertMaterial({ color: new THREE.Color(color) }));
+  const solid = (color: string, opacity = 1) =>
+    track(
+      new THREE.MeshLambertMaterial({
+        color: new THREE.Color(color),
+        ...(opacity < 1 ? { transparent: true, opacity } : {}),
+      }),
+    );
   const edgeMaterial = track(
     new THREE.LineBasicMaterial({ color: new THREE.Color(colors.edge), transparent: true, opacity: 0.35 }),
   );
@@ -181,6 +192,7 @@ export const buildFloor3dScene = (
     { category: 'masonry', color: colors.masonry },
     { category: 'monolith', color: colors.monolith },
     { category: 'lintel', color: colors.lintel },
+    { category: 'door', color: colors.door },
   ];
   for (const { category, color } of categories) {
     const merged = mergeItems(
@@ -192,7 +204,7 @@ export const buildFloor3dScene = (
     );
     if (merged === null) continue;
     track(merged.geometry);
-    const mesh = new THREE.Mesh(merged.geometry, solid(color));
+    const mesh = new THREE.Mesh(merged.geometry, solid(color, category === 'door' ? DOOR_OPACITY : 1));
     mesh.userData.pick = merged.pick;
     group.add(mesh);
     pickables.push(mesh);

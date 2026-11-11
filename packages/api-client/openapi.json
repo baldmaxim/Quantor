@@ -2963,6 +2963,16 @@
             "title": "Slab Holes",
             "type": "array"
           },
+          "title": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadSheetFloorTitle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "units": {
             "const": "mm",
             "title": "Units",
@@ -4375,6 +4385,16 @@
               }
             ]
           },
+          "floor_title": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadSheetFloorTitle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "page_index": {
             "title": "Page Index",
             "type": "integer"
@@ -5710,6 +5730,53 @@
           "context_crop_pt"
         ],
         "title": "CadScaleRead",
+        "type": "object"
+      },
+      "CadSheetFloorTitle": {
+        "description": "Заголовок плана листа из текста PDF: корпус, секция, этажи (cad_walls v1.5).\n\nОдин тип и для разбора `walls.json` (этажи там числа), и для ответов API (этажи строками).",
+        "properties": {
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "floors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Floors",
+            "type": "array"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "title": "CadSheetFloorTitle",
         "type": "object"
       },
       "CadSheetLevelsRead": {

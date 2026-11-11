@@ -9,6 +9,7 @@ import { unwrap } from '@/lib/queries';
 
 import { cadArtifactUrl } from './artifacts';
 import { cadErrorText } from './errors';
+import { floorTitleFileName, type FloorTitleLike } from './floor-title';
 import { WALLS_POLL_MS } from './constructions-queries';
 import { viewFolder } from './mep-candidate';
 import type { ICadViewParams } from './view-queries';
@@ -46,7 +47,11 @@ const jobFailureText = (job: JobRead): string => {
  * `resetKey` - то, от чего зависит DXF (модель этажа): при смене результат сбрасывается и
  * следующее нажатие ставит задание заново.
  */
-export const useFloor3dDxf = (params: ICadViewParams, resetKey: unknown): IFloor3dDxf => {
+export const useFloor3dDxf = (
+  params: ICadViewParams,
+  resetKey: unknown,
+  title?: FloorTitleLike,
+): IFloor3dDxf => {
   // Результат привязан к модели, для которой поставлено задание: у новой модели он не виден.
   const [result, setResult] = useState<{
     readonly key: unknown;
@@ -84,7 +89,9 @@ export const useFloor3dDxf = (params: ICadViewParams, resetKey: unknown): IFloor
   });
 
   const status = poll.data?.status ?? posted?.status;
-  const fileName = `floor3d_p${params.pageIndex + 1}_v${params.view}.dxf`;
+  // Имя по этажу (`floor3d_K9_S3_14.dxf`); заголовка нет - по номеру листа и виду.
+  const fileName =
+    floorTitleFileName(title) ?? `floor3d_p${params.pageIndex + 1}_v${params.view}.dxf`;
 
   let phase: Floor3dDxfPhase = 'idle';
   let error: string | null = null;

@@ -52,3 +52,26 @@ def test_heights_in_walls_document(tmp_path: Path) -> None:
     out = synth.run(tmp_path, doc, pdf=pdf, page=1)
     heights = cast(dict[str, object], out["heights"])
     assert heights["floor_elevation_mm"] == 50900
+
+
+def test_title_filled_with_corps_section_floors(tmp_path: Path) -> None:
+    pdf = synth.make_pdf(tmp_path / "t.pdf", TITLES)
+    title = cast(dict[str, object], resolve_heights(pdf, 0, load_params())["title"])
+    assert title["corps"] == "9"
+    assert title["section"] == "3"
+    assert title["floors"] == [14]
+    assert "План 14 этажа" in str(title["text"])
+
+
+def test_title_filled_without_elevation(tmp_path: Path) -> None:
+    pdf = synth.make_pdf(tmp_path / "t2.pdf", ["Корпус 9. Секция 3. План 14 этажа"])
+    h = resolve_heights(pdf, 0, load_params())
+    assert h["elevation_status"] == "missing"
+    title = cast(dict[str, object], h["title"])
+    assert (title["corps"], title["section"], title["floors"]) == ("9", "3", [14])
+
+
+def test_title_null_without_plan_title_or_pdf(tmp_path: Path) -> None:
+    assert resolve_heights(None, None, load_params())["title"] is None
+    pdf = synth.make_pdf(tmp_path / "t3.pdf", ["Общие данные"])
+    assert resolve_heights(pdf, 0, load_params())["title"] is None

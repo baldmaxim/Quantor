@@ -54,6 +54,7 @@ export const pipelineOfSheet = (
   overrides: Partial<IWorkspaceCadPipeline> = {},
 ): IWorkspaceCadPipeline => ({
   sheet,
+  sheets: sheet ? [sheet] : [],
   steps: sheet
     ? sheetSteps(sheet)
     : sheetSteps({ page_index: 2, page_label: null, calibrated: false, convert: null, views: [] }),

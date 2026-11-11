@@ -466,3 +466,18 @@ def test_room_zones_use_the_same_frame_as_door_zones() -> None:
         )
         == []
     )
+
+
+# ------------------------------------------------------------------ заголовок плана v1.5
+
+
+def test_model_carries_plan_title_from_walls_json() -> None:
+    title = {"corps": "9", "section": "3", "floors": [15], "text": "Корпус 9. Секция 3. План 15"}
+    model = build(heights_patch={"title": title})
+    assert model.title is not None
+    assert (model.title.corps, model.title.section, model.title.floors) == ("9", "3", ["15"])
+
+
+def test_model_without_plan_title_has_none() -> None:
+    assert build().title is None
+    assert build(heights_patch={"title": None}).title is None

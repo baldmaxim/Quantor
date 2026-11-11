@@ -323,6 +323,12 @@ async def execute_cad_walls(
         "dxf_sha256": document.dxf_sha256,
         "walls_sha256": files[0]["sha256"],
         "zones_count": job.payload.get("zones_count", 0),
+        # Заголовок плана для подписей листов: конвейер читает его из итога задания, не из файла.
+        "floor_title": (
+            None
+            if document.heights.title is None
+            else document.heights.title.model_dump(mode="json")
+        ),
         "input_sha256": revision.source_sha256,
         "parent_job_id": str(source.parent.id),
         "page_index": source.page_index,

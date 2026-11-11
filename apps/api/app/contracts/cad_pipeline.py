@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.contracts.cad_constructions import CadSheetFloorTitle
 from app.domain import JobStatus
 
 
@@ -46,6 +47,9 @@ class CadPipelineSheetRead(BaseModel):
     page_label: str | None
     # Есть действующая калибровка листа.
     calibrated: bool
+    # Заголовок плана (корпус, секция, этаж) из последнего успешного `cad_walls` листа;
+    # конструкций нет, заголовок не найден или задание старше cad_walls v1.5 — `null`.
+    floor_title: CadSheetFloorTitle | None = None
     # Последнее задание `cad_pdf_convert`, в котором есть этот лист.
     convert: CadPipelineStageRead | None
     views: list[CadPipelineViewRead]

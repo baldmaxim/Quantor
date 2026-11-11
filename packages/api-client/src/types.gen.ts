@@ -1493,6 +1493,7 @@ export type CadFloor3dRead = {
      * Slab Holes
      */
     slab_holes: Array<CadFloor3dHoleRead>;
+    title?: CadSheetFloorTitle | null;
     /**
      * Units
      */
@@ -2122,6 +2123,7 @@ export type CadPipelineSheetRead = {
      */
     calibrated: boolean;
     convert: CadPipelineStageRead | null;
+    floor_title?: CadSheetFloorTitle | null;
     /**
      * Page Index
      */
@@ -2794,6 +2796,32 @@ export type CadScaleRead = {
      * Unassociated Numeric Labels
      */
     unassociated_numeric_labels: number;
+};
+
+/**
+ * CadSheetFloorTitle
+ *
+ * Заголовок плана листа из текста PDF: корпус, секция, этажи (cad_walls v1.5).
+ *
+ * Один тип и для разбора `walls.json` (этажи там числа), и для ответов API (этажи строками).
+ */
+export type CadSheetFloorTitle = {
+    /**
+     * Corps
+     */
+    corps?: string | null;
+    /**
+     * Floors
+     */
+    floors?: Array<string>;
+    /**
+     * Section
+     */
+    section?: string | null;
+    /**
+     * Text
+     */
+    text?: string | null;
 };
 
 /**

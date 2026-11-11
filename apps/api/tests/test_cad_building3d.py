@@ -163,3 +163,10 @@ def test_floors_are_sorted_known_by_elevation_then_unknown_by_order() -> None:
         (False, 0),
     ]
     assert [f.page_index for f in ordered] == [4, 2, 3, 5]
+
+
+def test_floor_label_is_floor_title_when_plan_title_is_known() -> None:
+    title = {"corps": "9", "section": "3", "floors": [14], "text": "План 14 этажа"}
+    with_title = floor_of(raw_document(title=title), None)
+    assert with_title.label == "К9 · С3 · 14 эт."
+    assert floor_of(raw_document(), None).label == "АР · лист 1"

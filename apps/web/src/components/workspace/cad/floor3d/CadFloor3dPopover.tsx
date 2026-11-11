@@ -103,6 +103,17 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
         <Row label="Верх, м" value={formatMeters(lintel.z_top_mm)} />
       </>
     );
+  } else if (pick.kind === 'prism' && pick.category === 'door') {
+    const door = (model.doors ?? []).find((item) => item.opening_id === pick.id);
+    if (!door) return null;
+    title = 'Дверь';
+    body = (
+      <>
+        <Row label="Высота двери" value={`${door.door_height_mm} мм (${heightSourceText(door.door_height_source)})`} />
+        <Row label="Низ, м" value={formatMeters(door.z_bottom_mm)} />
+        <Row label="Верх, м" value={formatMeters(door.z_top_mm)} />
+      </>
+    );
   } else if (pick.kind === 'hole') {
     const hole = model.slab_holes.find((item) => item.key === pick.id);
     if (!hole) return null;

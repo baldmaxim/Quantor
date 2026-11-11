@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Final, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain import JobStatus
 
@@ -128,6 +128,27 @@ class WallsOpening(BaseModel):
     center: list[float]
 
 
+class CadSheetFloorTitle(BaseModel):
+    """Заголовок плана листа из текста PDF: корпус, секция, этажи (cad_walls v1.5).
+
+    Один тип и для разбора `walls.json` (этажи там числа), и для ответов API (этажи строками).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    corps: str | None = None
+    section: str | None = None
+    floors: list[str] = Field(default_factory=list)
+    text: str | None = None
+
+    @field_validator("floors", mode="before")
+    @classmethod
+    def _floors_as_text(cls, value: object) -> object:
+        if isinstance(value, list):
+            return [str(item) for item in value if isinstance(item, int | str)]
+        return value
+
+
 class WallsHeights(BaseModel):
     """Исходные величины высоты: отметки из документации и допущения параметров скрипта."""
 
@@ -143,6 +164,8 @@ class WallsHeights(BaseModel):
     slab_status: str
     door_height_mm: int | None
     door_height_status: str
+    # Заголовок плана (cad_walls v1.5); у старого файла и без заголовка — `None`.
+    title: CadSheetFloorTitle | None = None
 
 
 class WallsWarning(BaseModel):

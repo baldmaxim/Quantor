@@ -35,6 +35,7 @@ from app.models import Document, DocumentRevision, Job
 from app.services import cad as cad_service
 from app.services import cad_construction_store, cad_views, cad_walls
 from app.services.cad_constructions import ProjectSlab, effective_levels
+from app.services.cad_floor_title import format_floor_title
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 MAX_OUTLINE_POINTS: Final = 200
@@ -200,7 +201,7 @@ def build_floor(
         page_index=sheet.page_index,
         view=sheet.view,
         document_id=sheet.document_id,
-        label=sheet.label,
+        label=format_floor_title(document.heights.title, sheet.label),
         elevation_known=levels.elevation_mm is not None,
         base_z_mm=levels.elevation_mm if levels.elevation_mm is not None else 0,
         floor_height_mm=DEFAULT_FLOOR_HEIGHT_MM if floor_height is None else floor_height,

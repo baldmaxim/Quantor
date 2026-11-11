@@ -9,9 +9,9 @@ describe('сцена 3D-вида (без WebGL)', () => {
   const plan = buildFloor3dPlan(floor3dFixture());
   const scene = buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap: true });
 
-  it('меш на категорию, не на конструкцию; в клик входят плита, кладка, перемычки и отверстия', () => {
+  it('меш на категорию, не на конструкцию; в клик входят плита, кладка, перемычки, двери и отверстия', () => {
     const categories = scene.pickables.map((mesh) => (mesh.userData.pick as IFloor3dPickData).category);
-    expect(categories).toEqual(['slab', 'masonry', 'lintel', 'hole', 'hole']);
+    expect(categories).toEqual(['slab', 'masonry', 'lintel', 'door', 'hole', 'hole']);
     expect(scene.slabCap).not.toBeNull();
   });
 
@@ -21,6 +21,13 @@ describe('сцена 3D-вида (без WebGL)', () => {
     expect(pickOf(masonry!, 0)).toEqual({ kind: 'prism', category: 'masonry', id: 'w1' });
     expect(pickOf(masonry!, 100000)).toBeNull();
     expect(pickOf(masonry!, undefined)).toBeNull();
+  });
+
+  it('клик по двери даёт opening_id', () => {
+    const door = scene.pickables.find((mesh) => (mesh.userData.pick as IFloor3dPickData).category === 'door');
+    expect(door).toBeDefined();
+    expect(pickOf(door!, 0)).toEqual({ kind: 'prism', category: 'door', id: 'o1' });
+    expect(pickOf(door!, (door!.userData.pick as IFloor3dPickData).starts[1]!)?.id).toBe('o2');
   });
 
   it('отверстия: кандидат - своя заливка, включённое и «Не отверстие» - невидимый меш для клика', () => {

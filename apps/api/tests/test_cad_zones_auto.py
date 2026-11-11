@@ -438,7 +438,14 @@ async def test_pipeline_calibrated_page_without_jobs(
         assert set(body) == {"revision_id", "server_time", "sheets"}
         assert body["revision_id"] == revision_id
         assert body["sheets"] == [
-            {"page_index": 0, "page_label": None, "calibrated": True, "convert": None, "views": []}
+            {
+                "page_index": 0,
+                "page_label": None,
+                "calibrated": True,
+                "floor_title": None,
+                "convert": None,
+                "views": [],
+            }
         ]
         # Чужая ревизия - 404.
         missing = await api.get(_pipeline_url(project_id, str(uuid.uuid4())))
@@ -543,3 +550,54 @@ async def test_pipeline_uses_the_latest_convert_per_page(
         assert sheet["convert"]["status"] == "running"
         # У идущей конвертации итога нет, видов нет, чужих (старых) заданий нет.
         assert sheet["views"] == []
+
+
+async def test_pipeline_gives_floor_title_from_the_last_successful_walls(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    zones_tools: Path,
+    tmp_path: Path,
+) -> None:
+    """Заголовок плана берётся из итога успешного cad_walls; нет итога или заголовка - null."""
+    settings = zones_settings(zones_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        walls = await api.post(f"/api/v1/projects/{project_id}/cad/{job_id}/views/0/1/walls")
+        assert walls.status_code == 202, walls.text
+        sheet = (await api.get(_pipeline_url(project_id, revision_id))).json()["sheets"][0]
+        assert sheet["floor_title"] is None
+
+        job = await db_session.get(Job, uuid.UUID(walls.json()["job_id"]))
+        assert job is not None
+        job.status = JobStatus.SUCCEEDED
+        job.payload = {
+            **job.payload,
+            "cad_result": {
+                "result_status": "walls_ready",
+                "attempt": job.attempt,
+                "floor_title": {
+                    "corps": "9",
+                    "section": "3",
+                    "floors": [14],
+                    "text": "Корпус 9. Секция 3. План 14 этажа",
+                },
+            },
+        }
+        await db_session.commit()
+        sheet = (await api.get(_pipeline_url(project_id, revision_id))).json()["sheets"][0]
+        assert sheet["floor_title"] == {
+            "corps": "9",
+            "section": "3",
+            "floors": ["14"],
+            "text": "Корпус 9. Секция 3. План 14 этажа",
+        }
+
+        # Итог без заголовка (старое задание или заголовок не найден) - null, не ошибка.
+        job.payload = {
+            **job.payload,
+            "cad_result": {**job.payload["cad_result"], "floor_title": None},
+        }
+        await db_session.commit()
+        sheet = (await api.get(_pipeline_url(project_id, revision_id))).json()["sheets"][0]
+        assert sheet["floor_title"] is None

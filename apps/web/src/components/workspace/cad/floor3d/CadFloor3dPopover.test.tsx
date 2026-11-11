@@ -110,3 +110,32 @@ describe('плашка стены: величины из конструкций 
     expect(screen.getByRole('dialog')).toHaveTextContent('Объём не определён');
   });
 });
+
+describe('плашка двери', () => {
+  const mountDoor = (model = floor3dFixture(), id = 'o2') =>
+    render(
+      <CadFloor3dPopover
+        pick={{ kind: 'prism', category: 'door', id }}
+        model={model}
+        anchor={{ x: 10, y: 10 }}
+        bounds={{ width: 600, height: 400 }}
+        saving={false}
+        error={null}
+        onDecide={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+  it('высота, источник, низ и верх в метрах', () => {
+    mountDoor();
+    const dialog = screen.getByRole('dialog', { name: 'Дверь' });
+    expect(dialog).toHaveTextContent('Высота двери: 2000 мм (');
+    expect(dialog).toHaveTextContent('Низ, м: 3,00');
+    expect(dialog).toHaveTextContent('Верх, м: 5,00');
+  });
+
+  it('нет поля doors - плашки нет, ошибки нет', () => {
+    mountDoor(floor3dFixture({ doors: undefined }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});

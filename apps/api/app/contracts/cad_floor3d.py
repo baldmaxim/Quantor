@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.contracts.cad_constructions import (
     CadConstructionKind,
     CadHeightsRead,
+    CadSheetFloorTitle,
     CadValueSource,
 )
 
@@ -159,6 +160,8 @@ class CadFloor3dRead(BaseModel):
     units: Literal["mm"]
     generator: str
     heights: CadHeightsRead
+    # Заголовок плана из PDF (корпус, секция, этаж); нет в walls.json — `None`.
+    title: CadSheetFloorTitle | None = None
     # Отметка этажа (верх плиты); не определена — 0 и `elevation_known = false`.
     base_z_mm: int
     elevation_known: bool

@@ -38,6 +38,8 @@ export interface IWorkspaceCadPipelineParams {
 export interface IWorkspaceCadPipeline {
   /** Лист в конвейере; `null` - лист ещё не обрабатывался или данные не получены. */
   readonly sheet: CadPipelineSheetRead | null;
+  /** Все листы ревизии из конвейера (для подписей этажом в списке листов); данных нет - пусто. */
+  readonly sheets: readonly CadPipelineSheetRead[];
   readonly steps: readonly IPipelineStep[];
   readonly summary: IPipelineSummary | null;
   readonly isPending: boolean;
@@ -55,6 +57,8 @@ interface IStageSnapshot {
   readonly jobId: string;
   readonly active: boolean;
 }
+
+const NO_SHEETS: readonly CadPipelineSheetRead[] = [];
 
 const isActive = (stage: CadPipelineStageRead): boolean =>
   stage.status === 'queued' || stage.status === 'running';
@@ -195,6 +199,7 @@ export const useWorkspaceCadPipeline = ({
 
   return {
     sheet,
+    sheets: data?.sheets ?? NO_SHEETS,
     steps,
     summary,
     isPending: enabled && revisionId !== null && query.isPending,

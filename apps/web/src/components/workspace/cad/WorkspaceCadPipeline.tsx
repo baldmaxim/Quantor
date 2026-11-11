@@ -3,6 +3,7 @@
 import type { FC } from 'react';
 
 import { Button, Skeleton } from '@/components/ui';
+import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import type { IPipelineStep, PipelineStepKey } from '@/lib/cad/pipeline';
 import {
   PIPELINE_STATE_GLYPHS,
@@ -146,8 +147,22 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
     return null;
   };
 
+  const floorTitle = formatFloorTitle(sheet?.floor_title, '');
+
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-5)]" data-testid="workspace-cad-pipeline">
+      {floorTitle !== '' && (
+        <p
+          data-testid="pipeline-floor-title"
+          title={formatFloorTitleFull(sheet?.floor_title) ?? undefined}
+          className="m-0 text-sm font-semibold [overflow-wrap:anywhere]"
+        >
+          {floorTitle}
+          <span className="ml-[var(--s-3)] text-xs font-normal text-muted">
+            Лист {sheet?.page_label ?? (sheet ? sheet.page_index + 1 : '')}
+          </span>
+        </p>
+      )}
       <ol className="m-0 flex list-none flex-col gap-[var(--s-4)] p-0" aria-label="Шаги обработки листа">
         {steps.map((step) => {
           const tone = TONE_TEXT[PIPELINE_STATE_TONES[step.state]] ?? 'text-muted';

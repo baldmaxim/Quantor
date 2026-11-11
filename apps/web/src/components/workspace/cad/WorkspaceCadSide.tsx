@@ -14,6 +14,7 @@ import { CadSidePanel, type ICadSideTab } from '@/components/cad/viewer/CadSideP
 import { CadViewHeader } from '@/components/cad/viewer/CadViewHeader';
 import { CadZonesPanel } from '@/components/cad/viewer/CadZonesPanel';
 import { Button, ErrorState, Skeleton, SkeletonRows } from '@/components/ui';
+import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 
 import { ConstructionsPanel } from './ConstructionsPanel';
 import type { IWorkspaceCadLeftProps, IWorkspaceCadSideProps } from './types';
@@ -65,6 +66,7 @@ export const WorkspaceCadSide: FC<
 > = ({
   state,
   sheetLabel,
+  floorTitle = null,
   loadError,
   onRetry,
   job,
@@ -153,6 +155,14 @@ export const WorkspaceCadSide: FC<
       <div className="flex flex-col gap-[var(--s-3)] p-[var(--s-5)]" data-testid="workspace-cad-none">
         {sheetLabel !== null && (
           <p className="text-xs text-muted">
+            {floorTitle !== null && formatFloorTitle(floorTitle, '') !== '' && (
+              <>
+                <span className="text-text" title={formatFloorTitleFull(floorTitle) ?? undefined}>
+                  {formatFloorTitle(floorTitle, '')}
+                </span>
+                {' · '}
+              </>
+            )}
             Лист <span className="text-text">{sheetLabel}</span>
           </p>
         )}

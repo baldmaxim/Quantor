@@ -3,6 +3,7 @@
 import { useEffect, useRef, type FC } from 'react';
 
 import { Button } from '@/components/ui';
+import type { FloorTitleLike } from '@/lib/cad/floor-title';
 import { useFloor3dDxf } from '@/lib/cad/floor3d-dxf';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 
@@ -10,6 +11,8 @@ export interface ICadFloor3dDxfButtonProps {
   readonly params: ICadViewParams;
   /** Текущая модель этажа: при её смене прежний DXF устарел. */
   readonly model: unknown;
+  /** Заголовок плана листа: по нему называется скачиваемый файл. */
+  readonly title?: FloorTitleLike;
   readonly disabled: boolean;
   /** В модели есть отверстия-кандидаты без решения. */
   readonly hasCandidates: boolean;
@@ -22,10 +25,11 @@ export interface ICadFloor3dDxfButtonProps {
 export const CadFloor3dDxfButton: FC<ICadFloor3dDxfButtonProps> = ({
   params,
   model,
+  title,
   disabled,
   hasCandidates,
 }) => {
-  const dxf = useFloor3dDxf(params, model);
+  const dxf = useFloor3dDxf(params, model, title);
   const link = useRef<HTMLAnchorElement>(null);
   const downloaded = useRef<string | null>(null);
 

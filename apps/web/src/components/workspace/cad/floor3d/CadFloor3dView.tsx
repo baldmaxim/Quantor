@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type FC, type ReactNode } from 'r
 import { Button } from '@/components/ui';
 import { WALLS_NOT_READY, isWallsActive, useCadConstructions, wallsJobStatus } from '@/lib/cad/constructions-queries';
 import { cadErrorText } from '@/lib/cad/errors';
+import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import { buildFloor3dPlan } from '@/lib/cad/floor3d-geometry';
 import {
   useCadFloor3d,
@@ -34,6 +35,7 @@ const LEGEND: readonly { readonly label: string; readonly className: string }[] 
   { label: 'Кладка', className: 'bg-[var(--cad-construction-masonry)]' },
   { label: 'Монолит', className: 'bg-[var(--cad-construction-monolith)]' },
   { label: 'Перемычки', className: 'bg-[var(--cad-construction-check)]' },
+  { label: 'Двери', className: 'bg-[var(--cad-layer-6)]' },
   { label: 'Отверстие (кандидат)', className: 'bg-danger' },
   { label: 'Отверстие (включено)', className: 'bg-success' },
   { label: 'Не отверстие', className: 'bg-[var(--muted)]' },
@@ -196,6 +198,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
     );
   }
 
+  // Подпись этажом из заголовка плана; заголовка нет - без подписи, как раньше.
+  const floorTitle = formatFloorTitle(model?.title, '');
   const interactive = model !== null && plan !== null && plan.prisms.length > 0 && canvasError === null;
 
   return (
@@ -205,6 +209,15 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex flex-none flex-wrap items-center gap-[var(--s-3)] border-b border-border bg-surface px-[var(--s-4)] py-[var(--s-3)]">
+          {floorTitle !== '' && (
+            <h3
+              data-testid="floor3d-title"
+              title={formatFloorTitleFull(model?.title) ?? undefined}
+              className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]"
+            >
+              {floorTitle}
+            </h3>
+          )}
           <Button disabled={!interactive} className="max-md:h-[44px]" onClick={() => request('top')}>
             Сверху
           </Button>
@@ -235,6 +248,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
           <CadFloor3dDxfButton
             params={params}
             model={model}
+            title={model?.title}
             disabled={!interactive}
             hasCandidates={model?.slab_holes.some((hole) => hole.state === 'candidate') ?? false}
           />

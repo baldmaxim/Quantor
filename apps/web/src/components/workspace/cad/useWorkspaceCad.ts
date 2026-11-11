@@ -1,6 +1,6 @@
 'use client';
 
-import type { SheetRead } from '@quantor/api-client';
+import type { CadSheetFloorTitle, SheetRead } from '@quantor/api-client';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { ViewportSheet } from '@/components/viewer/DrawingViewport';
@@ -56,6 +56,8 @@ interface IUseWorkspaceCadInput {
   /** Листы ревизии в порядке рабочей области: позиция листа в адресе - номер с 1. */
   sheets: readonly Pick<SheetRead, 'page_index'>[];
   sheet: Pick<SheetRead, 'id' | 'page_index' | 'page_label'> | null;
+  /** Заголовок плана открытого листа из конвейера CAD; нет - лист подписан номером. */
+  floorTitle?: CadSheetFloorTitle | null;
   /** Размер листа у отрисовщика (pt при масштабе 1); `null` - ещё не известен. */
   page: ViewportSheet | null;
   camera: Camera;
@@ -114,6 +116,7 @@ export const useWorkspaceCad = ({
   revisionId,
   sheets,
   sheet,
+  floorTitle = null,
   page,
   camera,
   viewportSize,
@@ -471,6 +474,7 @@ export const useWorkspaceCad = ({
   const side: IWorkspaceCadSideProps = {
     state,
     sheetLabel: sheet ? (sheet.page_label ?? String(sheet.page_index + 1)) : null,
+    floorTitle,
     loadError: data.jobsError,
     onRetry: data.refetchJobs,
     job:

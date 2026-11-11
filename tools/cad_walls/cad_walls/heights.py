@@ -7,11 +7,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pymupdf
 
 from cad_walls.errors import WallsError
 from cad_walls.params import Params
+
+if TYPE_CHECKING:
+    from cad_mep.params import Params as MepParams
 
 
 def _base(p: Params) -> dict[str, object]:
@@ -26,6 +30,36 @@ def _base(p: Params) -> dict[str, object]:
         "slab_status": "assumption",
         "door_height_mm": p.count("door_height_mm"),
         "door_height_status": "assumption",
+        "title": None,
+    }
+
+
+def _plan_title(
+    pdf: Path, page: int, at: tuple[float, float], mep: MepParams
+) -> dict[str, object] | None:
+    """Заголовок плана листа: корпус, секция, этажи. Не найден — None.
+
+    Выбор как у отметки пола: однозначный заголовок «План N этажа на отм. …» ближе к центру листа,
+    иначе ближайший заголовок с этажами; отметка для заголовка не обязательна.
+    """
+    from cad_mep import elevations
+    from cad_mep.errors import MepError
+
+    try:
+        titles = elevations.parse_titles(elevations.read_lines(pdf, mep), mep)
+    except MepError:
+        return None
+    on_page = [t for t in titles if t.page == page and t.floors]
+    if not on_page:
+        return None
+    single = [t for t in on_page if len(t.pairs) == 1 and len(t.floors) == 1]
+    pool = single or on_page
+    best = min(pool, key=lambda t: (t.cx - at[0]) ** 2 + (t.cy - at[1]) ** 2)
+    return {
+        "corps": best.corps,
+        "section": best.section,
+        "floors": list(best.floors),
+        "text": best.text,
     }
 
 
@@ -50,8 +84,10 @@ def resolve_heights(pdf: Path | None, page: int | None, p: Params) -> dict[str, 
         at = ((rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2)
     finally:
         doc.close()
+    mep = load_params(None)
+    out["title"] = _plan_title(pdf, page, at, mep)
     try:
-        resolved = elevations.resolve(pdf, page, at, load_params(None), None, None)
+        resolved = elevations.resolve(pdf, page, at, mep, None, None)
     except MepError as exc:
         out["message"] = exc.message
         return out

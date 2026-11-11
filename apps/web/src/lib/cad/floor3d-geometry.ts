@@ -15,7 +15,7 @@ export const MM_IN_M = 1000;
 
 export type Point2 = readonly [number, number];
 
-export type PrismCategory = 'slab' | 'masonry' | 'monolith' | 'lintel';
+export type PrismCategory = 'slab' | 'masonry' | 'monolith' | 'lintel' | 'door';
 
 /** Призма: контур с отверстиями в плане (м, от центра) и высоты низа/верха (м, от центра по высоте). */
 export interface IPrismSpec {
@@ -46,7 +46,7 @@ export interface IFloor3dCenter {
 
 export interface IFloor3dPlan {
   readonly center: IFloor3dCenter;
-  /** Плита, стены и перемычки. */
+  /** Плита, стены, перемычки и полотна дверей. */
   readonly prisms: readonly IPrismSpec[];
   /** Отверстия `candidate` и `enabled`: плита по ним вырезана. */
   readonly holes: readonly IHoleSpec[];
@@ -200,6 +200,20 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     });
   }
 
+  // Полотна дверей: поле `doors` необязательное, нет его - дверей нет.
+  for (const door of model.doors ?? []) {
+    const shell = ring(door.shell);
+    if (shell === null) continue;
+    raw.push({
+      id: door.opening_id,
+      category: 'door',
+      shell,
+      holes: [],
+      zBottom: door.z_bottom_mm,
+      zTop: door.z_top_mm,
+    });
+  }
+
   // Центр: габарит в плане - bbox сервера (иначе по контурам), по высоте - середина диапазона призм.
   const bbox =
     validBbox(model.bbox) ?? bboxOfRings(raw.map((item) => item.shell as unknown as Ring));
@@ -299,7 +313,7 @@ export const itemAtTriangle = (starts: readonly number[], total: number, face: n
   return low;
 };
 
-/** Что подсвечивать при выборе: призма (стена, перемычка) или контур отверстия. */
+/** Что подсвечивать при выборе: призма (стена, перемычка, дверь) или контур отверстия. */
 export type IFloor3dHighlight =
   | { readonly kind: 'prism'; readonly spec: IPrismSpec }
   | { readonly kind: 'hole'; readonly spec: IHoleSpec };

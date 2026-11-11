@@ -51,6 +51,19 @@ describe('план этажа', () => {
     expect((lintel?.yTop ?? 0) - (lintel?.yBottom ?? 0)).toBeCloseTo(0.7);
   });
 
+  it('двери: призмы категории door с высотой от низа до верха полотна', () => {
+    const doors = plan.prisms.filter((item) => item.category === 'door');
+    expect(doors.map((item) => item.id)).toEqual(['o1', 'o2']);
+    expect((doors[0]?.yTop ?? 0) - (doors[0]?.yBottom ?? 0)).toBeCloseTo(2.1);
+    expect((doors[1]?.yTop ?? 0) - (doors[1]?.yBottom ?? 0)).toBeCloseTo(2.0);
+  });
+
+  it('нет поля doors - дверей нет, остальное строится', () => {
+    const bare = buildFloor3dPlan(floor3dFixture({ doors: undefined }));
+    expect(bare.prisms.some((item) => item.category === 'door')).toBe(false);
+    expect(bare.prisms.some((item) => item.category === 'lintel')).toBe(true);
+  });
+
   it('категории: кладка, монолит, перемычка, плита', () => {
     expect(find('w1')?.category).toBe('masonry');
     expect(find('w2')).toBeUndefined();
@@ -134,7 +147,7 @@ describe('план этажа', () => {
 
   it('пустая модель - пустой план', () => {
     const empty = buildFloor3dPlan(
-      floor3dFixture({ slab: null, slab_holes: [], walls: [], lintels: [], bbox: null }),
+      floor3dFixture({ slab: null, slab_holes: [], walls: [], lintels: [], doors: [], bbox: null }),
     );
     expect(empty.prisms).toEqual([]);
     expect(empty.extent).toEqual({ width: 0, height: 0, depth: 0 });
@@ -168,6 +181,12 @@ describe('план оверлея выделения', () => {
   it('перемычка - призма категории lintel', () => {
     const target = highlightOf(plan, { kind: 'prism', category: 'lintel', id: 'o1' });
     expect(target?.kind === 'prism' && target.spec.category).toBe('lintel');
+  });
+
+  it('дверь - призма категории door', () => {
+    const target = highlightOf(plan, { kind: 'prism', category: 'door', id: 'o2' });
+    expect(target?.kind === 'prism' && target.spec.category).toBe('door');
+    expect(highlightOf(plan, { kind: 'prism', category: 'door', id: 'w1' })).toBeNull();
   });
 
   it('отверстие - любое состояние, включая «Не отверстие»', () => {

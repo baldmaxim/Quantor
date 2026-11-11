@@ -223,4 +223,21 @@ describe('3D-вид этажа', () => {
     fireEvent.click(toggle);
     expect(canvas).toHaveAttribute('data-measuring', 'false');
   });
+
+  it('заголовок 3D-вида - этаж по заголовку плана; без заголовка подписи нет', async () => {
+    vi.mocked(client.readCadFloor3D).mockImplementation(
+      () => ok(floor3dFixture({ title: { corps: '9', section: '3', floors: ['15'], text: null } })) as never,
+    );
+    mount();
+    const heading = await screen.findByTestId('floor3d-title');
+    expect(heading).toHaveTextContent('К9 · С3 · 15 эт.');
+    expect(heading).toHaveAttribute('title', 'Корпус 9, секция 3, 15 этаж');
+  });
+
+  it('нет заголовка плана - подписи этажом нет', async () => {
+    vi.mocked(client.readCadFloor3D).mockImplementation(() => ok(floor3dFixture()) as never);
+    mount();
+    await screen.findByTestId('floor3d-heights');
+    expect(screen.queryByTestId('floor3d-title')).toBeNull();
+  });
 });

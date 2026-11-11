@@ -55,6 +55,7 @@ import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
 import { resolveSheetPosition } from '@/lib/cad/building3d-queries';
+import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import { useCadJobs } from '@/lib/cad/queries';
 import { latestSheetJobs, type ISheetResult } from '@/lib/cad/sheet-results';
 import { parseWorkspaceJob, sheetPosition } from '@/lib/cad/workspace-url';
@@ -477,6 +478,16 @@ const WorkspacePage = ({ params }: IPageProps) => {
     enabled: cadOn,
   });
   const openPipeline = () => setCadSideTab('pipeline');
+  // Лист подписывается этажом по заголовку плана; нет заголовка - номером листа. Для списка листов
+  // берётся тот же ответ конвейера, нового запроса нет.
+  const floorTitleByPage = useMemo(
+    () =>
+      new Map(
+        pipeline.sheets.flatMap((row) => (row.floor_title ? [[row.page_index, row.floor_title] as const] : [])),
+      ),
+    [pipeline.sheets],
+  );
+  const floorTitle = formatFloorTitle(pipeline.sheet?.floor_title, '');
 
   const cadSelection = parseWorkspaceJob(searchParams);
   const cad = useWorkspaceCad({
@@ -484,6 +495,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
     revisionId,
     sheets: pages,
     sheet,
+    floorTitle: pipeline.sheet?.floor_title ?? null,
     page: viewportSheet,
     camera,
     viewportSize,
@@ -552,7 +564,21 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
               <div className="flex min-w-0 flex-1 items-stretch">
                 <span className="flex items-center gap-[var(--s-3)] border-r border-border bg-surface-muted px-[var(--s-5)] text-xs shadow-[inset_0_-2px_0_var(--accent)]">
-                  {sheet ? `Лист ${sheet.page_label ?? sheet.page_index + 1}` : 'Лист не выбран'}
+                  {sheet && floorTitle !== '' ? (
+                    <>
+                      <span
+                        className="font-medium"
+                        title={formatFloorTitleFull(pipeline.sheet?.floor_title) ?? undefined}
+                      >
+                        {floorTitle}
+                      </span>
+                      <span className="text-muted">Лист {sheet.page_label ?? sheet.page_index + 1}</span>
+                    </>
+                  ) : sheet ? (
+                    `Лист ${sheet.page_label ?? sheet.page_index + 1}`
+                  ) : (
+                    'Лист не выбран'
+                  )}
                 </span>
               </div>
 
@@ -774,6 +800,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       id: item.id,
                       index: item.page_index,
                       label: item.page_label,
+                      floorTitle: floorTitleByPage.get(item.page_index) ?? null,
                       regionCount: item.region_count,
                       cad: isReadyDxf(cadResults.get(item.page_index)),
                     }))}

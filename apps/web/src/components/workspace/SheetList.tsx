@@ -1,13 +1,17 @@
 'use client';
 
+import type { CadSheetFloorTitle } from '@quantor/api-client';
 import { useEffect, useRef, type FC } from 'react';
 
 import { StatusBadge, cx } from '@/components/ui';
+import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 
 export interface ISheetListPage {
   id: string;
   index: number;
   label: string | null;
+  /** Заголовок плана из CAD (корпус, секция, этаж); нет - лист подписан номером. */
+  floorTitle?: CadSheetFloorTitle | null;
   regionCount: number;
   /** У листа есть готовый DXF (результат CAD без одной диагностики). */
   cad: boolean;
@@ -42,6 +46,7 @@ export const SheetList: FC<ISheetListProps> = ({ pages, activeIndex, onSelect })
     <div ref={container} className="flex flex-col py-[var(--s-2)]">
       {pages.map((page) => {
         const recognized = page.regionCount > 0;
+        const floorTitle = formatFloorTitle(page.floorTitle, '');
         return (
           <button
             key={page.id}
@@ -55,14 +60,34 @@ export const SheetList: FC<ISheetListProps> = ({ pages, activeIndex, onSelect })
                 : 'text-muted hover:bg-surface-muted hover:text-text',
             )}
           >
-            {/* Длинная метка листа обрезается: иначе строка растёт в высоту и теснит ярлыки. */}
-            <span
-              className="tabular min-w-[28px] max-w-[64px] flex-none truncate"
-              title={page.label ?? undefined}
-            >
-              {page.label ?? page.index + 1}
-            </span>
-            <span className="min-w-0 flex-1 truncate">Лист {page.index + 1}</span>
+            {floorTitle !== '' ? (
+              // Лист назван этажом; номер листа - второй серой подписью.
+              <>
+                <span
+                  className="min-w-0 flex-1 truncate"
+                  title={formatFloorTitleFull(page.floorTitle) ?? undefined}
+                >
+                  {floorTitle}
+                </span>
+                <span
+                  className="tabular max-w-[64px] flex-none truncate text-micro text-muted"
+                  title={page.label ?? undefined}
+                >
+                  Лист {page.label ?? page.index + 1}
+                </span>
+              </>
+            ) : (
+              <>
+                {/* Длинная метка листа обрезается: иначе строка растёт в высоту и теснит ярлыки. */}
+                <span
+                  className="tabular min-w-[28px] max-w-[64px] flex-none truncate"
+                  title={page.label ?? undefined}
+                >
+                  {page.label ?? page.index + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate">Лист {page.index + 1}</span>
+              </>
+            )}
             {recognized && (
               <span className="tabular flex-none text-micro text-muted">{page.regionCount}</span>
             )}

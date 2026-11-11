@@ -13,16 +13,18 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any, Final
 
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contracts.cad_constructions import CadSheetFloorTitle
 from app.contracts.cad_pipeline import (
     CadPipelineRead,
     CadPipelineSheetRead,
     CadPipelineStageRead,
     CadPipelineViewRead,
 )
-from app.domain import JobType
+from app.domain import JobStatus, JobType
 from app.models import CadDecision, CadZone, Job, ScaleCalibration, Sheet
 from app.models.cad_decision import DECISION_MEP_ACCEPTANCE, DECISION_VIEW_APPROVAL
 from app.services import cad as cad_service
@@ -75,6 +77,17 @@ def _child_key(job: Job) -> _ChildKey | None:
     return job.job_type, parent, page_index, view
 
 
+def _floor_title(job: Job) -> CadSheetFloorTitle | None:
+    """Заголовок плана из итога успешного `cad_walls`; нет или вне контракта — `None`."""
+    raw = cad_service.current_result(job).get("floor_title")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return CadSheetFloorTitle.model_validate(raw)
+    except ValidationError:
+        return None
+
+
 def _view_rows(convert: Job | None, page_index: int) -> list[dict[str, Any]]:
     if convert is None:
         return []
@@ -104,6 +117,8 @@ async def build_pipeline(
     )
     latest_convert: dict[int, Job] = {}
     latest_child: dict[_ChildKey, Job] = {}
+    # Заголовок плана берётся из последнего УСПЕШНОГО cad_walls, даже если позже запущен новый.
+    latest_walls_ok: dict[_ChildKey, Job] = {}
     job_pages: set[int] = set()
     for job in jobs:
         if job.job_type is JobType.CAD_PDF_CONVERT:
@@ -115,6 +130,8 @@ async def build_pipeline(
         if key is not None:
             job_pages.add(key[2])
             latest_child[key] = _newest(latest_child.get(key), job)
+            if job.job_type is JobType.CAD_WALLS and job.status is JobStatus.SUCCEEDED:
+                latest_walls_ok[key] = _newest(latest_walls_ok.get(key), job)
 
     calibrated = set(
         await session.scalars(
@@ -170,6 +187,16 @@ async def build_pipeline(
         if convert is not None and str(convert.id) == parent:
             by_page[page_index][job_type][view] = job
 
+    titles: dict[int, tuple[int, CadSheetFloorTitle]] = {}
+    for (_kind, parent, page_index, view), job in latest_walls_ok.items():
+        convert = latest_convert.get(page_index)
+        if convert is None or str(convert.id) != parent:
+            continue
+        title = _floor_title(job)
+        known = titles.get(page_index)
+        if title is not None and (known is None or view < known[0]):
+            titles[page_index] = (view, title)
+
     sheets: list[CadPipelineSheetRead] = []
     for page_index in sorted(job_pages | calibrated):
         convert = latest_convert.get(page_index)
@@ -210,6 +237,7 @@ async def build_pipeline(
                 page_index=page_index,
                 page_label=labels.get(page_index),
                 calibrated=page_index in calibrated,
+                floor_title=titles[page_index][1] if page_index in titles else None,
                 convert=None if convert is None else stage_of(convert),
                 views=views,
             )

@@ -157,4 +157,22 @@ describe('WorkspaceCadPipeline', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('convert-stub')).toBeInTheDocument();
   });
+
+  it('лист с заголовком плана подписан этажом, без заголовка подписи нет', () => {
+    const { unmount } = mount(
+      pipelineOfSheet(
+        pipelineSheet({
+          page_label: '82',
+          floor_title: { corps: '9', section: '3', floors: ['15'], text: null },
+        }),
+      ),
+    );
+    const title = screen.getByTestId('pipeline-floor-title');
+    expect(title).toHaveTextContent('К9 · С3 · 15 эт.');
+    expect(title).toHaveTextContent('Лист 82');
+    expect(title).toHaveAttribute('title', 'Корпус 9, секция 3, 15 этаж');
+    unmount();
+    mount(pipelineOfSheet(pipelineSheet()));
+    expect(screen.queryByTestId('pipeline-floor-title')).toBeNull();
+  });
 });

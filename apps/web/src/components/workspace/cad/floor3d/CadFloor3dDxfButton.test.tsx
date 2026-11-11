@@ -33,11 +33,17 @@ const posted = (status: string) =>
 const job = (status: string, extra: Record<string, unknown> = {}) =>
   Promise.resolve({ data: { id: 'dxf1', status, error_code: null, error_message: null, ...extra } }) as never;
 
-const mount = (hasCandidates = false) => {
+const mount = (hasCandidates = false, title?: client.CadSheetFloorTitle) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <CadFloor3dDxfButton params={params} model={model} disabled={false} hasCandidates={hasCandidates} />
+      <CadFloor3dDxfButton
+        params={params}
+        model={model}
+        title={title}
+        disabled={false}
+        hasCandidates={hasCandidates}
+      />
     </QueryClientProvider>,
   );
 };
@@ -116,5 +122,13 @@ describe('Скачать 3D DXF', () => {
   it('подсказка про отверстия-кандидаты', () => {
     mount(true);
     expect(screen.getByText('Отверстия-кандидаты войдут в DXF как отверстия')).toBeInTheDocument();
+  });
+
+  it('имя файла по заголовку плана: floor3d_K9_S3_14.dxf', async () => {
+    vi.mocked(client.createCadFloor3dDxf).mockImplementation(() => posted('succeeded'));
+    mount(false, { corps: '9', section: '3', floors: ['14'] });
+    fireEvent.click(screen.getByRole('button', { name: 'Скачать 3D DXF' }));
+    const link = await screen.findByRole('link', { name: 'Скачать ещё раз' });
+    expect(link).toHaveAttribute('download', 'floor3d_K9_S3_14.dxf');
   });
 });

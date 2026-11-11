@@ -435,6 +435,7 @@ def build_floor3d(
         units="mm",
         generator=document.generator,
         heights=cad_constructions.heights_read(document.heights, levels),
+        title=document.heights.title,
         base_z_mm=base,
         elevation_known=levels.elevation_mm is not None,
         slab=slab,

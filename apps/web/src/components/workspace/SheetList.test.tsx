@@ -62,4 +62,22 @@ describe('SheetList', () => {
     await userEvent.click(screen.getByRole('button', { name: /Лист 4/ }));
     expect(onSelect).toHaveBeenCalledWith(3);
   });
+
+  it('лист с заголовком плана назван этажом, номер листа - второй подписью', () => {
+    render(
+      <SheetList
+        pages={[
+          page({ id: 'a', index: 81, label: '82', floorTitle: { corps: '9', section: '3', floors: ['14'] } }),
+          page({ id: 'b', index: 0 }),
+        ]}
+        activeIndex={0}
+        onSelect={vi.fn()}
+      />,
+    );
+    const named = screen.getByText('К9 · С3 · 14 эт.');
+    expect(named).toHaveAttribute('title', 'Корпус 9, секция 3, 14 этаж');
+    expect(screen.getByText('Лист 82')).toBeInTheDocument();
+    // Лист без заголовка подписан по-прежнему.
+    expect(screen.getByText('Лист 1')).toBeInTheDocument();
+  });
 });

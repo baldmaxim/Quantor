@@ -40,7 +40,7 @@ def test_document_header_and_hashes(tmp_path: Path) -> None:
     assert main(["--dxf", str(dxf), "--out", str(out)]) == 0
     doc = json.loads(out.read_text(encoding="utf-8"))
     assert doc["schema"] == "quantor.cad_walls.v1"
-    assert doc["generator"] == "cad_walls.v1.4"
+    assert doc["generator"] == "cad_walls.v1.5"
     assert doc["params_version"] == "v1"
     assert doc["units"] == "mm"
     assert doc["dxf_sha256"] == hashlib.sha256(dxf.read_bytes()).hexdigest()

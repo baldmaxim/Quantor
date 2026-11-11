@@ -5,6 +5,7 @@ import type {
   CadDecisionRead,
   CadJobRead,
   CadRouteJobRead,
+  CadSheetFloorTitle,
   CadSheetLevelsWrite,
   CadViewDiagnosticsRead,
   CadVorCoverageRead,
@@ -307,6 +308,8 @@ export interface IWorkspaceCadSideProps {
   readonly state: WorkspaceCadState;
   /** Подпись листа для подсказок. */
   readonly sheetLabel: string | null;
+  /** Заголовок плана листа (корпус, секция, этаж): лист подписывается этажом, номер - второй. */
+  readonly floorTitle?: CadSheetFloorTitle | null;
   readonly loadError: string | null;
   readonly onRetry: () => void;
   readonly job: IWorkspaceCadJob | null;
