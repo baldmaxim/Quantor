@@ -45,6 +45,18 @@ describe('раздел по шифру в имени', () => {
     ['Дом-П-ОДИ.pdf', 'odi', 'ОДИ'],
     ['Дом-П-ЭЭ.pdf', 'ee', 'ЭЭ'],
     ['Дом-П-СМ.pdf', 'sm', 'СМ'],
+    ['Дом-П-ЭЭФ.pdf', 'ee', 'ЭЭФ'],
+    ['МЛДГВ-КАМ-0925-П-ПЗ_ver27.pdf', 'general', 'ПЗ'],
+    ['МЛДГВ-КАМ-0925-П-СП_ver10.pdf', 'general', 'СП'],
+    ['МЛДГВ-КАМ0925-П-ИРД_ver2.pdf', 'general', 'ИРД'],
+    ['МЛДГВ-КАМ-0925-П-ПЗ_ver27.zip', 'general', 'ПЗ'],
+    ['МЛДГВ-КАМ-0925-П-СП_ver10.zip', 'general', 'СП'],
+    ['МЛДГВ-КАМ0925-П-ИРД_ver2.zip', 'general', 'ИРД'],
+    ['100-25-ГК-ИГИ-2.1.pdf', 'surveys', 'ИГИ'],
+    ['100-25-ГК-ИГИ-2.1_results.pdf', 'surveys', 'ИГИ'],
+    ['ГСТ-22-26-ИГДИ.pdf', 'surveys', 'ИГДИ'],
+    ['ГСТ-22-26-ИЭИ.pdf', 'surveys', 'ИЭИ'],
+    ['ГСТ-22-26-ИГМИ.pdf', 'surveys', 'ИГМИ'],
   ])('%s → %s', (name, section, code) => {
     expect(documentSection(name, 'pdf')).toEqual({ section, code });
   });
@@ -53,6 +65,21 @@ describe('раздел по шифру в имени', () => {
     expect(documentSection('дом-п-ар1.1.pdf', 'pdf').section).toBe('ar');
     expect(documentSection('Dom-P-AP1.1.pdf', 'pdf').section).toBe('ar');
     expect(documentSection('дом-п-иос4.2.pdf', 'pdf').section).toBe('ios4');
+  });
+
+  it('«СП» и «ПЗ» только отдельным токеном: «Спецификация» — не общая часть', () => {
+    expect(documentSection('Спецификация.pdf', 'pdf').section).toBe('other');
+    expect(documentSection('Спец-ПЗУ.pdf', 'pdf').section).toBe('pzu');
+  });
+
+  it('общая часть и изыскания идут первыми, в этом порядке', () => {
+    const groups = groupDocuments([
+      doc('1', 'Дом-П-АР1.pdf'),
+      doc('2', 'ГСТ-22-26-ИГДИ.pdf'),
+      doc('3', 'МЛДГВ-КАМ-0925-П-ПЗ_ver27.pdf'),
+    ]);
+    expect(groups.map((group) => group.id)).toEqual(['general', 'surveys', 'ar']);
+    expect(groups[0]?.title).toBe('Общая часть: ПЗ, состав проекта, ИРД');
   });
 
   it('ИОС2.3 и ИОС3.2 не путаются', () => {

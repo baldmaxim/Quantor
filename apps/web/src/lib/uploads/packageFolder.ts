@@ -78,15 +78,23 @@ const classify = (name: string): { role: Role; stem: string } | null => {
   return null;
 };
 
-export const planFolderUpload = (entries: readonly IFolderEntry[]): IFolderPlan => {
+interface IPlanned {
+  readonly plan: IFolderPlan;
+  /** Записи неполных комплектов по stem: их можно спланировать заново вместе с новыми файлами. */
+  readonly incomplete: ReadonlyMap<string, readonly IFolderEntry[]>;
+}
+
+const planEntries = (entries: readonly IFolderEntry[]): IPlanned => {
   const groups = new Map<string, Partial<Record<Role, File>>>();
+  const groupEntries = new Map<string, IFolderEntry[]>();
   const plainFiles: File[] = [];
   let skipped = 0;
 
   // Порядок по пути: результат не зависит от того, в каком порядке браузер отдал файлы.
   const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path, 'ru'));
 
-  for (const { file, path } of sorted) {
+  for (const entry of sorted) {
+    const { file, path } = entry;
     const name = baseName(path);
     const part = classify(name);
 
@@ -98,6 +106,7 @@ export const planFolderUpload = (entries: readonly IFolderEntry[]): IFolderPlan 
       } else {
         group[part.role] = file;
         groups.set(part.stem, group);
+        groupEntries.set(part.stem, [...(groupEntries.get(part.stem) ?? []), entry]);
       }
       continue;
     }
@@ -112,6 +121,7 @@ export const planFolderUpload = (entries: readonly IFolderEntry[]): IFolderPlan 
 
   const packages: IFolderPackage[] = [];
   const warnings: IFolderWarning[] = [];
+  const incomplete = new Map<string, readonly IFolderEntry[]>();
 
   for (const [stem, group] of groups) {
     const { pdf, resultsMd, resultsHtml, blocks } = group;
@@ -126,10 +136,84 @@ export const planFolderUpload = (entries: readonly IFolderEntry[]): IFolderPlan 
         stem,
         missing: ROLE_ORDER.filter((role) => !group[role]).map((role) => roleFileName(stem, role)),
       });
+      incomplete.set(stem, groupEntries.get(stem) ?? []);
     }
   }
 
-  return { packages, plainFiles, warnings, skipped };
+  return { plan: { packages, plainFiles, warnings, skipped }, incomplete };
+};
+
+export const planFolderUpload = (entries: readonly IFolderEntry[]): IFolderPlan =>
+  planEntries(entries).plan;
+
+/** Не хватает только PDF: распознавание целиком есть, оригинал лежит в другой папке. */
+export const isMissingOnlyPdf = ({ stem, missing }: IFolderWarning): boolean =>
+  missing.length === 1 && missing[0] === roleFileName(stem, 'pdf');
+
+export interface IMergeFolderInput {
+  /** Записи неполных комплектов из прошлых добавлений. */
+  readonly pending: readonly IFolderEntry[];
+  /** Обычные PDF, уже выбранные и ещё не загруженные: могут достроить комплект. */
+  readonly loosePdfs: readonly File[];
+  /** Только что добавленное: папка или файлы. */
+  readonly incoming: readonly IFolderEntry[];
+  /** Базовые имена (нижний регистр) распознанных пакетов, уже лежащих в проекте. */
+  readonly existingStems: ReadonlySet<string>;
+}
+
+export interface IMergedPlan extends IFolderPlan {
+  /** Что ждёт недостающих файлов; передаётся в следующий вызов. */
+  readonly pending: readonly IFolderEntry[];
+  /** Обычные PDF, ушедшие в комплекты или в ожидание: из списка файлов их надо убрать. */
+  readonly consumed: readonly File[];
+  /** Stem неполных комплектов, пакет которых уже есть в проекте. */
+  readonly alreadyInProject: readonly string[];
+}
+
+/**
+ * План по новым записям вместе с ожидающими и уже выбранными PDF.
+ *
+ * Комплект собирается из нескольких выборов в любом порядке: распознавание из одной папки,
+ * PDF из другой или из файлов. Обычный PDF без распознавания рядом не трогается.
+ */
+export const mergeFolderPlan = ({
+  pending,
+  loosePdfs,
+  incoming,
+  existingStems,
+}: IMergeFolderInput): IMergedPlan => {
+  const parts = [...pending, ...incoming];
+  const withRecognition = new Set<string>();
+  const withPdf = new Set<string>();
+  for (const { path } of parts) {
+    const part = classify(baseName(path));
+    if (part) (part.role === 'pdf' ? withPdf : withRecognition).add(part.stem);
+  }
+
+  const taken = new Set<string>();
+  const consumed = loosePdfs.filter((file) => {
+    const part = classify(file.name);
+    if (!part || !withRecognition.has(part.stem) || withPdf.has(part.stem)) return false;
+    if (taken.has(part.stem)) return false;
+    taken.add(part.stem);
+    return true;
+  });
+
+  const { plan, incomplete } = planEntries([
+    ...parts,
+    ...consumed.map((file) => ({ file, path: file.name })),
+  ]);
+
+  const isExisting = (stem: string): boolean => existingStems.has(stem.toLowerCase());
+  return {
+    packages: plan.packages,
+    plainFiles: plan.plainFiles,
+    warnings: plan.warnings.filter((warning) => !isExisting(warning.stem)),
+    skipped: plan.skipped,
+    pending: [...incomplete].filter(([stem]) => !isExisting(stem)).flatMap(([, list]) => list),
+    consumed,
+    alreadyInProject: plan.warnings.map((warning) => warning.stem).filter(isExisting),
+  };
 };
 
 /** Файлы из `<input webkitdirectory>`: путь берётся из webkitRelativePath. */

@@ -9,6 +9,8 @@ import type { DocumentKind } from '@quantor/api-client';
  */
 
 export type SectionId =
+  | 'general'
+  | 'surveys'
   | 'ar'
   | 'kr'
   | 'ios1'
@@ -32,6 +34,8 @@ export type SectionId =
 
 /** Порядок групп: как в составе проекта; пакеты распознавания — внизу. */
 export const SECTION_ORDER: readonly SectionId[] = [
+  'general',
+  'surveys',
   'ar',
   'kr',
   'ios1',
@@ -55,6 +59,8 @@ export const SECTION_ORDER: readonly SectionId[] = [
 ];
 
 export const SECTION_TITLES: Readonly<Record<SectionId, string>> = {
+  general: 'Общая часть: ПЗ, состав проекта, ИРД',
+  surveys: 'Инженерные изыскания',
   ar: 'Архитектурные решения',
   kr: 'Конструктивные решения',
   ios1: 'Электроснабжение (ИОС1)',
@@ -101,7 +107,15 @@ const CODE_SECTIONS: Readonly<Record<string, SectionId>> = {
   МПБ: 'pb',
   ОДИ: 'odi',
   ЭЭ: 'ee',
+  ЭЭФ: 'ee',
   СМ: 'sm',
+  ПЗ: 'general',
+  СП: 'general',
+  ИРД: 'general',
+  ИГДИ: 'surveys',
+  ИГИ: 'surveys',
+  ИЭИ: 'surveys',
+  ИГМИ: 'surveys',
 };
 
 const IOS_SECTIONS: Readonly<Record<string, SectionId>> = {

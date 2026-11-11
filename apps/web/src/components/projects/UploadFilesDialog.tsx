@@ -1,20 +1,17 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo } from 'react';
 
-import {
-  classifyFiles,
-  FileDropzone,
-  packagePicked,
-  type PickedFile,
-} from '@/components/projects/FileDropzone';
-import { FolderReport, type FolderReportData } from '@/components/projects/FolderReport';
+import { FileDropzone } from '@/components/projects/FileDropzone';
+import { FolderReport } from '@/components/projects/FolderReport';
 import { useUploadQueue } from '@/components/projects/UploadQueue';
 import { getUploadDialogState } from '@/components/projects/uploadDialogState';
 import { UploadQueueList } from '@/components/projects/UploadQueueList';
+import { usePickedFiles } from '@/components/projects/usePickedFiles';
 import { Button, Dialog, DialogActions } from '@/components/ui';
-import { planFolderUpload, type IFolderEntry } from '@/lib/uploads/packageFolder';
+import { baseName, isRecognizedPackage } from '@/lib/documentSections';
+import { useProjectDocuments } from '@/lib/queries';
 
 /**
  * Загрузка файлов в существующий проект.
@@ -33,8 +30,20 @@ interface IUploadFilesDialogProps {
 export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDialogProps) => {
   const queryClient = useQueryClient();
 
-  const [files, setFiles] = useState<readonly PickedFile[]>([]);
-  const [folderReport, setFolderReport] = useState<FolderReportData | null>(null);
+  // Уже загруженные пакеты проекта: их комплекты в окне не предупреждение, а справка.
+  const documents = useProjectDocuments(projectId, open);
+  const existingStems = useMemo<ReadonlySet<string>>(
+    () =>
+      new Set(
+        (documents.data?.items ?? [])
+          .filter((item) => isRecognizedPackage(item.display_name, item.document_kind))
+          .map((item) => baseName(item.display_name).toLowerCase()),
+      ),
+    [documents.data],
+  );
+
+  const picked = usePickedFiles(existingStems);
+  const { files, folderReport } = picked;
   const queue = useUploadQueue();
 
   const accepted = files.filter((item) => item.accepted);
@@ -45,20 +54,13 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
     items: queue.items,
   });
 
-  const addFolder = (entries: IFolderEntry[]) => {
-    const plan = planFolderUpload(entries);
-    const added = [...plan.packages.map(packagePicked), ...classifyFiles(plan.plainFiles)];
-    setFiles((current) => [...current, ...added]);
-    setFolderReport({ warnings: plan.warnings, skipped: plan.skipped, added: added.length });
-  };
-
   const submit = async () => {
     await queue.start({
       projectId,
       files: accepted.map((item) => item.file),
       keepDone: true,
       // Загруженный файл уходит из очереди выбранных; упавшие остаются для повтора.
-      onFileDone: (done) => setFiles((current) => current.filter((item) => item.file !== done)),
+      onFileDone: picked.removeDone,
     });
     // Обновляем и карточку, и список: там и там виден ход импорта.
     await queryClient.invalidateQueries({ queryKey: ['project', projectId] });
@@ -72,8 +74,7 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
       busy={busy}
       title="Загрузить файлы"
       onExited={() => {
-        setFiles([]);
-        setFolderReport(null);
+        picked.reset();
         queue.reset();
       }}
       footer={
@@ -111,9 +112,9 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
       <FileDropzone
         files={files}
         disabled={busy}
-        onAdd={(added) => setFiles((current) => [...current, ...classifyFiles(added)])}
-        onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))}
-        onAddFolder={addFolder}
+        onAdd={picked.addFiles}
+        onRemove={picked.removeAt}
+        onAddFolder={picked.addFolder}
       />
 
       <FolderReport report={folderReport} />

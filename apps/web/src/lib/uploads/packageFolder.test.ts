@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { planFolderUpload, type IFolderEntry } from './packageFolder';
+import {
+  isMissingOnlyPdf,
+  mergeFolderPlan,
+  planFolderUpload,
+  type IFolderEntry,
+} from './packageFolder';
 
 const entry = (path: string): IFolderEntry => ({
   file: new File(['x'], path.split('/').pop() ?? path),
@@ -97,5 +102,124 @@ describe('разбор папки пакета', () => {
     const plan = planFolderUpload([entry('m/корпус.nwd'), entry('m/готовый.zip')]);
 
     expect(plan.plainFiles.map((file) => file.name).sort()).toEqual(['готовый.zip', 'корпус.nwd']);
+  });
+});
+
+const recognition = (stem: string, dir = 'rec/'): IFolderEntry[] =>
+  [`${stem}_results.md`, `${stem}_results.html`, `${stem}_blocks.json`, `${stem}_source.json`].map(
+    (name) => entry(`${dir}${name}`),
+  );
+
+const NONE: ReadonlySet<string> = new Set();
+
+describe('комплект из нескольких выборов', () => {
+  it('папка распознавания без PDF ждёт; только PDF не хватает', () => {
+    const first = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: recognition('АР-1'),
+      existingStems: NONE,
+    });
+
+    expect(first.packages).toHaveLength(0);
+    expect(first.pending).toHaveLength(3);
+    expect(first.skipped).toBe(1);
+    expect(first.warnings.map(isMissingOnlyPdf)).toEqual([true]);
+  });
+
+  it('PDF после папки достраивает комплект и не идёт обычным файлом', () => {
+    const first = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: recognition('АР-1'),
+      existingStems: NONE,
+    });
+    const second = mergeFolderPlan({
+      pending: first.pending,
+      loosePdfs: [],
+      incoming: [entry('pdf/АР-1.pdf'), entry('pdf/Б.pdf')],
+      existingStems: NONE,
+    });
+
+    expect(second.packages.map((pkg) => pkg.stem)).toEqual(['АР-1']);
+    expect(second.plainFiles.map((file) => file.name)).toEqual(['Б.pdf']);
+    expect(second.pending).toHaveLength(0);
+    expect(second.warnings).toHaveLength(0);
+    expect(second.skipped).toBe(0);
+  });
+
+  it('PDF, выбранный раньше папки, переезжает из обычных в пакет', () => {
+    const loose = new File(['x'], 'АР-1.pdf');
+    const other = new File(['x'], 'Б.pdf');
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [loose, other],
+      incoming: recognition('АР-1'),
+      existingStems: NONE,
+    });
+
+    expect(plan.packages.map((pkg) => pkg.stem)).toEqual(['АР-1']);
+    expect(plan.consumed).toEqual([loose]);
+    expect(plan.plainFiles).toHaveLength(0);
+  });
+
+  it('части распознавания из двух папок плюс PDF собираются в один пакет', () => {
+    const first = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: [entry('a/Х_results.md')],
+      existingStems: NONE,
+    });
+    const second = mergeFolderPlan({
+      pending: first.pending,
+      loosePdfs: [],
+      incoming: [entry('b/Х_results.html'), entry('b/Х_blocks.json')],
+      existingStems: NONE,
+    });
+
+    expect(second.warnings).toEqual([{ stem: 'Х', missing: ['Х.pdf'] }]);
+    const third = mergeFolderPlan({
+      pending: second.pending,
+      loosePdfs: [],
+      incoming: [entry('Х.pdf')],
+      existingStems: NONE,
+    });
+    expect(third.packages).toHaveLength(1);
+  });
+
+  it('пакет уже в проекте: не предупреждение и не ожидание', () => {
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: recognition('АР-1'),
+      existingStems: new Set(['ар-1']),
+    });
+
+    expect(plan.warnings).toHaveLength(0);
+    expect(plan.pending).toHaveLength(0);
+    expect(plan.alreadyInProject).toEqual(['АР-1']);
+  });
+
+  it('обычный PDF без распознавания рядом не трогается', () => {
+    const loose = new File(['x'], 'Б.pdf');
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [loose],
+      incoming: recognition('АР-1'),
+      existingStems: NONE,
+    });
+
+    expect(plan.consumed).toHaveLength(0);
+  });
+
+  it('частичный комплект: не только PDF — старый текст', () => {
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: [entry('Х_results.md')],
+      existingStems: NONE,
+    });
+
+    expect(plan.warnings.map(isMissingOnlyPdf)).toEqual([false]);
   });
 });
