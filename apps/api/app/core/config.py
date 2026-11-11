@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     #
     # Имя переменной — то, под которым ключ уже лежит в .env; вендорская документация
     # называет её TENDERHUB_API_KEY, поэтому принимаем оба варианта.
-    tenderhub_api_url: str = "https://tender.su10.ru"
+    tenderhub_api_url: str = "https://gp.su10.ru"
     tenderhub_api_token: SecretStr = Field(
         default=SecretStr(""),
         validation_alias=AliasChoices("TENDERHUB_API_TOKEN", "TENDERHUB_API_KEY"),
@@ -155,7 +155,12 @@ class Settings(BaseSettings):
     # получить общий cookie, локально же домен указывать нельзя — браузер отвергнет.
     auth_cookie_domain: str = ""
     auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    # Срок простоя: сеанс без активности дольше него гаснет. Активность продлевает
+    # сеанс (скользящий срок), но не дальше `auth_session_max_lifetime_seconds`.
     auth_session_ttl_seconds: int = Field(default=12 * 3600, gt=0)
+    # Абсолютный предел жизни сеанса от входа: после него нужен новый вход, сколько бы
+    # человек ни работал.
+    auth_session_max_lifetime_seconds: int = Field(default=30 * 24 * 3600, gt=0)
 
     # Кому выдать права администратора платформы при первом входе. Список почт или
     # субъектов через запятую. Зашивать первого администратора в миграцию нельзя:

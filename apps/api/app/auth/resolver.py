@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, params
@@ -21,6 +22,7 @@ from app.auth import csrf, oidc, sessions
 from app.auth.context import AuthContext, CredentialKind, Principal
 from app.auth.dev import DEV_ROLE_HEADER, dev_context
 from app.auth.permissions import Permission, permissions_for
+from app.auth.session_cookie import STATE_KEY, SessionCookieRefresh
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.db.session import get_session
@@ -108,7 +110,20 @@ async def _authenticate(
     if user is None or not identity_service.can_sign_in(user):
         raise _unauthenticated(ErrorCode.SESSION_EXPIRED)
 
-    await sessions.touch(session, row)
+    touched = await sessions.touch(
+        session,
+        row,
+        idle_ttl_seconds=settings.auth_session_ttl_seconds,
+        max_lifetime_seconds=settings.auth_session_max_lifetime_seconds,
+    )
+    if touched:
+        # До этого места сессия только читала, поэтому коммит безопасен. Без него продление
+        # на GET терялось бы: `get_session` сам ничего не фиксирует.
+        await session.commit()
+        remaining = int((row.expires_at - datetime.now(UTC)).total_seconds())
+        request.scope.setdefault("state", {})[STATE_KEY] = SessionCookieRefresh(
+            token=token, max_age=max(remaining, 0)
+        )
     return _principal(user), CredentialKind.SESSION, row.id
 
 

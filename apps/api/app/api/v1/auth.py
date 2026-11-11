@@ -25,6 +25,7 @@ from fastapi.responses import RedirectResponse
 
 from app.api.v1.deps import SessionDep, SettingsDep
 from app.auth import csrf, oidc, sessions
+from app.auth.cookies import set_session_cookies
 from app.auth.dev import DEV_ROLE_HEADER, dev_context
 from app.auth.permissions import permissions_for
 from app.core.config import Settings
@@ -99,27 +100,12 @@ def _require_local(settings: Settings) -> None:
 def _set_session_cookies(
     response: Response, settings: Settings, *, session_token: str, csrf_token: str
 ) -> None:
-    # Сеанс — HttpOnly: сценарию на странице он недоступен, и кража через XSS не даёт токен.
-    response.set_cookie(
-        settings.auth_cookie_name,
-        session_token,
-        httponly=True,
-        domain=settings.auth_cookie_domain or None,
-        secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
-        path="/",
-        max_age=settings.auth_session_ttl_seconds,
-    )
-    # Подтверждение — наоборот, читаемое: интерфейс обязан повторить его заголовком.
-    response.set_cookie(
-        settings.auth_csrf_cookie_name,
-        csrf_token,
-        httponly=False,
-        domain=settings.auth_cookie_domain or None,
-        secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
-        path="/",
-        max_age=settings.auth_session_ttl_seconds,
+    set_session_cookies(
+        response,
+        settings,
+        session_token=session_token,
+        csrf_token=csrf_token,
+        max_age=min(settings.auth_session_ttl_seconds, settings.auth_session_max_lifetime_seconds),
     )
 
 
@@ -238,6 +224,7 @@ async def complete_login(
         session,
         user_id=user.id,
         ttl_seconds=settings.auth_session_ttl_seconds,
+        max_lifetime_seconds=settings.auth_session_max_lifetime_seconds,
         ip=request.client.host if request.client else None,
         user_agent=request.headers.get("User-Agent"),
     )
@@ -351,6 +338,7 @@ async def login_with_password(
         session,
         user_id=user.id,
         ttl_seconds=settings.auth_session_ttl_seconds,
+        max_lifetime_seconds=settings.auth_session_max_lifetime_seconds,
         ip=request.client.host if request.client else None,
         user_agent=request.headers.get("User-Agent"),
     )

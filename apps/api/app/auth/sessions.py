@@ -40,19 +40,21 @@ async def create(
     *,
     user_id: uuid.UUID,
     ttl_seconds: int,
+    max_lifetime_seconds: int,
     ip: str | None = None,
     user_agent: str | None = None,
 ) -> tuple[AuthSession, str]:
     """Заводит сеанс и возвращает его вместе с токеном для cookie.
 
-    Токен возвращается ровно один раз — восстановить его из базы нельзя.
+    Токен возвращается ровно один раз — восстановить его из базы нельзя. Срок — срок простоя,
+    но не больше абсолютного предела жизни сеанса.
     """
     token = new_token()
     now = datetime.now(UTC)
     row = AuthSession(
         user_id=user_id,
         token_hash=hash_token(token),
-        expires_at=now + timedelta(seconds=ttl_seconds),
+        expires_at=now + timedelta(seconds=min(ttl_seconds, max_lifetime_seconds)),
         last_seen_at=now,
         ip=ip,
         # Строка агента бывает длиннее колонки; обрезаем, а не роняем вход.
@@ -81,12 +83,27 @@ async def resolve(session: AsyncSession, token: str) -> AuthSession | None:
     return row
 
 
-async def touch(session: AsyncSession, row: AuthSession) -> None:
-    """Отмечает активность, но не чаще, чем раз в интервал."""
+async def touch(
+    session: AsyncSession,
+    row: AuthSession,
+    *,
+    idle_ttl_seconds: int,
+    max_lifetime_seconds: int,
+) -> bool:
+    """Отмечает активность и продлевает сеанс, но не чаще, чем раз в интервал.
+
+    Новый срок — now + срок простоя, но не позже `created_at + max_lifetime`. Возвращает
+    True, если строка изменена: тогда вызывающий обязан сохранить её и обновить cookie.
+    """
     now = datetime.now(UTC)
     if row.last_seen_at is not None and now - row.last_seen_at < _TOUCH_INTERVAL:
-        return
+        return False
     row.last_seen_at = now
+    row.expires_at = min(
+        now + timedelta(seconds=idle_ttl_seconds),
+        row.created_at + timedelta(seconds=max_lifetime_seconds),
+    )
+    return True
 
 
 async def revoke(session: AsyncSession, row: AuthSession) -> None:

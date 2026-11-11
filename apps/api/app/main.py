@@ -21,6 +21,7 @@ from app.api.v1.cad import qa_router as cad_qa_router
 from app.api.v1.cad_mep import qa_router as cad_mep_qa_router
 from app.api.v1.cad_zones import qa_router as cad_zones_qa_router
 from app.api.v1.router import api_v1_router
+from app.auth.session_cookie import SessionCookieMiddleware
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import JsonBodyLimitMiddleware, RequestContextMiddleware
@@ -74,6 +75,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Порядок важен: предел тела стоит снаружи, чтобы переросший запрос не доходил
     # до разбора. Middleware выполняются в порядке, обратном добавлению.
+    # Самым внутренним: на старте ответа дописывает cookie сеанса при скользящем сроке.
+    app.add_middleware(SessionCookieMiddleware, settings=settings)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(JsonBodyLimitMiddleware, max_bytes=settings.max_json_body_bytes)
     app.add_middleware(

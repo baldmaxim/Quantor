@@ -147,7 +147,7 @@ pnpm db:migrate
 2. Положите его в `.env` в корне репозитория:
 
    ```dotenv
-   TENDERHUB_API_URL=https://tender.su10.ru
+   TENDERHUB_API_URL=https://gp.su10.ru
    TENDERHUB_API_TOKEN=thk_...
    ```
 

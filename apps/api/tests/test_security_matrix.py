@@ -434,7 +434,9 @@ async def test_12_logout_invalidates_the_session(
     db_session.add(user)
     await db_session.flush()
 
-    row, token = await sessions.create(db_session, user_id=user.id, ttl_seconds=3600)
+    row, token = await sessions.create(
+        db_session, user_id=user.id, ttl_seconds=3600, max_lifetime_seconds=86400
+    )
     await db_session.commit()
 
     assert await sessions.resolve(db_session, token) is not None
