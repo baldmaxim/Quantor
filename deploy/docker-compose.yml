@@ -162,7 +162,9 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
-    mem_limit: 768m
+    # Разбор паспортов листов (pypdf) на больших PDF упирался в 768m (OOM, 2026-11-12).
+    mem_limit: ${WORKER_MEM_LIMIT:-1536m}
+    memswap_limit: ${WORKER_MEMSWAP_LIMIT:-3g}
     networks: [internal]
 
   # CAD-исполнитель PDF -> DXF (ADR-0036). Отдельный образ: движок, PyMuPDF и Shapely есть только
