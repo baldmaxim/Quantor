@@ -140,3 +140,14 @@ def test_page_text_falls_back_when_trim_fails(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(pdf_text, "HEAVY_CONTENT_BYTES", 1024)
     monkeypatch.setattr(pdf_text, "text_only_content", boom)
     assert page_text(page, reader) == page.extract_text()
+
+
+def test_page_text_drops_nul_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PostgreSQL не принимает 0x00 в text/jsonb: NUL из текстового слоя вычищается."""
+    monkeypatch.setattr(pdf_text, "_raw_page_text", lambda page, reader: "Шифр\x00 АР\x00")
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    reader = PdfReader(io.BytesIO(buffer.getvalue()))
+    assert page_text(reader.pages[0], reader) == "Шифр АР"

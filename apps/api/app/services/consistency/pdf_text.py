@@ -139,7 +139,12 @@ def _trimmed_text(page: PageObject, reader: PdfReader, data: bytes) -> str:
 
 
 def page_text(page: PageObject, reader: PdfReader) -> str:
-    """Текст страницы. Тяжёлый поток урезается; любая ошибка урезанного пути — откат на полный."""
+    """Текст страницы без NUL: PostgreSQL не принимает 0x00 ни в text, ни в jsonb."""
+    return _raw_page_text(page, reader).replace("\x00", "")
+
+
+def _raw_page_text(page: PageObject, reader: PdfReader) -> str:
+    """Тяжёлый поток урезается; любая ошибка урезанного пути — откат на полный."""
     try:
         data = _stream_bytes(page)
     except Exception:  # битый поток: полный путь сам решит, что делать
