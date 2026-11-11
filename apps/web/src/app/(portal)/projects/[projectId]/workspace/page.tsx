@@ -7,7 +7,7 @@ import type {
 } from '@quantor/api-client';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, use, useEffect, useMemo, useState } from 'react';
 
 import { CadRemarkCapture } from '@/components/cad/viewer/CadRemarkCapture';
 import { CadZoneCapture } from '@/components/cad/viewer/CadZoneCapture';
@@ -20,6 +20,7 @@ import { WorkspaceCadBar } from '@/components/workspace/cad/WorkspaceCadBar';
 import { WorkspaceCadLeft } from '@/components/workspace/cad/WorkspaceCadLeft';
 import { WorkspaceCadSide } from '@/components/workspace/cad/WorkspaceCadSide';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
+import { SheetList } from '@/components/workspace/SheetList';
 import { TakeoffPanel, type TakeoffGeometry } from '@/components/workspace/TakeoffPanel';
 import { takeoffAccess, type ITakeoffAccess } from '@/components/workspace/takeoff-access';
 import type { NormalizedPoint } from '@/lib/viewer/coordinates';
@@ -46,6 +47,8 @@ import { ToolButton, ToolDivider, ToolField } from '@/components/workspace/Toolb
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
+import { useCadJobs } from '@/lib/cad/queries';
+import { latestSheetJobs } from '@/lib/cad/sheet-results';
 import { regionsVisible } from '@/lib/cad/workspace-cad';
 import { parseWorkspaceJob } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
@@ -144,6 +147,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const [regionSearch, setRegionSearch] = useState('');
 
   const pages = sheets.data?.items ?? [];
+  // Готовые результаты CAD по листам; без флага cad.export задания не запрашиваются.
+  const cadJobs = useCadJobs(projectId, cadOn ? revisionId : null);
+  const cadResults = useMemo(() => latestSheetJobs(cadJobs.data?.items ?? []), [cadJobs.data]);
   const pageIndex = Math.min(Math.max(pageParam - 1, 0), Math.max(pages.length - 1, 0));
   const sheet = pages[pageIndex] ?? null;
 
@@ -715,6 +721,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       index: item.page_index,
                       label: item.page_label,
                       regionCount: item.region_count,
+                      cad: cadResults.get(item.page_index)?.kind === 'recognized',
                     }))}
                     activeIndex={pageIndex}
                     onSelect={goToPage}
@@ -1138,55 +1145,6 @@ const ViewportArea = ({
 };
 
 /* ------------------------------------------------------------------- левая панель */
-
-interface ISheetListProps {
-  pages: readonly { id: string; index: number; label: string | null; regionCount: number }[];
-  activeIndex: number;
-  onSelect: (index: number) => void;
-}
-
-/**
- * Список листов.
- *
- * Показываются только видимые строки: у документа их 77, и держать в разметке все
- * вместе с миниатюрами значило бы рисовать весь документ ради панели шириной 264 px.
- */
-const SheetList = ({ pages, activeIndex, onSelect }: ISheetListProps) => {
-  const container = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    container.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex]);
-
-  if (pages.length === 0) {
-    return <p className="p-[var(--s-4)] text-xs text-muted">Листов пока нет.</p>;
-  }
-
-  return (
-    <div ref={container} className="flex flex-col py-[var(--s-2)]">
-      {pages.map((page) => (
-        <button
-          key={page.id}
-          type="button"
-          aria-current={page.index === activeIndex}
-          onClick={() => onSelect(page.index)}
-          className={cx(
-            'flex h-[var(--h-row-tree)] items-center gap-[var(--s-3)] px-[var(--s-4)] text-left text-xs transition-colors',
-            page.index === activeIndex
-              ? 'bg-accent-soft text-text'
-              : 'text-muted hover:bg-surface-muted hover:text-text',
-          )}
-        >
-          <span className="tabular w-[28px] flex-none">{page.label ?? page.index + 1}</span>
-          <span className="min-w-0 flex-1 truncate">Лист {page.index + 1}</span>
-          {page.regionCount > 0 && (
-            <span className="tabular text-micro text-muted">{page.regionCount}</span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-};
 
 interface IRecognitionPanelProps {
   counts: Record<string, number>;
