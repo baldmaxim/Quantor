@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import tempfile
 import uuid
 from datetime import UTC, datetime
@@ -33,12 +32,15 @@ from app.domain import DocumentKind, JobStatus, JobType
 from app.errors import ErrorCode, not_found
 from app.models import Document, DocumentRevision, Job, Project, SheetPassport
 from app.services import jobs as jobs_service
+from app.services.consistency.passport_process import (
+    PassportParseError,
+    parse_pdf_in_subprocess,
+)
 from app.services.consistency.sheet_passport import (
+    PARSER_VERSION,
     EvidenceSource,
     PassportCandidate,
     dictionary_versions,
-    extract_pdf_pages,
-    parse_page,
 )
 from app.storage.base import ObjectNotFoundError, ObjectStorage
 
@@ -153,22 +155,30 @@ async def _upsert_candidates(
     return created, updated, skipped
 
 
-def _parse_pdf(path: Path, file_name: str) -> list[PassportCandidate]:
-    """Синхронный разбор файла с диска: вызывается только из потока."""
-    with path.open("rb") as stream:
-        return [parse_page(page) for page in extract_pdf_pages(stream, file_name)]
-
-
 async def _download_and_parse(
-    storage: ObjectStorage, *, storage_key: str, file_name: str
+    storage: ObjectStorage, *, storage_key: str, file_name: str, settings: Settings
 ) -> list[PassportCandidate]:
-    """Файл потоково во временный файл на диске (ADR-0002), разбор - в потоке."""
+    """Файл потоково во временный файл на диске (ADR-0002), разбор - в подпроцессе с пределами."""
     with tempfile.TemporaryDirectory(prefix="quantor-passport-") as workdir:
         path = Path(workdir) / "source.pdf"
         with path.open("wb") as output:
             async for chunk in storage.iter_stream(storage_key, chunk_size=CHUNK_SIZE):
                 output.write(chunk)
-        return await asyncio.to_thread(_parse_pdf, path, file_name)
+        return await parse_pdf_in_subprocess(
+            path,
+            file_name,
+            memory_limit_mb=settings.sheet_passport_parse_memory_mb,
+            timeout_seconds=settings.sheet_passport_parse_timeout_seconds,
+        )
+
+
+async def _already_parsed(session: AsyncSession, revision_id: uuid.UUID) -> bool:
+    """У ревизии есть паспорта и все разобраны текущей версией разборщика: файл не качаем."""
+    versions = await session.scalars(
+        select(SheetPassport.versions).where(SheetPassport.revision_id == revision_id)
+    )
+    parsers = [item.get("parser") for item in versions]
+    return bool(parsers) and all(parser == PARSER_VERSION for parser in parsers)
 
 
 async def latest_pdf_revisions(
@@ -194,11 +204,11 @@ async def execute_sheet_passport_extract(
 ) -> Job:
     """Тело задания `sheet_passport_extract`: паспорта-кандидаты по текстовому слою PDF проекта.
 
-    Файлы идут по одному, после каждого - коммит. Файл, который не открылся, задание не валит:
+    Файлы идут по одному, после каждого - коммит. Каждый разбирается подпроцессом с пределом
+    памяти и времени. Файл, который не открылся или не уложился в пределы, задание не валит:
     он попадает в итог с именем и классом ошибки (содержимое чужих документов в итог и журнал
-    не попадает).
+    не попадает). Ревизия, уже разобранная текущей версией разборщика, при повторе пропускается.
     """
-    del settings  # реестр обработчиков один на все типы: сигнатура общая
     raw_project_id = job.payload.get("project_id")
     try:
         project_id = uuid.UUID(str(raw_project_id))
@@ -214,19 +224,27 @@ async def execute_sheet_passport_extract(
     revisions = await latest_pdf_revisions(session, project_id=project_id)
     await session.commit()
 
-    files = pages = created = updated = skipped = 0
+    files = pages = created = updated = skipped = already = 0
     errors: list[dict[str, str]] = []
     error_count = 0
     total = len(revisions)
     for number, revision in enumerate(revisions, start=1):
         file_name = revision.source_filename
         revision_id = revision.id
+        if await _already_parsed(session, revision_id):
+            already += 1
+            await jobs_service.report_progress(session, job=job, progress=number / total)
+            await session.commit()
+            continue
         try:
             candidates = await _download_and_parse(
-                storage, storage_key=revision.storage_key, file_name=file_name
+                storage, storage_key=revision.storage_key, file_name=file_name, settings=settings
             )
         except ObjectNotFoundError:
             reason = "ObjectNotFoundError"
+        except PassportParseError as error:
+            reason = error.reason
+            log.warning("sheet_passport_file_failed", job_id=str(job.id), reason=reason)
         except Exception as error:
             reason = type(error).__name__
             log.warning("sheet_passport_file_failed", job_id=str(job.id), reason=reason)
@@ -255,6 +273,7 @@ async def execute_sheet_passport_extract(
         "sheet_passport_extract_finished",
         job_id=str(job.id),
         files=files,
+        already_parsed=already,
         pages=pages,
         errors=error_count,
     )
@@ -264,6 +283,7 @@ async def execute_sheet_passport_extract(
         payload={
             "files_total": total,
             "files_parsed": files,
+            "files_already_parsed": already,
             "pages": pages,
             "created": created,
             "updated": updated,

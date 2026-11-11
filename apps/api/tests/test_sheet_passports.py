@@ -1,6 +1,8 @@
 """Паспорт листа (ADR-0043, С1): задание разбора, upsert, API правки и подтверждения.
 
-Только синтетика: текстовый слой страниц подменяется, настоящий pypdf работает на «битом» файле.
+Только синтетика: текстовый слой страниц подменяется (подпроцесс разбора в этих тестах заменён
+вызовом в процессе), настоящий pypdf работает на «битом» файле. Сам подпроцесс - в
+`test_sheet_passport_process.py`.
 """
 
 from __future__ import annotations
@@ -8,11 +10,12 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import BinaryIO
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -21,7 +24,13 @@ from app.main import create_app
 from app.models import Document, DocumentRevision, Job, SheetPassport, Workspace
 from app.services import jobs as jobs_service
 from app.services import sheet_passports as passports_service
-from app.services.consistency.sheet_passport import PageInput
+from app.services.consistency.passport_process import REASON_FAILED, PassportParseError
+from app.services.consistency.sheet_passport import (
+    PageInput,
+    PassportCandidate,
+    extract_pdf_pages,
+    parse_page,
+)
 from app.worker.registry import handler_for, supported_types
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 
@@ -60,16 +69,24 @@ class _Texts:
 @pytest.fixture
 def texts(monkeypatch: pytest.MonkeyPatch) -> _Texts:
     state = _Texts()
-    original = passports_service.extract_pdf_pages
 
-    def fake(stream: BinaryIO, file_name: str) -> Iterator[PageInput]:
+    def pages_of(stream: BinaryIO, file_name: str) -> Iterator[PageInput]:
         if file_name not in state.pages:
-            yield from original(stream, file_name)
+            yield from extract_pdf_pages(stream, file_name)
             return
         for index, text in enumerate(state.pages[file_name]):
             yield PageInput(page_index=index, text=text, file_name=file_name)
 
-    monkeypatch.setattr(passports_service, "extract_pdf_pages", fake)
+    async def fake(
+        path: Path, file_name: str, *, memory_limit_mb: int, timeout_seconds: float
+    ) -> list[PassportCandidate]:
+        try:
+            with path.open("rb") as stream:
+                return [parse_page(page) for page in pages_of(stream, file_name)]
+        except Exception:
+            raise PassportParseError(REASON_FAILED) from None
+
+    monkeypatch.setattr(passports_service, "parse_pdf_in_subprocess", fake)
     state.pages[PLAN_PDF] = [PLAN_STAMP, PLAN_STAMP.replace("7 40", "8 40")]
     state.pages[SCHEME_PDF] = [SCHEME_STAMP]
     return state
@@ -134,6 +151,12 @@ async def _extract(
     job = await _run_job(session, storage)
     assert str(job.id) == response.json()["id"]
     return job
+
+
+async def _make_stale(session: AsyncSession) -> None:
+    """Паспорта разобраны старой версией разборщика: повторный запуск их разбирает заново."""
+    await session.execute(update(SheetPassport).values(versions={"parser": "old"}))
+    await session.commit()
 
 
 def _url(project_id: str, tail: str = "") -> str:
@@ -222,7 +245,8 @@ async def test_extract_creates_candidates_and_survives_a_broken_file(
         assert item["versions"]["sections"].startswith("consistency.dict.sections")
         assert item["confirmed_by"] is None
 
-        # Новый запуск после завершения прежнего - новое задание, строки не множатся.
+        # Новый запуск после смены версии разборщика - новое задание, строки не множатся.
+        await _make_stale(db_session)
         again = await _extract(api, db_session, fake_storage, project_id)
         assert again.payload["created"] == 0 and again.payload["updated"] == 3
         assert (await api.get(_url(project_id))).json()["total"] == 3
@@ -252,6 +276,7 @@ async def test_rerun_keeps_confirmed_rows_and_manual_fields(
         # Разбор теперь видит другое: раздел ИОС2, номер листа 9, схема.
         changed = SCHEME_STAMP.replace("7 40", "9 40")
         texts.pages[PLAN_PDF] = [changed, changed]
+        await _make_stale(db_session)
         job = await _extract(api, db_session, fake_storage, project_id)
         assert job.payload["skipped_reviewed"] == 1 and job.payload["updated"] == 1
 
@@ -555,7 +580,44 @@ async def test_extract_summary_null_without_jobs_then_counts_and_errors(
         assert done["versions"]["parser"].startswith("consistency.sheet_passport")
 
         # Берётся последнее задание.
+        await _make_stale(db_session)
         again = await _extract(api, db_session, fake_storage, project_id)
         latest = (await api.get(_url(project_id, "/extract-summary"))).json()
         assert latest["job_id"] == str(again.id)
         assert latest["created"] == 0 and latest["updated"] == 3
+
+
+async def test_rerun_skips_revision_parsed_by_current_parser(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        await _add_pdf(db_session, fake_storage, project_id, PLAN_PDF)
+        await _add_pdf(db_session, fake_storage, project_id, SCHEME_PDF)
+        first = await _extract(api, db_session, fake_storage, project_id)
+        assert first.payload["files_parsed"] == 2 and first.payload["files_already_parsed"] == 0
+
+        # Повтор с той же версией разборщика: ничего не качается и не разбирается.
+        fake_storage.objects.clear()
+        second = await _extract(api, db_session, fake_storage, project_id)
+        assert second.status is JobStatus.SUCCEEDED
+        assert second.payload["files_total"] == 2
+        assert second.payload["files_already_parsed"] == 2
+        assert second.payload["files_parsed"] == 0 and second.payload["error_count"] == 0
+
+        # Одна ревизия разобрана старой версией - только она идёт в работу заново.
+        plan_rows = select(SheetPassport.id).where(SheetPassport.file_name == PLAN_PDF)
+        await db_session.execute(
+            update(SheetPassport)
+            .where(SheetPassport.id.in_(plan_rows))
+            .values(versions={"parser": "old"})
+        )
+        await db_session.commit()
+        for revision in (await db_session.scalars(select(DocumentRevision))).all():
+            fake_storage.objects[revision.storage_key] = b"%PDF-1.7\n"
+        third = await _extract(api, db_session, fake_storage, project_id)
+        assert third.payload["files_already_parsed"] == 1
+        assert third.payload["files_parsed"] == 1 and third.payload["updated"] == 2
