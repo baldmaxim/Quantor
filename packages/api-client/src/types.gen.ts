@@ -1354,6 +1354,38 @@ export type CadEventsRead = {
 };
 
 /**
+ * CadFloor3dDoorRead
+ *
+ * Полотно двери в разрыве стены: тонкая призма от отметки этажа до высоты двери.
+ */
+export type CadFloor3dDoorRead = {
+    /**
+     * Door Height Mm
+     */
+    door_height_mm: number;
+    /**
+     * Door Height Source
+     */
+    door_height_source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    /**
+     * Opening Id
+     */
+    opening_id: string;
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
+    /**
+     * Z Bottom Mm
+     */
+    z_bottom_mm: number;
+    /**
+     * Z Top Mm
+     */
+    z_top_mm: number;
+};
+
+/**
  * CadFloor3dHolePut
  *
  * Решение человека по отверстию: включено (есть отверстие) или выключено (плита сплошная).
@@ -1439,6 +1471,10 @@ export type CadFloor3dRead = {
      * Bbox
      */
     bbox: Array<number> | null;
+    /**
+     * Doors
+     */
+    doors?: Array<CadFloor3dDoorRead>;
     /**
      * Elevation Known
      */

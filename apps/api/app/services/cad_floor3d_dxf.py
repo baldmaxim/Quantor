@@ -28,7 +28,7 @@ from app.storage.base import ObjectStorage, StorageUnavailableError
 # Версия скрипта `tools/cad_walls/cad_walls/floor3d_dxf.py` (`GENERATOR_VERSION`). В образе API
 # файла скрипта нет, поэтому константа дублируется; исполнитель сверяет её с ответом скрипта, а
 # тест репозитория — с исходником.
-GENERATOR_VERSION: Final = "cad_floor3d_dxf.v1"
+GENERATOR_VERSION: Final = "cad_floor3d_dxf.v2"
 DXF_NAME: Final = "floor3d.dxf"
 # Сколько раз за ту же модель можно заново ставить отказавшее или отменённое задание.
 _MAX_SEQUENCE: Final = 20

@@ -57,15 +57,21 @@ def test_door_host_is_thicker_wall(tmp_path: Path) -> None:
     assert len(cast(list[str], op["adjacent_ids"])) == 2
 
 
-def test_door_with_one_side_uses_block_bbox(tmp_path: Path) -> None:
+def test_door_with_one_side_has_no_gap(tmp_path: Path) -> None:
     doc, msp = synth.new_doc()
     synth.add_rect(msp, synth.MASONRY, 0, 0, 2000, 100)
     synth.add_door(doc, msp, "AR_DOOR_BLOCK_003", 2000, -400, 2950, 500)
     out = synth.run(tmp_path, doc)
     (op,) = _openings(out)
-    assert (op["kind"], op["status"], op["width_source"]) == ("door", "estimate", "block_bbox")
-    assert _f(op["width_mm"]) == pytest.approx(950, abs=1)
+    assert (op["kind"], op["status"]) == ("door", "no_data")
+    assert op["lintel"] is None
+    assert op["leaf"] is None
     assert op["host_id"] in _by_id(out)
+    checks = cast(dict[str, object], out["checks"])
+    warnings = cast(list[dict[str, str]], checks["warnings"])
+    assert [w["message"] for w in warnings if w["code"] == "door_without_gap"] == [
+        f"дверь {op['id']}: разрыв стены не найден, перемычка и полотно не построены"
+    ]
 
 
 def test_gap_without_door(tmp_path: Path) -> None:

@@ -56,7 +56,7 @@ def _hint(item: dict[str, object]) -> dict[str, object]:
 
 def test_hints_legend_and_frame_partitions(tmp_path: Path) -> None:
     doc = _run(tmp_path, True)
-    assert doc["generator"] == "cad_walls.v1.3"
+    assert doc["generator"] == "cad_walls.v1.4"
     legend = cast(dict[str, object], doc["legend"])
     assert legend["heading_found"] is True
     assert cast(dict[str, object], legend["masonry"]).keys() == {"100"}

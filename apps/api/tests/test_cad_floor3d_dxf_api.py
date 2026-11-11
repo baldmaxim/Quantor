@@ -62,7 +62,7 @@ out.write_bytes(body)
 if mode == "extra":
     (out.parent / "other.txt").write_text("x")
 summary = {
-    "generator": "cad_floor3d_dxf.v0" if mode == "badgen" else "cad_floor3d_dxf.v1",
+    "generator": "cad_floor3d_dxf.v0" if mode == "badgen" else "cad_floor3d_dxf.v2",
     "model_sha256": hashlib.sha256(raw).hexdigest(),
     "dxf_sha256": "f" * 64 if mode == "badsha" else hashlib.sha256(body).hexdigest(),
     "meshes": {"Q3D_ПЛИТА": 1, "Q3D_КЛАДКА": 2},
@@ -240,7 +240,7 @@ async def test_queue_stores_the_same_model_as_get_and_is_idempotent(
         assert job is not None and job.job_type is JobType.CAD_FLOOR3D_DXF
         payload = job.payload
         assert payload["revision_id"] == revision_id and payload["parent_job_id"] == job_id
-        assert payload["generator_version"] == "cad_floor3d_dxf.v1"
+        assert payload["generator_version"] == "cad_floor3d_dxf.v2"
         key = floor3d_service.input_key(uuid.UUID(revision_id), payload["model_sha256"])
         stored = fake_storage.objects[key]
         assert hashlib.sha256(stored).hexdigest() == payload["model_sha256"]

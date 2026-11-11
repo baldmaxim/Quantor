@@ -355,10 +355,11 @@ async def recompute_cad_walls(
     session: SessionDep,
     context: AuthDep,
     settings: SettingsDep,
+    storage: StorageDep,
 ) -> CadWallsJobRead:
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     job = await cad_walls.schedule_recompute(
-        session, parent=sheet.parent, page_index=page_index, view=view, settings=settings
+        session, storage, parent=sheet.parent, page_index=page_index, view=view, settings=settings
     )
     response = CadWallsJobRead(
         job_id=job.id,

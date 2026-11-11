@@ -32,7 +32,7 @@ def _rect(x0: float, y0: float, x1: float, y1: float) -> list[list[float]]:
 def _model() -> dict[str, object]:
     return {
         "units": "mm",
-        "generator": "cad_walls.v1.3",
+        "generator": "cad_walls.v1.4",
         "heights": {
             "floor_elevation_mm": BASE,
             "floor_elevation_source": "drawing",
@@ -116,6 +116,16 @@ def _model() -> dict[str, object]:
                 "door_height_source": "assumed",
             }
         ],
+        "doors": [
+            {
+                "opening_id": "o1",
+                "shell": _rect(1000, 80, 1900, 120),
+                "z_bottom_mm": BASE,
+                "z_top_mm": BASE + 2100,
+                "door_height_mm": 2100,
+                "door_height_source": "assumed",
+            }
+        ],
         "bbox": [0, 0, 10000, 8000],
         "warnings": [{"code": "slab_thickness_assumed", "message": "Толщина плиты - допущение."}],
     }
@@ -171,6 +181,7 @@ def test_layers_and_mesh_counts(tmp_path: Path) -> None:
         f3d.LAYER_MASONRY: 1,
         f3d.LAYER_MONOLITH: 1,
         f3d.LAYER_LINTELS: 1,
+        f3d.LAYER_DOORS: 1,
     }
 
 
@@ -181,6 +192,7 @@ def test_z_ranges_match_model(tmp_path: Path) -> None:
         f3d.LAYER_MASONRY: (BASE, WALL_TOP),
         f3d.LAYER_MONOLITH: (BASE, WALL_TOP),
         f3d.LAYER_LINTELS: (BASE + 2100, WALL_TOP),
+        f3d.LAYER_DOORS: (BASE, BASE + 2100),
     }
     for layer, (z0, z1) in expected.items():
         zs = {round(v.z, 6) for v in _points(meshes[layer][0])}
@@ -232,7 +244,7 @@ def test_header_properties(tmp_path: Path) -> None:
     out = tmp_path / "floor3d.dxf"
     assert main(["--model", str(model_path), "--out", str(out)]) == 0
     props = dict(readfile(out).header.custom_vars.properties)
-    assert props["QUANTOR_GENERATOR"] == "cad_floor3d_dxf.v1"
+    assert props["QUANTOR_GENERATOR"] == "cad_floor3d_dxf.v2"
     assert props["QUANTOR_MODEL_SHA256"] == hashlib.sha256(model_path.read_bytes()).hexdigest()
     assert props["QUANTOR_FLOOR_ELEVATION_MM"] == "47600"
     assert props["QUANTOR_FLOOR_ELEVATION_SOURCE"] == "drawing"
@@ -354,3 +366,12 @@ def test_cli_exit_codes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     with pytest.raises(SystemExit) as info:
         main(["--out", str(tmp_path / "o.dxf")])
     assert info.value.code == 2
+
+
+def test_model_without_doors_key_has_no_door_layer_meshes(tmp_path: Path) -> None:
+    """Модель прежней версии API (без `doors`) строится; полотен нет."""
+    model = _model()
+    del model["doors"]
+    meshes = _meshes(_build(tmp_path, model))
+    assert f3d.LAYER_DOORS not in meshes
+    assert f3d.LAYER_LINTELS in meshes

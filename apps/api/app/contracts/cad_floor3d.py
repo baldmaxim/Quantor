@@ -53,13 +53,15 @@ class WallsSlabHole(BaseModel):
 
 
 class WallsOpeningExtras(BaseModel):
-    """Направление проёма и контур перемычки у проёма из walls.json."""
+    """Направление проёма, контур перемычки и полотно двери у проёма из walls.json."""
 
     model_config = ConfigDict(extra="ignore")
 
     id: str
     direction: list[float] | None = None
     lintel: list[list[float]] | None = None
+    # Полотно двери (cad_walls v1.4): нет у безымянных разрывов, дверей без разрыва и старых файлов.
+    leaf: list[list[float]] | None = None
 
 
 class WallsFloorExtras(BaseModel):
@@ -134,6 +136,18 @@ class CadFloor3dLintelRead(BaseModel):
     door_height_source: CadValueSource | None
 
 
+class CadFloor3dDoorRead(BaseModel):
+    """Полотно двери в разрыве стены: тонкая призма от отметки этажа до высоты двери."""
+
+    opening_id: str
+    shell: list[list[float]]
+    z_bottom_mm: int
+    z_top_mm: int
+    door_height_mm: int
+    # `manual` — зона двери человека; иначе источник действующей высоты двери листа.
+    door_height_source: CadValueSource | None
+
+
 class CadFloor3dWarningRead(BaseModel):
     code: str
     message: str
@@ -152,6 +166,8 @@ class CadFloor3dRead(BaseModel):
     slab_holes: list[CadFloor3dHoleRead]
     walls: list[CadFloor3dWallRead]
     lintels: list[CadFloor3dLintelRead]
+    # Полотна дверей (cad_walls v1.4); нет разрыва или старый walls.json — пусто.
+    doors: list[CadFloor3dDoorRead] = Field(default_factory=list)
     # [minx, miny, maxx, maxy] по плите и стенам; геометрии нет — `None`.
     bbox: list[float] | None
     warnings: list[CadFloor3dWarningRead]

@@ -31,6 +31,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--pdf", type=Path, default=None)
     p.add_argument("--page", type=int, default=None, help="индекс страницы PDF, с нуля")
+    p.add_argument("--zones", type=Path, default=None, help="зоны помещений листа, мм DXF (JSON)")
     return p
 
 
@@ -41,7 +42,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_INPUT
     started = time.monotonic()
     try:
-        summary = generate(Args(dxf=ns.dxf, params=ns.params, out=ns.out, pdf=ns.pdf, page=ns.page))
+        summary = generate(
+            Args(dxf=ns.dxf, params=ns.params, out=ns.out, pdf=ns.pdf, page=ns.page, zones=ns.zones)
+        )
     except WallsError as exc:
         _fail(exc.code, exc.message)
         return exc.exit_code

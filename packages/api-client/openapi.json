@@ -2720,6 +2720,64 @@
         "title": "CadEventsRead",
         "type": "object"
       },
+      "CadFloor3dDoorRead": {
+        "description": "Полотно двери в разрыве стены: тонкая призма от отметки этажа до высоты двери.",
+        "properties": {
+          "door_height_mm": {
+            "title": "Door Height Mm",
+            "type": "integer"
+          },
+          "door_height_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Height Source"
+          },
+          "opening_id": {
+            "title": "Opening Id",
+            "type": "string"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "z_bottom_mm": {
+            "title": "Z Bottom Mm",
+            "type": "integer"
+          },
+          "z_top_mm": {
+            "title": "Z Top Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "opening_id",
+          "shell",
+          "z_bottom_mm",
+          "z_top_mm",
+          "door_height_mm",
+          "door_height_source"
+        ],
+        "title": "CadFloor3dDoorRead",
+        "type": "object"
+      },
       "CadFloor3dHolePut": {
         "additionalProperties": false,
         "description": "Решение человека по отверстию: включено (есть отверстие) или выключено (плита сплошная).",
@@ -2862,6 +2920,13 @@
               }
             ],
             "title": "Bbox"
+          },
+          "doors": {
+            "items": {
+              "$ref": "#/components/schemas/CadFloor3dDoorRead"
+            },
+            "title": "Doors",
+            "type": "array"
           },
           "elevation_known": {
             "title": "Elevation Known",

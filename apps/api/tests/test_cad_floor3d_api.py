@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import Role
 from app.main import create_app
-from app.models import CadProjectLevels, CadSheetLevels, CadSlabHoleDecision, Workspace
+from app.models import CadProjectLevels, CadSheetLevels, CadSlabHoleDecision, Job, Workspace
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_constructions_api import (
     PARAMS,
@@ -460,3 +460,52 @@ async def test_door_zone_sets_lintel_height_through_the_view_frame(
         assert lintels["gap000000001"]["door_height_source"] == "assumption"
         assert lintels["gap000000001"]["door_height_mm"] == 2100
         assert "door_zones_unmapped" not in _codes(body)
+
+
+# ------------------------------------------------------------------ зоны помещений входом cad_walls
+
+
+async def test_recompute_walls_sends_room_zones_in_mm_as_job_input(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        factor, origin = 35.2778, (10.0, 20.0)
+        # Квартира: прямоугольник 1000 x 2000 мм DXF ниже начала координат кадра вида.
+        corners_mm = [(1000.0, -500.0), (2000.0, -500.0), (2000.0, -2500.0), (1000.0, -2500.0)]
+        points = [
+            [
+                (origin[0] + x / factor) / float(A3_WIDTH),
+                (origin[1] - y / factor) / float(A3_HEIGHT),
+            ]
+            for x, y in corners_mm
+        ]
+        created = await api.post(
+            f"/api/v1/projects/{project_id}/cad/zones",
+            json={
+                "revision_id": revision_id,
+                "page_index": 0,
+                "kind": "room_apartment",
+                "apartment_no": "1",
+                "points": points,
+            },
+        )
+        assert created.status_code == 201, created.text
+        queued = await api.post(_url(project_id, job_id, "walls"))
+        assert queued.status_code == 202, queued.text
+        job = await db_session.get(Job, uuid.UUID(queued.json()["job_id"]))
+        assert job is not None
+        assert job.payload["zones_count"] == 1
+        assert job.payload["zones_sha256"] and "zones_warning" not in job.payload
+        key = f"revisions/{revision_id}/cad/walls-zones-input/{job.payload['zones_sha256']}.json"
+        (zone,) = json.loads(fake_storage.objects[key])
+        assert zone["kind"] == "room_apartment"
+        for got, want in zip(zone["shell"], corners_mm, strict=True):
+            assert got == pytest.approx(list(want), abs=0.2)

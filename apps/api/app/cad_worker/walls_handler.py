@@ -3,10 +3,12 @@
 Скрипт не импортируется: он работает подпроцессом интерпретатора движка (`-I`, пустое окружение,
 новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
-    <python> -I run_walls.py --dxf --params --out --pdf --page
+    <python> -I run_walls.py --dxf --params --out --pdf --page [--zones]
 
 PDF ревизии и номер страницы нужны только разбору отметок этажа (как у генератора трасс); не
-определились — скрипт пишет в `heights` статус `missing`, и это не отказ. Код выхода 2 — ошибка
+определились — скрипт пишет в `heights` статус `missing`, и это не отказ. Зоны помещений листа
+(`--zones`, мм DXF) берутся из входного объекта хранилища, адресованного sha256 из задания; в
+задании их нет — контур плиты строится по стенам. Код выхода 2 — ошибка
 входа, причина — одной строкой JSON `{"code", "message"}` в stderr. Общие части (аренда,
 загрузка, отказ задания) — из `handler`.
 
@@ -18,6 +20,7 @@ PDF ревизии и номер страницы нужны только раз
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import shutil
 import tempfile
@@ -47,10 +50,10 @@ from app.errors import ErrorCode
 from app.models import DocumentRevision, Job
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_progress
+from app.services import cad_progress, cad_walls_zones
 from app.services import cad_walls as cad_walls_service
 from app.services import jobs as jobs_service
-from app.storage.base import ObjectStorage
+from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 log = get_logger(__name__)
 
@@ -66,12 +69,19 @@ class _Input:
 
 
 def _argv(
-    settings: Settings, *, dxf: Path, params: Path, out: Path, pdf: Path, page_index: int
+    settings: Settings,
+    *,
+    dxf: Path,
+    params: Path,
+    out: Path,
+    pdf: Path,
+    page_index: int,
+    zones: Path | None = None,
 ) -> list[str]:
     python, runner = settings.cad_engine_python.strip(), settings.cad_walls_runner.strip()
     if not (python and runner) or not (Path(python).is_file() and Path(runner).is_file()):
         raise CadError(ErrorCode.CAD_ENGINE_UNAVAILABLE, "скрипт подсчёта конструкций не настроен")
-    return [
+    argv = [
         python,
         "-I",
         runner,
@@ -86,6 +96,34 @@ def _argv(
         "--page",
         str(page_index),
     ]
+    if zones is not None:
+        argv += ["--zones", str(zones)]
+    return argv
+
+
+async def _download_zones(
+    storage: ObjectStorage, revision_id: uuid.UUID, sha256: str, size: int, target: Path
+) -> None:
+    """Зоны помещений из хранилища в файл попытки; sha256 и размер сверяются с заданием."""
+    if size > cad_walls_zones.MAX_ZONES_BYTES:
+        raise CadError(ErrorCode.CAD_INPUT_LIMIT_EXCEEDED, "зоны листа больше допустимого")
+    digest, received = hashlib.sha256(), 0
+    try:
+        with target.open("xb") as sink:
+            async for chunk in storage.iter_stream(cad_walls_zones.input_key(revision_id, sha256)):
+                received += len(chunk)
+                if received > cad_walls_zones.MAX_ZONES_BYTES:
+                    raise CadError(
+                        ErrorCode.CAD_INPUT_LIMIT_EXCEEDED, "зоны листа больше допустимого"
+                    )
+                digest.update(chunk)
+                sink.write(chunk)
+    except ObjectNotFoundError as error:
+        raise CadError(ErrorCode.CAD_INPUT_INVALID, "зоны листа не найдены") from error
+    except StorageUnavailableError as error:
+        raise CadError(ErrorCode.STORAGE_UNAVAILABLE, "хранилище недоступно") from error
+    if digest.hexdigest() != sha256 or received != size:
+        raise CadError(ErrorCode.CAD_INPUT_INVALID, "зоны листа не совпали с заданием")
 
 
 async def _checked_input(session: AsyncSession, job: Job) -> _Input:
@@ -214,6 +252,15 @@ async def execute_cad_walls(
         params_file = attempt_dir / "in" / params.path.name
         params_file.write_bytes(raw_params)
 
+        zones_file: Path | None = None
+        zones_sha = job.payload.get("zones_sha256")
+        if isinstance(zones_sha, str) and zones_sha:
+            zones_size = cad_mep_service.payload_int(job, "zones_size")
+            if zones_size is None:
+                raise CadError(ErrorCode.CAD_PARAMS_INVALID, "задание конструкций без размера зон")
+            zones_file = attempt_dir / "in" / "zones.json"
+            await _download_zones(storage, revision.id, zones_sha, zones_size, zones_file)
+
         out = attempt_dir / "out"
         walls_file = out / source.folder / cad_walls_service.WALLS_JSON
         walls_file.parent.mkdir(parents=True, mode=0o700)
@@ -233,6 +280,7 @@ async def execute_cad_walls(
                 out=walls_file,
                 pdf=pdf,
                 page_index=source.page_index,
+                zones=zones_file,
             ),
             limit_seconds=float(settings.cad_total_timeout_seconds),
             poll_interval=settings.worker_heartbeat_interval_seconds,
@@ -274,6 +322,7 @@ async def execute_cad_walls(
         "params_sha256": document.params_sha256,
         "dxf_sha256": document.dxf_sha256,
         "walls_sha256": files[0]["sha256"],
+        "zones_count": job.payload.get("zones_count", 0),
         "input_sha256": revision.source_sha256,
         "parent_job_id": str(source.parent.id),
         "page_index": source.page_index,

@@ -391,3 +391,78 @@ def test_project_levels_write_requires_the_section_sheet() -> None:
     ):
         with pytest.raises(ValidationError):
             CadProjectLevelsWrite.model_validate(bad)
+
+
+# ------------------------------------------------------------------ полотна дверей (cad_walls v1.4)
+
+LEAF = [[500.0, 80.0], [1500.0, 80.0], [1500.0, 120.0], [500.0, 120.0]]
+
+
+def test_door_leaf_runs_from_floor_to_door_height() -> None:
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = LEAF
+    model = build(extras=extras)
+    (door,) = model.doors
+    assert (door.opening_id, door.shell) == ("door00000001", LEAF)
+    assert (door.z_bottom_mm, door.z_top_mm) == (BASE, BASE + 2100)
+    assert (door.door_height_mm, door.door_height_source) == (2100, "assumption")
+    # Перемычка начинается там, где кончается полотно.
+    assert model.lintels[0].z_bottom_mm == door.z_top_mm
+
+
+def test_door_leaf_follows_zone_height() -> None:
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = LEAF
+    near = f3d.DoorZoneMm((500.0, 100.0), (1500.0, 100.0), 2300)
+    model = build(extras=extras, zones=[near])
+    assert model.doors[0].z_top_mm == BASE + 2300
+    assert model.doors[0].door_height_source == "manual"
+
+
+def test_no_leaf_in_walls_gives_no_doors() -> None:
+    assert build().doors == []
+
+
+def test_door_without_gap_has_no_lintel_or_leaf_and_warning_is_passed() -> None:
+    raw = raw_document()
+    raw["openings"][0]["status"] = "no_data"
+    raw["checks"]["warnings"] = [
+        {"code": "door_without_gap", "message": "дверь door00000001: разрыв стены не найден"},
+        {"code": "slab_missing", "message": "посторонний код не переносится"},
+    ]
+    extras = raw_extras(lintel=None)
+    model = f3d.build_floor3d(
+        WallsDocument.model_validate(raw),
+        WallsFloorExtras.model_validate(extras),
+        props_by_key={},
+        overrides=NO_LEVELS,
+        project_slab=None,
+        hole_decisions={},
+        door_zones=[],
+    )
+    assert model.lintels == [] and model.doors == []
+    assert codes(model) == ["door_without_gap"]
+
+
+def test_room_zones_use_the_same_frame_as_door_zones() -> None:
+    frame = {
+        "page_width_pt": 1000.0,
+        "page_height_pt": 500.0,
+        "origin_pt": (100.0, 50.0),
+        "mm_per_pdf_point": 10.0,
+    }
+    (room,) = f3d.room_zones_to_mm(
+        [f3d.RoomZoneNormalized("room_apartment", [[0.2, 0.2], [0.4, 0.2], [0.4, 0.4]])], **frame
+    )
+    (door,) = f3d.door_zones_to_mm(
+        [f3d.DoorZoneNormalized([[0.2, 0.2], [0.4, 0.2]], 2100)], **frame
+    )
+    assert room.kind == "room_apartment"
+    assert room.shell[:2] == [door.a, door.b] == [(1000.0, -500.0), (3000.0, -500.0)]
+    # Контур короче трёх точек зоной помещения не считается.
+    assert (
+        f3d.room_zones_to_mm(
+            [f3d.RoomZoneNormalized("room_mop", [[0.1, 0.1], [0.2, 0.2]])], **frame
+        )
+        == []
+    )

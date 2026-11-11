@@ -20,8 +20,9 @@ from cad_walls.heights import resolve_heights
 from cad_walls.legend import Legend, MaterialHint, material_hints, read_legend
 from cad_walls.openings import Opening, build_openings
 from cad_walls.params import Params, load_params
-from cad_walls.slab import SlabData, build_slab, lintel_shell
+from cad_walls.slab import SlabData, build_slab, leaf_shell, lintel_hull, lintel_shell, rect_along
 from cad_walls.version import GENERATOR_VERSION, SCHEMA
+from cad_walls.zones import read_zones
 
 KIND_ORDER = ("masonry", "monolith_wall", "monolith_pylon", "monolith_column")
 
@@ -44,6 +45,7 @@ class Args:
     out: Path
     pdf: Path | None = None
     page: int | None = None
+    zones: Path | None = None
 
 
 def _r(x: float) -> float:
@@ -88,9 +90,33 @@ def _construction(c: Construction, hint: MaterialHint | None = None) -> dict[str
     return item
 
 
-def _lintel(o: Opening) -> list[list[float]] | None:
-    shell = lintel_shell(o.axis_point or o.center, o.direction, o.width, o.thickness)
+def _ring_pts(shell: Sequence[tuple[float, float]] | None) -> list[list[float]] | None:
     return None if shell is None else [[_r(x), _r(y)] for x, y in shell]
+
+
+def _lintel(o: Opening) -> list[list[float]] | None:
+    """Перемычка: по торцевым сечениям, без них — прямоугольник по оси; двери без разрыва — нет."""
+    if o.kind == "door" and o.status == "no_data":
+        return None
+    shell = lintel_hull(o.sections, o.direction) or lintel_shell(
+        o.axis_point or o.center, o.direction, o.width, o.thickness
+    )
+    return _ring_pts(shell)
+
+
+def _leaf(o: Opening, thickness: float) -> list[list[float]] | None:
+    """Полотно двери в разрыве; у безымянных разрывов и дверей без разрыва его нет."""
+    if o.kind != "door" or o.status == "no_data":
+        return None
+    shell = leaf_shell(o.sections, thickness)
+    if shell is None and o.axis_point is not None and o.direction is not None:
+        half = o.width / 2
+        ax, ay = o.axis_point
+        dx, dy = o.direction
+        shell = rect_along(
+            (ax - dx * half, ay - dy * half), (ax + dx * half, ay + dy * half), thickness
+        )
+    return _ring_pts(shell)
 
 
 def _slab(data: SlabData) -> dict[str, object] | None:
@@ -116,7 +142,7 @@ def _slab_holes(data: SlabData) -> list[dict[str, object]]:
     ]
 
 
-def _opening(o: Opening) -> dict[str, object]:
+def _opening(o: Opening, leaf_mm: float) -> dict[str, object]:
     return {
         "id": o.id,
         "kind": o.kind,
@@ -131,6 +157,7 @@ def _opening(o: Opening) -> dict[str, object]:
         "center": [_r(o.center[0]), _r(o.center[1])],
         "direction": None if o.direction is None else [o.direction[0], o.direction[1]],
         "lintel": _lintel(o),
+        "leaf": _leaf(o, leaf_mm),
     }
 
 
@@ -183,8 +210,17 @@ def build(args: Args) -> Built:
     area_union = sum(p.area for polys in fill.polygons.values() for p in polys)
     area_cons = sum(c.polygon.area for c in cons)
     residue = abs(area_union - area_cons) / area_union if area_union > 0 else 0.0
-    slab = build_slab([p for polys in fill.polygons.values() for p in polys], params)
+    zones = read_zones(args.zones) if args.zones is not None else []
+    slab = build_slab([p for polys in fill.polygons.values() for p in polys], params, zones)
     issues: list[Issue] = [*fill.issues, *slab.issues]
+    issues += [
+        Issue(
+            "door_without_gap",
+            f"дверь {o.id}: разрыв стены не найден, перемычка и полотно не построены",
+        )
+        for o in openings
+        if o.kind == "door" and o.status == "no_data"
+    ]
     if residue > params.num("residue_tol"):
         issues.append(
             Issue(
@@ -203,7 +239,7 @@ def build(args: Args) -> Built:
         "legend": legend.to_json(),
         "constructions": [_construction(c, hints.get(c.id)) for c in cons],
         "frame_partitions": [_construction(c) for c in frames],
-        "openings": [_opening(o) for o in openings],
+        "openings": [_opening(o, params.num("door_leaf_thickness_mm")) for o in openings],
         "slab": _slab(slab),
         "slab_holes": _slab_holes(slab),
         "totals": _totals(cons),

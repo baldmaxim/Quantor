@@ -1,14 +1,15 @@
 """3D DXF этажа для AutoCAD по модели 3D-вида (ADR-0036 п. 6, ADR-0039).
 
 Вход - JSON модели этажа, как её отдаёт API (`CadFloor3dRead`): высоты с источниками, плита,
-отверстия плиты с решением человека, стены, перемычки; мм системы DXF плана. Выход - DXF R2018,
-единицы мм (`$INSUNITS = 4`): X и Y - как в DXF плана (без центрирования, чтобы 3D ложился на
-план), Z - абсолютные отметки из модели.
+отверстия плиты с решением человека, стены, перемычки, полотна дверей; мм системы DXF плана.
+Выход - DXF R2018, единицы мм (`$INSUNITS = 4`): X и Y - как в DXF плана (без центрирования,
+чтобы 3D ложился на план), Z - абсолютные отметки из модели.
 
-Каждая призма (плита, стена, перемычка) - замкнутая сущность MESH: низ и верх - триангуляция
-полигона с дырами, боковые грани - по каждому кольцу. Плита вырезана по отверстиям в состоянии
-`enabled` и `candidate`; `disabled` - плита сплошная. Контуры включённых и кандидатных отверстий
-дополнительно лежат полилиниями на отметке верха плиты. Площадей и объёмов в файле нет.
+Каждая призма (плита, стена, перемычка, полотно двери) - замкнутая сущность MESH: низ и верх -
+триангуляция полигона с дырами, боковые грани - по каждому кольцу. Плита вырезана по отверстиям
+в состоянии `enabled` и `candidate`; `disabled` - плита сплошная. Контуры включённых и
+кандидатных отверстий дополнительно лежат полилиниями на отметке верха плиты. Площадей и объёмов
+в файле нет.
 
 Сущности пишутся в порядке ключей модели, дата и GUID заголовка фиксированы: одна и та же модель
 даёт один и тот же файл.
@@ -35,7 +36,7 @@ from ezdxf.render.mesh import MeshVertexMerger
 
 from cad_walls.errors import WallsError
 
-GENERATOR_VERSION: Final = "cad_floor3d_dxf.v1"
+GENERATOR_VERSION: Final = "cad_floor3d_dxf.v2"
 DXF_VERSION: Final = "R2018"
 DXF_UNITS_MM: Final = 4
 PROP_PREFIX: Final = "QUANTOR_"
@@ -46,6 +47,7 @@ LAYER_SLAB: Final = "Q3D_ПЛИТА"
 LAYER_MASONRY: Final = "Q3D_КЛАДКА"
 LAYER_MONOLITH: Final = "Q3D_МОНОЛИТ"
 LAYER_LINTELS: Final = "Q3D_ПЕРЕМЫЧКИ"
+LAYER_DOORS: Final = "Q3D_ДВЕРИ"
 LAYER_HOLES: Final = "Q3D_ОТВЕРСТИЯ"
 LAYER_HOLES_CANDIDATE: Final = "Q3D_ОТВЕРСТИЯ_КАНДИДАТЫ"
 # Цвета ACI заданы явно: слои различимы в любой теме AutoCAD.
@@ -54,6 +56,7 @@ LAYER_COLORS: Final = {
     LAYER_MASONRY: 30,
     LAYER_MONOLITH: 5,
     LAYER_LINTELS: 6,
+    LAYER_DOORS: 3,
     LAYER_HOLES: 1,
     LAYER_HOLES_CANDIDATE: 2,
 }
@@ -335,6 +338,21 @@ def parse_model(raw_bytes: bytes) -> FloorModel:
         lintels.append(Prism(LAYER_LINTELS, key, shell, [], z0, z1))
     lintels.sort(key=lambda prism: prism.key)
     model.prisms.extend(lintels)
+
+    # полотна дверей (модель API с cad_walls v1.4); в старой модели ключа нет
+    doors: list[Prism] = []
+    for item in _list(raw.get("doors", []), "doors"):
+        door = _obj(item, "doors[]")
+        key = _str(door.get("opening_id"), "doors[].opening_id")
+        shell = _ring(door.get("shell"), f"doors[{key}].shell")
+        z0 = _number(door.get("z_bottom_mm"), f"doors[{key}].z_bottom_mm")
+        z1 = _number(door.get("z_top_mm"), f"doors[{key}].z_top_mm")
+        if not _usable(shell) or z0 >= z1:
+            model.skipped.append(f"дверь {key}: вырожденный контур или отметки")
+            continue
+        doors.append(Prism(LAYER_DOORS, key, shell, [], z0, z1))
+    doors.sort(key=lambda prism: prism.key)
+    model.prisms.extend(doors)
     return model
 
 

@@ -8,8 +8,10 @@
 
 Высоты (мм): отметка этажа — верх плиты; плита — от `отметка - t` до `отметка`; стена — от
 `отметка` до `отметка + (высота этажа - t)` (или своя высота конструкции от человека); перемычка
-над проёмом — от `отметка + высота двери` до верха стены. Высота двери — зона двери человека,
-содержащая середину перемычки, иначе действующая высота двери листа.
+над проёмом — от `отметка + высота двери` до верха стены; полотно двери — от `отметка` до
+`отметка + высота двери`. Высота двери — зона двери человека, содержащая середину перемычки
+(полотна), иначе действующая высота двери листа. У двери без разрыва (`no_data`) перемычки и
+полотна нет: предупреждение `door_without_gap` берётся из walls.json.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from app.contracts.cad_constructions import (
     WallsDocument,
 )
 from app.contracts.cad_floor3d import (
+    CadFloor3dDoorRead,
     CadFloor3dFamily,
     CadFloor3dHoleRead,
     CadFloor3dHoleState,
@@ -47,6 +50,8 @@ _KEY_LENGTH: Final = 12
 # Допуск: расстояние от середины перемычки до отрезка зоны двери. Человек рисует отрезок двери
 # по ширине проёма, а середина перемычки лежит на оси стены; допуск покрывает полтолщины стены.
 DOOR_ZONE_TOLERANCE_MM: Final = 300.0
+# Код предупреждения cad_walls: дверь без разрыва стены (перемычки и полотна нет).
+DOOR_WITHOUT_GAP: Final = "door_without_gap"
 
 Point = tuple[float, float]
 Ring = list[list[float]]
@@ -67,6 +72,22 @@ class DoorZoneNormalized:
 
     points: Sequence[Sequence[float]]
     height_mm: int
+
+
+@dataclass(frozen=True, slots=True)
+class RoomZoneNormalized:
+    """Зона помещения (квартира, МОП) как хранится: контур в [0, 1] от левого верхнего угла."""
+
+    kind: str
+    points: Sequence[Sequence[float]]
+
+
+@dataclass(frozen=True, slots=True)
+class RoomZoneMm:
+    """Зона помещения в мм DXF: вход контура плиты скрипта конструкций."""
+
+    kind: str
+    shell: list[Point]
 
 
 # --------------------------------------------------------------------------- геометрия
@@ -115,6 +136,28 @@ def _distance_to_segment(p: Point, a: Point, b: Point) -> float:
     return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
 
 
+def _point_to_mm(
+    nx: float,
+    ny: float,
+    *,
+    page_width_pt: float,
+    page_height_pt: float,
+    origin_pt: Point,
+    mm_per_pdf_point: float,
+) -> Point:
+    """Нормализованная точка ([0, 1] от левого верхнего угла страницы) -> мм DXF по кадру вида.
+
+    Кадр вида: `pt = origin_pt + (x_mm, -y_mm) / mm_per_pdf_point`, где `pt` — отображаемые
+    точки PDF от левого верхнего угла. Нормализованная точка -> `pt` умножением на отображаемый
+    размер страницы (тем же, что нормализует обмер, ADR-0008); обратно — по формуле кадра.
+    """
+    pt_x, pt_y = nx * page_width_pt, ny * page_height_pt
+    return (
+        (pt_x - origin_pt[0]) * mm_per_pdf_point,
+        -(pt_y - origin_pt[1]) * mm_per_pdf_point,
+    )
+
+
 def door_zones_to_mm(
     zones: Sequence[DoorZoneNormalized],
     *,
@@ -123,27 +166,53 @@ def door_zones_to_mm(
     origin_pt: Point,
     mm_per_pdf_point: float,
 ) -> list[DoorZoneMm]:
-    """Точки зон ([0, 1] от левого верхнего угла страницы) -> мм DXF по кадру вида.
-
-    Кадр вида: `pt = origin_pt + (x_mm, -y_mm) / mm_per_pdf_point`, где `pt` — отображаемые
-    точки PDF от левого верхнего угла. Нормализованная точка -> `pt` умножением на отображаемый
-    размер страницы (тем же, что нормализует обмер, ADR-0008); обратно — по формуле кадра.
-    """
+    """Точки зон двери ([0, 1] от левого верхнего угла страницы) -> мм DXF по кадру вида."""
     result: list[DoorZoneMm] = []
     for zone in zones:
         if len(zone.points) != 2:
             continue
-        converted: list[Point] = []
-        for nx, ny in zone.points:
-            pt_x, pt_y = nx * page_width_pt, ny * page_height_pt
-            converted.append(
-                (
-                    (pt_x - origin_pt[0]) * mm_per_pdf_point,
-                    -(pt_y - origin_pt[1]) * mm_per_pdf_point,
-                )
+        a, b = (
+            _point_to_mm(
+                nx,
+                ny,
+                page_width_pt=page_width_pt,
+                page_height_pt=page_height_pt,
+                origin_pt=origin_pt,
+                mm_per_pdf_point=mm_per_pdf_point,
             )
-        result.append(DoorZoneMm(converted[0], converted[1], zone.height_mm))
+            for nx, ny in zone.points
+        )
+        result.append(DoorZoneMm(a, b, zone.height_mm))
     return result
+
+
+def room_zones_to_mm(
+    zones: Sequence[RoomZoneNormalized],
+    *,
+    page_width_pt: float,
+    page_height_pt: float,
+    origin_pt: Point,
+    mm_per_pdf_point: float,
+) -> list[RoomZoneMm]:
+    """Контуры зон помещений -> мм DXF по кадру вида (тот же перевод, что у зон двери)."""
+    return [
+        RoomZoneMm(
+            zone.kind,
+            [
+                _point_to_mm(
+                    nx,
+                    ny,
+                    page_width_pt=page_width_pt,
+                    page_height_pt=page_height_pt,
+                    origin_pt=origin_pt,
+                    mm_per_pdf_point=mm_per_pdf_point,
+                )
+                for nx, ny in zone.points
+            ],
+        )
+        for zone in zones
+        if len(zone.points) >= 3
+    ]
 
 
 def _zone_height_at(point: Point, zones: Sequence[DoorZoneMm]) -> int | None:
@@ -215,6 +284,11 @@ def build_floor3d(
     """Модель этажа: плита с отверстиями, стены, перемычки, высоты с источниками, предупреждения."""
     levels = cad_constructions.effective_levels(document.heights, overrides, project_slab)
     warnings: list[CadFloor3dWarningRead] = list(extra_warnings)
+    warnings.extend(
+        CadFloor3dWarningRead(code=w.code, message=w.message)
+        for w in document.checks.warnings
+        if w.code == DOOR_WITHOUT_GAP
+    )
     outdated = extras.is_outdated
     if outdated:
         warnings.append(
@@ -276,7 +350,9 @@ def build_floor3d(
         )
 
     lintels: list[CadFloor3dLintelRead] = []
+    doors: list[CadFloor3dDoorRead] = []
     lintel_by_id = {o.id: o.lintel for o in extras.openings}
+    leaf_by_id = {o.id: o.leaf for o in extras.openings}
     sheet_top = None if wall_height is None else base + wall_height
     door_height_missing = False
     no_contour = 0
@@ -285,7 +361,9 @@ def build_floor3d(
             break
         shell = lintel_by_id.get(opening.id)
         if shell is None:
-            no_contour += 1
+            # дверь без разрыва: причина — предупреждение `door_without_gap` из walls.json
+            if not (opening.kind == "door" and opening.status == "no_data"):
+                no_contour += 1
             continue
         top = top_by_id.get(opening.host_id, sheet_top) if opening.host_id else sheet_top
         if top is None:
@@ -304,6 +382,18 @@ def build_floor3d(
         z_bottom = base + height_mm
         if z_bottom >= top:
             continue
+        leaf = leaf_by_id.get(opening.id)
+        if leaf is not None:
+            doors.append(
+                CadFloor3dDoorRead(
+                    opening_id=opening.id,
+                    shell=leaf,
+                    z_bottom_mm=base,
+                    z_top_mm=z_bottom,
+                    door_height_mm=height_mm,
+                    door_height_source=source,
+                )
+            )
         lintels.append(
             CadFloor3dLintelRead(
                 opening_id=opening.id,
@@ -351,6 +441,7 @@ def build_floor3d(
         slab_holes=_keyed_holes(extras, hole_decisions),
         walls=walls,
         lintels=lintels,
+        doors=doors,
         bbox=_bbox(rings),
         warnings=warnings,
     )

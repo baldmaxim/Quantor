@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import sys
@@ -31,6 +32,7 @@ from app.main import create_app
 from app.models import CadConstructionProps, CadSheetLevels, Job, Workspace
 from app.services import cad as cad_service
 from app.services import cad_walls as cad_walls_service
+from app.services import cad_walls_zones
 from app.services import jobs as jobs_service
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_mep import FOLDER, PARENT_DXF, _parent
@@ -42,7 +44,7 @@ STUB = """
 import argparse, hashlib, json, pathlib, sys
 
 parser = argparse.ArgumentParser()
-for name in ("dxf", "params", "out", "pdf", "page"):
+for name in ("dxf", "params", "out", "pdf", "page", "zones"):
     parser.add_argument("--" + name)
 args = parser.parse_args()
 here = pathlib.Path(__file__).parent
@@ -53,7 +55,8 @@ for name in ("dxf", "params", "pdf"):
         sys.exit(2)
 (here / "args.json").write_text(json.dumps({
     "page": args.page, "params_name": pathlib.Path(args.params).name,
-    "pdf_head": pathlib.Path(args.pdf).read_bytes()[:5].decode("latin-1")}))
+    "pdf_head": pathlib.Path(args.pdf).read_bytes()[:5].decode("latin-1"),
+    "zones": pathlib.Path(args.zones).read_text() if args.zones else None}))
 if mode == "fail":
     print(json.dumps({"code": "pdf_unreadable", "message": "PDF не открывается"}), file=sys.stderr)
     sys.exit(2)
@@ -343,7 +346,65 @@ async def test_worker_publishes_walls_json_and_result_carries_hashes(
     assert [a["name"] for a in result["artifacts"]] == [f"{FOLDER}/walls.json"]
     # Скрипт получил PDF ревизии и страницу с нуля; копия параметров названа как исходный файл.
     seen = json.loads((walls_tools / "args.json").read_text())
-    assert seen == {"page": "0", "params_name": "v1.json", "pdf_head": "%PDF-"}
+    assert seen == {"page": "0", "params_name": "v1.json", "pdf_head": "%PDF-", "zones": None}
+
+
+async def test_worker_passes_stored_zones_to_the_script(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    walls_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(walls_tools, tmp_path)
+    zones = cad_walls_zones.ZonesInput(
+        raw=b'[{"kind":"room_mop","shell":[[0,0],[1,0],[1,1]]}]',
+        sha256="",
+        count=1,
+        warning=None,
+    )
+    zones = dataclasses.replace(zones, sha256=_sha(zones.raw))
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        queued = await api.post(_url(project_id, job_id, "walls"))
+        walls = await db_session.get(Job, uuid.UUID(queued.json()["job_id"]))
+        assert walls is not None
+        walls_id = walls.id
+        await cad_walls_zones.store(
+            fake_storage,
+            revision_id=uuid.UUID(revision_id),
+            parent_id=uuid.UUID(job_id),
+            zones=zones,
+        )
+        payload = {
+            **walls.payload,
+            "zones_sha256": zones.sha256,
+            "zones_size": len(zones.raw),
+            "zones_count": 1,
+        }
+        await db_session.execute(update(Job).where(Job.id == walls_id).values(payload=payload))
+        await db_session.commit()
+        db_session.expire_all()
+        job = await _run_walls_worker(db_session, fake_storage, settings, str(walls_id))
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        seen = json.loads((walls_tools / "args.json").read_text())
+        assert seen["zones"] == zones.raw.decode()
+        assert cad_service.result_of(job)["zones_count"] == 1
+
+        # Подмена зон в хранилище: sha256 не совпал - запуска нет.
+        again = await api.post(_url(project_id, job_id, "walls"))
+        broken = await db_session.get(Job, uuid.UUID(again.json()["job_id"]))
+        assert broken is not None
+        broken_id = broken.id
+        await db_session.execute(
+            update(Job)
+            .where(Job.id == broken_id)
+            .values(payload={**broken.payload, "zones_sha256": "0" * 64, "zones_size": 5})
+        )
+        await db_session.commit()
+        db_session.expire_all()
+        job = await _run_walls_worker(db_session, fake_storage, settings, str(broken_id))
+        assert job.status is JobStatus.FAILED and job.error_code == "CAD_INPUT_INVALID"
 
 
 @pytest.mark.parametrize(

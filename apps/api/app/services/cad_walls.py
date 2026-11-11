@@ -25,7 +25,9 @@ from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
+from app.services import cad_walls_zones
 from app.services import jobs as jobs_service
+from app.storage.base import ObjectStorage
 
 log = get_logger(__name__)
 
@@ -93,8 +95,9 @@ def idempotency_key(
     params_sha256: str,
     generator_version: str,
     sequence: int,
+    zones_sha256: str = "",
 ) -> str:
-    """Тот же вид, параметры и версия скрипта — то же задание; пересчёт — следующий номер."""
+    """Тот же вид, параметры, зоны и версия скрипта — то же задание; пересчёт — следующий номер."""
     digest = hashlib.sha256(
         "|".join(
             (
@@ -104,6 +107,7 @@ def idempotency_key(
                 str(view),
                 params_sha256,
                 generator_version,
+                zones_sha256,
                 str(sequence),
             )
         ).encode()
@@ -146,9 +150,15 @@ async def walls_jobs_of_view(
 
 
 def _walls_payload(
-    parent: Job, *, page_index: int, view: int, dxf_sha256: str, params: WallsParams
+    parent: Job,
+    *,
+    page_index: int,
+    view: int,
+    dxf_sha256: str,
+    params: WallsParams,
+    zones: cad_walls_zones.ZonesInput,
 ) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "revision_id": parent.payload["revision_id"],
         "parent_job_id": str(parent.id),
         "parent_attempt": cad_service.result_of(parent).get("attempt"),
@@ -159,7 +169,14 @@ def _walls_payload(
         "params_version": params.params_version,
         "generator_version": params.generator_version,
         "engine_version": params.generator_version,
+        # зоны помещений листа для контура плиты: пусты — стены без зон (прежнее поведение)
+        "zones_sha256": zones.sha256,
+        "zones_size": len(zones.raw),
+        "zones_count": zones.count,
     }
+    if zones.warning is not None:
+        payload["zones_warning"] = zones.warning
+    return payload
 
 
 async def _enqueue(
@@ -171,6 +188,7 @@ async def _enqueue(
     dxf: dict[str, Any],
     params: WallsParams,
     sequence: int,
+    zones: cad_walls_zones.ZonesInput = cad_walls_zones.NO_ZONES,
 ) -> Job:
     attempt = cad_service.result_of(parent).get("attempt")
     return await jobs_service.enqueue(
@@ -186,9 +204,15 @@ async def _enqueue(
             params_sha256=params.sha256,
             generator_version=params.generator_version,
             sequence=sequence,
+            zones_sha256=zones.sha256,
         ),
         payload=_walls_payload(
-            parent, page_index=page_index, view=view, dxf_sha256=str(dxf["sha256"]), params=params
+            parent,
+            page_index=page_index,
+            view=view,
+            dxf_sha256=str(dxf["sha256"]),
+            params=params,
+            zones=zones,
         ),
     )
 
@@ -231,9 +255,17 @@ async def enqueue_after_convert(
 
 
 async def schedule_recompute(
-    session: AsyncSession, *, parent: Job, page_index: int, view: int, settings: Settings
+    session: AsyncSession,
+    storage: ObjectStorage,
+    *,
+    parent: Job,
+    page_index: int,
+    view: int,
+    settings: Settings,
 ) -> Job:
     """Пересчёт конструкций вида новым заданием.
+
+    Зоны квартир и МОП страницы уходят входом задания (контур плиты); нет кадра вида — без зон.
 
     Нельзя, пока задание этого вида в очереди или выполняется (409 `CAD_WALLS_BUSY`). Строка
     родителя берётся под блокировкой: два одновременных нажатия не ставят задание дважды.
@@ -249,6 +281,14 @@ async def schedule_recompute(
     existing = await walls_jobs_of_view(session, parent=parent, page_index=page_index, view=view)
     if any(job.status in _ACTIVE for job in existing):
         raise DomainError(ErrorCode.CAD_WALLS_BUSY)
+    zones = await cad_walls_zones.sheet_room_zones(
+        session, storage, parent=parent, page_index=page_index, view=view
+    )
+    revision_id = parent.payload.get("revision_id")
+    if zones.present and isinstance(revision_id, str):
+        await cad_walls_zones.store(
+            storage, revision_id=uuid.UUID(revision_id), parent_id=parent.id, zones=zones
+        )
     return await _enqueue(
         session,
         parent=parent,
@@ -257,4 +297,5 @@ async def schedule_recompute(
         dxf=dxf,
         params=load_params(settings),
         sequence=len(existing),
+        zones=zones,
     )

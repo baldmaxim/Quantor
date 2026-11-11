@@ -2,7 +2,11 @@
 
 Дверь стоит в разрыве стены: торцы участков по обе стороны разрыва лежат на одной оси.
 Торец — конец оси, продлённый вдоль неё до выхода из полигона участка. Ширина проёма — расстояние
-между торцами (`gap`); нет второй стороны — большая сторона bbox блока (`block_bbox`, оценка).
+между торцами (`gap`). Торец, касающийся другой конструкции (Т-примыкание, угол), тоже сторона
+разрыва двери. Нет пары торцов — ближайший свободный разрыв вдоль оси несущей стены; нет и его —
+проём `no_data` без перемычки и полотна (перемычка на сплошной стене не ставится никогда).
+У проёма с разрывом есть торцевые сечения стен (отрезки от грани до грани): по ним строятся
+перемычка и полотно двери.
 """
 
 from __future__ import annotations
@@ -25,6 +29,17 @@ from cad_walls.params import Params
 FloatArr = npt.NDArray[np.float64]
 MIN_BACK_MM = 100.0
 MIN_GAP_MM = 1.0
+# Сечение торца: глубина пробной линии внутрь стены, длина линии, окно вокруг оси (доля толщины)
+SECTION_DEPTHS_MM = (10.0, 40.0, 100.0)
+SECTION_REACH_MM = 3000.0
+SECTION_WINDOW = 0.8
+SECTION_MERGED_RATIO = 1.3
+# Запас зазора между торцами при проверке «разрыв свободен»
+CLEAR_SHRINK_MM = 2.0
+CLAIM_TOL_MM = 50.0
+
+Pt = tuple[float, float]
+Seg = tuple[Pt, Pt]
 
 
 @dataclass(frozen=True)
@@ -54,6 +69,10 @@ class Opening:
     direction: tuple[float, float] | None = None
     # точка на оси стены посреди проёма — центр перемычки (center двери — центр блока со створкой)
     axis_point: tuple[float, float] | None = None
+    # торцевые сечения стен по обе стороны разрыва (грань-грань); None — разрыва нет
+    sections: tuple[Seg, Seg] | None = None
+    # отрезок разрыва между серединами торцов; нужен, чтобы другой проём не занял тот же разрыв
+    span: Seg | None = None
 
 
 def _axis_point(con: Construction, center: tuple[float, float]) -> tuple[float, float] | None:
@@ -108,7 +127,7 @@ def _end_of(
         return None
     d = vec / norm
     hit = poly.intersection(LineString([origin, origin + d * (back + 3 * t)]))
-    parts = [g for g in shapely.get_parts(hit) if g.geom_type == "LineString"]
+    parts = [g for g in shapely.get_parts(hit) if g.geom_type == "LineString" and not g.is_empty]
     if not parts:
         return None
     here = min(parts, key=lambda g: g.distance(Point(origin)))
@@ -116,8 +135,8 @@ def _end_of(
     return coords[int(np.argmax(coords @ d))], d
 
 
-def free_ends(cons: list[Construction], p: Params) -> list[End]:
-    """Свободные торцы: конец оси участка, не касающийся другой конструкции или другого участка."""
+def free_ends(cons: list[Construction], p: Params, touching: bool = False) -> list[End]:
+    """Торцы участков: свободные (не касаются другой конструкции или участка) или все (touching)."""
     tol = p.num("end_contact_tol_mm")
     tree = STRtree([c.polygon for c in cons])
     out: list[End] = []
@@ -133,10 +152,11 @@ def free_ends(cons: list[Construction], p: Params) -> list[End]:
                 point, d = found
                 pt = Point(point)
                 near = tree.query(pt.buffer(tol))
-                if any(int(j) != i and cons[int(j)].polygon.distance(pt) < tol for j in near):
-                    continue
-                if any(k2 != k and part.distance(pt) < tol for k2, part in enumerate(parts)):
-                    continue
+                if not touching:
+                    if any(int(j) != i and cons[int(j)].polygon.distance(pt) < tol for j in near):
+                        continue
+                    if any(k2 != k and part.distance(pt) < tol for k2, part in enumerate(parts)):
+                        continue
                 out.append(End(i, point, d, k))
     return out
 
@@ -193,7 +213,98 @@ def _unique(openings: list[Opening]) -> list[Opening]:
     return openings
 
 
-def _door_opening(door: Door, ends: list[End], cons: list[Construction], p: Params) -> Opening:
+def _round_pt(pt: FloatArr) -> Pt:
+    return (round(float(pt[0]), 3), round(float(pt[1]), 3))
+
+
+def _section(
+    poly: shapely.Polygon, q: FloatArr, inward: FloatArr, d: FloatArr, t_end: float
+) -> Seg | None:
+    """Сечение стены у торца: отрезок поперёк d от грани до грани на линии торца (через точку q).
+
+    Пробная линия идёт чуть внутри стены от торца; берётся кусок, ближайший к оси. Окно вокруг
+    оси — 0,8 толщины стены торца; кусок длиннее 1,3 толщины (в полигон склеена перпендикулярная
+    стена) сжимается до самой толщины.
+    """
+    n = np.array([-d[1], d[0]], dtype=np.float64)
+    for depth in SECTION_DEPTHS_MM:
+        c = q + inward * depth
+        line = LineString([c - n * SECTION_REACH_MM, c + n * SECTION_REACH_MM])
+        pieces: list[tuple[float, float]] = []
+        for g in shapely.get_parts(poly.intersection(line)):
+            if g.geom_type != "LineString" or g.length < MIN_GAP_MM:
+                continue
+            us = sorted(float((np.asarray(xy, dtype=np.float64) - q) @ n) for xy in g.coords)
+            pieces.append((us[0], us[-1]))
+        if not pieces:
+            continue
+        lo0, hi0 = min(
+            pieces, key=lambda r: 0.0 if r[0] <= 0 <= r[1] else min(abs(r[0]), abs(r[1]))
+        )
+        half = SECTION_WINDOW * t_end
+        if hi0 - lo0 > SECTION_MERGED_RATIO * t_end:
+            half = min(half, t_end / 2)
+        lo, hi = max(lo0, -half), min(hi0, half)
+        if hi - lo < MIN_GAP_MM:
+            continue
+        return (_round_pt(q + n * lo), _round_pt(q + n * hi))
+    return None
+
+
+def _sections(cons: list[Construction], a: End, b: End) -> tuple[Seg, Seg] | None:
+    sa = _section(
+        cons[a.owner].polygon, a.point, -a.direction, a.direction, cons[a.owner].thickness
+    )
+    sb = _section(
+        cons[b.owner].polygon, b.point, -b.direction, a.direction, cons[b.owner].thickness
+    )
+    return None if sa is None or sb is None else (sa, sb)
+
+
+def _clear(a: End, b: End, tree: STRtree) -> bool:
+    """Отрезок между торцами не пересекает ни одну конструкцию (края отступом не считаются)."""
+    v = b.point - a.point
+    norm = float(np.hypot(*v))
+    if norm <= 2 * CLEAR_SHRINK_MM:
+        return True
+    u = v / norm
+    seg = LineString([a.point + u * CLEAR_SHRINK_MM, b.point - u * CLEAR_SHRINK_MM])
+    return len(tree.query(seg, predicate="intersects")) == 0
+
+
+def _pair_opening(door: Door, a: End, b: End, gap: float, cons: list[Construction]) -> Opening:
+    owners = sorted({a.owner, b.owner}, key=lambda i: cons[i].id)
+    host = _host(cons, owners)
+    return Opening(
+        id=_opening_id("door", door.handle, door.center),
+        kind="door",
+        status="ok",
+        host_id=host.id,
+        adjacent_ids=[cons[i].id for i in owners],
+        width=gap,
+        width_source="gap",
+        thickness=host.thickness,
+        block_name=door.block_name,
+        handle=door.handle,
+        center=door.center,
+        direction=unit_direction(float(a.direction[0]), float(a.direction[1])),
+        axis_point=(
+            round(float(a.point[0] + b.point[0]) / 2, 3),
+            round(float(a.point[1] + b.point[1]) / 2, 3),
+        ),
+        sections=_sections(cons, a, b),
+        span=(_round_pt(a.point), _round_pt(b.point)),
+    )
+
+
+def _door_by_ends(
+    door: Door,
+    ends: list[End],
+    cons: list[Construction],
+    p: Params,
+    tree: STRtree | None,
+) -> Opening | None:
+    """Дверь в разрыве между двумя торцами; `tree` — проверка, что разрыв между ними свободен."""
     reach = door.max_side + p.num("door_gap_tol_mm")
     cos_split = math.cos(math.radians(p.num("split_angle_deg")))
     center = np.asarray(door.center, dtype=np.float64)
@@ -207,52 +318,150 @@ def _door_opening(door: Door, ends: list[End], cons: list[Construction], p: Para
             dist = _seg_dist(center, a.point, b.point)
             if dist > door.max_side / 2 + p.num("door_gap_tol_mm"):
                 continue
+            if tree is not None and not _clear(a, b, tree):
+                continue
             score = gap + 2 * dist
             if best is None or score < best[0]:
                 best = (score, a, b, gap)
-    if best is not None:
-        _, a, b, gap = best
-        owners = sorted({a.owner, b.owner}, key=lambda i: cons[i].id)
-        host = _host(cons, owners)
-        return Opening(
-            id=_opening_id("door", door.handle, door.center),
-            kind="door",
-            status="ok",
-            host_id=host.id,
-            adjacent_ids=[cons[i].id for i in owners],
-            width=gap,
-            width_source="gap",
-            thickness=host.thickness,
-            block_name=door.block_name,
-            handle=door.handle,
-            center=door.center,
-            direction=unit_direction(float(a.direction[0]), float(a.direction[1])),
-            axis_point=(
-                round(float(a.point[0] + b.point[0]) / 2, 3),
-                round(float(a.point[1] + b.point[1]) / 2, 3),
-            ),
-        )
-    near_owners = sorted({e.owner for e in near}, key=lambda i: cons[i].id)
-    near_host = _host(cons, near_owners) if near_owners else None
+    if best is None:
+        return None
+    _, a, b, gap = best
+    return _pair_opening(door, a, b, gap, cons)
+
+
+def _solid_runs(
+    origin: FloatArr, d: FloatArr, lo: float, hi: float, cons: list[Construction], tree: STRtree
+) -> list[tuple[float, float, int, int]]:
+    """Занятые конструкциями отрезки линии: (начало, конец, владелец начала, владелец конца)."""
+    line = LineString([origin + d * lo, origin + d * hi])
+    raw: list[tuple[float, float, int]] = []
+    for j in tree.query(line, predicate="intersects"):
+        for g in shapely.get_parts(cons[int(j)].polygon.intersection(line)):
+            if g.geom_type != "LineString":
+                continue
+            ss = sorted(float((np.asarray(xy, dtype=np.float64) - origin) @ d) for xy in g.coords)
+            raw.append((ss[0], ss[-1], int(j)))
+    raw.sort()
+    runs: list[tuple[float, float, int, int]] = []
+    for start, end, j in raw:
+        if runs and start <= runs[-1][1] + MIN_GAP_MM:
+            s0, e0, o0, oe = runs[-1]
+            runs[-1] = (s0, max(e0, end), o0, j if end > e0 else oe)
+        else:
+            runs.append((start, end, j, j))
+    return runs
+
+
+def _search_gap(
+    door: Door,
+    cons: list[Construction],
+    tree: STRtree,
+    p: Params,
+    claimed: list[Seg],
+) -> Opening | None:
+    """Ближайший свободный разрыв вдоль оси несущей стены рядом с блоком двери."""
+    reach = door.max_side + p.num("door_gap_tol_mm")
+    min_gap = p.num("min_gap_mm")
+    pt = Point(door.center)
+    near = sorted(
+        (cons[int(j)].polygon.distance(pt), cons[int(j)].id, int(j))
+        for j in tree.query(pt.buffer(reach))
+    )
+    center = np.asarray(door.center, dtype=np.float64)
+    tried: list[tuple[FloatArr, FloatArr]] = []
+    best: tuple[tuple[float, float], FloatArr, FloatArr, float, float, int, int] | None = None
+    for dist0, _, j in near:
+        if dist0 > reach:
+            continue
+        unit = _axis_direction(cons[j], door.center)
+        origin_pt = _axis_point(cons[j], door.center)
+        if unit is None or origin_pt is None:
+            continue
+        d = np.asarray(unit, dtype=np.float64)
+        origin = np.asarray(origin_pt, dtype=np.float64)
+        nrm = np.array([-d[1], d[0]])
+        if any(
+            abs(float(d @ td)) > 0.996 and abs(float((origin - to) @ nrm)) < CLAIM_TOL_MM
+            for td, to in tried
+        ):
+            continue
+        tried.append((d, origin))
+        s_c = float((center - origin) @ d)
+        runs = _solid_runs(origin, d, s_c - 2 * reach, s_c + 2 * reach, cons, tree)
+        for left, right in pairwise(runs):
+            lo, hi = left[1], right[0]
+            width = hi - lo
+            if width < min_gap or width > reach:
+                continue
+            dist = 0.0 if lo <= s_c <= hi else min(abs(s_c - lo), abs(s_c - hi))
+            if dist > reach:
+                continue
+            mid = origin + d * (lo + hi) / 2
+            if any(
+                _seg_dist(mid, np.asarray(a), np.asarray(b)) <= CLAIM_TOL_MM for a, b in claimed
+            ):
+                continue
+            if best is None or (dist, width) < best[0]:
+                best = ((dist, width), origin, d, lo, hi, left[3], right[2])
+    if best is None:
+        return None
+    _, origin, d, lo, hi, left_owner, right_owner = best
+    owners = sorted({left_owner, right_owner}, key=lambda i: cons[i].id)
+    host = _host(cons, owners)
+    q_lo, q_hi = origin + d * lo, origin + d * hi
+    sa = _section(cons[left_owner].polygon, q_lo, -d, d, cons[left_owner].thickness)
+    sb = _section(cons[right_owner].polygon, q_hi, d, d, cons[right_owner].thickness)
+    mid = origin + d * (lo + hi) / 2
     return Opening(
         id=_opening_id("door", door.handle, door.center),
         kind="door",
-        status="estimate",
-        host_id=near_host.id if near_host else None,
-        adjacent_ids=[cons[i].id for i in near_owners],
-        width=door.max_side,
-        width_source="block_bbox",
-        thickness=near_host.thickness if near_host else None,
+        status="ok",
+        host_id=host.id,
+        adjacent_ids=[cons[i].id for i in owners],
+        width=hi - lo,
+        width_source="gap",
+        thickness=host.thickness,
         block_name=door.block_name,
         handle=door.handle,
         center=door.center,
-        direction=_axis_direction(near_host, door.center) if near_host else None,
-        axis_point=_axis_point(near_host, door.center) if near_host else None,
+        direction=unit_direction(float(d[0]), float(d[1])),
+        axis_point=_round_pt(mid),
+        sections=None if sa is None or sb is None else (sa, sb),
+        span=(_round_pt(q_lo), _round_pt(q_hi)),
+    )
+
+
+def _door_without_gap(door: Door, cons: list[Construction], tree: STRtree, p: Params) -> Opening:
+    """Разрыва рядом нет: проём без данных — ни перемычки, ни полотна."""
+    reach = door.max_side + p.num("door_gap_tol_mm")
+    pt = Point(door.center)
+    near = sorted(
+        (cons[int(j)].polygon.distance(pt), cons[int(j)].id, int(j))
+        for j in tree.query(pt.buffer(reach))
+    )
+    host = cons[near[0][2]] if near and near[0][0] <= reach else None
+    return Opening(
+        id=_opening_id("door", door.handle, door.center),
+        kind="door",
+        status="no_data",
+        host_id=host.id if host else None,
+        adjacent_ids=[host.id] if host else [],
+        width=door.max_side,
+        width_source="block_bbox",
+        thickness=host.thickness if host else None,
+        block_name=door.block_name,
+        handle=door.handle,
+        center=door.center,
+        direction=_axis_direction(host, door.center) if host else None,
     )
 
 
 def _gap_openings(
-    ends: list[End], cons: list[Construction], doors: list[Door], p: Params
+    ends: list[End],
+    cons: list[Construction],
+    doors: list[Door],
+    p: Params,
+    claimed: list[Seg],
 ) -> list[Opening]:
     """Соосные разрывы одного номинала без двери: вероятно окно или портал."""
     cos_split = math.cos(math.radians(p.num("split_angle_deg")))
@@ -283,7 +492,9 @@ def _gap_openings(
             <= d.max_side / 2 + p.num("door_gap_tol_mm")
             for d in doors
         )
-        if covered:
+        if covered or any(
+            _seg_dist(mid, np.asarray(c0), np.asarray(c1)) <= CLAIM_TOL_MM for c0, c1 in claimed
+        ):
             continue
         owners = sorted({a.owner, b.owner}, key=lambda k: cons[k].id)
         host = _host(cons, owners)
@@ -301,14 +512,30 @@ def _gap_openings(
                 handle=None,
                 center=center,
                 direction=unit_direction(float(a.direction[0]), float(a.direction[1])),
+                sections=_sections(cons, a, b),
             )
         )
     return out
 
 
 def build_openings(cons: list[Construction], doors: list[Door], p: Params) -> list[Opening]:
-    ends = free_ends(cons, p)
-    openings = [_door_opening(d, ends, cons, p) for d in doors]
-    openings += _gap_openings(ends, cons, doors, p)
+    free = free_ends(cons, p)
+    tree = STRtree([c.polygon for c in cons])
+    every = free_ends(cons, p, touching=True)
+    found: list[Opening | None] = []
+    claimed: list[Seg] = []
+    for door in doors:
+        op = _door_by_ends(door, free, cons, p, None) or _door_by_ends(door, every, cons, p, tree)
+        if op is not None and op.span is not None:
+            claimed.append(op.span)
+        found.append(op)
+    openings: list[Opening] = []
+    for door, op in zip(doors, found, strict=True):
+        if op is None:
+            op = _search_gap(door, cons, tree, p, claimed) or _door_without_gap(door, cons, tree, p)
+            if op.span is not None:
+                claimed.append(op.span)
+        openings.append(op)
+    openings += _gap_openings(free, cons, doors, p, claimed)
     openings.sort(key=lambda o: (o.kind, o.center[1], o.center[0], o.id))
     return _unique(openings)
