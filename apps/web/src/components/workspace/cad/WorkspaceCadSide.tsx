@@ -14,6 +14,7 @@ import { CadViewHeader } from '@/components/cad/viewer/CadViewHeader';
 import { CadZonesPanel } from '@/components/cad/viewer/CadZonesPanel';
 import { Button, ErrorState, Skeleton, SkeletonRows } from '@/components/ui';
 
+import { ConstructionsPanel } from './ConstructionsPanel';
 import type { IWorkspaceCadSideProps } from './types';
 import { WorkspaceCadConvert } from './WorkspaceCadConvert';
 
@@ -24,6 +25,7 @@ const HINT = 'p-[var(--s-5)] text-xs text-muted';
  * задание листа рабочей области.
  *
  * Раздел «Зоны» - разметка помещений и дверей листа - есть и у листа без задания.
+ * Раздел «Конструкции» (кладка и монолит, ADR-0038) - у листа с видом.
  * Показано только задание открытого листа. Лист без задания получает кнопку «Преобразовать лист
  * в CAD», с идущим или упавшим заданием - только раздел «Задание» (у упавшего та же кнопка):
  * диагностики вида у него нет. Ширину и сворачивание панели ведёт каркас рабочей области.
@@ -39,6 +41,7 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
   viewError,
   view,
   zones = null,
+  constructions = null,
 }) => {
   // Раздел живёт здесь: при переходе на другой лист панель остаётся на выбранном разделе.
   const [sideTab, setSideTab] = useState('layers');
@@ -171,6 +174,15 @@ export const WorkspaceCadSide: FC<IWorkspaceCadSideProps> = ({
           ? [{ id: 'mep', label: 'Трассы', content: <CadMepPanel {...view.mep} /> }]
           : []),
         ...(zonesTab ? [zonesTab] : []),
+        ...(constructions
+          ? [
+              {
+                id: 'constructions',
+                label: 'Конструкции',
+                content: <ConstructionsPanel {...constructions} />,
+              },
+            ]
+          : []),
         jobTab,
       ]
     : [...(zonesTab ? [zonesTab] : []), jobTab];

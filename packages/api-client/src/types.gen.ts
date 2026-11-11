@@ -319,6 +319,18 @@ export type Availability = 'available' | 'unavailable' | 'not_checked';
 export type BlockerCode = 'NETWORK_INVALID' | 'DECISION_BLOCKS_QUANTITY' | 'CLASS_UNRESOLVED' | 'PARAMETER_MISSING' | 'PARAMETER_UNRESOLVED' | 'NODE_SYSTEM_AMBIGUOUS' | 'NO_SCALE' | 'CROSS_SHEET_PLANAR' | 'ELEVATION_INCOMPLETE' | 'LENGTH_UNDETERMINED' | 'FITTING_RULES_NOT_APPROVED';
 
 /**
+ * Body_upload_cad_vor
+ */
+export type BodyUploadCadVor = {
+    /**
+     * File
+     *
+     * Книга Excel .xlsx с ВОР
+     */
+    file: Blob | File;
+};
+
+/**
  * Body_upload_file
  */
 export type BodyUploadFile = {
@@ -600,6 +612,453 @@ export type CadChecksRead = {
 };
 
 /**
+ * CadComputedSourcesRead
+ */
+export type CadComputedSourcesRead = {
+    /**
+     * Door Height
+     */
+    door_height: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    /**
+     * Height
+     */
+    height: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    /**
+     * Thickness
+     */
+    thickness: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+};
+
+/**
+ * CadConstructionComputedRead
+ *
+ * Вычисленные величины конструкции. Не определено — `None`.
+ */
+export type CadConstructionComputedRead = {
+    /**
+     * Height Mm
+     */
+    height_mm: number | null;
+    /**
+     * Length M
+     */
+    length_m: number | null;
+    sources: CadComputedSourcesRead;
+    /**
+     * Status
+     */
+    status: 'ok' | 'thickness_check' | 'height_missing';
+    /**
+     * Thickness Mm
+     */
+    thickness_mm: number | null;
+    /**
+     * Volume M3
+     */
+    volume_m3: number | null;
+    /**
+     * Wall Area M2
+     */
+    wall_area_m2: number | null;
+    /**
+     * Warnings
+     */
+    warnings: Array<'thickness_check' | 'height_missing' | 'opening_no_data' | 'opening_estimate' | 'material_check'>;
+};
+
+/**
+ * CadConstructionGroupRead
+ *
+ * Итог группы «вид x толщина x материал»; в группу входят только конструкции со статусом ok.
+ *
+ * Материал — действующий (ввод человека или документ). У каркасной перегородки `volume_m3` —
+ * `None`: она меряется площадью.
+ */
+export type CadConstructionGroupRead = {
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Kind
+     */
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition';
+    /**
+     * Length M
+     */
+    length_m: number;
+    /**
+     * Material
+     */
+    material: 'aerated_concrete' | 'expanded_clay_block' | 'ceramic_block' | 'brick_solid' | 'brick_hollow' | 'silicate_block' | 'gypsum_tongue_groove' | 'monolith_concrete' | 'other' | null;
+    /**
+     * Thickness Mm
+     */
+    thickness_mm: number;
+    /**
+     * Volume M3
+     */
+    volume_m3: number | null;
+    /**
+     * Wall Area M2
+     */
+    wall_area_m2: number;
+};
+
+/**
+ * CadConstructionMaterialRead
+ *
+ * Действующий материал: ввод человека, иначе подсказка из условных обозначений.
+ */
+export type CadConstructionMaterialRead = {
+    /**
+     * Evidence
+     */
+    evidence: Array<WallsHintEvidence>;
+    /**
+     * Hint Status
+     */
+    hint_status: 'matched' | 'not_in_legend' | 'conflict' | 'no_legend' | null;
+    /**
+     * Source
+     */
+    source: 'manual' | 'document' | null;
+    /**
+     * Value
+     */
+    value: 'aerated_concrete' | 'expanded_clay_block' | 'ceramic_block' | 'brick_solid' | 'brick_hollow' | 'silicate_block' | 'gypsum_tongue_groove' | 'monolith_concrete' | 'other' | null;
+};
+
+/**
+ * CadConstructionProps
+ *
+ * Параметры конструкции. Все поля необязательные; пустое поле — не задано.
+ */
+export type CadConstructionProps = {
+    /**
+     * Block Height Mm
+     *
+     * Высота блока или кирпича, мм
+     */
+    block_height_mm?: number | null;
+    /**
+     * Block Length Mm
+     *
+     * Длина блока или кирпича, мм
+     */
+    block_length_mm?: number | null;
+    /**
+     * Block Width Mm
+     *
+     * Ширина (толщина по кладке) блока, мм
+     */
+    block_width_mm?: number | null;
+    /**
+     * Brick Layout
+     *
+     * Кладка кирпича: half - в полкирпича; one - в один кирпич; one_and_half - в полтора кирпича; two - в два кирпича
+     */
+    brick_layout?: 'half' | 'one' | 'one_and_half' | 'two' | null;
+    /**
+     * Count Openings
+     *
+     * Учитывать надпроёмные части дверей в объёме и площади стены
+     */
+    count_openings?: boolean;
+    /**
+     * Density Grade
+     *
+     * Марка по плотности, например D500
+     */
+    density_grade?: string | null;
+    /**
+     * Fire Rating
+     *
+     * Предел огнестойкости, например EI 150
+     */
+    fire_rating?: string | null;
+    /**
+     * Height Override Mm
+     *
+     * Высота конструкции вместо расчётной, мм
+     */
+    height_override_mm?: number | null;
+    /**
+     * Joint Mm
+     *
+     * Толщина шва, мм
+     */
+    joint_mm?: number | null;
+    /**
+     * Material
+     *
+     * Материал: aerated_concrete - газобетон; expanded_clay_block - керамзитобетонный блок; ceramic_block - керамический блок; brick_solid - кирпич полнотелый; brick_hollow - кирпич пустотелый; silicate_block - силикатный блок; gypsum_tongue_groove - пазогребневая плита; monolith_concrete - монолитный железобетон; other - другое
+     */
+    material?: 'aerated_concrete' | 'expanded_clay_block' | 'ceramic_block' | 'brick_solid' | 'brick_hollow' | 'silicate_block' | 'gypsum_tongue_groove' | 'monolith_concrete' | 'other' | null;
+    /**
+     * Material Note
+     *
+     * Уточнение материала (свободный текст)
+     */
+    material_note?: string | null;
+    /**
+     * Mortar
+     *
+     * Раствор: glue - клей; cement_sand - цементно-песчаный; other - другой
+     */
+    mortar?: 'glue' | 'cement_sand' | 'other' | null;
+    /**
+     * Note
+     *
+     * Примечание
+     */
+    note?: string | null;
+    /**
+     * Purpose
+     *
+     * Назначение: external - наружная; inter_apartment - межквартирная; interior - внутренняя; mop - стена МОП; shaft - шахта; other - другое
+     */
+    purpose?: 'external' | 'inter_apartment' | 'interior' | 'mop' | 'shaft' | 'other' | null;
+    /**
+     * Reinforcement
+     *
+     * Армирование кладки или монолита
+     */
+    reinforcement?: string | null;
+    /**
+     * Sound Rw Db
+     *
+     * Индекс звукоизоляции Rw, дБ
+     */
+    sound_rw_db?: number | null;
+    /**
+     * Strength Class
+     *
+     * Класс или марка по прочности: B2,5, B25, М150
+     */
+    strength_class?: string | null;
+    /**
+     * Thickness Override Mm
+     *
+     * Толщина вместо номинала скрипта, мм
+     */
+    thickness_override_mm?: number | null;
+};
+
+/**
+ * CadConstructionPropsBulk
+ *
+ * Частичное слияние параметров в несколько конструкций («применить ко всем этой толщины»).
+ *
+ * В `props_patch` применяются только переданные поля; поле, переданное как null, снимает
+ * значение у каждой конструкции.
+ */
+export type CadConstructionPropsBulk = {
+    /**
+     * Accepted
+     *
+     * Принято человеком; не передано - прежнее значение
+     */
+    accepted?: boolean | null;
+    /**
+     * Keys
+     */
+    keys: Array<string>;
+    props_patch: CadConstructionProps;
+};
+
+/**
+ * CadConstructionPropsPut
+ *
+ * Параметры одной конструкции целиком (заменяют хранимые) и признак «принято человеком».
+ */
+export type CadConstructionPropsPut = {
+    /**
+     * Accepted
+     *
+     * Принято человеком; не передано - прежнее значение
+     */
+    accepted?: boolean | null;
+    props: CadConstructionProps;
+};
+
+/**
+ * CadConstructionRead
+ *
+ * Конструкция: геометрия из walls.json, вычисленные величины, параметры человека.
+ */
+export type CadConstructionRead = {
+    /**
+     * Accepted
+     */
+    accepted: boolean;
+    /**
+     * Area Plan M2
+     */
+    area_plan_m2: number;
+    /**
+     * Bbox
+     */
+    bbox: Array<number>;
+    /**
+     * Centroid
+     */
+    centroid: Array<number>;
+    computed: CadConstructionComputedRead;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition';
+    material: CadConstructionMaterialRead;
+    polygon: WallsPolygon;
+    props: CadConstructionProps;
+    /**
+     * Source Layers
+     */
+    source_layers: Array<string>;
+    /**
+     * Thickness Measured Mm
+     */
+    thickness_measured_mm: number;
+    /**
+     * Thickness Nominal Mm
+     */
+    thickness_nominal_mm: number | null;
+    /**
+     * Thickness Status
+     */
+    thickness_status: 'matched' | 'check';
+};
+
+/**
+ * CadConstructionsBulkRead
+ */
+export type CadConstructionsBulkRead = {
+    /**
+     * Changed
+     */
+    changed: number;
+    heights: CadHeightsRead;
+    sheet_levels: CadSheetLevelsRead;
+    summary: CadConstructionsSummaryRead;
+    /**
+     * Totals
+     */
+    totals: Array<CadConstructionGroupRead>;
+};
+
+/**
+ * CadConstructionsRead
+ *
+ * Конструкции вида по последнему успешному заданию `cad_walls`.
+ */
+export type CadConstructionsRead = {
+    /**
+     * Constructions
+     */
+    constructions: Array<CadConstructionRead>;
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256: string;
+    /**
+     * Generator
+     */
+    generator: string;
+    heights: CadHeightsRead;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    latest_walls_job?: CadLatestWallsJobRead | null;
+    /**
+     * Openings
+     */
+    openings: Array<CadOpeningRead>;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Params Sha256
+     */
+    params_sha256: string;
+    /**
+     * Params Version
+     */
+    params_version: string;
+    sheet_levels: CadSheetLevelsRead;
+    summary: CadConstructionsSummaryRead;
+    /**
+     * Totals
+     */
+    totals: Array<CadConstructionGroupRead>;
+    /**
+     * View
+     */
+    view: number;
+    /**
+     * Walls Job Id
+     */
+    walls_job_id: string;
+    /**
+     * Walls Sha256
+     */
+    walls_sha256: string;
+    /**
+     * Warnings
+     */
+    warnings: Array<CadWallsWarningRead>;
+};
+
+/**
+ * CadConstructionsSummaryRead
+ *
+ * Что в итоги групп не вошло.
+ */
+export type CadConstructionsSummaryRead = {
+    /**
+     * Door Openings Without Host
+     */
+    door_openings_without_host: number;
+    /**
+     * Height Missing Count
+     */
+    height_missing_count: number;
+    /**
+     * Thickness Check Count
+     */
+    thickness_check_count: number;
+    /**
+     * Total Count
+     */
+    total_count: number;
+    /**
+     * Unaccounted Gap Openings
+     */
+    unaccounted_gap_openings: number;
+};
+
+/**
+ * CadConstructionsTotalsRead
+ *
+ * Итоги листа после пересчёта.
+ */
+export type CadConstructionsTotalsRead = {
+    heights: CadHeightsRead;
+    sheet_levels: CadSheetLevelsRead;
+    summary: CadConstructionsSummaryRead;
+    /**
+     * Totals
+     */
+    totals: Array<CadConstructionGroupRead>;
+};
+
+/**
  * CadConvertCreate
  *
  * Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.
@@ -795,6 +1254,202 @@ export type CadEventsRead = {
 };
 
 /**
+ * CadFloor3dHolePut
+ *
+ * Решение человека по отверстию: включено (есть отверстие) или выключено (плита сплошная).
+ */
+export type CadFloor3dHolePut = {
+    /**
+     * Enabled
+     */
+    enabled: boolean;
+};
+
+/**
+ * CadFloor3dHoleRead
+ *
+ * Отверстие плиты. `candidate` — решения человека нет: рисуется как отверстие, но помечено.
+ */
+export type CadFloor3dHoleRead = {
+    /**
+     * Area M2
+     */
+    area_m2: number;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
+    /**
+     * State
+     */
+    state: 'candidate' | 'enabled' | 'disabled';
+};
+
+/**
+ * CadFloor3dLintelRead
+ *
+ * Перемычка над проёмом: от высоты двери до верха стены.
+ */
+export type CadFloor3dLintelRead = {
+    /**
+     * Door Height Mm
+     */
+    door_height_mm: number;
+    /**
+     * Door Height Source
+     */
+    door_height_source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    /**
+     * Kind
+     */
+    kind: 'door' | 'gap';
+    /**
+     * Opening Id
+     */
+    opening_id: string;
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
+    /**
+     * Z Bottom Mm
+     */
+    z_bottom_mm: number;
+    /**
+     * Z Top Mm
+     */
+    z_top_mm: number;
+};
+
+/**
+ * CadFloor3dRead
+ *
+ * Модель этажа в мм системы DXF, как `polygon.shell` конструкций.
+ */
+export type CadFloor3dRead = {
+    /**
+     * Base Z Mm
+     */
+    base_z_mm: number;
+    /**
+     * Bbox
+     */
+    bbox: Array<number> | null;
+    /**
+     * Elevation Known
+     */
+    elevation_known: boolean;
+    /**
+     * Generator
+     */
+    generator: string;
+    heights: CadHeightsRead;
+    /**
+     * Lintels
+     */
+    lintels: Array<CadFloor3dLintelRead>;
+    slab: CadFloor3dSlabRead | null;
+    /**
+     * Slab Holes
+     */
+    slab_holes: Array<CadFloor3dHoleRead>;
+    /**
+     * Units
+     */
+    units: 'mm';
+    /**
+     * Walls
+     */
+    walls: Array<CadFloor3dWallRead>;
+    /**
+     * Warnings
+     */
+    warnings: Array<CadFloor3dWarningRead>;
+};
+
+/**
+ * CadFloor3dSlabRead
+ *
+ * Плита этажа: верх — отметка этажа, низ — отметка минус толщина плиты.
+ */
+export type CadFloor3dSlabRead = {
+    /**
+     * Area M2
+     */
+    area_m2: number;
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
+    /**
+     * Z Bottom Mm
+     */
+    z_bottom_mm: number | null;
+    /**
+     * Z Top Mm
+     */
+    z_top_mm: number;
+};
+
+/**
+ * CadFloor3dWallRead
+ *
+ * Призма стены или пилона: обвод из walls.json и отметки низа и верха.
+ */
+export type CadFloor3dWallRead = {
+    /**
+     * Construction Key
+     */
+    construction_key: string;
+    /**
+     * Family
+     */
+    family: 'masonry' | 'monolith';
+    /**
+     * Holes
+     */
+    holes: Array<Array<Array<number>>>;
+    /**
+     * Kind
+     */
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition';
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
+    /**
+     * Thickness Nominal Mm
+     */
+    thickness_nominal_mm: number | null;
+    /**
+     * Z Bottom Mm
+     */
+    z_bottom_mm: number;
+    /**
+     * Z Top Mm
+     */
+    z_top_mm: number | null;
+};
+
+/**
+ * CadFloor3dWarningRead
+ */
+export type CadFloor3dWarningRead = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
  * CadFrameRead
  *
  * Кадр координат DXF (мм) -> PDF (pt от левого верхнего угла страницы).
@@ -826,6 +1481,45 @@ export type CadFrameRead = {
      * Units
      */
     units: string | null;
+};
+
+/**
+ * CadHeightsRead
+ *
+ * Высоты листа с источниками. Не определилось — `None` («требует ввода»), не 0.
+ */
+export type CadHeightsRead = {
+    door_height: CadLevelValueRead;
+    /**
+     * Evidence
+     */
+    evidence: string | null;
+    /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm: number | null;
+    /**
+     * Floor Elevation Source
+     */
+    floor_elevation_source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    floor_height: CadLevelValueRead;
+    /**
+     * Message
+     */
+    message: string | null;
+    slab_thickness: CadLevelValueRead;
+    /**
+     * Slab Thickness Sheet Ref
+     */
+    slab_thickness_sheet_ref?: string | null;
+    /**
+     * Wall Height Mm
+     */
+    wall_height_mm: number | null;
+    /**
+     * Wall Height Source
+     */
+    wall_height_source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
 };
 
 /**
@@ -1045,6 +1739,51 @@ export type CadJobSummaryRead = {
 };
 
 /**
+ * CadLatestWallsJobRead
+ *
+ * Самое свежее задание `cad_walls` вида, в том числе незавершённое или упавшее.
+ */
+export type CadLatestWallsJobRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    status: JobStatus;
+};
+
+/**
+ * CadLevelValueRead
+ *
+ * Величина высоты: действующее значение, происхождение и значение из walls.json.
+ */
+export type CadLevelValueRead = {
+    /**
+     * Default Mm
+     */
+    default_mm: number | null;
+    /**
+     * Source
+     */
+    source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    /**
+     * Value Mm
+     */
+    value_mm: number | null;
+};
+
+/**
  * CadMepAttemptRead
  *
  * Попытка route-задания: что запросил человек и что получилось (история расчётов).
@@ -1126,6 +1865,56 @@ export type CadMepRoutesCreate = {
      * Floor Height Mm
      */
     floor_height_mm?: number | null;
+};
+
+/**
+ * CadOpeningRead
+ */
+export type CadOpeningRead = {
+    /**
+     * Adjacent Ids
+     */
+    adjacent_ids: Array<string>;
+    /**
+     * Block Name
+     */
+    block_name: string | null;
+    /**
+     * Center
+     */
+    center: Array<number>;
+    /**
+     * Handle
+     */
+    handle: string | null;
+    /**
+     * Host Id
+     */
+    host_id: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'door' | 'gap';
+    /**
+     * Status
+     */
+    status: 'ok' | 'estimate' | 'no_data';
+    /**
+     * Thickness Mm
+     */
+    thickness_mm: number | null;
+    /**
+     * Width Mm
+     */
+    width_mm: number;
+    /**
+     * Width Source
+     */
+    width_source: string;
 };
 
 /**
@@ -1284,6 +2073,46 @@ export type CadProgressViewRead = {
      * View
      */
     view: number;
+};
+
+/**
+ * CadProjectLevelsRead
+ *
+ * Уровни проекта; записи нет — все поля `null`.
+ */
+export type CadProjectLevelsRead = {
+    /**
+     * Slab Source Ref
+     */
+    slab_source_ref: string | null;
+    /**
+     * Slab Thickness Mm
+     */
+    slab_thickness_mm: number | null;
+    /**
+     * Updated At
+     */
+    updated_at: string | null;
+};
+
+/**
+ * CadProjectLevelsWrite
+ *
+ * Толщина плиты проекта из разрезов; пустая толщина снимает значение.
+ */
+export type CadProjectLevelsWrite = {
+    /**
+     * Slab Source Ref
+     *
+     * Лист разреза, например «АР1.1 л. 45, разрез 4-4»; обязателен при толщине
+     */
+    slab_source_ref?: string | null;
+    /**
+     * Slab Thickness Mm
+     *
+     * Толщина плиты по разрезам, мм
+     */
+    slab_thickness_mm?: number | null;
 };
 
 /**
@@ -1716,6 +2545,62 @@ export type CadScaleRead = {
 };
 
 /**
+ * CadSheetLevelsRead
+ *
+ * Переопределения человека (пусто — значение из walls.json).
+ */
+export type CadSheetLevelsRead = {
+    /**
+     * Door Height Mm
+     */
+    door_height_mm: number | null;
+    /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm?: number | null;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number | null;
+    /**
+     * Slab Thickness Mm
+     */
+    slab_thickness_mm: number | null;
+};
+
+/**
+ * CadSheetLevelsWrite
+ *
+ * Высоты листа, заданные человеком. Пустое поле — значение из walls.json.
+ */
+export type CadSheetLevelsWrite = {
+    /**
+     * Door Height Mm
+     *
+     * Высота дверного проёма, мм
+     */
+    door_height_mm?: number | null;
+    /**
+     * Floor Elevation Mm
+     *
+     * Отметка этажа = верх плиты, мм
+     */
+    floor_elevation_mm?: number | null;
+    /**
+     * Floor Height Mm
+     *
+     * Высота этажа (пол - пол), мм
+     */
+    floor_height_mm?: number | null;
+    /**
+     * Slab Thickness Mm
+     *
+     * Толщина плиты перекрытия, мм
+     */
+    slab_thickness_mm?: number | null;
+};
+
+/**
  * CadStageRead
  *
  * Этап вида, как его записал движок. Ключ — один из семи этапов штатного worker.
@@ -1867,6 +2752,315 @@ export type CadViewRead = {
      * View
      */
     view: number;
+};
+
+/**
+ * CadVorCoverageGroupRead
+ *
+ * Группа итогов листа и связанные с ней строки ВОР.
+ */
+export type CadVorCoverageGroupRead = {
+    /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Items
+     */
+    items: Array<CadVorItemRead>;
+    /**
+     * Kind
+     */
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition';
+    /**
+     * Material
+     */
+    material: 'aerated_concrete' | 'expanded_clay_block' | 'ceramic_block' | 'brick_solid' | 'brick_hollow' | 'silicate_block' | 'gypsum_tongue_groove' | 'monolith_concrete' | 'other' | null;
+    /**
+     * Status
+     */
+    status: 'linked' | 'not_in_vor';
+    /**
+     * Thickness Mm
+     */
+    thickness_mm: number;
+};
+
+/**
+ * CadVorCoverageRead
+ *
+ * Сверка листа с ВОР: что из конструкций листа в ВОР не вошло.
+ */
+export type CadVorCoverageRead = {
+    /**
+     * Groups
+     */
+    groups: Array<CadVorCoverageGroupRead>;
+    /**
+     * Has Vor
+     */
+    has_vor: boolean;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Not In Vor Keys
+     */
+    not_in_vor_keys: Array<string>;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Thickness Not In Vor
+     */
+    thickness_not_in_vor: Array<string>;
+    /**
+     * View
+     */
+    view: number;
+    /**
+     * Vor Thicknesses
+     */
+    vor_thicknesses: Array<number>;
+};
+
+/**
+ * CadVorDocumentRead
+ */
+export type CadVorDocumentRead = {
+    /**
+     * Columns
+     */
+    columns: Array<CadVorSheetColumnsRead>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Header Row
+     */
+    header_row: number;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Rows Count
+     */
+    rows_count: number;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Sheet Names
+     */
+    sheet_names: Array<string>;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Uploaded By
+     */
+    uploaded_by: string | null;
+};
+
+/**
+ * CadVorItemRead
+ *
+ * Строка ВОР; `quantity` - справочно.
+ */
+export type CadVorItemRead = {
+    /**
+     * Code
+     */
+    code: string | null;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind Hint
+     */
+    kind_hint: 'masonry' | 'monolith' | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Quantity
+     */
+    quantity: number | null;
+    /**
+     * Row No
+     */
+    row_no: number;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Sheet
+     */
+    sheet: string;
+    /**
+     * Thickness Hint Mm
+     */
+    thickness_hint_mm: number | null;
+    /**
+     * Unit
+     */
+    unit: string | null;
+};
+
+/**
+ * CadVorItemsRead
+ */
+export type CadVorItemsRead = {
+    /**
+     * Items
+     */
+    items: Array<CadVorItemRead>;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * CadVorLinkRead
+ */
+export type CadVorLinkRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Id
+     */
+    id: string;
+    item: CadVorItemRead;
+};
+
+/**
+ * CadVorLinksWrite
+ *
+ * Полный набор строк ВОР группы: прежние связи группы заменяются.
+ */
+export type CadVorLinksWrite = {
+    /**
+     * Vor Item Ids
+     */
+    vor_item_ids?: Array<string>;
+};
+
+/**
+ * CadVorSheetColumnsRead
+ *
+ * Какие колонки распознаны на листе: роль -> номер колонки с единицы.
+ */
+export type CadVorSheetColumnsRead = {
+    /**
+     * Columns
+     */
+    columns: {
+        [key: string]: number;
+    };
+    /**
+     * Header Row
+     */
+    header_row: number;
+    /**
+     * Rows Count
+     */
+    rows_count: number;
+    /**
+     * Sheet
+     */
+    sheet: string;
+};
+
+/**
+ * CadVorSuggestionRead
+ *
+ * Строка-кандидат для группы: подсказка, связь ставит человек.
+ */
+export type CadVorSuggestionRead = {
+    item: CadVorItemRead;
+    /**
+     * Reasons
+     */
+    reasons: Array<'thickness' | 'kind' | 'material'>;
+    /**
+     * Score
+     */
+    score: number;
+};
+
+/**
+ * CadWallsJobRead
+ *
+ * Задание `cad_walls`, поставленное на пересчёт конструкций вида.
+ */
+export type CadWallsJobRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Parent Job Id
+     */
+    parent_job_id: string;
+    status: JobStatus;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadWallsWarningRead
+ */
+export type CadWallsWarningRead = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
 };
 
 /**
@@ -8360,9 +9554,9 @@ export type GeometryIssueCode = 'too_few_vertices' | 'duplicate_vertex' | 'degen
  * совпало с числом листов, доверять нельзя ни одной. Частично извлечённой геометрии не
  * бывает (ADR-0016).
  *
- * Отдельно от `ProcessingStatus`: тот описывает импорт распознанного пакета и у обычного
- * PDF навсегда остаётся `unprocessed`. Одно поле на два независимых процесса означало бы,
- * что успех одного стирает отказ другого.
+ * Отдельно от `ProcessingStatus`: тот описывает распознавание — у PDF он `unprocessed`,
+ * пока к ревизии не прикреплён распознанный пакет, и `ready` после (ADR-0037). Одно поле
+ * на два независимых процесса означало бы, что успех одного стирает отказ другого.
  */
 export type GeometryStatus = 'not_applicable' | 'pending' | 'extracting' | 'ready' | 'failed';
 
@@ -8566,7 +9760,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls';
 
 /**
  * LengthUnit
@@ -11631,6 +12825,47 @@ export type Vertex = {
      * Z Mm
      */
     z_mm?: number | null;
+};
+
+/**
+ * WallsHintEvidence
+ *
+ * Строка условных обозначений, по которой подобран материал.
+ */
+export type WallsHintEvidence = {
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
+ * WallsPolygon
+ *
+ * Контур в мм DXF: внешнее кольцо и отверстия, без повторного замыкающего узла.
+ */
+export type WallsPolygon = {
+    /**
+     * Holes
+     */
+    holes: Array<Array<Array<number>>>;
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
 };
 
 /**
@@ -15164,6 +16399,332 @@ export type UpdateProjectResponses = {
 
 export type UpdateProjectResponse = UpdateProjectResponses[keyof UpdateProjectResponses];
 
+export type ReadCadProjectLevelsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/levels';
+};
+
+export type ReadCadProjectLevelsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadProjectLevelsError = ReadCadProjectLevelsErrors[keyof ReadCadProjectLevelsErrors];
+
+export type ReadCadProjectLevelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadProjectLevelsRead;
+};
+
+export type ReadCadProjectLevelsResponse = ReadCadProjectLevelsResponses[keyof ReadCadProjectLevelsResponses];
+
+export type PutCadProjectLevelsData = {
+    body: CadProjectLevelsWrite;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/levels';
+};
+
+export type PutCadProjectLevelsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutCadProjectLevelsError = PutCadProjectLevelsErrors[keyof PutCadProjectLevelsErrors];
+
+export type PutCadProjectLevelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadProjectLevelsRead;
+};
+
+export type PutCadProjectLevelsResponse = PutCadProjectLevelsResponses[keyof PutCadProjectLevelsResponses];
+
+export type ListCadVorDocumentsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/vor';
+};
+
+export type ListCadVorDocumentsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCadVorDocumentsError = ListCadVorDocumentsErrors[keyof ListCadVorDocumentsErrors];
+
+export type ListCadVorDocumentsResponses = {
+    /**
+     * Response List Cad Vor Documents
+     *
+     * Successful Response
+     */
+    200: Array<CadVorDocumentRead>;
+};
+
+export type ListCadVorDocumentsResponse = ListCadVorDocumentsResponses[keyof ListCadVorDocumentsResponses];
+
+export type UploadCadVorData = {
+    body: BodyUploadCadVor;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/vor';
+};
+
+export type UploadCadVorErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadCadVorError = UploadCadVorErrors[keyof UploadCadVorErrors];
+
+export type UploadCadVorResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadVorDocumentRead;
+};
+
+export type UploadCadVorResponse = UploadCadVorResponses[keyof UploadCadVorResponses];
+
+export type ListCadVorLinksData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/vor/links';
+};
+
+export type ListCadVorLinksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCadVorLinksError = ListCadVorLinksErrors[keyof ListCadVorLinksErrors];
+
+export type ListCadVorLinksResponses = {
+    /**
+     * Response List Cad Vor Links
+     *
+     * Successful Response
+     */
+    200: Array<CadVorLinkRead>;
+};
+
+export type ListCadVorLinksResponse = ListCadVorLinksResponses[keyof ListCadVorLinksResponses];
+
+export type PutCadVorLinksData = {
+    body: CadVorLinksWrite;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Group Key
+         */
+        group_key: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/vor/links/{group_key}';
+};
+
+export type PutCadVorLinksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutCadVorLinksError = PutCadVorLinksErrors[keyof PutCadVorLinksErrors];
+
+export type PutCadVorLinksResponses = {
+    /**
+     * Response Put Cad Vor Links
+     *
+     * Successful Response
+     */
+    200: Array<CadVorItemRead>;
+};
+
+export type PutCadVorLinksResponse = PutCadVorLinksResponses[keyof PutCadVorLinksResponses];
+
+export type SuggestCadVorItemsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Group Key
+         */
+        group_key: string;
+        /**
+         * Document Id
+         *
+         * Документ; по умолчанию - текущий
+         */
+        document_id?: string | null;
+    };
+    url: '/api/v1/projects/{project_id}/cad/vor/suggest';
+};
+
+export type SuggestCadVorItemsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SuggestCadVorItemsError = SuggestCadVorItemsErrors[keyof SuggestCadVorItemsErrors];
+
+export type SuggestCadVorItemsResponses = {
+    /**
+     * Response Suggest Cad Vor Items
+     *
+     * Successful Response
+     */
+    200: Array<CadVorSuggestionRead>;
+};
+
+export type SuggestCadVorItemsResponse = SuggestCadVorItemsResponses[keyof SuggestCadVorItemsResponses];
+
+export type DeleteCadVorDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/vor/{document_id}';
+};
+
+export type DeleteCadVorDocumentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteCadVorDocumentError = DeleteCadVorDocumentErrors[keyof DeleteCadVorDocumentErrors];
+
+export type DeleteCadVorDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteCadVorDocumentResponse = DeleteCadVorDocumentResponses[keyof DeleteCadVorDocumentResponses];
+
+export type ListCadVorItemsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: {
+        /**
+         * Q
+         *
+         * Слова наименования
+         */
+        q?: string | null;
+        /**
+         * Kind
+         */
+        kind?: 'masonry' | 'monolith' | null;
+        /**
+         * Thickness
+         *
+         * Толщина, мм
+         */
+        thickness?: number | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/vor/{document_id}/items';
+};
+
+export type ListCadVorItemsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCadVorItemsError = ListCadVorItemsErrors[keyof ListCadVorItemsErrors];
+
+export type ListCadVorItemsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadVorItemsRead;
+};
+
+export type ListCadVorItemsResponse = ListCadVorItemsResponses[keyof ListCadVorItemsResponses];
+
 export type ListCadZonesData = {
     body?: never;
     path: {
@@ -15234,6 +16795,350 @@ export type CreateCadZoneResponses = {
 };
 
 export type CreateCadZoneResponse = CreateCadZoneResponses[keyof CreateCadZoneResponses];
+
+export type ReadCadConstructionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/constructions';
+};
+
+export type ReadCadConstructionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadConstructionsError = ReadCadConstructionsErrors[keyof ReadCadConstructionsErrors];
+
+export type ReadCadConstructionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadConstructionsRead;
+};
+
+export type ReadCadConstructionsResponse = ReadCadConstructionsResponses[keyof ReadCadConstructionsResponses];
+
+export type BulkCadConstructionPropsData = {
+    body: CadConstructionPropsBulk;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/constructions/props:bulk';
+};
+
+export type BulkCadConstructionPropsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BulkCadConstructionPropsError = BulkCadConstructionPropsErrors[keyof BulkCadConstructionPropsErrors];
+
+export type BulkCadConstructionPropsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadConstructionsBulkRead;
+};
+
+export type BulkCadConstructionPropsResponse = BulkCadConstructionPropsResponses[keyof BulkCadConstructionPropsResponses];
+
+export type PutCadConstructionPropsData = {
+    body: CadConstructionPropsPut;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+        /**
+         * Construction Key
+         */
+        construction_key: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/constructions/{construction_key}/props';
+};
+
+export type PutCadConstructionPropsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutCadConstructionPropsError = PutCadConstructionPropsErrors[keyof PutCadConstructionPropsErrors];
+
+export type PutCadConstructionPropsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadConstructionRead;
+};
+
+export type PutCadConstructionPropsResponse = PutCadConstructionPropsResponses[keyof PutCadConstructionPropsResponses];
+
+export type ReadCadFloor3dData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/floor3d';
+};
+
+export type ReadCadFloor3dErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadFloor3dError = ReadCadFloor3dErrors[keyof ReadCadFloor3dErrors];
+
+export type ReadCadFloor3dResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadFloor3dRead;
+};
+
+export type ReadCadFloor3dResponse = ReadCadFloor3dResponses[keyof ReadCadFloor3dResponses];
+
+export type PutCadFloor3dHoleData = {
+    body: CadFloor3dHolePut;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+        /**
+         * Hole Key
+         */
+        hole_key: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/floor3d/holes/{hole_key}';
+};
+
+export type PutCadFloor3dHoleErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutCadFloor3dHoleError = PutCadFloor3dHoleErrors[keyof PutCadFloor3dHoleErrors];
+
+export type PutCadFloor3dHoleResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadFloor3dRead;
+};
+
+export type PutCadFloor3dHoleResponse = PutCadFloor3dHoleResponses[keyof PutCadFloor3dHoleResponses];
+
+export type PutCadSheetLevelsData = {
+    body: CadSheetLevelsWrite;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/levels';
+};
+
+export type PutCadSheetLevelsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutCadSheetLevelsError = PutCadSheetLevelsErrors[keyof PutCadSheetLevelsErrors];
+
+export type PutCadSheetLevelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadConstructionsTotalsRead;
+};
+
+export type PutCadSheetLevelsResponse = PutCadSheetLevelsResponses[keyof PutCadSheetLevelsResponses];
+
+export type ReadCadVorCoverageData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/vor-coverage';
+};
+
+export type ReadCadVorCoverageErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadVorCoverageError = ReadCadVorCoverageErrors[keyof ReadCadVorCoverageErrors];
+
+export type ReadCadVorCoverageResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadVorCoverageRead;
+};
+
+export type ReadCadVorCoverageResponse = ReadCadVorCoverageResponses[keyof ReadCadVorCoverageResponses];
+
+export type RecomputeCadWallsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/walls';
+};
+
+export type RecomputeCadWallsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RecomputeCadWallsError = RecomputeCadWallsErrors[keyof RecomputeCadWallsErrors];
+
+export type RecomputeCadWallsResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadWallsJobRead;
+};
+
+export type RecomputeCadWallsResponse = RecomputeCadWallsResponses[keyof RecomputeCadWallsResponses];
 
 export type ListProjectDocumentsData = {
     body?: never;

@@ -25,6 +25,10 @@
 # Генератор трасс механики: образ cad-worker копирует каталог целиком, образ API - только
 # params/v1.json и cad_mep/version.py (см. Dockerfile.api).
 !tools/cad_mep
+# Скрипт конструкций (ADR-0038): образ cad-worker копирует каталог целиком, образ API - только
+# params/v1.json и cad_walls/version.py (см. Dockerfile.api); тесты в образы не нужны.
+!tools/cad_walls
+tools/cad_walls/tests
 
 # Внутри разрешённого — только исходники, без артефактов сборки и окружений.
 **/node_modules

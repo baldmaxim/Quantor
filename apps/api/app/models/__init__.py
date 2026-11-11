@@ -2,8 +2,11 @@
 
 from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
+from app.models.cad_construction import CadConstructionProps, CadSheetLevels
 from app.models.cad_decision import CadDecision
+from app.models.cad_project_levels import CadProjectLevels, CadSlabHoleDecision
 from app.models.cad_remark import CadRemark
+from app.models.cad_vor import CadVorDocument, CadVorItem, CadVorLink
 from app.models.cad_zone import CadZone
 from app.models.calc import (
     CalcFact,
@@ -38,8 +41,15 @@ from app.models.worker import Worker
 __all__ = [
     "AuditEvent",
     "AuthSession",
+    "CadConstructionProps",
     "CadDecision",
+    "CadProjectLevels",
     "CadRemark",
+    "CadSheetLevels",
+    "CadSlabHoleDecision",
+    "CadVorDocument",
+    "CadVorItem",
+    "CadVorLink",
     "CadZone",
     "CalcExpectedQuantity",
     "CalcFact",

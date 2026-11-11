@@ -8,6 +8,8 @@
 `model.auto`, и этот флаг закрыт до условий ADR-0035.
 Пилот CAD PDF→DXF (3D DXF для AutoCAD вместо Revit) — [ADR-0036](docs/adr/0036-pilot-cad-v-boyu-i-3d-dxf.md): флаг
 `cad.export` на одно пространство, отдельный сервис `quantor-cad-worker`; PyMuPDF, Shapely и Pillow — только в его образе.
+Подсчёт кладки и монолита в пилоте CAD и сверка с ВОР Заказчика — [ADR-0038](docs/adr/0038-podschyot-kladki-i-monolita-v-pilote-cad.md):
+контур «Конструкции CAD» за `cad.export`, скрипт `tools/cad_walls` в исполнителе CAD, не обмер и не calc.
 Работа ведётся по пакету промтов `_prompts/stage2b_ai_geometry_qwen/` строго по порядку,
 по одному промту за раз. Параллельно идёт изолированный MEP-эксперимент по пакету
 `_prompts/mep_p_to_rd_v3/` (раздел «MEP-эксперимент» ниже). Третий трек — расчётный контур стадии П

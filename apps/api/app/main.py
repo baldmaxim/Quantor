@@ -18,7 +18,10 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from app import API_VERSION
 from app.api import health
 from app.api.v1.cad import qa_router as cad_qa_router
+from app.api.v1.cad_constructions import qa_router as cad_constructions_qa_router
+from app.api.v1.cad_floor3d import qa_router as cad_floor3d_qa_router
 from app.api.v1.cad_mep import qa_router as cad_mep_qa_router
+from app.api.v1.cad_vor import qa_router as cad_vor_qa_router
 from app.api.v1.cad_zones import qa_router as cad_zones_qa_router
 from app.api.v1.router import api_v1_router
 from app.auth.session_cookie import SessionCookieMiddleware
@@ -96,6 +99,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cad_qa_router)
     app.include_router(cad_mep_qa_router)
     app.include_router(cad_zones_qa_router)
+    app.include_router(cad_constructions_qa_router)
+    # ВОР Заказчика как объект сверки конструкций CAD (ADR-0038 п. 5).
+    app.include_router(cad_vor_qa_router)
+    # 3D-вид этажа (ADR-0039).
+    app.include_router(cad_floor3d_qa_router)
     return app
 
 

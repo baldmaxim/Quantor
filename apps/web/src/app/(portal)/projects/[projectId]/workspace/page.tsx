@@ -15,6 +15,7 @@ import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
 import { resolveLeftTab } from '@/components/workspace/cad/left-tab';
+import { CadConstructionPicker } from '@/components/workspace/cad/CadConstructionPicker';
 import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
 import { WorkspaceCadBar } from '@/components/workspace/cad/WorkspaceCadBar';
 import { WorkspaceCadLeft } from '@/components/workspace/cad/WorkspaceCadLeft';
@@ -828,6 +829,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
               />
               {cad.capture && <CadRemarkCapture {...cad.capture} />}
               {cad.zoneCapture && <CadZoneCapture {...cad.zoneCapture} />}
+              {cad.constructionPicker && (
+                <CadConstructionPicker {...cad.constructionPicker} disabled={activeTool === 'scale'} />
+              )}
               {draftPhase === 'complete' && draftA && draftB && sheetId && (
                 <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">
                   <ScaleDialog

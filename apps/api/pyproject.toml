@@ -25,6 +25,9 @@ dependencies = [
     "pypdf==6.18.0",
     # Хеш паролей локального входа — argon2id (ADR-0031). Лицензия MIT.
     "argon2-cffi==25.1.0",
+    # Чтение XLSX с ВОР Заказчика в контуре «Конструкции CAD» (ADR-0038 п. 5). Лицензия MIT.
+    # Только read_only + data_only: формулы не вычисляются, макросы и внешние связи не читаются.
+    "openpyxl==3.1.5",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +37,7 @@ dev = [
     "ruff==0.16.6",
     "mypy==2.3.1",
     "types-aioboto3[s3]==15.5.0",
+    "types-openpyxl==3.1.5.20261017",
 ]
 
 [build-system]

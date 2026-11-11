@@ -14,6 +14,7 @@ import type { BboxPt, IRemarkBinding } from '@/lib/cad/remarks';
 import { composePainters, createRemarksPainter } from '@/lib/cad/remarks-painter';
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import { useStoredNumber } from '@/lib/cad/useStoredNumber';
+import { createConstructionsPainter } from '@/lib/cad/constructions-painter';
 import { createZonesPainter } from '@/lib/cad/zones-painter';
 import { formatNumber } from '@/lib/cad/view-format';
 import {
@@ -37,11 +38,13 @@ import { tabFromQuery } from './left-tab';
 import { mepLayersOf, mepOf } from './mep-side';
 import type {
   IWorkspaceCadBarProps,
+  IWorkspaceCadConstructionPicker,
   IWorkspaceCadLayers,
   IWorkspaceCadLeftProps,
   IWorkspaceCadSideProps,
   WorkspaceCadState,
 } from './types';
+import { useWorkspaceCadConstructions } from './useWorkspaceCadConstructions';
 import { useWorkspaceCadJob } from './useWorkspaceCadJob';
 import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
 import { useWorkspaceCadRoutes } from './useWorkspaceCadRoutes';
@@ -91,6 +94,8 @@ export interface IWorkspaceCad {
   side: IWorkspaceCadSideProps;
   /** Данные слоя рисования зоны; `null` - режим рисования выключен. */
   zoneCapture: IWorkspaceCadZonesState['capture'];
+  /** Выбор конструкции щелчком и её карточка; `null` - выбор выключен. */
+  constructionPicker: IWorkspaceCadConstructionPicker | null;
 }
 
 const NO_LAYERS: ReadonlySet<number> = new Set<number>();
@@ -265,27 +270,49 @@ export const useWorkspaceCad = ({
     active,
     remarksCapturing: remarks.capturing,
   });
+
+  // --- конструкции листа: кладка и монолит с величинами (ADR-0038) ---
+  const constructionsState = useWorkspaceCadConstructions({
+    params,
+    frame,
+    pageSize,
+    camera,
+    load: enabled && opened && revisionId !== null,
+    active,
+    blocked: remarks.capturing || zonesState.capture !== null,
+  });
+  const constructionsPainter = useMemo(
+    () =>
+      constructionsState.paintData
+        ? createConstructionsPainter(constructionsState.paintData, { clear: cadPainter === null })
+        : null,
+    [constructionsState.paintData, cadPainter],
+  );
+
   const zonesPainter = useMemo(
     () =>
       zonesState.paintData
-        ? createZonesPainter(zonesState.paintData, { clear: cadPainter === null })
+        ? createZonesPainter(zonesState.paintData, {
+            clear: cadPainter === null && constructionsPainter === null,
+          })
         : null,
-    [zonesState.paintData, cadPainter],
+    [zonesState.paintData, cadPainter, constructionsPainter],
   );
 
   const painter = useMemo<LayerPainter | null>(
     () =>
       composePainters(
         cadPainter,
+        constructionsPainter,
         zonesPainter,
         remarks.marks.length > 0
           ? createRemarksPainter(
               { marks: remarks.marks, colors: colors.remarks, activeId: remarks.activeId },
-              { clear: cadPainter === null && zonesPainter === null },
+              { clear: cadPainter === null && constructionsPainter === null && zonesPainter === null },
             )
           : null,
       ),
-    [cadPainter, zonesPainter, remarks.marks, remarks.activeId, colors.remarks],
+    [cadPainter, constructionsPainter, zonesPainter, remarks.marks, remarks.activeId, colors.remarks],
   );
 
   // --- переходы: всё в адрес рабочей области ---
@@ -392,6 +419,7 @@ export const useWorkspaceCad = ({
     regionsVisible: cadRegionsVisible,
     onRegionsVisibleChange: setCadRegionsVisible,
     regionsAvailable: overlayVisible,
+    constructions: constructionsState.layers,
   };
 
   const side: IWorkspaceCadSideProps = {
@@ -446,6 +474,7 @@ export const useWorkspaceCad = ({
         }
       : null,
     zones: zonesState.zones,
+    constructions: constructionsState.side,
   };
 
   return {
@@ -461,5 +490,6 @@ export const useWorkspaceCad = ({
     bar,
     side,
     zoneCapture: zonesState.capture,
+    constructionPicker: constructionsState.picker,
   };
 };

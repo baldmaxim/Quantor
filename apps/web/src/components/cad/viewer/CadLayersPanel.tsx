@@ -34,6 +34,11 @@ interface ICadLayersPanelProps {
   onRegionsVisibleChange: (visible: boolean) => void;
   /** Слой распознавания включён на панели инструментов; нет - флажок недоступен. */
   regionsAvailable: boolean;
+  /** Слой «Конструкции» (кладка и монолит листа); нет - переключателя нет. */
+  constructions?: {
+    visible: boolean;
+    onVisibleChange: (visible: boolean) => void;
+  } | null;
   /** Трассы механики выбранного route-задания; нет - группы нет. */
   mep?: {
     /** Имена слоёв DXF трасс. */
@@ -68,6 +73,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   regionsVisible,
   onRegionsVisibleChange,
   regionsAvailable,
+  constructions = null,
   mep = null,
 }) => {
   const groups = useMemo(() => groupLayers(layers), [layers]);
@@ -91,6 +97,21 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
             : 'Слой распознавания выключен на панели инструментов'}
         </p>
       </div>
+
+      {constructions && (
+        <div className="flex min-w-0 flex-col">
+          <label className={CHECK}>
+            <input
+              type="checkbox"
+              checked={constructions.visible}
+              onChange={(event) => constructions.onVisibleChange(event.target.checked)}
+              className="size-5 shrink-0"
+            />
+            Конструкции
+          </label>
+          <p className="text-xs text-muted">Кладка и монолит с величинами поверх чертежа</p>
+        </div>
+      )}
 
       {previewAvailable && (
         <div className="flex min-w-0 flex-col">

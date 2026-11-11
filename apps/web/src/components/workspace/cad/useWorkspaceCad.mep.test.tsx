@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { diagnostics, preview, SHA } from '@/components/cad/viewer/fixtures';
+import type * as ConstructionQueries from '@/lib/cad/constructions-queries';
+import type * as VorQueries from '@/lib/cad/vor-queries';
 import type * as ViewQueries from '@/lib/cad/view-queries';
 import { MEP_HIDDEN_KEY } from '@/lib/cad/mep-layers';
 import { resetStoredNumbers } from '@/lib/cad/useStoredNumber';
@@ -81,6 +83,28 @@ vi.mock('@/lib/cad/zones-queries', () => ({
   useCreateCadZone: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateCadZone: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteCadZone: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+vi.mock('@/lib/cad/constructions-queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof ConstructionQueries>()),
+  useCadConstructions: () => ({
+    data: undefined,
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useRecomputeCadWalls: () => ({ mutate: vi.fn(), isPending: false }),
+  useSaveConstructionProps: () => ({ mutate: vi.fn(), isPending: false }),
+  useBulkConstructionProps: () => ({ mutate: vi.fn(), isPending: false }),
+  useSaveSheetLevels: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+vi.mock('@/lib/cad/vor-queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof VorQueries>()),
+  useCadVorDocuments: () => ({ data: undefined, isPending: false, isError: false, error: null }),
+  useCadVorCoverage: () => ({ data: undefined, isPending: false, isError: false, error: null }),
+  useUploadCadVor: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
+  useDeleteCadVor: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
 }));
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof ViewQueries>()),

@@ -36,7 +36,11 @@ vi.mock('@/components/cad/viewer/CadFilesSection', () => ({
 
 import type { CadJobRead } from '@quantor/api-client';
 
-import type { IWorkspaceCadSideProps, IWorkspaceCadZones } from './types';
+import type {
+  IWorkspaceCadConstructions,
+  IWorkspaceCadSideProps,
+  IWorkspaceCadZones,
+} from './types';
 import { WorkspaceCadSide } from './WorkspaceCadSide';
 
 const DETAIL = { job_id: 'j1', attempt: 2, result_attempt: 1 } as CadJobRead;
@@ -239,5 +243,32 @@ describe('WorkspaceCadSide', () => {
     expect(screen.getByText('Лист не преобразовывался')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Зоны' }));
     expect(screen.getByText('панель зон')).toBeVisible();
+  });
+  it('раздел «Конструкции» стоит перед «Заданием», его слой - в панели слоёв', () => {
+    const constructions: IWorkspaceCadConstructions = {
+      status: 'not-ready',
+      data: null,
+      notReadyText: 'Конструкции этого листа ещё не считались.',
+      loadError: null,
+      onReload: vi.fn(),
+      calculating: false,
+      actionError: null,
+      onCompute: vi.fn(),
+      levelsSaving: false,
+      onSaveLevels: vi.fn(),
+      activeGroup: null,
+      onSelectGroup: vi.fn(),
+    };
+    mount({ constructions });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Слои',
+      'Замечания',
+      'Масштаб',
+      'Файлы',
+      'Конструкции',
+      'Задание',
+    ]);
+    fireEvent.click(screen.getByRole('tab', { name: 'Конструкции' }));
+    expect(screen.getByRole('button', { name: 'Посчитать конструкции' })).toBeVisible();
   });
 });

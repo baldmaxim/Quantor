@@ -1,0 +1,487 @@
+"""Контракты контура «Конструкции CAD» (ADR-0038): параметры конструкций, высоты листа, расчёт.
+
+Здесь три группы моделей:
+
+- вход скрипта `tools/cad_walls` — разбор `walls.json` (схема `quantor.cad_walls.v1`), лишние поля
+  игнорируются, нужные проверяются; исполнитель и API разбирают файл одной и той же схемой;
+- данные человека — параметры конструкции и переопределения высот листа;
+- ответы API — конструкции с вычисленными величинами, проёмы и итоги.
+
+Величины контура не входят в итоги обмера и не пишутся в таблицы обмера, MEP и calc. Не
+определено — `None`, а не 0.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Final, Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.domain import JobStatus
+
+WALLS_SCHEMA: Final = "quantor.cad_walls.v1"
+MAX_BULK_KEYS: Final = 2000
+
+# Происхождение величины: observed - прочитано из документации; derived - выведено из неё;
+# assumption - допущение параметров скрипта; manual - ввод человека.
+CadValueSource = Literal["observed", "derived", "assumption", "manual"]
+CadConstructionKind = Literal[
+    "masonry", "monolith_wall", "monolith_pylon", "monolith_column", "frame_partition"
+]
+CadComputedStatus = Literal["ok", "thickness_check", "height_missing"]
+CadConstructionWarning = Literal[
+    "thickness_check", "height_missing", "opening_no_data", "opening_estimate", "material_check"
+]
+# Материал из условных обозначений: matched - найден; not_in_legend - толщины нет в легенде;
+# conflict - в легенде несколько материалов; no_legend - легенды на листе нет (ADR-0040).
+CadMaterialHintStatus = Literal["matched", "not_in_legend", "conflict", "no_legend"]
+CadMaterialSource = Literal["manual", "document"]
+
+# Материал: газобетон, керамзитобетонный блок, керамический блок, кирпич полнотелый,
+# кирпич пустотелый, силикатный блок, пазогребневая плита, монолитный железобетон, другое.
+CadMaterial = Literal[
+    "aerated_concrete",
+    "expanded_clay_block",
+    "ceramic_block",
+    "brick_solid",
+    "brick_hollow",
+    "silicate_block",
+    "gypsum_tongue_groove",
+    "monolith_concrete",
+    "other",
+]
+CadBrickLayout = Literal["half", "one", "one_and_half", "two"]
+CadMortar = Literal["glue", "cement_sand", "other"]
+CadPurpose = Literal["external", "inter_apartment", "interior", "mop", "shaft", "other"]
+
+
+# --------------------------------------------------------------------------- walls.json
+
+
+class WallsPolygon(BaseModel):
+    """Контур в мм DXF: внешнее кольцо и отверстия, без повторного замыкающего узла."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    shell: list[list[float]]
+    holes: list[list[list[float]]]
+
+
+class WallsHintEvidence(BaseModel):
+    """Строка условных обозначений, по которой подобран материал."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    text: str = Field(max_length=200)
+    page_index: int
+    bbox: list[float] = Field(min_length=4, max_length=4)
+
+
+class WallsMaterialHint(BaseModel):
+    """Подсказка материала из условных обозначений листа (ADR-0040); не данные человека."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    value: CadMaterial | None
+    source: Literal["legend"]
+    status: CadMaterialHintStatus
+    evidence: list[WallsHintEvidence] = []
+
+
+class WallsConstruction(BaseModel):
+    """Конструкция из walls.json: связный участок кладки, монолита или каркасной перегородки."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(min_length=1, max_length=32)
+    kind: CadConstructionKind
+    source_layers: list[str]
+    polygon: WallsPolygon
+    area_plan_mm2: float
+    thickness_measured_mm: float
+    thickness_nominal_mm: float | None
+    thickness_status: Literal["matched", "check"]
+    length_axis_mm: float
+    centroid: list[float]
+    bbox: list[float]
+    # Нет у монолита и каркасных перегородок и в старых walls.json (v1, v1.1).
+    material_hint: WallsMaterialHint | None = None
+
+
+class WallsOpening(BaseModel):
+    """Проём: дверь (по блоку DXF) или безымянный разрыв стены (`gap`, нет данных о проёме)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    kind: Literal["door", "gap"]
+    status: Literal["ok", "estimate", "no_data"]
+    host_id: str | None
+    adjacent_ids: list[str]
+    width_mm: float
+    width_source: str
+    thickness_mm: float | None
+    block_name: str | None
+    handle: str | None
+    center: list[float]
+
+
+class WallsHeights(BaseModel):
+    """Исходные величины высоты: отметки из документации и допущения параметров скрипта."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    floor_elevation_mm: int | None
+    floor_height_mm: int | None
+    elevation_status: str
+    height_status: str
+    evidence: str | None
+    message: str | None
+    slab_thickness_mm: int | None
+    slab_status: str
+    door_height_mm: int | None
+    door_height_status: str
+
+
+class WallsWarning(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    code: str
+    message: str
+
+
+class WallsChecks(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    warnings: list[WallsWarning]
+
+
+class WallsDocument(BaseModel):
+    """walls.json целиком (схема `quantor.cad_walls.v1`)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    schema_name: str = Field(alias="schema")
+    generator: str
+    params_version: str
+    params_sha256: str
+    dxf_sha256: str
+    units: Literal["mm"]
+    heights: WallsHeights
+    constructions: list[WallsConstruction]
+    # Каркасные перегородки ГКЛ (ADR-0040): те же поля конструкции; нет в старых walls.json.
+    frame_partitions: list[WallsConstruction] = []
+    openings: list[WallsOpening]
+    checks: WallsChecks
+
+
+# --------------------------------------------------------------------------- данные человека
+
+
+class CadConstructionProps(BaseModel):
+    """Параметры конструкции. Все поля необязательные; пустое поле — не задано."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    material: CadMaterial | None = Field(
+        default=None,
+        description=(
+            "Материал: aerated_concrete - газобетон; expanded_clay_block - керамзитобетонный "
+            "блок; ceramic_block - керамический блок; brick_solid - кирпич полнотелый; "
+            "brick_hollow - кирпич пустотелый; silicate_block - силикатный блок; "
+            "gypsum_tongue_groove - пазогребневая плита; monolith_concrete - монолитный "
+            "железобетон; other - другое"
+        ),
+    )
+    material_note: str | None = Field(
+        default=None, max_length=200, description="Уточнение материала (свободный текст)"
+    )
+    density_grade: str | None = Field(
+        default=None, max_length=16, description="Марка по плотности, например D500"
+    )
+    strength_class: str | None = Field(
+        default=None, max_length=16, description="Класс или марка по прочности: B2,5, B25, М150"
+    )
+    block_length_mm: int | None = Field(
+        default=None, ge=10, le=2000, description="Длина блока или кирпича, мм"
+    )
+    block_width_mm: int | None = Field(
+        default=None, ge=10, le=2000, description="Ширина (толщина по кладке) блока, мм"
+    )
+    block_height_mm: int | None = Field(
+        default=None, ge=10, le=2000, description="Высота блока или кирпича, мм"
+    )
+    brick_layout: CadBrickLayout | None = Field(
+        default=None,
+        description=(
+            "Кладка кирпича: half - в полкирпича; one - в один кирпич; one_and_half - в полтора "
+            "кирпича; two - в два кирпича"
+        ),
+    )
+    mortar: CadMortar | None = Field(
+        default=None,
+        description="Раствор: glue - клей; cement_sand - цементно-песчаный; other - другой",
+    )
+    joint_mm: int | None = Field(default=None, ge=1, le=30, description="Толщина шва, мм")
+    reinforcement: str | None = Field(
+        default=None, max_length=200, description="Армирование кладки или монолита"
+    )
+    purpose: CadPurpose | None = Field(
+        default=None,
+        description=(
+            "Назначение: external - наружная; inter_apartment - межквартирная; "
+            "interior - внутренняя; mop - стена МОП; shaft - шахта; other - другое"
+        ),
+    )
+    fire_rating: str | None = Field(
+        default=None, max_length=16, description="Предел огнестойкости, например EI 150"
+    )
+    sound_rw_db: int | None = Field(
+        default=None, ge=0, le=90, description="Индекс звукоизоляции Rw, дБ"
+    )
+    height_override_mm: int | None = Field(
+        default=None, ge=500, le=10000, description="Высота конструкции вместо расчётной, мм"
+    )
+    thickness_override_mm: int | None = Field(
+        default=None, ge=30, le=1500, description="Толщина вместо номинала скрипта, мм"
+    )
+    count_openings: bool = Field(
+        default=True,
+        description="Учитывать надпроёмные части дверей в объёме и площади стены",
+    )
+    note: str | None = Field(default=None, max_length=1000, description="Примечание")
+
+
+class CadSheetLevelsWrite(BaseModel):
+    """Высоты листа, заданные человеком. Пустое поле — значение из walls.json."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    floor_height_mm: int | None = Field(
+        default=None, ge=2000, le=6000, description="Высота этажа (пол - пол), мм"
+    )
+    slab_thickness_mm: int | None = Field(
+        default=None, ge=100, le=1000, description="Толщина плиты перекрытия, мм"
+    )
+    door_height_mm: int | None = Field(
+        default=None, ge=1500, le=3500, description="Высота дверного проёма, мм"
+    )
+    floor_elevation_mm: int | None = Field(
+        default=None, ge=-100000, le=500000, description="Отметка этажа = верх плиты, мм"
+    )
+
+
+class CadConstructionPropsPut(BaseModel):
+    """Параметры одной конструкции целиком (заменяют хранимые) и признак «принято человеком»."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    props: CadConstructionProps
+    accepted: bool | None = Field(
+        default=None, description="Принято человеком; не передано - прежнее значение"
+    )
+
+
+class CadConstructionPropsBulk(BaseModel):
+    """Частичное слияние параметров в несколько конструкций («применить ко всем этой толщины»).
+
+    В `props_patch` применяются только переданные поля; поле, переданное как null, снимает
+    значение у каждой конструкции.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    keys: list[str] = Field(min_length=1, max_length=MAX_BULK_KEYS)
+    props_patch: CadConstructionProps
+    accepted: bool | None = Field(
+        default=None, description="Принято человеком; не передано - прежнее значение"
+    )
+
+
+# --------------------------------------------------------------------------- ответы
+
+
+class CadLevelValueRead(BaseModel):
+    """Величина высоты: действующее значение, происхождение и значение из walls.json."""
+
+    value_mm: int | None
+    source: CadValueSource | None
+    # Значение из walls.json; у переопределённой человеком величины отличается от `value_mm`.
+    default_mm: int | None
+
+
+class CadHeightsRead(BaseModel):
+    """Высоты листа с источниками. Не определилось — `None` («требует ввода»), не 0."""
+
+    floor_elevation_mm: int | None
+    floor_elevation_source: CadValueSource | None
+    floor_height: CadLevelValueRead
+    slab_thickness: CadLevelValueRead
+    door_height: CadLevelValueRead
+    # Лист разреза, если толщина плиты взята из уровня проекта (ADR-0039 п. 4).
+    slab_thickness_sheet_ref: str | None = None
+    # Высота стены = высота этажа - толщина плиты; None, если высота этажа не определена.
+    wall_height_mm: int | None
+    wall_height_source: CadValueSource | None
+    evidence: str | None
+    message: str | None
+
+
+class CadSheetLevelsRead(BaseModel):
+    """Переопределения человека (пусто — значение из walls.json)."""
+
+    floor_height_mm: int | None
+    slab_thickness_mm: int | None
+    door_height_mm: int | None
+    floor_elevation_mm: int | None = None
+
+
+class CadComputedSourcesRead(BaseModel):
+    thickness: CadValueSource | None
+    height: CadValueSource | None
+    door_height: CadValueSource | None
+
+
+class CadConstructionComputedRead(BaseModel):
+    """Вычисленные величины конструкции. Не определено — `None`."""
+
+    thickness_mm: float | None
+    height_mm: int | None
+    length_m: float | None
+    wall_area_m2: float | None
+    volume_m3: float | None
+    status: CadComputedStatus
+    sources: CadComputedSourcesRead
+    warnings: list[CadConstructionWarning]
+
+
+class CadConstructionMaterialRead(BaseModel):
+    """Действующий материал: ввод человека, иначе подсказка из условных обозначений."""
+
+    value: CadMaterial | None
+    source: CadMaterialSource | None
+    # Статус подсказки из walls.json; None - подсказки нет (монолит, перегородка, старый файл).
+    hint_status: CadMaterialHintStatus | None
+    evidence: list[WallsHintEvidence]
+
+
+class CadConstructionRead(BaseModel):
+    """Конструкция: геометрия из walls.json, вычисленные величины, параметры человека."""
+
+    id: str
+    kind: CadConstructionKind
+    source_layers: list[str]
+    polygon: WallsPolygon
+    centroid: list[float]
+    bbox: list[float]
+    area_plan_m2: float
+    thickness_measured_mm: float
+    thickness_nominal_mm: float | None
+    thickness_status: Literal["matched", "check"]
+    computed: CadConstructionComputedRead
+    props: CadConstructionProps
+    material: CadConstructionMaterialRead
+    accepted: bool
+
+
+class CadOpeningRead(BaseModel):
+    id: str
+    kind: Literal["door", "gap"]
+    status: Literal["ok", "estimate", "no_data"]
+    host_id: str | None
+    adjacent_ids: list[str]
+    width_mm: float
+    width_source: str
+    thickness_mm: float | None
+    block_name: str | None
+    handle: str | None
+    center: list[float]
+
+
+class CadConstructionGroupRead(BaseModel):
+    """Итог группы «вид x толщина x материал»; в группу входят только конструкции со статусом ok.
+
+    Материал — действующий (ввод человека или документ). У каркасной перегородки `volume_m3` —
+    `None`: она меряется площадью.
+    """
+
+    kind: CadConstructionKind
+    thickness_mm: float
+    material: CadMaterial | None
+    count: int
+    length_m: float
+    wall_area_m2: float
+    volume_m3: float | None
+
+
+class CadConstructionsSummaryRead(BaseModel):
+    """Что в итоги групп не вошло."""
+
+    total_count: int
+    thickness_check_count: int
+    height_missing_count: int
+    # Разрывы стен без данных о проёме (окна, порталы): в объём не входят.
+    unaccounted_gap_openings: int
+    # Двери, у которых скрипт не нашёл несущую стену: надпроёмная часть не учтена.
+    door_openings_without_host: int
+
+
+class CadWallsWarningRead(BaseModel):
+    code: str
+    message: str
+
+
+class CadConstructionsTotalsRead(BaseModel):
+    """Итоги листа после пересчёта."""
+
+    heights: CadHeightsRead
+    sheet_levels: CadSheetLevelsRead
+    totals: list[CadConstructionGroupRead]
+    summary: CadConstructionsSummaryRead
+
+
+class CadConstructionsBulkRead(CadConstructionsTotalsRead):
+    changed: int
+
+
+class CadLatestWallsJobRead(BaseModel):
+    """Самое свежее задание `cad_walls` вида, в том числе незавершённое или упавшее."""
+
+    id: UUID
+    status: JobStatus
+    error_code: str | None
+    error_message: str | None
+    created_at: datetime
+
+
+class CadConstructionsRead(CadConstructionsTotalsRead):
+    """Конструкции вида по последнему успешному заданию `cad_walls`."""
+
+    job_id: UUID
+    page_index: int
+    view: int
+    walls_job_id: UUID
+    walls_sha256: str
+    # Свежее задание может быть новее успешного, из которого взяты конструкции.
+    latest_walls_job: CadLatestWallsJobRead | None = None
+    generator: str
+    params_version: str
+    params_sha256: str
+    dxf_sha256: str
+    constructions: list[CadConstructionRead]
+    openings: list[CadOpeningRead]
+    warnings: list[CadWallsWarningRead]
+
+
+class CadWallsJobRead(BaseModel):
+    """Задание `cad_walls`, поставленное на пересчёт конструкций вида."""
+
+    job_id: UUID
+    parent_job_id: UUID
+    page_index: int
+    view: int
+    status: JobStatus
+    attempt: int
+    created_at: datetime

@@ -34,6 +34,11 @@ COPY tools/cad_engine/quantor_cad_runner.py tools/cad_engine/pins.json ${CAD_ENG
 # исполнителя один и тот же файл.
 COPY tools/cad_mep /app/tools/cad_mep
 
+# Скрипт конструкций кладки и монолита (ADR-0038, tools/cad_walls): тем же интерпретатором движка;
+# отметки этажа он разбирает кодом tools/cad_mep (cad_mep.elevations), поэтому каталоги лежат рядом.
+# API читает у него только params/v1.json и cad_walls/version.py (см. Dockerfile.api).
+COPY tools/cad_walls /app/tools/cad_walls
+
 # Архив движка кладёт в контекст сборки publish.yml (checkout приватного репозитория по
 # закреплённому коммиту, deploy-key только на чтение); здесь — повторная сверка SHA256 с pins.json.
 COPY deploy/cad-engine/engine.zip ${CAD_ENGINE_HOME}/engine.zip
@@ -41,7 +46,7 @@ RUN test -n "${ENGINE_ARCHIVE_SHA256}" \
     && echo "${ENGINE_ARCHIVE_SHA256}  ${CAD_ENGINE_HOME}/engine.zip" | sha256sum -c -
 
 # Рабочие каталоги попыток: удаляются после каждого задания. Файлы движка — только на чтение.
-RUN chmod -R a=rX ${CAD_ENGINE_HOME} /app/tools/cad_mep \
+RUN chmod -R a=rX ${CAD_ENGINE_HOME} /app/tools/cad_mep /app/tools/cad_walls \
     && mkdir -p /var/tmp/quantor-cad \
     && chown quantor:quantor /var/tmp/quantor-cad \
     && chmod 700 /var/tmp/quantor-cad
@@ -50,6 +55,8 @@ ENV CAD_ENGINE_PYTHON=${CAD_ENGINE_HOME}/venv/bin/python \
     CAD_ENGINE_RUNNER=${CAD_ENGINE_HOME}/runner/quantor_cad_runner.py \
     CAD_ENGINE_ARCHIVE=${CAD_ENGINE_HOME}/engine.zip \
     CAD_MEP_RUNNER=/app/tools/cad_mep/run_mep.py \
+    CAD_WALLS_RUNNER=/app/tools/cad_walls/run_walls.py \
+    CAD_WALLS_PARAMS=/app/tools/cad_walls/params/v1.json \
     CAD_WORK_ROOT=/var/tmp/quantor-cad
 
 USER quantor

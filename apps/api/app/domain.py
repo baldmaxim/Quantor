@@ -417,6 +417,9 @@ class JobType(StrEnum):
     # Трассы механики по одобренному виду результата CAD (ADR-0036 п. 8): генератор tools/cad_mep
     # подпроцессом в том же cad-worker. Основной исполнитель этот тип не берёт.
     CAD_MEP_ROUTE = "cad_mep_route"
+    # Конструкции кладки и монолита по DXF вида (ADR-0038): скрипт tools/cad_walls подпроцессом
+    # в том же cad-worker. Основной исполнитель этот тип не берёт.
+    CAD_WALLS = "cad_walls"
 
 
 class JobStatus(StrEnum):

@@ -52,6 +52,8 @@ ROUTE_ARTIFACT_NAME: Final = re.compile(
     r"^(?:report\.json|manifest\.json|"
     r"views/p\d{3}_v\d{2}/(?:mep_routes\.dxf|candidate\.json|preview\.json))$"
 )
+# Артефакт задания конструкций (`cad_walls`, ADR-0038): один файл в каталоге вида.
+WALLS_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/walls\.json$")
 CONTENT_TYPES: Final = {".dxf": "application/dxf", ".json": "application/json"}
 # Типы заданий контура CAD: у обоих один и тот же вид доступа (пространство, проект, ревизия).
 CAD_JOB_TYPES: Final = (JobType.CAD_PDF_CONVERT, JobType.CAD_MEP_ROUTE)
@@ -126,7 +128,11 @@ def idempotency_key(revision_id: uuid.UUID, params: dict[str, Any]) -> str:
 
 
 def artifact_storage_key(revision_id: uuid.UUID, job_id: uuid.UUID, attempt: int, name: str) -> str:
-    if attempt < 1 or not (ARTIFACT_NAME.fullmatch(name) or ROUTE_ARTIFACT_NAME.fullmatch(name)):
+    if attempt < 1 or not (
+        ARTIFACT_NAME.fullmatch(name)
+        or ROUTE_ARTIFACT_NAME.fullmatch(name)
+        or WALLS_ARTIFACT_NAME.fullmatch(name)
+    ):
         raise ValueError("недопустимое имя артефакта или номер попытки CAD")
     return f"revisions/{revision_id}/cad/{job_id}/attempt-{attempt}/{name}"
 

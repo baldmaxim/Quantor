@@ -139,6 +139,11 @@ class Settings(BaseSettings):
     # в корне репозитория (/app в образах).
     cad_mep_runner: str = ""
     cad_mep_params: str = ""
+    # Конструкции кладки и монолита (ADR-0038): скрипт `tools/cad_walls/run_walls.py` запускается
+    # тем же интерпретатором движка в образе cad-worker. API читает только sha256 параметров и
+    # версию скрипта; пусто — `tools/cad_walls/params/v1.json` в корне репозитория (/app в образах).
+    cad_walls_runner: str = ""
+    cad_walls_params: str = ""
 
     # --- вход в портал ---
     #

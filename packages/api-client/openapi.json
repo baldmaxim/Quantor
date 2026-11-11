@@ -629,6 +629,21 @@
         "title": "BlockerCode",
         "type": "string"
       },
+      "Body_upload_cad_vor": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Книга Excel .xlsx с ВОР",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_cad_vor",
+        "type": "object"
+      },
       "Body_upload_file": {
         "properties": {
           "document_id": {
@@ -1229,6 +1244,954 @@
         "title": "CadChecksRead",
         "type": "object"
       },
+      "CadComputedSourcesRead": {
+        "properties": {
+          "door_height": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Height"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "thickness": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness"
+          }
+        },
+        "required": [
+          "thickness",
+          "height",
+          "door_height"
+        ],
+        "title": "CadComputedSourcesRead",
+        "type": "object"
+      },
+      "CadConstructionComputedRead": {
+        "description": "Вычисленные величины конструкции. Не определено — `None`.",
+        "properties": {
+          "height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Mm"
+          },
+          "length_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length M"
+          },
+          "sources": {
+            "$ref": "#/components/schemas/CadComputedSourcesRead"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "thickness_check",
+              "height_missing"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "thickness_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Mm"
+          },
+          "volume_m3": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume M3"
+          },
+          "wall_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Area M2"
+          },
+          "warnings": {
+            "items": {
+              "enum": [
+                "thickness_check",
+                "height_missing",
+                "opening_no_data",
+                "opening_estimate",
+                "material_check"
+              ],
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "thickness_mm",
+          "height_mm",
+          "length_m",
+          "wall_area_m2",
+          "volume_m3",
+          "status",
+          "sources",
+          "warnings"
+        ],
+        "title": "CadConstructionComputedRead",
+        "type": "object"
+      },
+      "CadConstructionGroupRead": {
+        "description": "Итог группы «вид x толщина x материал»; в группу входят только конструкции со статусом ok.\n\nМатериал — действующий (ввод человека или документ). У каркасной перегородки `volume_m3` —\n`None`: она меряется площадью.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "masonry",
+              "monolith_wall",
+              "monolith_pylon",
+              "monolith_column",
+              "frame_partition"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "length_m": {
+            "title": "Length M",
+            "type": "number"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aerated_concrete",
+                  "expanded_clay_block",
+                  "ceramic_block",
+                  "brick_solid",
+                  "brick_hollow",
+                  "silicate_block",
+                  "gypsum_tongue_groove",
+                  "monolith_concrete",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "thickness_mm": {
+            "title": "Thickness Mm",
+            "type": "number"
+          },
+          "volume_m3": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume M3"
+          },
+          "wall_area_m2": {
+            "title": "Wall Area M2",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "thickness_mm",
+          "material",
+          "count",
+          "length_m",
+          "wall_area_m2",
+          "volume_m3"
+        ],
+        "title": "CadConstructionGroupRead",
+        "type": "object"
+      },
+      "CadConstructionMaterialRead": {
+        "description": "Действующий материал: ввод человека, иначе подсказка из условных обозначений.",
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/WallsHintEvidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "hint_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "matched",
+                  "not_in_legend",
+                  "conflict",
+                  "no_legend"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint Status"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "manual",
+                  "document"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aerated_concrete",
+                  "expanded_clay_block",
+                  "ceramic_block",
+                  "brick_solid",
+                  "brick_hollow",
+                  "silicate_block",
+                  "gypsum_tongue_groove",
+                  "monolith_concrete",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "source",
+          "hint_status",
+          "evidence"
+        ],
+        "title": "CadConstructionMaterialRead",
+        "type": "object"
+      },
+      "CadConstructionProps": {
+        "additionalProperties": false,
+        "description": "Параметры конструкции. Все поля необязательные; пустое поле — не задано.",
+        "properties": {
+          "block_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 2000.0,
+                "minimum": 10.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Высота блока или кирпича, мм",
+            "title": "Block Height Mm"
+          },
+          "block_length_mm": {
+            "anyOf": [
+              {
+                "maximum": 2000.0,
+                "minimum": 10.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Длина блока или кирпича, мм",
+            "title": "Block Length Mm"
+          },
+          "block_width_mm": {
+            "anyOf": [
+              {
+                "maximum": 2000.0,
+                "minimum": 10.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ширина (толщина по кладке) блока, мм",
+            "title": "Block Width Mm"
+          },
+          "brick_layout": {
+            "anyOf": [
+              {
+                "enum": [
+                  "half",
+                  "one",
+                  "one_and_half",
+                  "two"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Кладка кирпича: half - в полкирпича; one - в один кирпич; one_and_half - в полтора кирпича; two - в два кирпича",
+            "title": "Brick Layout"
+          },
+          "count_openings": {
+            "default": true,
+            "description": "Учитывать надпроёмные части дверей в объёме и площади стены",
+            "title": "Count Openings",
+            "type": "boolean"
+          },
+          "density_grade": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Марка по плотности, например D500",
+            "title": "Density Grade"
+          },
+          "fire_rating": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Предел огнестойкости, например EI 150",
+            "title": "Fire Rating"
+          },
+          "height_override_mm": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 500.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Высота конструкции вместо расчётной, мм",
+            "title": "Height Override Mm"
+          },
+          "joint_mm": {
+            "anyOf": [
+              {
+                "maximum": 30.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Толщина шва, мм",
+            "title": "Joint Mm"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aerated_concrete",
+                  "expanded_clay_block",
+                  "ceramic_block",
+                  "brick_solid",
+                  "brick_hollow",
+                  "silicate_block",
+                  "gypsum_tongue_groove",
+                  "monolith_concrete",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Материал: aerated_concrete - газобетон; expanded_clay_block - керамзитобетонный блок; ceramic_block - керамический блок; brick_solid - кирпич полнотелый; brick_hollow - кирпич пустотелый; silicate_block - силикатный блок; gypsum_tongue_groove - пазогребневая плита; monolith_concrete - монолитный железобетон; other - другое",
+            "title": "Material"
+          },
+          "material_note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Уточнение материала (свободный текст)",
+            "title": "Material Note"
+          },
+          "mortar": {
+            "anyOf": [
+              {
+                "enum": [
+                  "glue",
+                  "cement_sand",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Раствор: glue - клей; cement_sand - цементно-песчаный; other - другой",
+            "title": "Mortar"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Примечание",
+            "title": "Note"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "enum": [
+                  "external",
+                  "inter_apartment",
+                  "interior",
+                  "mop",
+                  "shaft",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Назначение: external - наружная; inter_apartment - межквартирная; interior - внутренняя; mop - стена МОП; shaft - шахта; other - другое",
+            "title": "Purpose"
+          },
+          "reinforcement": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Армирование кладки или монолита",
+            "title": "Reinforcement"
+          },
+          "sound_rw_db": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Индекс звукоизоляции Rw, дБ",
+            "title": "Sound Rw Db"
+          },
+          "strength_class": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Класс или марка по прочности: B2,5, B25, М150",
+            "title": "Strength Class"
+          },
+          "thickness_override_mm": {
+            "anyOf": [
+              {
+                "maximum": 1500.0,
+                "minimum": 30.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Толщина вместо номинала скрипта, мм",
+            "title": "Thickness Override Mm"
+          }
+        },
+        "title": "CadConstructionProps",
+        "type": "object"
+      },
+      "CadConstructionPropsBulk": {
+        "additionalProperties": false,
+        "description": "Частичное слияние параметров в несколько конструкций («применить ко всем этой толщины»).\n\nВ `props_patch` применяются только переданные поля; поле, переданное как null, снимает\nзначение у каждой конструкции.",
+        "properties": {
+          "accepted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Принято человеком; не передано - прежнее значение",
+            "title": "Accepted"
+          },
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Keys",
+            "type": "array"
+          },
+          "props_patch": {
+            "$ref": "#/components/schemas/CadConstructionProps"
+          }
+        },
+        "required": [
+          "keys",
+          "props_patch"
+        ],
+        "title": "CadConstructionPropsBulk",
+        "type": "object"
+      },
+      "CadConstructionPropsPut": {
+        "additionalProperties": false,
+        "description": "Параметры одной конструкции целиком (заменяют хранимые) и признак «принято человеком».",
+        "properties": {
+          "accepted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Принято человеком; не передано - прежнее значение",
+            "title": "Accepted"
+          },
+          "props": {
+            "$ref": "#/components/schemas/CadConstructionProps"
+          }
+        },
+        "required": [
+          "props"
+        ],
+        "title": "CadConstructionPropsPut",
+        "type": "object"
+      },
+      "CadConstructionRead": {
+        "description": "Конструкция: геометрия из walls.json, вычисленные величины, параметры человека.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "area_plan_m2": {
+            "title": "Area Plan M2",
+            "type": "number"
+          },
+          "bbox": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Bbox",
+            "type": "array"
+          },
+          "centroid": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Centroid",
+            "type": "array"
+          },
+          "computed": {
+            "$ref": "#/components/schemas/CadConstructionComputedRead"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "masonry",
+              "monolith_wall",
+              "monolith_pylon",
+              "monolith_column",
+              "frame_partition"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "material": {
+            "$ref": "#/components/schemas/CadConstructionMaterialRead"
+          },
+          "polygon": {
+            "$ref": "#/components/schemas/WallsPolygon"
+          },
+          "props": {
+            "$ref": "#/components/schemas/CadConstructionProps"
+          },
+          "source_layers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Layers",
+            "type": "array"
+          },
+          "thickness_measured_mm": {
+            "title": "Thickness Measured Mm",
+            "type": "number"
+          },
+          "thickness_nominal_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Nominal Mm"
+          },
+          "thickness_status": {
+            "enum": [
+              "matched",
+              "check"
+            ],
+            "title": "Thickness Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "source_layers",
+          "polygon",
+          "centroid",
+          "bbox",
+          "area_plan_m2",
+          "thickness_measured_mm",
+          "thickness_nominal_mm",
+          "thickness_status",
+          "computed",
+          "props",
+          "material",
+          "accepted"
+        ],
+        "title": "CadConstructionRead",
+        "type": "object"
+      },
+      "CadConstructionsBulkRead": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "integer"
+          },
+          "heights": {
+            "$ref": "#/components/schemas/CadHeightsRead"
+          },
+          "sheet_levels": {
+            "$ref": "#/components/schemas/CadSheetLevelsRead"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CadConstructionsSummaryRead"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/CadConstructionGroupRead"
+            },
+            "title": "Totals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "heights",
+          "sheet_levels",
+          "totals",
+          "summary",
+          "changed"
+        ],
+        "title": "CadConstructionsBulkRead",
+        "type": "object"
+      },
+      "CadConstructionsRead": {
+        "description": "Конструкции вида по последнему успешному заданию `cad_walls`.",
+        "properties": {
+          "constructions": {
+            "items": {
+              "$ref": "#/components/schemas/CadConstructionRead"
+            },
+            "title": "Constructions",
+            "type": "array"
+          },
+          "dxf_sha256": {
+            "title": "Dxf Sha256",
+            "type": "string"
+          },
+          "generator": {
+            "title": "Generator",
+            "type": "string"
+          },
+          "heights": {
+            "$ref": "#/components/schemas/CadHeightsRead"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "latest_walls_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadLatestWallsJobRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "openings": {
+            "items": {
+              "$ref": "#/components/schemas/CadOpeningRead"
+            },
+            "title": "Openings",
+            "type": "array"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "params_sha256": {
+            "title": "Params Sha256",
+            "type": "string"
+          },
+          "params_version": {
+            "title": "Params Version",
+            "type": "string"
+          },
+          "sheet_levels": {
+            "$ref": "#/components/schemas/CadSheetLevelsRead"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CadConstructionsSummaryRead"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/CadConstructionGroupRead"
+            },
+            "title": "Totals",
+            "type": "array"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "walls_job_id": {
+            "format": "uuid",
+            "title": "Walls Job Id",
+            "type": "string"
+          },
+          "walls_sha256": {
+            "title": "Walls Sha256",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/CadWallsWarningRead"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "heights",
+          "sheet_levels",
+          "totals",
+          "summary",
+          "job_id",
+          "page_index",
+          "view",
+          "walls_job_id",
+          "walls_sha256",
+          "generator",
+          "params_version",
+          "params_sha256",
+          "dxf_sha256",
+          "constructions",
+          "openings",
+          "warnings"
+        ],
+        "title": "CadConstructionsRead",
+        "type": "object"
+      },
+      "CadConstructionsSummaryRead": {
+        "description": "Что в итоги групп не вошло.",
+        "properties": {
+          "door_openings_without_host": {
+            "title": "Door Openings Without Host",
+            "type": "integer"
+          },
+          "height_missing_count": {
+            "title": "Height Missing Count",
+            "type": "integer"
+          },
+          "thickness_check_count": {
+            "title": "Thickness Check Count",
+            "type": "integer"
+          },
+          "total_count": {
+            "title": "Total Count",
+            "type": "integer"
+          },
+          "unaccounted_gap_openings": {
+            "title": "Unaccounted Gap Openings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_count",
+          "thickness_check_count",
+          "height_missing_count",
+          "unaccounted_gap_openings",
+          "door_openings_without_host"
+        ],
+        "title": "CadConstructionsSummaryRead",
+        "type": "object"
+      },
+      "CadConstructionsTotalsRead": {
+        "description": "Итоги листа после пересчёта.",
+        "properties": {
+          "heights": {
+            "$ref": "#/components/schemas/CadHeightsRead"
+          },
+          "sheet_levels": {
+            "$ref": "#/components/schemas/CadSheetLevelsRead"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CadConstructionsSummaryRead"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/CadConstructionGroupRead"
+            },
+            "title": "Totals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "heights",
+          "sheet_levels",
+          "totals",
+          "summary"
+        ],
+        "title": "CadConstructionsTotalsRead",
+        "type": "object"
+      },
       "CadConvertCreate": {
         "additionalProperties": false,
         "description": "Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.\n\nЛист выбирает человек. Масштаб клиент не передаёт: сервер берёт действующую калибровку\nлиста (ADR-0018); без неё — 409 `CAD_CALIBRATION_REQUIRED`.",
@@ -1595,6 +2558,369 @@
         "title": "CadEventsRead",
         "type": "object"
       },
+      "CadFloor3dHolePut": {
+        "additionalProperties": false,
+        "description": "Решение человека по отверстию: включено (есть отверстие) или выключено (плита сплошная).",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "CadFloor3dHolePut",
+        "type": "object"
+      },
+      "CadFloor3dHoleRead": {
+        "description": "Отверстие плиты. `candidate` — решения человека нет: рисуется как отверстие, но помечено.",
+        "properties": {
+          "area_m2": {
+            "title": "Area M2",
+            "type": "number"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "candidate",
+              "enabled",
+              "disabled"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "shell",
+          "area_m2",
+          "state"
+        ],
+        "title": "CadFloor3dHoleRead",
+        "type": "object"
+      },
+      "CadFloor3dLintelRead": {
+        "description": "Перемычка над проёмом: от высоты двери до верха стены.",
+        "properties": {
+          "door_height_mm": {
+            "title": "Door Height Mm",
+            "type": "integer"
+          },
+          "door_height_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Height Source"
+          },
+          "kind": {
+            "enum": [
+              "door",
+              "gap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "opening_id": {
+            "title": "Opening Id",
+            "type": "string"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "z_bottom_mm": {
+            "title": "Z Bottom Mm",
+            "type": "integer"
+          },
+          "z_top_mm": {
+            "title": "Z Top Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "opening_id",
+          "kind",
+          "shell",
+          "z_bottom_mm",
+          "z_top_mm",
+          "door_height_mm",
+          "door_height_source"
+        ],
+        "title": "CadFloor3dLintelRead",
+        "type": "object"
+      },
+      "CadFloor3dRead": {
+        "description": "Модель этажа в мм системы DXF, как `polygon.shell` конструкций.",
+        "properties": {
+          "base_z_mm": {
+            "title": "Base Z Mm",
+            "type": "integer"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "elevation_known": {
+            "title": "Elevation Known",
+            "type": "boolean"
+          },
+          "generator": {
+            "title": "Generator",
+            "type": "string"
+          },
+          "heights": {
+            "$ref": "#/components/schemas/CadHeightsRead"
+          },
+          "lintels": {
+            "items": {
+              "$ref": "#/components/schemas/CadFloor3dLintelRead"
+            },
+            "title": "Lintels",
+            "type": "array"
+          },
+          "slab": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadFloor3dSlabRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "slab_holes": {
+            "items": {
+              "$ref": "#/components/schemas/CadFloor3dHoleRead"
+            },
+            "title": "Slab Holes",
+            "type": "array"
+          },
+          "units": {
+            "const": "mm",
+            "title": "Units",
+            "type": "string"
+          },
+          "walls": {
+            "items": {
+              "$ref": "#/components/schemas/CadFloor3dWallRead"
+            },
+            "title": "Walls",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/CadFloor3dWarningRead"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "units",
+          "generator",
+          "heights",
+          "base_z_mm",
+          "elevation_known",
+          "slab",
+          "slab_holes",
+          "walls",
+          "lintels",
+          "bbox",
+          "warnings"
+        ],
+        "title": "CadFloor3dRead",
+        "type": "object"
+      },
+      "CadFloor3dSlabRead": {
+        "description": "Плита этажа: верх — отметка этажа, низ — отметка минус толщина плиты.",
+        "properties": {
+          "area_m2": {
+            "title": "Area M2",
+            "type": "number"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "z_bottom_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Bottom Mm"
+          },
+          "z_top_mm": {
+            "title": "Z Top Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shell",
+          "z_bottom_mm",
+          "z_top_mm",
+          "area_m2"
+        ],
+        "title": "CadFloor3dSlabRead",
+        "type": "object"
+      },
+      "CadFloor3dWallRead": {
+        "description": "Призма стены или пилона: обвод из walls.json и отметки низа и верха.",
+        "properties": {
+          "construction_key": {
+            "title": "Construction Key",
+            "type": "string"
+          },
+          "family": {
+            "enum": [
+              "masonry",
+              "monolith"
+            ],
+            "title": "Family",
+            "type": "string"
+          },
+          "holes": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "title": "Holes",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "masonry",
+              "monolith_wall",
+              "monolith_pylon",
+              "monolith_column",
+              "frame_partition"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "thickness_nominal_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Nominal Mm"
+          },
+          "z_bottom_mm": {
+            "title": "Z Bottom Mm",
+            "type": "integer"
+          },
+          "z_top_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Top Mm"
+          }
+        },
+        "required": [
+          "construction_key",
+          "kind",
+          "family",
+          "thickness_nominal_mm",
+          "shell",
+          "holes",
+          "z_bottom_mm",
+          "z_top_mm"
+        ],
+        "title": "CadFloor3dWallRead",
+        "type": "object"
+      },
+      "CadFloor3dWarningRead": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "CadFloor3dWarningRead",
+        "type": "object"
+      },
       "CadFrameRead": {
         "description": "Кадр координат DXF (мм) -> PDF (pt от левого верхнего угла страницы).\n\n`pt = origin_pt + (x_mm, -y_mm) / mm_per_pdf_point`. Подтверждён, только если масштаб\nпрошёл размерную проверку и движок указал начало координат DXF на странице.",
         "properties": {
@@ -1665,6 +2991,122 @@
           "mm_per_pdf_point"
         ],
         "title": "CadFrameRead",
+        "type": "object"
+      },
+      "CadHeightsRead": {
+        "description": "Высоты листа с источниками. Не определилось — `None` («требует ввода»), не 0.",
+        "properties": {
+          "door_height": {
+            "$ref": "#/components/schemas/CadLevelValueRead"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
+          },
+          "floor_elevation_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Source"
+          },
+          "floor_height": {
+            "$ref": "#/components/schemas/CadLevelValueRead"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "slab_thickness": {
+            "$ref": "#/components/schemas/CadLevelValueRead"
+          },
+          "slab_thickness_sheet_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slab Thickness Sheet Ref"
+          },
+          "wall_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Height Mm"
+          },
+          "wall_height_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Height Source"
+          }
+        },
+        "required": [
+          "floor_elevation_mm",
+          "floor_elevation_source",
+          "floor_height",
+          "slab_thickness",
+          "door_height",
+          "wall_height_mm",
+          "wall_height_source",
+          "evidence",
+          "message"
+        ],
+        "title": "CadHeightsRead",
         "type": "object"
       },
       "CadJobListRead": {
@@ -2183,6 +3625,106 @@
         "title": "CadJobSummaryRead",
         "type": "object"
       },
+      "CadLatestWallsJobRead": {
+        "description": "Самое свежее задание `cad_walls` вида, в том числе незавершённое или упавшее.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "error_code",
+          "error_message",
+          "created_at"
+        ],
+        "title": "CadLatestWallsJobRead",
+        "type": "object"
+      },
+      "CadLevelValueRead": {
+        "description": "Величина высоты: действующее значение, происхождение и значение из walls.json.",
+        "properties": {
+          "default_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Mm"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "value_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Mm"
+          }
+        },
+        "required": [
+          "value_mm",
+          "source",
+          "default_mm"
+        ],
+        "title": "CadLevelValueRead",
+        "type": "object"
+      },
       "CadMepAttemptRead": {
         "description": "Попытка route-задания: что запросил человек и что получилось (история расчётов).",
         "properties": {
@@ -2380,6 +3922,112 @@
           "attempt"
         ],
         "title": "CadMepRoutesCreate",
+        "type": "object"
+      },
+      "CadOpeningRead": {
+        "properties": {
+          "adjacent_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Adjacent Ids",
+            "type": "array"
+          },
+          "block_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Name"
+          },
+          "center": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Center",
+            "type": "array"
+          },
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handle"
+          },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "door",
+              "gap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "estimate",
+              "no_data"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "thickness_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Mm"
+          },
+          "width_mm": {
+            "title": "Width Mm",
+            "type": "number"
+          },
+          "width_source": {
+            "title": "Width Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "host_id",
+          "adjacent_ids",
+          "width_mm",
+          "width_source",
+          "thickness_mm",
+          "block_name",
+          "handle",
+          "center"
+        ],
+        "title": "CadOpeningRead",
         "type": "object"
       },
       "CadPageRead": {
@@ -2634,6 +4282,87 @@
           "stages"
         ],
         "title": "CadProgressViewRead",
+        "type": "object"
+      },
+      "CadProjectLevelsRead": {
+        "description": "Уровни проекта; записи нет — все поля `null`.",
+        "properties": {
+          "slab_source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slab Source Ref"
+          },
+          "slab_thickness_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slab Thickness Mm"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "slab_thickness_mm",
+          "slab_source_ref",
+          "updated_at"
+        ],
+        "title": "CadProjectLevelsRead",
+        "type": "object"
+      },
+      "CadProjectLevelsWrite": {
+        "additionalProperties": false,
+        "description": "Толщина плиты проекта из разрезов; пустая толщина снимает значение.",
+        "properties": {
+          "slab_source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Лист разреза, например «АР1.1 л. 45, разрез 4-4»; обязателен при толщине",
+            "title": "Slab Source Ref"
+          },
+          "slab_thickness_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 100.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Толщина плиты по разрезам, мм",
+            "title": "Slab Thickness Mm"
+          }
+        },
+        "title": "CadProjectLevelsWrite",
         "type": "object"
       },
       "CadRemarkFileItem": {
@@ -3506,6 +5235,126 @@
         "title": "CadScaleRead",
         "type": "object"
       },
+      "CadSheetLevelsRead": {
+        "description": "Переопределения человека (пусто — значение из walls.json).",
+        "properties": {
+          "door_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Height Mm"
+          },
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Mm"
+          },
+          "slab_thickness_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slab Thickness Mm"
+          }
+        },
+        "required": [
+          "floor_height_mm",
+          "slab_thickness_mm",
+          "door_height_mm"
+        ],
+        "title": "CadSheetLevelsRead",
+        "type": "object"
+      },
+      "CadSheetLevelsWrite": {
+        "additionalProperties": false,
+        "description": "Высоты листа, заданные человеком. Пустое поле — значение из walls.json.",
+        "properties": {
+          "door_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 3500.0,
+                "minimum": 1500.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Высота дверного проёма, мм",
+            "title": "Door Height Mm"
+          },
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "maximum": 500000.0,
+                "minimum": -100000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Отметка этажа = верх плиты, мм",
+            "title": "Floor Elevation Mm"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 6000.0,
+                "minimum": 2000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Высота этажа (пол - пол), мм",
+            "title": "Floor Height Mm"
+          },
+          "slab_thickness_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 100.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Толщина плиты перекрытия, мм",
+            "title": "Slab Thickness Mm"
+          }
+        },
+        "title": "CadSheetLevelsWrite",
+        "type": "object"
+      },
       "CadStageRead": {
         "description": "Этап вида, как его записал движок. Ключ — один из семи этапов штатного worker.",
         "properties": {
@@ -3871,6 +5720,524 @@
           "dxf_entities"
         ],
         "title": "CadViewRead",
+        "type": "object"
+      },
+      "CadVorCoverageGroupRead": {
+        "description": "Группа итогов листа и связанные с ней строки ВОР.",
+        "properties": {
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CadVorItemRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "masonry",
+              "monolith_wall",
+              "monolith_pylon",
+              "monolith_column",
+              "frame_partition"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aerated_concrete",
+                  "expanded_clay_block",
+                  "ceramic_block",
+                  "brick_solid",
+                  "brick_hollow",
+                  "silicate_block",
+                  "gypsum_tongue_groove",
+                  "monolith_concrete",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "status": {
+            "enum": [
+              "linked",
+              "not_in_vor"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "thickness_mm": {
+            "title": "Thickness Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "group_key",
+          "kind",
+          "thickness_mm",
+          "material",
+          "status",
+          "items"
+        ],
+        "title": "CadVorCoverageGroupRead",
+        "type": "object"
+      },
+      "CadVorCoverageRead": {
+        "description": "Сверка листа с ВОР: что из конструкций листа в ВОР не вошло.",
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CadVorCoverageGroupRead"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "has_vor": {
+            "title": "Has Vor",
+            "type": "boolean"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "not_in_vor_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not In Vor Keys",
+            "type": "array"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "thickness_not_in_vor": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Thickness Not In Vor",
+            "type": "array"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "vor_thicknesses": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Vor Thicknesses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "job_id",
+          "page_index",
+          "view",
+          "has_vor",
+          "groups",
+          "not_in_vor_keys",
+          "vor_thicknesses",
+          "thickness_not_in_vor"
+        ],
+        "title": "CadVorCoverageRead",
+        "type": "object"
+      },
+      "CadVorDocumentRead": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/CadVorSheetColumnsRead"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "header_row": {
+            "title": "Header Row",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "rows_count": {
+            "title": "Rows Count",
+            "type": "integer"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "sheet_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sheet Names",
+            "type": "array"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "uploaded_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uploaded By"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "file_name",
+          "sha256",
+          "size",
+          "sheet_names",
+          "header_row",
+          "columns",
+          "rows_count",
+          "uploaded_by",
+          "created_at"
+        ],
+        "title": "CadVorDocumentRead",
+        "type": "object"
+      },
+      "CadVorItemRead": {
+        "description": "Строка ВОР; `quantity` - справочно.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind_hint": {
+            "anyOf": [
+              {
+                "enum": [
+                  "masonry",
+                  "monolith"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind Hint"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "row_no": {
+            "title": "Row No",
+            "type": "integer"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "sheet": {
+            "title": "Sheet",
+            "type": "string"
+          },
+          "thickness_hint_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Hint Mm"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "id",
+          "document_id",
+          "row_no",
+          "sheet",
+          "code",
+          "name",
+          "unit",
+          "quantity",
+          "section",
+          "thickness_hint_mm",
+          "kind_hint"
+        ],
+        "title": "CadVorItemRead",
+        "type": "object"
+      },
+      "CadVorItemsRead": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CadVorItemRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "CadVorItemsRead",
+        "type": "object"
+      },
+      "CadVorLinkRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item": {
+            "$ref": "#/components/schemas/CadVorItemRead"
+          }
+        },
+        "required": [
+          "id",
+          "group_key",
+          "item",
+          "created_at"
+        ],
+        "title": "CadVorLinkRead",
+        "type": "object"
+      },
+      "CadVorLinksWrite": {
+        "description": "Полный набор строк ВОР группы: прежние связи группы заменяются.",
+        "properties": {
+          "vor_item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Vor Item Ids",
+            "type": "array"
+          }
+        },
+        "title": "CadVorLinksWrite",
+        "type": "object"
+      },
+      "CadVorSheetColumnsRead": {
+        "description": "Какие колонки распознаны на листе: роль -> номер колонки с единицы.",
+        "properties": {
+          "columns": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Columns",
+            "type": "object"
+          },
+          "header_row": {
+            "title": "Header Row",
+            "type": "integer"
+          },
+          "rows_count": {
+            "title": "Rows Count",
+            "type": "integer"
+          },
+          "sheet": {
+            "title": "Sheet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sheet",
+          "header_row",
+          "rows_count",
+          "columns"
+        ],
+        "title": "CadVorSheetColumnsRead",
+        "type": "object"
+      },
+      "CadVorSuggestionRead": {
+        "description": "Строка-кандидат для группы: подсказка, связь ставит человек.",
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/CadVorItemRead"
+          },
+          "reasons": {
+            "items": {
+              "enum": [
+                "thickness",
+                "kind",
+                "material"
+              ],
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item",
+          "score",
+          "reasons"
+        ],
+        "title": "CadVorSuggestionRead",
+        "type": "object"
+      },
+      "CadWallsJobRead": {
+        "description": "Задание `cad_walls`, поставленное на пересчёт конструкций вида.",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "parent_job_id": {
+            "format": "uuid",
+            "title": "Parent Job Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "parent_job_id",
+          "page_index",
+          "view",
+          "status",
+          "attempt",
+          "created_at"
+        ],
+        "title": "CadWallsJobRead",
+        "type": "object"
+      },
+      "CadWallsWarningRead": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "CadWallsWarningRead",
         "type": "object"
       },
       "CadZoneCreate": {
@@ -16170,7 +18537,7 @@
         "type": "string"
       },
       "GeometryStatus": {
-        "description": "Состояние извлечения канонической геометрии страниц ревизии.\n\nОтносится ко всей ревизии, а не к отдельной странице: если число страниц в PDF не\nсовпало с числом листов, доверять нельзя ни одной. Частично извлечённой геометрии не\nбывает (ADR-0016).\n\nОтдельно от `ProcessingStatus`: тот описывает импорт распознанного пакета и у обычного\nPDF навсегда остаётся `unprocessed`. Одно поле на два независимых процесса означало бы,\nчто успех одного стирает отказ другого.",
+        "description": "Состояние извлечения канонической геометрии страниц ревизии.\n\nОтносится ко всей ревизии, а не к отдельной странице: если число страниц в PDF не\nсовпало с числом листов, доверять нельзя ни одной. Частично извлечённой геометрии не\nбывает (ADR-0016).\n\nОтдельно от `ProcessingStatus`: тот описывает распознавание — у PDF он `unprocessed`,\nпока к ревизии не прикреплён распознанный пакет, и `ready` после (ADR-0037). Одно поле\nна два независимых процесса означало бы, что успех одного стирает отказ другого.",
         "enum": [
           "not_applicable",
           "pending",
@@ -16578,7 +18945,8 @@
           "legacy_import",
           "pdf_geometry_extract",
           "cad_pdf_convert",
-          "cad_mep_route"
+          "cad_mep_route",
+          "cad_walls"
         ],
         "title": "JobType",
         "type": "string"
@@ -22277,6 +24645,70 @@
           }
         },
         "title": "Vertex",
+        "type": "object"
+      },
+      "WallsHintEvidence": {
+        "description": "Строка условных обозначений, по которой подобран материал.",
+        "properties": {
+          "bbox": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Bbox",
+            "type": "array"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 200,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "page_index",
+          "bbox"
+        ],
+        "title": "WallsHintEvidence",
+        "type": "object"
+      },
+      "WallsPolygon": {
+        "description": "Контур в мм DXF: внешнее кольцо и отверстия, без повторного замыкающего узла.",
+        "properties": {
+          "holes": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "title": "Holes",
+            "type": "array"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          }
+        },
+        "required": [
+          "shell",
+          "holes"
+        ],
+        "title": "WallsPolygon",
         "type": "object"
       },
       "WorkerRead": {
@@ -28039,6 +30471,571 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/cad/levels": {
+      "get": {
+        "operationId": "read_cad_project_levels",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadProjectLevelsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Уровни проекта: толщина плиты из разрезов и лист-источник",
+        "tags": [
+          "cad-floor3d"
+        ]
+      },
+      "put": {
+        "operationId": "put_cad_project_levels",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadProjectLevelsWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadProjectLevelsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Задать толщину плиты проекта из разрезов (применяется ко всем листам проекта)",
+        "tags": [
+          "cad-floor3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/vor": {
+      "get": {
+        "operationId": "list_cad_vor_documents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CadVorDocumentRead"
+                  },
+                  "title": "Response List Cad Vor Documents",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Документы ВОР проекта; текущий - первый (самый поздний)",
+        "tags": [
+          "cad-vor"
+        ]
+      },
+      "post": {
+        "description": "Читает файл потоково во временный файл на диске, разбирает и кладёт оригинал в хранилище.",
+        "operationId": "upload_cad_vor",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_cad_vor"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadVorDocumentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Загрузить ВОР Заказчика (XLSX) на проект",
+        "tags": [
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/vor/links": {
+      "get": {
+        "operationId": "list_cad_vor_links",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CadVorLinkRead"
+                  },
+                  "title": "Response List Cad Vor Links",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Связи групп конструкций со строками ВОР",
+        "tags": [
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/vor/links/{group_key}": {
+      "put": {
+        "operationId": "put_cad_vor_links",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "group_key",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:masonry|monolith_wall|monolith_pylon|monolith_column)\\|\\d{1,4}(?:\\.\\d{1,3})?\\|[a-z_]{0,40}$",
+              "title": "Group Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadVorLinksWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CadVorItemRead"
+                  },
+                  "title": "Response Put Cad Vor Links",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Заменить набор строк ВОР, связанных с группой конструкций",
+        "tags": [
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/vor/suggest": {
+      "get": {
+        "description": "Детерминированное ранжирование без моделей: связь ставит человек.",
+        "operationId": "suggest_cad_vor_items",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group_key",
+            "required": true,
+            "schema": {
+              "pattern": "^(?:masonry|monolith_wall|monolith_pylon|monolith_column)\\|\\d{1,4}(?:\\.\\d{1,3})?\\|[a-z_]{0,40}$",
+              "title": "Group Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Документ; по умолчанию - текущий",
+            "in": "query",
+            "name": "document_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Документ; по умолчанию - текущий",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CadVorSuggestionRead"
+                  },
+                  "title": "Response Suggest Cad Vor Items",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Подсказка: до 10 строк ВОР для группы конструкций (по толщине, виду и материалу)",
+        "tags": [
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/vor/{document_id}": {
+      "delete": {
+        "operationId": "delete_cad_vor_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить документ ВОР вместе со строками и связями",
+        "tags": [
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/vor/{document_id}/items": {
+      "get": {
+        "operationId": "list_cad_vor_items",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Слова наименования",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Слова наименования",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "masonry",
+                    "monolith"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "Толщина, мм",
+            "in": "query",
+            "name": "thickness",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9999,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Толщина, мм",
+              "title": "Thickness"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadVorItemsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Строки документа ВОР: поиск по наименованию, фильтры по виду и толщине",
+        "tags": [
+          "cad-vor"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/cad/zones": {
       "get": {
         "operationId": "list_cad_zones",
@@ -28161,6 +31158,637 @@
         "summary": "Создать зону листа",
         "tags": [
           "cad-zones"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/constructions": {
+      "get": {
+        "operationId": "read_cad_constructions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadConstructionsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Конструкции вида: геометрия, вычисленные величины, параметры и итоги",
+        "tags": [
+          "cad-constructions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/constructions/props:bulk": {
+      "put": {
+        "operationId": "bulk_cad_construction_props",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadConstructionPropsBulk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadConstructionsBulkRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Применить параметры к нескольким конструкциям (слияние переданных полей)",
+        "tags": [
+          "cad-constructions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/constructions/{construction_key}/props": {
+      "put": {
+        "operationId": "put_cad_construction_props",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "construction_key",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 1,
+              "title": "Construction Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadConstructionPropsPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadConstructionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Заменить параметры конструкции; ответ — конструкция с пересчётом",
+        "tags": [
+          "cad-constructions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/floor3d": {
+      "get": {
+        "operationId": "read_cad_floor3d",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadFloor3dRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Модель этажа для 3D-вида: плита, отверстия, стены, перемычки, высоты с источниками",
+        "tags": [
+          "cad-floor3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/floor3d/holes/{hole_key}": {
+      "put": {
+        "operationId": "put_cad_floor3d_hole",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "hole_key",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 1,
+              "title": "Hole Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadFloor3dHolePut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadFloor3dRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Включить или выключить отверстие плиты; ответ — обновлённая модель этажа",
+        "tags": [
+          "cad-floor3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/levels": {
+      "put": {
+        "operationId": "put_cad_sheet_levels",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadSheetLevelsWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadConstructionsTotalsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Задать высоты листа (этаж, плита, дверь); пустое поле — значение из walls.json",
+        "tags": [
+          "cad-constructions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/vor-coverage": {
+      "get": {
+        "description": "Количества ВОР с количествами CAD не сравниваются: ВОР на объект, лист - его часть.",
+        "operationId": "read_cad_vor_coverage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadVorCoverageRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сверка листа с ВОР: какие группы конструкций в ВОР не вошли",
+        "tags": [
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/walls": {
+      "post": {
+        "operationId": "recompute_cad_walls",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadWallsJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Пересчитать конструкции вида: поставить задание cad_walls",
+        "tags": [
+          "cad-constructions"
         ]
       }
     },

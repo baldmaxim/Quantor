@@ -164,6 +164,11 @@ class ErrorCode(StrEnum):
     CAD_ELEVATION_NOT_FOUND = "CAD_ELEVATION_NOT_FOUND"
     CAD_FLOOR_HEIGHT_NOT_FOUND = "CAD_FLOOR_HEIGHT_NOT_FOUND"
     CAD_RECOMPUTE_SAME_PARAMS = "CAD_RECOMPUTE_SAME_PARAMS"
+    # Конструкции кладки и монолита (ADR-0038): результата ещё нет / расчёт этого вида идёт.
+    CAD_WALLS_NOT_READY = "CAD_WALLS_NOT_READY"
+    CAD_WALLS_BUSY = "CAD_WALLS_BUSY"
+    # ВОР Заказчика в контуре CAD (ADR-0038 п. 5): файл не разобран как таблица ВОР.
+    CAD_VOR_PARSE_FAILED = "CAD_VOR_PARSE_FAILED"
 
     # --- поставщики моделей ---
     MODEL_PROVIDER_NOT_CONFIGURED = "MODEL_PROVIDER_NOT_CONFIGURED"
@@ -318,6 +323,9 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_RECOMPUTE_SAME_PARAMS: (
         "Пересчёт с теми же отметкой и высотой даст тот же результат"
     ),
+    ErrorCode.CAD_WALLS_NOT_READY: "Конструкции вида ещё не посчитаны",
+    ErrorCode.CAD_WALLS_BUSY: "Расчёт конструкций этого вида уже идёт",
+    ErrorCode.CAD_VOR_PARSE_FAILED: "Файл не удалось разобрать как ВОР",
     ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
     ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: "Поставщик моделей не настроен",
@@ -464,6 +472,9 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_ELEVATION_NOT_FOUND: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_FLOOR_HEIGHT_NOT_FOUND: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_RECOMPUTE_SAME_PARAMS: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_WALLS_NOT_READY: status.HTTP_404_NOT_FOUND,
+    ErrorCode.CAD_WALLS_BUSY: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_VOR_PARSE_FAILED: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: status.HTTP_409_CONFLICT,

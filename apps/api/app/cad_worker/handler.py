@@ -32,7 +32,7 @@ from app.domain import JobStatus
 from app.errors import ErrorCode
 from app.models import DocumentRevision, Job
 from app.services import cad as cad_service
-from app.services import cad_progress
+from app.services import cad_progress, cad_walls
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
@@ -470,7 +470,10 @@ async def execute_cad_pdf_convert(
         outcome="succeeded",
         result_status=str(report["status"]),
     )
-    return await jobs_service.succeed(session, job=job, payload={"cad_result": result})
+    done = await jobs_service.succeed(session, job=job, payload={"cad_result": result})
+    # Конструкции видов (ADR-0038): задания появляются в той же транзакции, что и успех конвертации.
+    await cad_walls.enqueue_after_convert(session, done, settings)
+    return done
 
 
 def _failure_from_report(out: Path, code: int) -> CadError:

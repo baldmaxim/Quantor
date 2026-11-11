@@ -1,16 +1,23 @@
 import type {
+  CadConstructionProps,
+  CadConstructionRead,
+  CadConstructionsRead,
   CadDecisionRead,
   CadJobRead,
   CadRouteJobRead,
+  CadSheetLevelsWrite,
   CadViewDiagnosticsRead,
+  CadVorCoverageRead,
+  CadVorDocumentRead,
   CadZoneRead,
 } from '@quantor/api-client';
 
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
+import type { IConstructionIndex } from '@/lib/cad/constructions';
 import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { ZoneKind } from '@/lib/cad/zones';
-import type { CameraState, Viewport } from '@/lib/viewer/camera';
+import type { Camera, CameraState, Viewport } from '@/lib/viewer/camera';
 
 /** Замечания вида: всё, что нужно разделу «Замечания» (тот же, что был на странице CAD). */
 export interface IWorkspaceCadRemarks {
@@ -59,6 +66,82 @@ export interface IWorkspaceCadZones {
   readonly error: string | null;
   readonly onRename: (id: string, name: string) => void;
   readonly onDelete: (id: string) => void;
+}
+
+/** ВОР Заказчика в разделе «Конструкции»: только объект сверки, на расчёт не влияет (ADR-0038 п. 5). */
+export interface IWorkspaceCadVor {
+  readonly projectId: string;
+  /** Текущий документ ВОР проекта; `null` - не загружен. */
+  readonly document: CadVorDocumentRead | null;
+  /** Сверка листа; `null` - ещё не прочитана. */
+  readonly coverage: CadVorCoverageRead | null;
+  readonly loading: boolean;
+  readonly uploading: boolean;
+  readonly deleting: boolean;
+  /** Отказ последней операции (загрузка, удаление, чтение). */
+  readonly error: string | null;
+  /** Загрузить ВОР; прежний документ проекта заменяется вместе со связями. */
+  readonly onUpload: (file: File) => void;
+  readonly onDelete: () => void;
+  /** Подсвечивать на холсте конструкции «не в ВОР». */
+  readonly showNotInVor: boolean;
+  readonly onShowNotInVorChange: (visible: boolean) => void;
+}
+
+/** Раздел «Конструкции»: свод кладки и монолита листа (ADR-0038). */
+export interface IWorkspaceCadConstructions {
+  /** `loading` - читается; `not-ready` - результата расчёта нет; `error` - отказ чтения. */
+  readonly status: 'loading' | 'ready' | 'not-ready' | 'error';
+  readonly data: CadConstructionsRead | null;
+  /** Что сказать, когда результата нет (ещё считается, ошибка, не запускалось). */
+  readonly notReadyText: string | null;
+  readonly loadError: string | null;
+  readonly onReload: () => void;
+  /** Расчёт идёт (задание в очереди или выполняется). */
+  readonly calculating: boolean;
+  /** Отказ последнего действия (запуск расчёта, высоты). */
+  readonly actionError: string | null;
+  /** Самый свежий пересчёт упал, показан прежний результат: текст причины. */
+  readonly recomputeFailure?: string | null;
+  readonly onCompute: () => void;
+  readonly levelsSaving: boolean;
+  readonly onSaveLevels: (levels: CadSheetLevelsWrite) => void;
+  /** Ключ подсвеченной строки свода; `null` - ничего. */
+  readonly activeGroup: string | null;
+  /** Подсветить конструкции строки на холсте; повтор по той же строке снимает подсветку. */
+  readonly onSelectGroup: (key: string, ids: readonly string[]) => void;
+  /** Сверка с ВОР Заказчика; нет - блок не показывается. */
+  readonly vor?: IWorkspaceCadVor | null;
+}
+
+/** Карточка выбранной конструкции у курсора. */
+export interface IWorkspaceCadConstructionPopover {
+  readonly construction: CadConstructionRead;
+  /** Дверей, стоящих в этой конструкции. */
+  readonly doors: number;
+  /** Конструкций того же вида и номинала на листе, включая выбранную. */
+  readonly groupCount: number;
+  /** Точка клика, экранные координаты. */
+  readonly anchor: { readonly x: number; readonly y: number };
+  readonly saving: boolean;
+  readonly error: string | null;
+  readonly onClose: () => void;
+  readonly onSave: (props: CadConstructionProps) => void;
+  readonly onBulk: (patch: CadConstructionProps) => void;
+  readonly onAccept: (accepted: boolean) => void;
+}
+
+/** Выбор конструкции щелчком по холсту и её карточка. */
+export interface IWorkspaceCadConstructionPicker {
+  readonly camera: Camera;
+  /** Размер листа у отрисовщика (pt при масштабе 1). */
+  readonly page: { readonly width: number; readonly height: number };
+  readonly index: IConstructionIndex;
+  /** Щелчок: конструкция под курсором или `null` (пустое место) и точка клика. */
+  readonly onPick: (id: string | null, anchor: { x: number; y: number }) => void;
+  /** Карточку закрыть (панорама, зум, щелчок вне, Esc); выделение остаётся. */
+  readonly onDismiss: () => void;
+  readonly popover: IWorkspaceCadConstructionPopover | null;
 }
 
 /** Левая панель вкладки CAD: листы и задания ревизии рабочей области. */
@@ -121,6 +204,11 @@ export interface IWorkspaceCadLayers {
   readonly onRegionsVisibleChange: (visible: boolean) => void;
   /** Слой распознавания включён на панели инструментов; иначе флажок недоступен. */
   readonly regionsAvailable: boolean;
+  /** Слой «Конструкции»; `null` или нет - переключателя нет (конструкции не считались). */
+  readonly constructions?: {
+    readonly visible: boolean;
+    readonly onVisibleChange: (visible: boolean) => void;
+  } | null;
 }
 
 /** Выбранное route-задание: то, что нужно блоку «Принять трассы». */
@@ -219,4 +307,6 @@ export interface IWorkspaceCadSideProps {
   readonly view: IWorkspaceCadView | null;
   /** Раздел «Зоны»; `null` или нет - раздела нет. */
   readonly zones?: IWorkspaceCadZones | null;
+  /** Раздел «Конструкции»; `null` или нет - раздела нет. */
+  readonly constructions?: IWorkspaceCadConstructions | null;
 }

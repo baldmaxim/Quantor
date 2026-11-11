@@ -110,6 +110,12 @@
   --cad-zone-mop: #116b2f;
   --cad-zone-door: #b45309;
 
+  /* Конструкции листа (вкладка CAD): кладка, монолит, конструкция без толщины или высоты */
+  --cad-construction-masonry: #a8501a;
+  --cad-construction-monolith: #3b4cc0;
+  --cad-construction-check: #c07a00;
+  --cad-construction-not-in-vor: #c4182c;
+
   /* --- вспомогательное --- */
   --tooltip-bg: #2b323b;
   --tooltip-text: #ffffff;
@@ -260,6 +266,10 @@
     --cad-zone-apartment: #2b71d3;
     --cad-zone-mop: #1b843e;
     --cad-zone-door: #c26a14;
+    --cad-construction-masonry: #c8672a;
+    --cad-construction-monolith: #6b7bdc;
+    --cad-construction-check: #d99a14;
+    --cad-construction-not-in-vor: #ff6b7a;
 
     --tooltip-bg: #c8d2de;
     --tooltip-text: #0f141a;
@@ -340,6 +350,10 @@
   --cad-zone-apartment: #2b71d3;
   --cad-zone-mop: #1b843e;
   --cad-zone-door: #c26a14;
+  --cad-construction-masonry: #c8672a;
+  --cad-construction-monolith: #6b7bdc;
+  --cad-construction-check: #d99a14;
+  --cad-construction-not-in-vor: #ff6b7a;
 
   --tooltip-bg: #c8d2de;
   --tooltip-text: #0f141a;
