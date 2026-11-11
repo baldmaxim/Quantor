@@ -15,6 +15,7 @@ import {
   MORTARS,
   PURPOSE_LABELS,
   PURPOSES,
+  isFloorSlab,
   isMonolith,
   showBlockSize,
   showBrickLayout,
@@ -75,7 +76,8 @@ const options = <T extends string>(keys: readonly T[], labels: Readonly<Record<T
 /**
  * Параметры конструкции: материал, блок, шов, назначение, огнестойкость и переопределения.
  * Все поля необязательны; пустое поле - «не задано». Поля кирпича и блока показываются по смыслу
- * материала, у монолита - класс бетона. Валидация диапазонов - до запроса, величины считает сервер.
+ * материала, у монолита - класс бетона. У плиты перекрытия (одна на лист) - только материал и
+ * ручная толщина. Валидация диапазонов - до запроса, величины считает сервер.
  */
 export const ConstructionPropsForm: FC<IConstructionPropsFormProps> = ({
   construction,
@@ -91,6 +93,7 @@ export const ConstructionPropsForm: FC<IConstructionPropsFormProps> = ({
   const kind = construction.kind;
   const monolith = isMonolith(kind);
   const masonry = kind === 'masonry';
+  const slab = isFloorSlab(kind);
   const fromDocument = construction.material;
   const material = draft.material === '' ? null : (draft.material as keyof typeof MATERIAL_LABELS);
   const { props, error } = propsOfDraft(draft);
@@ -139,7 +142,8 @@ export const ConstructionPropsForm: FC<IConstructionPropsFormProps> = ({
     fromDocument.source === 'document' && fromDocument.value !== null ? fromDocument.value : null;
   // Материал из документа в поле не подставляется: пустое поле - «человек не выбирал».
   let materialEmpty = 'Не задан';
-  if (documentMaterial !== null) materialEmpty = `По документу: ${MATERIAL_LABELS[documentMaterial]}`;
+  if (documentMaterial !== null)
+    materialEmpty = `По документу: ${MATERIAL_LABELS[documentMaterial]}`;
   else if (monolith) materialEmpty = `${MATERIAL_LABELS.monolith_concrete} (по умолчанию)`;
 
   const bulkLabel = `Применить ко всем: ${KIND_LABELS[kind]} ${
@@ -155,9 +159,7 @@ export const ConstructionPropsForm: FC<IConstructionPropsFormProps> = ({
         if (error === null) onSave(props);
       }}
     >
-      <h4 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
-        Параметры
-      </h4>
+      <h4 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">Параметры</h4>
 
       <Select
         label="Материал"
@@ -166,63 +168,78 @@ export const ConstructionPropsForm: FC<IConstructionPropsFormProps> = ({
         options={options(MATERIALS, MATERIAL_LABELS)}
         onChange={(value) => setSelect('material', value)}
       />
-      {text('material_note', 'Примечание к материалу')}
-      {masonry && text('density_grade', 'Марка по плотности', 'D500')}
-      {text('strength_class', monolith ? 'Класс бетона' : 'Класс прочности', monolith ? 'B25' : 'B2,5')}
-
-      {showBlockSize(kind, material) && (
-        <div className="grid grid-cols-3 gap-[var(--s-3)]" role="group" aria-label="Размер блока Д×Ш×В">
-          {number('block_length_mm', 'Длина, мм')}
-          {number('block_width_mm', 'Ширина, мм')}
-          {number('block_height_mm', 'Высота, мм')}
-        </div>
-      )}
-      {showBrickLayout(kind, material) && (
-        <Select
-          label="Кладка в кирпичах"
-          value={draft.brick_layout}
-          empty="Не задана"
-          options={options(BRICK_LAYOUTS, BRICK_LAYOUT_LABELS)}
-          onChange={(value) => setSelect('brick_layout', value)}
-        />
-      )}
-      {masonry && (
+      {slab && number('thickness_override_mm')}
+      {!slab && (
         <>
+          {text('material_note', 'Примечание к материалу')}
+          {masonry && text('density_grade', 'Марка по плотности', 'D500')}
+          {text(
+            'strength_class',
+            monolith ? 'Класс бетона' : 'Класс прочности',
+            monolith ? 'B25' : 'B2,5',
+          )}
+
+          {showBlockSize(kind, material) && (
+            <div
+              className="grid grid-cols-3 gap-[var(--s-3)]"
+              role="group"
+              aria-label="Размер блока Д×Ш×В"
+            >
+              {number('block_length_mm', 'Длина, мм')}
+              {number('block_width_mm', 'Ширина, мм')}
+              {number('block_height_mm', 'Высота, мм')}
+            </div>
+          )}
+          {showBrickLayout(kind, material) && (
+            <Select
+              label="Кладка в кирпичах"
+              value={draft.brick_layout}
+              empty="Не задана"
+              options={options(BRICK_LAYOUTS, BRICK_LAYOUT_LABELS)}
+              onChange={(value) => setSelect('brick_layout', value)}
+            />
+          )}
+          {masonry && (
+            <>
+              <Select
+                label="Раствор или клей"
+                value={draft.mortar}
+                empty="Не задан"
+                options={options(MORTARS, MORTAR_LABELS)}
+                onChange={(value) => setSelect('mortar', value)}
+              />
+              {number('joint_mm')}
+            </>
+          )}
+
+          {text('reinforcement', 'Армирование')}
           <Select
-            label="Раствор или клей"
-            value={draft.mortar}
-            empty="Не задан"
-            options={options(MORTARS, MORTAR_LABELS)}
-            onChange={(value) => setSelect('mortar', value)}
+            label="Назначение"
+            value={draft.purpose}
+            empty="Не задано"
+            options={options(PURPOSES, PURPOSE_LABELS)}
+            onChange={(value) => setSelect('purpose', value)}
           />
-          {number('joint_mm')}
+          {text('fire_rating', 'Огнестойкость EI', 'EI 150')}
+          {number('sound_rw_db')}
+          {number('height_override_mm')}
+          {number('thickness_override_mm')}
+
+          <label className="flex min-h-[44px] items-center gap-[var(--s-3)] text-sm">
+            <input
+              type="checkbox"
+              checked={draft.count_openings}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, count_openings: event.target.checked }))
+              }
+              className="size-5 shrink-0"
+            />
+            Учитывать надпроёмные части
+          </label>
+
+          {text('note', 'Примечание')}
         </>
       )}
-
-      {text('reinforcement', 'Армирование')}
-      <Select
-        label="Назначение"
-        value={draft.purpose}
-        empty="Не задано"
-        options={options(PURPOSES, PURPOSE_LABELS)}
-        onChange={(value) => setSelect('purpose', value)}
-      />
-      {text('fire_rating', 'Огнестойкость EI', 'EI 150')}
-      {number('sound_rw_db')}
-      {number('height_override_mm')}
-      {number('thickness_override_mm')}
-
-      <label className="flex min-h-[44px] items-center gap-[var(--s-3)] text-sm">
-        <input
-          type="checkbox"
-          checked={draft.count_openings}
-          onChange={(event) => setDraft((current) => ({ ...current, count_openings: event.target.checked }))}
-          className="size-5 shrink-0"
-        />
-        Учитывать надпроёмные части
-      </label>
-
-      {text('note', 'Примечание')}
 
       {error !== null && (
         <p role="alert" className="text-xs text-danger">
@@ -239,14 +256,18 @@ export const ConstructionPropsForm: FC<IConstructionPropsFormProps> = ({
         >
           Сохранить
         </Button>
-        <Button
-          type="button"
-          disabled={saving || patch.error !== null || isEmptyPatch(patch.props) || groupCount === 0}
-          className="h-auto min-h-[var(--h-ctl)] self-start py-[var(--s-2)] text-left whitespace-normal max-md:min-h-[44px]"
-          onClick={() => onBulk(patch.props)}
-        >
-          {bulkLabel}
-        </Button>
+        {!slab && (
+          <Button
+            type="button"
+            disabled={
+              saving || patch.error !== null || isEmptyPatch(patch.props) || groupCount === 0
+            }
+            className="h-auto min-h-[var(--h-ctl)] self-start py-[var(--s-2)] text-left whitespace-normal max-md:min-h-[44px]"
+            onClick={() => onBulk(patch.props)}
+          >
+            {bulkLabel}
+          </Button>
+        )}
         <Button
           type="button"
           disabled={saving || dirty}
@@ -256,7 +277,9 @@ export const ConstructionPropsForm: FC<IConstructionPropsFormProps> = ({
           {construction.accepted ? 'Снять принятие' : 'Принять'}
         </Button>
         {dirty && (
-          <p className="text-xs text-muted">Чтобы принять конструкцию, сначала сохраните изменения.</p>
+          <p className="text-xs text-muted">
+            Чтобы принять конструкцию, сначала сохраните изменения.
+          </p>
         )}
       </div>
     </form>

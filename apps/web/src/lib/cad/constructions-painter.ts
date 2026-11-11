@@ -2,8 +2,8 @@
  * Рисовальщик конструкций листа для просмотрщика (Canvas2D, ADR-0015, ADR-0038).
  *
  * Конструкции идут тем же слоем, что и геометрия CAD, и подчиняются протоколу слоя (ADR-0025):
- * полосы панорамы, отсечение по охвату, `touches` не строже `paint`. Кладка и монолит - полупрозрачная
- * заливка разных токенов; конструкция без толщины или высоты - токеном «проверить»; принятая
+ * полосы панорамы, отсечение по охвату, `touches` не строже `paint`. Кладка, монолит и плита
+ * перекрытия (под стенами, слабее) - полупрозрачная заливка разных токенов; конструкция без толщины или высоты - токеном «проверить»; принятая
  * плотнее; выделенная - контур цвета акцента потолще.
  */
 
@@ -17,6 +17,8 @@ import type { IConstructionShape } from './constructions';
 export interface IConstructionColors {
   readonly masonry: string;
   readonly monolith: string;
+  /** Плита перекрытия: приглушённый фон под стенами. */
+  readonly slab: string;
   readonly check: string;
   /** Контур выделенных конструкций. */
   readonly accent: string;
@@ -43,6 +45,8 @@ export interface IConstructionPaintData {
 const FILL_ALPHA = 0.22;
 const ACCEPTED_FILL_ALPHA = 0.36;
 const SELECTED_FILL_ALPHA = 0.45;
+/** Плита перекрытия лежит под стенами: заливка слабее, принятие её не сгущает. */
+const SLAB_FILL_ALPHA = 0.1;
 const LINE_WIDTH = 1;
 const ACCEPTED_LINE_WIDTH = 1.5;
 const SELECTED_LINE_WIDTH = 3;
@@ -66,6 +70,7 @@ export const readConstructionColors = (): IConstructionColors => {
     return {
       masonry: 'CanvasText',
       monolith: 'CanvasText',
+      slab: 'CanvasText',
       check: 'CanvasText',
       accent: 'CanvasText',
       notInVor: 'CanvasText',
@@ -76,6 +81,7 @@ export const readConstructionColors = (): IConstructionColors => {
   return {
     masonry: token('--cad-construction-masonry'),
     monolith: token('--cad-construction-monolith'),
+    slab: token('--cad-construction-slab'),
     check: token('--cad-construction-check'),
     accent: token('--accent'),
     notInVor: token('--cad-construction-not-in-vor'),
@@ -88,9 +94,11 @@ export const constructionColor = (
 ): string =>
   shape.status !== 'ok'
     ? colors.check
-    : shape.kind === 'masonry' || shape.kind === 'frame_partition'
-      ? colors.masonry
-      : colors.monolith;
+    : shape.kind === 'floor_slab'
+      ? colors.slab
+      : shape.kind === 'masonry' || shape.kind === 'frame_partition'
+        ? colors.masonry
+        : colors.monolith;
 
 interface IScreenBox {
   readonly minX: number;
@@ -161,7 +169,9 @@ const drawShape = (
   trace(context, shape, placement);
   context.globalAlpha = selected
     ? SELECTED_FILL_ALPHA
-    : shape.accepted
+    : shape.kind === 'floor_slab'
+      ? SLAB_FILL_ALPHA
+      : shape.accepted
       ? ACCEPTED_FILL_ALPHA
       : FILL_ALPHA;
   context.fillStyle = color;
@@ -242,10 +252,14 @@ export const createConstructionsPainter = (
       const box = screenBox(shape, placement);
       return boundsIntersectAny(box.minX, box.minY, box.maxX, box.maxY, rects);
     });
-    // Выделенные - последними, чтобы контур не прятался под соседними.
+    // Плита - первой (под стенами); выделенные - последними, чтобы контур не прятался под соседними.
+    const isSlab = (shape: IConstructionShape) => shape.kind === 'floor_slab';
+    const isSelected = (shape: IConstructionShape) => data.selected.has(shape.id);
     const ordered = [
-      ...visible.filter((shape) => !data.selected.has(shape.id)),
-      ...visible.filter((shape) => data.selected.has(shape.id)),
+      ...visible.filter((shape) => isSlab(shape) && !isSelected(shape)),
+      ...visible.filter((shape) => !isSlab(shape) && !isSelected(shape)),
+      ...visible.filter((shape) => isSlab(shape) && isSelected(shape)),
+      ...visible.filter((shape) => !isSlab(shape) && isSelected(shape)),
     ];
     const hatchView =
       data.showAll && data.notInVor && data.notInVor.size > 0 && rects.length > 0

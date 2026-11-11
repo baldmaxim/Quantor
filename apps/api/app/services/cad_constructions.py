@@ -22,7 +22,10 @@
 - каркасная перегородка ГКЛ (`frame_partition`) меряется площадью: длина и площадь стены как у
   кладки, объём не определён (`None`);
 - разрыв без данных о проёме (`gap`) в объём и площадь не входит и даёт предупреждение
-  `opening_no_data` у несущей конструкции.
+  `opening_no_data` у несущей конструкции;
+- плита перекрытия (`floor_slab`, одна на лист): площадь нетто = контур минус включённые
+  отверстия; толщина = переопределение человека, иначе толщина плиты листа; объём = нетто x
+  толщина; нет толщины — `thickness_check`, в итоги не входит.
 """
 
 from __future__ import annotations
@@ -54,6 +57,7 @@ from app.contracts.cad_constructions import (
     WallsDocument,
     WallsHeights,
     WallsOpening,
+    WallsPolygon,
 )
 
 KIND_ORDER: Final[tuple[CadConstructionKind, ...]] = (
@@ -62,6 +66,7 @@ KIND_ORDER: Final[tuple[CadConstructionKind, ...]] = (
     "monolith_pylon",
     "monolith_column",
     "frame_partition",
+    "floor_slab",
 )
 
 _MM2_IN_M2: Final = 1e6
@@ -208,6 +213,8 @@ class Computed:
     status: CadComputedStatus
     sources: CadComputedSourcesRead
     warnings: list[CadConstructionWarning] = field(default_factory=list)
+    # Площадь плиты нетто, м2; у стен `None`.
+    area_m2: float | None = None
 
     def read(self) -> CadConstructionComputedRead:
         return CadConstructionComputedRead(
@@ -219,6 +226,7 @@ class Computed:
             status=self.status,
             sources=self.sources,
             warnings=self.warnings,
+            area_m2=_round(self.area_m2, 3),
         )
 
 
@@ -323,14 +331,123 @@ class SheetResult:
 
 PropsByKey = Mapping[str, tuple[CadConstructionProps, bool]]
 
+# Адрес плиты листа в параметрах конструкций (у файла без `id` у плиты — он же).
+SLAB_ID: Final = "slab"
+
+
+@dataclass(frozen=True, slots=True)
+class SlabInput:
+    """Плита перекрытия листа: контур, площадь и только ВКЛЮЧЁННЫЕ отверстия (shell, area_mm2)."""
+
+    id: str
+    shell: list[list[float]]
+    area_mm2: float
+    holes: list[tuple[list[list[float]], float]] = field(default_factory=list)
+
+    @property
+    def net_area_mm2(self) -> float:
+        """Площадь нетто: контур минус включённые отверстия, не меньше нуля."""
+        return max(0.0, self.area_mm2 - math.fsum(area for _shell, area in self.holes))
+
+
+def _ring_centroid(shell: list[list[float]]) -> list[float]:
+    """Центроид многоугольника по формуле площади; у вырожденного кольца — среднее вершин."""
+    n = len(shell)
+    twice_area = 0.0
+    cx = 0.0
+    cy = 0.0
+    for i in range(n):
+        x0, y0 = shell[i][0], shell[i][1]
+        x1, y1 = shell[(i + 1) % n][0], shell[(i + 1) % n][1]
+        cross = x0 * y1 - x1 * y0
+        twice_area += cross
+        cx += (x0 + x1) * cross
+        cy += (y0 + y1) * cross
+    if abs(twice_area) < 1e-9:
+        return [
+            math.fsum(p[0] for p in shell) / max(n, 1),
+            math.fsum(p[1] for p in shell) / max(n, 1),
+        ]
+    return [cx / (3.0 * twice_area), cy / (3.0 * twice_area)]
+
+
+def _bbox(shell: list[list[float]]) -> list[float]:
+    xs = [p[0] for p in shell]
+    ys = [p[1] for p in shell]
+    return [min(xs), min(ys), max(xs), max(ys)] if xs else [0.0, 0.0, 0.0, 0.0]
+
+
+def _slab_material(props: CadConstructionProps) -> CadConstructionMaterialRead:
+    """Материал плиты: только ввод человека; подсказки из условных обозначений у плиты нет."""
+    if props.material is not None:
+        return CadConstructionMaterialRead(
+            value=props.material, source="manual", hint_status=None, evidence=[]
+        )
+    return CadConstructionMaterialRead(value=None, source=None, hint_status=None, evidence=[])
+
+
+def compute_slab(slab: SlabInput, props: CadConstructionProps, levels: EffectiveLevels) -> Computed:
+    """Величины плиты: площадь нетто и объём = нетто x толщина (мм -> м2, м3)."""
+    thickness: float | None
+    source: CadValueSource | None
+    if props.thickness_override_mm is not None:
+        thickness, source = float(props.thickness_override_mm), "manual"
+    elif levels.slab_thickness.value_mm is not None:
+        thickness, source = float(levels.slab_thickness.value_mm), levels.slab_thickness.source
+    else:
+        thickness, source = None, None
+    net_mm2 = slab.net_area_mm2
+    return Computed(
+        thickness_mm=thickness,
+        height_mm=None,
+        length_m=None,
+        wall_area_m2=None,
+        volume_m3=None if thickness is None else net_mm2 * thickness / _MM3_IN_M3,
+        status="ok" if thickness is not None else "thickness_check",
+        sources=CadComputedSourcesRead(thickness=source, height=None, door_height=None),
+        warnings=[] if thickness is not None else ["thickness_check"],
+        area_m2=net_mm2 / _MM2_IN_M2,
+    )
+
+
+def slab_read(
+    slab: SlabInput,
+    computed: Computed,
+    props: CadConstructionProps,
+    material: CadConstructionMaterialRead,
+    accepted: bool,
+) -> CadConstructionRead:
+    thickness = computed.thickness_mm
+    return CadConstructionRead(
+        id=slab.id,
+        kind="floor_slab",
+        source_layers=[],
+        polygon=WallsPolygon(shell=slab.shell, holes=[shell for shell, _area in slab.holes]),
+        centroid=_ring_centroid(slab.shell),
+        bbox=_bbox(slab.shell),
+        area_plan_m2=round(slab.net_area_mm2 / _MM2_IN_M2, 4),
+        thickness_measured_mm=thickness if thickness is not None else 0.0,
+        thickness_nominal_mm=thickness,
+        thickness_status="matched" if thickness is not None else "check",
+        computed=computed.read(),
+        props=props,
+        material=material,
+        accepted=accepted,
+    )
+
 
 def compute_sheet(
     document: WallsDocument,
     props_by_key: PropsByKey,
     overrides: CadSheetLevelsRead,
     project_slab: ProjectSlab | None = None,
+    slab: SlabInput | None = None,
 ) -> SheetResult:
-    """Конструкции листа с величинами и итоги по группам (вид x толщина x материал)."""
+    """Конструкции листа с величинами и итоги по группам (вид x толщина x материал).
+
+    `slab` — плита перекрытия листа; её добавляют в конец списка и считают как конструкцию.
+    Без неё (3D-вид, общий вид здания) поведение прежнее.
+    """
     levels = effective_levels(document.heights, overrides, project_slab)
     items_all = [*document.constructions, *document.frame_partitions]
     known = {c.id for c in items_all}
@@ -373,6 +490,19 @@ def compute_sheet(
                 accepted=accepted,
             )
         )
+    if slab is not None:
+        slab_props, slab_accepted = props_by_key.get(slab.id, (CadConstructionProps(), False))
+        slab_material = _slab_material(slab_props)
+        slab_computed = compute_slab(slab, slab_props, levels)
+        if slab_computed.status == "thickness_check":
+            check_count += 1
+        elif slab_computed.thickness_mm is not None:
+            groups[("floor_slab", slab_computed.thickness_mm, slab_material.value)].append(
+                slab_computed
+            )
+        constructions.append(
+            slab_read(slab, slab_computed, slab_props, slab_material, slab_accepted)
+        )
 
     def order(key: tuple[CadConstructionKind, float, CadMaterial | None]) -> tuple[int, float, str]:
         return (KIND_ORDER.index(key[0]), key[1], key[2] or "")
@@ -390,13 +520,18 @@ def compute_sheet(
                 if kind == "frame_partition"
                 else round(math.fsum(c.volume_m3 or 0.0 for c in items), 4)
             ),
+            area_m2=(
+                round(math.fsum(c.area_m2 or 0.0 for c in items), 3)
+                if kind == "floor_slab"
+                else None
+            ),
         )
         for (kind, thickness, material), items in sorted(
             groups.items(), key=lambda kv: order(kv[0])
         )
     ]
     summary = CadConstructionsSummaryRead(
-        total_count=len(items_all),
+        total_count=len(items_all) + (0 if slab is None else 1),
         thickness_check_count=check_count,
         height_missing_count=height_missing_count,
         unaccounted_gap_openings=sum(1 for o in document.openings if o.kind == "gap"),

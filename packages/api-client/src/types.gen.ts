@@ -796,8 +796,15 @@ export type CadComputedSourcesRead = {
  * CadConstructionComputedRead
  *
  * Вычисленные величины конструкции. Не определено — `None`.
+ *
+ * У плиты перекрытия длина, высота и площадь стены не определены, `area_m2` — площадь плиты
+ * нетто (контур минус включённые отверстия); у стен `area_m2` — `None`.
  */
 export type CadConstructionComputedRead = {
+    /**
+     * Area M2
+     */
+    area_m2?: number | null;
     /**
      * Height Mm
      */
@@ -835,9 +842,14 @@ export type CadConstructionComputedRead = {
  * Итог группы «вид x толщина x материал»; в группу входят только конструкции со статусом ok.
  *
  * Материал — действующий (ввод человека или документ). У каркасной перегородки `volume_m3` —
- * `None`: она меряется площадью.
+ * `None`: она меряется площадью. У плиты перекрытия `area_m2` — сумма площадей нетто, у стен —
+ * `None`.
  */
 export type CadConstructionGroupRead = {
+    /**
+     * Area M2
+     */
+    area_m2?: number | null;
     /**
      * Count
      */
@@ -845,7 +857,7 @@ export type CadConstructionGroupRead = {
     /**
      * Kind
      */
-    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition';
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition' | 'floor_slab';
     /**
      * Length M
      */
@@ -1075,7 +1087,7 @@ export type CadConstructionRead = {
     /**
      * Kind
      */
-    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition';
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition' | 'floor_slab';
     material: CadConstructionMaterialRead;
     polygon: WallsPolygon;
     props: CadConstructionProps;
@@ -1463,7 +1475,9 @@ export type CadFloor3dHolePut = {
 /**
  * CadFloor3dHoleRead
  *
- * Отверстие плиты. `candidate` — решения человека нет: рисуется как отверстие, но помечено.
+ * Отверстие плиты: без решения человека включено (`enabled`), `candidate` сервис не выдаёт.
+ *
+ * `disabled` — человек отметил «Не отверстие».
  */
 export type CadFloor3dHoleRead = {
     /**
@@ -1502,6 +1516,10 @@ export type CadFloor3dLintelRead = {
      * Kind
      */
     kind: 'door' | 'gap';
+    /**
+     * Material
+     */
+    material?: 'monolith' | 'masonry' | 'frame_partition' | null;
     /**
      * Opening Id
      */
@@ -1616,7 +1634,7 @@ export type CadFloor3dWallRead = {
     /**
      * Kind
      */
-    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition';
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition' | 'floor_slab';
     /**
      * Shell
      */
@@ -3186,7 +3204,7 @@ export type CadVorCoverageGroupRead = {
     /**
      * Kind
      */
-    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition';
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition' | 'floor_slab';
     /**
      * Material
      */

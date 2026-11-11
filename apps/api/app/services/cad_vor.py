@@ -81,7 +81,7 @@ class GroupKeyParts:
 
 
 _GROUP_KEY_RE: Final = re.compile(
-    r"^(?P<kind>masonry|monolith_wall|monolith_pylon|monolith_column)\|"
+    r"^(?P<kind>masonry|monolith_wall|monolith_pylon|monolith_column|floor_slab)\|"
     r"(?P<thickness>\d{1,4}(?:\.\d{1,3})?)\|(?P<material>[a-z_]{0,40})$"
 )
 

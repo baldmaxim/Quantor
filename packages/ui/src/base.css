@@ -125,10 +125,11 @@
   --cad-zone-apt-7: #b0246f;
   --cad-zone-apt-8: #8a6d00;
 
-  /* Конструкции листа (вкладка CAD): кладка, монолит, конструкция без толщины или высоты */
+  /* Конструкции листа (вкладка CAD): кладка, монолит, плита перекрытия, конструкция без толщины или высоты */
   --cad-construction-masonry: #a8501a;
   --cad-construction-monolith: #3b4cc0;
   --cad-construction-check: #c07a00;
+  --cad-construction-slab: #5f7f8c;
   --cad-construction-not-in-vor: #c4182c;
 
   /* --- вспомогательное --- */
@@ -299,6 +300,7 @@
     --cad-construction-masonry: #c8672a;
     --cad-construction-monolith: #6b7bdc;
     --cad-construction-check: #d99a14;
+    --cad-construction-slab: #7f9ca8;
     --cad-construction-not-in-vor: #ff6b7a;
 
     --tooltip-bg: #c8d2de;
@@ -398,6 +400,7 @@
   --cad-construction-masonry: #c8672a;
   --cad-construction-monolith: #6b7bdc;
   --cad-construction-check: #d99a14;
+  --cad-construction-slab: #7f9ca8;
   --cad-construction-not-in-vor: #ff6b7a;
 
   --tooltip-bg: #c8d2de;

@@ -236,3 +236,71 @@ describe('ConstructionPopover: форма', () => {
     expect(screen.getByText('Данные запроса не приняты.')).toBeInTheDocument();
   });
 });
+
+describe('ConstructionPopover: плита перекрытия', () => {
+  const base = construction({ id: 'x' });
+  const slab = (patch: Partial<ReturnType<typeof construction>> = {}) =>
+    construction({
+      id: 'slab',
+      kind: 'floor_slab',
+      thickness_nominal_mm: 200,
+      computed: {
+        ...base.computed,
+        thickness_mm: 200,
+        height_mm: null,
+        length_m: null,
+        wall_area_m2: null,
+        area_m2: 52.5,
+        volume_m3: 10.5,
+      },
+      ...patch,
+    });
+
+  it('заголовок «Плита перекрытия»; площадь нетто, толщина, объём; без длины, высоты и стены', () => {
+    mount({ construction: slab(), groupCount: 1 });
+    expect(dialog()).toHaveAccessibleName('Конструкция: Плита перекрытия');
+    expect(screen.getByRole('heading', { name: 'Плита перекрытия' })).toBeInTheDocument();
+    expect(screen.getByText('Площадь (нетто)').nextSibling).toHaveTextContent('52,5 м²');
+    expect(screen.getByText('Толщина').nextSibling).toHaveTextContent('200 мм');
+    expect(screen.getByText('Объём').nextSibling).toHaveTextContent('10,5 м³');
+    for (const label of ['Длина', 'Высота', 'Площадь стены', 'Двери в стене']) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+  });
+
+  it('форма плиты: материал и ручная толщина; высоты, проёмов, кладки и «применить ко всем» нет', () => {
+    mount({ construction: slab(), groupCount: 1 });
+    expect(screen.getByLabelText('Материал')).toBeInTheDocument();
+    expect(screen.getByLabelText('Толщина вручную, мм', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Высота вручную, мм', { exact: false })).toBeNull();
+    expect(screen.queryByLabelText('Учитывать надпроёмные части')).toBeNull();
+    expect(screen.queryByLabelText('Раствор или клей')).toBeNull();
+    expect(screen.queryByLabelText('Назначение')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Применить ко всем/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeInTheDocument();
+  });
+
+  it('толщина не задана: бейдж «Толщина плиты не задана», «не определено» вместо нуля', () => {
+    mount({
+      construction: slab({
+        thickness_nominal_mm: null,
+        computed: {
+          ...base.computed,
+          status: 'thickness_check',
+          thickness_mm: null,
+          height_mm: null,
+          length_m: null,
+          wall_area_m2: null,
+          area_m2: 52.5,
+          volume_m3: null,
+          warnings: ['thickness_check'],
+        },
+      }),
+      groupCount: 1,
+    });
+    expect(screen.getAllByText('Толщина плиты не задана').length).toBeGreaterThan(0);
+    expect(screen.getByText('Толщина').nextSibling).toHaveTextContent('не определено');
+    expect(screen.getByText('Объём').nextSibling).toHaveTextContent('не определено');
+  });
+});
+

@@ -22,6 +22,7 @@ export const CONSTRUCTION_KINDS: readonly ConstructionKind[] = [
   'monolith_pylon',
   'monolith_column',
   'frame_partition',
+  'floor_slab',
 ];
 
 export const KIND_LABELS: Readonly<Record<ConstructionKind, string>> = {
@@ -30,6 +31,7 @@ export const KIND_LABELS: Readonly<Record<ConstructionKind, string>> = {
   monolith_pylon: 'Монолит — пилон',
   monolith_column: 'Монолит — колонна',
   frame_partition: 'Каркасная перегородка ГКЛ',
+  floor_slab: 'Плита перекрытия',
 };
 
 export const isMonolith = (kind: ConstructionKind): boolean =>
@@ -37,6 +39,9 @@ export const isMonolith = (kind: ConstructionKind): boolean =>
 
 /** Каркасная перегородка ГКЛ меряется площадью: объёма у неё нет. */
 export const isFramePartition = (kind: ConstructionKind): boolean => kind === 'frame_partition';
+
+/** Плита перекрытия: одна на лист, меряется площадью нетто и объёмом; длины, высоты и стены нет. */
+export const isFloorSlab = (kind: ConstructionKind): boolean => kind === 'floor_slab';
 
 export const MATERIAL_LABELS: Readonly<Record<Material, string>> = {
   aerated_concrete: 'Газобетон',
@@ -105,6 +110,16 @@ export const STATUS_LABELS: Readonly<Record<ConstructionStatus, string>> = {
   height_missing: 'Нет высоты',
 };
 
+/** Статус плиты: толщину у неё не измеряют, а берут с листа или вводят вручную. */
+export const SLAB_STATUS_LABELS: Readonly<Record<ConstructionStatus, string>> = {
+  ...STATUS_LABELS,
+  thickness_check: 'Толщина плиты не задана',
+};
+
+/** Предупреждение расчёта плиты: другие предупреждения стен к ней не относятся. */
+export const SLAB_THICKNESS_WARNING =
+  'Толщина плиты не задана: укажите её в высотах листа или вручную в параметрах.';
+
 export const WARNING_LABELS: Readonly<Record<ConstructionWarning, string>> = {
   thickness_check: 'Толщина не совпала с номиналом: назначьте толщину вручную.',
   height_missing: 'Высота не определена: задайте высоту этажа или высоту вручную.',
@@ -144,8 +159,9 @@ export const showBlockSize = (kind: ConstructionKind, material: Material | null)
   kind === 'masonry' &&
   (material === null || material === 'other' || BLOCK_MATERIALS.has(material));
 
-/** Заголовок карточки: вид и толщина. */
+/** Заголовок карточки: вид и толщина (у плиты - только вид: толщина в строках расчёта). */
 export const constructionTitle = (construction: CadConstructionRead): string => {
+  if (isFloorSlab(construction.kind)) return KIND_LABELS.floor_slab;
   const thickness = construction.computed.thickness_mm ?? construction.thickness_nominal_mm;
   return thickness === null
     ? `${KIND_LABELS[construction.kind]}, толщина не определена — проверить`

@@ -171,6 +171,49 @@ describe('индекс попаданий', () => {
     expect(index.hit({ x: 0.3, y: 0.4 }, 0.002)).toBeNull();
   });
 
+  describe('плита перекрытия', () => {
+    // Плита 6000 x 4000 мм с отверстием 1000 x 1000 мм: x 0.1..0.7, y 0.1..0.5; центр отверстия (0.4, 0.2).
+    const slab = construction({
+      id: 'slab',
+      kind: 'floor_slab',
+      polygon: {
+        shell: [
+          [0, 0],
+          [6000, 0],
+          [6000, 4000],
+          [0, 4000],
+        ],
+        holes: [
+          [
+            [2500, 2500],
+            [3500, 2500],
+            [3500, 3500],
+            [2500, 3500],
+          ],
+        ],
+      },
+    });
+
+    it('точка в стене - стена, в плите вне стен - плита, в отверстии - ничего', () => {
+      const index = buildConstructionIndex(buildShapes([slab, wall], FRAME, PAGE));
+      expect(index.hit({ x: 0.3, y: 0.494 }, 0)).toBe('wall');
+      expect(index.hit({ x: 0.65, y: 0.3 }, 0)).toBe('slab');
+      expect(index.hit({ x: 0.4, y: 0.2 }, 0)).toBeNull();
+      expect(index.hit({ x: 0.9, y: 0.9 }, 0)).toBeNull();
+    });
+
+    it('стена рядом с точкой (допуск) побеждает плиту под ней', () => {
+      const index = buildConstructionIndex(buildShapes([slab, wall], FRAME, PAGE));
+      expect(index.hit({ x: 0.3, y: 0.4865 }, 0.002)).toBe('wall');
+      expect(index.hit({ x: 0.3, y: 0.4865 }, 0)).toBe('slab');
+    });
+
+    it('близость к краю плиты вне её контура - не попадание', () => {
+      const index = buildConstructionIndex(buildShapes([slab], FRAME, PAGE));
+      expect(index.hit({ x: 0.701, y: 0.2 }, 0.002)).toBeNull();
+    });
+  });
+
   it('search отдаёт конструкции по охвату', () => {
     const index = buildConstructionIndex(buildShapes([wall, column], FRAME, PAGE));
     expect(index.size).toBe(2);

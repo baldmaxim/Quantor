@@ -42,12 +42,14 @@ from app.contracts.cad_constructions import (
     CadWallsWarningRead,
     WallsDocument,
 )
+from app.contracts.cad_floor3d import WallsFloorExtras
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
 from app.services import cad_construction_store as store
-from app.services import cad_constructions, cad_walls
+from app.services import cad_constructions, cad_slab, cad_walls
+from app.services import cad_floor3d_store as floor3d_store
 from app.services import jobs as jobs_service
 
 router = APIRouter(
@@ -138,6 +140,31 @@ async def _load_walls(session: SessionDep, storage: StorageDep, sheet: _Sheet) -
     return _Walls(ready, str(artifact["sha256"]), document, raw, jobs[0])
 
 
+def _floor_extras(walls: _Walls) -> WallsFloorExtras:
+    try:
+        return WallsFloorExtras.model_validate(walls.raw)
+    except ValidationError as error:
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "walls.json вне контракта") from error
+
+
+async def _slab(
+    session: SessionDep, sheet: _Sheet, walls: _Walls
+) -> cad_constructions.SlabInput | None:
+    """Плита листа с отверстиями, включёнными решениями человека (как в 3D); нет плиты — None."""
+    decisions = await floor3d_store.load_hole_decisions(
+        session, revision_id=sheet.revision_id, page_index=sheet.page_index, view=sheet.view
+    )
+    return cad_slab.slab_input(_floor_extras(walls), decisions)
+
+
+def _known_keys(walls: _Walls) -> set[str]:
+    """Адреса конструкций листа: стены, перегородки и плита, если она есть в файле."""
+    known = {c.id for c in (*walls.document.constructions, *walls.document.frame_partitions)}
+    if _floor_extras(walls).slab is not None:
+        known.add(cad_constructions.SLAB_ID)
+    return known
+
+
 async def _totals(
     session: SessionDep, sheet: _Sheet, walls: _Walls
 ) -> tuple[cad_constructions.SheetResult, CadSheetLevelsRead]:
@@ -149,7 +176,9 @@ async def _totals(
     )
     # Толщина плиты проекта из разреза (ADR-0039) сильнее walls.json, слабее переопределения листа.
     project_slab = await store.load_project_slab(session, project_id=sheet.project_id)
-    return cad_constructions.compute_sheet(walls.document, props, levels, project_slab), levels
+    slab = await _slab(session, sheet, walls)
+    result = cad_constructions.compute_sheet(walls.document, props, levels, project_slab, slab)
+    return result, levels
 
 
 def _totals_read(
@@ -227,7 +256,7 @@ async def bulk_cad_construction_props(
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
     keys = list(dict.fromkeys(body.keys))
-    known = {c.id for c in (*walls.document.constructions, *walls.document.frame_partitions)}
+    known = _known_keys(walls)
     unknown = [key for key in keys if key not in known]
     if unknown:
         raise DomainError(
@@ -279,9 +308,7 @@ async def put_cad_construction_props(
 ) -> CadConstructionRead:
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
-    if construction_key not in {
-        c.id for c in (*walls.document.constructions, *walls.document.frame_partitions)
-    }:
+    if construction_key not in _known_keys(walls):
         raise not_found("Конструкция")
     current = await store.load_props(
         session, revision_id=sheet.revision_id, page_index=page_index, view=view
@@ -334,7 +361,8 @@ async def put_cad_sheet_levels(
         session, revision_id=sheet.revision_id, page_index=page_index, view=view
     )
     project_slab = await store.load_project_slab(session, project_id=sheet.project_id)
-    result = cad_constructions.compute_sheet(walls.document, props, levels, project_slab)
+    slab = await _slab(session, sheet, walls)
+    result = cad_constructions.compute_sheet(walls.document, props, levels, project_slab, slab)
     response = _totals_read(result, levels)
     await session.commit()
     return response

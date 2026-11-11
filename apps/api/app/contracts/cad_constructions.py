@@ -27,8 +27,14 @@ MAX_BULK_KEYS: Final = 2000
 # Происхождение величины: observed - прочитано из документации; derived - выведено из неё;
 # assumption - допущение параметров скрипта; manual - ввод человека.
 CadValueSource = Literal["observed", "derived", "assumption", "manual"]
+# `floor_slab` — плита перекрытия листа: одна на лист, контур и отверстия — из ключа `slab`.
 CadConstructionKind = Literal[
-    "masonry", "monolith_wall", "monolith_pylon", "monolith_column", "frame_partition"
+    "masonry",
+    "monolith_wall",
+    "monolith_pylon",
+    "monolith_column",
+    "frame_partition",
+    "floor_slab",
 ]
 CadComputedStatus = Literal["ok", "thickness_check", "height_missing"]
 CadConstructionWarning = Literal[
@@ -368,7 +374,11 @@ class CadComputedSourcesRead(BaseModel):
 
 
 class CadConstructionComputedRead(BaseModel):
-    """Вычисленные величины конструкции. Не определено — `None`."""
+    """Вычисленные величины конструкции. Не определено — `None`.
+
+    У плиты перекрытия длина, высота и площадь стены не определены, `area_m2` — площадь плиты
+    нетто (контур минус включённые отверстия); у стен `area_m2` — `None`.
+    """
 
     thickness_mm: float | None
     height_mm: int | None
@@ -378,6 +388,7 @@ class CadConstructionComputedRead(BaseModel):
     status: CadComputedStatus
     sources: CadComputedSourcesRead
     warnings: list[CadConstructionWarning]
+    area_m2: float | None = None
 
 
 class CadConstructionMaterialRead(BaseModel):
@@ -427,7 +438,8 @@ class CadConstructionGroupRead(BaseModel):
     """Итог группы «вид x толщина x материал»; в группу входят только конструкции со статусом ok.
 
     Материал — действующий (ввод человека или документ). У каркасной перегородки `volume_m3` —
-    `None`: она меряется площадью.
+    `None`: она меряется площадью. У плиты перекрытия `area_m2` — сумма площадей нетто, у стен —
+    `None`.
     """
 
     kind: CadConstructionKind
@@ -437,6 +449,7 @@ class CadConstructionGroupRead(BaseModel):
     length_m: float
     wall_area_m2: float
     volume_m3: float | None
+    area_m2: float | None = None
 
 
 class CadConstructionsSummaryRead(BaseModel):

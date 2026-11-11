@@ -16,7 +16,7 @@ from app.contracts.cad_constructions import CadConstructionKind, CadMaterial
 
 # Вид, толщина (мм, целая или с долей), материал (может быть пустым): `masonry|100|aerated_concrete`
 GROUP_KEY_PATTERN: Final = (
-    r"^(?:masonry|monolith_wall|monolith_pylon|monolith_column)"
+    r"^(?:masonry|monolith_wall|monolith_pylon|monolith_column|floor_slab)"
     r"\|\d{1,4}(?:\.\d{1,3})?\|[a-z_]{0,40}$"
 )
 MAX_LINKED_ITEMS: Final = 200

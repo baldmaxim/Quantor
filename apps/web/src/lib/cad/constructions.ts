@@ -154,6 +154,7 @@ export interface IConstructionIndex {
   /**
    * Конструкция под точкой. Внутри контура - с меньшим охватом (вложенное побеждает объемлющее);
    * иначе ближайшая в пределах `tolerance` (доли листа): тонкую стену трудно попасть точно.
+   * Плита перекрытия уступает любой другой конструкции под точкой.
    */
   hit(point: NormalizedPoint, tolerance: number): string | null;
   /** Идентификаторы, чей охват пересекает прямоугольник. */
@@ -181,10 +182,17 @@ export const buildConstructionIndex = (
         maxY: point.y + reach,
       });
       let inside: IConstructionShape | null = null;
+      let insideSlab: IConstructionShape | null = null;
       let near: { shape: IConstructionShape; distance: number } | null = null;
       for (const id of candidates) {
         const shape = byId.get(id);
         if (!shape) continue;
+        // Плита - фон под стенами: возвращается, только если под точкой нет другой конструкции
+        // (ни внутри, ни рядом); попадание в отверстие плиты и близость к её краю - не попадание.
+        if (shape.kind === 'floor_slab') {
+          if (pointInRings(point, shape.rings)) insideSlab = shape;
+          continue;
+        }
         if (pointInRings(point, shape.rings)) {
           if (inside === null || boundsArea(shape.bounds) < boundsArea(inside.bounds)) {
             inside = shape;
@@ -197,7 +205,7 @@ export const buildConstructionIndex = (
           near = { shape, distance };
         }
       }
-      return inside?.id ?? near?.shape.id ?? null;
+      return inside?.id ?? near?.shape.id ?? insideSlab?.id ?? null;
     },
   };
 };

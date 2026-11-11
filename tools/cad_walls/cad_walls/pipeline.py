@@ -121,7 +121,10 @@ def _leaf(o: Opening, thickness: float) -> list[list[float]] | None:
 def _slab(data: SlabData) -> dict[str, object] | None:
     if data.shell is None:
         return None
+    # Плита — конструкция листа: адрес `slab`, вид `floor_slab` (объём считает API конструкций).
     return {
+        "id": "slab",
+        "kind": "floor_slab",
         "shell": _ring(data.shell.exterior.coords),
         "area_mm2": _r(data.shell.area),
         "close_radius_mm": _r(data.close_radius),

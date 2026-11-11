@@ -4,7 +4,12 @@ import { useEffect, useLayoutEffect, useRef, type FC } from 'react';
 import { createPortal } from 'react-dom';
 
 import { StatusBadge } from '@/components/ui';
-import { STATUS_LABELS, constructionTitle } from '@/lib/cad/construction-labels';
+import {
+  SLAB_STATUS_LABELS,
+  STATUS_LABELS,
+  constructionTitle,
+  isFloorSlab,
+} from '@/lib/cad/construction-labels';
 import { POPOVER_OFFSET_PX, placePopover } from '@/lib/cad/constructions';
 
 import { ConstructionComputed } from './ConstructionComputed';
@@ -74,6 +79,7 @@ export const ConstructionPopover: FC<IWorkspaceCadConstructionPopover> = ({
   }, [onClose]);
 
   const { computed } = construction;
+  const statusLabels = isFloorSlab(construction.kind) ? SLAB_STATUS_LABELS : STATUS_LABELS;
   return createPortal(
     <div
       ref={element}
@@ -92,7 +98,7 @@ export const ConstructionPopover: FC<IWorkspaceCadConstructionPopover> = ({
           <h3 className="m-0 text-sm font-medium break-words">{constructionTitle(construction)}</h3>
           <div className="flex flex-wrap gap-[var(--s-3)]">
             {computed.status !== 'ok' && (
-              <StatusBadge tone="warning">{STATUS_LABELS[computed.status]}</StatusBadge>
+              <StatusBadge tone="warning">{statusLabels[computed.status]}</StatusBadge>
             )}
             {construction.accepted && <StatusBadge tone="success">Принято</StatusBadge>}
           </div>

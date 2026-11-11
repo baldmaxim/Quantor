@@ -5,6 +5,7 @@ import type { FC } from 'react';
 
 import {
   KIND_LABELS,
+  isFloorSlab,
   isFramePartition,
   isMonolith,
   materialLabel,
@@ -67,12 +68,23 @@ export const ConstructionsTotals: FC<IConstructionsTotalsProps> = ({
   onSelectGroup,
 }) => {
   const { totals, summary, constructions } = data;
+  const slabGroups = totals.filter((group) => isFloorSlab(group.kind));
+  const wallGroups = totals.filter((group) => !isFloorSlab(group.kind));
   const masonry = sumGroups(
-    totals,
+    wallGroups,
     (group) => !isMonolith(group.kind) && !isFramePartition(group.kind),
   );
-  const monolith = sumGroups(totals, (group) => isMonolith(group.kind));
-  const frame = sumGroups(totals, (group) => isFramePartition(group.kind));
+  const monolith = sumGroups(wallGroups, (group) => isMonolith(group.kind));
+  const frame = sumGroups(wallGroups, (group) => isFramePartition(group.kind));
+
+  /** Подпись источников материала для строки группы: берётся по конструкциям группы. */
+  const sourcesOf = (ids: readonly string[]): Set<MaterialSource> => {
+    const sources = new Set<MaterialSource>();
+    for (const item of constructions) {
+      if (ids.includes(item.id) && item.material.source !== null) sources.add(item.material.source);
+    }
+    return sources;
+  };
 
   const materialCheckIds = constructions
     .filter((item) => item.computed.warnings.includes('material_check'))
@@ -105,68 +117,129 @@ export const ConstructionsTotals: FC<IConstructionsTotalsProps> = ({
     <section aria-label="Свод конструкций" className="flex min-w-0 flex-col gap-[var(--s-3)]">
       <h4 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">Свод</h4>
       {totals.length === 0 ? (
-        <p className="text-xs text-muted">Посчитанных конструкций нет: итоги по группам не набраны.</p>
+        <p className="text-xs text-muted">
+          Посчитанных конструкций нет: итоги по группам не набраны.
+        </p>
       ) : (
-        <div className="scroll-area overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-auto">
-          <table className="w-full min-w-[420px] border-collapse text-xs">
-            <thead>
-              <tr>
-                <th className={TH}>Вид</th>
-                <th className={TH}>Толщина, мм</th>
-                <th className={TH}>Материал</th>
-                <th className={`${TH} text-right`}>Шт.</th>
-                <th className={`${TH} text-right`}>Длина, м</th>
-                <th className={`${TH} text-right`}>Стена, м²</th>
-                <th className={`${TH} text-right`}>Объём, м³</th>
-              </tr>
-            </thead>
-            <tbody>
-              {totals.map((group) => {
-                const key = groupKeyOf(group);
-                const active = activeGroup === key;
-                const ids = groupIds(constructions, group);
-                const sources = new Set<MaterialSource>();
-                for (const item of constructions) {
-                  if (ids.includes(item.id) && item.material.source !== null) {
-                    sources.add(item.material.source);
-                  }
-                }
-                return (
-                  <tr
-                    key={key}
-                    onClick={() => onSelectGroup(key, ids)}
-                    className={`cursor-pointer border-t border-border hover:bg-surface-muted ${
-                      active ? 'bg-accent-soft' : ''
-                    }`}
-                  >
-                    <td className={TD}>
-                      <button
-                        type="button"
-                        aria-pressed={active}
-                        className="min-h-[44px] text-left md:min-h-0"
-                      >
-                        {KIND_LABELS[group.kind]}
-                      </button>
-                    </td>
-                    <td className={TD}>{group.thickness_mm}</td>
-                    <td className={TD}>
-                      {materialLabel(group.material)}
-                      {group.material !== null && sourceSuffix(sources)}
-                    </td>
-                    <td className={NUM}>{group.count}</td>
-                    <td className={NUM}>{formatNumber(group.length_m, 2)}</td>
-                    <td className={NUM}>{formatNumber(group.wall_area_m2, 2)}</td>
-                    <td className={NUM}>
-                      {group.volume_m3 === null ? NO_VOLUME : formatNumber(group.volume_m3, 3)}
-                    </td>
-                  </tr>
-                );
-              })}
-              {masonry && <SumRow label="Итого кладка" sum={masonry} />}
-              {monolith && <SumRow label="Итого монолит" sum={monolith} />}
-              {frame && <SumRow label="Итого ГКЛ (по площади)" sum={frame} withVolume={false} />}
-            </tbody>
-          </table>
+        wallGroups.length > 0 && (
+          <div className="scroll-area overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-auto">
+            <table className="w-full min-w-[420px] border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className={TH}>Вид</th>
+                  <th className={TH}>Толщина, мм</th>
+                  <th className={TH}>Материал</th>
+                  <th className={`${TH} text-right`}>Шт.</th>
+                  <th className={`${TH} text-right`}>Длина, м</th>
+                  <th className={`${TH} text-right`}>Стена, м²</th>
+                  <th className={`${TH} text-right`}>Объём, м³</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wallGroups.map((group) => {
+                  const key = groupKeyOf(group);
+                  const active = activeGroup === key;
+                  const ids = groupIds(constructions, group);
+                  const sources = sourcesOf(ids);
+                  return (
+                    <tr
+                      key={key}
+                      onClick={() => onSelectGroup(key, ids)}
+                      className={`cursor-pointer border-t border-border hover:bg-surface-muted ${
+                        active ? 'bg-accent-soft' : ''
+                      }`}
+                    >
+                      <td className={TD}>
+                        <button
+                          type="button"
+                          aria-pressed={active}
+                          className="min-h-[44px] text-left md:min-h-0"
+                        >
+                          {KIND_LABELS[group.kind]}
+                        </button>
+                      </td>
+                      <td className={TD}>{group.thickness_mm}</td>
+                      <td className={TD}>
+                        {materialLabel(group.material)}
+                        {group.material !== null && sourceSuffix(sources)}
+                      </td>
+                      <td className={NUM}>{group.count}</td>
+                      <td className={NUM}>{formatNumber(group.length_m, 2)}</td>
+                      <td className={NUM}>{formatNumber(group.wall_area_m2, 2)}</td>
+                      <td className={NUM}>
+                        {group.volume_m3 === null ? NO_VOLUME : formatNumber(group.volume_m3, 3)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {masonry && <SumRow label="Итого кладка" sum={masonry} />}
+                {monolith && <SumRow label="Итого монолит" sum={monolith} />}
+                {frame && <SumRow label="Итого ГКЛ (по площади)" sum={frame} withVolume={false} />}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+
+      {slabGroups.length > 0 && (
+        <div
+          role="group"
+          aria-label="Плита перекрытия"
+          className="flex min-w-0 flex-col gap-[var(--s-2)]"
+        >
+          <h5 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
+            {KIND_LABELS.floor_slab}
+          </h5>
+          <div className="scroll-area overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-auto">
+            <table className="w-full min-w-[320px] border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className={TH}>Толщина, мм</th>
+                  <th className={TH}>Материал</th>
+                  <th className={`${TH} text-right`}>Площадь, м²</th>
+                  <th className={`${TH} text-right`}>Объём, м³</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slabGroups.map((group) => {
+                  const key = groupKeyOf(group);
+                  const active = activeGroup === key;
+                  const ids = groupIds(constructions, group);
+                  return (
+                    <tr
+                      key={key}
+                      onClick={() => onSelectGroup(key, ids)}
+                      className={`cursor-pointer border-t border-border hover:bg-surface-muted ${
+                        active ? 'bg-accent-soft' : ''
+                      }`}
+                    >
+                      <td className={TD}>
+                        <button
+                          type="button"
+                          aria-pressed={active}
+                          className="min-h-[44px] text-left md:min-h-0"
+                        >
+                          {group.thickness_mm}
+                        </button>
+                      </td>
+                      <td className={TD}>
+                        {materialLabel(group.material)}
+                        {group.material !== null && sourceSuffix(sourcesOf(ids))}
+                      </td>
+                      <td className={NUM}>
+                        {group.area_m2 === null || group.area_m2 === undefined
+                          ? NO_VOLUME
+                          : formatNumber(group.area_m2, 2)}
+                      </td>
+                      <td className={NUM}>
+                        {group.volume_m3 === null ? NO_VOLUME : formatNumber(group.volume_m3, 3)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

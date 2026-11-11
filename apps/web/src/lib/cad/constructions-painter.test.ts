@@ -4,7 +4,7 @@ import { construction } from './constructions-fixtures';
 import { buildShapes } from './constructions';
 import { createConstructionsPainter, type IConstructionPaintData } from './constructions-painter';
 
-const COLORS = { masonry: 'brown', monolith: 'indigo', check: 'amber', accent: 'blue', notInVor: 'red' };
+const COLORS = { masonry: 'brown', monolith: 'indigo', slab: 'teal', check: 'amber', accent: 'blue', notInVor: 'red' };
 const FRAME = { originX: 100, originY: 500, mmPerPt: 10 };
 const PAGE = { width: 1000, height: 1000 };
 const PLACEMENT = { x: 0, y: 0, width: 1000, height: 1000, rotation: 0 as const };
@@ -92,6 +92,63 @@ describe('рисовальщик конструкций', () => {
     expect(calls.some((call) => call.name === 'fill')).toBe(false);
     expect(painter.touches(PLACEMENT, 1, strip)).toBe(false);
     expect(painter.touches(PLACEMENT, 1, [{ x: 100, y: 480, width: 100, height: 40 }])).toBe(true);
+  });
+});
+
+describe('плита перекрытия', () => {
+  const slab = construction({
+    id: 's',
+    kind: 'floor_slab',
+    polygon: {
+      shell: [
+        [0, 0],
+        [6000, 0],
+        [6000, 4000],
+        [0, 4000],
+      ],
+      holes: [
+        [
+          [2500, 2500],
+          [3500, 2500],
+          [3500, 3500],
+          [2500, 3500],
+        ],
+      ],
+    },
+  });
+  const slabData = (selected: string[] = [], showAll = true): IConstructionPaintData => ({
+    ...data(selected, showAll),
+    // Плита стоит в списке последней, как у сервера: рисоваться она должна первой.
+    shapes: buildShapes([construction({ id: 'm' }), slab], FRAME, PAGE),
+  });
+
+  it('рисуется первой, своим токеном, слабее стен; отверстие - вырезом evenodd', () => {
+    const { context, calls } = recording();
+    createConstructionsPainter(slabData(), { clear: true }).paint(context, PLACEMENT, 1, null);
+    const fills = calls.filter((call) => call.name === 'fill');
+    expect(fills.map((call) => call.fill)).toEqual(['teal', 'brown']);
+    expect(fills[0]?.args[0]).toBe('evenodd');
+    expect(fills[0]?.alpha).toBeLessThan(fills[1]?.alpha ?? 0);
+    // Контур плиты: внешнее кольцо и отверстие - два замкнутых подпути.
+    const firstFill = calls.findIndex((call) => call.name === 'fill');
+    expect(calls.slice(0, firstFill).filter((call) => call.name === 'closePath')).toHaveLength(2);
+  });
+
+  it('выбранная плита - подсветка как у стены, но под выбранной стеной', () => {
+    const { context, calls } = recording();
+    createConstructionsPainter(slabData(['s', 'm']), { clear: true }).paint(context, PLACEMENT, 1, null);
+    const fills = calls.filter((call) => call.name === 'fill');
+    expect(fills.map((call) => call.fill)).toEqual(['teal', 'brown']);
+    expect(fills.map((call) => call.alpha)).toEqual([0.45, 0.45]);
+    const strokes = calls.filter((call) => call.name === 'stroke');
+    expect(strokes.map((call) => call.stroke)).toEqual(['blue', 'blue']);
+    expect(strokes[0]?.width).toBeGreaterThan(1.5);
+  });
+
+  it('при showAll = false рисуется только выбранная плита', () => {
+    const { context, calls } = recording();
+    createConstructionsPainter(slabData(['s'], false), { clear: true }).paint(context, PLACEMENT, 1, null);
+    expect(calls.filter((call) => call.name === 'fill').map((call) => call.fill)).toEqual(['teal']);
   });
 });
 

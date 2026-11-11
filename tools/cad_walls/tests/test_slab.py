@@ -47,6 +47,9 @@ def _outer_walls(msp: Modelspace, gap: tuple[float, float] | None = None) -> Non
 def _slab(doc: Doc) -> Obj:
     slab = doc["slab"]
     assert isinstance(slab, dict)
+    # Плита — конструкция листа (v1.7): адрес и вид для API конструкций.
+    assert slab["id"] == "slab"
+    assert slab["kind"] == "floor_slab"
     return cast(Obj, slab)
 
 

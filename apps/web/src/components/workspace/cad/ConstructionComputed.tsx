@@ -4,6 +4,8 @@ import type { CadConstructionRead } from '@quantor/api-client';
 import type { FC } from 'react';
 
 import {
+  SLAB_THICKNESS_WARNING,
+  isFloorSlab,
   isFramePartition,
   materialLabel,
   materialSourceLabel,
@@ -36,6 +38,7 @@ export const ConstructionComputed: FC<IConstructionComputedProps> = ({ construct
   const nominal = construction.thickness_nominal_mm;
   const { material } = construction;
   const framePartition = isFramePartition(construction.kind);
+  const slab = isFloorSlab(construction.kind);
   const hintText = material.evidence[0]?.text;
   const heightSource = computed.height_mm === null ? null : sourceLabel(computed.sources.height);
   return (
@@ -63,43 +66,71 @@ export const ConstructionComputed: FC<IConstructionComputedProps> = ({ construct
             )}
           </dd>
         </div>
-        <div className={ROW}>
-          <dt className="text-muted">Толщина измеренная / номинал</dt>
-          <dd className="m-0">
-            {numberOrUndefined(construction.thickness_measured_mm, 1, 'мм')} /{' '}
-            {nominal === null ? UNDEFINED_TEXT : `${nominal} мм`}
-          </dd>
-        </div>
-        <div className={ROW}>
-          <dt className="text-muted">Длина</dt>
-          <dd className="m-0">{numberOrUndefined(computed.length_m, 2, 'м')}</dd>
-        </div>
-        <div className={ROW}>
-          <dt className="text-muted">Высота</dt>
-          <dd className="m-0">
-            {numberOrUndefined(computed.height_mm, 0, 'мм')}
-            {heightSource !== null && <span className="text-muted"> ({heightSource})</span>}
-          </dd>
-        </div>
-        <div className={ROW}>
-          <dt className="text-muted">Площадь стены</dt>
-          <dd className="m-0">{numberOrUndefined(computed.wall_area_m2, 2, 'м²')}</dd>
-        </div>
-        <div className={ROW}>
-          <dt className="text-muted">Объём</dt>
-          <dd className="m-0">
-            {framePartition ? '—' : numberOrUndefined(computed.volume_m3, 3, 'м³')}
-          </dd>
-        </div>
-        <div className={ROW}>
-          <dt className="text-muted">Двери в стене</dt>
-          <dd className="m-0">{doors}</dd>
-        </div>
+        {slab ? (
+          <>
+            <div className={ROW}>
+              <dt className="text-muted">Площадь (нетто)</dt>
+              <dd className="m-0">{numberOrUndefined(computed.area_m2, 2, 'м²')}</dd>
+            </div>
+            <div className={ROW}>
+              <dt className="text-muted">Толщина</dt>
+              <dd className="m-0">
+                {numberOrUndefined(computed.thickness_mm, 0, 'мм')}
+                {computed.thickness_mm !== null && (
+                  <span className="text-muted"> ({sourceLabel(computed.sources.thickness)})</span>
+                )}
+              </dd>
+            </div>
+            <div className={ROW}>
+              <dt className="text-muted">Объём</dt>
+              <dd className="m-0">{numberOrUndefined(computed.volume_m3, 3, 'м³')}</dd>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={ROW}>
+              <dt className="text-muted">Толщина измеренная / номинал</dt>
+              <dd className="m-0">
+                {numberOrUndefined(construction.thickness_measured_mm, 1, 'мм')} /{' '}
+                {nominal === null ? UNDEFINED_TEXT : `${nominal} мм`}
+              </dd>
+            </div>
+            <div className={ROW}>
+              <dt className="text-muted">Длина</dt>
+              <dd className="m-0">{numberOrUndefined(computed.length_m, 2, 'м')}</dd>
+            </div>
+            <div className={ROW}>
+              <dt className="text-muted">Высота</dt>
+              <dd className="m-0">
+                {numberOrUndefined(computed.height_mm, 0, 'мм')}
+                {heightSource !== null && <span className="text-muted"> ({heightSource})</span>}
+              </dd>
+            </div>
+            <div className={ROW}>
+              <dt className="text-muted">Площадь стены</dt>
+              <dd className="m-0">{numberOrUndefined(computed.wall_area_m2, 2, 'м²')}</dd>
+            </div>
+            <div className={ROW}>
+              <dt className="text-muted">Объём</dt>
+              <dd className="m-0">
+                {framePartition ? '—' : numberOrUndefined(computed.volume_m3, 3, 'м³')}
+              </dd>
+            </div>
+            <div className={ROW}>
+              <dt className="text-muted">Двери в стене</dt>
+              <dd className="m-0">{doors}</dd>
+            </div>
+          </>
+        )}
       </dl>
       {computed.warnings.length > 0 && (
         <ul className="m-0 flex list-none flex-col gap-[var(--s-2)] p-0 text-xs text-warning">
           {computed.warnings.map((warning) => (
-            <li key={warning}>{WARNING_LABELS[warning]}</li>
+            <li key={warning}>
+              {slab && warning === 'thickness_check'
+                ? SLAB_THICKNESS_WARNING
+                : WARNING_LABELS[warning]}
+            </li>
           ))}
         </ul>
       )}
