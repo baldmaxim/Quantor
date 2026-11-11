@@ -424,7 +424,7 @@ SHA = "ab" * 32
 CONTEXT = {
     "job_id": "5f1c0f1e-0000-4000-8000-000000000001",
     "source_sha256": SHA,
-    "engine_version": "2026.11.10+e37b347ff1a4",
+    "engine_version": "2026.11.12+a712a359fe93",
     "engine_commit": "c10110fea15f95fb9e4ce7bed44e298dca2cadbf",
     "runner_version": "0.1.0",
 }
