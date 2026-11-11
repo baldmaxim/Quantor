@@ -23,6 +23,7 @@ from app.services.consistency.dictionaries import (
     match_section_mark,
     sheet_kind_match,
 )
+from app.services.consistency.pdf_text import page_text
 from app.services.consistency.sheet_levels import parse_elevation, parse_level
 from app.services.consistency.sheet_stamp import (
     SPACES_RE,
@@ -36,7 +37,7 @@ from app.services.consistency.sheet_stamp import (
     stamp_window,
 )
 
-PARSER_VERSION: Final = "consistency.sheet_passport.v1"
+PARSER_VERSION: Final = "consistency.sheet_passport.v2"
 
 _SNIPPET_MAX: Final = 120
 
@@ -449,7 +450,7 @@ def extract_pdf_pages(stream: BinaryIO, file_name: str) -> Iterator[PageInput]:
         labels = None
     for index, page in enumerate(reader.pages):
         try:
-            text = page.extract_text() or ""
+            text = page_text(page, reader)
         except Exception:  # страница с нечитаемым потоком: пустой текст, не падение файла
             text = ""
         label = labels[index] if labels is not None and index < len(labels) else None
