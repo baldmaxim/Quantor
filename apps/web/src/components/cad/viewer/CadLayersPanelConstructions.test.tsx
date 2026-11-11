@@ -19,9 +19,6 @@ const mount = (constructions: { visible: boolean; onVisibleChange: (value: boole
       cropAvailable={false}
       cropVisible={false}
       onCropChange={vi.fn()}
-      regionsVisible={false}
-      onRegionsVisibleChange={vi.fn()}
-      regionsAvailable
       constructions={constructions}
     />,
   );

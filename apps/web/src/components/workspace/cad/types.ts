@@ -205,11 +205,6 @@ export interface IWorkspaceCadLayers {
   readonly cropAvailable: boolean;
   readonly cropVisible: boolean;
   readonly onCropChange: (visible: boolean) => void;
-  /** Показаны ли распознанные блоки поверх PDF на вкладке CAD. */
-  readonly regionsVisible: boolean;
-  readonly onRegionsVisibleChange: (visible: boolean) => void;
-  /** Слой распознавания включён на панели инструментов; иначе флажок недоступен. */
-  readonly regionsAvailable: boolean;
   /** Слой «Конструкции»; `null` или нет - переключателя нет (конструкции не считались). */
   readonly constructions?: {
     readonly visible: boolean;

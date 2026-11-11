@@ -82,9 +82,6 @@ const VIEW: NonNullable<IWorkspaceCadSideProps['view']> = {
     cropAvailable: false,
     cropVisible: false,
     onCropChange: vi.fn(),
-    regionsVisible: false,
-    onRegionsVisibleChange: vi.fn(),
-    regionsAvailable: true,
   },
   remarks: {} as never,
 };

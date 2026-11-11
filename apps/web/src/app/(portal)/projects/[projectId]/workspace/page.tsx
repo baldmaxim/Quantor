@@ -14,6 +14,7 @@ import { CadZoneCapture } from '@/components/cad/viewer/CadZoneCapture';
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
+import { RegionInspector } from '@/components/workspace/RegionInspector';
 import { WorkspaceModeSwitch } from '@/components/workspace/WorkspaceModeSwitch';
 import { resolveLeftTab } from '@/components/workspace/cad/left-tab';
 import { CadConstructionPicker } from '@/components/workspace/cad/CadConstructionPicker';
@@ -32,7 +33,7 @@ import { ScaleDraft, type ScaleDraftPhase } from '@/lib/viewer/scale-draft';
 import { ToolController } from '@/lib/viewer/tool-controller';
 import type { ToolMode } from '@/lib/viewer/tool-machine';
 import { useDocumentBackend } from '@/components/viewer/useDocumentBackend';
-import { EmptyState, ErrorState, Field, InspectorSection, StatusBadge, cx } from '@/components/ui';
+import { EmptyState, ErrorState, InspectorSection, StatusBadge, cx } from '@/components/ui';
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -42,7 +43,6 @@ import {
   IconHand,
   IconLayers,
   IconReset,
-  IconWarning,
   IconZoomIn,
   IconZoomOut,
 } from '@/components/ui/icons';
@@ -52,7 +52,6 @@ import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
 import { useCadJobs } from '@/lib/cad/queries';
 import { latestSheetJobs, type ISheetResult } from '@/lib/cad/sheet-results';
-import { regionsVisible } from '@/lib/cad/workspace-cad';
 import { parseWorkspaceJob } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
 import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
@@ -833,7 +832,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 sheet={viewportSheet}
                 regions={overlayRegions}
                 hiddenTypes={hiddenTypes}
-                overlayVisible={regionsVisible(overlayVisible, activeTab, cad.regionsVisible)}
+                overlayVisible={overlayVisible}
                 selectedId={selectedRegionId}
                 onSelect={(id) => setQuery({ region: id })}
                 camera={camera}
@@ -911,7 +910,28 @@ const WorkspacePage = ({ params }: IPageProps) => {
               )}
             >
               {activeTab === 'cad' ? (
-                <WorkspaceCadSide {...cad.side} />
+                <>
+                  {overlayVisible && selectedRegion && (
+                    <div className="flex-none border-b border-border p-[var(--s-4)]">
+                      <div className="mb-[var(--s-3)] flex items-center justify-between gap-[var(--s-3)]">
+                        <span className="text-xs font-medium text-muted">Свойства блока</span>
+                        <button
+                          type="button"
+                          aria-label="Закрыть свойства блока"
+                          onClick={() => setQuery({ region: null })}
+                          className="min-h-[32px] rounded-[var(--radius-sm)] border border-border px-[var(--s-3)] text-xs text-muted transition-colors duration-[var(--dur-fast)] hover:text-text"
+                        >
+                          Закрыть
+                        </button>
+                      </div>
+                      <RegionInspector
+                        region={selectedRegion}
+                        sheetLabel={sheetLabel(sheet, pages.length)}
+                      />
+                    </div>
+                  )}
+                  <WorkspaceCadSide {...cad.side} />
+                </>
               ) : activeTab === 'takeoff' ? (
                 <MeasurementInspector
                   measurement={selectedMeasurement}
@@ -938,7 +958,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                     });
                   }}
                 />
-              ) : selectedRegion ? (
+              ) : overlayVisible && selectedRegion ? (
                 <RegionInspector
                   region={selectedRegion}
                   sheetLabel={sheetLabel(sheet, pages.length)}
@@ -1002,22 +1022,6 @@ const viewportSize = () => {
   return element
     ? { width: element.clientWidth, height: element.clientHeight }
     : { width: 1200, height: 800 };
-};
-
-/**
- * Ссылка из пакета, пригодная для перехода.
- *
- * Адрес приходит из недоверенного архива, поэтому схема проверяется явно: `javascript:`
- * в href — это исполнение чужого кода на странице портала. Всё, кроме http(s), остаётся
- * обычным текстом.
- */
-const externalHref = (value: string): string | null => {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
-  } catch {
-    return null;
-  }
 };
 
 const sheetLabel = (
@@ -1307,68 +1311,6 @@ const RecognitionPanel = ({
         )}
       </div>
     </div>
-  );
-};
-
-/* ---------------------------------------------------------------------- инспектор */
-
-const RegionInspector = ({ region, sheetLabel }: { region: RegionRead; sheetLabel: string }) => {
-  const cropUrl = region.legacy_metadata['crop_url'];
-  const cropHref = typeof cropUrl === 'string' ? externalHref(cropUrl) : null;
-
-  return (
-    <>
-      <InspectorSection title={blockType(region.block_type)}>
-        <dl className="grid grid-cols-[92px_1fr] gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
-          <Field label="block_id">{region.external_block_id}</Field>
-          {region.ordinal !== null && <Field label="Номер">{region.ordinal}</Field>}
-          <Field label="Лист">{sheetLabel}</Field>
-          <Field label="Форма">{region.shape_type}</Field>
-          <Field label="Координаты">
-            [{region.coords_norm.map((value) => value.toFixed(3)).join(', ')}]
-          </Field>
-          <Field label="Простр-во">normalized_page_top_left</Field>
-          {region.recognition_status && <Field label="Статус">{region.recognition_status}</Field>}
-        </dl>
-      </InspectorSection>
-
-      {region.raw_content_md && (
-        <InspectorSection title="Распознанный текст">
-          {/* Текст пришёл из недоверенного архива и показывается как текст, а не как
-              разметка: разбирать его как HTML нельзя. */}
-          <pre className="mono max-h-[240px] overflow-auto rounded-[var(--radius-sm)] border border-border bg-surface-sunken p-[var(--s-3)] text-micro leading-relaxed whitespace-pre-wrap text-muted">
-            {region.raw_content_md}
-          </pre>
-        </InspectorSection>
-      )}
-
-      {typeof cropUrl === 'string' && (
-        <InspectorSection title="Исходные метаданные">
-          <p className="flex items-start gap-[var(--s-3)] text-micro text-muted">
-            <IconWarning width={13} height={13} className="mt-[2px] flex-none text-warning" />
-            {/* Сервер эту ссылку не загружает: пакет должен оставаться самодостаточным.
-                Открыть её может человек — и пусть открывает в новой вкладке, не теряя
-                рабочую область. */}
-            <span className="min-w-0 break-all">
-              crop_url — внешняя ссылка, сервер её не загружает:{' '}
-              {cropHref ? (
-                <a
-                  href={cropHref}
-                  target="_blank"
-                  rel="noopener noreferrer external"
-                  title="Открыть вырезку в новой вкладке"
-                  className="text-accent underline decoration-dotted underline-offset-2 transition-colors duration-[var(--dur-fast)] hover:decoration-solid"
-                >
-                  {cropUrl}
-                </a>
-              ) : (
-                cropUrl
-              )}
-            </span>
-          </p>
-        </InspectorSection>
-      )}
-    </>
   );
 };
 

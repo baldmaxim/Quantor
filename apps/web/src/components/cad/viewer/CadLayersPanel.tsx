@@ -6,6 +6,7 @@ import { groupLayers } from '@/lib/cad/layer-groups';
 import { mepColorVar } from '@/lib/cad/mep-layers';
 import { formatInt } from '@/lib/cad/view-format';
 import { MAX_PDF_OPACITY, MIN_PDF_OPACITY } from '@/lib/cad/view-mode';
+import { useWorkspaceStore } from '@/store/workspace';
 
 import { CadLayerGroup } from './CadLayerGroup';
 import { CadZoneLayers, type ICadZoneLayers } from './CadZoneLayers';
@@ -30,11 +31,6 @@ interface ICadLayersPanelProps {
   cropAvailable: boolean;
   cropVisible: boolean;
   onCropChange: (visible: boolean) => void;
-  /** Показаны ли распознанные блоки (области распознавания) поверх PDF. */
-  regionsVisible: boolean;
-  onRegionsVisibleChange: (visible: boolean) => void;
-  /** Слой распознавания включён на панели инструментов; нет - флажок недоступен. */
-  regionsAvailable: boolean;
   /** Полный показ контуров конструкций (без него - только выбранные); нет - переключателя нет. */
   constructions?: {
     visible: boolean;
@@ -73,14 +69,14 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   cropAvailable,
   cropVisible,
   onCropChange,
-  regionsVisible,
-  onRegionsVisibleChange,
-  regionsAvailable,
   constructions = null,
   zones = null,
   mep = null,
 }) => {
   const groups = useMemo(() => groupLayers(layers), [layers]);
+  // Показ распознанных блоков один на всё окно: тот же флаг, что у кнопки панели инструментов.
+  const regionsVisible = useWorkspaceStore((state) => state.overlayVisible);
+  const toggleRegions = useWorkspaceStore((state) => state.toggleOverlay);
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-4)]">
@@ -88,18 +84,13 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
         <label className={CHECK}>
           <input
             type="checkbox"
-            checked={regionsAvailable && regionsVisible}
-            disabled={!regionsAvailable}
-            onChange={(event) => onRegionsVisibleChange(event.target.checked)}
+            checked={regionsVisible}
+            onChange={toggleRegions}
             className="size-5 shrink-0"
           />
           Распознанные блоки
         </label>
-        <p className="text-xs text-muted">
-          {regionsAvailable
-            ? 'Области распознавания поверх PDF'
-            : 'Слой распознавания выключен на панели инструментов'}
-        </p>
+        <p className="text-xs text-muted">Области распознавания поверх PDF</p>
       </div>
 
       {constructions && (

@@ -11,7 +11,6 @@ import {
   overlayAvailability,
   overlayPaintData,
   pickWorkspaceView,
-  regionsVisible,
   workspaceMarks,
   workspaceViewParams,
 } from './workspace-cad';
@@ -182,22 +181,5 @@ describe('отметки замечаний', () => {
     expect(
       workspaceMarks([{ id: 'a', status: 'open', bbox_pt: [1, 1, 5, 5] }], null, null),
     ).toEqual([]);
-  });
-});
-
-describe('regionsVisible', () => {
-  it('вне вкладки CAD действует только общий переключатель', () => {
-    expect(regionsVisible(true, 'documents', false)).toBe(true);
-    expect(regionsVisible(true, 'takeoff', false)).toBe(true);
-    expect(regionsVisible(false, 'documents', true)).toBe(false);
-  });
-
-  it('на вкладке CAD блоки скрыты, пока не включены в «Слоях»', () => {
-    expect(regionsVisible(true, 'cad', false)).toBe(false);
-    expect(regionsVisible(true, 'cad', true)).toBe(true);
-  });
-
-  it('выключенный общий переключатель скрывает блоки и на вкладке CAD', () => {
-    expect(regionsVisible(false, 'cad', true)).toBe(false);
   });
 });

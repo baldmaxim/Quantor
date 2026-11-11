@@ -16,9 +16,6 @@ export const MAX_PDF_OPACITY = 1;
 /** Ключ localStorage: непрозрачность PDF в режиме «Наложение». */
 export const PDF_OPACITY_KEY = 'quantor.cad.pdf-opacity';
 
-/** Ключ localStorage: показывать ли распознанные блоки поверх PDF на вкладке CAD. */
-export const CAD_REGIONS_VISIBLE_KEY = 'quantor.cad.regions-visible';
-
 /** Приводит значение к допустимому отрезку; не число - значение по умолчанию. */
 export const clampPdfOpacity = (value: number): number =>
   Number.isFinite(value)

@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { useWorkspaceStore } from '@/store/workspace';
 
 import { CadLayersPanel } from './CadLayersPanel';
 
@@ -7,7 +9,6 @@ const mount = (patch: Partial<Parameters<typeof CadLayersPanel>[0]> = {}) => {
   const onToggleLayer = vi.fn();
   const onSetLayersHidden = vi.fn();
   const onPdfOpacityChange = vi.fn();
-  const onRegionsVisibleChange = vi.fn();
   render(
     <CadLayersPanel
       layers={['WALLS', 'DOORS', 'TEXT']}
@@ -23,16 +24,17 @@ const mount = (patch: Partial<Parameters<typeof CadLayersPanel>[0]> = {}) => {
       cropAvailable
       cropVisible={false}
       onCropChange={vi.fn()}
-      regionsVisible={false}
-      onRegionsVisibleChange={onRegionsVisibleChange}
-      regionsAvailable
       {...patch}
     />,
   );
-  return { onToggleLayer, onSetLayersHidden, onPdfOpacityChange, onRegionsVisibleChange };
+  return { onToggleLayer, onSetLayersHidden, onPdfOpacityChange };
 };
 
 describe('CadLayersPanel', () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ overlayVisible: false });
+  });
+
   it('у каждого слоя свой цветной образец из токенов палитры по порядку', () => {
     mount();
     const swatches = screen.getAllByTestId('layer-swatch');
@@ -150,26 +152,22 @@ describe('CadLayersPanel', () => {
     expect(onSetLayersHidden).not.toHaveBeenCalled();
   });
 
-  it('флажок «Распознанные блоки» отражает состояние и вызывает обработчик', () => {
-    const { onRegionsVisibleChange } = mount();
+  it('флажок «Распознанные блоки» переключает общее состояние показа блоков', () => {
+    mount();
     const box = screen.getByRole('checkbox', { name: 'Распознанные блоки' });
     expect(box).not.toBeChecked();
     expect(box).toBeEnabled();
     expect(screen.getByText('Области распознавания поверх PDF')).toBeInTheDocument();
     fireEvent.click(box);
-    expect(onRegionsVisibleChange).toHaveBeenCalledWith(true);
+    expect(useWorkspaceStore.getState().overlayVisible).toBe(true);
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+    expect(useWorkspaceStore.getState().overlayVisible).toBe(false);
   });
 
-  it('флажок «Распознанные блоки» показан и без DXF', () => {
-    mount({ layers: [], cadShown: false, previewAvailable: false, regionsVisible: true });
+  it('флажок «Распознанные блоки» отражает общее состояние и без DXF', () => {
+    useWorkspaceStore.setState({ overlayVisible: true });
+    mount({ layers: [], cadShown: false, previewAvailable: false });
     expect(screen.getByRole('checkbox', { name: 'Распознанные блоки' })).toBeChecked();
-  });
-
-  it('при выключенном слое распознавания флажок недоступен и объясняет причину', () => {
-    mount({ regionsAvailable: false, regionsVisible: true });
-    const box = screen.getByRole('checkbox', { name: 'Распознанные блоки' });
-    expect(box).toBeDisabled();
-    expect(box).not.toBeChecked();
-    expect(screen.getByText('Слой распознавания выключен на панели инструментов')).toBeInTheDocument();
   });
 });
