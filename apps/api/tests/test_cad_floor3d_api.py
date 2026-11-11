@@ -290,7 +290,7 @@ async def test_floor3d_model_of_a_sheet(
         assert body["heights"]["floor_elevation_source"] == "observed"
         assert body["slab"]["z_top_mm"] == BASE and body["slab"]["z_bottom_mm"] == BASE - 200
         assert body["slab"]["area_m2"] == 24.0
-        assert [h["state"] for h in body["slab_holes"]] == ["candidate", "candidate"]
+        assert [h["state"] for h in body["slab_holes"]] == ["enabled", "enabled"]
         assert [h["area_m2"] for h in body["slab_holes"]] == [1.0, 2.0]
         keys = [w["construction_key"] for w in body["walls"]]
         assert keys == ["aaaaaaaaaaaa", "bbbbbbbbbbbb", "cccccccccccc", "dddddddddddd"]
@@ -396,11 +396,11 @@ async def test_hole_decision_changes_state_and_persists(
         enabled = await api.put(url, json={"enabled": True})
         assert enabled.status_code == 200, enabled.text
         states = {h["key"]: h["state"] for h in enabled.json()["slab_holes"]}
-        assert states == {first: "enabled", second: "candidate"}
+        assert states == {first: "enabled", second: "enabled"}
 
         disabled = await api.put(url, json={"enabled": False})
         states = {h["key"]: h["state"] for h in disabled.json()["slab_holes"]}
-        assert states == {first: "disabled", second: "candidate"}
+        assert states == {first: "disabled", second: "enabled"}
         listed = (await api.get(_floor(project_id, job_id))).json()
         assert {h["key"]: h["state"] for h in listed["slab_holes"]} == states
 

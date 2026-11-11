@@ -253,7 +253,7 @@ async def test_queue_stores_the_same_model_as_get_and_is_idempotent(
         # Другая модель (решение по отверстию) — другой вход и новое задание.
         holes = model["slab_holes"]
         put = await api.put(
-            _url(project_id, job_id, f"floor3d/holes/{holes[0]['key']}"), json={"enabled": True}
+            _url(project_id, job_id, f"floor3d/holes/{holes[0]['key']}"), json={"enabled": False}
         )
         assert put.status_code == 200, put.text
         changed = await api.post(_dxf_url(project_id, job_id))

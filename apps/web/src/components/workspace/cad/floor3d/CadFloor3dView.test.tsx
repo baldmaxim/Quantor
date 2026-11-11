@@ -161,7 +161,7 @@ describe('3D-вид этажа', () => {
     vi.mocked(client.putCadFloor3dHole).mockImplementation(() => ok(floor3dFixture()) as never);
     mount();
     const toggle = await screen.findByRole('button', { name: /Отверстия плиты \(3\)/ });
-    expect(toggle).toHaveTextContent('кандидатов 1, отверстий 1, не отверстий 1');
+    expect(toggle).toHaveTextContent('отверстий 1, не отверстий 1');
     fireEvent.click(toggle);
     const rows = screen.getAllByTestId(/^floor3d-hole-/).map((row) => row.getAttribute('data-testid'));
     expect(rows).toEqual(['floor3d-hole-h2', 'floor3d-hole-h3', 'floor3d-hole-h1']);

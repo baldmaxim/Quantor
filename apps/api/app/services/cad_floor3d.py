@@ -251,9 +251,8 @@ def _keyed_holes(
         seen[base] = seen.get(base, 0) + 1
         key = base if seen[base] == 1 else f"{base}-{seen[base]}"
         decision = decisions.get(key)
-        state: CadFloor3dHoleState = (
-            "candidate" if decision is None else ("enabled" if decision else "disabled")
-        )
+        # Без решения человека отверстие включено; «Не отверстие» - решение enabled=false.
+        state: CadFloor3dHoleState = "disabled" if decision is False else "enabled"
         holes.append(
             CadFloor3dHoleRead(
                 key=key,

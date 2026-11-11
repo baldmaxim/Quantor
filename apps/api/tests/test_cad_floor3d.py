@@ -346,7 +346,7 @@ def test_hole_state_follows_the_human_decision() -> None:
     states = {h.key: h.state for h in model.slab_holes}
     assert states == {first: "enabled", second: "disabled"}
     undecided = build()
-    assert {h.state for h in undecided.slab_holes} == {"candidate"}
+    assert {h.state for h in undecided.slab_holes} == {"enabled"}
     assert [h.area_m2 for h in undecided.slab_holes] == [1.0, 2.0]
     assert f3d.hole_keys(WallsFloorExtras.model_validate(raw_extras())) == [
         h.key for h in undecided.slab_holes

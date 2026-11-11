@@ -102,7 +102,10 @@ class CadFloor3dSlabRead(BaseModel):
 
 
 class CadFloor3dHoleRead(BaseModel):
-    """Отверстие плиты. `candidate` — решения человека нет: рисуется как отверстие, но помечено."""
+    """Отверстие плиты: без решения человека включено (`enabled`), `candidate` сервис не выдаёт.
+
+    `disabled` — человек отметил «Не отверстие».
+    """
 
     key: str
     shell: list[list[float]]

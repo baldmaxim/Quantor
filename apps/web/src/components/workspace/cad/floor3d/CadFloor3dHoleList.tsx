@@ -45,8 +45,7 @@ export const CadFloor3dHoleList: FC<ICadFloor3dHoleListProps> = ({ holes, saving
             Отверстия плиты ({holes.length})
           </span>
           <span className="block text-xs text-muted">
-            кандидатов {count(holes, 'candidate')}, отверстий {count(holes, 'enabled')}, не отверстий{' '}
-            {count(holes, 'disabled')}
+            отверстий {count(holes, 'enabled')}, не отверстий {count(holes, 'disabled')}
           </span>
         </span>
         <span aria-hidden="true">{open ? '▾' : '▸'}</span>
