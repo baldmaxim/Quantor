@@ -22,6 +22,12 @@ const HOLE_STATE_TEXT = {
   disabled: 'не отверстие',
 } as const;
 
+const LINTEL_MATERIAL_TEXT = {
+  monolith: 'монолит',
+  masonry: 'кладка',
+  frame_partition: 'каркасная перегородка',
+} as const;
+
 interface ICadFloor3dPopoverProps {
   readonly pick: IFloor3dPick;
   readonly model: CadFloor3dRead;
@@ -95,9 +101,15 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
   } else if (pick.kind === 'prism' && pick.category === 'lintel') {
     const lintel = model.lintels.find((item) => item.opening_id === pick.id);
     if (!lintel) return null;
-    title = lintel.kind === 'door' ? 'Перемычка над дверью' : 'Перемычка над проёмом';
+    const monolith = lintel.material === 'monolith';
+    const over = lintel.kind === 'door' ? 'над дверью' : 'над проёмом';
+    title = `${monolith ? 'Монолит' : 'Перемычка'} ${over}`;
     body = (
       <>
+        <Row
+          label="Материал"
+          value={lintel.material ? LINTEL_MATERIAL_TEXT[lintel.material] : 'не определён'}
+        />
         <Row label="Высота двери" value={`${lintel.door_height_mm} мм (${heightSourceText(lintel.door_height_source)})`} />
         <Row label="Низ, м" value={formatMeters(lintel.z_bottom_mm)} />
         <Row label="Верх, м" value={formatMeters(lintel.z_top_mm)} />

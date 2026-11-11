@@ -65,6 +65,39 @@ describe('сцена 3D-вида (без WebGL)', () => {
     own.dispose();
   });
 
+  it('перемычки красятся по материалу, категория и клик остаются прежними', () => {
+    const base = floor3dFixture();
+    const lintel = base.lintels[0]!;
+    const withMaterials = floor3dFixture({
+      lintels: [
+        { ...lintel, opening_id: 'a', material: 'monolith' },
+        { ...lintel, opening_id: 'b', material: 'masonry' },
+        { ...lintel, opening_id: 'c', material: 'frame_partition' },
+        { ...lintel, opening_id: 'd', material: null },
+        { ...lintel, opening_id: 'e' },
+      ],
+    });
+    const colors = {
+      ...readFloor3dColors(),
+      monolith: 'rgb(10, 0, 0)',
+      masonry: 'rgb(0, 10, 0)',
+      lintel: 'rgb(0, 0, 10)',
+    };
+    const own = buildFloor3dScene(buildFloor3dPlan(withMaterials), colors, { showSlabCap: false });
+    const lintels = own.pickables.filter((mesh) => (mesh.userData.pick as IFloor3dPickData).category === 'lintel');
+    const byColor = new Map(
+      lintels.map((mesh) => [
+        (mesh.material as THREE.MeshLambertMaterial).color.getHex(),
+        (mesh.userData.pick as IFloor3dPickData).ids,
+      ]),
+    );
+    expect(byColor.get(new THREE.Color(colors.monolith).getHex())).toEqual(['a']);
+    expect(byColor.get(new THREE.Color(colors.masonry).getHex())).toEqual(['b', 'c']);
+    expect(byColor.get(new THREE.Color(colors.lintel).getHex())).toEqual(['d', 'e']);
+    expect(pickOf(lintels[0]!, 0)?.category).toBe('lintel');
+    own.dispose();
+  });
+
   it('без галки плиты сверху копии нет; dispose не падает', () => {
     const plain = buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap: false });
     expect(plain.slabCap).toBeNull();

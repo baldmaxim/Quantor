@@ -139,3 +139,45 @@ describe('плашка двери', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
+
+describe('плашка перемычки: материал', () => {
+  const mountLintel = (patch: { material?: 'monolith' | 'masonry' | 'frame_partition' | null; kind?: 'door' | 'gap' }) => {
+    const base = floor3dFixture();
+    const lintel = { ...base.lintels[0]!, ...patch };
+    render(
+      <CadFloor3dPopover
+        pick={{ kind: 'prism', category: 'lintel', id: 'o1' }}
+        model={floor3dFixture({ lintels: [lintel] })}
+        anchor={{ x: 10, y: 10 }}
+        bounds={{ width: 600, height: 400 }}
+        saving={false}
+        error={null}
+        onDecide={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+  };
+
+  it('монолит над дверью и над проёмом', () => {
+    mountLintel({ material: 'monolith' });
+    expect(screen.getByRole('dialog', { name: 'Монолит над дверью' })).toHaveTextContent('Материал: монолит');
+  });
+
+  it('монолит над проёмом', () => {
+    mountLintel({ material: 'monolith', kind: 'gap' });
+    expect(screen.getByRole('dialog', { name: 'Монолит над проёмом' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['masonry', 'кладка'],
+    ['frame_partition', 'каркасная перегородка'],
+  ] as const)('%s - заголовок прежний, материал в строке', (material, text) => {
+    mountLintel({ material });
+    expect(screen.getByRole('dialog', { name: 'Перемычка над дверью' })).toHaveTextContent(`Материал: ${text}`);
+  });
+
+  it('материала нет - «не определён»', () => {
+    mountLintel({ material: null });
+    expect(screen.getByRole('dialog', { name: 'Перемычка над дверью' })).toHaveTextContent('Материал: не определён');
+  });
+});

@@ -218,13 +218,14 @@ async def _enqueue(
 
 
 async def enqueue_after_convert(
-    session: AsyncSession, parent: Job, settings: Settings
+    session: AsyncSession, storage: ObjectStorage, parent: Job, settings: Settings
 ) -> list[Job]:
     """Автопостановка: по заданию на каждый вид успешного `cad_pdf_convert`, у которого есть DXF.
 
     Вызывается в транзакции записи успеха конвертации: задания появляются вместе с результатом.
     Параметры скрипта не нашлись — конвертация остаётся успешной, а конструкции ставятся
-    вручную после исправления установки.
+    вручную после исправления установки. Зоны помещений листа уходят входом задания, как у
+    пересчёта; сбой их чтения конвертацию не рушит (задание без зон, причина в `zones_warning`).
     """
     try:
         params = load_params(settings)
@@ -240,6 +241,9 @@ async def enqueue_after_convert(
             dxf = view_has_dxf(parent, page_index, view)
             if dxf is None:
                 continue
+            zones = await cad_walls_zones.prepare_or_empty(
+                session, storage, parent=parent, page_index=page_index, view=view
+            )
             jobs.append(
                 await _enqueue(
                     session,
@@ -249,9 +253,75 @@ async def enqueue_after_convert(
                     dxf=dxf,
                     params=params,
                     sequence=0,
+                    zones=zones,
                 )
             )
     return jobs
+
+
+async def schedule_after_auto_zones(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    *,
+    parent: Job,
+    page_index: int,
+    view: int,
+    settings: Settings,
+) -> Job | None:
+    """Пересчёт конструкций вида после появления зон авторазметки; без 409 и без исключений.
+
+    Первое задание листа без разметки человека уходит до авторазметки, то есть без зон. Нет DXF,
+    параметров или самих зон либо уже активно задание вида с теми же зонами — ничего не
+    ставится, причина в логе; активное задание без этих зон пересчёт не блокирует. Цикла нет:
+    зоны авторазметка создаёт только на пустом листе, поэтому повторного успеха с новыми
+    зонами не бывает, а ключ идемпотентности включает хеш зон и номер пересчёта.
+    """
+    try:
+        params = load_params(settings)
+    except DomainError:
+        log.warning("cad_walls_params_unavailable", job_id=str(parent.id))
+        return None
+    await session.refresh(parent, with_for_update=True)
+    if parent.status is not JobStatus.SUCCEEDED or not cad_service.current_result(parent):
+        return None
+    dxf = view_has_dxf(parent, page_index, view)
+    if dxf is None:
+        return None
+    existing = await walls_jobs_of_view(session, parent=parent, page_index=page_index, view=view)
+    zones = await cad_walls_zones.prepare_or_empty(
+        session, storage, parent=parent, page_index=page_index, view=view
+    )
+    if not zones.present:
+        log.info(
+            "cad_walls_recompute_skipped_no_zones",
+            job_id=str(parent.id),
+            page_index=page_index,
+            view=view,
+        )
+        return None
+    # Активное задание вида с теми же зонами уже всё сделает. Активное без них (или с другими)
+    # не мешает: пересчёт ставится следующим, а API берёт последнее успешное задание по created_at.
+    if any(
+        job.status in _ACTIVE and job.payload.get("zones_sha256") == zones.sha256
+        for job in existing
+    ):
+        log.info(
+            "cad_walls_recompute_skipped_same_zones",
+            job_id=str(parent.id),
+            page_index=page_index,
+            view=view,
+        )
+        return None
+    return await _enqueue(
+        session,
+        parent=parent,
+        page_index=page_index,
+        view=view,
+        dxf=dxf,
+        params=params,
+        sequence=len(existing),
+        zones=zones,
+    )
 
 
 async def schedule_recompute(
@@ -281,14 +351,9 @@ async def schedule_recompute(
     existing = await walls_jobs_of_view(session, parent=parent, page_index=page_index, view=view)
     if any(job.status in _ACTIVE for job in existing):
         raise DomainError(ErrorCode.CAD_WALLS_BUSY)
-    zones = await cad_walls_zones.sheet_room_zones(
+    zones = await cad_walls_zones.prepare(
         session, storage, parent=parent, page_index=page_index, view=view
     )
-    revision_id = parent.payload.get("revision_id")
-    if zones.present and isinstance(revision_id, str):
-        await cad_walls_zones.store(
-            storage, revision_id=uuid.UUID(revision_id), parent_id=parent.id, zones=zones
-        )
     return await _enqueue(
         session,
         parent=parent,

@@ -472,7 +472,7 @@ async def execute_cad_pdf_convert(
     )
     done = await jobs_service.succeed(session, job=job, payload={"cad_result": result})
     # Конструкции видов (ADR-0038): задания появляются в той же транзакции, что и успех конвертации.
-    await cad_walls.enqueue_after_convert(session, done, settings)
+    await cad_walls.enqueue_after_convert(session, storage, done, settings)
     # Зоны квартир: только для листов без разметки человека; сбой постановки конвертацию не рушит.
     await cad_zones_auto.enqueue_after_convert(session, done, settings)
     return done

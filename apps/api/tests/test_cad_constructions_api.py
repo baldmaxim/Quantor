@@ -884,7 +884,9 @@ async def test_convert_success_enqueues_walls_for_every_view_with_dxf(
         assert payload["generator_version"] == "cad_walls.v1" and payload["parent_attempt"] == 1
 
         # Повторный вызов того же успеха задание не дублирует.
-        again = await cad_walls_service.enqueue_after_convert(db_session, job, settings)
+        again = await cad_walls_service.enqueue_after_convert(
+            db_session, fake_storage, job, settings
+        )
         await db_session.commit()
         assert [j.id for j in again] == [walls[0].id]
 
@@ -896,7 +898,10 @@ async def test_convert_success_enqueues_walls_for_every_view_with_dxf(
 
 
 async def test_convert_success_survives_missing_walls_params(
-    db_session: AsyncSession, walls_tools: Path, tmp_path: Path
+    db_session: AsyncSession,
+    fake_storage: FakeObjectStorage,
+    walls_tools: Path,
+    tmp_path: Path,
 ) -> None:
     """Нет параметров скрипта - конвертация остаётся успешной, заданий конструкций нет."""
     settings = walls_settings(walls_tools, tmp_path)
@@ -907,4 +912,7 @@ async def test_convert_success_survives_missing_walls_params(
         status=JobStatus.SUCCEEDED,
         payload={},
     )
-    assert await cad_walls_service.enqueue_after_convert(db_session, parent, settings) == []
+    assert (
+        await cad_walls_service.enqueue_after_convert(db_session, fake_storage, parent, settings)
+        == []
+    )

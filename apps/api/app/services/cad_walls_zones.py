@@ -15,14 +15,19 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Final
 
+from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.domain import JobType
 from app.errors import DomainError, ErrorCode, http_error
 from app.models import Job
 from app.services import cad as cad_service
 from app.services import cad_floor3d, cad_views, cad_zones
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
+
+log = get_logger(__name__)
 
 ROOM_KINDS: Final = ("room_apartment", "room_mop")
 # Предел входа: контуры зон одного листа, с большим запасом.
@@ -168,3 +173,50 @@ async def store(
         raise http_error(ErrorCode.STORAGE_UNAVAILABLE) from error
     if stored.sha256 != zones.sha256 or stored.size != len(zones.raw):
         raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "хранилище получило другие зоны")
+
+
+async def prepare(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    *,
+    parent: Job,
+    page_index: int,
+    view: int,
+) -> ZonesInput:
+    """Зоны вида и их вход в хранилище: общий путь автопостановки и пересчёта конструкций."""
+    zones = await sheet_room_zones(
+        session, storage, parent=parent, page_index=page_index, view=view
+    )
+    revision_id = parent.payload.get("revision_id")
+    if zones.present and isinstance(revision_id, str):
+        await store(storage, revision_id=uuid.UUID(revision_id), parent_id=parent.id, zones=zones)
+    return zones
+
+
+async def prepare_or_empty(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    *,
+    parent: Job,
+    page_index: int,
+    view: int,
+) -> ZonesInput:
+    """То же, но сбой чтения зон или записи входа не прерывает вызывающего.
+
+    Задание строится без зон, причина — в `zones_warning`. Работа идёт во вложенной транзакции,
+    чтобы сбой базы не портил внешнюю (в ней пишется успех конвертации или авторазметки).
+    """
+    try:
+        async with session.begin_nested():
+            return await prepare(session, storage, parent=parent, page_index=page_index, view=view)
+    except (DomainError, HTTPException, StorageUnavailableError, SQLAlchemyError) as error:
+        log.warning(
+            "cad_walls_zones_unavailable",
+            job_id=str(parent.id),
+            page_index=page_index,
+            view=view,
+            error=type(error).__name__,
+        )
+        return ZonesInput(
+            b"", "", 0, "Контур плиты построен без зон помещений: зоны листа не прочитаны."
+        )

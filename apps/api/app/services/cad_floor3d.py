@@ -352,6 +352,7 @@ def build_floor3d(
     doors: list[CadFloor3dDoorRead] = []
     lintel_by_id = {o.id: o.lintel for o in extras.openings}
     leaf_by_id = {o.id: o.leaf for o in extras.openings}
+    lintel_material_by_id = {o.id: o.lintel_material for o in extras.openings}
     sheet_top = None if wall_height is None else base + wall_height
     door_height_missing = False
     no_contour = 0
@@ -402,6 +403,7 @@ def build_floor3d(
                 z_top_mm=top,
                 door_height_mm=height_mm,
                 door_height_source=source,
+                material=lintel_material_by_id.get(opening.id),
             )
         )
 

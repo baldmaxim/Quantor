@@ -25,7 +25,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from fastapi import HTTPException
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cad_worker.handler import (
@@ -48,7 +50,7 @@ from app.errors import DomainError, ErrorCode
 from app.models import DocumentRevision, Job
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_progress
+from app.services import cad_progress, cad_walls
 from app.services import cad_zones as cad_zones_service
 from app.services import cad_zones_auto as auto
 from app.services import jobs as jobs_service
@@ -331,6 +333,8 @@ async def execute_cad_zones(
             document=document,
         )
     )
+    if created:
+        await _recompute_walls(session, storage, source, settings)
     return await _finish(
         session,
         job,
@@ -342,6 +346,32 @@ async def execute_cad_zones(
         counts={"in_file": len(document.zones), "created": created, "rejected": rejected},
         artifacts=artifacts,
     )
+
+
+async def _recompute_walls(
+    session: AsyncSession, storage: ObjectStorage, source: _Input, settings: Settings
+) -> None:
+    """Появились зоны листа: конструкции вида пересчитываются с зонами (контур плиты).
+
+    Постановка идёт в транзакции записи успеха; сбой её не рушит, разметка остаётся.
+    """
+    try:
+        async with session.begin_nested():
+            await cad_walls.schedule_after_auto_zones(
+                session,
+                storage,
+                parent=source.parent,
+                page_index=source.page_index,
+                view=source.view,
+                settings=settings,
+            )
+    except (DomainError, HTTPException, SQLAlchemyError):
+        log.warning(
+            "cad_walls_recompute_after_zones_failed",
+            job_id=str(source.parent.id),
+            page_index=source.page_index,
+            view=source.view,
+        )
 
 
 async def _finish(

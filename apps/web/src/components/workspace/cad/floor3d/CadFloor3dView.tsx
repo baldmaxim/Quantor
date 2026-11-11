@@ -23,6 +23,7 @@ import { CadFloor3dCanvas, type IFloor3dViewRequest } from './CadFloor3dCanvas';
 import { CadFloor3dDxfButton } from './CadFloor3dDxfButton';
 import { CadFloor3dHeights } from './CadFloor3dHeights';
 import { CadFloor3dHoleList } from './CadFloor3dHoleList';
+import { CadFloor3dInfoPanel } from './CadFloor3dInfoPanel';
 import { CadFloor3dPopover } from './CadFloor3dPopover';
 
 export interface ICadFloor3dViewProps {
@@ -67,7 +68,6 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
 
   const [showSlabCap, setShowSlabCap] = useState(false);
   const [viewRequest, setViewRequest] = useState<IFloor3dViewRequest | null>(null);
-  const [panelOpen, setPanelOpen] = useState(false);
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [popoverError, setPopoverError] = useState<string | null>(null);
@@ -205,10 +205,10 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
   return (
     <div
       data-testid="floor3d-view"
-      className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg lg:flex-row"
+      className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex flex-none flex-wrap items-center gap-[var(--s-3)] border-b border-border bg-surface px-[var(--s-4)] py-[var(--s-3)]">
+        <div className="relative z-30 flex flex-none flex-wrap items-center gap-[var(--s-3)] border-b border-border bg-surface px-[var(--s-4)] py-[var(--s-3)]">
           {floorTitle !== '' && (
             <h3
               data-testid="floor3d-title"
@@ -252,6 +252,48 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
             disabled={!interactive}
             hasCandidates={model?.slab_holes.some((hole) => hole.state === 'candidate') ?? false}
           />
+          {model !== null && (
+            <CadFloor3dInfoPanel>
+              <CadFloor3dHeights
+                heights={model.heights}
+                elevationKnown={model.elevation_known}
+                projectLevels={projectLevels.data}
+                sheetSaving={saveSheet.isPending}
+                projectSaving={saveProject.isPending}
+                error={panelError}
+                onSaveSheet={(write) => {
+                  setPanelError(null);
+                  saveSheet.mutate(write, { onError: (error) => setPanelError(cadErrorText(error)) });
+                }}
+                onSaveProject={(write) => {
+                  setPanelError(null);
+                  saveProject.mutate(write, { onError: (error) => setPanelError(cadErrorText(error)) });
+                }}
+              />
+              <CadFloor3dHoleList
+                holes={model.slab_holes}
+                saving={setHole.isPending}
+                onDecide={(key, enabled) => {
+                  setPanelError(null);
+                  setHole.mutate({ key, enabled }, { onError: (error) => setPanelError(cadErrorText(error)) });
+                }}
+              />
+              {model.warnings.length > 0 && (
+                <section aria-label="Предупреждения" className="flex min-w-0 flex-col gap-[var(--s-3)]">
+                  <h4 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
+                    Предупреждения
+                  </h4>
+                  <ul className="flex flex-col gap-[var(--s-2)]">
+                    {model.warnings.map((item) => (
+                      <li key={`${item.code}:${item.message}`} className="text-xs text-warning [overflow-wrap:anywhere]">
+                        {item.message}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </CadFloor3dInfoPanel>
+          )}
         </div>
         {(outdated || skipped > 0) && (
           <div className="flex flex-none flex-col gap-[var(--s-2)] border-b border-border bg-surface px-[var(--s-4)] py-[var(--s-3)]">
@@ -292,68 +334,6 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
           )}
         </div>
       </div>
-      {model !== null && (
-        <aside
-          aria-label="Высоты этажа"
-          className="flex min-h-0 flex-none flex-col border-t border-border bg-surface lg:w-[320px] lg:border-t-0 lg:border-l"
-        >
-          <button
-            type="button"
-            aria-expanded={panelOpen}
-            onClick={() => setPanelOpen((open) => !open)}
-            className="press flex min-h-[44px] w-full items-center justify-between px-[var(--s-5)] text-left text-sm font-medium lg:hidden"
-          >
-            Высоты и предупреждения
-            <span aria-hidden="true">{panelOpen ? '▾' : '▸'}</span>
-          </button>
-          <div
-            className={cx(
-              'scroll-area min-h-0 flex-1 flex-col gap-[var(--s-5)] overflow-auto overscroll-contain p-[var(--s-5)]',
-              'max-lg:max-h-[45dvh]',
-              panelOpen ? 'flex' : 'hidden lg:flex',
-            )}
-          >
-            <CadFloor3dHeights
-              heights={model.heights}
-              elevationKnown={model.elevation_known}
-              projectLevels={projectLevels.data}
-              sheetSaving={saveSheet.isPending}
-              projectSaving={saveProject.isPending}
-              error={panelError}
-              onSaveSheet={(write) => {
-                setPanelError(null);
-                saveSheet.mutate(write, { onError: (error) => setPanelError(cadErrorText(error)) });
-              }}
-              onSaveProject={(write) => {
-                setPanelError(null);
-                saveProject.mutate(write, { onError: (error) => setPanelError(cadErrorText(error)) });
-              }}
-            />
-            <CadFloor3dHoleList
-              holes={model.slab_holes}
-              saving={setHole.isPending}
-              onDecide={(key, enabled) => {
-                setPanelError(null);
-                setHole.mutate({ key, enabled }, { onError: (error) => setPanelError(cadErrorText(error)) });
-              }}
-            />
-            {model.warnings.length > 0 && (
-              <section aria-label="Предупреждения" className="flex min-w-0 flex-col gap-[var(--s-3)]">
-                <h4 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
-                  Предупреждения
-                </h4>
-                <ul className="flex flex-col gap-[var(--s-2)]">
-                  {model.warnings.map((item) => (
-                    <li key={`${item.code}:${item.message}`} className="text-xs text-warning [overflow-wrap:anywhere]">
-                      {item.message}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </div>
-        </aside>
-      )}
     </div>
   );
 };

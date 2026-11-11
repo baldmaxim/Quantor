@@ -187,17 +187,31 @@ export const buildFloor3dScene = (
     new THREE.LineBasicMaterial({ color: new THREE.Color(colors.edge), transparent: true, opacity: 0.35 }),
   );
 
-  const categories: readonly { category: PrismCategory; color: string }[] = [
-    { category: 'slab', color: colors.slab },
-    { category: 'masonry', color: colors.masonry },
-    { category: 'monolith', color: colors.monolith },
-    { category: 'lintel', color: colors.lintel },
-    { category: 'door', color: colors.door },
+  // Перемычки красятся по материалу: монолит - цветом монолита, кладка и каркасная перегородка -
+  // цветом кладки, материал не определён - цветом перемычки. Категория `lintel` у всех одна.
+  const isUndefinedMaterial = (item: IPrismSpec): boolean =>
+    item.material !== 'monolith' && item.material !== 'masonry' && item.material !== 'frame_partition';
+  const groups: readonly {
+    category: PrismCategory;
+    color: string;
+    include: (item: IPrismSpec) => boolean;
+  }[] = [
+    { category: 'slab', color: colors.slab, include: () => true },
+    { category: 'masonry', color: colors.masonry, include: () => true },
+    { category: 'monolith', color: colors.monolith, include: () => true },
+    { category: 'lintel', color: colors.lintel, include: isUndefinedMaterial },
+    { category: 'lintel', color: colors.monolith, include: (item) => item.material === 'monolith' },
+    {
+      category: 'lintel',
+      color: colors.masonry,
+      include: (item) => item.material === 'masonry' || item.material === 'frame_partition',
+    },
+    { category: 'door', color: colors.door, include: () => true },
   ];
-  for (const { category, color } of categories) {
+  for (const { category, color, include } of groups) {
     const merged = mergeItems(
       plan.prisms
-        .filter((item) => item.category === category)
+        .filter((item) => item.category === category && include(item))
         .map((item) => ({ id: item.id, geometry: prismGeometry(item) })),
       'prism',
       category,

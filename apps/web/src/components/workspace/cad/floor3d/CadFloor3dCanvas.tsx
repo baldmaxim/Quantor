@@ -7,12 +7,14 @@ import {
   type Floor3dViewKind,
   type IFloor3dEngine,
   type IFloor3dMeasureState,
+  type IFloor3dSnapState,
 } from '@/lib/cad/floor3d-engine';
 import { highlightOf, type IFloor3dPlan } from '@/lib/cad/floor3d-geometry';
 import { buildFloor3dScene, readFloor3dColors, type IFloor3dPick } from '@/lib/cad/floor3d-scene';
 import { useTheme } from '@/lib/theme';
 
 import { CadFloor3dMeasureLabel } from './CadFloor3dMeasureLabel';
+import { CadFloor3dSnapLabel } from './CadFloor3dSnapLabel';
 
 /** Запрос камеры: `seq` меняется при каждом нажатии, чтобы повторная команда не терялась. */
 export interface IFloor3dViewRequest {
@@ -52,6 +54,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   const engine = useRef<IFloor3dEngine | null>(null);
   const theme = useTheme();
   const [measure, setMeasure] = useState<IFloor3dMeasureState | null>(null);
+  const [snap, setSnap] = useState<IFloor3dSnapState | null>(null);
 
   // Колбэки читаются в момент события: смена пропсов движок не пересоздаёт.
   const handlers = useRef({ onPick, onMove, onError });
@@ -68,6 +71,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
         onPick: (pick, anchor) => handlers.current.onPick(pick, anchor),
         onMove: () => handlers.current.onMove(),
         onMeasure: setMeasure,
+        onSnap: setSnap,
       });
     } catch {
       handlers.current.onError('Не удалось запустить 3D: в браузере недоступен WebGL.');
@@ -107,6 +111,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
       {measuring && first !== undefined && second !== undefined && measure?.mid && (
         <CadFloor3dMeasureLabel a={first} b={second} center={plan.center} at={measure.mid} />
       )}
+      {measuring && snap !== null && <CadFloor3dSnapLabel snap={snap} />}
     </div>
   );
 };

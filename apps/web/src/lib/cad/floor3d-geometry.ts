@@ -17,6 +17,9 @@ export type Point2 = readonly [number, number];
 
 export type PrismCategory = 'slab' | 'masonry' | 'monolith' | 'lintel' | 'door';
 
+/** Материал перемычки от движка; `null` - не определён или файл старый. */
+export type LintelMaterial = 'monolith' | 'masonry' | 'frame_partition';
+
 /** Призма: контур с отверстиями в плане (м, от центра) и высоты низа/верха (м, от центра по высоте). */
 export interface IPrismSpec {
   readonly id: string;
@@ -25,6 +28,8 @@ export interface IPrismSpec {
   readonly holes: readonly (readonly Point2[])[];
   readonly yBottom: number;
   readonly yTop: number;
+  /** Только у перемычек: от него зависит цвет. */
+  readonly material?: LintelMaterial | null;
 }
 
 /** Отверстие плиты для показа: контур на верхе плиты. */
@@ -144,6 +149,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     holes: Point2[][];
     zBottom: number;
     zTop: number;
+    material?: LintelMaterial | null;
   }
   const raw: IRaw[] = [];
   let wallsWithoutTop = 0;
@@ -197,6 +203,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
       holes: [],
       zBottom: lintel.z_bottom_mm,
       zTop: lintel.z_top_mm,
+      material: lintel.material ?? null,
     });
   }
 
@@ -243,6 +250,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     holes: item.holes.map((hole) => toLocal(hole, center)),
     yBottom: (item.zBottom - center.z) / MM_IN_M,
     yTop: (item.zTop - center.z) / MM_IN_M,
+    ...(item.category === 'lintel' ? { material: item.material ?? null } : {}),
   }));
 
   const slab = prisms.find((item) => item.category === 'slab') ?? null;

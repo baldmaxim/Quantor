@@ -254,6 +254,17 @@ def test_lintel_runs_from_door_height_to_wall_top_with_default_source() -> None:
     assert (lintel.door_height_mm, lintel.door_height_source) == (2100, "assumption")
 
 
+def test_lintel_material_is_passed_from_walls_json_and_defaults_to_none() -> None:
+    assert build().lintels[0].material is None
+    for material in ("monolith", "masonry", "frame_partition"):
+        extras = raw_extras()
+        extras["openings"][0]["lintel_material"] = material
+        assert build(extras=extras).lintels[0].material == material
+    extras = raw_extras()
+    extras["openings"][0]["lintel_material"] = None
+    assert build(extras=extras).lintels[0].material is None
+
+
 def test_door_height_from_the_zone_that_contains_the_lintel_midpoint() -> None:
     near = f3d.DoorZoneMm((500.0, 100.0), (1500.0, 100.0), 2300)
     far = f3d.DoorZoneMm((9000.0, 9000.0), (10000.0, 9000.0), 1800)
