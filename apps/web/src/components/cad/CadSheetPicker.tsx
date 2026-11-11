@@ -8,7 +8,6 @@ import { Button, ErrorState, SkeletonRows } from '@/components/ui';
 import { useCadJobs } from '@/lib/cad/queries';
 import { useSheetCalibrationStates } from '@/lib/cad/sheet-queries';
 import { latestSheetJobs } from '@/lib/cad/sheet-results';
-import { sheetWorkspaceHref } from '@/lib/cad/sheets';
 import { extractCode } from '@/lib/errors';
 import { useFeatures, useSheets } from '@/lib/queries';
 
@@ -90,14 +89,13 @@ export const CadSheetPicker: FC<ICadSheetPickerProps> = ({
       ) : (
         <>
           <ul className="flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain rounded-[var(--radius-md)] border border-border">
-            {items.map((sheet, position) => (
+            {items.map((sheet) => (
               <CadSheetRow
                 key={sheet.id}
                 sheet={sheet}
                 result={results.get(sheet.page_index) ?? null}
                 open={activePage === sheet.page_index}
                 onOpen={() => onOpenSheet(sheet.page_index)}
-                href={sheetWorkspaceHref(projectId, revisionId, position)}
                 state={states.get(sheet.page_index) ?? 'unknown'}
               />
             ))}

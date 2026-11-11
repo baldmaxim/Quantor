@@ -113,12 +113,9 @@ describe('CadSheetPicker', () => {
     const [sheets, enabled] = mocks.calibrations.mock.calls.at(-1) as [{ page_index: number }[], boolean];
     expect(sheets.map((sheet) => sheet.page_index)).toEqual([1]);
     expect(enabled).toBe(true);
-    // Лист без калибровки: бейдж и ссылка только у открытой строки.
+    // Лист без калибровки: бейдж только у открытой строки, ссылки калибровки нет.
     expect(screen.getAllByText('Нет калибровки')).toHaveLength(1);
-    expect(screen.getByRole('link', { name: 'Откалибровать' })).toHaveAttribute(
-      'href',
-      '/projects/p/workspace?revision=r&page=2',
-    );
+    expect(screen.queryByText('Откалибровать')).toBeNull();
   });
 
   it('нет бейджей: колонка узкая', () => {

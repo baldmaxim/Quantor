@@ -6,7 +6,6 @@ import type { SheetCalibrationState } from '@/lib/cad/sheets';
 
 import { CadSheetRow } from './CadSheetRow';
 
-const HREF = '/projects/p/workspace?revision=r&page=3';
 
 const mount = (
   result: ISheetResult | null,
@@ -18,7 +17,6 @@ const mount = (
     <ul>
       <CadSheetRow
         sheet={{ id: 's', page_index: 2, page_label: '3' } as never}
-        href={HREF}
         state={state}
         result={result}
         open={open}
@@ -59,14 +57,10 @@ describe('CadSheetRow', () => {
     expect(screen.getByRole('button', { name: /Стр. 3/ })).toHaveAttribute('aria-current', 'true');
   });
 
-  it('нет калибровки: бейдж и отдельная ссылка, не открывающая лист', () => {
-    const { onOpen } = mount(null, true, 'missing');
+  it('нет калибровки: бейдж без ссылки «Откалибровать»', () => {
+    mount(null, true, 'missing');
     expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: 'Откалибровать' });
-    expect(link).toHaveAttribute('href', HREF);
-    expect(link.closest('button')).toBeNull();
-    fireEvent.click(link);
-    expect(onOpen).not.toHaveBeenCalled();
+    expect(screen.queryByText('Откалибровать')).toBeNull();
   });
 
   it('калибровка есть: бейдж без ссылки; неизвестная - без бейджа', () => {

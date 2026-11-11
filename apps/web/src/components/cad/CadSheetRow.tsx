@@ -1,7 +1,6 @@
 'use client';
 
 import type { SheetRead } from '@quantor/api-client';
-import Link from 'next/link';
 import type { FC } from 'react';
 
 import { StatusBadge, cx } from '@/components/ui';
@@ -11,8 +10,6 @@ import type { SheetCalibrationState } from '@/lib/cad/sheets';
 
 interface ICadSheetRowProps {
   sheet: SheetRead;
-  /** Ссылка на лист в рабочей области для калибровки. */
-  href: string;
   /** Известна только у открытого листа: у остальных `unknown`, и бейджа нет. */
   state: SheetCalibrationState;
   /** Последнее задание по листу; `null` — листа в заданиях ещё не было. */
@@ -25,9 +22,9 @@ interface ICadSheetRowProps {
 
 /**
  * Строка листа: вся строка - одна кнопка, открывающая лист в рабочей области (с результатом CAD,
- * если он есть). «Откалибровать» - отдельная ссылка под строкой, а не часть кнопки.
+ * если он есть). Калибровка - кнопкой «Откалибровать» у преобразования листа, не здесь.
  */
-export const CadSheetRow: FC<ICadSheetRowProps> = ({ sheet, href, state, result, open, onOpen }) => {
+export const CadSheetRow: FC<ICadSheetRowProps> = ({ sheet, state, result, open, onOpen }) => {
   const extraLabel =
     sheet.page_label && sheet.page_label !== String(sheet.page_index + 1) ? sheet.page_label : null;
 
@@ -60,16 +57,6 @@ export const CadSheetRow: FC<ICadSheetRowProps> = ({ sheet, href, state, result,
           </StatusBadge>
         )}
       </button>
-      {state === 'missing' && (
-        <Link
-          href={href}
-          target="_blank"
-          rel="noopener"
-          className="inline-flex min-h-[44px] items-center self-start px-[var(--s-5)] text-xs text-accent underline underline-offset-4"
-        >
-          Откалибровать
-        </Link>
-      )}
     </li>
   );
 };
