@@ -144,12 +144,14 @@ describe('CadZonesPanel', () => {
         })}
       />,
     );
-    const apartment = screen.getByRole('heading', { name: /Квартира 0042/ });
+    const apartment = screen.getByRole('heading', { name: /Кв\. 0042/ });
     expect(apartment).toHaveTextContent('12,50');
     const mop = screen.getByRole('heading', { name: /МОП/ });
     expect(mop).toHaveTextContent('нет калибровки');
     expect(mop).not.toHaveTextContent('0,00');
     expect(screen.getByRole('heading', { name: /Двери/ })).toHaveTextContent('1 шт.');
+    expect(screen.queryByText('900 × 2100 мм')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть все' }));
     expect(screen.getByText('900 × 2100 мм')).toBeInTheDocument();
   });
 
@@ -157,12 +159,14 @@ describe('CadZonesPanel', () => {
     const onActivate = vi.fn();
     const onRename = vi.fn();
     const onDelete = vi.fn();
-    render(
-      <CadZonesPanel {...props({ zones: [zone({ id: 'a' })], onActivate, onRename, onDelete })} />,
-    );
+    const base = { zones: [zone({ id: 'a' })], onActivate, onRename, onDelete };
+    const { rerender } = render(<CadZonesPanel {...props(base)} />);
     const list = screen.getByTestId('cad-zone-list');
+    expect(within(list).queryByRole('button', { name: 'Переименовать' })).toBeNull();
+    fireEvent.click(within(list).getByRole('button', { name: /Кв\. 0042/ }));
     fireEvent.click(within(list).getByRole('button', { name: /3-1\/6/ }));
     expect(onActivate).toHaveBeenCalledWith('a');
+    rerender(<CadZonesPanel {...props({ ...base, activeId: 'a' })} />);
 
     fireEvent.click(within(list).getByRole('button', { name: 'Переименовать' }));
     const field = within(list).getByRole('textbox', { name: 'Название зоны' });
@@ -209,6 +213,7 @@ describe('CadZonesPanel', () => {
     render(
       <CadZonesPanel
         {...props({
+          activeId: 'a',
           zones: [
             space('a', 'permanent', 13.25),
             space('b', 'permanent', 13.25),
@@ -221,13 +226,17 @@ describe('CadZonesPanel', () => {
     const summary = screen.getByTestId('cad-parking-summary');
     expect(screen.getByRole('heading', { name: /Машино-места: 3/ })).toHaveTextContent('38,50');
     const [byPermanent, byGuest] = within(summary).getAllByRole('listitem');
+    expect(within(summary).queryByRole('combobox')).toBeNull();
     expect(byPermanent).toHaveTextContent('Постоянное хранение');
     expect(byPermanent).toHaveTextContent('2 шт. · 26,50');
     expect(byGuest).toHaveTextContent('Гостевое');
     expect(byGuest).toHaveTextContent('1 шт. · 12,00');
 
-    const [first] = within(summary).getAllByRole('combobox');
-    fireEvent.change(first as HTMLElement, { target: { value: 'medium' } });
+    // Тип правится только у выделенного места.
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
+    fireEvent.change(screen.getByRole('combobox', { name: /Тип места/ }), {
+      target: { value: 'medium' },
+    });
     expect(onSetParkingType).toHaveBeenCalledWith('a', 'medium');
   });
 

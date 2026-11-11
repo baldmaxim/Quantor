@@ -91,9 +91,16 @@ const finish = (onAssign = vi.fn().mockResolvedValue({ assigned: 2, skipped: 0 }
   onAssign,
 });
 
+const openSelection = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Шаблон отделки…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Развернуть все' }));
+};
+
 describe('тип помещения в списке зон', () => {
   it('выбор только из кодов своего вида; выведенный тип помечен «авто»', () => {
-    render(<CadZonesPanel {...props({ onSetRoomType: vi.fn() })} />);
+    const { rerender } = render(
+      <CadZonesPanel {...props({ onSetRoomType: vi.fn(), activeId: 'a' })} />,
+    );
     const mop = screen.getByRole('combobox', { name: 'Тип помещения: Холл 1' });
     const codes = within(mop)
       .getAllByRole('option')
@@ -101,17 +108,20 @@ describe('тип помещения в списке зон', () => {
     expect(codes).toContain('Лифтовой холл');
     expect(codes).toContain('Прочее МОП');
     expect(codes).not.toContain('Кухня');
+    expect(screen.getAllByText('авто')).toHaveLength(1);
+    rerender(<CadZonesPanel {...props({ onSetRoomType: vi.fn(), activeId: 'c' })} />);
     const apartment = screen.getByRole('combobox', { name: /Тип помещения: .*Кухня/ });
     // 8 кодов квартиры + «Авто (по названию)» у типа, заданного человеком.
     expect(within(apartment).getAllByRole('option')).toHaveLength(9);
     expect(within(apartment).getByRole('option', { name: 'Авто (по названию)' })).toBeTruthy();
-    expect(screen.getAllByText('авто')).toHaveLength(1);
   });
 
   it('у двери выбора типа нет; смена типа вызывает onSetRoomType', () => {
     const onSetRoomType = vi.fn();
-    render(<CadZonesPanel {...props({ onSetRoomType })} />);
-    expect(screen.getAllByRole('combobox', { name: /^Тип помещения:/ })).toHaveLength(3);
+    const { rerender } = render(<CadZonesPanel {...props({ onSetRoomType, activeId: 'd' })} />);
+    expect(screen.queryAllByRole('combobox', { name: /^Тип помещения:/ })).toHaveLength(0);
+    rerender(<CadZonesPanel {...props({ onSetRoomType, activeId: 'a' })} />);
+    expect(screen.getAllByRole('combobox', { name: /^Тип помещения:/ })).toHaveLength(1);
     fireEvent.change(screen.getByRole('combobox', { name: 'Тип помещения: Холл 1' }), {
       target: { value: 'corridor' },
     });
@@ -120,9 +130,13 @@ describe('тип помещения в списке зон', () => {
 });
 
 describe('выбор зон и назначение шаблона', () => {
-  it('чекбоксы только у помещений; «выбрать все на листе» - без дверей', () => {
+  it('чекбоксы только в режиме выбора и только у помещений; «выбрать все на листе» - без дверей', () => {
     render(<CadZonesPanel {...props({ finish: finish() })} />);
-    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByTestId('cad-zone-finish-bar')).toBeNull();
+    openSelection();
+    // 2 флажка групп (кв. 1, МОП) и 3 помещения.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
     fireEvent.click(screen.getByRole('button', { name: 'Выбрать все на листе' }));
     expect(screen.getAllByRole('checkbox').every((box) => (box as HTMLInputElement).checked)).toBe(
       true,
@@ -134,6 +148,7 @@ describe('выбор зон и назначение шаблона', () => {
 
   it('«выбрать по типу» выбирает зоны этого типа', () => {
     render(<CadZonesPanel {...props({ finish: finish() })} />);
+    openSelection();
     fireEvent.change(screen.getByRole('combobox', { name: 'Выбрать зоны по типу помещения' }), {
       target: { value: 'lift_hall' },
     });
@@ -145,6 +160,7 @@ describe('выбор зон и назначение шаблона', () => {
   it('«Назначить шаблон…» передаёт выбранные зоны и шаблон, потом сбрасывает выбор', async () => {
     const onAssign = vi.fn().mockResolvedValue({ assigned: 2, skipped: 0 });
     render(<CadZonesPanel {...props({ finish: finish(onAssign) })} />);
+    openSelection();
     expect(screen.getByRole('button', { name: 'Назначить шаблон…' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать зону: Холл 1' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать зону: Холл 2' }));
@@ -161,6 +177,7 @@ describe('выбор зон и назначение шаблона', () => {
   it('снятие явного назначения передаёт null; пропуски показаны', async () => {
     const onAssign = vi.fn().mockResolvedValue({ assigned: 1, skipped: 1 });
     render(<CadZonesPanel {...props({ finish: finish(onAssign) })} />);
+    openSelection();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать зону: Холл 1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Назначить шаблон…' }));
     fireEvent.change(screen.getByRole('combobox', { name: 'Шаблон отделки для назначения' }), {
@@ -176,6 +193,7 @@ describe('выбор зон и назначение шаблона', () => {
   it('отказ: выбор остаётся, ошибка видна', async () => {
     const onAssign = vi.fn().mockResolvedValue(null);
     render(<CadZonesPanel {...props({ finish: { ...finish(onAssign), error: 'Не вышло' } })} />);
+    openSelection();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать зону: Холл 1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Назначить шаблон…' }));
     fireEvent.change(screen.getByRole('combobox', { name: 'Шаблон отделки для назначения' }), {
@@ -191,5 +209,6 @@ describe('выбор зон и назначение шаблона', () => {
     render(<CadZonesPanel {...props()} />);
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     expect(screen.queryByTestId('cad-zone-finish-bar')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Шаблон отделки…' })).toBeNull();
   });
 });

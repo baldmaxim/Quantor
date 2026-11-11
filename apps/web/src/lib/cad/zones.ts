@@ -248,6 +248,66 @@ export const doorSizeText = (zone: CadZoneRead): string => {
   return `${Math.round(zone.width_m * 1000)} × ${height} мм`;
 };
 
+// --- спецификация зон ---
+
+/** Ключ группы в списке зон: `apt:<no>`, `mop`, `parking`, `doors`. */
+export const apartmentGroupKey = (apartmentNo: string): string => `apt:${apartmentNo}`;
+export const MOP_GROUP_KEY = 'mop';
+export const PARKING_GROUP_KEY = 'parking';
+export const DOORS_GROUP_KEY = 'doors';
+
+/** Ключ группы, в которой лежит зона. */
+export const zoneGroupKey = (zone: CadZoneRead): string => {
+  if (zone.kind === 'door') return DOORS_GROUP_KEY;
+  if (zone.kind === 'parking_space') return PARKING_GROUP_KEY;
+  if (zone.kind === 'room_mop') return MOP_GROUP_KEY;
+  return apartmentGroupKey(zone.apartment_no ?? '');
+};
+
+/** Ключи всех непустых групп в порядке показа: квартиры, МОП, машино-места, двери. */
+export const zoneGroupKeys = (groups: IZoneGroups): readonly string[] => [
+  ...groups.apartments.map((group) => apartmentGroupKey(group.apartmentNo)),
+  ...(groups.mop.zones.length > 0 ? [MOP_GROUP_KEY] : []),
+  ...(groups.parking.zones.length > 0 ? [PARKING_GROUP_KEY] : []),
+  ...(groups.doors.length > 0 ? [DOORS_GROUP_KEY] : []),
+];
+
+/** Сумма площади текстом: неопределённая не превращается в 0, неполная помечена. */
+export const formatZoneSum = (sum: IZoneSum): string =>
+  `${formatZoneArea(sum.areaM2)}${sum.partial ? ' (не у всех)' : ''}`;
+
+/** Название строки: марка и имя, а без них - вид зоны. */
+export const zoneTitle = (zone: CadZoneRead): string => {
+  const parts = [zone.room_mark, zone.name].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(' · ') : ZONE_KIND_LABELS[zone.kind];
+};
+
+/** Значение справа в строке спецификации: площадь, размер двери, тип и площадь места. */
+export const zoneSpecValue = (zone: CadZoneRead): string => {
+  if (zone.kind === 'door') return doorSizeText(zone);
+  const area = zoneUndefinedReason(zone) ?? formatZoneArea(zone.area_m2);
+  return zone.kind === 'parking_space'
+    ? `${PARKING_TYPE_LABELS[zone.parking_type ?? 'unknown']} · ${area}`
+    : area;
+};
+
+/** Сводка над списком: строки «Квартир: N · помещений: M · S», «МОП: S · Машино-мест: K · Дверей: D». */
+export const zoneListSummary = (groups: IZoneGroups): readonly string[] => {
+  const lines: string[] = [];
+  if (groups.apartments.length > 0) {
+    const rooms = groups.apartments.flatMap((group) => group.zones);
+    lines.push(
+      `Квартир: ${groups.apartments.length} · помещений: ${rooms.length} · ${formatZoneSum(sumAreas(rooms))}`,
+    );
+  }
+  const rest: string[] = [];
+  if (groups.mop.zones.length > 0) rest.push(`МОП: ${formatZoneSum(groups.mop)}`);
+  if (groups.parking.zones.length > 0) rest.push(`Машино-мест: ${groups.parking.zones.length}`);
+  if (groups.doors.length > 0) rest.push(`Дверей: ${groups.doors.length}`);
+  if (rest.length > 0) lines.push(rest.join(' · '));
+  return lines;
+};
+
 // --- ввод ---
 
 export interface IZoneInput {
