@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -129,5 +129,73 @@ describe('WorkspaceCadConvert', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.queryByText('Нет калибровки')).toBeNull();
     expect(button()).toBeEnabled();
+  });
+
+  describe('режим «заново»', () => {
+    const mountAgain = (onJobCreated = vi.fn()) => {
+      render(
+        <WorkspaceCadConvert
+          projectId="p"
+          revisionId="r"
+          sheetId="s3"
+          pageIndex={3}
+          onCalibrate={onCalibrate}
+          onJobCreated={onJobCreated}
+          again
+          currentJobId="old"
+        />,
+      );
+      return onJobCreated;
+    };
+    const againButton = () => screen.getByRole('button', { name: 'Преобразовать заново' });
+    const confirm = () => {
+      fireEvent.click(againButton());
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent('Преобразовать лист заново?');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Преобразовать заново' }));
+    };
+    const succeed = (job: unknown) => {
+      const options = mocks.mutate.mock.calls[0]?.[1] as { onSuccess: (job: unknown) => void };
+      act(() => options.onSuccess(job));
+    };
+
+    it('вместо основной кнопки - «Преобразовать заново», запроса до подтверждения нет', () => {
+      mountAgain();
+      expect(screen.queryByRole('button', { name: 'Преобразовать лист в CAD' })).toBeNull();
+      fireEvent.click(againButton());
+      expect(mocks.mutate).not.toHaveBeenCalled();
+    });
+
+    it('подтверждение создаёт задание; новое задание открывается', () => {
+      const onJobCreated = mountAgain();
+      confirm();
+      expect(mocks.mutate).toHaveBeenCalledTimes(1);
+      expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ pages: [3] });
+      succeed({ job_id: 'new', requested_pages: [3] });
+      expect(onJobCreated).toHaveBeenCalledWith('new', [3]);
+      expect(screen.queryByText(/повтор не нужен/)).toBeNull();
+    });
+
+    it('сервер вернул то же задание: onJobCreated не вызван, сказано «повтор не нужен»', () => {
+      const onJobCreated = mountAgain();
+      confirm();
+      succeed({ job_id: 'old', requested_pages: [3] });
+      expect(onJobCreated).not.toHaveBeenCalled();
+      expect(screen.getByRole('status')).toHaveTextContent('повтор не нужен');
+    });
+
+    it('«Отмена» не создаёт задание', () => {
+      mountAgain();
+      fireEvent.click(againButton());
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Отмена' }));
+      expect(mocks.mutate).not.toHaveBeenCalled();
+    });
+
+    it('нет калибровки: кнопка закрыта', () => {
+      mocks.calibration.current = 'missing';
+      mountAgain();
+      expect(againButton()).toBeDisabled();
+      expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
+    });
   });
 });

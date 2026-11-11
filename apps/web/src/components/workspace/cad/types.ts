@@ -285,6 +285,10 @@ export interface IWorkspaceCadConvert {
   readonly onCalibrate: () => void;
   /** Задание создано: рабочая область открывает его. */
   readonly onJobCreated: (jobId: string, pages: readonly number[]) => void;
+  /** Режим «Преобразовать заново» для листа, уже преобразованного в CAD. */
+  readonly again?: boolean;
+  /** Текущее задание преобразования листа: совпадение с ответом сервера - повтор не нужен. */
+  readonly currentJobId?: string | null;
 }
 
 export type WorkspaceCadState =

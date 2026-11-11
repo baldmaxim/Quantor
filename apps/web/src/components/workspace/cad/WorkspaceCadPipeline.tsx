@@ -88,6 +88,17 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
   const canOpen = (id: string) => openablePanels.includes(id);
 
   const action = (key: PipelineStepKey, state: IPipelineStep['state']) => {
+    // Лист уже преобразован: повторный запуск (после обновления движка) - вторичное действие.
+    if (key === 'convert' && state === 'done' && next?.key !== 'convert' && convert) {
+      return (
+        <WorkspaceCadConvert
+          key={convert.pageIndex}
+          {...convert}
+          again
+          currentJobId={sheet?.convert?.job_id ?? null}
+        />
+      );
+    }
     if (next?.key !== key) return null;
     if (key === 'calibration' || key === 'convert') return convertNode;
     if (key === 'walls' && state === 'failed' && canOpen(PIPELINE_PANEL_CONSTRUCTIONS)) {

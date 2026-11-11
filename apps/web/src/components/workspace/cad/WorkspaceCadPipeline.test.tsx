@@ -2,8 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./WorkspaceCadConvert', () => ({
-  WorkspaceCadConvert: (props: { pageIndex: number }) => (
-    <div data-testid="convert-stub">запуск листа {props.pageIndex}</div>
+  WorkspaceCadConvert: (props: { pageIndex: number; again?: boolean; currentJobId?: string | null }) => (
+    <div data-testid="convert-stub">
+      {props.again ? `заново ${props.currentJobId ?? ''}` : `запуск листа ${props.pageIndex}`}
+    </div>
   ),
 }));
 
@@ -57,6 +59,20 @@ describe('WorkspaceCadPipeline', () => {
     mount(pipelineOfSheet(pipelineSheet({ convert: null, views: [] })));
     expect(screen.getAllByTestId('convert-stub')).toHaveLength(1);
     expect(screen.getAllByRole('listitem')[1]).toContainElement(screen.getByTestId('convert-stub'));
+  });
+
+  it('лист преобразован: «заново» под шагом «CAD» с id текущего задания', () => {
+    mount(pipelineOfSheet(pipelineSheet({ convert: stage({ job_id: 'conv-7' }) })));
+    const stub = screen.getByTestId('convert-stub');
+    expect(screen.getAllByTestId('convert-stub')).toHaveLength(1);
+    expect(screen.getAllByRole('listitem')[1]).toContainElement(stub);
+    expect(stub).toHaveTextContent('заново conv-7');
+  });
+
+  it('преобразования не было: обычный запуск, режима «заново» нет', () => {
+    mount(pipelineOfSheet(pipelineSheet({ convert: null, views: [] })));
+    expect(screen.getByTestId('convert-stub')).toHaveTextContent('запуск листа 2');
+    expect(screen.queryByText(/заново/)).toBeNull();
   });
 
   it('преобразование упало: запуск заново под шагом «CAD»', () => {
