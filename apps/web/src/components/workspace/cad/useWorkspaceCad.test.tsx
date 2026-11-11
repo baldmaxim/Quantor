@@ -330,14 +330,14 @@ describe('useWorkspaceCad: переходы', () => {
       sheetId: 's0',
       pageIndex: 0,
     });
+    act(() => convert?.onCalibrate());
+    expect(useWorkspaceStore.getState().tool).toBe('scale');
     act(() => convert?.onJobCreated(OTHER_JOB, [0]));
     // лист тот же - в адресе только задание
     expect(navigate).toHaveBeenCalledWith({ job: OTHER_JOB, view: null });
   });
 
   it('созданное задание другого листа открывается на своём листе', () => {
-    act(() => convert?.onCalibrate());
-    expect(useWorkspaceStore.getState().tool).toBe('scale');
     const { result } = mount();
     act(() => result.current.side.convert?.onJobCreated(OTHER_JOB, [1]));
     expect(navigate).toHaveBeenCalledWith({ page: '2', region: null, job: OTHER_JOB, view: null });
