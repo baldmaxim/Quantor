@@ -5935,6 +5935,21 @@
         "title": "CadVorDocumentRead",
         "type": "object"
       },
+      "CadVorFromRevisionWrite": {
+        "description": "ВОР из документов проекта: ревизия книги .xlsx, которую нужно разобрать.",
+        "properties": {
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_id"
+        ],
+        "title": "CadVorFromRevisionWrite",
+        "type": "object"
+      },
       "CadVorItemRead": {
         "description": "Строка ВОР; `quantity` - справочно.",
         "properties": {
@@ -30660,6 +30675,60 @@
           }
         },
         "summary": "Загрузить ВОР Заказчика (XLSX) на проект",
+        "tags": [
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/vor/from-revision": {
+      "post": {
+        "description": "Файл ревизии читается из хранилища потоком; ВОР получает собственную копию файла.",
+        "operationId": "import_cad_vor_from_revision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadVorFromRevisionWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadVorDocumentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Взять ВОР Заказчика из ревизии документа проекта (книга XLSX)",
         "tags": [
           "cad-vor"
         ]

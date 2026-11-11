@@ -73,6 +73,15 @@ RAW_PDF = FileKind(
     # это два независимых процесса над одним файлом (ADR-0016).
     geometry_status=GeometryStatus.PENDING,
 )
+# Книга Excel (например, ВОР Заказчика) хранится как есть: разбор - дело потребителя файла
+# (ВОР во вкладке CAD берёт его ревизию), загрузка ничего не распознаёт и заданий не ставит.
+XLSX_BOOK = FileKind(
+    document_kind=DocumentKind.OTHER,
+    processing_status=ProcessingStatus.UNPROCESSED,
+    content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    schedules_import=False,
+    capability="Сохранить, например ВОР Заказчика для сверки в CAD",
+)
 
 
 def _bim(kind: DocumentKind, content_type: str) -> FileKind:
@@ -89,6 +98,7 @@ def _bim(kind: DocumentKind, content_type: str) -> FileKind:
 SUPPORTED_EXTENSIONS: Final[dict[str, FileKind]] = {
     "zip": RECOGNIZED_PACKAGE,
     "pdf": RAW_PDF,
+    "xlsx": XLSX_BOOK,
     "rvt": _bim(DocumentKind.REVIT, "application/octet-stream"),
     "nwd": _bim(DocumentKind.NAVISWORKS, "application/octet-stream"),
     "nwc": _bim(DocumentKind.NAVISWORKS, "application/octet-stream"),
@@ -116,7 +126,8 @@ def classify(filename: str) -> FileKind:
     if kind is None:
         raise DomainError(
             ErrorCode.UNSUPPORTED_FILE_TYPE,
-            "Поддерживаются ZIP-пакет распознавалки, PDF, а также RVT, NWD, NWC и IFC на хранение",
+            "Поддерживаются ZIP-пакет распознавалки, PDF, книга Excel .xlsx, "
+            "а также RVT, NWD, NWC и IFC на хранение",
         )
     return kind
 
@@ -140,6 +151,10 @@ def verify_signature(head: bytes, kind: FileKind) -> None:
             )
     elif kind is RAW_PDF and not head.startswith(PDF_MAGIC):
         raise DomainError(ErrorCode.MIME_MISMATCH, "Файл с расширением .pdf не является PDF")
+    elif kind is XLSX_BOOK and not head.startswith(ZIP_MAGIC):
+        raise DomainError(
+            ErrorCode.MIME_MISMATCH, "Файл с расширением .xlsx не является книгой Excel"
+        )
 
 
 async def limit_stream(chunks: AsyncIterator[bytes], *, max_size: int) -> AsyncIterator[bytes]:

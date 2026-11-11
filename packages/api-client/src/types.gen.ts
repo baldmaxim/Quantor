@@ -2877,6 +2877,18 @@ export type CadVorDocumentRead = {
 };
 
 /**
+ * CadVorFromRevisionWrite
+ *
+ * ВОР из документов проекта: ревизия книги .xlsx, которую нужно разобрать.
+ */
+export type CadVorFromRevisionWrite = {
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+};
+
+/**
  * CadVorItemRead
  *
  * Строка ВОР; `quantity` - справочно.
@@ -16520,6 +16532,36 @@ export type UploadCadVorResponses = {
 };
 
 export type UploadCadVorResponse = UploadCadVorResponses[keyof UploadCadVorResponses];
+
+export type ImportCadVorFromRevisionData = {
+    body: CadVorFromRevisionWrite;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/vor/from-revision';
+};
+
+export type ImportCadVorFromRevisionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ImportCadVorFromRevisionError = ImportCadVorFromRevisionErrors[keyof ImportCadVorFromRevisionErrors];
+
+export type ImportCadVorFromRevisionResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadVorDocumentRead;
+};
+
+export type ImportCadVorFromRevisionResponse = ImportCadVorFromRevisionResponses[keyof ImportCadVorFromRevisionResponses];
 
 export type ListCadVorLinksData = {
     body?: never;

@@ -151,9 +151,10 @@ export const useProject = (projectId: string) =>
     refetchInterval: (query) => (isRunning(query.state.data) ? JOB_POLL_INTERVAL : false),
   });
 
-export const useProjectDocuments = (projectId: string) =>
+export const useProjectDocuments = (projectId: string, enabled = true) =>
   useQuery({
     queryKey: queryKeys.documents(projectId),
+    enabled,
     queryFn: async () =>
       unwrap(
         await listProjectDocuments({

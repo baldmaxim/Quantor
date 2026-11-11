@@ -19,7 +19,7 @@ import {
 
 // Значения из apps/api/app/services/uploads.py. Расхождение означает, что интерфейс
 // обещает или запрещает не то, что делает сервер.
-const SERVER_EXTENSIONS = ['zip', 'pdf', 'rvt', 'nwd', 'nwc', 'ifc'];
+const SERVER_EXTENSIONS = ['zip', 'pdf', 'xlsx', 'rvt', 'nwd', 'nwc', 'ifc'];
 
 describe('принимаемые типы', () => {
   it('совпадают с серверным списком', () => {
@@ -27,14 +27,14 @@ describe('принимаемые типы', () => {
   });
 
   it('атрибут accept собирается из того же списка', () => {
-    expect(ACCEPT_ATTRIBUTE).toBe('.zip,.pdf,.rvt,.nwd,.nwc,.ifc');
+    expect(ACCEPT_ATTRIBUTE).toBe('.zip,.pdf,.xlsx,.rvt,.nwd,.nwc,.ifc');
   });
 
-  it.each(['пакет.zip', 'ЧЕРТЁЖ.PDF', 'модель.rvt', 'сводная.NWD'])('%s принимается', (name) => {
+  it.each(['пакет.zip', 'ЧЕРТЁЖ.PDF', 'модель.rvt', 'сводная.NWD', 'ВОР.XLSX'])('%s принимается', (name) => {
     expect(isAccepted(name)).toBe(true);
   });
 
-  it.each(['скрипт.exe', 'архив.rar', 'смета.xlsx', 'без_расширения', 'план.dwg'])(
+  it.each(['скрипт.exe', 'архив.rar', 'отчёт.docx', 'без_расширения', 'план.dwg'])(
     '%s отклоняется',
     (name) => {
       expect(isAccepted(name)).toBe(false);

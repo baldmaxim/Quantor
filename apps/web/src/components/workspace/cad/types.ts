@@ -17,6 +17,7 @@ import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRe
 import type { IConstructionIndex } from '@/lib/cad/constructions';
 import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
+import type { IVorSource } from '@/lib/cad/vor-queries';
 import type { ZoneKind } from '@/lib/cad/zones';
 import type { Camera, CameraState, Viewport } from '@/lib/viewer/camera';
 
@@ -77,12 +78,16 @@ export interface IWorkspaceCadVor {
   /** Сверка листа; `null` - ещё не прочитана. */
   readonly coverage: CadVorCoverageRead | null;
   readonly loading: boolean;
-  readonly uploading: boolean;
+  /** Идёт импорт ВОР из документа проекта. */
+  readonly importing: boolean;
   readonly deleting: boolean;
-  /** Отказ последней операции (загрузка, удаление, чтение). */
+  /** Книги .xlsx из документов проекта: из них выбирается ВОР. */
+  readonly sources: readonly IVorSource[];
+  readonly sourcesLoading: boolean;
+  /** Отказ последней операции (импорт, удаление, чтение). */
   readonly error: string | null;
-  /** Загрузить ВОР; прежний документ проекта заменяется вместе со связями. */
-  readonly onUpload: (file: File) => void;
+  /** Взять ВОР из ревизии документа проекта; прежний ВОР заменяется вместе со связями. */
+  readonly onImport: (revisionId: string) => void;
   readonly onDelete: () => void;
   /** Подсвечивать на холсте конструкции «не в ВОР». */
   readonly showNotInVor: boolean;

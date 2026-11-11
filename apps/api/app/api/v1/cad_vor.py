@@ -1,4 +1,5 @@
-"""ВОР Заказчика во вкладке CAD (ADR-0038 п. 5): загрузка, строки, связи с группами, сверка листа.
+"""ВОР Заказчика во вкладке CAD (ADR-0038 п. 5): загрузка, выбор из документов проекта, строки,
+связи с группами, сверка листа.
 
 ВОР - только объект сверки: количества строк показываются справочно и на подсчёт конструкций не
 влияют, в Facts Registry, calc и таблицы обмера ничего не пишется, во внешние сервисы файл не
@@ -26,6 +27,7 @@ from app.contracts.cad_vor import (
     GROUP_KEY_PATTERN,
     CadVorCoverageRead,
     CadVorDocumentRead,
+    CadVorFromRevisionWrite,
     CadVorItemRead,
     CadVorItemsRead,
     CadVorKindHint,
@@ -36,10 +38,11 @@ from app.contracts.cad_vor import (
 from app.errors import DomainError, ErrorCode, not_found
 from app.models import Project
 from app.services import cad_vor as vor_service
+from app.services import documents as documents_service
 from app.services import projects as projects_service
 from app.services.cad_vor_import import MAX_FILE_BYTES, VorParseError, parse_workbook
 from app.services.uploads import CHUNK_SIZE, ZIP_MAGIC, limit_stream
-from app.storage.base import StorageUnavailableError
+from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 from app.storage.keys import display_filename, extension_of
 
 XLSX_CONTENT_TYPE: Final = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -69,34 +72,26 @@ async def _file_chunks(source: IO[bytes]) -> AsyncIterator[bytes]:
         yield chunk
 
 
-@router.post(
-    "/projects/{project_id}/cad/vor",
-    response_model=CadVorDocumentRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Загрузить ВОР Заказчика (XLSX) на проект",
-    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
-)
-async def upload_cad_vor(
-    project_id: uuid.UUID,
+async def _import_vor(
     session: SessionDep,
+    storage: ObjectStorage,
     context: AuthDep,
-    storage: StorageDep,
-    file: Annotated[UploadFile, File(description="Книга Excel .xlsx с ВОР")],
+    *,
+    project: Project,
+    name: str,
+    chunks: AsyncIterator[bytes],
 ) -> CadVorDocumentRead:
-    """Читает файл потоково во временный файл на диске, разбирает и кладёт оригинал в хранилище."""
-    project = await _project(session, context, project_id)
-    if not file.filename:
-        raise DomainError(ErrorCode.VALIDATION_FAILED, "Имя файла не передано")
-    name = display_filename(file.filename)
-    if extension_of(name) != "xlsx":
-        raise DomainError(ErrorCode.CAD_VOR_PARSE_FAILED, "ВОР принимается книгой Excel .xlsx")
+    """Общий путь импорта ВОР: поток во временный файл, разбор, копия в хранилище, записи в базе.
 
+    Оригинал всегда кладётся в собственный ключ `cad-vor/...`: удаление или замена ВОР не должны
+    задевать файл документа проекта, из которого он взят.
+    """
     digest = hashlib.sha256()
     size = 0
     document_id = uuid.uuid4()
     key = f"cad-vor/{project.id}/{document_id}.xlsx"
     with SpooledTemporaryFile(max_size=CHUNK_SIZE * 4) as spool:
-        async for chunk in limit_stream(_upload_chunks(file), max_size=MAX_FILE_BYTES):
+        async for chunk in limit_stream(chunks, max_size=MAX_FILE_BYTES):
             digest.update(chunk)
             size += len(chunk)
             spool.write(chunk)
@@ -139,6 +134,74 @@ async def upload_cad_vor(
             await storage.delete(key)
         raise
     return response
+
+
+@router.post(
+    "/projects/{project_id}/cad/vor",
+    response_model=CadVorDocumentRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Загрузить ВОР Заказчика (XLSX) на проект",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def upload_cad_vor(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+    file: Annotated[UploadFile, File(description="Книга Excel .xlsx с ВОР")],
+) -> CadVorDocumentRead:
+    """Читает файл потоково во временный файл на диске, разбирает и кладёт оригинал в хранилище."""
+    project = await _project(session, context, project_id)
+    if not file.filename:
+        raise DomainError(ErrorCode.VALIDATION_FAILED, "Имя файла не передано")
+    name = display_filename(file.filename)
+    if extension_of(name) != "xlsx":
+        raise DomainError(ErrorCode.CAD_VOR_PARSE_FAILED, "ВОР принимается книгой Excel .xlsx")
+    return await _import_vor(
+        session, storage, context, project=project, name=name, chunks=_upload_chunks(file)
+    )
+
+
+@router.post(
+    "/projects/{project_id}/cad/vor/from-revision",
+    response_model=CadVorDocumentRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Взять ВОР Заказчика из ревизии документа проекта (книга XLSX)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def import_cad_vor_from_revision(
+    project_id: uuid.UUID,
+    body: CadVorFromRevisionWrite,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+) -> CadVorDocumentRead:
+    """Файл ревизии читается из хранилища потоком; ВОР получает собственную копию файла."""
+    project = await _project(session, context, project_id)
+    revision = await documents_service.get_revision(
+        session, workspace_id=context.tenant, revision_id=body.revision_id
+    )
+    if revision is None:
+        raise not_found("Ревизия")
+    document = await documents_service.get_document(
+        session, workspace_id=context.tenant, document_id=revision.document_id
+    )
+    if document is None or document.project_id != project.id:
+        raise not_found("Ревизия")
+    name = display_filename(revision.source_filename)
+    if extension_of(name) != "xlsx":
+        raise DomainError(ErrorCode.CAD_VOR_PARSE_FAILED, "ВОР принимается книгой Excel .xlsx")
+    try:
+        return await _import_vor(
+            session,
+            storage,
+            context,
+            project=project,
+            name=name,
+            chunks=storage.iter_stream(revision.storage_key),
+        )
+    except ObjectNotFoundError as error:
+        raise not_found("Файл ревизии") from error
 
 
 @router.get(

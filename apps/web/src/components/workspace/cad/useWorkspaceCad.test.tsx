@@ -62,7 +62,13 @@ vi.mock('@/lib/cad/vor-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof VorQueries>()),
   useCadVorDocuments: () => ({ data: undefined, isPending: false, isError: false, error: null }),
   useCadVorCoverage: () => ({ data: undefined, isPending: false, isError: false, error: null }),
-  useUploadCadVor: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
+  useCadVorSources: () => ({ sources: [], loading: false, error: null }),
+  useImportCadVorFromRevision: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
   useDeleteCadVor: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
 }));
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({

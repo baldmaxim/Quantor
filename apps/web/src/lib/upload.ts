@@ -117,7 +117,7 @@ const toUploadError = (payload: unknown, status: number): UploadError => {
 };
 
 /** Расширения, которые портал принимает. Список дублирует серверный и сверяется тестом. */
-export const ACCEPTED_EXTENSIONS = ['zip', 'pdf', 'rvt', 'nwd', 'nwc', 'ifc'] as const;
+export const ACCEPTED_EXTENSIONS = ['zip', 'pdf', 'xlsx', 'rvt', 'nwd', 'nwc', 'ifc'] as const;
 
 export const ACCEPT_ATTRIBUTE = ACCEPTED_EXTENSIONS.map((ext) => `.${ext}`).join(',');
 

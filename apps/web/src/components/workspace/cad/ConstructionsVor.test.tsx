@@ -4,7 +4,6 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MAX_VOR_BYTES } from '@/lib/cad/vor';
 import { coverage, coverageGroup, LINKED_ITEM, vorDocument, vorItem } from '@/lib/cad/vor-fixtures';
 
 const mocks = vi.hoisted(() => ({
@@ -34,10 +33,12 @@ const vorProps = (patch: Partial<IWorkspaceCadVor> = {}): IWorkspaceCadVor => ({
   document: vorDocument(),
   coverage: coverage(),
   loading: false,
-  uploading: false,
+  importing: false,
   deleting: false,
+  sources: [],
+  sourcesLoading: false,
   error: null,
-  onUpload: vi.fn(),
+  onImport: vi.fn(),
   onDelete: vi.fn(),
   showNotInVor: true,
   onShowNotInVorChange: vi.fn(),
@@ -63,19 +64,21 @@ beforeEach(() => {
 });
 
 describe('блок «ВОР Заказчика»', () => {
-  it('нет ВОР: кнопка загрузки и пояснение, групп нет', () => {
+  it('нет ВОР и нет книг в документах: подсказка со ссылкой на проект, без загрузки файла', () => {
     mount(<ConstructionsVor vor={vorProps({ document: null, coverage: null })} />);
-    expect(screen.getByRole('button', { name: 'Загрузить ВОР Заказчика (.xlsx)' })).toBeInTheDocument();
+    expect(screen.getByText(/В документах проекта нет книг \.xlsx/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'проекта' })).toHaveAttribute('href', '/projects/p1');
+    expect(screen.queryByLabelText('Файл ВОР Заказчика')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Загрузить|Заменить/ })).toBeNull();
     expect(screen.getByText('ВОР — только для сверки, на расчёт не влияет.')).toBeInTheDocument();
     expect(screen.queryByTestId('vor-group')).toBeNull();
   });
 
-  it('есть ВОР: имя файла, строк, дата, «Заменить» и «Удалить» с подтверждением', () => {
+  it('есть ВОР: имя файла, строк, дата и «Удалить» с подтверждением', () => {
     const p = vorProps();
     mount(<ConstructionsVor vor={p} />);
     expect(screen.getByText('ВОР.xlsx')).toBeInTheDocument();
     expect(screen.getByText(/строк: 42/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Заменить' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
     expect(p.onDelete).not.toHaveBeenCalled();
     const dialog = screen.getByRole('dialog');
@@ -110,22 +113,31 @@ describe('блок «ВОР Заказчика»', () => {
     expect(p.onShowNotInVorChange).toHaveBeenCalledWith(false);
   });
 
-  it('файл больше 20 МБ: понятная ошибка, на сервер не уходит', () => {
-    const p = vorProps({ document: null, coverage: null });
+  it('выбор книги из документов проекта: select, текущая книга выбрана, выбор запускает импорт', () => {
+    const sources = [
+      { documentId: 'doc1', revisionId: 'rev1', fileName: 'ВОР.xlsx', sha256: 'x' },
+      { documentId: 'doc2', revisionId: 'rev2', fileName: 'ВОР 2.xlsx', sha256: 'y' },
+    ];
+    const p = vorProps({ sources });
     mount(<ConstructionsVor vor={p} />);
-    const big = new File(['x'], 'ВОР.xlsx');
-    Object.defineProperty(big, 'size', { value: MAX_VOR_BYTES + 1 });
-    fireEvent.change(screen.getByLabelText('Файл ВОР Заказчика'), { target: { files: [big] } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Файл больше 20 МБ');
-    expect(p.onUpload).not.toHaveBeenCalled();
+    const select = screen.getByLabelText('ВОР из документов проекта');
+    expect(select).toHaveValue('rev1');
+    expect(screen.queryByText(/нет книг/)).toBeNull();
+    fireEvent.change(select, { target: { value: 'rev2' } });
+    expect(p.onImport).toHaveBeenCalledWith('rev2');
   });
 
-  it('подходящий файл передаётся на загрузку', () => {
-    const p = vorProps({ document: null, coverage: null });
-    mount(<ConstructionsVor vor={p} />);
-    const ok = new File(['x'], 'ВОР.xlsx');
-    fireEvent.change(screen.getByLabelText('Файл ВОР Заказчика'), { target: { files: [ok] } });
-    expect(p.onUpload).toHaveBeenCalledWith(ok);
+  it('импорт идёт: select заблокирован, виден статус', () => {
+    const sources = [{ documentId: 'doc1', revisionId: 'rev1', fileName: 'ВОР.xlsx', sha256: 'z' }];
+    mount(<ConstructionsVor vor={vorProps({ sources, importing: true, document: null, coverage: null })} />);
+    expect(screen.getByLabelText('ВОР из документов проекта')).toBeDisabled();
+    expect(screen.getByLabelText('ВОР из документов проекта')).toHaveValue('');
+    expect(screen.getByRole('status')).toHaveTextContent('разбирается');
+  });
+
+  it('ошибка импорта показывается', () => {
+    mount(<ConstructionsVor vor={vorProps({ error: 'ВОР принимается книгой Excel .xlsx' })} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('книгой Excel');
   });
 });
 

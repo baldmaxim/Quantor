@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 import pytest
 from httpx import AsyncClient
 
-from app.domain import DocumentKind, ProcessingStatus
+from app.domain import DocumentKind, GeometryStatus, ProcessingStatus
 from app.errors import DomainError, ErrorCode
 from app.services import uploads as uploads_service
 from app.services.uploads import RAW_PDF, RECOGNIZED_PACKAGE, classify, verify_signature
@@ -43,13 +43,14 @@ class TestClassification:
             ("сводная.nwd", DocumentKind.NAVISWORKS),
             ("кэш.nwc", DocumentKind.NAVISWORKS),
             ("обмен.ifc", DocumentKind.IFC),
+            ("ВОР.XLSX", DocumentKind.OTHER),
         ],
     )
     def test_supported_extensions(self, filename: str, kind: DocumentKind) -> None:
         assert classify(filename).document_kind is kind
 
     @pytest.mark.parametrize(
-        "filename", ["скрипт.exe", "архив.rar", "таблица.xlsx", "без_расширения", "план.dwg"]
+        "filename", ["скрипт.exe", "архив.rar", "отчёт.docx", "без_расширения", "план.dwg"]
     )
     def test_unsupported_extensions_are_rejected(self, filename: str) -> None:
         with pytest.raises(DomainError) as error:
@@ -63,6 +64,13 @@ class TestClassification:
 
         assert kind.processing_status is ProcessingStatus.PROCESSOR_UNAVAILABLE
         assert kind.schedules_import is False
+
+    def test_xlsx_is_stored_without_processing(self) -> None:
+        kind = classify("ВОР.xlsx")
+
+        assert kind.processing_status is ProcessingStatus.UNPROCESSED
+        assert kind.schedules_import is False
+        assert kind.geometry_status is GeometryStatus.NOT_APPLICABLE
 
     def test_only_recognized_package_schedules_import(self) -> None:
         assert classify("пакет.zip").schedules_import is True
@@ -238,11 +246,39 @@ class TestUploadEndpoint:
 
         response = await api.post(
             f"/api/v1/projects/{project_id}/uploads",
-            files={"file": ("смета.xlsx", b"PK\x03\x04data", "application/vnd.ms-excel")},
+            files={"file": ("отчёт.docx", b"PK\x03\x04data", "application/msword")},
         )
 
         assert response.status_code == 415
         assert response.json()["detail"]["code"] == "UNSUPPORTED_FILE_TYPE"
+
+    async def test_xlsx_is_stored_without_job(
+        self, api: AsyncClient, fake_storage: FakeObjectStorage
+    ) -> None:
+        project_id = await self._project(api)
+
+        response = await api.post(
+            f"/api/v1/projects/{project_id}/uploads",
+            files={"file": ("ВОР.xlsx", b"PK\x03\x04data", "application/octet-stream")},
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["document"]["document_kind"] == "other"
+        assert body["revision"]["processing_status"] == "unprocessed"
+        assert body["job"] is None
+        assert len(fake_storage.objects) == 1
+
+    async def test_renamed_file_is_not_accepted_as_xlsx(self, api: AsyncClient) -> None:
+        project_id = await self._project(api)
+
+        response = await api.post(
+            f"/api/v1/projects/{project_id}/uploads",
+            files={"file": ("ВОР.xlsx", b"%PDF-1.7 not a book", "application/pdf")},
+        )
+
+        assert response.status_code == 415
+        assert response.json()["detail"]["code"] == "MIME_MISMATCH"
 
     async def test_empty_file_is_rejected(
         self, api: AsyncClient, fake_storage: FakeObjectStorage
@@ -300,7 +336,7 @@ class TestCapabilities:
         body = (await api.get(f"/api/v1/projects/{project_id}/upload-capabilities")).json()
 
         extensions = {item["extension"] for item in body}
-        assert extensions == {"zip", "pdf", "rvt", "nwd", "nwc", "ifc"}
+        assert extensions == {"zip", "pdf", "xlsx", "rvt", "nwd", "nwc", "ifc"}
         for item in body:
             assert item["capability"]
             assert item["max_size_bytes"] > 0

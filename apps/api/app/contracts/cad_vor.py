@@ -79,6 +79,12 @@ class CadVorLinkRead(BaseModel):
     created_at: datetime
 
 
+class CadVorFromRevisionWrite(BaseModel):
+    """ВОР из документов проекта: ревизия книги .xlsx, которую нужно разобрать."""
+
+    revision_id: UUID
+
+
 class CadVorLinksWrite(BaseModel):
     """Полный набор строк ВОР группы: прежние связи группы заменяются."""
 

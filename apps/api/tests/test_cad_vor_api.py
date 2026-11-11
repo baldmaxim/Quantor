@@ -101,6 +101,7 @@ async def test_routes_are_closed_when_the_flag_is_off(
             ("put", f"{base}/links/masonry%7C100%7C", {"json": {"vor_item_ids": []}}),
             ("delete", f"{base}/{fake}", {}),
             ("post", base, {"files": {"file": ("a.xlsx", b"x", XLSX)}}),
+            ("post", f"{base}/from-revision", {"json": {"revision_id": fake}}),
             ("get", _url(fake, fake, "vor-coverage"), {}),
         ]
         for method, url, kwargs in calls:
@@ -228,6 +229,98 @@ async def test_upload_rejects_bad_files(
             api, project_id, data=workbook_bytes({"x": [["без", "заголовка"]]})
         )
         assert "заголовка" in parse_error.json()["detail"]["message"]
+    assert not [key for key in fake_storage.objects if key.startswith("cad-vor/")]
+
+
+# ------------------------------------------------------------------ ВОР из документов проекта
+
+
+async def _document_revision(
+    api: AsyncClient, project_id: str, name: str, data: bytes, content_type: str = XLSX
+) -> str:
+    """Кладёт файл в документы проекта общей загрузкой и возвращает id его ревизии."""
+    response = await api.post(
+        f"/api/v1/projects/{project_id}/uploads", files={"file": (name, data, content_type)}
+    )
+    assert response.status_code == 201, response.text
+    return str(response.json()["revision"]["id"])
+
+
+async def test_import_from_revision_copies_the_book(
+    build_api: Callable[..., AsyncClient], fake_storage: FakeObjectStorage
+) -> None:
+    async with build_api(make_context(), settings=vor_settings()) as api:
+        project_id = await _project(api)
+        revision_id = await _document_revision(
+            api, project_id, "ВОР Заказчика.xlsx", workbook_bytes({"ВОР": ROWS})
+        )
+        base = f"/api/v1/projects/{project_id}/cad/vor"
+        response = await api.post(f"{base}/from-revision", json={"revision_id": revision_id})
+        assert response.status_code == 201, response.text
+        document = response.json()
+        assert document["file_name"] == "ВОР Заказчика.xlsx" and document["rows_count"] == 6
+        assert (await api.get(base)).json()[0]["id"] == document["id"]
+
+        # Копия лежит в своём ключе; объект документа проекта остался на месте.
+        copy_key = f"cad-vor/{project_id}/{document['id']}.xlsx"
+        assert copy_key in fake_storage.objects
+        originals = [key for key in fake_storage.objects if not key.startswith("cad-vor/")]
+        assert len(originals) == 1
+        assert fake_storage.objects[copy_key] == fake_storage.objects[originals[0]]
+
+        # Удаление ВОР не задевает файл документа.
+        assert (await api.delete(f"{base}/{document['id']}")).status_code == 204
+        assert copy_key not in fake_storage.objects
+        assert originals[0] in fake_storage.objects
+
+
+async def test_import_from_revision_rejects_foreign_and_unknown_revisions(
+    build_api: Callable[..., AsyncClient], second_workspace: Workspace
+) -> None:
+    second_id = second_workspace.id
+    async with build_api(make_context(), settings=vor_settings()) as api:
+        project_id = await _project(api)
+        other_project_id = await _project(api)
+        revision_id = await _document_revision(
+            api, project_id, "ВОР.xlsx", workbook_bytes({"ВОР": ROWS})
+        )
+        # Ревизия документа другого проекта того же пространства.
+        wrong_project = await api.post(
+            f"/api/v1/projects/{other_project_id}/cad/vor/from-revision",
+            json={"revision_id": revision_id},
+        )
+        assert wrong_project.status_code == 404
+        unknown = await api.post(
+            f"/api/v1/projects/{project_id}/cad/vor/from-revision",
+            json={"revision_id": str(uuid.uuid4())},
+        )
+        assert unknown.status_code == 404
+    stranger = make_context(platform_admin=False, workspace_id=second_id)
+    async with build_api(stranger, settings=vor_settings()) as foreign:
+        response = await foreign.post(
+            f"/api/v1/projects/{project_id}/cad/vor/from-revision",
+            json={"revision_id": revision_id},
+        )
+        assert response.status_code == 404
+
+
+async def test_import_from_revision_rejects_non_xlsx_and_bad_books(
+    build_api: Callable[..., AsyncClient], fake_storage: FakeObjectStorage
+) -> None:
+    async with build_api(make_context(), settings=vor_settings()) as api:
+        project_id = await _project(api)
+        url = f"/api/v1/projects/{project_id}/cad/vor/from-revision"
+        pdf = await _document_revision(
+            api, project_id, "чертёж.pdf", b"%PDF-1.7\n" + b"0" * 64, "application/pdf"
+        )
+        no_header = await _document_revision(
+            api, project_id, "пустая.xlsx", workbook_bytes({"x": [["без", "заголовка"]]})
+        )
+        for revision_id in (pdf, no_header):
+            response = await api.post(url, json={"revision_id": revision_id})
+            assert response.status_code == 422, response.text
+            assert response.json()["detail"]["code"] == "CAD_VOR_PARSE_FAILED"
+        assert (await api.get(f"/api/v1/projects/{project_id}/cad/vor")).json() == []
     assert not [key for key in fake_storage.objects if key.startswith("cad-vor/")]
 
 

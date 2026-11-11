@@ -15,28 +15,7 @@ import { formatNumber, NO_VALUE } from './view-format';
  * не сравниваются.
  */
 
-/** Предел файла - тот же, что на сервере (`MAX_FILE_BYTES`). */
-export const MAX_VOR_BYTES = 20 * 1024 * 1024;
-
 export const CAD_VOR_NOT_IN_VOR_VISIBLE_KEY = 'quantor.cad.vor-not-in-vor-visible';
-
-/** Отказ проверки файла до отправки: сервер не вызывался. */
-export class VorFileError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'VorFileError';
-  }
-}
-
-/** Текст отказа, если файл не годится для загрузки; `null` - файл подходит. */
-export const checkVorFile = (file: Pick<File, 'name' | 'size'>): string | null => {
-  if (!file.name.toLowerCase().endsWith('.xlsx')) return 'ВОР принимается книгой Excel .xlsx.';
-  if (file.size === 0) return 'Файл пуст.';
-  if (file.size > MAX_VOR_BYTES) {
-    return `Файл больше ${MAX_VOR_BYTES / (1024 * 1024)} МБ: ВОР не загружен.`;
-  }
-  return null;
-};
 
 /** Группа свода: подпись «Кладка, 100 мм, газобетон». */
 export const vorGroupLabel = (

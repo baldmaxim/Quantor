@@ -2,33 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { construction } from './constructions-fixtures';
 import {
-  checkVorFile,
   constructionVorStatus,
-  MAX_VOR_BYTES,
   notInVorIds,
   thicknessesOfKeys,
   thicknessListText,
   vorItemQuantity,
 } from './vor';
 import { coverage, coverageGroup, LINKED_ITEM } from './vor-fixtures';
-
-describe('проверка файла ВОР до отправки', () => {
-  it('.xlsx до 20 МБ подходит', () => {
-    expect(checkVorFile({ name: 'ВОР.XLSX', size: 1000 })).toBeNull();
-    expect(checkVorFile({ name: 'ВОР.xlsx', size: MAX_VOR_BYTES })).toBeNull();
-  });
-
-  it('больше 20 МБ - понятный отказ', () => {
-    expect(checkVorFile({ name: 'ВОР.xlsx', size: MAX_VOR_BYTES + 1 })).toBe(
-      'Файл больше 20 МБ: ВОР не загружен.',
-    );
-  });
-
-  it('не .xlsx и пустой файл отклоняются', () => {
-    expect(checkVorFile({ name: 'ВОР.xls', size: 10 })).toMatch(/\.xlsx/);
-    expect(checkVorFile({ name: 'ВОР.xlsx', size: 0 })).toBe('Файл пуст.');
-  });
-});
 
 describe('подсветка «не в ВОР»', () => {
   it('ВОР не загружен: пусто, даже если сервер прислал ключи', () => {

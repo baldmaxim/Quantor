@@ -2,13 +2,13 @@
 
 import {
   deleteCadVorDocument,
+  importCadVorFromRevision,
   listCadVorDocuments,
   listCadVorItems,
   listCadVorLinks,
   putCadVorLinks,
   readCadVorCoverage,
   suggestCadVorItems,
-  uploadCadVor,
   type CadVorCoverageRead,
   type CadVorDocumentRead,
   type CadVorItemRead,
@@ -25,16 +25,16 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 
+import { fileExtension } from '@/lib/documentSections';
 import { extractCode } from '@/lib/errors';
-import { unwrap } from '@/lib/queries';
+import { unwrap, useDocumentsRevisions, useProjectDocuments } from '@/lib/queries';
 
 import { cadErrorText } from './errors';
-import { checkVorFile, VorFileError } from './vor';
 import type { ICadViewParams } from './view-queries';
 
 /**
  * ВОР Заказчика: запросы и мутации (ADR-0038 п. 5). Все ключи лежат под `['cad-vor', projectId]`:
- * загрузка, удаление и смена связей инвалидируют этот префикс разом - список документов, связи,
+ * импорт, удаление и смена связей инвалидируют этот префикс разом - список документов, связи,
  * строки, подсказки и сверку листа. ВОР - только объект сверки, на подсчёт конструкций не влияет.
  */
 
@@ -163,24 +163,72 @@ export const useCadVorSuggest = (
     retry: retryNetworkOnly,
   });
 
-export interface IUploadVor {
-  readonly file: File;
-  /** Прежние документы, которые заменяются: удаляются после успешной загрузки (со связями). */
+/** Книга .xlsx из документов проекта: кандидат в ВОР Заказчика (последняя ревизия документа). */
+export interface IVorSource {
+  readonly documentId: string;
+  readonly revisionId: string;
+  readonly fileName: string;
+  /** SHA-256 файла ревизии: по нему видно, какая книга сейчас стоит ВОРом. */
+  readonly sha256: string;
+}
+
+export interface IVorSources {
+  readonly sources: readonly IVorSource[];
+  readonly loading: boolean;
+  readonly error: unknown;
+}
+
+/**
+ * Книги .xlsx документов проекта (вкладка «Документы»): последняя ревизия каждого документа, чьё
+ * имя заканчивается на .xlsx. Ревизии идут от старой к новой, берётся последняя из прочитанных.
+ */
+export const useCadVorSources = (projectId: string | null, enabled: boolean): IVorSources => {
+  const documents = useProjectDocuments(projectId ?? '', enabled && projectId !== null);
+  const books = (documents.data?.items ?? []).filter(
+    (document) => fileExtension(document.display_name) === 'xlsx',
+  );
+  const revisions = useDocumentsRevisions(books.map((document) => document.id));
+
+  const sources: IVorSource[] = [];
+  for (const document of books) {
+    const items = revisions.byDocument.get(document.id)?.items ?? [];
+    const latest = items[items.length - 1];
+    if (latest !== undefined && fileExtension(latest.source_filename) === 'xlsx') {
+      sources.push({
+        documentId: document.id,
+        revisionId: latest.id,
+        fileName: latest.source_filename,
+        sha256: latest.source_sha256,
+      });
+    }
+  }
+  return {
+    sources,
+    loading: documents.isPending || revisions.isPending,
+    error: documents.isError ? documents.error : null,
+  };
+};
+
+export interface IImportVorFromRevision {
+  readonly revisionId: string;
+  /** Прежние документы ВОР, которые заменяются: удаляются после успешного импорта (со связями). */
   readonly replaceIds?: readonly string[];
 }
 
-/** Загрузка ВОР: multipart через клиент API, предел и тип файла проверяются до отправки. */
-export const useUploadCadVor = (
+/** Импорт ВОР из ревизии документа проекта: сервер читает файл сам, берёт копию и разбирает. */
+export const useImportCadVorFromRevision = (
   projectId: string | null,
-): UseMutationResult<CadVorDocumentRead, unknown, IUploadVor> => {
+): UseMutationResult<CadVorDocumentRead, unknown, IImportVorFromRevision> => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file, replaceIds = [] }) => {
+    mutationFn: async ({ revisionId, replaceIds = [] }) => {
       if (projectId === null) throw new Error('Проект не выбран');
-      const problem = checkVorFile(file);
-      if (problem !== null) throw new VorFileError(problem);
       const created = unwrap(
-        await uploadCadVor({ throwOnError: true, path: { project_id: projectId }, body: { file } }),
+        await importCadVorFromRevision({
+          throwOnError: true,
+          path: { project_id: projectId },
+          body: { revision_id: revisionId },
+        }),
       );
       for (const id of replaceIds) {
         await deleteCadVorDocument({
@@ -241,6 +289,5 @@ export const usePutCadVorLinks = (
   });
 };
 
-/** Текст отказа: проверка файла до отправки, затем словарь CAD и сообщение сервера. */
-export const vorErrorText = (error: unknown): string =>
-  error instanceof VorFileError ? error.message : cadErrorText(error);
+/** Текст отказа: словарь CAD и сообщение сервера. */
+export const vorErrorText = (error: unknown): string => cadErrorText(error);

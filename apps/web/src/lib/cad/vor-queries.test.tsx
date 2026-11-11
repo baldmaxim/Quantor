@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
   docs: vi.fn(),
   links: vi.fn(),
   coverage: vi.fn(),
-  upload: vi.fn(),
+  importRevision: vi.fn(),
+  projectDocs: vi.fn(),
+  revisions: vi.fn(),
   remove: vi.fn(),
   put: vi.fn(),
 }));
@@ -18,12 +20,13 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
   listCadVorDocuments: mocks.docs,
   listCadVorLinks: mocks.links,
   readCadVorCoverage: mocks.coverage,
-  uploadCadVor: mocks.upload,
+  importCadVorFromRevision: mocks.importRevision,
+  listProjectDocuments: mocks.projectDocs,
+  listDocumentRevisions: mocks.revisions,
   deleteCadVorDocument: mocks.remove,
   putCadVorLinks: mocks.put,
 }));
 
-import { MAX_VOR_BYTES } from './vor';
 import { coverage, vorDocument } from './vor-fixtures';
 import {
   useCadVorCoverage,
@@ -31,8 +34,8 @@ import {
   useCadVorLinks,
   useDeleteCadVor,
   usePutCadVorLinks,
-  useUploadCadVor,
-  vorErrorText,
+  useImportCadVorFromRevision,
+  useCadVorSources,
 } from './vor-queries';
 
 const PARAMS = { projectId: 'p1', revisionId: 'r1', jobId: 'j1', attempt: 1, pageIndex: 0, view: 1 };
@@ -47,18 +50,13 @@ const mount = () => {
       docs: useCadVorDocuments('p1', true),
       links: useCadVorLinks('p1', true),
       coverage: useCadVorCoverage(PARAMS, true, 1),
-      upload: useUploadCadVor('p1'),
+      importRevision: useImportCadVorFromRevision('p1'),
+      sources: useCadVorSources('p1', true),
       remove: useDeleteCadVor('p1'),
       put: usePutCadVorLinks('p1'),
     }),
     { wrapper },
   );
-};
-
-const file = (name: string, size: number): File => {
-  const made = new File(['x'], name);
-  Object.defineProperty(made, 'size', { value: size });
-  return made;
 };
 
 describe('запросы ВОР', () => {
@@ -67,7 +65,27 @@ describe('запросы ВОР', () => {
     mocks.docs.mockResolvedValue({ data: [vorDocument()] });
     mocks.links.mockResolvedValue({ data: [] });
     mocks.coverage.mockResolvedValue({ data: coverage() });
-    mocks.upload.mockResolvedValue({ data: vorDocument({ id: 'd2' }) });
+    mocks.importRevision.mockResolvedValue({ data: vorDocument({ id: 'd2' }) });
+    mocks.projectDocs.mockResolvedValue({
+      data: {
+        items: [
+          { id: 'doc1', display_name: 'ВОР.xlsx' },
+          { id: 'doc2', display_name: 'чертёж.pdf' },
+          { id: 'doc3', display_name: 'Книга.xlsx' },
+        ],
+      },
+    });
+    mocks.revisions.mockImplementation(async ({ path }: { path: { document_id: string } }) => ({
+      data: {
+        items:
+          path.document_id === 'doc1'
+            ? [
+                { id: 'rev-old', source_filename: 'ВОР.xlsx', source_sha256: 'old' },
+                { id: 'rev-new', source_filename: 'ВОР.xlsx', source_sha256: 'new' },
+              ]
+            : [{ id: 'rev3', source_filename: 'Книга.pdf', source_sha256: 'pdf' }],
+      },
+    }));
     mocks.remove.mockResolvedValue({ data: undefined });
     mocks.put.mockResolvedValue({ data: [] });
   });
@@ -84,30 +102,40 @@ describe('запросы ВОР', () => {
 
   const calls = () => [mocks.docs, mocks.links, mocks.coverage].map((mock) => mock.mock.calls.length);
 
-  it('загрузка ВОР: multipart-файл через клиент, список, связи и сверка перечитываются', async () => {
+  it('импорт из ревизии: тело с id ревизии, список, связи и сверка перечитываются', async () => {
     const { result } = await loaded();
-    const xlsx = file('ВОР.xlsx', 1000);
     await act(async () => {
-      await result.current.upload.mutateAsync({ file: xlsx });
+      await result.current.importRevision.mutateAsync({ revisionId: 'rev-new' });
     });
-    expect(mocks.upload).toHaveBeenCalledWith({
+    expect(mocks.importRevision).toHaveBeenCalledWith({
       throwOnError: true,
       path: { project_id: 'p1' },
-      body: { file: xlsx },
+      body: { revision_id: 'rev-new' },
     });
     await waitFor(() => expect(calls()).toEqual([2, 2, 2]));
   });
 
-  it('замена: прежние документы удаляются после загрузки нового', async () => {
+  it('замена: прежние документы удаляются после импорта нового', async () => {
     const { result } = await loaded();
     await act(async () => {
-      await result.current.upload.mutateAsync({ file: file('ВОР.xlsx', 10), replaceIds: ['d1'] });
+      await result.current.importRevision.mutateAsync({ revisionId: 'rev-new', replaceIds: ['d1'] });
     });
     expect(mocks.remove).toHaveBeenCalledWith({
       throwOnError: true,
       path: { project_id: 'p1', document_id: 'd1' },
     });
-    expect(mocks.upload.mock.invocationCallOrder[0]).toBeLessThan(mocks.remove.mock.invocationCallOrder[0] ?? 0);
+    expect(mocks.importRevision.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.remove.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it('источники: книги .xlsx проекта, последняя ревизия; не .xlsx отбрасываются', async () => {
+    const { result } = mount();
+    await waitFor(() => expect(result.current.sources.sources).toHaveLength(1));
+    expect(result.current.sources.sources).toEqual([
+      { documentId: 'doc1', revisionId: 'rev-new', fileName: 'ВОР.xlsx', sha256: 'new' },
+    ]);
+    expect(mocks.revisions).toHaveBeenCalledTimes(2);
   });
 
   it('удаление ВОР перечитывает список, связи и сверку', async () => {
@@ -129,22 +157,5 @@ describe('запросы ВОР', () => {
       body: { vor_item_ids: ['i1', 'i2'] },
     });
     await waitFor(() => expect(calls()).toEqual([2, 2, 2]));
-  });
-
-  it('файл больше 20 МБ и не .xlsx: отказ до отправки, сервер не вызывается', async () => {
-    const { result } = await loaded();
-    let error: unknown = null;
-    await act(async () => {
-      await result.current.upload
-        .mutateAsync({ file: file('ВОР.xlsx', MAX_VOR_BYTES + 1) })
-        .catch((reason: unknown) => {
-          error = reason;
-        });
-    });
-    expect(vorErrorText(error)).toBe('Файл больше 20 МБ: ВОР не загружен.');
-    await act(async () => {
-      await result.current.upload.mutateAsync({ file: file('ВОР.xls', 5) }).catch(() => undefined);
-    });
-    expect(mocks.upload).not.toHaveBeenCalled();
   });
 });

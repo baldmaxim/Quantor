@@ -14,8 +14,9 @@ import {
 import {
   useCadVorCoverage,
   useCadVorDocuments,
+  useCadVorSources,
   useDeleteCadVor,
-  useUploadCadVor,
+  useImportCadVorFromRevision,
   vorErrorText,
 } from '@/lib/cad/vor-queries';
 
@@ -35,14 +36,15 @@ export interface IWorkspaceCadVorState {
   readonly notInVor: ReadonlySet<string> | undefined;
 }
 
-/** ВОР Заказчика для листа: документ, сверка, загрузка и удаление. Количества ВОР с CAD не сравниваются. */
+/** ВОР Заказчика для листа: документ, сверка, выбор книги из документов проекта и удаление. Количества ВОР с CAD не сравниваются. */
 export const useWorkspaceCadVor = ({ params, enabled, stamp }: IInput): IWorkspaceCadVorState => {
   const projectId = params?.projectId ?? null;
   const [showNotInVor, setShowNotInVor] = useStoredBoolean(CAD_VOR_NOT_IN_VOR_VISIBLE_KEY, true);
 
   const documents = useCadVorDocuments(projectId, enabled);
   const coverageQuery = useCadVorCoverage(params, enabled, stamp);
-  const upload = useUploadCadVor(projectId);
+  const sources = useCadVorSources(projectId, enabled);
+  const importing = useImportCadVorFromRevision(projectId);
   const remove = useDeleteCadVor(projectId);
 
   const coverage = coverageQuery.data ?? null;
@@ -51,15 +53,17 @@ export const useWorkspaceCadVor = ({ params, enabled, stamp }: IInput): IWorkspa
   if (!enabled || projectId === null) return { side: null, notInVor: undefined };
 
   const list = documents.data ?? [];
-  const failed = upload.isError
-    ? upload.error
+  const failed = importing.isError
+    ? importing.error
     : remove.isError
       ? remove.error
       : documents.isError
         ? documents.error
-        : coverageQuery.isError
-          ? coverageQuery.error
-          : null;
+        : sources.error !== null
+          ? sources.error
+          : coverageQuery.isError
+            ? coverageQuery.error
+            : null;
 
   return {
     notInVor,
@@ -68,10 +72,13 @@ export const useWorkspaceCadVor = ({ params, enabled, stamp }: IInput): IWorkspa
       document: list[0] ?? null,
       coverage,
       loading: documents.isPending,
-      uploading: upload.isPending,
+      importing: importing.isPending,
       deleting: remove.isPending,
+      sources: sources.sources,
+      sourcesLoading: sources.loading,
       error: failed === null ? null : vorErrorText(failed),
-      onUpload: (file) => upload.mutate({ file, replaceIds: list.map((item) => item.id) }),
+      onImport: (revisionId) =>
+        importing.mutate({ revisionId, replaceIds: list.map((item) => item.id) }),
       onDelete: () => {
         const current = list[0];
         if (current) remove.mutate(current.id);

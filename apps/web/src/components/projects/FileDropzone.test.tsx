@@ -77,7 +77,7 @@ describe('приём файлов', () => {
 
     expect(screen.getByLabelText('Выбрать файлы')).toHaveAttribute(
       'accept',
-      '.zip,.pdf,.rvt,.nwd,.nwc,.ifc',
+      '.zip,.pdf,.xlsx,.rvt,.nwd,.nwc,.ifc',
     );
   });
 });

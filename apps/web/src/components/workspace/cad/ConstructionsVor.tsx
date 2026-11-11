@@ -1,11 +1,10 @@
 'use client';
 
 import type { CadVorCoverageGroupRead } from '@quantor/api-client';
-import { useRef, useState, type ChangeEvent, type FC } from 'react';
+import { useState, type FC } from 'react';
 
 import { Button, Dialog, DialogActions } from '@/components/ui';
 import {
-  checkVorFile,
   thicknessListText,
   thicknessesOfKeys,
   vorGroupLabel,
@@ -15,13 +14,13 @@ import {
 
 import type { IWorkspaceCadVor } from './types';
 import { VorLinkDialog } from './VorLinkDialog';
+import { VorSourcePicker } from './VorSourcePicker';
 
 interface IConstructionsVorProps {
   vor: IWorkspaceCadVor;
 }
 
 const HEADING = 'text-micro font-semibold tracking-[0.06em] text-muted uppercase';
-const XLSX_ACCEPT = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 const formatDate = (iso: string): string => {
   const date = new Date(iso);
@@ -68,62 +67,44 @@ const GroupRow: FC<IGroupRowProps> = ({ group, onMatch }) => (
 );
 
 /**
- * Блок «ВОР Заказчика» раздела «Конструкции» (ADR-0038 п. 5): загрузка файла, статус каждой группы
- * свода в ВОР, сопоставление с его строками, толщины ВОР. ВОР - только объект сверки: количества
- * ВОР показываются справочно, на расчёт не влияют и с количествами CAD не сравниваются.
+ * Блок «ВОР Заказчика» раздела «Конструкции» (ADR-0038 п. 5): выбор книги из документов проекта,
+ * статус каждой группы свода в ВОР, сопоставление с его строками, толщины ВОР. ВОР - только объект
+ * сверки: количества ВОР показываются справочно, на расчёт не влияют и с количествами CAD не
+ * сравниваются.
  */
 export const ConstructionsVor: FC<IConstructionsVorProps> = ({ vor }) => {
-  const input = useRef<HTMLInputElement>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [matching, setMatching] = useState<CadVorCoverageGroupRead | null>(null);
 
   const { document, coverage } = vor;
-  const busy = vor.uploading || vor.deleting;
+  const busy = vor.importing || vor.deleting;
 
-  const pick = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    const problem = checkVorFile(file);
-    setFileError(problem);
-    if (problem === null) vor.onUpload(file);
-  };
-
-  const chooseFile = (label: string, variant: 'primary' | 'default') => (
-    <Button
-      variant={variant}
+  const picker = (
+    <VorSourcePicker
+      projectId={vor.projectId}
+      sources={vor.sources}
+      loading={vor.sourcesLoading}
+      currentSha256={document?.sha256 ?? null}
       disabled={busy}
-      className="self-start max-md:h-[44px]"
-      onClick={() => input.current?.click()}
-    >
-      {label}
-    </Button>
+      onPick={vor.onImport}
+    />
   );
 
-  const error = fileError ?? vor.error;
+  const error = vor.error;
   const missing = coverage?.thickness_not_in_vor ?? [];
   const missingThicknesses = thicknessesOfKeys(missing);
 
   return (
     <section aria-label="ВОР Заказчика" className="flex min-w-0 flex-col gap-[var(--s-3)]">
       <h4 className={HEADING}>ВОР Заказчика</h4>
-      <input
-        ref={input}
-        type="file"
-        accept={XLSX_ACCEPT}
-        aria-label="Файл ВОР Заказчика"
-        hidden
-        onChange={pick}
-      />
       {error !== null && (
         <p role="alert" className="text-xs text-danger">
           {error}
         </p>
       )}
-      {vor.uploading && (
+      {vor.importing && (
         <p role="status" className="text-xs text-muted">
-          ВОР загружается и разбирается…
+          ВОР берётся из документа и разбирается…
         </p>
       )}
 
@@ -135,7 +116,7 @@ export const ConstructionsVor: FC<IConstructionsVorProps> = ({ vor }) => {
         ) : (
           <>
             <p className="text-xs text-muted">ВОР — только для сверки, на расчёт не влияет.</p>
-            {chooseFile('Загрузить ВОР Заказчика (.xlsx)', 'default')}
+            {picker}
           </>
         )
       ) : (
@@ -148,10 +129,10 @@ export const ConstructionsVor: FC<IConstructionsVorProps> = ({ vor }) => {
             </span>
           </p>
           <p className="text-xs text-muted">
-            ВОР — только для сверки, на расчёт не влияет. Замена файла сбрасывает сопоставления.
+            ВОР — только для сверки, на расчёт не влияет. Выбор другой книги сбрасывает сопоставления.
           </p>
+          {picker}
           <div className="flex flex-wrap gap-[var(--s-3)]">
-            {chooseFile('Заменить', 'default')}
             <Button
               variant="danger"
               disabled={busy}
@@ -224,7 +205,6 @@ export const ConstructionsVor: FC<IConstructionsVorProps> = ({ vor }) => {
               variant="danger"
               onClick={() => {
                 setConfirmDelete(false);
-                setFileError(null);
                 vor.onDelete();
               }}
             >
