@@ -70,8 +70,8 @@ def test_door_finds_nearest_free_gap_along_axis(tmp_path: Path) -> None:
     synth.add_rect(msp, synth.MASONRY, 0, 0, 2000, 200)
     synth.add_rect(msp, synth.MONOLITH, 2900, -1500, 3100, 1500)
     synth.add_rect(msp, synth.MASONRY, 3100, 0, 6000, 200)
-    # центр блока (3500) лежит на сплошной стене, разрыв 2000..2900 в пределах досягаемости
-    synth.add_door(doc, msp, "AR_DOOR_BLOCK_N", 3000, -400, 4000, 600)
+    # центр блока (2900) лежит на торце монолита, оба конца разрыва 2000..2900 — у bbox блока
+    synth.add_door(doc, msp, "AR_DOOR_BLOCK_N", 2300, -400, 3500, 600)
     out = synth.run(tmp_path, doc)
     (op,) = [o for o in cast(list[Obj], out["openings"]) if o["kind"] == "door"]
     assert (op["status"], op["width_source"]) == ("ok", "gap")

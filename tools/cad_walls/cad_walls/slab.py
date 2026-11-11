@@ -129,49 +129,57 @@ Pt = tuple[float, float]
 Seg = tuple[Pt, Pt]
 
 
-def lintel_hull(
-    sections: tuple[Seg, Seg] | None, direction: tuple[float, float] | None = None
-) -> list[Pt] | None:
-    """Перемычка: выпуклая оболочка торцевых сечений стен по обе стороны разрыва (против часовой).
+def lintel_strip(
+    sections: tuple[Seg, Seg] | None,
+    direction: tuple[float, float] | None,
+    origin: Pt,
+    coaxial: tuple[bool, bool],
+    host_thickness: float | None,
+) -> tuple[list[Pt], Seg] | None:
+    """Прямоугольная перемычка и ось полотна двери в системе (d, n = (-dy, dx)) с началом `origin`.
 
-    Покрывает обе грани и при Т-примыкании, и при несоосных гранях. Оболочка вырождена — None.
-    Вершины идут в порядке прямоугольника перемычки: от торца со стороны «минус» вдоль
-    `direction` и поперёк слева направо; невыпуклый обход заменяется оболочкой.
+    Вдоль d — от торцевого сечения одной стороны разрыва до сечения другой. Поперёк n — объединение
+    интервалов сечений только тех сторон, чья стена соосна проёму (`coaxial` — по порядку
+    `sections`); перпендикулярная стена или обрезок в ширину не входят. Соосных сторон нет — полоса
+    по оси хоста: `origin` ± толщина хоста / 2. Кольцо — 4 точки против часовой, стороны строго
+    параллельны d и n. Ось полотна — середина полосы, от одного торца до другого. Вырождение — None.
     """
-    if sections is None:
+    if sections is None or direction is None:
         return None
-    hull = shapely.MultiPoint([*sections[0], *sections[1]]).convex_hull
-    if not isinstance(hull, Polygon) or hull.is_empty or hull.area < 1.0:
+    dx, dy = direction
+    nx, ny = -dy, dx
+    ox, oy = origin
+
+    def along(pt: Pt) -> float:
+        return (pt[0] - ox) * dx + (pt[1] - oy) * dy
+
+    def across(pt: Pt) -> float:
+        return (pt[0] - ox) * nx + (pt[1] - oy) * ny
+
+    sides = [
+        ((along(seg[0]) + along(seg[1])) / 2, [across(seg[0]), across(seg[1])], flag)
+        for seg, flag in zip(sections, coaxial, strict=True)
+    ]
+    sides.sort(key=lambda side: side[0])
+    s0, s1 = sides[0][0], sides[1][0]
+    us = [u for _, pair, flag in sides if flag for u in pair]
+    if us:
+        lo, hi = min(us), max(us)
+    elif host_thickness is not None:
+        lo, hi = -host_thickness / 2, host_thickness / 2
+    else:
         return None
-    m0 = ((sections[0][0][0] + sections[0][1][0]) / 2, (sections[0][0][1] + sections[0][1][1]) / 2)
-    m1 = ((sections[1][0][0] + sections[1][1][0]) / 2, (sections[1][0][1] + sections[1][1][1]) / 2)
-    dx, dy = direction if direction is not None else (m1[0] - m0[0], m1[1] - m0[1])
-    first, second = sections if (m1[0] - m0[0]) * dx + (m1[1] - m0[1]) * dy >= 0 else sections[::-1]
-
-    def across(seg: Seg) -> Seg:
-        lo, hi = seg
-        return seg if (hi[0] - lo[0]) * -dy + (hi[1] - lo[1]) * dx >= 0 else (hi, lo)
-
-    f, g = across(first), across(second)
-    ring = Polygon([f[0], g[0], g[1], f[1]])
-    if (
-        ring.is_valid
-        and ring.area > 1.0
-        and abs(ring.area - hull.area) < 1.0
-        and ring.exterior.is_ccw
-    ):
-        return [f[0], g[0], g[1], f[1]]
-    return [(x, y) for x, y in list(orient(hull, 1.0).exterior.coords)[:-1]]
-
-
-def leaf_shell(sections: tuple[Seg, Seg] | None, thickness: float) -> list[Pt] | None:
-    """Полотно двери: прямоугольник толщиной `thickness` по оси между серединами сечений."""
-    if sections is None:
+    if s1 - s0 < 1.0 or hi - lo < 1.0:
         return None
-    (a0, a1), (b0, b1) = sections
-    m0 = ((a0[0] + a1[0]) / 2, (a0[1] + a1[1]) / 2)
-    m1 = ((b0[0] + b1[0]) / 2, (b0[1] + b1[1]) / 2)
-    return rect_along(m0, m1, thickness)
+
+    def world(s: float, u: float) -> Pt:
+        return (round(ox + dx * s + nx * u, 3), round(oy + dy * s + ny * u, 3))
+
+    mid = (lo + hi) / 2
+    return [world(s0, lo), world(s1, lo), world(s1, hi), world(s0, hi)], (
+        world(s0, mid),
+        world(s1, mid),
+    )
 
 
 def rect_along(start: Pt, end: Pt, thickness: float) -> list[Pt] | None:

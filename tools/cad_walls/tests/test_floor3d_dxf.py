@@ -375,3 +375,27 @@ def test_model_without_doors_key_has_no_door_layer_meshes(tmp_path: Path) -> Non
     meshes = _meshes(_build(tmp_path, model))
     assert f3d.LAYER_DOORS not in meshes
     assert f3d.LAYER_LINTELS in meshes
+
+
+def _with_lintel_material(material: object) -> dict[str, object]:
+    model = _model()
+    lintels = model["lintels"]
+    assert isinstance(lintels, list)
+    lintels[0]["material"] = material
+    return model
+
+
+def test_monolith_lintel_goes_to_monolith_layer(tmp_path: Path) -> None:
+    meshes = _meshes(_build(tmp_path, _with_lintel_material("monolith")))
+    assert f3d.LAYER_LINTELS not in meshes
+    assert len(meshes[f3d.LAYER_MONOLITH]) == 2  # колонна и перемычка
+    lintel = next(m for m in meshes[f3d.LAYER_MONOLITH] if min(v.x for v in _points(m)) < 2000)
+    zs = {round(v.z, 6) for v in _points(lintel)}
+    assert zs == {BASE + 2100, WALL_TOP}
+
+
+@pytest.mark.parametrize("material", ["masonry", "frame_partition", None])
+def test_other_lintel_material_stays_on_lintel_layer(tmp_path: Path, material: str | None) -> None:
+    meshes = _meshes(_build(tmp_path, _with_lintel_material(material)))
+    assert len(meshes[f3d.LAYER_LINTELS]) == 1
+    assert len(meshes[f3d.LAYER_MONOLITH]) == 1

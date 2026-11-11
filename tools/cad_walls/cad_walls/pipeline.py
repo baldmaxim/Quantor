@@ -18,9 +18,9 @@ from cad_walls.fill import build_fill
 from cad_walls.framed import extract_frame_partitions
 from cad_walls.heights import resolve_heights
 from cad_walls.legend import Legend, MaterialHint, material_hints, read_legend
-from cad_walls.openings import Opening, build_openings
+from cad_walls.openings import Opening, build_openings, lintel_material
 from cad_walls.params import Params, load_params
-from cad_walls.slab import SlabData, build_slab, leaf_shell, lintel_hull, lintel_shell, rect_along
+from cad_walls.slab import SlabData, build_slab, lintel_shell, rect_along
 from cad_walls.version import GENERATOR_VERSION, SCHEMA
 from cad_walls.zones import read_zones
 
@@ -95,12 +95,10 @@ def _ring_pts(shell: Sequence[tuple[float, float]] | None) -> list[list[float]] 
 
 
 def _lintel(o: Opening) -> list[list[float]] | None:
-    """Перемычка: по торцевым сечениям, без них — прямоугольник по оси; двери без разрыва — нет."""
+    """Перемычка: прямоугольник по сечениям, без них — по оси; двери без разрыва — нет."""
     if o.kind == "door" and o.status == "no_data":
         return None
-    shell = lintel_hull(o.sections, o.direction) or lintel_shell(
-        o.axis_point or o.center, o.direction, o.width, o.thickness
-    )
+    shell = o.lintel or lintel_shell(o.axis_point or o.center, o.direction, o.width, o.thickness)
     return _ring_pts(shell)
 
 
@@ -108,7 +106,7 @@ def _leaf(o: Opening, thickness: float) -> list[list[float]] | None:
     """Полотно двери в разрыве; у безымянных разрывов и дверей без разрыва его нет."""
     if o.kind != "door" or o.status == "no_data":
         return None
-    shell = leaf_shell(o.sections, thickness)
+    shell = None if o.leaf_axis is None else rect_along(o.leaf_axis[0], o.leaf_axis[1], thickness)
     if shell is None and o.axis_point is not None and o.direction is not None:
         half = o.width / 2
         ax, ay = o.axis_point
@@ -142,7 +140,8 @@ def _slab_holes(data: SlabData) -> list[dict[str, object]]:
     ]
 
 
-def _opening(o: Opening, leaf_mm: float) -> dict[str, object]:
+def _opening(o: Opening, leaf_mm: float, kinds: dict[str, str]) -> dict[str, object]:
+    lintel = _lintel(o)
     return {
         "id": o.id,
         "kind": o.kind,
@@ -156,7 +155,8 @@ def _opening(o: Opening, leaf_mm: float) -> dict[str, object]:
         "handle": o.handle,
         "center": [_r(o.center[0]), _r(o.center[1])],
         "direction": None if o.direction is None else [o.direction[0], o.direction[1]],
-        "lintel": _lintel(o),
+        "lintel": lintel,
+        "lintel_material": None if lintel is None else lintel_material(o.adjacent_ids, kinds),
         "leaf": _leaf(o, leaf_mm),
     }
 
@@ -228,6 +228,7 @@ def build(args: Args) -> Built:
                 f"сумма площадей конструкций расходится с объединением на {residue:.4%}",
             )
         )
+    kinds = {c.id: c.kind for c in cons}
     document: dict[str, object] = {
         "schema": SCHEMA,
         "generator": GENERATOR_VERSION,
@@ -239,7 +240,7 @@ def build(args: Args) -> Built:
         "legend": legend.to_json(),
         "constructions": [_construction(c, hints.get(c.id)) for c in cons],
         "frame_partitions": [_construction(c) for c in frames],
-        "openings": [_opening(o, params.num("door_leaf_thickness_mm")) for o in openings],
+        "openings": [_opening(o, params.num("door_leaf_thickness_mm"), kinds) for o in openings],
         "slab": _slab(slab),
         "slab_holes": _slab_holes(slab),
         "totals": _totals(cons),

@@ -25,6 +25,7 @@ from shapely.strtree import STRtree
 from cad_walls.constructions import Construction
 from cad_walls.dxfin import Door
 from cad_walls.params import Params
+from cad_walls.slab import lintel_strip
 
 FloatArr = npt.NDArray[np.float64]
 MIN_BACK_MM = 100.0
@@ -73,6 +74,9 @@ class Opening:
     sections: tuple[Seg, Seg] | None = None
     # отрезок разрыва между серединами торцов; нужен, чтобы другой проём не занял тот же разрыв
     span: Seg | None = None
+    # перемычка в плане (4 точки против часовой, стороны параллельны проёму) и ось полотна двери
+    lintel: list[Pt] | None = None
+    leaf_axis: Seg | None = None
 
 
 def _axis_point(con: Construction, center: tuple[float, float]) -> tuple[float, float] | None:
@@ -261,6 +265,33 @@ def _sections(cons: list[Construction], a: End, b: End) -> tuple[Seg, Seg] | Non
     return None if sa is None or sb is None else (sa, sb)
 
 
+def _is_coaxial(con: Construction, pt: FloatArr, d: tuple[float, float], cos_split: float) -> bool:
+    """Ось стены у точки проёма параллельна проёму (в пределах угла склейки)."""
+    own = _axis_direction(con, (float(pt[0]), float(pt[1])))
+    return own is not None and abs(own[0] * d[0] + own[1] * d[1]) >= cos_split
+
+
+def _frame(
+    cons: list[Construction],
+    owners: tuple[int, int],
+    points: tuple[FloatArr, FloatArr],
+    sections: tuple[Seg, Seg] | None,
+    direction: tuple[float, float] | None,
+    origin: Pt,
+    host: Construction,
+    cos_split: float,
+) -> tuple[list[Pt] | None, Seg | None]:
+    """Перемычка и ось полотна: ширина по сторонам с соосной стеной, иначе по оси хоста."""
+    if sections is None or direction is None:
+        return None, None
+    flags = (
+        _is_coaxial(cons[owners[0]], points[0], direction, cos_split),
+        _is_coaxial(cons[owners[1]], points[1], direction, cos_split),
+    )
+    found = lintel_strip(sections, direction, origin, flags, host.thickness)
+    return (None, None) if found is None else found
+
+
 def _clear(a: End, b: End, tree: STRtree) -> bool:
     """Отрезок между торцами не пересекает ни одну конструкцию (края отступом не считаются)."""
     v = b.point - a.point
@@ -272,9 +303,27 @@ def _clear(a: End, b: End, tree: STRtree) -> bool:
     return len(tree.query(seg, predicate="intersects")) == 0
 
 
-def _pair_opening(door: Door, a: End, b: End, gap: float, cons: list[Construction]) -> Opening:
+def _pair_opening(
+    door: Door, a: End, b: End, gap: float, cons: list[Construction], cos_split: float
+) -> Opening:
     owners = sorted({a.owner, b.owner}, key=lambda i: cons[i].id)
     host = _host(cons, owners)
+    sections = _sections(cons, a, b)
+    direction = unit_direction(float(a.direction[0]), float(a.direction[1]))
+    axis_point = (
+        round(float(a.point[0] + b.point[0]) / 2, 3),
+        round(float(a.point[1] + b.point[1]) / 2, 3),
+    )
+    lintel, leaf_axis = _frame(
+        cons,
+        (a.owner, b.owner),
+        (a.point, b.point),
+        sections,
+        direction,
+        axis_point,
+        host,
+        cos_split,
+    )
     return Opening(
         id=_opening_id("door", door.handle, door.center),
         kind="door",
@@ -287,14 +336,24 @@ def _pair_opening(door: Door, a: End, b: End, gap: float, cons: list[Constructio
         block_name=door.block_name,
         handle=door.handle,
         center=door.center,
-        direction=unit_direction(float(a.direction[0]), float(a.direction[1])),
-        axis_point=(
-            round(float(a.point[0] + b.point[0]) / 2, 3),
-            round(float(a.point[1] + b.point[1]) / 2, 3),
-        ),
-        sections=_sections(cons, a, b),
+        direction=direction,
+        axis_point=axis_point,
+        sections=sections,
         span=(_round_pt(a.point), _round_pt(b.point)),
+        lintel=lintel,
+        leaf_axis=leaf_axis,
     )
+
+
+def _span_near_door(door: Door, a: FloatArr, b: FloatArr, tol: float) -> bool:
+    """Оба конца разрыва лежат на bbox блока двери или не дальше `tol` от него."""
+    hw, hh = door.width / 2, door.height / 2
+    for pt in (a, b):
+        ex = max(abs(float(pt[0]) - door.center[0]) - hw, 0.0)
+        ey = max(abs(float(pt[1]) - door.center[1]) - hh, 0.0)
+        if math.hypot(ex, ey) > tol:
+            return False
+    return True
 
 
 def _door_by_ends(
@@ -313,7 +372,9 @@ def _door_by_ends(
     for i, a in enumerate(near):
         for b in near[i + 1 :]:
             gap = _coaxial(a, b, cons, cos_split)
-            if gap is None:
+            if gap is None or gap > reach:
+                continue
+            if not _span_near_door(door, a.point, b.point, p.num("door_gap_tol_mm")):
                 continue
             dist = _seg_dist(center, a.point, b.point)
             if dist > door.max_side / 2 + p.num("door_gap_tol_mm"):
@@ -326,7 +387,7 @@ def _door_by_ends(
     if best is None:
         return None
     _, a, b, gap = best
-    return _pair_opening(door, a, b, gap, cons)
+    return _pair_opening(door, a, b, gap, cons, cos_split)
 
 
 def _solid_runs(
@@ -396,6 +457,10 @@ def _search_gap(
             dist = 0.0 if lo <= s_c <= hi else min(abs(s_c - lo), abs(s_c - hi))
             if dist > reach:
                 continue
+            if not _span_near_door(
+                door, origin + d * lo, origin + d * hi, p.num("door_gap_tol_mm")
+            ):
+                continue
             mid = origin + d * (lo + hi) / 2
             if any(
                 _seg_dist(mid, np.asarray(a), np.asarray(b)) <= CLAIM_TOL_MM for a, b in claimed
@@ -412,6 +477,19 @@ def _search_gap(
     sa = _section(cons[left_owner].polygon, q_lo, -d, d, cons[left_owner].thickness)
     sb = _section(cons[right_owner].polygon, q_hi, d, d, cons[right_owner].thickness)
     mid = origin + d * (lo + hi) / 2
+    sections = None if sa is None or sb is None else (sa, sb)
+    direction = unit_direction(float(d[0]), float(d[1]))
+    cos_split = math.cos(math.radians(p.num("split_angle_deg")))
+    lintel, leaf_axis = _frame(
+        cons,
+        (left_owner, right_owner),
+        (q_lo, q_hi),
+        sections,
+        direction,
+        _round_pt(mid),
+        host,
+        cos_split,
+    )
     return Opening(
         id=_opening_id("door", door.handle, door.center),
         kind="door",
@@ -424,10 +502,12 @@ def _search_gap(
         block_name=door.block_name,
         handle=door.handle,
         center=door.center,
-        direction=unit_direction(float(d[0]), float(d[1])),
+        direction=direction,
         axis_point=_round_pt(mid),
-        sections=None if sa is None or sb is None else (sa, sb),
+        sections=sections,
         span=(_round_pt(q_lo), _round_pt(q_hi)),
+        lintel=lintel,
+        leaf_axis=leaf_axis,
     )
 
 
@@ -498,6 +578,18 @@ def _gap_openings(
             continue
         owners = sorted({a.owner, b.owner}, key=lambda k: cons[k].id)
         host = _host(cons, owners)
+        sections = _sections(cons, a, b)
+        direction = unit_direction(float(a.direction[0]), float(a.direction[1]))
+        lintel, _ = _frame(
+            cons,
+            (a.owner, b.owner),
+            (a.point, b.point),
+            sections,
+            direction,
+            _round_pt(mid),
+            host,
+            cos_split,
+        )
         out.append(
             Opening(
                 id=_opening_id("gap", "", center),
@@ -511,8 +603,9 @@ def _gap_openings(
                 block_name=None,
                 handle=None,
                 center=center,
-                direction=unit_direction(float(a.direction[0]), float(a.direction[1])),
-                sections=_sections(cons, a, b),
+                direction=direction,
+                sections=sections,
+                lintel=lintel,
             )
         )
     return out
@@ -539,3 +632,21 @@ def build_openings(cons: list[Construction], doors: list[Door], p: Params) -> li
     openings += _gap_openings(free, cons, doors, p, claimed)
     openings.sort(key=lambda o: (o.kind, o.center[1], o.center[0], o.id))
     return _unique(openings)
+
+
+def lintel_material(adjacent_ids: list[str], kinds: dict[str, str]) -> str | None:
+    """Материал перемычки: все соседние стены монолитные — monolith, иначе вид первой немонолитной.
+
+    Вокруг монолита перемычка монолитная; у перегородки — из того же материала (masonry,
+    frame_partition). Нет соседей — None.
+    """
+    first_other: str | None = None
+    for cid in adjacent_ids:
+        kind = kinds.get(cid)
+        if kind is None:
+            continue
+        if not kind.startswith("monolith") and first_other is None:
+            first_other = kind
+    if first_other is not None:
+        return first_other
+    return "monolith" if any(cid in kinds for cid in adjacent_ids) else None

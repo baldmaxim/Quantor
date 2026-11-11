@@ -335,7 +335,9 @@ def parse_model(raw_bytes: bytes) -> FloorModel:
         if not _usable(shell) or z0 >= z1:
             model.skipped.append(f"перемычка {key}: вырожденный контур или отметки")
             continue
-        lintels.append(Prism(LAYER_LINTELS, key, shell, [], z0, z1))
+        # материал (модель с cad_walls v1.6): монолит - на слой монолита, иначе - слой перемычек
+        layer = LAYER_MONOLITH if lintel.get("material") == "monolith" else LAYER_LINTELS
+        lintels.append(Prism(layer, key, shell, [], z0, z1))
     lintels.sort(key=lambda prism: prism.key)
     model.prisms.extend(lintels)
 
