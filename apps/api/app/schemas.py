@@ -685,6 +685,10 @@ class SheetRead(ApiModel):
     height_px: int | None
     rotation: int
     region_count: int = Field(ge=0)
+    title: str | None = Field(
+        default=None,
+        description="Название листа из штампа распознавалки; нет штампа — null",
+    )
 
 
 class PageGeometryRead(ApiModel):

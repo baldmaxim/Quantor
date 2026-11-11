@@ -23773,6 +23773,18 @@
             "title": "Rotation",
             "type": "integer"
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Название листа из штампа распознавалки; нет штампа — null",
+            "title": "Title"
+          },
           "width_px": {
             "anyOf": [
               {

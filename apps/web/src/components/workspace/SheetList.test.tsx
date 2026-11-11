@@ -63,7 +63,7 @@ describe('SheetList', () => {
     expect(onSelect).toHaveBeenCalledWith(3);
   });
 
-  it('лист с заголовком плана назван этажом, номер листа - второй подписью', () => {
+  it('у листа с заголовком плана этаж идёт после номера листа', () => {
     render(
       <SheetList
         pages={[
@@ -74,10 +74,34 @@ describe('SheetList', () => {
         onSelect={vi.fn()}
       />,
     );
-    const named = screen.getByText('К9 · С3 · 14 эт.');
-    expect(named).toHaveAttribute('title', 'Корпус 9, секция 3, 14 этаж');
-    expect(screen.getByText('Лист 82')).toBeInTheDocument();
+    const named = screen.getByTitle('Корпус 9, секция 3, 14 этаж');
+    expect(named).toHaveTextContent(/^Лист 82 · К9 · С3 · 14 эт\.$/);
+    expect(screen.getByText('82')).toBeInTheDocument();
     // Лист без заголовка подписан по-прежнему.
     expect(screen.getByText('Лист 1')).toBeInTheDocument();
+  });
+
+  it('без этажа из CAD после номера показывается название из штампа', () => {
+    render(
+      <SheetList
+        pages={[
+          page({ id: 'a', index: 49, title: 'План -2 этажа на отм. -6.600' }),
+          page({
+            id: 'b',
+            index: 81,
+            title: 'План 14 этажа',
+            floorTitle: { corps: '9', section: '3', floors: ['14'] },
+          }),
+        ]}
+        activeIndex={0}
+        onSelect={vi.fn()}
+      />,
+    );
+    const stamped = screen.getByTitle('План -2 этажа на отм. -6.600');
+    expect(stamped).toHaveTextContent(/^Лист 50 · План -2 этажа на отм\. -6\.600$/);
+    // Этаж из CAD приоритетнее штампа.
+    const cad = screen.getByTitle('Корпус 9, секция 3, 14 этаж');
+    expect(cad).toHaveTextContent(/^Лист 82 · К9 · С3 · 14 эт\.$/);
+    expect(screen.queryByText(/План 14 этажа/)).not.toBeInTheDocument();
   });
 });

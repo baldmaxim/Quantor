@@ -810,6 +810,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       index: item.page_index,
                       label: item.page_label,
                       floorTitle: floorTitleByPage.get(item.page_index) ?? null,
+                      title: item.title ?? null,
                       regionCount: item.region_count,
                       cad: isReadyDxf(cadResults.get(item.page_index)),
                     }))}

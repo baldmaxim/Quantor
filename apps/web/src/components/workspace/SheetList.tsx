@@ -12,6 +12,8 @@ export interface ISheetListPage {
   label: string | null;
   /** Заголовок плана из CAD (корпус, секция, этаж); нет - лист подписан номером. */
   floorTitle?: CadSheetFloorTitle | null;
+  /** Название листа из штампа распознавалки; нет штампа - null. */
+  title?: string | null;
   regionCount: number;
   /** У листа есть готовый DXF (результат CAD без одной диагностики). */
   cad: boolean;
@@ -47,6 +49,8 @@ export const SheetList: FC<ISheetListProps> = ({ pages, activeIndex, onSelect })
       {pages.map((page) => {
         const recognized = page.regionCount > 0;
         const floorTitle = formatFloorTitle(page.floorTitle, '');
+        // Этаж из CAD точнее названия из штампа: штамп показывается, только если этажа нет.
+        const caption = floorTitle !== '' ? floorTitle : (page.title ?? '');
         return (
           <button
             key={page.id}
@@ -60,34 +64,21 @@ export const SheetList: FC<ISheetListProps> = ({ pages, activeIndex, onSelect })
                 : 'text-muted hover:bg-surface-muted hover:text-text',
             )}
           >
-            {floorTitle !== '' ? (
-              // Лист назван этажом; номер листа - второй серой подписью.
-              <>
-                <span
-                  className="min-w-0 flex-1 truncate"
-                  title={formatFloorTitleFull(page.floorTitle) ?? undefined}
-                >
-                  {floorTitle}
-                </span>
-                <span
-                  className="tabular max-w-[64px] flex-none truncate text-micro text-muted"
-                  title={page.label ?? undefined}
-                >
-                  Лист {page.label ?? page.index + 1}
-                </span>
-              </>
-            ) : (
-              <>
-                {/* Длинная метка листа обрезается: иначе строка растёт в высоту и теснит ярлыки. */}
-                <span
-                  className="tabular min-w-[28px] max-w-[64px] flex-none truncate"
-                  title={page.label ?? undefined}
-                >
-                  {page.label ?? page.index + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate">Лист {page.index + 1}</span>
-              </>
-            )}
+            {/* Длинная метка листа обрезается: иначе строка растёт в высоту и теснит ярлыки. */}
+            <span
+              className="tabular min-w-[28px] max-w-[64px] flex-none truncate"
+              title={page.label ?? undefined}
+            >
+              {page.label ?? page.index + 1}
+            </span>
+            {/* Номер листа первым, этаж — следом: нумерация в списке не прерывается. */}
+            <span
+              className="min-w-0 flex-1 truncate"
+              title={formatFloorTitleFull(page.floorTitle) ?? page.title ?? undefined}
+            >
+              Лист {page.index + 1}
+              {caption !== '' && <span className="text-text"> · {caption}</span>}
+            </span>
             {recognized && (
               <span className="tabular flex-none text-micro text-muted">{page.regionCount}</span>
             )}

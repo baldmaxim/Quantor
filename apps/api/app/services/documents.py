@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import func, select
@@ -22,6 +23,7 @@ from app.models import (
     Region,
     Sheet,
 )
+from app.services.calc.adapters.recognized import parse_stamp
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +271,32 @@ async def list_sheets(
     )
     result = await session.execute(query)
     return [SheetWithCount(sheet=sheet, region_count=count) for sheet, count in result.all()]
+
+
+async def sheet_titles(
+    session: AsyncSession, *, sheet_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """Названия листов из штампа распознавалки: один запрос на все листы страницы выборки.
+
+    Берётся первый по порядку область листа, где есть строка штампа; без штампа или без
+    названия в нём листа в результате нет.
+    """
+    if not sheet_ids:
+        return {}
+    query = (
+        select(Region.sheet_id, Region.raw_content_md)
+        .where(Region.sheet_id.in_(sheet_ids), Region.raw_content_md.contains("**Stamp:**"))
+        .distinct(Region.sheet_id)
+        .order_by(Region.sheet_id, Region.ordinal.asc().nulls_last(), Region.id)
+    )
+    titles: dict[uuid.UUID, str] = {}
+    for sheet_id, text in (await session.execute(query)).all():
+        stamp = parse_stamp(text or "")
+        if stamp is not None and stamp.name is not None:
+            name = stamp.name.value.strip()
+            if name:
+                titles[sheet_id] = name
+    return titles
 
 
 async def count_sheets(session: AsyncSession, *, revision_id: uuid.UUID) -> int:

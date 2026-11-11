@@ -143,6 +143,7 @@ async def list_revision_sheets(
         session, revision_id=revision.id, limit=limit, offset=offset
     )
     total = await documents_service.count_sheets(session, revision_id=revision.id)
+    titles = await documents_service.sheet_titles(session, sheet_ids=[row.sheet.id for row in rows])
     items = [
         SheetRead(
             id=row.sheet.id,
@@ -153,6 +154,7 @@ async def list_revision_sheets(
             height_px=row.sheet.height_px,
             rotation=row.sheet.rotation,
             region_count=row.region_count,
+            title=titles.get(row.sheet.id),
         )
         for row in rows
     ]

@@ -12397,6 +12397,12 @@ export type SheetRead = {
      */
     rotation: number;
     /**
+     * Title
+     *
+     * Название листа из штампа распознавалки; нет штампа — null
+     */
+    title?: string | null;
+    /**
      * Width Px
      */
     width_px: number | null;

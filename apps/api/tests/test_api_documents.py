@@ -343,6 +343,41 @@ class TestSheetsAndRegions:
         assert body["items"][0]["region_count"] == 3
         assert body["items"][0]["width_px"] == 2481
 
+    async def test_sheet_title_comes_from_stamp_of_first_region(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        data = await _build(db_session, workspace_id)
+        db_session.add_all(
+            [
+                Region(
+                    sheet_id=data.sheet.id,
+                    external_block_id="blk_stamp_b",
+                    ordinal=9,
+                    block_type="text",
+                    shape_type="rectangle",
+                    coords_norm=[0.1, 0.1, 0.2, 0.2],
+                    raw_content_md="> **Stamp:** Code: X | Name: Второе название | Sheet: 2",
+                ),
+                Region(
+                    sheet_id=data.sheet.id,
+                    external_block_id="blk_stamp_a",
+                    ordinal=4,
+                    block_type="text",
+                    shape_type="rectangle",
+                    coords_norm=[0.1, 0.1, 0.2, 0.2],
+                    raw_content_md=(
+                        "> **Stamp:** Code: ПД-АР | Name: План 9 этажа на отм. +27.900 | Sheet: 1"
+                    ),
+                ),
+            ]
+        )
+        await db_session.commit()
+
+        body = (await api.get(f"/api/v1/revisions/{data.revision.id}/sheets")).json()
+
+        assert body["items"][0]["title"] == "План 9 этажа на отм. +27.900"
+        assert body["items"][1]["title"] is None
+
     async def test_regions_expose_normalized_coordinates(
         self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
     ) -> None:
