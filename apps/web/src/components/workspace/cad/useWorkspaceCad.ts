@@ -98,6 +98,8 @@ export interface IWorkspaceCad {
   constructionPicker: IWorkspaceCadConstructionPicker | null;
   /** Вид «3D» открыт поверх холста (ADR-0039): параметры листа и вида; `null` - режим «План». */
   floor3d: { readonly params: ICadViewParams } | null;
+  /** Режим «3D» включён, но лист или вид ещё грузится: оверлей держится, план не мелькает. */
+  floor3dPending: { readonly onExit: () => void } | null;
 }
 
 const NO_LAYERS: ReadonlySet<number> = new Set<number>();
@@ -529,6 +531,8 @@ export const useWorkspaceCad = ({
     constructions: constructionsState.side,
   };
 
+  const floor3d = bar !== null && view3d && params !== null ? { params } : null;
+
   return {
     opened,
     painter,
@@ -540,6 +544,10 @@ export const useWorkspaceCad = ({
     side,
     zoneCapture: zonesState.capture,
     constructionPicker: constructionsState.picker,
-    floor3d: bar !== null && view3d && params !== null ? { params } : null,
+    floor3d,
+    floor3dPending:
+      active && view3d && floor3d === null && (state === 'loading' || state === 'ready')
+        ? { onExit: () => setView3d(false) }
+        : null,
   };
 };

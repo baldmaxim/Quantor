@@ -20,8 +20,7 @@ import { RegionInspector } from '@/components/workspace/RegionInspector';
 import { WorkspaceModeSwitch } from '@/components/workspace/WorkspaceModeSwitch';
 import { resolveLeftTab, resolveMode } from '@/components/workspace/cad/left-tab';
 import { CadConstructionPicker } from '@/components/workspace/cad/CadConstructionPicker';
-import { CadBuilding3dLazy } from '@/components/workspace/cad/building3d/CadBuilding3dLazy';
-import { CadFloor3dLazy } from '@/components/workspace/cad/floor3d/CadFloor3dLazy';
+import { CadFloor3dOverlay } from '@/components/workspace/cad/floor3d/CadFloor3dOverlay';
 import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
 import { WorkspaceCadBar } from '@/components/workspace/cad/WorkspaceCadBar';
 import { useWorkspaceCadPipeline } from '@/components/workspace/cad/useWorkspaceCadPipeline';
@@ -907,24 +906,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   disabled={activeTool === 'scale'}
                 />
               )}
-              {mode === 'cad' && cad.floor3d && (
-                <div className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg lg:flex-row">
-                  <CadBuilding3dLazy
-                    projectId={projectId}
-                    current={{
-                      jobId: cad.floor3d.params.jobId,
-                      pageIndex: cad.floor3d.params.pageIndex,
-                      view: cad.floor3d.params.view,
-                    }}
-                    onSelectFloor={(floor) => void openBuildingFloor(floor)}
-                  />
-                  <div className="relative min-h-0 min-w-0 flex-1">
-                    <CadFloor3dLazy
-                      key={`${cad.floor3d.params.jobId}:${cad.floor3d.params.pageIndex}:${cad.floor3d.params.view}`}
-                      params={cad.floor3d.params}
-                    />
-                  </div>
-                </div>
+              {mode === 'cad' && (cad.floor3d || cad.floor3dPending) && (
+                <CadFloor3dOverlay
+                  projectId={projectId}
+                  params={cad.floor3d?.params ?? null}
+                  onSelectFloor={(floor) => void openBuildingFloor(floor)}
+                  onExit={() => cad.floor3dPending?.onExit()}
+                />
               )}
               {draftPhase === 'complete' && draftA && draftB && sheetId && (
                 <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">
