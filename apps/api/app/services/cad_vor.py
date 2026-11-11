@@ -4,8 +4,9 @@
 конструкций не влияют, в calc и таблицы обмера не пишутся. Привязка - к проекту. «Текущий» документ
 проекта - самый поздний; по нему идут подсказки и список толщин.
 
-Ключ группы - `вид|толщина_мм|материал` (материал может быть пустым). Строится одной функцией
-`group_key` и для связей, и для сверки листа.
+Ключ группы - `вид|толщина_мм|материал` (материал может быть пустым); у групп монолитных
+перемычек над проёмами - с суффиксом `|lintel`. Строится одной функцией `group_key` и для связей,
+и для сверки листа.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from app.contracts.cad_constructions import (
     CadConstructionGroupRead,
     CadConstructionKind,
     CadConstructionRead,
+    CadGroupElement,
     CadMaterial,
 )
 from app.contracts.cad_vor import (
@@ -62,6 +64,8 @@ KIND_WORDS: Final[Mapping[str, tuple[str, ...]]] = {
     "monolith_pylon": ("пилон",),
     "monolith_column": ("колонн",),
 }
+# Слова группы перемычек (вид у неё - монолитная стена, поэтому «стен» не подходит).
+LINTEL_WORDS: Final[tuple[str, ...]] = ("перемыч",)
 
 SCORE_THICKNESS: Final = 10
 SCORE_KIND: Final = 4
@@ -78,11 +82,12 @@ class GroupKeyParts:
     kind: CadConstructionKind
     thickness_mm: float
     material: str
+    element: CadGroupElement = "construction"
 
 
 _GROUP_KEY_RE: Final = re.compile(
     r"^(?P<kind>masonry|monolith_wall|monolith_pylon|monolith_column|floor_slab)\|"
-    r"(?P<thickness>\d{1,4}(?:\.\d{1,3})?)\|(?P<material>[a-z_]{0,40})$"
+    r"(?P<thickness>\d{1,4}(?:\.\d{1,3})?)\|(?P<material>[a-z_]{0,40})(?P<lintel>\|lintel)?$"
 )
 
 
@@ -97,9 +102,18 @@ def format_thickness(thickness_mm: float) -> str:
     return str(int(rounded)) if rounded == int(rounded) else f"{rounded:g}"
 
 
-def group_key(kind: str, thickness_mm: float, material: str | None) -> str:
-    """Ключ группы `вид|толщина_мм|материал`; материала нет - `вид|толщина|`."""
-    return f"{kind}|{format_thickness(thickness_mm)}|{material or ''}"
+def group_key(
+    kind: str,
+    thickness_mm: float,
+    material: str | None,
+    element: CadGroupElement = "construction",
+) -> str:
+    """Ключ группы `вид|толщина_мм|материал`; материала нет - `вид|толщина|`.
+
+    У перемычек над проёмами добавляется суффикс `|lintel`: они не сливаются со стенами.
+    """
+    suffix = "|lintel" if element == "lintel" else ""
+    return f"{kind}|{format_thickness(thickness_mm)}|{material or ''}{suffix}"
 
 
 def parse_group_key(key: str) -> GroupKeyParts | None:
@@ -107,7 +121,10 @@ def parse_group_key(key: str) -> GroupKeyParts | None:
     if found is None:
         return None
     return GroupKeyParts(
-        _KINDS[found.group("kind")], float(found.group("thickness")), found.group("material")
+        _KINDS[found.group("kind")],
+        float(found.group("thickness")),
+        found.group("material"),
+        "lintel" if found.group("lintel") else "construction",
     )
 
 
@@ -370,6 +387,10 @@ async def replace_links(
 # --------------------------------------------------------------------------- подсказки
 
 
+def _kind_words(parts: GroupKeyParts) -> tuple[str, ...]:
+    return LINTEL_WORDS if parts.element == "lintel" else KIND_WORDS.get(parts.kind, ())
+
+
 def score_item(item: CadVorItem, parts: GroupKeyParts) -> tuple[int, list[CadVorSuggestReason]]:
     """Очки строки для группы: толщина (главный признак), вид, слова материала. Без моделей."""
     score = 0
@@ -384,7 +405,7 @@ def score_item(item: CadVorItem, parts: GroupKeyParts) -> tuple[int, list[CadVor
         kind_reason = True
     elif item.kind_hint is not None:
         score += SCORE_KIND_CONFLICT
-    if any(word in item.name_norm for word in KIND_WORDS.get(parts.kind, ())):
+    if any(word in item.name_norm for word in _kind_words(parts)):
         score += SCORE_KIND_WORD
         kind_reason = True
     if kind_reason:
@@ -400,7 +421,7 @@ async def suggest(
 ) -> list[CadVorSuggestionRead]:
     """До десяти строк-кандидатов для группы, лучшие первыми; связь ставит человек."""
     family = "masonry" if parts.kind == "masonry" else "monolith"
-    words = (*MATERIAL_WORDS.get(parts.material, ()), *KIND_WORDS.get(parts.kind, ()))
+    words = (*MATERIAL_WORDS.get(parts.material, ()), *_kind_words(parts))
     candidates: list[ColumnElement[bool]] = [
         CadVorItem.thickness_hint_mm == round(parts.thickness_mm),
         CadVorItem.kind_hint == family,
@@ -463,12 +484,13 @@ def build_coverage(
     groups: list[CadVorCoverageGroupRead] = []
     unlinked: set[str] = set()
     for total in totals:
-        key = group_key(total.kind, total.thickness_mm, total.material)
+        key = group_key(total.kind, total.thickness_mm, total.material, total.element)
         items = list(linked.get(key, ()))
         groups.append(
             CadVorCoverageGroupRead(
                 group_key=key,
                 kind=total.kind,
+                element=total.element,
                 thickness_mm=total.thickness_mm,
                 material=total.material,
                 status="linked" if items else "not_in_vor",

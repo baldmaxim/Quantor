@@ -17,11 +17,17 @@ import { formatNumber, NO_VALUE } from './view-format';
 
 export const CAD_VOR_NOT_IN_VOR_VISIBLE_KEY = 'quantor.cad.vor-not-in-vor-visible';
 
+/** Подпись группы монолитных перемычек над проёмами (вид у неё - монолитная стена). */
+export const LINTEL_GROUP_LABEL = 'Перемычки монолитные';
+
 /** Группа свода: подпись «Кладка, 100 мм, газобетон». */
 export const vorGroupLabel = (
-  group: Pick<CadVorCoverageGroupRead, 'kind' | 'thickness_mm' | 'material'>,
+  group: Pick<CadVorCoverageGroupRead, 'kind' | 'thickness_mm' | 'material' | 'element'>,
 ): string => {
-  const parts = [KIND_LABELS[group.kind], `${formatNumber(group.thickness_mm, 1)} мм`];
+  const parts = [
+    group.element === 'lintel' ? LINTEL_GROUP_LABEL : KIND_LABELS[group.kind],
+    `${formatNumber(group.thickness_mm, 1)} мм`,
+  ];
   if (group.material !== null) parts.push(materialLabel(group.material));
   return parts.join(', ');
 };
@@ -37,7 +43,9 @@ export const vorItemQuantity = (item: Pick<CadVorItemRead, 'quantity' | 'unit'>)
       ? `${formatNumber(item.quantity, 3)} ${item.unit}`
       : formatNumber(item.quantity, 3);
 
-export const SUGGEST_REASON_LABELS: Readonly<Record<CadVorSuggestionRead['reasons'][number], string>> = {
+export const SUGGEST_REASON_LABELS: Readonly<
+  Record<CadVorSuggestionRead['reasons'][number], string>
+> = {
   thickness: 'совпала толщина',
   kind: 'совпал вид',
   material: 'совпал материал',
@@ -73,18 +81,23 @@ export type ConstructionVorStatus =
   /** Конструкция не в итогах (нет толщины или высоты): со строками ВОР не сверяется. */
   | { readonly state: 'not-counted' }
   | { readonly state: 'not-in-vor'; readonly groupKey: string }
-  | { readonly state: 'in-vor'; readonly groupKey: string; readonly items: readonly CadVorItemRead[] };
+  | {
+      readonly state: 'in-vor';
+      readonly groupKey: string;
+      readonly items: readonly CadVorItemRead[];
+    };
 
 const sameThickness = (a: number, b: number): boolean => Math.abs(a - b) < 0.0005;
 
 /** Группа сверки, к которой относится строка свода или конструкция. */
 export const coverageGroupFor = (
   coverage: CadVorCoverageRead,
-  group: Pick<CadVorCoverageGroupRead, 'kind' | 'thickness_mm' | 'material'>,
+  group: Pick<CadVorCoverageGroupRead, 'kind' | 'thickness_mm' | 'material' | 'element'>,
 ): CadVorCoverageGroupRead | null =>
   coverage.groups.find(
     (item) =>
       item.kind === group.kind &&
+      (item.element ?? 'construction') === (group.element ?? 'construction') &&
       sameThickness(item.thickness_mm, group.thickness_mm) &&
       (item.material ?? null) === (group.material ?? null),
   ) ?? null;

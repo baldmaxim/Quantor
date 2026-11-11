@@ -60,6 +60,8 @@ CadMaterial = Literal[
 ]
 CadBrickLayout = Literal["half", "one", "one_and_half", "two"]
 CadMortar = Literal["glue", "cement_sand", "other"]
+# Предмет итога: конструкция листа или монолитные перемычки над проёмами (отдельная группа).
+CadGroupElement = Literal["construction", "lintel"]
 CadPurpose = Literal["external", "inter_apartment", "interior", "mop", "shaft", "other"]
 
 
@@ -132,6 +134,10 @@ class WallsOpening(BaseModel):
     block_name: str | None
     handle: str | None
     center: list[float]
+    # Контур перемычки в плане (4 точки) и её материал (`monolith`, `masonry`, `frame_partition`):
+    # нет у дверей без разрыва и в старых walls.json.
+    lintel: list[list[float]] | None = None
+    lintel_material: str | None = None
 
 
 class CadSheetFloorTitle(BaseModel):
@@ -443,6 +449,9 @@ class CadConstructionGroupRead(BaseModel):
     """
 
     kind: CadConstructionKind
+    # `lintel` - монолитные перемычки над проёмами в кладке и перегородках: `count` - штуки,
+    # `length_m` - сумма ширин проёмов, `thickness_mm` - толщина стены-хозяина, `wall_area_m2` - 0.
+    element: CadGroupElement = "construction"
     thickness_mm: float
     material: CadMaterial | None
     count: int
@@ -462,6 +471,8 @@ class CadConstructionsSummaryRead(BaseModel):
     unaccounted_gap_openings: int
     # Двери, у которых скрипт не нашёл несущую стену: надпроёмная часть не учтена.
     door_openings_without_host: int
+    # Монолитные перемычки без определимого объёма (нет высоты, толщины, хозяина): в итоги не вошли.
+    lintels_without_volume: int = 0
 
 
 class CadWallsWarningRead(BaseModel):

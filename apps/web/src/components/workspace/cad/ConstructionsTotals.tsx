@@ -35,6 +35,9 @@ const NUM = `${TD} text-right`;
 /** Объём каркасной перегородки не определён: ГКЛ меряется площадью. */
 const NO_VOLUME = '—';
 
+/** Подпись группы монолитных перемычек над проёмами (отдельно от монолитных стен). */
+const LINTEL_LABEL = 'Монолит — перемычки';
+
 const SumRow: FC<{ label: string; sum: IGroupSum; withVolume?: boolean }> = ({
   label,
   sum,
@@ -111,6 +114,12 @@ export const ConstructionsTotals: FC<IConstructionsTotalsProps> = ({
     },
     { key: 'gaps', label: 'Проёмы без данных', count: summary.unaccounted_gap_openings, ids: [] },
     { key: 'doors', label: 'Двери без стены', count: summary.door_openings_without_host, ids: [] },
+    {
+      key: 'lintels',
+      label: 'Перемычки без объёма',
+      count: summary.lintels_without_volume ?? 0,
+      ids: [],
+    },
   ];
 
   return (
@@ -137,6 +146,22 @@ export const ConstructionsTotals: FC<IConstructionsTotalsProps> = ({
               </thead>
               <tbody>
                 {wallGroups.map((group) => {
+                  if (group.element === 'lintel') {
+                    // Перемычки - не конструкции листа: на холсте подсвечивать нечего, площади стены нет.
+                    return (
+                      <tr key={`${groupKeyOf(group)}|lintel`} className="border-t border-border">
+                        <td className={TD}>{LINTEL_LABEL}</td>
+                        <td className={TD}>{group.thickness_mm}</td>
+                        <td className={TD}>{materialLabel(group.material)}</td>
+                        <td className={NUM}>{group.count}</td>
+                        <td className={NUM}>{formatNumber(group.length_m, 2)}</td>
+                        <td className={NUM}>{NO_VOLUME}</td>
+                        <td className={NUM}>
+                          {group.volume_m3 === null ? NO_VOLUME : formatNumber(group.volume_m3, 3)}
+                        </td>
+                      </tr>
+                    );
+                  }
                   const key = groupKeyOf(group);
                   const active = activeGroup === key;
                   const ids = groupIds(constructions, group);

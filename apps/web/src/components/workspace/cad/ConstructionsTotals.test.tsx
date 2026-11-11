@@ -129,3 +129,59 @@ describe('ConstructionsTotals: плита перекрытия', () => {
     expect(screen.queryByText(/Посчитанных конструкций нет/)).toBeNull();
   });
 });
+
+describe('ConstructionsTotals: монолитные перемычки', () => {
+  const data = constructionsRead({
+    constructions: [construction({ id: 'm' })],
+    totals: [
+      {
+        kind: 'masonry',
+        thickness_mm: 200,
+        material: null,
+        count: 1,
+        length_m: 5,
+        wall_area_m2: 14,
+        volume_m3: 2.8,
+      },
+      {
+        kind: 'monolith_wall',
+        element: 'lintel',
+        thickness_mm: 200,
+        material: 'monolith_concrete',
+        count: 2,
+        length_m: 1.9,
+        wall_area_m2: 0,
+        volume_m3: 0.28,
+      },
+    ],
+    summary: {
+      total_count: 1,
+      thickness_check_count: 0,
+      height_missing_count: 0,
+      unaccounted_gap_openings: 0,
+      door_openings_without_host: 0,
+      lintels_without_volume: 3,
+    },
+  });
+
+  it('строка «Монолит — перемычки»: шт., длина, объём; площадь стены - прочерк; входит в итог монолита', () => {
+    const onSelectGroup = vi.fn();
+    render(<ConstructionsTotals data={data} activeGroup={null} onSelectGroup={onSelectGroup} />);
+    const row = screen.getByText('Монолит — перемычки').closest('tr') as HTMLElement;
+    expect(within(row).getByText('2')).toBeInTheDocument();
+    expect(within(row).getByText('1,9')).toBeInTheDocument();
+    expect(within(row).getByText('0,28')).toBeInTheDocument();
+    expect(within(row).getByText('—')).toBeInTheDocument();
+    const total = screen.getByText('Итого монолит').closest('tr') as HTMLElement;
+    expect(within(total).getByText('0,28')).toBeInTheDocument();
+    const masonryTotal = screen.getByText('Итого кладка').closest('tr') as HTMLElement;
+    expect(within(masonryTotal).queryByText('0,28')).toBeNull();
+    fireEvent.click(row);
+    expect(onSelectGroup).not.toHaveBeenCalled();
+  });
+
+  it('счётчик перемычек без объёма - в блоке «не вошло»', () => {
+    render(<ConstructionsTotals data={data} activeGroup={null} onSelectGroup={vi.fn()} />);
+    expect(screen.getByText('Перемычки без объёма — 3')).toBeInTheDocument();
+  });
+});

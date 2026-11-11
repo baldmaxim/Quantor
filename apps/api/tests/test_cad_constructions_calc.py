@@ -272,3 +272,157 @@ def test_walls_models_accept_extra_fields_of_the_file() -> None:
     raw["axis"] = [[[0.0, 100.0], [5000.0, 100.0]]]
     assert WallsConstruction.model_validate(raw).id == "c1"
     assert WallsOpening.model_validate(opening("d", None)).host_id is None
+
+
+# --------------------------------------------------------------------------- монолитные перемычки
+
+# Контур перемычки 1000 x 200 мм в плане: площадь 200 000 мм2.
+LINTEL_RING = [[0.0, 0.0], [1000.0, 0.0], [1000.0, 200.0], [0.0, 200.0]]
+
+
+def with_lintel(
+    item: dict[str, Any], material: str | None = "monolith", ring: list[list[float]] | None = None
+) -> dict[str, Any]:
+    return {**item, "lintel": LINTEL_RING if ring is None else ring, "lintel_material": material}
+
+
+def lintel_group(result: calc.SheetResult) -> Any:
+    found = [g for g in result.totals if g.element == "lintel"]
+    return found[0] if found else None
+
+
+def test_monolith_lintel_over_masonry_door_leaves_the_host_volume() -> None:
+    doc = document([construction()], [with_lintel(opening("d1", "c1"))])
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    host = result.constructions[0].computed
+    # Надпроёмной части в объёме кладки нет; поверхность под отделку остаётся.
+    assert host.volume_m3 == pytest.approx(2.8)
+    assert host.wall_area_m2 == pytest.approx(5.0 * 2.8 + 1000 * 700 / 1e6)
+    group = lintel_group(result)
+    # H = 2800, высота двери 2100: 200 000 мм2 x 700 мм = 0,14 м3.
+    assert (group.kind, group.element, group.thickness_mm) == ("monolith_wall", "lintel", 200.0)
+    assert group.material == "monolith_concrete" and group.count == 1
+    assert group.length_m == pytest.approx(1.0) and group.volume_m3 == pytest.approx(0.14)
+    assert group.wall_area_m2 == 0.0
+    assert result.summary.lintels_without_volume == 0
+    assert result.totals[-1] is group  # после групп кладки; монолита в листе нет
+
+
+def test_lintel_group_goes_right_after_monolith_groups() -> None:
+    doc = document(
+        [
+            construction("a"),
+            construction("m", kind="monolith_column", nominal=400.0, area=160_000.0, axis=400.0),
+        ],
+        [with_lintel(opening("d1", "a"))],
+    )
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    assert [(g.kind, g.element) for g in result.totals] == [
+        ("masonry", "construction"),
+        ("monolith_column", "construction"),
+        ("monolith_wall", "lintel"),
+    ]
+
+
+def test_monolith_lintel_over_monolith_host_is_not_duplicated() -> None:
+    doc = document(
+        [construction(kind="monolith_wall")], [with_lintel(opening("d1", "c1"), "monolith")]
+    )
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    assert lintel_group(result) is None
+    assert result.constructions[0].computed.volume_m3 == pytest.approx(
+        (1_000_000 * 2800 + 1000 * 200 * 700) / 1e9
+    )
+
+
+def test_non_monolith_lintel_stays_in_the_host() -> None:
+    for material in ("masonry", "frame_partition", None):
+        doc = document([construction()], [with_lintel(opening("d1", "c1"), material)])
+        result = calc.compute_sheet(doc, {}, NO_LEVELS)
+        assert lintel_group(result) is None
+        assert result.constructions[0].computed.volume_m3 == pytest.approx(
+            (1_000_000 * 2800 + 1000 * 200 * 700) / 1e9
+        )
+
+
+def test_door_without_a_gap_gives_no_above_opening_part() -> None:
+    doc = document([construction()], [opening("d1", "c1", status="no_data")])
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    computed = result.constructions[0].computed
+    assert computed.volume_m3 == pytest.approx(2.8)
+    assert computed.wall_area_m2 == pytest.approx(5.0 * 2.8)
+    assert lintel_group(result) is None and result.summary.lintels_without_volume == 0
+
+
+def test_gap_with_a_monolith_lintel_is_in_the_group() -> None:
+    gap = with_lintel(opening("g1", "c1", kind="gap", status="no_data", width=1000.0))
+    result = calc.compute_sheet(document([construction()], [gap]), {}, NO_LEVELS)
+    group = lintel_group(result)
+    assert group.count == 1 and group.volume_m3 == pytest.approx(0.14)
+    # Разрыв по-прежнему не входит в объём стены и даёт предупреждение.
+    assert result.constructions[0].computed.volume_m3 == pytest.approx(2.8)
+    assert "opening_no_data" in result.constructions[0].computed.warnings
+
+
+def test_lintels_are_grouped_by_host_thickness_and_summed() -> None:
+    doc = document(
+        [construction("a"), construction("b", nominal=100.0, area=500_000.0)],
+        [
+            with_lintel(opening("d1", "a", width=900.0)),
+            with_lintel(opening("d2", "a", width=1000.0)),
+            with_lintel(opening("d3", "b", width=800.0)),
+        ],
+    )
+    groups = [g for g in calc.compute_sheet(doc, {}, NO_LEVELS).totals if g.element == "lintel"]
+    assert [(g.thickness_mm, g.count) for g in groups] == [(100.0, 1), (200.0, 2)]
+    assert groups[1].length_m == pytest.approx(1.9)
+    assert groups[1].volume_m3 == pytest.approx(2 * 0.14)
+
+
+def test_lintel_without_height_or_host_is_counted_as_without_volume() -> None:
+    no_height = calc.compute_sheet(
+        document([construction()], [with_lintel(opening("d1", "c1"))], floor_height=None),
+        {},
+        NO_LEVELS,
+    )
+    assert lintel_group(no_height) is None and no_height.summary.lintels_without_volume == 1
+    no_host = calc.compute_sheet(
+        document([construction()], [with_lintel(opening("d1", None))]), {}, NO_LEVELS
+    )
+    assert lintel_group(no_host) is None and no_host.summary.lintels_without_volume == 1
+
+
+def test_lintel_height_override_of_the_host_is_used() -> None:
+    doc = document([construction()], [with_lintel(opening("d1", "c1"))])
+    props = {"c1": (CadConstructionProps(height_override_mm=2500), False)}
+    group = lintel_group(calc.compute_sheet(doc, props, NO_LEVELS))
+    assert group.volume_m3 == pytest.approx(200_000 * 400 / 1e9)
+
+
+def test_lintel_group_key_and_coverage_do_not_merge_with_monolith_walls() -> None:
+    from app.services import cad_vor
+
+    key = cad_vor.group_key("monolith_wall", 200.0, "monolith_concrete", "lintel")
+    assert key == "monolith_wall|200|monolith_concrete|lintel"
+    assert key != cad_vor.group_key("monolith_wall", 200.0, "monolith_concrete")
+    parts = cad_vor.parse_group_key(key)
+    assert parts is not None and parts.element == "lintel" and parts.thickness_mm == 200.0
+    plain = cad_vor.parse_group_key("monolith_wall|200|monolith_concrete")
+    assert plain is not None and plain.element == "construction"
+
+    doc = document(
+        [construction("a"), construction("w", kind="monolith_wall")],
+        [with_lintel(opening("d1", "a"))],
+    )
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    coverage = cad_vor.build_coverage(
+        totals=result.totals,
+        constructions=result.constructions,
+        linked={},
+        thicknesses=[200],
+        has_vor=True,
+    )
+    by_key = {g.group_key: g for g in coverage.groups}
+    assert by_key[key].element == "lintel"
+    assert by_key["monolith_wall|200|"].element == "construction"
+    assert set(by_key) == {"masonry|200|", "monolith_wall|200|", key}

@@ -855,6 +855,10 @@ export type CadConstructionGroupRead = {
      */
     count: number;
     /**
+     * Element
+     */
+    element?: 'construction' | 'lintel';
+    /**
      * Kind
      */
     kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition' | 'floor_slab';
@@ -1204,6 +1208,10 @@ export type CadConstructionsSummaryRead = {
      * Height Missing Count
      */
     height_missing_count: number;
+    /**
+     * Lintels Without Volume
+     */
+    lintels_without_volume?: number;
     /**
      * Thickness Check Count
      */
@@ -3773,6 +3781,10 @@ export type CadViewRead = {
  * Группа итогов листа и связанные с ней строки ВОР.
  */
 export type CadVorCoverageGroupRead = {
+    /**
+     * Element
+     */
+    element?: 'construction' | 'lintel';
     /**
      * Group Key
      */

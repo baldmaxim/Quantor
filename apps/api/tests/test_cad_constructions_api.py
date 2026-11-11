@@ -538,6 +538,7 @@ async def test_read_constructions_computes_values_and_sources(
             "height_missing_count": 0,
             "unaccounted_gap_openings": 1,
             "door_openings_without_host": 0,
+            "lintels_without_volume": 0,
         }
         assert [(g["kind"], g["thickness_mm"], g["count"]) for g in body["totals"]] == [
             ("masonry", 100.0, 1),

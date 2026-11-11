@@ -12,12 +12,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.contracts.cad_constructions import CadConstructionKind, CadMaterial
+from app.contracts.cad_constructions import CadConstructionKind, CadGroupElement, CadMaterial
 
-# Вид, толщина (мм, целая или с долей), материал (может быть пустым): `masonry|100|aerated_concrete`
+# Вид, толщина (мм, целая или с долей), материал (может быть пустым): `masonry|100|brick_solid`.
+# Монолитные перемычки над проёмами — с суффиксом: `monolith_wall|200|monolith_concrete|lintel`.
 GROUP_KEY_PATTERN: Final = (
     r"^(?:masonry|monolith_wall|monolith_pylon|monolith_column|floor_slab)"
-    r"\|\d{1,4}(?:\.\d{1,3})?\|[a-z_]{0,40}$"
+    r"\|\d{1,4}(?:\.\d{1,3})?\|[a-z_]{0,40}(?:\|lintel)?$"
 )
 MAX_LINKED_ITEMS: Final = 200
 MAX_SUGGESTIONS: Final = 10
@@ -104,6 +105,7 @@ class CadVorCoverageGroupRead(BaseModel):
 
     group_key: str
     kind: CadConstructionKind
+    element: CadGroupElement = "construction"
     thickness_mm: float
     material: CadMaterial | None
     status: CadVorCoverageStatus

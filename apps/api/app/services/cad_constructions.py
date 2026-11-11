@@ -17,8 +17,15 @@
 - длина = длина оси из walls.json (площадь в плане / измеренная толщина);
 - объём = длина x `t` x `H` (по номиналу: штриховка бывает шире номинала) плюс по
   каждой двери конструкции ширина x `t` x max(0, `H` - высота двери): дверь стоит в разрыве стены
-  на плане, и надпроёмная часть в площадь плана не попадает;
-- площадь стены = длина x `H` плюс по каждой двери ширина x max(0, `H` - высота двери);
+  на плане, и надпроёмная часть в площадь плана не попадает. Монолитная перемычка над дверью
+  в кладке или перегородке в объём хозяина не идёт: она отдельная группа итогов (`lintel`);
+  дверь без разрыва в стене (`no_data`) надпроёмной части не даёт;
+- площадь стены = длина x `H` плюс по каждой двери ширина x max(0, `H` - высота двери): это
+  поверхность под отделку, монолитная перемычка в ней остаётся;
+- монолитные перемычки (`lintel_material == monolith`) над проёмами (двери не `no_data` и разрывы
+  `gap`) стен-хозяев не из монолита: объём = площадь контура `lintel` в плане x max(0, высота
+  стены хозяина - высота двери); у монолитного хозяина перемычка уже в его объёме; нет высоты,
+  толщины или хозяина — в итог не идёт, считается в `lintels_without_volume`;
 - каркасная перегородка ГКЛ (`frame_partition`) меряется площадью: длина и площадь стены как у
   кладки, объём не определён (`None`);
 - разрыв без данных о проёме (`gap`) в объём и площадь не входит и даёт предупреждение
@@ -47,6 +54,7 @@ from app.contracts.cad_constructions import (
     CadConstructionRead,
     CadConstructionsSummaryRead,
     CadConstructionWarning,
+    CadGroupElement,
     CadHeightsRead,
     CadLevelValueRead,
     CadMaterial,
@@ -71,6 +79,11 @@ KIND_ORDER: Final[tuple[CadConstructionKind, ...]] = (
 
 _MM2_IN_M2: Final = 1e6
 _MM3_IN_M3: Final = 1e9
+
+# Материал монолитной перемычки в итогах: монолит у перемычки определяет движок (`monolith`).
+LINTEL_MONOLITH: Final = "monolith"
+LINTEL_GROUP_KIND: Final[CadConstructionKind] = "monolith_wall"
+LINTEL_GROUP_MATERIAL: Final[CadMaterial] = "monolith_concrete"
 
 
 def source_of(raw: str) -> CadValueSource | None:
@@ -182,6 +195,28 @@ def heights_read(heights: WallsHeights, levels: EffectiveLevels) -> CadHeightsRe
     )
 
 
+def _is_monolith_kind(kind: CadConstructionKind) -> bool:
+    return kind.startswith("monolith")
+
+
+def _ring_area_mm2(shell: list[list[float]]) -> float:
+    """Площадь многоугольника по формуле шнуровки, мм2."""
+    n = len(shell)
+    twice = math.fsum(
+        shell[i][0] * shell[(i + 1) % n][1] - shell[(i + 1) % n][0] * shell[i][1] for i in range(n)
+    )
+    return abs(twice) / 2.0
+
+
+def is_monolith_lintel(opening: WallsOpening) -> bool:
+    """Над проёмом монолитная перемычка с контуром в плане."""
+    return (
+        opening.lintel_material == LINTEL_MONOLITH
+        and opening.lintel is not None
+        and len(opening.lintel) >= 3
+    )
+
+
 def effective_material(
     construction: WallsConstruction, props: CadConstructionProps
 ) -> CadConstructionMaterialRead:
@@ -263,7 +298,15 @@ def compute_construction(
     else:
         height, height_source = levels.wall_height_mm, levels.wall_height_source
 
-    doors = [o for o in host_openings if o.kind == "door"] if props.count_openings else []
+    # Дверь без разрыва (`no_data`): полигон стены сплошной, надпроёмной части нет вовсе.
+    doors = (
+        [o for o in host_openings if o.kind == "door" and o.status != "no_data"]
+        if props.count_openings
+        else []
+    )
+    # В объём хозяина не идут монолитные перемычки в кладке и перегородках: у них своя группа.
+    host_is_monolith = _is_monolith_kind(construction.kind)
+    volume_doors = [o for o in doors if host_is_monolith or not is_monolith_lintel(o)]
     door_height = levels.door_height.value_mm
     warnings: list[CadConstructionWarning] = []
     if thickness is None:
@@ -294,16 +337,12 @@ def compute_construction(
         base_mm3_per_h = length_mm * thickness
         length_m = length_mm / 1000
         if height is not None and not door_height_missing:
-            above_mm = [
-                (o.width_mm, max(0.0, float(height) - float(door_height or 0))) for o in doors
-            ]
+            above_h = max(0.0, float(height) - float(door_height or 0))
+            volume_above = math.fsum(o.width_mm * thickness * above_h for o in volume_doors)
+            area_above = math.fsum(o.width_mm * above_h for o in doors)
             if construction.kind != "frame_partition":
-                volume_m3 = (
-                    base_mm3_per_h * height + math.fsum(w * thickness * h for w, h in above_mm)
-                ) / _MM3_IN_M3
-            wall_area_m2 = length_m * height / 1000 + math.fsum(w * h for w, h in above_mm) / (
-                _MM2_IN_M2
-            )
+                volume_m3 = (base_mm3_per_h * height + volume_above) / _MM3_IN_M3
+            wall_area_m2 = length_m * height / 1000 + area_above / _MM2_IN_M2
     return Computed(
         thickness_mm=thickness,
         height_mm=height,
@@ -436,6 +475,65 @@ def slab_read(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class LintelGroup:
+    """Монолитные перемычки одной толщины хозяина: ширины проёмов и объёмы, мм и м3."""
+
+    widths_mm: list[float] = field(default_factory=list)
+    volumes_m3: list[float] = field(default_factory=list)
+
+
+def compute_lintels(
+    document: WallsDocument,
+    items: list[WallsConstruction],
+    props_by_key: PropsByKey,
+    levels: EffectiveLevels,
+) -> tuple[dict[float, LintelGroup], int]:
+    """Монолитные перемычки над проёмами стен не из монолита: группы по толщине хозяина.
+
+    Объём = площадь контура в плане x (высота хозяина - высота двери). Возвращает группы и число
+    перемычек без определимого объёма (нет хозяина, толщины или высоты).
+    """
+    hosts = {c.id: c for c in items}
+    groups: dict[float, LintelGroup] = defaultdict(LintelGroup)
+    without_volume = 0
+    door_height = levels.door_height.value_mm
+    for opening in document.openings:
+        if opening.kind == "door" and opening.status == "no_data":
+            continue
+        if not is_monolith_lintel(opening) or opening.lintel is None:
+            continue
+        host = hosts.get(opening.host_id) if opening.host_id is not None else None
+        if host is not None and _is_monolith_kind(host.kind):
+            continue  # перемычка уже в объёме монолитного хозяина
+        if host is None:
+            without_volume += 1
+            continue
+        props = props_by_key.get(host.id, (CadConstructionProps(), False))[0]
+        if not props.count_openings:
+            continue
+        thickness = (
+            float(props.thickness_override_mm)
+            if props.thickness_override_mm is not None
+            else host.thickness_nominal_mm
+        )
+        height = (
+            props.height_override_mm
+            if props.height_override_mm is not None
+            else levels.wall_height_mm
+        )
+        if thickness is None or height is None or door_height is None:
+            without_volume += 1
+            continue
+        above = float(height) - float(door_height)
+        if above <= 0:
+            continue
+        group = groups[thickness]
+        group.widths_mm.append(opening.width_mm)
+        group.volumes_m3.append(_ring_area_mm2(opening.lintel) * above / _MM3_IN_M3)
+    return groups, without_volume
+
+
 def compute_sheet(
     document: WallsDocument,
     props_by_key: PropsByKey,
@@ -507,6 +605,23 @@ def compute_sheet(
     def order(key: tuple[CadConstructionKind, float, CadMaterial | None]) -> tuple[int, float, str]:
         return (KIND_ORDER.index(key[0]), key[1], key[2] or "")
 
+    lintel_groups, lintels_without_volume = compute_lintels(
+        document, items_all, props_by_key, levels
+    )
+    lintel_element: CadGroupElement = "lintel"
+    lintel_totals = [
+        CadConstructionGroupRead(
+            kind=LINTEL_GROUP_KIND,
+            element=lintel_element,
+            thickness_mm=thickness,
+            material=LINTEL_GROUP_MATERIAL,
+            count=len(group.widths_mm),
+            length_m=round(math.fsum(group.widths_mm) / 1000, 3),
+            wall_area_m2=0.0,
+            volume_m3=round(math.fsum(group.volumes_m3), 4),
+        )
+        for thickness, group in sorted(lintel_groups.items())
+    ]
     totals = [
         CadConstructionGroupRead(
             kind=kind,
@@ -530,6 +645,16 @@ def compute_sheet(
             groups.items(), key=lambda kv: order(kv[0])
         )
     ]
+    # Перемычки — сразу после групп монолита, перед каркасными перегородками и плитой.
+    after_monolith = next(
+        (
+            i
+            for i, total in enumerate(totals)
+            if KIND_ORDER.index(total.kind) > KIND_ORDER.index("monolith_column")
+        ),
+        len(totals),
+    )
+    totals[after_monolith:after_monolith] = lintel_totals
     summary = CadConstructionsSummaryRead(
         total_count=len(items_all) + (0 if slab is None else 1),
         thickness_check_count=check_count,
@@ -540,6 +665,7 @@ def compute_sheet(
             for o in document.openings
             if o.kind == "door" and (o.host_id is None or o.host_id not in known)
         ),
+        lintels_without_volume=lintels_without_volume,
     )
     openings = [
         CadOpeningRead(
