@@ -562,6 +562,18 @@ export type CadAttemptRead = {
  */
 export type CadBuilding3dFloorRead = {
     /**
+     * Alignment
+     */
+    alignment: 'reference' | 'axes' | 'none';
+    /**
+     * Alignment Axes
+     */
+    alignment_axes: Array<string>;
+    /**
+     * Alignment Message
+     */
+    alignment_message: string | null;
+    /**
      * Base Z Mm
      */
     base_z_mm: number;
@@ -569,6 +581,10 @@ export type CadBuilding3dFloorRead = {
      * Bbox
      */
     bbox: Array<number> | null;
+    /**
+     * Corps
+     */
+    corps: string | null;
     /**
      * Document Id
      */
@@ -586,6 +602,14 @@ export type CadBuilding3dFloorRead = {
      */
     floor_height_mm: number;
     /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Group Label
+     */
+    group_label: string;
+    /**
      * Job Id
      */
     job_id: string;
@@ -593,6 +617,13 @@ export type CadBuilding3dFloorRead = {
      * Label
      */
     label: string;
+    /**
+     * Offset Mm
+     */
+    offset_mm: [
+        number,
+        number
+    ];
     /**
      * Outline
      */
@@ -610,6 +641,10 @@ export type CadBuilding3dFloorRead = {
      */
     revision_id: string;
     /**
+     * Section
+     */
+    section: string | null;
+    /**
      * Slab Thickness Known
      */
     slab_thickness_known: boolean;
@@ -624,6 +659,30 @@ export type CadBuilding3dFloorRead = {
 };
 
 /**
+ * CadBuilding3dGroupRead
+ *
+ * Здание для переключателя вида: этажи одного корпуса и секции.
+ */
+export type CadBuilding3dGroupRead = {
+    /**
+     * Aligned Count
+     */
+    aligned_count: number;
+    /**
+     * Floor Count
+     */
+    floor_count: number;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+};
+
+/**
  * CadBuilding3dRead
  */
 export type CadBuilding3dRead = {
@@ -631,6 +690,10 @@ export type CadBuilding3dRead = {
      * Floors
      */
     floors: Array<CadBuilding3dFloorRead>;
+    /**
+     * Groups
+     */
+    groups: Array<CadBuilding3dGroupRead>;
     /**
      * Units
      */

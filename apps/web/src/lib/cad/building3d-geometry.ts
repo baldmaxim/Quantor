@@ -1,12 +1,13 @@
-import type { CadBuilding3dFloorRead } from '@quantor/api-client';
+import type { CadBuilding3dFloorRead, CadBuilding3dGroupRead } from '@quantor/api-client';
 
 /**
  * План колонки «Здание» (вид «3D»): чистые функции без DOM и без three.js.
  *
  * Этаж с известной отметкой - призма: контур `outline` (мм системы DXF, Y вверх), плита толщиной
  * `slab_thickness_mm` под `base_z_mm` и полупрозрачный объём этажа от `base_z_mm` на
- * `floor_height_mm`. Координаты XY берутся как есть (листы одного комплекта лежат на одной сетке),
- * общий центр - один на всё здание. Этажи без отметки в 3D не строятся.
+ * `floor_height_mm`. Координаты XY берутся как есть: сервер уже совместил этажи одного здания
+ * (корпус + секция) по осям, поэтому план строится по этажам одного выбранного здания, а общий
+ * центр - один на это здание. Этажи без отметки в 3D не строятся.
  *
  * Ориентация та же, что в `floor3d-geometry`: контур `(u, v) = (x, y)` в метрах, сцена three:
  * `X = u`, `Y` = высота, `Z = -v`.
@@ -59,6 +60,59 @@ export const describeFloor = (floor: CadBuilding3dFloorRead): string => {
   if (!floor.elevation_known) return `${floor.label}, отметка не определена`;
   const typical = floor.floor_height_known ? '' : ', высота типовая';
   return `${floor.label}, ${formatElevation(floor.base_z_mm)}${typical}`;
+};
+
+/** Этажи выбранного здания; ключа нет (старый ответ без групп) - все этажи. */
+export const filterFloorsByGroup = (
+  floors: readonly CadBuilding3dFloorRead[],
+  groupKey: string | null,
+): CadBuilding3dFloorRead[] =>
+  groupKey === null ? [...floors] : floors.filter((floor) => floor.group_key === groupKey);
+
+/** Действующее здание: выбранное, если оно есть в ответе, иначе первое; групп нет - `null`. */
+export const resolveGroupKey = (
+  groups: readonly CadBuilding3dGroupRead[],
+  chosen: string | null,
+): string | null => {
+  const first = groups[0];
+  if (first === undefined) return null;
+  return groups.some((group) => group.key === chosen) && chosen !== null ? chosen : first.key;
+};
+
+export interface IAlignmentNote {
+  /** Короткий текст для строки списка. */
+  readonly text: string;
+  /** Полное пояснение (подсказка по наведению и нажатию). */
+  readonly title: string | null;
+  /** Этаж не совмещён: пометка предупреждением. */
+  readonly warn: boolean;
+}
+
+const AXES_SHOWN = 4;
+
+/**
+ * Пометка совмещения этажа. «Не совмещён» - только если в здании больше одного этажа; этаж, совмещённый
+ * по осям, - короткий список осей; эталон пометки не получает.
+ */
+export const alignmentNote = (
+  floor: CadBuilding3dFloorRead,
+  groupFloorCount: number,
+): IAlignmentNote | null => {
+  if (floor.alignment === 'none') {
+    return groupFloorCount > 1
+      ? { text: 'не совмещён по осям', title: floor.alignment_message, warn: true }
+      : null;
+  }
+  if (floor.alignment === 'axes' && floor.alignment_axes.length > 0) {
+    const shown = floor.alignment_axes.slice(0, AXES_SHOWN).join(', ');
+    const rest = floor.alignment_axes.length - AXES_SHOWN;
+    return {
+      text: `по осям ${shown}${rest > 0 ? ` +${rest}` : ''}`,
+      title: `Совмещён по осям: ${floor.alignment_axes.join(', ')}`,
+      warn: false,
+    };
+  }
+  return null;
 };
 
 const byElevationDesc = (a: CadBuilding3dFloorRead, b: CadBuilding3dFloorRead): number =>

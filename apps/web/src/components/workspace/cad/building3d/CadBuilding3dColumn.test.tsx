@@ -1,5 +1,5 @@
 import * as client from '@quantor/api-client';
-import type { CadBuilding3dFloorRead } from '@quantor/api-client';
+import type { CadBuilding3dFloorRead, CadBuilding3dGroupRead } from '@quantor/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,13 +49,28 @@ const floor = (patch: Partial<CadBuilding3dFloorRead>): CadBuilding3dFloorRead =
   outline: rect,
   outline_source: 'slab',
   bbox: null,
+  corps: null,
+  section: null,
+  group_key: 'none',
+  group_label: 'Корпус не указан',
+  offset_mm: [0, 0],
+  alignment: 'reference',
+  alignment_axes: [],
+  alignment_message: null,
   ...patch,
 });
 
-const respond = (floors: CadBuilding3dFloorRead[]) =>
+const respond = (floors: CadBuilding3dFloorRead[], groups: CadBuilding3dGroupRead[] = []) =>
   vi.mocked(client.readCadBuilding3D).mockImplementation(
-    () => Promise.resolve({ data: { floors, units: 'mm', warnings: [] } }) as never,
+    () => Promise.resolve({ data: { floors, groups, units: 'mm', warnings: [] } }) as never,
   );
+
+const group = (key: string, label: string, floorCount: number): CadBuilding3dGroupRead => ({
+  key,
+  label,
+  floor_count: floorCount,
+  aligned_count: floorCount,
+});
 
 const mount = (onSelectFloor = vi.fn()) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -118,5 +133,81 @@ describe('колонка «Здание»', () => {
     expect(await screen.findByText(/нечего строить/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Лист А/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'щелчок по холсту' })).toBeNull();
+  });
+
+  describe('здания', () => {
+    const two = () =>
+      respond(
+        [
+          floor({ job_id: 'a1', label: 'К2 этаж 1', group_key: 'k2', group_label: 'Корп. 2' }),
+          floor({
+            job_id: 'a2',
+            label: 'К2 этаж 2',
+            base_z_mm: 3000,
+            group_key: 'k2',
+            group_label: 'Корп. 2',
+            alignment: 'axes',
+            alignment_axes: ['3.1', '3.2', 'А'],
+          }),
+          floor({
+            job_id: 'b1',
+            label: 'К10 этаж 1',
+            group_key: 'k10',
+            group_label: 'Корп. 10',
+          }),
+        ],
+        [group('k2', 'Корп. 2', 2), group('k10', 'Корп. 10', 1)],
+      );
+
+    it('по умолчанию показывает первое здание, переключатель меняет список', async () => {
+      two();
+      mount();
+      const select = await screen.findByRole('combobox', { name: /Корпус и секция/ });
+      expect(select).toHaveValue('k2');
+      expect(
+        within(screen.getByRole('list')).getAllByRole('button').map((row) => row.textContent),
+      ).toEqual(['К2 этаж 2по осям 3.1, 3.2, А+3.000', 'К2 этаж 10.000']);
+      fireEvent.change(select, { target: { value: 'k10' } });
+      expect(
+        within(screen.getByRole('list')).getAllByRole('button').map((row) => row.textContent),
+      ).toEqual(['К10 этаж 10.000']);
+    });
+
+    it('одно здание - переключателя нет', async () => {
+      respond([floor({ group_key: 'k2' })], [group('k2', 'Корп. 2', 1)]);
+      mount();
+      await screen.findByRole('list');
+      expect(screen.queryByRole('combobox')).toBeNull();
+    });
+
+    it('этаж без совмещения помечен с пояснением, если в здании больше одного этажа', async () => {
+      respond(
+        [
+          floor({ job_id: 'a1', label: 'Эталон', group_key: 'k2' }),
+          floor({
+            job_id: 'a2',
+            label: 'Сдвинутый',
+            base_z_mm: 3000,
+            group_key: 'k2',
+            alignment: 'none',
+            alignment_message: 'нет общих осей с эталонным этажом',
+          }),
+          floor({
+            job_id: 'b1',
+            label: 'Одиночный',
+            group_key: 'k10',
+            alignment: 'none',
+            alignment_message: 'в группе нет этажа с осями',
+          }),
+        ],
+        [group('k2', 'Корп. 2', 2), group('k10', 'Корп. 10', 1)],
+      );
+      mount();
+      const row = await screen.findByRole('button', { name: /Сдвинутый/ });
+      expect(row).toHaveTextContent('не совмещён по осям');
+      expect(row).toHaveAttribute('title', 'нет общих осей с эталонным этажом');
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'k10' } });
+      expect(screen.getByRole('button', { name: /Одиночный/ })).not.toHaveTextContent('не совмещён');
+    });
   });
 });

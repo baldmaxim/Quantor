@@ -5,11 +5,20 @@ import type { CadBuilding3dFloorRead } from '@quantor/api-client';
 import { useMemo, useState, type FC } from 'react';
 
 import { Button } from '@/components/ui';
-import { describeFloor, floorKey, formatElevation, splitFloors } from '@/lib/cad/building3d-geometry';
+import {
+  alignmentNote,
+  describeFloor,
+  filterFloorsByGroup,
+  floorKey,
+  formatElevation,
+  resolveGroupKey,
+  splitFloors,
+} from '@/lib/cad/building3d-geometry';
 import { useCadBuilding3d } from '@/lib/cad/building3d-queries';
 import { cadErrorText } from '@/lib/cad/errors';
 
 import { CadBuilding3dCanvas } from './CadBuilding3dCanvas';
+import { CadBuilding3dGroupSelect } from './CadBuilding3dGroupSelect';
 
 export interface ICadBuilding3dColumnProps {
   readonly projectId: string;
@@ -27,7 +36,9 @@ const ROW =
   'flex min-h-[44px] w-full items-center justify-between gap-[var(--s-3)] px-[var(--s-4)] py-[var(--s-2)] text-left text-sm transition-colors motion-reduce:transition-none hover:bg-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
 /**
- * Колонка «Здание» вида «3D»: аксонометрия стопки этажей и список этажей. Щелчок по этажу на
+ * Колонка «Здание» вида «3D»: аксонометрия стопки этажей и список этажей одного здания (корпус +
+ * секция; при нескольких - переключатель, по умолчанию первое). Этажи уже совмещены сервером по
+ * осям; несовмещённые помечены в списке и в подсказке. Щелчок по этажу на
  * холсте или в списке открывает его лист в основном 3D-виде. Этаж без отметки в 3D не строится
  * и стоит в списке внизу. Ширина от `lg` - колонка слева; уже - сворачиваемая полоса сверху.
  */
@@ -36,12 +47,19 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
   const [open, setOpen] = useState(true);
   const [hover, setHover] = useState<IHover | null>(null);
   const [canvasError, setCanvasError] = useState<string | null>(null);
+  const [chosenGroup, setChosenGroup] = useState<string | null>(null);
 
-  const floors = useMemo(() => query.data?.floors ?? [], [query.data]);
+  const groups = useMemo(() => query.data?.groups ?? [], [query.data]);
+  const groupKey = resolveGroupKey(groups, chosenGroup);
+  const floors = useMemo(
+    () => filterFloorsByGroup(query.data?.floors ?? [], groupKey),
+    [query.data, groupKey],
+  );
   const list = useMemo(() => splitFloors(floors), [floors]);
   const byKey = useMemo(() => new Map(floors.map((floor) => [floorKey(floor), floor])), [floors]);
   const currentKey = current ? floorKey({ job_id: current.jobId, page_index: current.pageIndex, view: current.view }) : null;
   const hovered = hover ? (byKey.get(hover.key) ?? null) : null;
+  const hoveredNote = hovered ? alignmentNote(hovered, floors.length) : null;
   const hasFloors = list.known.length + list.unknown.length > 0;
 
   const select = (key: string) => {
@@ -52,11 +70,13 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
   const renderRow = (floor: CadBuilding3dFloorRead) => {
     const key = floorKey(floor);
     const isCurrent = key === currentKey;
+    const note = alignmentNote(floor, floors.length);
     return (
       <li key={key}>
         <button
           type="button"
           aria-current={isCurrent ? 'true' : undefined}
+          title={note?.title ?? undefined}
           className={cx(ROW, isCurrent ? 'bg-bg text-accent' : 'text-text')}
           onClick={() => onSelectFloor(floor)}
           onMouseEnter={() => setHover({ key, anchor: null })}
@@ -64,7 +84,14 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
           onFocus={() => setHover({ key, anchor: null })}
           onBlur={() => setHover(null)}
         >
-          <span className="min-w-0 [overflow-wrap:anywhere]">{floor.label}</span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">
+            {floor.label}
+            {note && (
+              <span className={cx('block text-xs', note.warn ? 'text-warning' : 'text-muted')}>
+                {note.text}
+              </span>
+            )}
+          </span>
           <span className="flex-none text-xs text-muted">
             {floor.elevation_known ? formatElevation(floor.base_z_mm) : 'отметка не определена'}
           </span>
@@ -128,6 +155,7 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
               style={{ left: Math.max(0, hover.anchor.x + 12), top: Math.max(0, hover.anchor.y + 12) }}
             >
               {describeFloor(hovered)}
+              {hoveredNote?.warn && `, ${hoveredNote.text}`}
             </div>
           )}
         </div>
@@ -154,7 +182,22 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
           {open ? 'Здание (свернуть)' : 'Здание (развернуть)'}
         </Button>
       </div>
-      <div className={cx('min-h-0 flex-1 flex-col', open ? 'flex h-[220px] lg:h-auto' : 'hidden lg:flex')}>{body}</div>
+      <div
+        className={cx(
+          'min-h-0 flex-1 flex-col',
+          open ? cx('flex lg:h-auto', groups.length > 1 ? 'h-[272px]' : 'h-[220px]') : 'hidden lg:flex',
+        )}
+      >
+        <CadBuilding3dGroupSelect
+          groups={groups}
+          value={groupKey ?? ''}
+          onChange={(key) => {
+            setChosenGroup(key);
+            setHover(null);
+          }}
+        />
+        {body}
+      </div>
     </aside>
   );
 };

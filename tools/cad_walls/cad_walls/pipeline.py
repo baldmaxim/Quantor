@@ -11,6 +11,7 @@ from pathlib import Path
 from shapely.geometry import Polygon
 from shapely.geometry.polygon import orient
 
+from cad_walls.axes import read_axes
 from cad_walls.constructions import Construction, build_constructions
 from cad_walls.dxfin import read_dxf
 from cad_walls.errors import Issue
@@ -237,6 +238,7 @@ def build(args: Args) -> Built:
         "dxf_sha256": dxf.dxf_sha256,
         "units": "mm",
         "heights": heights,
+        "axes": read_axes(args.pdf, args.page, params),
         "legend": legend.to_json(),
         "constructions": [_construction(c, hints.get(c.id)) for c in cons],
         "frame_partitions": [_construction(c) for c in frames],

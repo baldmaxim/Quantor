@@ -109,6 +109,21 @@ async def test_floor_of_a_ready_sheet_follows_project_levels_for_viewer(
     assert floor["outline_source"] == "slab"
     assert floor["outline"] == [[0.0, 0.0], [6000.0, 0.0], [6000.0, 4000.0], [0.0, 4000.0]]
     assert floor["bbox"] == [0.0, 0.0, 6000.0, 4000.0]
+    # Заглушка не пишет заголовок плана и оси: здание без корпуса, этаж не совмещён.
+    assert (floor["corps"], floor["section"]) == (None, None)
+    assert (floor["group_key"], floor["group_label"]) == ("none", "Корпус не указан")
+    assert (floor["alignment"], floor["offset_mm"], floor["alignment_axes"]) == (
+        "none",
+        [0.0, 0.0],
+        [],
+    )
+    assert floor["alignment_message"] == (
+        "в группе нет этажа с осями в обоих направлениях; "
+        "лист: оси не распознаны: пересчитайте конструкции листа"
+    )
+    assert body["groups"] == [
+        {"key": "none", "label": "Корпус не указан", "floor_count": 1, "aligned_count": 0}
+    ]
 
 
 async def test_sheet_without_walls_is_skipped_with_warning(
@@ -144,3 +159,37 @@ async def test_unreadable_walls_file_does_not_fail_the_response(
             fake_storage.objects[key] = b'{"schema": "x"}'
         invalid = (await api.get(_url(project_id))).json()
         assert invalid["floors"] == [] and _codes(invalid) == ["walls_invalid"]
+
+
+async def test_axes_in_walls_file_make_the_single_floor_a_reference(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _rev, _job, _walls = await _ready_sheet(api, db_session, fake_storage, settings)
+        for key in [k for k in fake_storage.objects if k.endswith("/walls.json")]:
+            raw = json.loads(fake_storage.objects[key])
+            raw["heights"]["title"] = {"corps": "9", "section": "3", "floors": [1], "text": None}
+            raw["axes"] = {
+                "status": "found",
+                "message": None,
+                "diameter_pt": 12.0,
+                "items": [
+                    {"label": "3.1", "orient": "vertical", "pos_pt": 110.0, "bubbles_pt": []},
+                    {"label": "А", "orient": "horizontal", "pos_pt": 10.0, "bubbles_pt": []},
+                ],
+                "conflicts": [],
+                "rejected": 0,
+            }
+            fake_storage.objects[key] = json.dumps(raw).encode()
+        body = (await api.get(_url(project_id))).json()
+    (floor,) = body["floors"]
+    assert (floor["group_key"], floor["group_label"]) == ("k9-s3", "Корп. 9 · сек. 3")
+    assert floor["alignment"] == "reference" and floor["alignment_message"] is None
+    assert body["groups"] == [
+        {"key": "k9-s3", "label": "Корп. 9 · сек. 3", "floor_count": 1, "aligned_count": 1}
+    ]

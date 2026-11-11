@@ -48,8 +48,8 @@ def test_document_header_and_hashes(tmp_path: Path) -> None:
     assert doc["params_sha256"] == canonical_sha256(raw)
     assert set(doc) == {
         "schema", "generator", "params_version", "params_sha256", "dxf_sha256", "units",
-        "heights", "legend", "constructions", "frame_partitions", "openings", "slab", "slab_holes",
-        "totals", "checks",
+        "heights", "axes", "legend", "constructions", "frame_partitions", "openings", "slab",
+        "slab_holes", "totals", "checks",
     }  # fmt: skip
     assert {o["kind"] for o in doc["openings"]} == {"door"}
 

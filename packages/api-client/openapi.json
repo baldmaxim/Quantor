@@ -1106,6 +1106,33 @@
       "CadBuilding3dFloorRead": {
         "description": "Этаж здания: адрес листа, отметки и контур плиты в мм системы DXF.",
         "properties": {
+          "alignment": {
+            "enum": [
+              "reference",
+              "axes",
+              "none"
+            ],
+            "title": "Alignment",
+            "type": "string"
+          },
+          "alignment_axes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Alignment Axes",
+            "type": "array"
+          },
+          "alignment_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Message"
+          },
           "base_z_mm": {
             "title": "Base Z Mm",
             "type": "integer"
@@ -1123,6 +1150,17 @@
               }
             ],
             "title": "Bbox"
+          },
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
           },
           "document_id": {
             "anyOf": [
@@ -1148,6 +1186,14 @@
             "title": "Floor Height Mm",
             "type": "integer"
           },
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "group_label": {
+            "title": "Group Label",
+            "type": "string"
+          },
           "job_id": {
             "format": "uuid",
             "title": "Job Id",
@@ -1156,6 +1202,20 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "offset_mm": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Offset Mm",
+            "type": "array"
           },
           "outline": {
             "items": {
@@ -1183,6 +1243,17 @@
             "format": "uuid",
             "title": "Revision Id",
             "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
           },
           "slab_thickness_known": {
             "title": "Slab Thickness Known",
@@ -1212,9 +1283,46 @@
           "slab_thickness_known",
           "outline",
           "outline_source",
-          "bbox"
+          "bbox",
+          "corps",
+          "section",
+          "group_key",
+          "group_label",
+          "offset_mm",
+          "alignment",
+          "alignment_axes",
+          "alignment_message"
         ],
         "title": "CadBuilding3dFloorRead",
+        "type": "object"
+      },
+      "CadBuilding3dGroupRead": {
+        "description": "Здание для переключателя вида: этажи одного корпуса и секции.",
+        "properties": {
+          "aligned_count": {
+            "title": "Aligned Count",
+            "type": "integer"
+          },
+          "floor_count": {
+            "title": "Floor Count",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "floor_count",
+          "aligned_count"
+        ],
+        "title": "CadBuilding3dGroupRead",
         "type": "object"
       },
       "CadBuilding3dRead": {
@@ -1224,6 +1332,13 @@
               "$ref": "#/components/schemas/CadBuilding3dFloorRead"
             },
             "title": "Floors",
+            "type": "array"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CadBuilding3dGroupRead"
+            },
+            "title": "Groups",
             "type": "array"
           },
           "units": {
@@ -1242,6 +1357,7 @@
         "required": [
           "units",
           "floors",
+          "groups",
           "warnings"
         ],
         "title": "CadBuilding3dRead",

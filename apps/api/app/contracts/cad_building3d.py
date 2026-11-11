@@ -12,6 +12,9 @@ from uuid import UUID
 from pydantic import BaseModel
 
 CadBuilding3dOutlineSource = Literal["slab", "bbox"]
+# `reference` - эталонный этаж группы; `axes` - совмещён с эталоном по общим осям;
+# `none` - не совмещён (смещение - запасное: центр контура на центр эталона или 0).
+CadBuilding3dAlignment = Literal["reference", "axes", "none"]
 
 
 class CadBuilding3dWarningRead(BaseModel):
@@ -42,9 +45,33 @@ class CadBuilding3dFloorRead(BaseModel):
     outline_source: CadBuilding3dOutlineSource
     # [minx, miny, maxx, maxy] по плите и стенам листа.
     bbox: list[float] | None
+    # Корпус и секция из заголовка плана; нет заголовка - `None`.
+    corps: str | None
+    section: str | None
+    # Здание (корпус + секция), к которому относится этаж: ключ и подпись для переключателя.
+    group_key: str
+    group_label: str
+    # Смещение в мм, уже применённое к контуру и bbox этажа: геометрия в системе эталона группы.
+    offset_mm: tuple[float, float]
+    alignment: CadBuilding3dAlignment
+    # Подписи общих осей, по которым совмещён этаж (`alignment = axes`).
+    alignment_axes: list[str]
+    # Почему этаж не совмещён (`alignment = none`); иначе `None`.
+    alignment_message: str | None
+
+
+class CadBuilding3dGroupRead(BaseModel):
+    """Здание для переключателя вида: этажи одного корпуса и секции."""
+
+    key: str
+    label: str
+    floor_count: int
+    # Этажи, совмещённые по осям (эталон входит).
+    aligned_count: int
 
 
 class CadBuilding3dRead(BaseModel):
     units: Literal["mm"]
     floors: list[CadBuilding3dFloorRead]
+    groups: list[CadBuilding3dGroupRead]
     warnings: list[CadBuilding3dWarningRead]

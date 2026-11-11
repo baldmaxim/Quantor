@@ -259,5 +259,65 @@
   "unit": "мм",
   "source": "assumed",
   "note": "номинальные толщины каркасных перегородок; допуск — tolerance_masonry_mm"
+ },
+ "axis_bubble_min_d_pt": {
+  "value": 8,
+  "unit": "pt",
+  "source": "assumed",
+  "note": "наименьший диаметр кружка марки оси на листе"
+ },
+ "axis_bubble_max_d_pt": {
+  "value": 40,
+  "unit": "pt",
+  "source": "assumed",
+  "note": "наибольший диаметр кружка марки оси на листе"
+ },
+ "axis_square_tol": {
+  "value": 0.08,
+  "unit": "доля",
+  "source": "assumed",
+  "note": "допуск |ширина-высота| габарита кружка, доля большей стороны"
+ },
+ "axis_circle_dev": {
+  "value": 0.1,
+  "unit": "доля",
+  "source": "assumed",
+  "note": "допуск расстояния вершины контура от центра кружка, доля радиуса"
+ },
+ "axis_label_reach_ratio": {
+  "value": 0.85,
+  "unit": "доля",
+  "source": "assumed",
+  "note": "марка — слова с центром не дальше этой доли радиуса от центра кружка"
+ },
+ "axis_diameter_tol": {
+  "value": 0.06,
+  "unit": "доля",
+  "source": "assumed",
+  "note": "допуск диаметров кружков одной группы"
+ },
+ "axis_align_tol_ratio": {
+  "value": 0.35,
+  "unit": "доля",
+  "source": "assumed",
+  "note": "допуск выстраивания в ряд/колонку и слияния дублей марки, доля диаметра"
+ },
+ "axis_min_segments": {
+  "value": 10,
+  "unit": "шт",
+  "source": "assumed",
+  "note": "наименьшее число отрезков ломаной, чтобы считать контур кружком"
+ },
+ "axis_min_beziers": {
+  "value": 4,
+  "unit": "шт",
+  "source": "assumed",
+  "note": "наименьшее число кривых Безье, чтобы считать контур кружком"
+ },
+ "axis_min_in_line": {
+  "value": 2,
+  "unit": "шт",
+  "source": "assumed",
+  "note": "наименьшее число кружков в ряду или колонке, чтобы это были оси"
  }
 }
