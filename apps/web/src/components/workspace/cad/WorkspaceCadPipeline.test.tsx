@@ -1,5 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import type * as ApiClient from '@quantor/api-client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const api = vi.hoisted(() => ({ recompute: vi.fn() }));
+
+vi.mock('@quantor/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof ApiClient>()),
+  recomputeCadWalls: api.recompute,
+}));
 
 vi.mock('./WorkspaceCadConvert', () => ({
   WorkspaceCadConvert: (props: { pageIndex: number; again?: boolean; currentJobId?: string | null }) => (
@@ -27,13 +36,20 @@ const mount = (
   extra: { openablePanels?: string[]; onOpenPanel?: (id: string) => void } = {},
 ) =>
   render(
-    <WorkspaceCadPipeline
-      pipeline={pipeline}
-      convert={CONVERT}
-      openablePanels={extra.openablePanels ?? ['mep', 'constructions']}
-      onOpenPanel={extra.onOpenPanel ?? vi.fn()}
-    />,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { mutations: { retry: false } } })}>
+      <WorkspaceCadPipeline
+        pipeline={pipeline}
+        convert={CONVERT}
+        openablePanels={extra.openablePanels ?? ['mep', 'constructions']}
+        onOpenPanel={extra.onOpenPanel ?? vi.fn()}
+      />
+    </QueryClientProvider>,
   );
+
+beforeEach(() => {
+  api.recompute.mockReset();
+  api.recompute.mockResolvedValue({ data: { job_id: 'w2' } });
+});
 
 describe('WorkspaceCadPipeline', () => {
   it('семь шагов со словом состояния и подсказкой под списком', () => {
@@ -92,6 +108,39 @@ describe('WorkspaceCadPipeline', () => {
     mount(pipelineOfSheet(pipelineSheet({ views: [view] })), { onOpenPanel });
     fireEvent.click(screen.getByRole('button', { name: 'Открыть Конструкции' }));
     expect(onOpenPanel).toHaveBeenCalledWith('constructions');
+  });
+
+  it('конструкции упали: «Повторить» пересчитывает упавший вид', async () => {
+    const view = pipelineView({
+      view: 1,
+      walls: stage({ job_id: 'w1', job_type: 'cad_walls', status: 'failed', error_code: 'CAD_ENGINE_FAILED' }),
+    });
+    mount(pipelineOfSheet(pipelineSheet({ convert: stage({ job_id: 'conv-7' }), views: [view] })));
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() => expect(api.recompute).toHaveBeenCalledTimes(1));
+    expect(api.recompute.mock.calls[0]?.[0]).toMatchObject({
+      path: { project_id: 'p', job_id: 'conv-7', page_index: 2, view: 1 },
+    });
+  });
+
+  it('несколько видов: пересчёт только у упавших; отказ сервера показан', async () => {
+    const failed = stage({ job_id: 'w1', job_type: 'cad_walls', status: 'failed' });
+    const views = [
+      pipelineView({ view: 0, walls: failed }),
+      pipelineView({ view: 1 }),
+      pipelineView({ view: 2, walls: failed }),
+    ];
+    api.recompute.mockRejectedValue({ detail: { code: 'CAD_WALLS_BUSY' } });
+    mount(pipelineOfSheet(pipelineSheet({ views })));
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    const sent = api.recompute.mock.calls.map((call) => (call[0] as { path: { view: number } }).path.view);
+    expect(sent.sort()).toEqual([0, 2]);
+  });
+
+  it('конструкции не упали: «Повторить» нет', () => {
+    mount(pipelineOfSheet(pipelineSheet()));
+    expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull();
   });
 
   it('зон нет и задания не было: «Разметить зоны автоматически» запускает разметку', () => {

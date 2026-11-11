@@ -1,5 +1,6 @@
 'use client';
 
+import type { CadPipelineSheetRead } from '@quantor/api-client';
 import type { FC } from 'react';
 
 import { Button, Skeleton } from '@/components/ui';
@@ -14,6 +15,7 @@ import {
 import type { IWorkspaceCadConvert } from './types';
 import type { IWorkspaceCadPipeline } from './useWorkspaceCadPipeline';
 import { WorkspaceCadConvert } from './WorkspaceCadConvert';
+import { WorkspaceCadWallsRetry } from './WorkspaceCadWallsRetry';
 
 /** Разделы правой панели, в которые ведут действия шагов. */
 export const PIPELINE_PANEL_CONSTRUCTIONS = 'constructions';
@@ -56,6 +58,17 @@ const nextStep = (steps: readonly IPipelineStep[]): IPipelineStep | null =>
   steps.find((step) => ACTIONABLE.has(step.state)) ?? null;
 
 const BUTTON = 'self-start max-md:h-[44px]';
+
+/** Виды листа с DXF, у которых последнее задание расчёта конструкций упало. */
+const failedWallsViews = (sheet: CadPipelineSheetRead | null): number[] =>
+  (sheet?.views ?? [])
+    .filter((view) => {
+      const walls = view.walls;
+      if (!view.has_dxf || walls === null) return false;
+      if (walls.status === 'queued' || walls.status === 'running') return false;
+      return walls.status !== 'succeeded' || walls.result_status === 'failed';
+    })
+    .map((view) => view.view);
 
 /**
  * Содержимое окна «Обработка листа» у бейджа в шапке: шаги конвейера открытого листа и одно
@@ -112,11 +125,29 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
     }
     if (next?.key !== key) return null;
     if (key === 'calibration' || key === 'convert') return convertNode;
-    if (key === 'walls' && state === 'failed' && canOpen(PIPELINE_PANEL_CONSTRUCTIONS)) {
+    if (key === 'walls' && state === 'failed') {
+      const jobId = sheet?.convert?.job_id;
+      const failedViews = failedWallsViews(sheet);
+      const showRetry = convert !== null && jobId !== undefined && failedViews.length > 0;
+      if (!showRetry && !canOpen(PIPELINE_PANEL_CONSTRUCTIONS)) return null;
       return (
-        <Button compact onClick={() => onOpenPanel(PIPELINE_PANEL_CONSTRUCTIONS)} className={BUTTON}>
-          Открыть Конструкции
-        </Button>
+        <div className="flex min-w-0 flex-col items-start gap-[var(--s-3)]">
+          {showRetry && (
+            <WorkspaceCadWallsRetry
+              key={`${jobId}:${failedViews.join(',')}`}
+              projectId={convert.projectId}
+              revisionId={convert.revisionId}
+              jobId={jobId}
+              pageIndex={convert.pageIndex}
+              views={failedViews}
+            />
+          )}
+          {canOpen(PIPELINE_PANEL_CONSTRUCTIONS) && (
+            <Button compact onClick={() => onOpenPanel(PIPELINE_PANEL_CONSTRUCTIONS)} className={BUTTON}>
+              Открыть Конструкции
+            </Button>
+          )}
+        </div>
       );
     }
     const view = sheet?.views.find((row) => row.has_dxf);

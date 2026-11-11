@@ -173,15 +173,18 @@ describe('WorkspaceCadConvert', () => {
       expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ pages: [3] });
       succeed({ job_id: 'new', requested_pages: [3] });
       expect(onJobCreated).toHaveBeenCalledWith('new', [3]);
-      expect(screen.queryByText(/повтор не нужен/)).toBeNull();
+      expect(screen.queryByText(/Уже актуально/)).toBeNull();
     });
 
-    it('сервер вернул то же задание: onJobCreated не вызван, сказано «повтор не нужен»', () => {
+    it('сервер вернул то же задание: onJobCreated не вызван, сказано «Уже актуально»', () => {
       const onJobCreated = mountAgain();
       confirm();
       succeed({ job_id: 'old', requested_pages: [3] });
       expect(onJobCreated).not.toHaveBeenCalled();
-      expect(screen.getByRole('status')).toHaveTextContent('повтор не нужен');
+      const status = screen.getByRole('status');
+      expect(status).toHaveTextContent('Уже актуально');
+      expect(status).toHaveTextContent('CAD не перезапускался');
+      expect(status).toHaveTextContent('кнопкой «Повторить» у шага');
     });
 
     it('«Отмена» не создаёт задание', () => {

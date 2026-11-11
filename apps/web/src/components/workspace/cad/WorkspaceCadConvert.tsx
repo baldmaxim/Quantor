@@ -111,9 +111,14 @@ export const WorkspaceCadConvert: FC<IWorkspaceCadConvert> = ({
         </Button>
       )}
       {upToDate && (
-        <p role="status" className="text-xs text-muted [overflow-wrap:anywhere]">
-          Лист уже преобразован текущей версией движка с этой калибровкой — повтор не нужен.
-        </p>
+        <div role="status" className="flex min-w-0 flex-col items-start gap-[var(--s-2)]">
+          <StatusBadge tone="accent" dot={false}>
+            Уже актуально
+          </StatusBadge>
+          <p className="m-0 text-xs [overflow-wrap:anywhere]">
+            Лист уже преобразован текущей версией движка с этой калибровкой — CAD не перезапускался. Упавший шаг повторите кнопкой «Повторить» у шага.
+          </p>
+        </div>
       )}
       {state === 'missing' && (
         <div className="flex flex-wrap items-center gap-x-[var(--s-4)]">
