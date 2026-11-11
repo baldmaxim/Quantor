@@ -428,6 +428,9 @@ class JobType(StrEnum):
     # подпроцессом в том же cad-worker; результат пишется зонами листа через сервис зон. Основной
     # исполнитель этот тип не берёт.
     CAD_ZONES = "cad_zones"
+    # Паспорт листа по текстовому слою PDF проекта (ADR-0043, С1): разбор pypdf в основном
+    # исполнителе, результат - кандидаты `sheet_passports`; подтверждает человек.
+    SHEET_PASSPORT_EXTRACT = "sheet_passport_extract"
 
 
 class JobStatus(StrEnum):

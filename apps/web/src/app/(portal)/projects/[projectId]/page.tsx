@@ -26,6 +26,7 @@ import {
 } from '@/lib/openability';
 import { CAD_FEATURE } from '@/lib/cad/access';
 import { CALC_FEATURE } from '@/lib/calc/access';
+import { CONSISTENCY_FEATURE } from '@/lib/consistency/access';
 import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 import { useDocumentsRevisions, useFeatures, useProject, useProjectDocuments } from '@/lib/queries';
 
@@ -107,6 +108,11 @@ const ProjectPage = ({ params }: IPageProps) => {
                 transitionTypes={['nav-forward']}
               >
                 Версии тендера
+              </ButtonLink>
+            )}
+            {features[CONSISTENCY_FEATURE] === true && (
+              <ButtonLink href={`/projects/${projectId}/sheets`} transitionTypes={['nav-forward']}>
+                Листы комплекта
               </ButtonLink>
             )}
             {features[CALC_FEATURE] === true && (

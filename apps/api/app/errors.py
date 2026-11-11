@@ -74,6 +74,8 @@ class ErrorCode(StrEnum):
     PDF_PAGE_COUNT_MISMATCH = "PDF_PAGE_COUNT_MISMATCH"
     PDF_PAGE_GEOMETRY_INVALID = "PDF_PAGE_GEOMETRY_INVALID"
     GEOMETRY_EXTRACT_FAILED = "GEOMETRY_EXTRACT_FAILED"
+    # Паспорт листа (ADR-0043): задание разбора комплекта не удалось выполнить.
+    SHEET_PASSPORT_EXTRACT_FAILED = "SHEET_PASSPORT_EXTRACT_FAILED"
 
     # --- калибровка масштаба (ADR-0018) ---
     SCALE_GEOMETRY_REQUIRED = "SCALE_GEOMETRY_REQUIRED"
@@ -255,6 +257,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.GEOMETRY_EXTRACT_FAILED: "Извлечь геометрию страниц не удалось",
     ErrorCode.SCALE_GEOMETRY_REQUIRED: "Масштаб нельзя задать до извлечения геометрии страницы",
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: "Отрезок калибровки слишком короткий",
+    ErrorCode.SHEET_PASSPORT_EXTRACT_FAILED: "Разобрать паспорта листов не удалось",
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: "Измерение изменено другим пользователем",
     ErrorCode.TAKEOFF_NAME_TAKEN: "Строка с таким названием в проекте уже есть",
     ErrorCode.CALC_FACT_TYPE_UNKNOWN: "Неизвестный тип факта",
@@ -435,6 +438,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: status.HTTP_409_CONFLICT,
     ErrorCode.TAKEOFF_NAME_TAKEN: status.HTTP_409_CONFLICT,
+    ErrorCode.SHEET_PASSPORT_EXTRACT_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.CALC_FACT_TYPE_UNKNOWN: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_SUBJECT_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CALC_VALUE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,

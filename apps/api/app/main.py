@@ -28,6 +28,7 @@ from app.api.v1.cad_risers import qa_router as cad_risers_qa_router
 from app.api.v1.cad_vor import qa_router as cad_vor_qa_router
 from app.api.v1.cad_zones import qa_router as cad_zones_qa_router
 from app.api.v1.router import api_v1_router
+from app.api.v1.sheet_passports import qa_router as sheet_passports_qa_router
 from app.auth.session_cookie import SessionCookieMiddleware
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
@@ -116,6 +117,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cad_floor3d_qa_router)
     # Общий вид здания для 3D (ADR-0039).
     app.include_router(cad_building3d_qa_router)
+    # Паспорт листа (ADR-0043, С1): маршруты закрыты флагом пространства `project.consistency`.
+    app.include_router(sheet_passports_qa_router)
     return app
 
 

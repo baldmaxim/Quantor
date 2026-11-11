@@ -10550,6 +10550,20 @@ export type EvidenceRelation = {
 export type EvidenceStatus = 'observed' | 'extraction_inferred' | 'human_confirmed';
 
 /**
+ * FieldEvidenceOut
+ */
+export type FieldEvidenceOut = {
+    /**
+     * Snippet
+     */
+    snippet: string;
+    /**
+     * Source
+     */
+    source: string;
+};
+
+/**
  * FlagOverrideWrite
  */
 export type FlagOverrideWrite = {
@@ -10870,7 +10884,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'sheet_passport_extract';
 
 /**
  * LengthUnit
@@ -12964,6 +12978,310 @@ export type SettingStateRead = {
      */
     value_type: string;
 };
+
+/**
+ * SheetPassportBulkOut
+ */
+export type SheetPassportBulkOut = {
+    /**
+     * Updated
+     */
+    updated: number;
+};
+
+/**
+ * SheetPassportBulkStatus
+ */
+export type SheetPassportBulkStatus = {
+    /**
+     * Ids
+     */
+    ids: Array<string>;
+    status: SheetPassportStatus;
+};
+
+/**
+ * SheetPassportExtractError
+ */
+export type SheetPassportExtractError = {
+    /**
+     * Error
+     */
+    error: string;
+    /**
+     * File Name
+     */
+    file_name: string;
+};
+
+/**
+ * SheetPassportExtractSummary
+ *
+ * Итог последнего задания разбора листов; числа, которых нет в итоге задания, - null.
+ */
+export type SheetPassportExtractSummary = {
+    /**
+     * Created
+     */
+    created: number | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Count
+     */
+    error_count: number | null;
+    /**
+     * Errors
+     */
+    errors: Array<SheetPassportExtractError>;
+    /**
+     * Files Parsed
+     */
+    files_parsed: number | null;
+    /**
+     * Files Total
+     */
+    files_total: number | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Pages
+     */
+    pages: number | null;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Skipped Reviewed
+     */
+    skipped_reviewed: number | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Updated
+     */
+    updated: number | null;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * SheetPassportListOut
+ */
+export type SheetPassportListOut = {
+    /**
+     * Items
+     */
+    items: Array<SheetPassportOut>;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * SheetPassportOut
+ */
+export type SheetPassportOut = {
+    /**
+     * Building
+     */
+    building: string | null;
+    /**
+     * Code
+     */
+    code: string | null;
+    /**
+     * Confirmed At
+     */
+    confirmed_at: string | null;
+    /**
+     * Confirmed By
+     */
+    confirmed_by: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Document Name
+     */
+    document_name: string;
+    /**
+     * Elevation M
+     */
+    elevation_m: number | null;
+    /**
+     * Evidence
+     */
+    evidence: {
+        [key: string]: FieldEvidenceOut;
+    };
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Level From
+     */
+    level_from: string | null;
+    /**
+     * Level From Ordinal
+     */
+    level_from_ordinal: number | null;
+    /**
+     * Level To
+     */
+    level_to: string | null;
+    /**
+     * Level To Ordinal
+     */
+    level_to_ordinal: number | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Section Mark
+     */
+    section_mark: string | null;
+    /**
+     * Sheet Kind
+     */
+    sheet_kind: string | null;
+    /**
+     * Sheet Number
+     */
+    sheet_number: string | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    status: SheetPassportStatus;
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * SheetPassportPatch
+ *
+ * Частичная правка: переданное поле меняется (в том числе на null), остальные - нет.
+ */
+export type SheetPassportPatch = {
+    /**
+     * Building
+     */
+    building?: string | null;
+    /**
+     * Code
+     */
+    code?: string | null;
+    /**
+     * Elevation M
+     */
+    elevation_m?: number | null;
+    /**
+     * Level From
+     */
+    level_from?: string | null;
+    /**
+     * Level From Ordinal
+     */
+    level_from_ordinal?: number | null;
+    /**
+     * Level To
+     */
+    level_to?: string | null;
+    /**
+     * Level To Ordinal
+     */
+    level_to_ordinal?: number | null;
+    /**
+     * Section
+     */
+    section?: string | null;
+    /**
+     * Section Mark
+     */
+    section_mark?: string | null;
+    /**
+     * Sheet Kind
+     */
+    sheet_kind?: string | null;
+    /**
+     * Sheet Number
+     */
+    sheet_number?: string | null;
+    /**
+     * Stage
+     */
+    stage?: string | null;
+    status?: SheetPassportStatus | null;
+    /**
+     * Title
+     */
+    title?: string | null;
+};
+
+/**
+ * SheetPassportStatus
+ */
+export type SheetPassportStatus = 'candidate' | 'confirmed' | 'rejected';
 
 /**
  * SheetQuantitiesRead
@@ -19608,6 +19926,183 @@ export type ReadCadPreviewResponses = {
 };
 
 export type ReadCadPreviewResponse = ReadCadPreviewResponses[keyof ReadCadPreviewResponses];
+
+export type ListSheetPassportsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Status
+         */
+        status?: SheetPassportStatus | null;
+        /**
+         * Section Mark
+         */
+        section_mark?: string | null;
+        /**
+         * Revision Id
+         */
+        revision_id?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/v1/projects/{project_id}/sheet-passports';
+};
+
+export type ListSheetPassportsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSheetPassportsError = ListSheetPassportsErrors[keyof ListSheetPassportsErrors];
+
+export type ListSheetPassportsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SheetPassportListOut;
+};
+
+export type ListSheetPassportsResponse = ListSheetPassportsResponses[keyof ListSheetPassportsResponses];
+
+export type BulkSheetPassportStatusData = {
+    body: SheetPassportBulkStatus;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/sheet-passports/bulk-status';
+};
+
+export type BulkSheetPassportStatusErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BulkSheetPassportStatusError = BulkSheetPassportStatusErrors[keyof BulkSheetPassportStatusErrors];
+
+export type BulkSheetPassportStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: SheetPassportBulkOut;
+};
+
+export type BulkSheetPassportStatusResponse = BulkSheetPassportStatusResponses[keyof BulkSheetPassportStatusResponses];
+
+export type StartSheetPassportExtractData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/sheet-passports/extract';
+};
+
+export type StartSheetPassportExtractErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartSheetPassportExtractError = StartSheetPassportExtractErrors[keyof StartSheetPassportExtractErrors];
+
+export type StartSheetPassportExtractResponses = {
+    /**
+     * Successful Response
+     */
+    202: JobRead;
+};
+
+export type StartSheetPassportExtractResponse = StartSheetPassportExtractResponses[keyof StartSheetPassportExtractResponses];
+
+export type GetSheetPassportExtractSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/sheet-passports/extract-summary';
+};
+
+export type GetSheetPassportExtractSummaryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSheetPassportExtractSummaryError = GetSheetPassportExtractSummaryErrors[keyof GetSheetPassportExtractSummaryErrors];
+
+export type GetSheetPassportExtractSummaryResponses = {
+    /**
+     * Response Get Sheet Passport Extract Summary
+     *
+     * Successful Response
+     */
+    200: SheetPassportExtractSummary | null;
+};
+
+export type GetSheetPassportExtractSummaryResponse = GetSheetPassportExtractSummaryResponses[keyof GetSheetPassportExtractSummaryResponses];
+
+export type PatchSheetPassportData = {
+    body: SheetPassportPatch;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Passport Id
+         */
+        passport_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/sheet-passports/{passport_id}';
+};
+
+export type PatchSheetPassportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PatchSheetPassportError = PatchSheetPassportErrors[keyof PatchSheetPassportErrors];
+
+export type PatchSheetPassportResponses = {
+    /**
+     * Successful Response
+     */
+    200: SheetPassportOut;
+};
+
+export type PatchSheetPassportResponse = PatchSheetPassportResponses[keyof PatchSheetPassportResponses];
 
 export type ListTakeoffItemsData = {
     body?: never;

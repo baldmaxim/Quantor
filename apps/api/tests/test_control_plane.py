@@ -224,6 +224,7 @@ def test_every_stage1_flag_key_survived() -> None:
         "tender.versions",
         "calc.portal",
         "cad.export",
+        "project.consistency",
     }
     assert set(FLAG_REGISTRY) == expected
 
@@ -250,6 +251,12 @@ def test_unfinished_features_cannot_be_enabled_from_the_console() -> None:
 
 def test_cad_export_is_an_admin_editable_pilot_flag() -> None:
     flag = FLAG_REGISTRY["cad.export"]
+    assert flag.admin_editable is True and flag.workspace_scoped is True
+    assert flag.default is False
+
+
+def test_project_consistency_is_an_admin_editable_pilot_flag() -> None:
+    flag = FLAG_REGISTRY["project.consistency"]
     assert flag.admin_editable is True and flag.workspace_scoped is True
     assert flag.default is False
 

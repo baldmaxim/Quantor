@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from app.contracts.calc.enums import CalcDiscipline, CalcDocumentStage, CalcSourceClass
+from app.services.consistency.dictionaries import match_section_mark, normalize_mark
 
 TEXT_BLOCK: Final = "text"
 IMAGE_BLOCK: Final = "image"
@@ -98,16 +99,9 @@ def parse_stamp(text: str) -> Stamp | None:
     return Stamp(code=found.get("Code"), stage=found.get("Stage"), name=found.get("Name"))
 
 
-_LOOKALIKES: Final = str.maketrans("ABCEHKMOPTXY", "АВСЕНКМОРТХУ")
-
-
-def _upper_cyrillic(value: str) -> str:
-    return value.upper().translate(_LOOKALIKES)
-
-
 def stage_from_mark(mark: str) -> CalcDocumentStage | None:
     """«П», «ПД» — проектная стадия; «Р», «РД» — рабочая. Прочее стадией не считается."""
-    cleaned = re.sub(r"[\s.]", "", _upper_cyrillic(mark))
+    cleaned = re.sub(r"[\s.]", "", normalize_mark(mark))
     if cleaned in {"П", "ПД"}:
         return CalcDocumentStage.P
     if cleaned in {"Р", "РД"}:
@@ -133,17 +127,18 @@ _SECTION_MARKS: Final[tuple[tuple[str, CalcSourceClass, CalcDiscipline | None], 
     ("ПЗ", CalcSourceClass.EXPLANATORY_NOTE, None),
     ("СП", CalcSourceClass.PROJECT_COMPOSITION, None),
 )
-_TOKEN_SPLIT = re.compile(r"[-_.\s/,]+")
+
+
+_ALLOWED_MARKS: Final = frozenset(mark for mark, _, _ in _SECTION_MARKS)
 
 
 def section_from_code(code: str) -> str | None:
-    """Марка раздела из шифра «ПД-00000000-АР.С-КОР1» → «АР»; «…-ОВ0-1» → «ОВ»."""
-    for token in _TOKEN_SPLIT.split(_upper_cyrillic(code)):
-        for mark, _, _ in _SECTION_MARKS:
-            rest = token[len(mark) :]
-            if token.startswith(mark) and (not rest or rest.isdigit()):
-                return mark
-    return None
+    """Марка раздела из шифра «ПД-00000000-АР.С-КОР1» → «АР»; «…-ОВ0-1» → «ОВ».
+
+    Сопоставление — общий словарь контура согласованности; набор марок — политика calc.
+    Алиасы словаря («ОВиК») calc не использует: поведение не меняется.
+    """
+    return match_section_mark(code, allowed=_ALLOWED_MARKS, with_aliases=False)
 
 
 def class_for_section(mark: str) -> tuple[CalcSourceClass, CalcDiscipline | None] | None:

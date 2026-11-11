@@ -1,0 +1,511 @@
+"""Паспорт листа (ADR-0043, С1): задание разбора комплекта, хранение и правка кандидатов.
+
+Кандидата собирает исполнитель по текстовому слою PDF (pypdf, без OCR и растра); подтверждает
+человек. Поле, которое правил человек (`evidence.source == "manual"`), повторный разбор не
+трогает; подтверждённый и отклонённый паспорт не перезаписывается вовсе. Доступ к проекту
+проверяет вызывающий.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import tempfile
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, Final
+
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.contracts.sheet_passports import (
+    PASSPORT_FIELDS,
+    FieldEvidenceOut,
+    SheetPassportExtractError,
+    SheetPassportExtractSummary,
+    SheetPassportOut,
+    SheetPassportPatch,
+    SheetPassportStatus,
+)
+from app.core.config import Settings
+from app.core.logging import get_logger
+from app.domain import DocumentKind, JobStatus, JobType
+from app.errors import ErrorCode, not_found
+from app.models import Document, DocumentRevision, Job, Project, SheetPassport
+from app.services import jobs as jobs_service
+from app.services.consistency.sheet_passport import (
+    EvidenceSource,
+    PassportCandidate,
+    dictionary_versions,
+    extract_pdf_pages,
+    parse_page,
+)
+from app.storage.base import ObjectNotFoundError, ObjectStorage
+
+log = get_logger(__name__)
+
+CHUNK_SIZE: Final = 1024 * 1024
+MAX_REPORTED_ERRORS: Final = 50
+_ACTIVE: Final = (JobStatus.QUEUED, JobStatus.RUNNING)
+
+
+# --------------------------------------------------------------------------- постановка
+
+
+async def schedule_extract(session: AsyncSession, *, project: Project) -> Job:
+    """Ставит задание разбора проекта; уже есть активное - возвращает его.
+
+    Строка проекта берётся под блокировкой: два нажатия подряд не ставят задание дважды.
+    """
+    await session.execute(select(Project.id).where(Project.id == project.id).with_for_update())
+    active = await session.scalar(
+        select(Job)
+        .where(
+            Job.job_type == JobType.SHEET_PASSPORT_EXTRACT,
+            Job.project_id == project.id,
+            Job.status.in_(_ACTIVE),
+        )
+        .order_by(Job.created_at.desc())
+        .limit(1)
+    )
+    if active is not None:
+        return active
+    return await jobs_service.enqueue(
+        session,
+        job_type=JobType.SHEET_PASSPORT_EXTRACT,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={"project_id": str(project.id)},
+    )
+
+
+# --------------------------------------------------------------------------- исполнитель
+
+
+def _evidence_to_json(candidate: PassportCandidate) -> dict[str, dict[str, str]]:
+    return {
+        name: {"source": item.source.value, "snippet": item.snippet}
+        for name, item in candidate.evidence.items()
+    }
+
+
+def _field_value(candidate: PassportCandidate, name: str) -> object:
+    value = getattr(candidate, name)
+    # SheetKind - StrEnum, в базу идёт значением.
+    return value.value if hasattr(value, "value") else value
+
+
+def _fill_row(row: SheetPassport, candidate: PassportCandidate, file_name: str) -> None:
+    """Перезаписывает кандидата, кроме полей, правленных человеком."""
+    evidence: dict[str, Any] = dict(row.evidence)
+    fresh = _evidence_to_json(candidate)
+    for name in PASSPORT_FIELDS:
+        current = evidence.get(name)
+        if isinstance(current, dict) and current.get("source") == EvidenceSource.MANUAL.value:
+            continue
+        setattr(row, name, _field_value(candidate, name))
+        if name in fresh:
+            evidence[name] = fresh[name]
+        else:
+            evidence.pop(name, None)
+    row.evidence = evidence
+    row.file_name = file_name
+    row.versions = dictionary_versions()
+
+
+async def _upsert_candidates(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    file_name: str,
+    candidates: list[PassportCandidate],
+) -> tuple[int, int, int]:
+    """Записывает страницы файла; возвращает (создано, обновлено, пропущено)."""
+    rows = await session.scalars(
+        select(SheetPassport)
+        .where(SheetPassport.revision_id == revision_id)
+        .execution_options(populate_existing=True)
+    )
+    existing = {row.page_index: row for row in rows}
+    created = updated = skipped = 0
+    for candidate in candidates:
+        row = existing.get(candidate.page_index)
+        if row is None:
+            row = SheetPassport(
+                project_id=project_id,
+                revision_id=revision_id,
+                page_index=candidate.page_index,
+                file_name=file_name,
+                status=SheetPassportStatus.CANDIDATE.value,
+                evidence={},
+                versions={},
+            )
+            _fill_row(row, candidate, file_name)
+            session.add(row)
+            created += 1
+        elif row.status != SheetPassportStatus.CANDIDATE.value:
+            skipped += 1
+        else:
+            _fill_row(row, candidate, file_name)
+            updated += 1
+    await session.flush()
+    return created, updated, skipped
+
+
+def _parse_pdf(path: Path, file_name: str) -> list[PassportCandidate]:
+    """Синхронный разбор файла с диска: вызывается только из потока."""
+    with path.open("rb") as stream:
+        return [parse_page(page) for page in extract_pdf_pages(stream, file_name)]
+
+
+async def _download_and_parse(
+    storage: ObjectStorage, *, storage_key: str, file_name: str
+) -> list[PassportCandidate]:
+    """Файл потоково во временный файл на диске (ADR-0002), разбор - в потоке."""
+    with tempfile.TemporaryDirectory(prefix="quantor-passport-") as workdir:
+        path = Path(workdir) / "source.pdf"
+        with path.open("wb") as output:
+            async for chunk in storage.iter_stream(storage_key, chunk_size=CHUNK_SIZE):
+                output.write(chunk)
+        return await asyncio.to_thread(_parse_pdf, path, file_name)
+
+
+async def latest_pdf_revisions(
+    session: AsyncSession, *, project_id: uuid.UUID
+) -> list[DocumentRevision]:
+    """Последняя ревизия каждого PDF-документа проекта, по имени файла."""
+    rows = await session.scalars(
+        select(DocumentRevision)
+        .join(Document, Document.id == DocumentRevision.document_id)
+        .where(Document.project_id == project_id, Document.document_kind == DocumentKind.PDF)
+        .distinct(DocumentRevision.document_id)
+        .order_by(
+            DocumentRevision.document_id,
+            DocumentRevision.created_at.desc(),
+            DocumentRevision.id.desc(),
+        )
+    )
+    return sorted(rows, key=lambda item: (item.source_filename, str(item.id)))
+
+
+async def execute_sheet_passport_extract(
+    session: AsyncSession, job: Job, *, storage: ObjectStorage, settings: Settings
+) -> Job:
+    """Тело задания `sheet_passport_extract`: паспорта-кандидаты по текстовому слою PDF проекта.
+
+    Файлы идут по одному, после каждого - коммит. Файл, который не открылся, задание не валит:
+    он попадает в итог с именем и классом ошибки (содержимое чужих документов в итог и журнал
+    не попадает).
+    """
+    del settings  # реестр обработчиков один на все типы: сигнатура общая
+    raw_project_id = job.payload.get("project_id")
+    try:
+        project_id = uuid.UUID(str(raw_project_id))
+    except ValueError:
+        return await jobs_service.fail(
+            session,
+            job=job,
+            error_code=ErrorCode.SHEET_PASSPORT_EXTRACT_FAILED.value,
+            error_message="в задании нет ссылки на проект",
+        )
+
+    await jobs_service.start(session, job=job, stage="passport")
+    revisions = await latest_pdf_revisions(session, project_id=project_id)
+    await session.commit()
+
+    files = pages = created = updated = skipped = 0
+    errors: list[dict[str, str]] = []
+    error_count = 0
+    total = len(revisions)
+    for number, revision in enumerate(revisions, start=1):
+        file_name = revision.source_filename
+        revision_id = revision.id
+        try:
+            candidates = await _download_and_parse(
+                storage, storage_key=revision.storage_key, file_name=file_name
+            )
+        except ObjectNotFoundError:
+            reason = "ObjectNotFoundError"
+        except Exception as error:
+            reason = type(error).__name__
+            log.warning("sheet_passport_file_failed", job_id=str(job.id), reason=reason)
+        else:
+            reason = ""
+            made, changed, left = await _upsert_candidates(
+                session,
+                project_id=project_id,
+                revision_id=revision_id,
+                file_name=file_name,
+                candidates=candidates,
+            )
+            files += 1
+            pages += len(candidates)
+            created += made
+            updated += changed
+            skipped += left
+        if reason:
+            error_count += 1
+            if len(errors) < MAX_REPORTED_ERRORS:
+                errors.append({"file_name": file_name, "reason": reason})
+        await jobs_service.report_progress(session, job=job, progress=number / total)
+        await session.commit()
+
+    log.info(
+        "sheet_passport_extract_finished",
+        job_id=str(job.id),
+        files=files,
+        pages=pages,
+        errors=error_count,
+    )
+    result = await jobs_service.succeed(
+        session,
+        job=job,
+        payload={
+            "files_total": total,
+            "files_parsed": files,
+            "pages": pages,
+            "created": created,
+            "updated": updated,
+            "skipped_reviewed": skipped,
+            "error_count": error_count,
+            "errors": errors,
+            "versions": dictionary_versions(),
+        },
+    )
+    await session.commit()
+    return result
+
+
+# --------------------------------------------------------------------------- чтение и правка
+
+
+def _to_out(row: SheetPassport, document_id: uuid.UUID, document_name: str) -> SheetPassportOut:
+    return SheetPassportOut(
+        id=row.id,
+        project_id=row.project_id,
+        revision_id=row.revision_id,
+        document_id=document_id,
+        document_name=document_name,
+        page_index=row.page_index,
+        file_name=row.file_name,
+        section_mark=row.section_mark,
+        sheet_kind=row.sheet_kind,
+        stage=row.stage,
+        building=row.building,
+        section=row.section,
+        level_from=row.level_from,
+        level_to=row.level_to,
+        level_from_ordinal=row.level_from_ordinal,
+        level_to_ordinal=row.level_to_ordinal,
+        elevation_m=row.elevation_m,
+        code=row.code,
+        sheet_number=row.sheet_number,
+        title=row.title,
+        status=SheetPassportStatus(row.status),
+        evidence={
+            name: FieldEvidenceOut(
+                source=str(item.get("source", "")), snippet=str(item.get("snippet", ""))
+            )
+            for name, item in row.evidence.items()
+            if isinstance(item, dict)
+        },
+        versions={str(key): str(value) for key, value in row.versions.items()},
+        confirmed_by=row.confirmed_by,
+        confirmed_at=row.confirmed_at,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _scoped(project_id: uuid.UUID) -> Any:
+    return (
+        select(SheetPassport, Document.id, Document.display_name)
+        .join(DocumentRevision, DocumentRevision.id == SheetPassport.revision_id)
+        .join(Document, Document.id == DocumentRevision.document_id)
+        .where(SheetPassport.project_id == project_id)
+    )
+
+
+async def list_passports(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    status: SheetPassportStatus | None,
+    section_mark: str | None,
+    revision_id: uuid.UUID | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[SheetPassportOut], int]:
+    conditions = []
+    if status is not None:
+        conditions.append(SheetPassport.status == status.value)
+    if section_mark is not None:
+        conditions.append(SheetPassport.section_mark == section_mark)
+    if revision_id is not None:
+        conditions.append(SheetPassport.revision_id == revision_id)
+    total = await session.scalar(
+        select(func.count())
+        .select_from(SheetPassport)
+        .where(SheetPassport.project_id == project_id, *conditions)
+    )
+    result = await session.execute(
+        _scoped(project_id)
+        .where(*conditions)
+        .order_by(SheetPassport.file_name, SheetPassport.page_index, SheetPassport.id)
+        .limit(limit)
+        .offset(offset)
+        .execution_options(populate_existing=True)
+    )
+    items = [_to_out(row, document_id, name) for row, document_id, name in result.all()]
+    return items, int(total or 0)
+
+
+async def get_passport_out(
+    session: AsyncSession, *, project_id: uuid.UUID, passport_id: uuid.UUID
+) -> SheetPassportOut:
+    result = await session.execute(
+        _scoped(project_id)
+        .where(SheetPassport.id == passport_id)
+        .execution_options(populate_existing=True)
+    )
+    found = result.first()
+    if found is None:
+        raise not_found("Паспорт листа")
+    row, document_id, name = found
+    return _to_out(row, document_id, name)
+
+
+def _stamp_review(row: SheetPassport, status: SheetPassportStatus, user_id: uuid.UUID) -> None:
+    row.status = status.value
+    if status is SheetPassportStatus.CANDIDATE:
+        row.confirmed_by = None
+        row.confirmed_at = None
+    else:
+        row.confirmed_by = user_id
+        row.confirmed_at = datetime.now(UTC)
+
+
+async def patch_passport(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    passport_id: uuid.UUID,
+    patch: SheetPassportPatch,
+    user_id: uuid.UUID,
+) -> SheetPassportOut:
+    """Правка полей и/или статуса; правленое поле получает доказательство `manual`."""
+    row = await session.scalar(
+        select(SheetPassport)
+        .where(SheetPassport.id == passport_id, SheetPassport.project_id == project_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if row is None:
+        raise not_found("Паспорт листа")
+    evidence: dict[str, Any] = dict(row.evidence)
+    for name in PASSPORT_FIELDS:
+        if name in patch.model_fields_set:
+            setattr(row, name, getattr(patch, name))
+            evidence[name] = {"source": EvidenceSource.MANUAL.value, "snippet": ""}
+    row.evidence = evidence
+    if patch.status is not None:
+        _stamp_review(row, patch.status, user_id)
+    await session.flush()
+    return await get_passport_out(session, project_id=project_id, passport_id=passport_id)
+
+
+async def bulk_status(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    ids: list[uuid.UUID],
+    status: SheetPassportStatus,
+    user_id: uuid.UUID,
+) -> int:
+    """Единый статус пачке паспортов проекта; чужой или неизвестный id - 404, ничего не меняется."""
+    unique = set(ids)
+    found = await session.scalar(
+        select(func.count())
+        .select_from(SheetPassport)
+        .where(SheetPassport.project_id == project_id, SheetPassport.id.in_(unique))
+    )
+    if int(found or 0) != len(unique):
+        raise not_found("Паспорт листа")
+    review = status is not SheetPassportStatus.CANDIDATE
+    updated = await session.scalars(
+        update(SheetPassport)
+        .where(SheetPassport.project_id == project_id, SheetPassport.id.in_(unique))
+        .values(
+            status=status.value,
+            confirmed_by=user_id if review else None,
+            confirmed_at=datetime.now(UTC) if review else None,
+        )
+        .returning(SheetPassport.id)
+    )
+    return len(updated.all())
+
+
+# --------------------------------------------------------------------------- итог разбора
+
+
+def _payload_int(payload: dict[str, Any], key: str) -> int | None:
+    value = payload.get(key)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _payload_errors(payload: dict[str, Any]) -> list[SheetPassportExtractError]:
+    raw = payload.get("errors")
+    if not isinstance(raw, list):
+        return []
+    return [
+        SheetPassportExtractError(
+            file_name=str(item["file_name"]), error=str(item.get("reason", ""))
+        )
+        for item in raw
+        if isinstance(item, dict) and "file_name" in item
+    ]
+
+
+def _payload_versions(payload: dict[str, Any]) -> dict[str, str]:
+    raw = payload.get("versions")
+    if not isinstance(raw, dict):
+        return {}
+    return {str(key): str(value) for key, value in raw.items()}
+
+
+async def latest_extract_summary(
+    session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
+) -> SheetPassportExtractSummary | None:
+    """Последнее задание разбора листов проекта с итогом из его payload; заданий не было - None."""
+    job = await session.scalar(
+        select(Job)
+        .where(
+            Job.workspace_id == workspace_id,
+            Job.project_id == project_id,
+            Job.job_type == JobType.SHEET_PASSPORT_EXTRACT,
+        )
+        .order_by(Job.created_at.desc(), Job.id.desc())
+        .limit(1)
+    )
+    if job is None:
+        return None
+    payload: dict[str, Any] = job.payload if isinstance(job.payload, dict) else {}
+    return SheetPassportExtractSummary(
+        job_id=job.id,
+        status=job.status.value,
+        progress=job.progress,
+        stage=job.stage,
+        error_code=job.error_code,
+        created_at=job.created_at,
+        finished_at=job.finished_at,
+        files_total=_payload_int(payload, "files_total"),
+        files_parsed=_payload_int(payload, "files_parsed"),
+        pages=_payload_int(payload, "pages"),
+        created=_payload_int(payload, "created"),
+        updated=_payload_int(payload, "updated"),
+        skipped_reviewed=_payload_int(payload, "skipped_reviewed"),
+        error_count=_payload_int(payload, "error_count"),
+        errors=_payload_errors(payload),
+        versions=_payload_versions(payload),
+    )
