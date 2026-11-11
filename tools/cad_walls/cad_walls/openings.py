@@ -34,6 +34,7 @@ class End:
     owner: int
     point: FloatArr
     direction: FloatArr
+    part: int = 0  # индекс линии оси в конструкции-владельце
 
 
 @dataclass
@@ -116,23 +117,27 @@ def _end_of(
 
 
 def free_ends(cons: list[Construction], p: Params) -> list[End]:
+    """Свободные торцы: конец оси участка, не касающийся другой конструкции или другого участка."""
     tol = p.num("end_contact_tol_mm")
     tree = STRtree([c.polygon for c in cons])
     out: list[End] = []
     for i, c in enumerate(cons):
-        for line in c.axis:
+        # участки линий оси до склейки; нет их или не сходятся с осями — как у целой конструкции
+        parts = c.axis_parts if len(c.axis_parts) == len(c.axis) else []
+        for k, line in enumerate(c.axis):
             arr = np.asarray(line, dtype=np.float64)
             for at_start in (True, False):
-                found = _end_of(arr, at_start, c.thickness, c.polygon)
+                found = _end_of(arr, at_start, c.thickness, parts[k] if parts else c.polygon)
                 if found is None:
                     continue
                 point, d = found
-                near = tree.query(Point(point).buffer(tol))
-                if any(
-                    int(j) != i and cons[int(j)].polygon.distance(Point(point)) < tol for j in near
-                ):
+                pt = Point(point)
+                near = tree.query(pt.buffer(tol))
+                if any(int(j) != i and cons[int(j)].polygon.distance(pt) < tol for j in near):
                     continue
-                out.append(End(i, point, d))
+                if any(k2 != k and part.distance(pt) < tol for k2, part in enumerate(parts)):
+                    continue
+                out.append(End(i, point, d, k))
     return out
 
 
@@ -145,7 +150,7 @@ def _seg_dist(p: FloatArr, a: FloatArr, b: FloatArr) -> float:
 
 def _coaxial(a: End, b: End, cons: list[Construction], cos_split: float) -> float | None:
     """Ширина разрыва между двумя торцами, если они смотрят друг на друга по одной оси."""
-    if a.owner == b.owner or float(a.direction @ b.direction) > -cos_split:
+    if float(a.direction @ b.direction) > -cos_split:
         return None
     v = b.point - a.point
     gap = float(np.hypot(*v))
@@ -156,7 +161,14 @@ def _coaxial(a: End, b: End, cons: list[Construction], cos_split: float) -> floa
     off_b = abs(float(v[0] * b.direction[1] - v[1] * b.direction[0]))
     if off_a > half or off_b > half:
         return None
-    if cons[a.owner].polygon.distance(cons[b.owner].polygon) < MIN_GAP_MM:
+    if a.owner == b.owner:
+        # одна конструкция: торцы разных участков, между которыми есть зазор (кольцо с разрывом)
+        parts = cons[a.owner].axis_parts
+        if a.part == b.part or len(parts) != len(cons[a.owner].axis):
+            return None
+        if parts[a.part].distance(parts[b.part]) < MIN_GAP_MM:
+            return None
+    elif cons[a.owner].polygon.distance(cons[b.owner].polygon) < MIN_GAP_MM:
         return None
     return gap
 

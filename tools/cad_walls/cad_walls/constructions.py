@@ -28,6 +28,8 @@ class Construction:
     thickness_nominal: float | None
     length_axis: float
     source_layers: list[str] = field(default_factory=list)
+    # параллельно axis: полигон участка линии до склейки одной толщины; в выходной JSON не выводится
+    axis_parts: list[Polygon] = field(default_factory=list)
 
     @property
     def thickness(self) -> float:
@@ -60,7 +62,7 @@ def _rect_piece(poly: Polygon) -> RawPiece:
     rect = poly.minimum_rotated_rectangle
     c = list(rect.exterior.coords) if isinstance(rect, Polygon) else []
     if len(c) < 4:
-        return RawPiece(poly, [], [])
+        return RawPiece(poly, [], [], [])
     a = math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1])
     b = math.hypot(c[2][0] - c[1][0], c[2][1] - c[1][1])
     if a >= b:  # длинная сторона c0-c1: ось между серединами коротких сторон
@@ -69,12 +71,23 @@ def _rect_piece(poly: Polygon) -> RawPiece:
     else:
         p0 = ((c[0][0] + c[1][0]) / 2, (c[0][1] + c[1][1]) / 2)
         p1 = ((c[3][0] + c[2][0]) / 2, (c[3][1] + c[2][1]) / 2)
-    return RawPiece(poly, [[p0, p1]], [])
+    return RawPiece(poly, [[p0, p1]], [], [poly])
 
 
-def _axis(raw: RawPiece) -> list[list[Pt]]:
-    lines = [line for line in raw.axis if len(line) >= MIN_AXIS_POINTS]
-    return lines or _rect_piece(raw.polygon).axis
+def _axis(raw: RawPiece) -> tuple[list[list[Pt]], list[Polygon]]:
+    """Оси конструкции и полигоны их участков; нет оси — средняя линия описанного прямоугольника."""
+    parts = (
+        raw.axis_parts if len(raw.axis_parts) == len(raw.axis) else [raw.polygon] * len(raw.axis)
+    )
+    kept = [
+        (line, part)
+        for line, part in zip(raw.axis, parts, strict=True)
+        if len(line) >= MIN_AXIS_POINTS
+    ]
+    if not kept:
+        rect = _rect_piece(raw.polygon)
+        return rect.axis, rect.axis_parts
+    return [line for line, _ in kept], [part for _, part in kept]
 
 
 def _measure(raw: RawPiece, p: Params) -> float:
@@ -88,9 +101,9 @@ def _measure(raw: RawPiece, p: Params) -> float:
     return t_rect if t_rect > 0 else short
 
 
-def _monolith_kind(poly: Polygon, p: Params) -> str:
-    short, long, _ = min_rect_sides(poly)
-    aspect = long / short if short > 0 else math.inf
+def _monolith_kind(poly: Polygon, t: float, p: Params) -> str:
+    """Вид монолита по длине оси: площадь / t² (для прямоугольника — long / short)."""
+    aspect = poly.area / t**2 if t > 0 else math.inf
     if aspect <= p.num("column_max_aspect"):
         return "monolith_column"
     if aspect <= p.num("pylon_max_aspect"):
@@ -134,18 +147,20 @@ def build_constructions(
                 t = _measure(raw, p)
                 if t <= 0:
                     continue
-                kind = family if family == "masonry" else _monolith_kind(raw.polygon, p)
+                kind = family if family == "masonry" else _monolith_kind(raw.polygon, t, p)
+                axis, axis_parts = _axis(raw)
                 out.append(
                     Construction(
                         id="",
                         kind=kind,
                         family=family,
                         polygon=raw.polygon,
-                        axis=_axis(raw),
+                        axis=axis,
                         thickness_measured=t,
                         thickness_nominal=match_nominal(t, nominals, tol),
                         length_axis=raw.polygon.area / t,
                         source_layers=_layers_of(raw.polygon, layers[family]),
+                        axis_parts=axis_parts,
                     )
                 )
     order = {"masonry": 0, "monolith_wall": 1, "monolith_pylon": 2, "monolith_column": 3}

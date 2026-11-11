@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from ezdxf.layouts.layout import Modelspace
+from shapely.geometry import Polygon, box
 
 from tests import synth
 
@@ -91,3 +93,52 @@ def test_gap_between_different_nominals_is_not_opening(tmp_path: Path) -> None:
     synth.add_rect(msp, synth.MASONRY, 0, 0, 2000, 100)
     synth.add_rect(msp, synth.MASONRY, 3000, -50, 5000, 150)
     assert _openings(synth.run(tmp_path, doc)) == []
+
+
+def _ring_with_gap(msp: Modelspace) -> None:
+    """Кольцо кладки 100 (3000 x 2000) с разрывом 900 мм посреди верхней стороны."""
+    poly = (
+        box(0, 0, 3000, 2000)
+        .difference(box(100, 100, 2900, 1900))
+        .difference(box(1050, 1900, 1950, 2000))
+    )
+    assert isinstance(poly, Polygon)
+    synth.add_poly(msp, synth.MASONRY, poly)
+
+
+def test_bent_wall_has_no_false_gap(tmp_path: Path) -> None:
+    for name, boxes in (
+        ("l", [(0, 0, 2000, 100), (0, 0, 100, 1500)]),
+        ("u", [(0, 0, 3000, 100), (0, 0, 100, 2000), (2900, 0, 3000, 2000)]),
+    ):
+        doc, msp = synth.new_doc()
+        synth.add_union(msp, synth.MASONRY, *boxes)
+        (tmp_path / name).mkdir()
+        out = synth.run(tmp_path / name, doc)
+        assert _openings(out) == []
+        assert len(_by_id(out)) == 1
+
+
+def test_ring_gap_without_door_is_gap_of_same_construction(tmp_path: Path) -> None:
+    doc, msp = synth.new_doc()
+    _ring_with_gap(msp)
+    out = synth.run(tmp_path, doc)
+    (con_id,) = _by_id(out)
+    (op,) = _openings(out)
+    assert (op["kind"], op["status"], op["width_source"]) == ("gap", "no_data", "gap")
+    assert _f(op["width_mm"]) == pytest.approx(900, abs=2)
+    assert op["host_id"] == con_id
+    assert op["adjacent_ids"] == [con_id]
+
+
+def test_door_in_ring_gap_is_ok(tmp_path: Path) -> None:
+    doc, msp = synth.new_doc()
+    _ring_with_gap(msp)
+    synth.add_door(doc, msp, "AR_DOOR_BLOCK_004", 1050, 1500, 1950, 2400)
+    out = synth.run(tmp_path, doc)
+    (con_id,) = _by_id(out)
+    (op,) = _openings(out)
+    assert (op["kind"], op["status"], op["width_source"]) == ("door", "ok", "gap")
+    assert _f(op["width_mm"]) == pytest.approx(900, abs=2)
+    assert op["host_id"] == con_id
+    assert op["adjacent_ids"] == [con_id]

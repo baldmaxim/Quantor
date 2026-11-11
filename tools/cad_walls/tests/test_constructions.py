@@ -58,9 +58,9 @@ def test_l_shaped_wall_80(tmp_path: Path) -> None:
     poly = synth.add_union(msp, synth.MASONRY, (0, 0, 2000, 80), (0, 0, 80, 1500))
     out = synth.run(tmp_path, doc)
     cons = _cons(out)
-    assert 1 <= len(cons) <= 2
-    assert all(c["thickness_nominal_mm"] == 80 for c in cons)
-    assert sum(_f(c["length_axis_mm"]) for c in cons) == pytest.approx(poly.area / 80, rel=0.01)
+    (c,) = cons
+    assert c["thickness_nominal_mm"] == 80
+    assert _f(c["length_axis_mm"]) == pytest.approx(poly.area / 80, rel=0.01)
     _assert_area_matches(out, poly.area)
 
 
@@ -74,6 +74,35 @@ def test_t_junction_200_and_100(tmp_path: Path) -> None:
     # ножка 100 x 1600 целиком, остальное — стена 200 (узел отдан более толстой)
     assert _f(by_nominal[100]["area_plan_mm2"]) == pytest.approx(160_000, rel=0.02)
     assert _f(by_nominal[200]["area_plan_mm2"]) == pytest.approx(600_000, rel=0.02)
+    # стена 200 проходит через Т насквозь — одна конструкция
+    assert [c["thickness_nominal_mm"] for c in _cons(out)].count(200) == 1
+
+
+def test_t_and_cross_junction_same_thickness_is_one_construction(tmp_path: Path) -> None:
+    for name, boxes in (
+        ("t", [(0, 0, 3000, 100), (1450, 100, 1550, 1900)]),
+        ("cross", [(0, 900, 3000, 1000), (1450, 0, 1550, 1900)]),
+    ):
+        doc, msp = synth.new_doc()
+        poly = synth.add_union(msp, synth.MASONRY, *boxes)
+        (tmp_path / name).mkdir()
+        out = synth.run(tmp_path / name, doc)
+        (c,) = _cons(out)
+        assert c["thickness_nominal_mm"] == 100
+        _assert_area_matches(out, poly.area)
+
+
+def test_u_shaped_monolith_shaft_wall_200_is_one_wall(tmp_path: Path) -> None:
+    doc, msp = synth.new_doc()
+    poly = synth.add_union(
+        msp, synth.MONOLITH, (0, 0, 1500, 200), (0, 0, 200, 1200), (1300, 0, 1500, 1200)
+    )
+    out = synth.run(tmp_path, doc)
+    (c,) = _cons(out)
+    assert c["kind"] == "monolith_wall"
+    assert c["thickness_nominal_mm"] == 200
+    assert _f(c["area_plan_mm2"]) == pytest.approx(poly.area, rel=1e-3)
+    _assert_area_matches(out, poly.area)
 
 
 def test_coaxial_step_80_to_200(tmp_path: Path) -> None:
@@ -115,6 +144,8 @@ def test_ring_wall_100_closed_chain(tmp_path: Path) -> None:
     synth.add_hatch(msp, synth.MASONRY, outer, [hole])
     out = synth.run(tmp_path, doc)
     _assert_area_matches(out, 3000 * 2000 - 2800 * 1800)
+    (c,) = _cons(out)
+    assert c["thickness_nominal_mm"] == 100
 
 
 def test_round_end_edge_path_with_arc(tmp_path: Path) -> None:

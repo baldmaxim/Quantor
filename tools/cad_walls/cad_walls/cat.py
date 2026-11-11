@@ -5,6 +5,9 @@
 Цепочки рукавов — участки стены; локальная ширина — длина внутренних хорд. Цепочка рвётся там,
 где меняется номинал ширины (медиана по окну) или направление оси. Узлы отдаются соседнему
 участку с наибольшей толщиной, мелкие остатки — соседу по самой длинной общей границе.
+Затем соседние участки одной толщины склеиваются через изломы и узлы (Г, П, Т, крест, кольцо):
+связная область одного вида и одной толщины — одна конструкция; разрыв остаётся только при смене
+номинала. Каждая линия оси помнит полигон своего участка до склейки: по ним ищутся торцы и проёмы.
 """
 
 from __future__ import annotations
@@ -32,6 +35,8 @@ class RawPiece:
     polygon: Polygon
     axis: list[list[Pt]]
     widths: list[float]
+    # параллельно axis: полигон участка, которому принадлежала линия до склейки одной толщины
+    axis_parts: list[Polygon] = field(default_factory=list)
 
 
 @dataclass
@@ -282,6 +287,8 @@ def _segments(chain: _Chain, nominals: tuple[float, ...], tol: float, p: Params)
 class _Piece:
     tris: list[int] = field(default_factory=list)
     axis: list[list[Pt]] = field(default_factory=list)
+    # параллельно axis: треугольники участка перед склейкой одной толщины (общий список на участок)
+    axis_tris: list[list[int]] = field(default_factory=list)
     chords: list[float] = field(default_factory=list)  # собственные ширины участка
     area: float = 0.0
     width: float = 0.0
@@ -387,6 +394,47 @@ def _merge_small(pieces: dict[int, _Piece], p: Params) -> None:
         del pieces[p_id]
 
 
+def _compatible(a: _Piece, b: _Piece, tol: float) -> bool:
+    """Одной ли толщины два участка: один номинал либо близкие ширины без номинала."""
+    if a.label >= 0 or b.label >= 0:
+        return a.label == b.label
+    return abs(_width(a) - _width(b)) <= tol
+
+
+def _merge_same_nominal(pieces: dict[int, _Piece], tol: float) -> None:
+    """Склеивает соседние участки одной толщины: связная область одной толщины — один участок.
+
+    Хост — участок с меньшим номером; оси (с составом исходных участков) и ширины обоих участков
+    идут вместе. Повторяется до неподвижной точки.
+    """
+    while True:
+        pair = next(
+            (
+                (q, r)
+                for q in sorted(pieces)
+                for r in sorted(pieces[q].adj)
+                if q < r and _compatible(pieces[q], pieces[r], tol)
+            ),
+            None,
+        )
+        if pair is None:
+            return
+        host_id, p_id = pair
+        host, piece = pieces[host_id], pieces[p_id]
+        host.tris += piece.tris
+        host.area += piece.area
+        host.axis += piece.axis
+        host.axis_tris += piece.axis_tris
+        host.chords += piece.chords
+        for r, length in piece.adj.items():
+            del pieces[r].adj[p_id]
+            if r != host_id:
+                host.adj[r] = host.adj.get(r, 0.0) + length
+                pieces[r].adj[host_id] = pieces[r].adj.get(host_id, 0.0) + length
+        del pieces[p_id]
+        host.width = _width(host)
+
+
 def _simplify_axis(line: list[Pt]) -> list[Pt]:
     if len(line) < 3:
         return line
@@ -417,7 +465,12 @@ def decompose(poly: Polygon, nominals: tuple[float, ...], tol: float, p: Params)
     _assign_junctions(mesh, pieces, owner, nominals, p)
     _adjacency(mesh, pieces, owner)
     _merge_small(pieces, p)
+    for piece in pieces.values():
+        snapshot = list(piece.tris)  # состав участка до склейки; общий для всех его линий оси
+        piece.axis_tris = [snapshot for _ in piece.axis]
+    _merge_same_nominal(pieces, tol)
     out: list[RawPiece] = []
+    cache: dict[int, list[Polygon]] = {}  # по id списка треугольников: части участка до склейки
     for pid in sorted(pieces):
         piece = pieces[pid]
         geom = shapely.union_all(shapely.polygons(mesh.tri[piece.tris]))
@@ -425,8 +478,25 @@ def decompose(poly: Polygon, nominals: tuple[float, ...], tol: float, p: Params)
         if not parts:
             continue
         for g in parts:
-            out.append(RawPiece(g, [_simplify_axis(a) for a in piece.axis], list(piece.chords)))
+            axis_parts = [_line_part(mesh, tris, g, cache) for tris in piece.axis_tris]
+            out.append(
+                RawPiece(g, [_simplify_axis(a) for a in piece.axis], list(piece.chords), axis_parts)
+            )
     return out
+
+
+def _line_part(
+    mesh: _Mesh, tris: list[int], g: Polygon, cache: dict[int, list[Polygon]]
+) -> Polygon:
+    """Полигон участка линии оси до склейки; из нескольких частей — та, что больше лежит в `g`."""
+    parts = cache.get(id(tris))
+    if parts is None:
+        geom = shapely.union_all(shapely.polygons(mesh.tri[tris]))
+        parts = [q for q in shapely.get_parts(geom) if isinstance(q, Polygon)]
+        cache[id(tris)] = parts
+    if not parts:
+        return g
+    return max(parts, key=lambda q: (q.intersection(g).area, q.area))
 
 
 def min_rect_sides(poly: Polygon) -> tuple[float, float, float]:
