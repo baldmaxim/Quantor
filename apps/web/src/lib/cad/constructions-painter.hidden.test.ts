@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildConstructionIndex, buildShapes } from './constructions';
+import { buildConstructionIndex, buildShapes, type IConstructionShape } from './constructions';
 import { construction } from './constructions-fixtures';
 import { createConstructionsPainter, type IConstructionPaintData } from './constructions-painter';
 import { withoutHiddenCategories } from './layer-categories';
@@ -16,7 +16,11 @@ const shapes = buildShapes(
   PAGE,
 );
 
-const fillColors = (hidden: IConstructionPaintData['hiddenCategories']): string[] => {
+const fillColors = (
+  hidden: IConstructionPaintData['hiddenCategories'],
+  hiddenLayerNames?: ReadonlySet<string>,
+  paintShapes: readonly IConstructionShape[] = shapes,
+): string[] => {
   const fills: string[] = [];
   let fill = '';
   const context = new Proxy(
@@ -35,7 +39,14 @@ const fillColors = (hidden: IConstructionPaintData['hiddenCategories']): string[
     },
   ) as unknown as CanvasRenderingContext2D;
   createConstructionsPainter(
-    { shapes, colors: COLORS, selected: new Set<string>(), showAll: true, hiddenCategories: hidden },
+    {
+      shapes: paintShapes,
+      colors: COLORS,
+      selected: new Set<string>(),
+      showAll: true,
+      hiddenCategories: hidden,
+      hiddenLayerNames,
+    },
     { clear: true },
   ).paint(context, PLACEMENT, 1, null);
   return fills;
@@ -50,6 +61,21 @@ describe('рисовальщик: скрытые категории', () => {
     expect(fillColors(new Set(['monolith']))).toEqual(['brown', 'brown']);
     expect(fillColors(new Set(['masonry', 'frame_partition']))).toEqual(['indigo']);
     expect(fillColors(new Set(['masonry', 'frame_partition', 'monolith']))).toEqual([]);
+  });
+
+  it('конструкция, все слои-источники которой скрыты, не рисуется', () => {
+    const layered = buildShapes(
+      [
+        construction({ id: 'a', source_layers: ['01_КЛАДКА_200'] }),
+        construction({ id: 'b', kind: 'monolith_wall', source_layers: ['01_КЛАДКА_80'] }),
+        construction({ id: 'c', source_layers: ['01_КЛАДКА_200', '01_КЛАДКА_80'] }),
+      ],
+      FRAME,
+      PAGE,
+    );
+    expect(fillColors(undefined, new Set(['01_КЛАДКА_200']), layered)).toEqual(['indigo', 'brown']);
+    expect(fillColors(undefined, new Set(['01_КЛАДКА_200', '01_КЛАДКА_80']), layered)).toEqual([]);
+    expect(fillColors(undefined, new Set(), layered)).toHaveLength(3);
   });
 
   it('touches не строже paint: всё скрыто - слой пуст', () => {

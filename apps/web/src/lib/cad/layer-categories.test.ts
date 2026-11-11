@@ -4,6 +4,9 @@ import {
   categoryOfKind,
   categoryOfLayer,
   hiddenCategoriesOf,
+  hiddenConstructionIdsOf,
+  isHiddenByLayers,
+  layerGroupKeyOf,
   withoutHiddenCategories,
 } from './layer-categories';
 
@@ -72,5 +75,40 @@ describe('фильтр фигур по скрытым категориям', () 
     expect(withoutHiddenCategories(shapes, new Set(['monolith', 'slab'])).map((s) => s.id)).toEqual(['a']);
     expect(withoutHiddenCategories(shapes, new Set())).toBe(shapes);
     expect(withoutHiddenCategories(shapes, undefined)).toBe(shapes);
+  });
+});
+
+describe('скрытие конструкций слоями-источниками', () => {
+  const hidden = new Set(['01_КЛАДКА_200']);
+
+  it('isHiddenByLayers: пустой список, часть скрыта, все скрыты', () => {
+    expect(isHiddenByLayers([], hidden)).toBe(false);
+    expect(isHiddenByLayers(['01_КЛАДКА_200', '01_КЛАДКА_80'], hidden)).toBe(false);
+    expect(isHiddenByLayers(['01_КЛАДКА_200'], hidden)).toBe(true);
+    expect(isHiddenByLayers(['01_КЛАДКА_200'], new Set())).toBe(false);
+  });
+
+  it('набор скрытых id: слой 200 скрыт, 80 виден - скрыты только конструкции слоя 200', () => {
+    const items = [
+      { id: 'a', kind: 'masonry' as const, source_layers: ['01_КЛАДКА_200'] },
+      { id: 'b', kind: 'masonry' as const, source_layers: ['01_КЛАДКА_80'] },
+      { id: 'c', kind: 'masonry' as const, source_layers: [] },
+    ];
+    expect([...hiddenConstructionIdsOf(items, new Set(), hidden)]).toEqual(['a']);
+    // Скрытая категория скрывает и конструкции без слоёв.
+    expect([...hiddenConstructionIdsOf(items, new Set(['masonry']), hidden)].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('withoutHiddenCategories учитывает слои фигуры', () => {
+    const shapes = [
+      { kind: 'masonry' as const, layers: ['01_КЛАДКА_200'] },
+      { kind: 'masonry' as const, layers: ['01_КЛАДКА_80'] },
+    ];
+    expect(withoutHiddenCategories(shapes, undefined, hidden)).toEqual([shapes[1]]);
+  });
+
+  it('ключ подгруппы не зависит от порядка и дублей слоёв', () => {
+    expect(layerGroupKeyOf(['b', 'a', 'a'])).toBe(layerGroupKeyOf(['a', 'b']));
+    expect(layerGroupKeyOf([])).toBeUndefined();
   });
 });

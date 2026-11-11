@@ -43,6 +43,8 @@ export interface IConstructionPaintData {
   readonly notInVor?: ReadonlySet<string>;
   /** Скрытые категории вкладки «Слои»: их конструкции не рисуются (и не выбираются - индекс строится без них). */
   readonly hiddenCategories?: ReadonlySet<CadLayerCategory>;
+  /** Имена скрытых слоёв DXF: конструкция скрыта, когда скрыты все её слои-источники. */
+  readonly hiddenLayerNames?: ReadonlySet<string>;
 }
 
 const FILL_ALPHA = 0.22;
@@ -65,7 +67,7 @@ const MARGIN = 8;
 
 /** Конструкции, которые слой рисует: при полном показе все, иначе только выбранные. */
 const drawnShapes = (data: IConstructionPaintData): readonly IConstructionShape[] => {
-  const shapes = withoutHiddenCategories(data.shapes, data.hiddenCategories);
+  const shapes = withoutHiddenCategories(data.shapes, data.hiddenCategories, data.hiddenLayerNames);
   return data.showAll ? shapes : shapes.filter((shape) => data.selected.has(shape.id));
 };
 

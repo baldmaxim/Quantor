@@ -4,6 +4,7 @@ import { cx } from '@quantor/ui';
 import { useEffect, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
+import { ToolButton, ToolDivider } from '@/components/workspace/Toolbar';
 import { WALLS_NOT_READY, isWallsActive, useCadConstructions, wallsJobStatus } from '@/lib/cad/constructions-queries';
 import { cadErrorText } from '@/lib/cad/errors';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
@@ -16,7 +17,7 @@ import {
   useSetFloor3dHole,
 } from '@/lib/cad/floor3d-queries';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
-import type { CadLayerCategory } from '@/lib/cad/layer-categories';
+import { layerGroupKeys, type CadLayerCategory } from '@/lib/cad/layer-categories';
 import { useMepLayerVisibility } from '@/lib/cad/mep-layers';
 import { useCadMepRoutes3d } from '@/lib/cad/mep-routes3d-queries';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
@@ -38,12 +39,14 @@ export interface ICadFloor3dViewProps {
   readonly onSelectConstruction?: (id: string | null) => void;
   /** Скрытые категории вкладки «Слои». */
   readonly hiddenCategories?: ReadonlySet<CadLayerCategory>;
+  /** Конструкции, скрытые вкладкой «Слои» (категория или все слои-источники). */
+  readonly hiddenConstructionIds?: ReadonlySet<string>;
 }
 
 /** Связь 3D-вида с общим выбором и слоями рабочей области: всё, кроме листа. */
 export type ICadFloor3dLink = Pick<
   ICadFloor3dViewProps,
-  'selectedIds' | 'onSelectConstruction' | 'hiddenCategories'
+  'selectedIds' | 'onSelectConstruction' | 'hiddenCategories' | 'hiddenConstructionIds'
 >;
 
 const NO_IDS: ReadonlySet<string> = new Set<string>();
@@ -86,6 +89,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   selectedIds = NO_IDS,
   onSelectConstruction,
   hiddenCategories,
+  hiddenConstructionIds,
 }) => {
   const query = useCadFloor3d(params, true);
   const projectLevels = useCadProjectLevels(params.projectId, true);
@@ -94,6 +98,14 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const saveProject = useSaveCadProjectLevels(params.projectId);
   // Тот же запрос и ключ, что у вкладки «Конструкции»: кеш общий. Из него - длина, площадь, объём стены.
   const constructions = useCadConstructions(params, true);
+
+  // Ключи подгрупп сцены по слоям-источникам: пересборка только при смене содержимого, не данных.
+  const keysNow = useMemo(
+    () => layerGroupKeys(constructions.data?.constructions ?? []),
+    [constructions.data],
+  );
+  const [groupKeys, setGroupKeys] = useState(keysNow);
+  if (groupKeys.signature !== keysNow.signature) setGroupKeys(keysNow);
 
   const model = query.data ?? null;
   const plan = useMemo(() => (model ? buildFloor3dPlan(model) : null), [model]);
@@ -259,6 +271,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
           selected={selected}
           selectedIds={selectedIds}
           hiddenCategories={hiddenCategories}
+          hiddenConstructionIds={hiddenConstructionIds}
+          groupKeyOf={groupKeys.keyOf}
           measuring={measuring}
           onPick={onPick}
           // Камера пошла - плашка у курсора устарела, а выделение остаётся.
@@ -302,43 +316,50 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
       className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="relative z-30 flex flex-none flex-wrap items-center gap-[var(--s-3)] border-b border-border bg-surface px-[var(--s-4)] py-[var(--s-3)]">
+        <div className="relative z-30 flex flex-none flex-wrap items-center gap-x-[var(--s-2)] gap-y-[var(--s-1)] border-b border-border bg-surface px-[var(--s-4)] py-[var(--s-2)]">
           {floorTitle !== '' && (
-            <h3
-              data-testid="floor3d-title"
-              title={formatFloorTitleFull(model?.title) ?? undefined}
-              className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]"
-            >
-              {floorTitle}
-            </h3>
+            <>
+              <h3
+                data-testid="floor3d-title"
+                title={formatFloorTitleFull(model?.title) ?? undefined}
+                className="min-w-0 text-xs font-semibold [overflow-wrap:anywhere]"
+              >
+                {floorTitle}
+              </h3>
+              <ToolDivider />
+            </>
           )}
-          <Button disabled={!interactive} className="max-md:h-[44px]" onClick={() => request('top')}>
+          <ToolButton wide label="Сверху" hint="вид сверху на план" disabled={!interactive} onClick={() => request('top')}>
             Сверху
-          </Button>
-          <Button disabled={!interactive} className="max-md:h-[44px]" onClick={() => request('iso')}>
+          </ToolButton>
+          <ToolButton wide label="Изометрия" hint="вид под углом" disabled={!interactive} onClick={() => request('iso')}>
             Изометрия
-          </Button>
-          <Button disabled={!interactive} className="max-md:h-[44px]" onClick={() => request('fit')}>
+          </ToolButton>
+          <ToolButton wide label="Вписать" hint="весь этаж в экран" disabled={!interactive} onClick={() => request('fit')}>
             Вписать
-          </Button>
-          <Button
+          </ToolButton>
+          <ToolButton
+            wide
+            label="Измерить"
+            hint="две точки на модели, Esc — выход"
+            active={measuring}
             disabled={!interactive}
-            aria-pressed={measuring}
-            className={cx('max-md:h-[44px]', measuring && 'border-accent text-accent')}
             onClick={toggleMeasuring}
           >
             Измерить
-          </Button>
-          <label className="flex min-h-[44px] items-center gap-[var(--s-3)] text-xs md:min-h-0">
-            <input
-              type="checkbox"
-              checked={showSlabCap}
-              disabled={!interactive}
-              onChange={(event) => setShowSlabCap(event.target.checked)}
-              className="h-[20px] w-[20px] accent-[var(--accent)]"
-            />
+          </ToolButton>
+          <ToolDivider />
+          <ToolButton
+            wide
+            label="Плита сверху"
+            hint="показать или скрыть плиту перекрытия"
+            active={showSlabCap}
+            disabled={!interactive}
+            onClick={() => setShowSlabCap((v) => !v)}
+          >
             Плита сверху
-          </label>
+          </ToolButton>
+          <ToolDivider />
           <CadFloor3dDxfButton
             params={params}
             model={model}

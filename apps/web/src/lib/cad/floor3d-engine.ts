@@ -42,6 +42,8 @@ export interface IFloor3dEngine {
   setHighlight: (targets: readonly IFloor3dHighlight[]) => void;
   /** Показать или скрыть категорию без пересборки сцены; переживает пересборку модели. */
   setCategoryVisible: (category: CadLayerCategory, visible: boolean) => void;
+  /** Скрыть конструкции по id (подгруппы сцены) без пересборки; переживает пересборку модели. */
+  setHiddenIds: (ids: ReadonlySet<string>) => void;
   /** Трассы механики: отдельная группа вне модели, в клик не входит; прежняя освобождается, `null` - снять. */
   setRoutes: (routes: IFloor3dRoutes | null) => void;
   /** Перерисовать кадр после смены видимости трасс. */
@@ -159,6 +161,7 @@ export const createFloor3dEngine = (
   let fitted = false;
   let highlight: readonly IFloor3dHighlight[] = [];
   const hiddenCategories = new Set<CadLayerCategory>();
+  let hiddenIds: ReadonlySet<string> = new Set<string>();
 
   // Замер: маркеры и линия лежат в сцене отдельно от модели, поверх всего (depthTest выключен).
   let measuring = false;
@@ -487,6 +490,7 @@ export const createFloor3dEngine = (
       if (next !== null) {
         next.setHighlight(highlight);
         for (const category of hiddenCategories) next.setCategoryVisible(category, false);
+        next.setHiddenIds(hiddenIds);
       }
       if (next === null) {
         requestRender();
@@ -517,6 +521,11 @@ export const createFloor3dEngine = (
       if (visible) hiddenCategories.delete(category);
       else hiddenCategories.add(category);
       model?.setCategoryVisible(category, visible);
+      requestRender();
+    },
+    setHiddenIds: (ids) => {
+      hiddenIds = ids;
+      model?.setHiddenIds(ids);
       requestRender();
     },
     setMeasuring: (on) => {

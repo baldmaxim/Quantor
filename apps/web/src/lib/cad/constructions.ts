@@ -32,6 +32,8 @@ export interface IConstructionShape {
   readonly kind: ConstructionKind;
   readonly status: ConstructionStatus;
   readonly accepted: boolean;
+  /** Слои DXF, по которым построена конструкция (`source_layers`); пусто - только правило категории. */
+  readonly layers: readonly string[];
   readonly rings: readonly Ring[];
   readonly bounds: NormalizedBounds;
 }
@@ -76,6 +78,7 @@ export const shapeOf = (
     kind: construction.kind,
     status: construction.computed.status,
     accepted: construction.accepted,
+    layers: construction.source_layers,
     rings: [shell, ...holes],
     bounds: boundsOfRing(shell),
   };

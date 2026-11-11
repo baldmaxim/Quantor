@@ -90,6 +90,11 @@ export interface IFloor3dScene {
   setHighlight: (targets: readonly IFloor3dHighlight[]) => void;
   /** Показать или скрыть категорию (Object3D.visible, без пересборки). Скрытое в клик не входит. */
   setCategoryVisible: (category: CadLayerCategory, visible: boolean) => void;
+  /**
+   * Скрыть конструкции по id (Object3D.visible, без пересборки): подгруппа скрывается, когда скрыты
+   * все её id. Работает для кладки, монолита и каркасных перегородок; пусто - показать всё.
+   */
+  setHiddenIds: (ids: ReadonlySet<string>) => void;
   dispose: () => void;
 }
 
@@ -169,10 +174,24 @@ const mergeItems = (
   return { geometry, pick: { kind, category, ids: built.map((item) => item.id), starts, total } };
 };
 
+/** Категории, чьи слитые меши делятся на подгруппы по набору слоёв-источников. */
+const SPLIT_CATEGORIES: ReadonlySet<PrismCategory> = new Set<PrismCategory>([
+  'masonry',
+  'monolith',
+  'frame_partition',
+]);
+
 export const buildFloor3dScene = (
   plan: IFloor3dPlan,
   colors: IFloor3dColors,
-  options: { readonly showSlabCap: boolean },
+  options: {
+    readonly showSlabCap: boolean;
+    /**
+     * Ключ подгруппы конструкции: у конструкций одной подгруппы одинаковый набор слоёв-источников,
+     * поэтому видимость подгруппы однозначна. Нет функции или ключа - общая группа категории.
+     */
+    readonly groupKeyOf?: (id: string) => string | undefined;
+  },
 ): IFloor3dScene => {
   const group = new THREE.Group();
   const pickables: THREE.Mesh[] = [];
@@ -184,11 +203,27 @@ export const buildFloor3dScene = (
   };
 
   // Объекты по категориям видимости: меши, рёбра, отверстия и копия плиты сверху.
-  const byCategory = new Map<CadLayerCategory, THREE.Object3D[]>();
-  const register = (category: CadLayerCategory, object: THREE.Object3D): void => {
-    const list = byCategory.get(category);
-    if (list === undefined) byCategory.set(category, [object]);
-    else list.push(object);
+  // Видимость объекта = категория не скрыта и подгруппа (если есть) не скрыта по id.
+  interface IRegistered {
+    readonly category: CadLayerCategory;
+    readonly object: THREE.Object3D;
+    /** id подгруппы; `null` - объект управляется только категорией. */
+    readonly ids: readonly string[] | null;
+  }
+  const registered: IRegistered[] = [];
+  const hiddenCategorySet = new Set<CadLayerCategory>();
+  let hiddenIdSet: ReadonlySet<string> = new Set<string>();
+  const applyVisibility = (item: IRegistered): void => {
+    const byIds =
+      item.ids !== null && item.ids.length > 0 && item.ids.every((id) => hiddenIdSet.has(id));
+    item.object.visible = !hiddenCategorySet.has(item.category) && !byIds;
+  };
+  const register = (
+    category: CadLayerCategory,
+    object: THREE.Object3D,
+    ids: readonly string[] | null = null,
+  ): void => {
+    registered.push({ category, object, ids });
   };
 
   const solid = (color: string, opacity = 1) =>
@@ -224,26 +259,38 @@ export const buildFloor3dScene = (
     },
     { category: 'door', color: colors.door, include: () => true },
   ];
+  const groupKeyOf = options.groupKeyOf;
   for (const { category, color, include } of groups) {
-    const merged = mergeItems(
-      plan.prisms
-        .filter((item) => item.category === category && include(item))
-        .map((item) => ({ id: item.id, geometry: prismGeometry(item) })),
-      'prism',
-      category,
-    );
-    if (merged === null) continue;
-    track(merged.geometry);
-    const mesh = new THREE.Mesh(merged.geometry, solid(color, category === 'door' ? DOOR_OPACITY : 1));
-    mesh.userData.pick = merged.pick;
-    group.add(mesh);
-    pickables.push(mesh);
-    register(category, mesh);
-    const edges = new THREE.EdgesGeometry(merged.geometry, 30);
-    track(edges);
-    const edgeLines = new THREE.LineSegments(edges, edgeMaterial);
-    group.add(edgeLines);
-    register(category, edgeLines);
+    const items = plan.prisms.filter((item) => item.category === category && include(item));
+    // Кладка, монолит и перегородки делятся на подгруппы по слоям-источникам: слой скрывается без
+    // пересборки. Прочие категории - один меш, как раньше.
+    const subgroups = new Map<string, typeof items>();
+    for (const item of items) {
+      const key = SPLIT_CATEGORIES.has(category) ? (groupKeyOf?.(item.id) ?? '') : '';
+      const list = subgroups.get(key);
+      if (list === undefined) subgroups.set(key, [item]);
+      else list.push(item);
+    }
+    for (const [key, members] of subgroups) {
+      const merged = mergeItems(
+        members.map((item) => ({ id: item.id, geometry: prismGeometry(item) })),
+        'prism',
+        category,
+      );
+      if (merged === null) continue;
+      track(merged.geometry);
+      const ids = key === '' ? null : merged.pick.ids;
+      const mesh = new THREE.Mesh(merged.geometry, solid(color, category === 'door' ? DOOR_OPACITY : 1));
+      mesh.userData.pick = merged.pick;
+      group.add(mesh);
+      pickables.push(mesh);
+      register(category, mesh, ids);
+      const edges = new THREE.EdgesGeometry(merged.geometry, 30);
+      track(edges);
+      const edgeLines = new THREE.LineSegments(edges, edgeMaterial);
+      group.add(edgeLines);
+      register(category, edgeLines, ids);
+    }
   }
 
   // Отверстия плиты: кандидат - полупрозрачная заливка и контур, включённое - контур, «Не отверстие» -
@@ -402,7 +449,14 @@ export const buildFloor3dScene = (
   };
 
   const setCategoryVisible = (category: CadLayerCategory, visible: boolean): void => {
-    for (const object of byCategory.get(category) ?? []) object.visible = visible;
+    if (visible) hiddenCategorySet.delete(category);
+    else hiddenCategorySet.add(category);
+    for (const item of registered) if (item.category === category) applyVisibility(item);
+  };
+
+  const setHiddenIds = (ids: ReadonlySet<string>): void => {
+    hiddenIdSet = ids;
+    for (const item of registered) if (item.ids !== null) applyVisibility(item);
   };
 
   return {
@@ -411,6 +465,7 @@ export const buildFloor3dScene = (
     slabCap,
     setHighlight,
     setCategoryVisible,
+    setHiddenIds,
     dispose: () => {
       clearOverlay();
       for (const item of disposables) item.dispose();

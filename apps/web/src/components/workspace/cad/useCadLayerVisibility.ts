@@ -59,6 +59,8 @@ export interface ICadLayerVisibility {
   readonly hiddenLayers: ReadonlySet<number>;
   /** Скрытые категории конструкций: из слоёв DXF и строки «Плита»/«Перемычки». */
   readonly hiddenCategories: ReadonlySet<CadLayerCategory>;
+  /** Имена скрытых слоёв DXF: по ним скрываются конструкции с этими слоями-источниками. */
+  readonly hiddenLayerNames: ReadonlySet<string>;
   readonly toggleLayer: (index: number) => void;
   readonly setLayersHidden: (indices: readonly number[], hidden: boolean) => void;
   readonly setExtraHidden: (category: CadExtraCategory, hidden: boolean) => void;
@@ -131,6 +133,7 @@ export const useCadLayerVisibility = (
   return {
     hiddenLayers,
     hiddenCategories,
+    hiddenLayerNames: hiddenNames,
     toggleLayer: (index) => setLayersHidden([index], !hiddenLayers.has(index)),
     setLayersHidden,
     setExtraHidden,

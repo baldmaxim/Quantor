@@ -50,6 +50,10 @@ interface ICadFloor3dCanvasProps {
   readonly selectedIds?: ReadonlySet<string>;
   /** Скрытые категории (вкладка «Слои»): скрываются без пересборки сцены. */
   readonly hiddenCategories?: ReadonlySet<CadLayerCategory>;
+  /** Скрытые конструкции (все слои-источники скрыты): подгруппы сцены скрываются без пересборки. */
+  readonly hiddenConstructionIds?: ReadonlySet<string>;
+  /** Ключ подгруппы конструкции по слоям-источникам; смена пересобирает сцену. */
+  readonly groupKeyOf?: (id: string) => string | undefined;
   /** Режим измерения: клики ставят точки, элемент не выбирается. */
   readonly measuring: boolean;
   readonly onPick: (pick: IFloor3dPick | null, anchor: { x: number; y: number }) => void;
@@ -69,6 +73,13 @@ const ALL_CATEGORIES: readonly CadLayerCategory[] = [
   ...EXTRA_CATEGORIES,
 ];
 
+/** Категории, чьи меши сцена делит на подгруппы по слоям-источникам. */
+const LAYER_SPLIT: ReadonlySet<CadLayerCategory> = new Set<CadLayerCategory>([
+  'masonry',
+  'monolith',
+  'frame_partition',
+]);
+
 /**
  * Холст three.js: владеет renderer'ом и освобождает его при размонтировании. Модель пересобирается
  * при смене плана, темы и галки «Плита сверху»; камера при этом не сбрасывается.
@@ -82,6 +93,8 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   selected,
   selectedIds = NO_IDS,
   hiddenCategories = NO_CATEGORIES,
+  hiddenConstructionIds = NO_IDS,
+  groupKeyOf,
   measuring,
   onPick,
   onMove,
@@ -122,9 +135,11 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
 
   useEffect(() => {
     engine.current?.setModel(
-      plan.prisms.length === 0 ? null : buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap }),
+      plan.prisms.length === 0
+        ? null
+        : buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap, groupKeyOf }),
     );
-  }, [plan, showSlabCap, theme]);
+  }, [plan, showSlabCap, theme, groupKeyOf]);
 
   // Трассы механики: отдельная группа сцены, пересобирается при смене данных, плана и темы.
   const routeScene = useRef<ReturnType<typeof buildFloor3dRoutes> | null>(null);
@@ -159,16 +174,26 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
     }
   }, [plan, showSlabCap, theme, hiddenCategories]);
 
+  // Скрытые слоями конструкции: движок помнит набор и применяет его к каждой новой модели.
+  useEffect(() => {
+    engine.current?.setHiddenIds(hiddenConstructionIds);
+  }, [hiddenConstructionIds]);
+
   // Выделение накладывается после пересборки модели (эффект выше) и при смене выбора: общий выбор
   // конструкций плюс локальный (перемычка, дверь, отверстие). Скрытое категорией не подсвечивается.
   useEffect(() => {
     const local = highlightOf(plan, selected);
     const targets = [...highlightsOf(plan, selectedIds), ...(local === null ? [] : [local])].filter(
-      (target) =>
-        !hiddenCategories.has(target.kind === 'hole' ? 'slab' : visibilityOf(target.spec)),
+      (target) => {
+        if (target.kind === 'hole') return !hiddenCategories.has('slab');
+        const category = visibilityOf(target.spec);
+        if (hiddenCategories.has(category)) return false;
+        // Подгруппы по слоям есть только у кладки, монолита и перегородок.
+        return !(LAYER_SPLIT.has(category) && hiddenConstructionIds.has(target.spec.id));
+      },
     );
     engine.current?.setHighlight(targets);
-  }, [plan, showSlabCap, theme, selected, selectedIds, hiddenCategories]);
+  }, [plan, showSlabCap, theme, selected, selectedIds, hiddenCategories, hiddenConstructionIds]);
 
   useEffect(() => {
     engine.current?.setMeasuring(measuring);

@@ -29,6 +29,7 @@ import {
 import { matchingPreview, overlayPaintData, remarkBindingOf } from '@/lib/cad/workspace-cad';
 import { pageForJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { useTheme } from '@/lib/theme';
+import { hiddenConstructionIdsOf } from '@/lib/cad/layer-categories';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { Camera, Viewport } from '@/lib/viewer/camera';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
@@ -288,6 +289,7 @@ export const useWorkspaceCad = ({
       zonesState.edit !== null ||
       zonesState.split !== null,
     hiddenCategories: visibility.hiddenCategories,
+    hiddenLayerNames: visibility.hiddenLayerNames,
   });
   // Выбрана конструкция - подложка DXF приглушается, чтобы чужие линии не читались как выделение.
   const dimmed = constructionsState.selection.selectedIds.size > 0;
@@ -541,7 +543,21 @@ export const useWorkspaceCad = ({
     },
   };
 
-  const link = { ...constructionsState.selection, hiddenCategories: visibility.hiddenCategories };
+  const constructionList = constructionsState.side?.data?.constructions;
+  const hiddenConstructionIds = useMemo(
+    () =>
+      hiddenConstructionIdsOf(
+        constructionList ?? [],
+        visibility.hiddenCategories,
+        visibility.hiddenLayerNames,
+      ),
+    [constructionList, visibility.hiddenCategories, visibility.hiddenLayerNames],
+  );
+  const link = {
+    ...constructionsState.selection,
+    hiddenCategories: visibility.hiddenCategories,
+    hiddenConstructionIds,
+  };
   const floor3d = bar !== null && view3d && params !== null ? { params, link } : null;
 
   return {

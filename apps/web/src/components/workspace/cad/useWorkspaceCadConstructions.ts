@@ -55,6 +55,8 @@ interface IInput {
   blocked: boolean;
   /** Скрытые категории вкладки «Слои»: не рисуются и не выбираются кликом. */
   hiddenCategories?: ReadonlySet<CadLayerCategory>;
+  /** Имена скрытых слоёв DXF: конструкция скрыта, когда скрыты все её слои-источники. */
+  hiddenLayerNames?: ReadonlySet<string>;
 }
 
 export interface IWorkspaceCadConstructionsState {
@@ -95,6 +97,7 @@ export const useWorkspaceCadConstructions = ({
   active,
   blocked,
   hiddenCategories,
+  hiddenLayerNames,
 }: IInput): IWorkspaceCadConstructionsState => {
   const theme = useTheme();
   const colors = useMemo(() => {
@@ -139,8 +142,8 @@ export const useWorkspaceCadConstructions = ({
   );
   // Скрытая категория не попадает под клик (индекс и выбор строятся без неё); не рисует её сам рисовальщик.
   const shapes = useMemo(
-    () => withoutHiddenCategories(allShapes, hiddenCategories),
-    [allShapes, hiddenCategories],
+    () => withoutHiddenCategories(allShapes, hiddenCategories, hiddenLayerNames),
+    [allShapes, hiddenCategories, hiddenLayerNames],
   );
   const index = useMemo(() => buildConstructionIndex(shapes), [shapes]);
 
@@ -160,9 +163,10 @@ export const useWorkspaceCadConstructions = ({
             showAll: visible,
             notInVor: vor.notInVor,
             hiddenCategories,
+            hiddenLayerNames,
           }
         : null,
-    [active, visible, shapes.length, allShapes, colors, live, vor.notInVor, hiddenCategories],
+    [active, visible, shapes.length, allShapes, colors, live, vor.notInVor, hiddenCategories, hiddenLayerNames],
   );
 
   // --- карточка ---

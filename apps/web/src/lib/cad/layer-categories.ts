@@ -64,11 +64,79 @@ export const hiddenCategoriesOf = (
   return result;
 };
 
-/** Фигуры без скрытых категорий; ничего не скрыто - тот же массив. */
-export const withoutHiddenCategories = <T extends { readonly kind: ConstructionKind }>(
+/**
+ * Конструкция скрыта слоями: у неё есть слои-источники (`source_layers`, имена слоёв DXF) и все они
+ * скрыты на вкладке «Слои». Пустой список - только правило категории. Имена сравниваются точно:
+ * так их хранит `useCadLayerVisibility`.
+ */
+export const isHiddenByLayers = (
+  sourceLayers: readonly string[],
+  hiddenNames: ReadonlySet<string>,
+): boolean =>
+  sourceLayers.length > 0 && hiddenNames.size > 0 && sourceLayers.every((name) => hiddenNames.has(name));
+
+/** Конструкция листа в минимуме, нужном для скрытия: id, вид и слои-источники. */
+export interface IHideableConstruction {
+  readonly id: string;
+  readonly kind: ConstructionKind;
+  readonly source_layers: readonly string[];
+}
+
+/** Ключ подгруппы 3D по набору слоёв-источников; без слоёв - `undefined` (общая группа категории). */
+export const layerGroupKeyOf = (sourceLayers: readonly string[]): string | undefined =>
+  sourceLayers.length === 0 ? undefined : [...new Set(sourceLayers)].sort().join('\u0001');
+
+/**
+ * Ключи подгрупп 3D по id конструкций. `signature` меняется только вместе с содержимым: по нему
+ * вид решает, нужна ли пересборка сцены (повторная загрузка тех же данных её не вызывает).
+ */
+export const layerGroupKeys = (
+  constructions: readonly IHideableConstruction[],
+): { readonly signature: string; readonly keyOf: (id: string) => string | undefined } => {
+  const keys = new Map<string, string>();
+  for (const item of constructions) {
+    const key = layerGroupKeyOf(item.source_layers);
+    if (key !== undefined) keys.set(item.id, key);
+  }
+  const signature = [...keys].map(([id, key]) => `${id}\u0002${key}`).join('\u0003');
+  return { signature, keyOf: (id) => keys.get(id) };
+};
+
+/** Идентификаторы скрытых конструкций: скрыта категория вида или все слои-источники. */
+export const hiddenConstructionIdsOf = (
+  constructions: readonly IHideableConstruction[],
+  hiddenCategories: ReadonlySet<CadLayerCategory> | undefined,
+  hiddenNames: ReadonlySet<string> | undefined,
+): ReadonlySet<string> => {
+  const result = new Set<string>();
+  for (const item of constructions) {
+    if (
+      hiddenCategories?.has(categoryOfKind(item.kind)) === true ||
+      (hiddenNames !== undefined && isHiddenByLayers(item.source_layers, hiddenNames))
+    ) {
+      result.add(item.id);
+    }
+  }
+  return result;
+};
+
+/**
+ * Фигуры без скрытых конструкций: скрыта категория вида или (если у фигуры есть `layers`) все её
+ * слои-источники; ничего не скрыто - тот же массив.
+ */
+export const withoutHiddenCategories = <
+  T extends { readonly kind: ConstructionKind; readonly layers?: readonly string[] },
+>(
   shapes: readonly T[],
   hidden: ReadonlySet<CadLayerCategory> | undefined,
-): readonly T[] =>
-  hidden === undefined || hidden.size === 0
-    ? shapes
-    : shapes.filter((shape) => !hidden.has(categoryOfKind(shape.kind)));
+  hiddenNames?: ReadonlySet<string>,
+): readonly T[] => {
+  const noCategories = hidden === undefined || hidden.size === 0;
+  const noLayers = hiddenNames === undefined || hiddenNames.size === 0;
+  if (noCategories && noLayers) return shapes;
+  return shapes.filter(
+    (shape) =>
+      !(hidden?.has(categoryOfKind(shape.kind)) ?? false) &&
+      !(hiddenNames !== undefined && isHiddenByLayers(shape.layers ?? [], hiddenNames)),
+  );
+};
