@@ -23,7 +23,13 @@ from cad_mep.labels import ExplRow, RoomLabel
 from cad_mep.params import Params
 from cad_mep.plan import PlanInput, PlanModel, build_plan_model, open_plan
 from cad_mep.version import GENERATOR_VERSION
-from cad_mep.zones_grow import assign_pockets, collect_pockets, grow
+from cad_mep.zones_grow import (
+    absorb_residual,
+    assign_pockets,
+    collect_pockets,
+    grow,
+    residual_notes,
+)
 from cad_mep.zones_lines import (
     axis_mask,
     boundary_lines,
@@ -118,8 +124,13 @@ def _apartment_marks(pm: PlanModel, params: Params) -> tuple[list[_Mark], list[s
     return marks, extra
 
 
-def _build_field(plan: PlanInput, pm: PlanModel, args: ZoneArgs) -> tuple[Field, Splitter]:
-    """Тонкий растр: препятствия, стартовые маски, разделение слитых помещений и рост областей."""
+def _build_field(
+    plan: PlanInput, pm: PlanModel, args: ZoneArgs
+) -> tuple[Field, Splitter, dict[int, str]]:
+    """Тонкий растр: препятствия, маски, разделение слитых помещений, рост и добор карманов.
+
+    Третий элемент — замечания о присоединённых карманах по меткам областей.
+    """
     model = pm.model
     strokes = pdfsrc.read_strokes(args.pdf, args.page_index, plan.zone, zc.DARK_MAX_CHANNEL)
     seg = localize(strokes, plan.frame)
@@ -147,7 +158,7 @@ def _build_field(plan: PlanInput, pm: PlanModel, args: ZoneArgs) -> tuple[Field,
     pockets = collect_pockets(fld, pm.doors, sp.label_apt)
     grow(fld, zc.GROW_LIMIT_MM)
     assign_pockets(fld, pockets)
-    return fld, sp
+    return fld, sp, residual_notes(absorb_residual(fld))
 
 
 def _apartment_number(plan_model: PlanModel, mark: _Mark) -> str:
@@ -175,9 +186,10 @@ class _Shapes:
     polys: dict[int, Polygon]
     region_notes: dict[int, list[str]]
     arc_notes: dict[int, str]
+    absorbed_notes: dict[int, str]
 
 
-def _shapes(sp: Splitter, fld: Field) -> _Shapes:
+def _shapes(sp: Splitter, fld: Field, absorbed_notes: dict[int, str]) -> _Shapes:
     """Многоугольники областей: контур, упрощение, дуги остекления, без перекрытий."""
     raw, notes = seed_polygons(fld, sorted(set(sp.mark_seed.values())))
     final = simplify_all(raw, notes)
@@ -190,13 +202,15 @@ def _shapes(sp: Splitter, fld: Field) -> _Shapes:
                 f"дуга остекления: добавлено вершин {added} (шаг <= {zc.ARC_STEP_MM:.0f} мм)"
             )
     remove_overlaps(final)
-    return _Shapes(final, notes, arc_notes)
+    return _Shapes(final, notes, arc_notes, absorbed_notes)
 
 
 def _zone_notes(sp: Splitter, sid: int, mk: _Mark, group: list[str], shapes: _Shapes) -> list[str]:
     notes = list(shapes.region_notes.get(sid, []))
     if sid in shapes.arc_notes:
         notes.append(shapes.arc_notes[sid])
+    if sid in shapes.absorbed_notes:
+        notes.append(shapes.absorbed_notes[sid])
     cid = next(
         (c for c, rls in sp.comp_marks.items() if any(r.room_id == mk.room_id for r in rls)), None
     )
@@ -218,8 +232,8 @@ def extract_zones(args: ZoneArgs) -> dict[str, object]:
             "в экспликации листа нет комнат квартир: зоны сопоставить не с чем",
             EXIT_NO_ROUTES,
         )
-    fld, sp = _build_field(plan, pm, args)
-    shapes = _shapes(sp, fld)
+    fld, sp, absorbed_notes = _build_field(plan, pm, args)
+    shapes = _shapes(sp, fld, absorbed_notes)
     polys = shapes.polys
     width_pt, height_pt, scale = plan.page.width, plan.page.height, plan.frame.scale
     by_id = {mk.room_id: mk for mk in marks}

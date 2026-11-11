@@ -54,6 +54,8 @@ class Floor:
     # стены произвольной формы (вершины в мм здания) и тонкие чёрные линии плана (x0, y0, x1, y1)
     poly_walls: list[list[tuple[float, float]]] = field(default_factory=list)
     lines: list[Rect] = field(default_factory=list)
+    # прямоугольники-обводки без заливки (тонкий чёрный штрих): граней стен в DXF у них нет
+    outlines: list[Rect] = field(default_factory=list)
 
 
 def _hwall(floor: Floor, y: float, x0: float, x1: float, gaps: list[tuple[float, float]]) -> None:
@@ -299,6 +301,9 @@ def write_pdf(
         _text(tw, name, 500, y)
         _text(tw, f"{area:.2f}".replace(".", ","), 580, y)
         y += 10.0
+    for x0, y0, x1, y1 in floor.outlines:
+        a, b = _pt(x0, y1), _pt(x1, y0)
+        page.draw_rect(pymupdf.Rect(a[0], a[1], b[0], b[1]), color=(0, 0, 0), fill=None, width=0.24)
     tw.write_text(page)
     for title in neighbor_titles:
         other = doc.new_page(width=900, height=500)

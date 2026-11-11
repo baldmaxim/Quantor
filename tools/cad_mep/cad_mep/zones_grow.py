@@ -11,7 +11,7 @@ from shapely.geometry import Polygon
 
 from cad_mep import zones_const as zc
 from cad_mep.dxfin import Door
-from cad_mep.raster import BoolArr, Grid, label, raster_polys
+from cad_mep.raster import BoolArr, Grid, IntArr, label, nearest_true, raster_polys
 from cad_mep.zones_raster import Field, Window
 
 
@@ -150,3 +150,128 @@ def assign_pockets(fld: Field, pockets: list[Pocket]) -> int:
             sub[comp] = pk.sides[side]
             given += 1
     return given
+
+
+@dataclass(frozen=True)
+class Absorbed:
+    """Присоединённый к зоне карман: метка зоны, площадь (с мягкими клетками), центр в мм."""
+
+    zone: int
+    area_m2: float
+    centre: tuple[float, float]
+
+
+def _dilate4(m: BoolArr) -> BoolArr:
+    """Расширение маски на клетку по 4-связности."""
+    out = m.copy()
+    out[1:] |= m[:-1]
+    out[:-1] |= m[1:]
+    out[:, 1:] |= m[:, :-1]
+    out[:, :-1] |= m[:, 1:]
+    return out
+
+
+def _soft_dist(start: BoolArr, soft: BoolArr, limit: int) -> IntArr:
+    """Расстояние от start по мягким клеткам: 1 — соседняя, 0 — не достигнута за limit клеток."""
+    dist: IntArr = np.zeros(start.shape, dtype=np.int32)
+    seen = start.copy()
+    front = start
+    for step in range(1, limit + 1):
+        new = _dilate4(front) & soft & ~seen
+        if not new.any():
+            break
+        dist[new] = step
+        seen |= new
+        front = new
+    return dist
+
+
+def absorb_residual(fld: Field) -> list[Absorbed]:
+    """Мелкие непокрытые карманы, отделённые от зоны только тонкими штрихами, — этой зоне.
+
+    Граница зоны проходит по граням заливок стен, а не по тонким обводкам: «твёрдое» — заливки,
+    «мягкое» — тёмные штрихи без заливки. Свободный карман (4-связная область клеток без метки)
+    площадью не больше RESIDUAL_MAX_M2 присоединяется к зоне, с которой у него самый длинный
+    контакт (клетки зоны, достижимые через не более RESIDUAL_SOFT_CELLS мягких клеток), если
+    контакт не короче RESIDUAL_CONTACT_MIN_MM и он не ближе RESIDUAL_EXTERIOR_MM к наружной
+    области (свободные клетки, 4-связные с краем растра; оконные проёмы фасада). Вместе с
+    карманом зоне отходят мягкие клетки на путях контакта; заливки не трогаются.
+    Решения принимаются по снимку исходной разметки, порядок — по возрастанию
+    метки кармана, при равном контакте берётся меньшая метка зоны.
+    """
+    f = fld.f
+    gi = fld.gi
+    ny, nx = gi.shape
+    lab, n = label(gi == 0)
+    if n == 0:
+        return []
+    counts = np.bincount(lab.ravel(), minlength=n + 1)
+    small = counts <= int(zc.RESIDUAL_MAX_M2 * 1e6 / (f * f))
+    small[0] = False
+    edge = np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))
+    outer_ids = np.zeros(n + 1, dtype=np.bool_)  # наружная область — по снимку до присоединений
+    outer_ids[edge] = True
+    outer_ids[0] = False
+    small &= ~outer_ids
+    outer: BoolArr = outer_ids[lab]
+    ext_cells = int(zc.RESIDUAL_EXTERIOR_MM / f)
+    flat = lab.ravel()
+    cells = np.flatnonzero(small[flat])
+    if len(cells) == 0:
+        return []
+    cells = cells[np.argsort(flat[cells], kind="stable")]
+    groups = np.split(cells, np.flatnonzero(np.diff(flat[cells])) + 1)
+    zones0 = gi.copy()
+    soft_all = (gi < 0) & ~fld.fill
+    reach = zc.RESIDUAL_SOFT_CELLS
+    pad = reach + 1
+    min_cells = zc.RESIDUAL_CONTACT_MIN_MM / f
+    out: list[Absorbed] = []
+    for grp in groups:
+        ys, xs = np.divmod(grp, nx)
+        y0, y1 = max(int(ys.min()) - pad, 0), min(int(ys.max()) + pad + 1, ny)
+        x0, x1 = max(int(xs.min()) - pad, 0), min(int(xs.max()) + pad + 1, nx)
+        comp: BoolArr = np.zeros((y1 - y0, x1 - x0), dtype=np.bool_)
+        comp[ys - y0, xs - x0] = True
+        soft = soft_all[y0:y1, x0:x1] & (gi[y0:y1, x0:x1] < 0)
+        near = zones0[y0:y1, x0:x1]
+        from_comp = _soft_dist(comp, soft, reach)
+        touched = _dilate4(comp | (from_comp > 0)) & (near > 0)
+        if not touched.any():
+            continue
+        ids, contact = np.unique(near[touched], return_counts=True)
+        pick = int(np.argmax(contact))  # равный контакт — меньшая метка зоны (ids по возрастанию)
+        if contact[pick] < min_cells:
+            continue
+        best = int(ids[pick])
+        ey0, ey1 = max(int(ys.min()) - ext_cells - 1, 0), min(int(ys.max()) + ext_cells + 2, ny)
+        ex0, ex1 = max(int(xs.min()) - ext_cells - 1, 0), min(int(xs.max()) + ext_cells + 2, nx)
+        ext_win = outer[ey0:ey1, ex0:ex1]
+        if ext_win.any():
+            dist = nearest_true(ext_win, ext_cells).dist
+            if float(dist[ys - ey0, xs - ex0].min()) * f < zc.RESIDUAL_EXTERIOR_MM:
+                continue
+        to_zone = _soft_dist(near == best, soft, reach)
+        between = (from_comp > 0) & (to_zone > 0) & (from_comp + to_zone - 1 <= reach)
+        take = comp | between
+        sub = gi[y0:y1, x0:x1]
+        sub[take] = best
+        out.append(
+            Absorbed(
+                best,
+                float(take.sum()) * f * f / 1e6,
+                ((float(xs.mean()) + 0.5) * f, (float(ys.mean()) + 0.5) * f),
+            )
+        )
+    return out
+
+
+def residual_notes(absorbed: list[Absorbed]) -> dict[int, str]:
+    """Замечание на каждую зону, к которой присоединены карманы."""
+    acc: dict[int, list[float]] = {}
+    for a in absorbed:
+        acc.setdefault(a.zone, []).append(a.area_m2)
+    return {
+        z: f"дорощено до заливок: {len(v)} карманов, {sum(v):.2f} м²"
+        for z, v in sorted(acc.items())
+    }
