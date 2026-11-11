@@ -138,10 +138,11 @@ describe('панель обработки документа', () => {
     renderPanel(panel());
 
     const sheet = (await screen.findByText('Лист 3')).closest('li') as HTMLElement;
-    expect(within(sheet).getByText('CAD: 40 %')).toBeInTheDocument();
-    const steps = within(sheet).getByRole('list', { name: 'Шаги' });
-    expect(within(steps).getAllByRole('listitem')).toHaveLength(7);
-    expect(within(steps).getByText(/Калибровка/)).toBeInTheDocument();
+    expect(within(sheet).getByText('Идёт: CAD · 40 %')).toBeInTheDocument();
+    expect(within(sheet).getByText('1 из 6')).toBeInTheDocument();
+    const steps = within(sheet).getByRole('list', { name: 'Шаги конвейера' });
+    expect(within(steps).getAllByRole('listitem')).toHaveLength(6);
+    expect(within(steps).getByText('Калибровка')).toBeInTheDocument();
     // Не только цветом: слово состояния для чтения с экрана.
     expect(within(steps).getByText(': идёт')).toBeInTheDocument();
 
@@ -156,7 +157,7 @@ describe('панель обработки документа', () => {
       'href',
       '/projects/p-1/workspace?revision=rev-1&page=6&tab=cad',
     );
-    expect(screen.getByText('Нужна калибровка')).toBeInTheDocument();
+    expect(screen.getByText('Нужно: откалибровать лист')).toBeInTheDocument();
   });
 
   it('листов нет: подсказка', async () => {
@@ -210,5 +211,75 @@ describe('панель обработки документа', () => {
     expect(screen.queryByRole('link', { name: /Открыть/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Открыть' })).toBeDisabled();
     expect(mocks.pipeline).not.toHaveBeenCalled();
+  });
+
+  it('лист с заголовком плана назван этажом, номер листа - второй подписью', async () => {
+    mocks.pipeline.mockResolvedValue({
+      data: pipelineWith([
+        {
+          page_index: 2,
+          page_label: '82',
+          calibrated: true,
+          floor_title: { corps: '9', section: '3', floors: ['14'], text: null },
+          convert: stage(),
+          views: [],
+        },
+      ]),
+    });
+    renderPanel(panel());
+
+    const name = await screen.findByText('К9 · С3 · 14 эт.');
+    expect(name).toHaveAttribute('title', 'Корпус 9, секция 3, 14 этаж');
+    expect(screen.getByText('Лист 82')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Открыть К9 · С3 · 14 эт. в CAD' })).toBeInTheDocument();
+  });
+
+  it('лист: метка 3D DXF и ошибка шага показаны отдельно от дорожки', async () => {
+    const done = stage();
+    const routes = stage({ job_type: 'cad_mep_route' });
+    mocks.pipeline.mockResolvedValue({
+      data: pipelineWith([
+        {
+          page_index: 0,
+          page_label: '1',
+          calibrated: true,
+          convert: stage(),
+          views: [
+            {
+              page: 0,
+              view: 1,
+              has_dxf: true,
+              walls: done,
+              zones: done,
+              zones_count: 2,
+              approved: true,
+              routes,
+              routes_accepted: true,
+              floor3d: stage({ job_type: 'cad_floor3d_dxf' }),
+            },
+          ],
+        },
+        {
+          page_index: 1,
+          page_label: '2',
+          calibrated: true,
+          convert: stage({ status: 'failed', error_code: 'CAD_ENGINE_FAILED', result_status: null }),
+          views: [],
+        },
+      ]),
+    });
+    renderPanel(panel());
+
+    const ready = (await screen.findByText('Лист 1')).closest('li') as HTMLElement;
+    expect(within(ready).getByText('Готово')).toBeInTheDocument();
+    expect(within(ready).getByText('6 из 6')).toBeInTheDocument();
+    expect(within(ready).getByText('3D DXF готов')).toBeInTheDocument();
+
+    const failed = (await screen.findByText('Лист 2')).closest('li') as HTMLElement;
+    expect(within(failed).getByText('Ошибка: CAD')).toBeInTheDocument();
+    expect(
+      within(failed).getByText('Движок CAD не выдал проверенный результат.'),
+    ).toBeInTheDocument();
+    expect(within(failed).queryByText(/3D DXF/)).not.toBeInTheDocument();
   });
 });

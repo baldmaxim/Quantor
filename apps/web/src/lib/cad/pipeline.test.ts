@@ -6,7 +6,13 @@ import type {
 } from '@quantor/api-client';
 import { describe, expect, it } from 'vitest';
 
-import { pipelineHasActive, sheetSteps, sheetSummary, type PipelineStepKey } from './pipeline';
+import {
+  pipelineHasActive,
+  sheetProgress,
+  sheetSteps,
+  sheetSummary,
+  type PipelineStepKey,
+} from './pipeline';
 
 const stage = (overrides: Partial<CadPipelineStageRead> = {}): CadPipelineStageRead => ({
   job_id: 'job-1',
@@ -74,7 +80,7 @@ describe('шаги листа', () => {
       'blocked',
       'blocked',
     ]);
-    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Нужна калибровка' });
+    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Нужно: откалибровать лист' });
   });
 
   it('калиброван, задания нет: CAD ждёт запуска', () => {
@@ -82,19 +88,19 @@ describe('шаги листа', () => {
     expect(state(s, 'calibration')?.state).toBe('done');
     expect(state(s, 'convert')?.state).toBe('todo');
     expect(state(s, 'walls')?.state).toBe('blocked');
-    expect(sheetSummary(s).label).toBe('Готов к преобразованию в CAD');
+    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Не запущено: CAD' });
   });
 
   it('преобразование идёт: процент в подписи, дальше заблокировано', () => {
     const s = sheet({ convert: stage({ status: 'running', progress: 0.4 }), views: [] });
     expect(state(s, 'convert')).toMatchObject({ state: 'running', detail: '40 %' });
     expect(state(s, 'walls')?.state).toBe('blocked');
-    expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'CAD: 40 %' });
+    expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'Идёт: CAD · 40 %' });
   });
 
   it('преобразование без хода: просто «CAD»', () => {
     const s = sheet({ convert: stage({ status: 'queued', progress: null }), views: [] });
-    expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'CAD' });
+    expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'Идёт: CAD' });
   });
 
   it('отказ преобразования: код ошибки в подписи, итог - ошибка CAD', () => {
@@ -136,16 +142,41 @@ describe('шаги листа', () => {
     expect(state(s, 'zones')?.state).toBe('skipped');
   });
 
-  it('конструкции и зоны ещё не созданы или идут: «Конструкции и зоны…»', () => {
+  it('конструкции не запущены: «Не запущено», зоны тоже todo', () => {
     expect(state(sheet(), 'walls')?.state).toBe('todo');
+    expect(state(sheet(), 'zones')?.state).toBe('todo');
     expect(state(sheet(), 'approval')?.state).toBe('blocked');
-    expect(sheetSummary(sheet())).toEqual({ tone: 'accent', label: 'Конструкции и зоны…' });
+    expect(sheetSummary(sheet())).toEqual({ tone: 'warning', label: 'Не запущено: Конструкции' });
+  });
 
+  it('конструкции идут: «Идёт» с процентом', () => {
     const running = sheet({
       views: [view({ walls: stage({ status: 'running', progress: 0.5 }), zones: zonesReady })],
     });
     expect(state(running, 'walls')).toMatchObject({ state: 'running', detail: '50 %' });
-    expect(sheetSummary(running).label).toBe('Конструкции и зоны…');
+    expect(sheetSummary(running)).toEqual({ tone: 'accent', label: 'Идёт: Конструкции · 50 %' });
+  });
+
+  it('конструкции готовы, зоны не запускались (лист старше автозон): «Не запущено: Зоны»', () => {
+    const s = sheet({ views: [view({ walls, zones: null, zones_count: 0 })] });
+    expect(state(s, 'walls')?.state).toBe('done');
+    expect(state(s, 'zones')?.state).toBe('todo');
+    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Не запущено: Зоны' });
+  });
+
+  it('зоны идут, трассы ждут принятия: «Идёт» важнее «Нужно»', () => {
+    const s = sheet({
+      views: [
+        view({
+          walls,
+          zones: stage({ job_type: 'cad_zones', status: 'running', progress: null }),
+          approved: true,
+          routes: stage({ job_type: 'cad_mep_route' }),
+        }),
+      ],
+    });
+    expect(state(s, 'routes')?.state).toBe('review');
+    expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'Идёт: Зоны' });
   });
 
   it('отказ конструкций: ошибка, одобрение заблокировано', () => {
@@ -195,14 +226,14 @@ describe('шаги листа', () => {
     const s = sheet({ views: [view({ walls, zones: zonesReady, zones_count: 3 })] });
     expect(state(s, 'approval')?.state).toBe('review');
     expect(state(s, 'routes')?.state).toBe('blocked');
-    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Ждёт одобрения' });
+    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Нужно: одобрить вид' });
   });
 
   it('одобрен, трасс нет: трассы можно строить', () => {
     const s = sheet({ views: [view({ walls, zones: zonesReady, approved: true })] });
     expect(state(s, 'approval')?.state).toBe('done');
     expect(state(s, 'routes')?.state).toBe('todo');
-    expect(sheetSummary(s).label).toBe('Одобрен, трассы не построены');
+    expect(sheetSummary(s).label).toBe('Не запущено: Трассы');
   });
 
   it('трассы идут: процент', () => {
@@ -217,7 +248,7 @@ describe('шаги листа', () => {
       ],
     });
     expect(state(s, 'routes')).toMatchObject({ state: 'running', detail: '60 %' });
-    expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'Трассы: 60 %' });
+    expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'Идёт: Трассы · 60 %' });
   });
 
   it('трассы построены, но не приняты: ждут человека', () => {
@@ -232,7 +263,7 @@ describe('шаги листа', () => {
       ],
     });
     expect(state(s, 'routes')?.state).toBe('review');
-    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Трассы ждут принятия' });
+    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Нужно: принять трассы' });
   });
 
   it('трассы приняты: готово, 3D DXF необязателен', () => {
@@ -252,7 +283,7 @@ describe('шаги листа', () => {
     expect(sheetSummary(s)).toEqual({ tone: 'success', label: 'Готово' });
   });
 
-  it('3D DXF строится: процент, затем готово', () => {
+  it('3D DXF не входит в итог листа: идёт или готов - итог «Готово»', () => {
     const base = {
       walls,
       zones: zonesReady,
@@ -265,7 +296,8 @@ describe('шаги листа', () => {
         view({ ...base, floor3d: stage({ job_type: 'cad_floor3d_dxf', status: 'running', progress: 0.2 }) }),
       ],
     });
-    expect(sheetSummary(running)).toEqual({ tone: 'accent', label: '3D DXF: 20 %' });
+    expect(state(running, 'floor3d')).toMatchObject({ state: 'running', detail: '20 %' });
+    expect(sheetSummary(running)).toEqual({ tone: 'success', label: 'Готово' });
 
     const done = sheet({
       views: [view({ ...base, floor3d: stage({ job_type: 'cad_floor3d_dxf' }) })],
@@ -274,7 +306,7 @@ describe('шаги листа', () => {
     expect(sheetSummary(done).label).toBe('Готово');
   });
 
-  it('отказ 3D DXF не скрывается', () => {
+  it('отказ 3D DXF виден в шаге, но итог листа не меняет', () => {
     const s = sheet({
       views: [
         view({
@@ -287,7 +319,8 @@ describe('шаги листа', () => {
         }),
       ],
     });
-    expect(sheetSummary(s)).toEqual({ tone: 'danger', label: 'Ошибка: 3D DXF' });
+    expect(state(s, 'floor3d')?.state).toBe('failed');
+    expect(sheetSummary(s)).toEqual({ tone: 'success', label: 'Готово' });
   });
 
   it('несколько видов: побеждает худшее состояние, виды без DXF не считаются', () => {
@@ -307,6 +340,32 @@ describe('шаги листа', () => {
     const done = sheet({ views: [ready, { ...ready, view: 2 }, noDxf] });
     expect(state(done, 'walls')?.state).toBe('done');
     expect(state(done, 'approval')?.state).toBe('done');
+  });
+});
+
+describe('sheetProgress', () => {
+  it('считает готовые и пропущенные из шести основных шагов, 3D DXF не в счёт', () => {
+    expect(sheetProgress(sheet({ calibrated: false, convert: null, views: [] }))).toEqual({
+      done: 0,
+      total: 6,
+    });
+    expect(sheetProgress(sheet())).toEqual({ done: 2, total: 6 });
+    expect(
+      sheetProgress(sheet({ views: [view({ walls, zones: zonesReady, zones_count: 2 })] })),
+    ).toEqual({ done: 4, total: 6 });
+    expect(sheetProgress(sheet({ views: [] }))).toEqual({ done: 6, total: 6 });
+    const all = sheet({
+      views: [
+        view({
+          walls,
+          zones: zonesReady,
+          approved: true,
+          routes: stage({ job_type: 'cad_mep_route' }),
+          routes_accepted: true,
+        }),
+      ],
+    });
+    expect(sheetProgress(all)).toEqual({ done: 6, total: 6 });
   });
 });
 

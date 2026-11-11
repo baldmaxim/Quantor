@@ -13,8 +13,8 @@ describe('WorkspacePipelineBadge', () => {
     render(
       <WorkspacePipelineBadge pipeline={pipelineOfSheet(pipelineSheet())} cadOn onOpen={vi.fn()} />,
     );
-    expect(screen.getByRole('button', { name: 'Обработка листа: Ждёт одобрения' })).toHaveTextContent(
-      'Ждёт одобрения',
+    expect(screen.getByRole('button', { name: 'Обработка листа: Нужно: одобрить вид' })).toHaveTextContent(
+      'Нужно: одобрить вид',
     );
   });
 

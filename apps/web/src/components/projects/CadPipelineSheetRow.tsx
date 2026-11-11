@@ -1,19 +1,20 @@
 import type { CadPipelineSheetRead } from '@quantor/api-client';
 import type { FC } from 'react';
 
-import { ButtonLink, StatusBadge } from '@/components/ui';
-import { sheetSteps, sheetSummary } from '@/lib/cad/pipeline';
+import { PipelineStepper } from '@/components/cad/pipeline/PipelineStepper';
+import { type BadgeTone, ButtonLink, StatusBadge } from '@/components/ui';
+import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import {
-  PIPELINE_STATE_GLYPHS as STATE_GLYPHS,
-  PIPELINE_STATE_TONES as STATE_TONES,
-  PIPELINE_STATE_WORDS as STATE_WORDS,
-} from '@/lib/cad/pipeline-view';
+  sheetProgress,
+  sheetSteps,
+  sheetSummary,
+  type PipelineStepState,
+} from '@/lib/cad/pipeline';
 import { workspaceCadHref } from '@/lib/cad/workspace-url';
 
 /**
- * Лист в панели «Обработка»: шаги конвейера чипами, итог одной строкой и переход в рабочую
- * область на вкладку CAD. Состояние шага передано не только цветом: значок и слово для чтения
- * с экрана.
+ * Лист в панели «Обработка»: итог одной строкой, дорожка шагов конвейера и переход в рабочую
+ * область на вкладку CAD. Необязательный 3D DXF в дорожку не входит и показан отдельной меткой.
  */
 
 export interface ICadPipelineSheetRowProps {
@@ -24,6 +25,12 @@ export interface ICadPipelineSheetRowProps {
   readonly position: number;
 }
 
+const FLOOR3D_BADGES: Partial<Record<PipelineStepState, { tone: BadgeTone; label: string }>> = {
+  running: { tone: 'accent', label: '3D DXF…' },
+  done: { tone: 'success', label: '3D DXF готов' },
+  failed: { tone: 'danger', label: '3D DXF: ошибка' },
+};
+
 export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   projectId,
   revisionId,
@@ -32,8 +39,14 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
 }) => {
   const steps = sheetSteps(sheet);
   const summary = sheetSummary(sheet);
-  const failed = steps.find((step) => step.state === 'failed');
-  const name = `Лист ${sheet.page_label ?? sheet.page_index + 1}`;
+  const progress = sheetProgress(sheet);
+  const failed = steps.find((step) => step.state === 'failed' && step.key !== 'floor3d');
+  const floor3d = steps.find((step) => step.key === 'floor3d');
+  const floor3dBadge = floor3d ? FLOOR3D_BADGES[floor3d.state] : undefined;
+  const sheetName = `Лист ${sheet.page_label ?? sheet.page_index + 1}`;
+  // Лист называется этажом по заголовку плана; номер листа - второй серой подписью.
+  const floorTitle = formatFloorTitle(sheet.floor_title, '');
+  const name = floorTitle || sheetName;
 
   const href = workspaceCadHref(projectId, {
     revision: revisionId,
@@ -46,10 +59,22 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
     <li className="flex flex-col gap-[var(--s-3)] border-b border-border py-[var(--s-4)] last:border-b-0">
       <div className="flex items-center gap-[var(--s-4)]">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
-          <span className="text-sm font-medium [overflow-wrap:anywhere]">{name}</span>
+          <span
+            className="text-sm font-medium [overflow-wrap:anywhere]"
+            title={formatFloorTitleFull(sheet.floor_title) ?? undefined}
+          >
+            {name}
+          </span>
+          {floorTitle && <span className="text-xs text-muted">{sheetName}</span>}
           <StatusBadge tone={summary.tone} wrap>
             {summary.label}
           </StatusBadge>
+          <span
+            className="font-mono text-xs text-muted"
+            title="Завершено основных шагов конвейера"
+          >
+            {`${progress.done} из ${progress.total}`}
+          </span>
         </div>
         <ButtonLink
           href={href}
@@ -62,22 +87,18 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
         </ButtonLink>
       </div>
 
-      <ul className="m-0 flex list-none flex-wrap gap-[var(--s-2)] p-0" aria-label="Шаги">
-        {steps.map((step) => (
-          <li key={step.key}>
-            <StatusBadge tone={STATE_TONES[step.state]} dot={false}>
-              <span aria-hidden="true">{STATE_GLYPHS[step.state]}</span>
-              {step.label}
-              {step.detail && step.state !== 'failed' && (
-                <span className="text-muted">· {step.detail}</span>
-              )}
-              <span className="sr-only">: {STATE_WORDS[step.state]}</span>
-            </StatusBadge>
-          </li>
-        ))}
-      </ul>
+      <PipelineStepper steps={steps} />
 
-      {failed?.detail && <p className="text-xs text-danger">{failed.detail}</p>}
+      {(failed?.detail || floor3dBadge) && (
+        <div className="flex flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
+          {failed?.detail && <p className="m-0 text-xs text-danger">{failed.detail}</p>}
+          {floor3dBadge && (
+            <StatusBadge tone={floor3dBadge.tone} dot={false}>
+              {floor3dBadge.label}
+            </StatusBadge>
+          )}
+        </div>
+      )}
     </li>
   );
 };

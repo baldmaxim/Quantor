@@ -219,54 +219,68 @@ export const sheetSteps = (sheet: CadPipelineSheetRead): IPipelineStep[] => {
   return [calibration, convert, ...merged];
 };
 
-const stateOf = (steps: readonly IPipelineStep[], key: PipelineStepKey): IPipelineStep =>
-  steps.find((step) => step.key === key) ?? make(key, 'blocked');
+/** Основные шаги листа: дорожка конвейера без необязательного 3D DXF. */
+export const MAIN_STEP_KEYS = [
+  'calibration',
+  'convert',
+  'walls',
+  'zones',
+  'approval',
+  'routes',
+] as const;
 
-const withProgress = (label: string, detail: string | null): string =>
-  detail !== null && detail.endsWith('%') ? `${label}: ${detail}` : label;
+export const MAIN_STEP_TOTAL = MAIN_STEP_KEYS.length;
 
-/** Одна строка о состоянии листа: что с ним сейчас и нужно ли действие человека. */
+const mainSteps = (sheet: CadPipelineSheetRead): IPipelineStep[] =>
+  sheetSteps(sheet).filter((step) => (MAIN_STEP_KEYS as readonly PipelineStepKey[]).includes(step.key));
+
+/** Сколько из шести основных шагов закончено (готово или не требуется). */
+export const sheetProgress = (sheet: CadPipelineSheetRead): { done: number; total: 6 } => ({
+  done: mainSteps(sheet).filter((step) => step.state === 'done' || step.state === 'skipped').length,
+  total: MAIN_STEP_TOTAL,
+});
+
+/** Что должен сделать человек на шаге, ждущем его. */
+const HUMAN_ACTIONS: Readonly<Partial<Record<PipelineStepKey, string>>> = {
+  calibration: 'откалибровать лист',
+  approval: 'одобрить вид',
+  routes: 'принять трассы',
+};
+
+const needsHuman = (step: IPipelineStep): boolean =>
+  step.state === 'review' || (step.state === 'todo' && (step.key === 'calibration' || step.key === 'approval'));
+
+/**
+ * Одна строка о состоянии листа. Порядок: ошибка, идёт, нужен человек, не запущено, готово.
+ * Необязательный 3D DXF в итог не входит: его состояние показывается отдельно.
+ */
 export const sheetSummary = (sheet: CadPipelineSheetRead): IPipelineSummary => {
-  const steps = sheetSteps(sheet);
+  const steps = mainSteps(sheet);
 
   const failed = steps.find((step) => step.state === 'failed');
   if (failed) return { tone: 'danger', label: `Ошибка: ${failed.label}` };
 
-  if (stateOf(steps, 'calibration').state === 'todo') {
-    return { tone: 'warning', label: 'Нужна калибровка' };
+  const running = steps.find((step) => step.state === 'running');
+  if (running) {
+    const percent = running.detail !== null && running.detail.endsWith('%') ? ` · ${running.detail}` : '';
+    return { tone: 'accent', label: `Идёт: ${running.label}${percent}` };
   }
 
-  const convert = stateOf(steps, 'convert');
-  if (convert.state === 'running') {
-    return { tone: 'accent', label: withProgress('CAD', convert.detail) };
+  const human = steps.find(needsHuman);
+  if (human) {
+    return { tone: 'warning', label: `Нужно: ${HUMAN_ACTIONS[human.key] ?? human.label}` };
   }
-  if (convert.state === 'todo') return { tone: 'neutral', label: 'Готов к преобразованию в CAD' };
-  if (convert.state === 'blocked') return { tone: 'neutral', label: 'CAD не запущен' };
-  if (stateOf(steps, 'walls').state === 'skipped') {
+
+  const idle = steps.find((step) => step.state === 'todo');
+  if (idle) return { tone: 'warning', label: `Не запущено: ${idle.label}` };
+
+  // DXF не выпущен: все шаги после CAD пропущены - это не «готово», а конечная точка.
+  if (steps.find((step) => step.key === 'walls')?.state === 'skipped') {
     return { tone: 'neutral', label: 'CAD: DXF не выпущен' };
   }
 
-  const walls = stateOf(steps, 'walls');
-  const zones = stateOf(steps, 'zones');
-  const auto = [walls, zones];
-  if (auto.some((step) => step.state === 'running' || step.state === 'todo')) {
-    return { tone: 'accent', label: 'Конструкции и зоны…' };
-  }
-
-  if (stateOf(steps, 'approval').state === 'review') {
-    return { tone: 'warning', label: 'Ждёт одобрения' };
-  }
-
-  const routes = stateOf(steps, 'routes');
-  if (routes.state === 'running') {
-    return { tone: 'accent', label: withProgress('Трассы', routes.detail) };
-  }
-  if (routes.state === 'review') return { tone: 'warning', label: 'Трассы ждут принятия' };
-  if (routes.state === 'todo') return { tone: 'neutral', label: 'Одобрен, трассы не построены' };
-  if (routes.state === 'done') {
-    return stateOf(steps, 'floor3d').state === 'running'
-      ? { tone: 'accent', label: withProgress('3D DXF', stateOf(steps, 'floor3d').detail) }
-      : { tone: 'success', label: 'Готово' };
+  if (steps.every((step) => step.state === 'done' || step.state === 'skipped')) {
+    return { tone: 'success', label: 'Готово' };
   }
 
   return { tone: 'neutral', label: 'В работе' };
