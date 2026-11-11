@@ -134,7 +134,7 @@ def two_vk(tmp_path_factory: pytest.TempPathFactory) -> Built:
 def test_provenance_and_registry_in_candidate(full: Built) -> None:
     prov = _dict(full.data["provenance"])
     assert full.reg_path is not None
-    assert prov["generator_version"] == "cad_mep.v7"
+    assert prov["generator_version"] == "cad_mep.v8"
     assert prov["risers_sha256"] == hashlib.sha256(full.reg_path.read_bytes()).hexdigest()
     assert full.data["risers_registry"] == {"schema": "cad_risers.v1", "risers": FULL}
     assert full.issues("risers_registry_missing") == []

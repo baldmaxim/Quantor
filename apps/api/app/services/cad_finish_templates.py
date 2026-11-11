@@ -23,7 +23,7 @@ from app.contracts.cad_finishes import (
     CadFinishTemplateWrite,
 )
 from app.errors import DomainError, ErrorCode
-from app.models import CadFinishTemplate, CadZone
+from app.models import CadFinishTemplate, CadZone, Project
 from app.services.cad_zones import ROOM_KINDS
 
 
@@ -78,7 +78,12 @@ async def _check_unique(
     room_types: Sequence[str],
     exclude_id: uuid.UUID | None,
 ) -> None:
-    """Название уникально в проекте, типы помещений не пересекаются с другими шаблонами."""
+    """Название уникально в проекте, типы помещений не пересекаются с другими шаблонами.
+
+    Строка проекта блокируется до конца транзакции: параллельные запросы проверяют по очереди,
+    и гонка не доходит до ограничения базы (500) и не оставляет пересечения типов.
+    """
+    await session.execute(select(Project.id).where(Project.id == project_id).with_for_update())
     for other in await list_templates(session, project_id=project_id):
         if other.id == exclude_id:
             continue

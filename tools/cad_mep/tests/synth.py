@@ -432,11 +432,18 @@ class ZoneTruth:
     shapes: dict[str, BaseGeometry]
 
 
-def build_zones_floor() -> tuple[Floor, ZoneTruth]:
+MOP_MARK = "1-0.1"
+MOP_NAME = "Коридор"
+MOP_Y1 = 10200.0  # северная грань коридора МОП в тесте зон
+
+
+def build_zones_floor(mop: bool = False) -> tuple[Floor, ZoneTruth]:
     """Квартира 1-1: спальня (стена, без двери) и открытая пара «кухня + прихожая» с дугой в углу.
 
     Кухня и прихожая не разделены стеной — только тонкой чёрной линией плана на y = SPLIT_Y;
     юго-восточный угол здания скруглён дугой (многоугольник из вершин через 5 градусов).
+    mop=True — за северной стеной квартиры коридор МОП (марка 1-0.1, «Коридор»), отделённый
+    от неё глухой стеной.
     """
     f = Floor()
     cx, cy = ARC_CENTER
@@ -462,6 +469,15 @@ def build_zones_floor() -> tuple[Floor, ZoneTruth]:
     }
     names = {"1-1/1": "Спальня", "1-1/2": "Прихожая", "1-1/3": "Кухня"}
     marks = {"1-1/1": (3000.0, 4000.0), "1-1/2": (9000.0, 6300.0), "1-1/3": (8500.0, 2500.0)}
+    if mop:
+        f.walls += [
+            (0, MOP_Y1, 12000, MOP_Y1 + 300),
+            (0, 8000, 300, MOP_Y1 + 300),
+            (11700, 8000, 12000, MOP_Y1 + 300),
+        ]
+        shapes[MOP_MARK] = box(300, 8000, 11700, MOP_Y1)
+        names[MOP_MARK] = MOP_NAME
+        marks[MOP_MARK] = (6000.0, 9000.0)
     for mark, (x, y) in marks.items():
         f.labels.append((mark, x, y))
         f.expl.append((mark, names[mark], round(shapes[mark].area / 1e6, 2)))

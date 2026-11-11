@@ -70,11 +70,17 @@ def test_schema_and_marks(result: dict[str, object]) -> None:
     assert result["scale_mm_per_pt"] == synth.SCALE
     assert result["unmatched_marks"] == []
     zones = _zones(result)
-    assert sorted(zones) == MARKS  # по одной зоне на марку, МОП не размечается
+    assert sorted(zones) == MARKS  # по одной зоне на марку; на этаже нет марок МОП
     for z in zones.values():
         assert z["kind"] == "room_apartment"
         assert z["apartment_no"] == "1011"
         assert isinstance(z["notes"], list)
+    assert result["summary_mop"] == {
+        "zones": 0,
+        "poly_area_m2": 0.0,
+        "expl_area_m2": 0.0,
+        "delta_pct": None,
+    }
     summary = result["summary"]
     assert isinstance(summary, list)
     assert [s["apartment_no"] for s in summary] == ["1011"]
@@ -196,6 +202,90 @@ def test_cli_json_error(inputs: tuple[dict[str, Path], synth.ZoneTruth], tmp_pat
     proc = subprocess.run(bad, capture_output=True, text=True, check=False, timeout=60)
     assert proc.returncode == 2
     assert json.loads(proc.stderr)["code"] == "pdf_unreadable"
+
+
+# --- помещения МОП: марка с точкой -> зона room_mop ---------------------------------------------
+def _run(floor: synth.Floor, folder: Path) -> dict[str, object]:
+    files = synth.write_inputs(floor, folder)
+    args = ZoneArgs(
+        files["pdf"], 0, files["dxf"], files["scale"], files["preview"], None, folder / "z.json"
+    )
+    return extract_zones(args)
+
+
+@pytest.fixture(scope="module")
+def mop_result(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
+    floor, _ = synth.build_zones_floor(mop=True)
+    return _run(floor, tmp_path_factory.mktemp("zones_mop"))
+
+
+def test_mop_mark_becomes_room_mop_zone(mop_result: dict[str, object]) -> None:
+    zones = _zones(mop_result)
+    assert sorted(zones) == sorted([*MARKS, synth.MOP_MARK])
+    mop = zones[synth.MOP_MARK]
+    assert mop["kind"] == "room_mop"
+    assert mop["apartment_no"] is None
+    assert mop["name"] == synth.MOP_NAME  # дословно из экспликации
+    ideal = (11700.0 - 300.0) * (synth.MOP_Y1 - 8000.0) / 1e6
+    assert float(str(mop["poly_area_m2"])) == pytest.approx(ideal, rel=AREA_TOL)
+    assert float(str(mop["expl_area_m2"])) == pytest.approx(ideal, abs=0.01)
+    assert _to_building(mop["points"]).area / 1e6 == pytest.approx(ideal, rel=AREA_TOL)
+    assert isinstance(mop["notes"], list)
+    assert mop_result["unmatched_marks"] == []
+
+
+def test_mop_summary_is_separate_from_apartments(mop_result: dict[str, object]) -> None:
+    summary = mop_result["summary"]
+    assert isinstance(summary, list)
+    assert [s["apartment_no"] for s in summary] == ["1011"]  # МОП в квартирную сводку не входит
+    assert summary[0]["zones"] == 3
+    mop_summary = mop_result["summary_mop"]
+    assert isinstance(mop_summary, dict)
+    assert mop_summary["zones"] == 1
+    zone_area = float(str(_zones(mop_result)[synth.MOP_MARK]["poly_area_m2"]))
+    assert float(str(mop_summary["poly_area_m2"])) == pytest.approx(zone_area, abs=0.01)
+
+
+def test_mop_does_not_change_apartment_zones(
+    result: dict[str, object], mop_result: dict[str, object]
+) -> None:
+    before, after = _zones(result), _zones(mop_result)
+    for mark in MARKS:
+        assert after[mark]["kind"] == "room_apartment"
+        assert after[mark]["points"] == before[mark]["points"], mark
+        assert after[mark]["poly_area_m2"] == before[mark]["poly_area_m2"], mark
+        assert after[mark]["apartment_no"] == before[mark]["apartment_no"], mark
+    mop = _to_building(after[synth.MOP_MARK]["points"])
+    for mark in MARKS:
+        assert mop.intersection(_to_building(after[mark]["points"])).area / 1e6 <= zc.OVERLAP_MIN_M2
+
+
+def test_mop_mark_missing_from_explication_is_unmatched(tmp_path: Path) -> None:
+    floor, _ = synth.build_zones_floor(mop=True)
+    floor.expl = [e for e in floor.expl if e[0] != synth.MOP_MARK]
+    data = _run(floor, tmp_path)
+    assert sorted(_zones(data)) == MARKS
+    assert data["unmatched_marks"] == [
+        {
+            "room_mark": synth.MOP_MARK,
+            "name": None,
+            "expl_area_m2": None,
+            "reason": "нет в экспликации",
+        }
+    ]
+
+
+def test_mop_mark_absent_on_plan_is_unmatched(tmp_path: Path) -> None:
+    floor, _ = synth.build_zones_floor(mop=True)
+    synth.drop_labels(floor, {synth.MOP_MARK})
+    data = _run(floor, tmp_path)
+    assert sorted(_zones(data)) == MARKS
+    unmatched = data["unmatched_marks"]
+    assert isinstance(unmatched, list) and len(unmatched) == 1
+    um = unmatched[0]
+    assert um["room_mark"] == synth.MOP_MARK
+    assert um["name"] == synth.MOP_NAME
+    assert um["reason"] == "полигон не построен"
 
 
 # --- добор до заливок: карманы за тонкими штрихами ---------------------------------------------

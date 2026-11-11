@@ -52,20 +52,23 @@ def grow(fld: Field, limit_mm: float) -> int:
 
 @dataclass
 class Pocket:
-    """Проём входной двери: зона откоса, помещения по сторонам и квартиры этих сторон."""
+    """Проём двери: зона откоса, помещения по сторонам и признак «размечается зоной» сторон."""
 
     door: Door
     win: Window
     zone: BoolArr
     sides: list[int]  # метка области с каждой стороны (0 — нет)
-    apts: list[int | None]
+    zoned: list[bool]
     normal: tuple[float, float]
 
 
 def collect_pockets(
-    fld: Field, doors: list[Door], label_apt: Callable[[int], int | None]
+    fld: Field, doors: list[Door], label_zoned: Callable[[int], bool]
 ) -> list[Pocket]:
-    """Зона проёма и стороны каждой двери; только двери, у которых одна из сторон в квартире."""
+    """Зона проёма и стороны каждой двери; только двери, у которых одна из сторон — зона.
+
+    Зона — помещение квартиры или МОП: проём между двумя МОП и между МОП и квартирой делится так же,
+    как проём входной двери квартиры."""
     f = fld.f
     gi = fld.gi
     out: list[Pocket] = []
@@ -99,9 +102,9 @@ def collect_pockets(
                     got = int(gi[iy, ix])
                     break
             sides.append(got)
-        apts = [label_apt(v) if v else None for v in sides]
-        if any(a is not None for a in apts):
-            out.append(Pocket(d, (wx0, wy0, wx1, wy1), zone, sides, apts, (nx, ny)))
+        zoned = [bool(v) and label_zoned(v) for v in sides]
+        if any(zoned):
+            out.append(Pocket(d, (wx0, wy0, wx1, wy1), zone, sides, zoned, (nx, ny)))
     return out
 
 
@@ -145,7 +148,7 @@ def assign_pockets(fld: Field, pockets: list[Pocket]) -> int:
             yy, xx = np.nonzero(comp)
             gx, gy = (xx.mean() + ax0 + 0.5) * f, (yy.mean() + ay0 + 0.5) * f
             side = 0 if ((gx - door.mid[0]) * nx + (gy - door.mid[1]) * ny) > 0 else 1
-            if pk.apts[side] is None or not pk.sides[side]:
+            if not pk.zoned[side] or not pk.sides[side]:
                 continue
             sub[comp] = pk.sides[side]
             given += 1
@@ -266,6 +269,66 @@ def absorb_residual(fld: Field) -> list[Absorbed]:
     return out
 
 
+def absorb_enclosed(fld: Field, zones: set[int]) -> list[Absorbed]:
+    """Просветы внутри зоны: свободная область, ограждённая тонкими штрихами и одной зоной.
+
+    Просвет — связная (4-связность) группа свободных клеток и мягких клеток (тёмные штрихи без
+    заливки), площадью свободных клеток до ENCLOSED_MAX_M2. Его границы с областями — только
+    клетки одной зоны. Присоединяется зоне, если он нигде не примыкает к заливке (рамка отметки
+    уровня или подписи, отдельно стоящая колонна: зона не держит отверстий) либо зона примыкает
+    к нему с противоположных сторон (контакт охватывает не меньше ENCLOSED_SPAN_RATIO размаха
+    просвета по обеим осям: полоса коридора между двумя выносными линиями размеров, режущими его
+    насквозь). Шахта или ниша, открытая к зоне одним краем (проём, дверь лифта), остаётся.
+    Присоединяются свободные и мягкие клетки группы; заливки не трогаются. Только зонам из `zones`
+    (метки областей МОП): квартирные зоны этим шагом не меняются.
+    """
+    f = fld.f
+    gi = fld.gi
+    ny, nx = gi.shape
+    free = gi == 0
+    soft = (gi < 0) & ~fld.fill
+    lab, n = label(free | soft)
+    if n == 0:
+        return []
+    free_counts = np.bincount(lab[free].ravel(), minlength=n + 1)
+    cand = (free_counts > 0) & (free_counts <= int(zc.ENCLOSED_MAX_M2 * 1e6 / (f * f)))
+    cand[0] = False
+    flat = lab.ravel()
+    cells = np.flatnonzero(cand[flat])
+    if len(cells) == 0:
+        return []
+    cells = cells[np.argsort(flat[cells], kind="stable")]
+    groups = np.split(cells, np.flatnonzero(np.diff(flat[cells])) + 1)
+    out: list[Absorbed] = []
+    for grp in groups:
+        ys, xs = np.divmod(grp, nx)
+        y0, y1 = max(int(ys.min()) - 1, 0), min(int(ys.max()) + 2, ny)
+        x0, x1 = max(int(xs.min()) - 1, 0), min(int(xs.max()) + 2, nx)
+        comp: BoolArr = np.zeros((y1 - y0, x1 - x0), dtype=np.bool_)
+        comp[ys - y0, xs - x0] = True
+        sub = gi[y0:y1, x0:x1]
+        ring = _dilate4(comp) & ~comp
+        ids = np.unique(sub[ring & (sub > 0)])
+        if len(ids) != 1 or int(ids[0]) not in zones:
+            continue
+        touches_fill = bool((ring & fld.fill[y0:y1, x0:x1]).any())
+        if touches_fill:
+            cy, cx = np.nonzero(ring & (sub > 0))
+            span_y, span_x = int(cy.max() - cy.min()) + 1, int(cx.max() - cx.min()) + 1
+            width, height = int(xs.max() - xs.min()) + 1, int(ys.max() - ys.min()) + 1
+            if span_x < zc.ENCLOSED_SPAN_RATIO * width or span_y < zc.ENCLOSED_SPAN_RATIO * height:
+                continue
+        sub[comp] = int(ids[0])
+        out.append(
+            Absorbed(
+                int(ids[0]),
+                float(comp.sum()) * f * f / 1e6,
+                ((float(xs.mean()) + 0.5) * f, (float(ys.mean()) + 0.5) * f),
+            )
+        )
+    return out
+
+
 def residual_notes(absorbed: list[Absorbed]) -> dict[int, str]:
     """Замечание на каждую зону, к которой присоединены карманы."""
     acc: dict[int, list[float]] = {}
@@ -273,5 +336,16 @@ def residual_notes(absorbed: list[Absorbed]) -> dict[int, str]:
         acc.setdefault(a.zone, []).append(a.area_m2)
     return {
         z: f"дорощено до заливок: {len(v)} карманов, {sum(v):.2f} м²"
+        for z, v in sorted(acc.items())
+    }
+
+
+def enclosed_notes(absorbed: list[Absorbed]) -> dict[int, str]:
+    """Замечание на каждую зону, к которой присоединены просветы."""
+    acc: dict[int, list[float]] = {}
+    for a in absorbed:
+        acc.setdefault(a.zone, []).append(a.area_m2)
+    return {
+        z: f"закрыто просветов внутри зоны: {len(v)}, {sum(v):.2f} м²"
         for z, v in sorted(acc.items())
     }

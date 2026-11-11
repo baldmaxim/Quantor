@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.contracts.cad_zones import CadParkingType, ZonePoint
 from app.domain import MAX_MEASUREMENT_POINTS, JobStatus
@@ -27,15 +27,24 @@ PARKING_TYPE_LABELS: dict[str, str] = {
 
 
 class ZonesFileZone(BaseModel):
-    """Зона из `zones.json` генератора: кандидат, поля сверх контракта сервер не читает."""
+    """Зона из `zones.json` генератора: кандидат, поля сверх контракта сервер не читает.
+
+    У `room_apartment` № квартиры обязателен, у `room_mop` его нет (проверяется валидатором).
+    """
 
     model_config = ConfigDict(extra="ignore")
 
-    kind: Literal["room_apartment"]
-    apartment_no: str = Field(min_length=1)
+    kind: Literal["room_apartment", "room_mop"]
+    apartment_no: str | None = Field(default=None, min_length=1)
     room_mark: str | None = None
     name: str | None = None
     points: list[ZonePoint] = Field(min_length=3, max_length=MAX_MEASUREMENT_POINTS)
+
+    @model_validator(mode="after")
+    def _apartment_by_kind(self) -> ZonesFileZone:
+        if self.kind == "room_apartment" and self.apartment_no is None:
+            raise ValueError("room_apartment: apartment_no обязателен")
+        return self
 
 
 class ZonesFileParkingSpace(BaseModel):

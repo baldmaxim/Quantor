@@ -140,6 +140,7 @@ class Splitter:
         self.relax = LineIndex(lines.relax, model.gr.step)
         self.mark_seed: dict[str, int] = {}  # марка -> метка области в поле
         self.part_apt: dict[int, int | None] = {}  # метка выделенной части -> квартира
+        self.mop_labels: set[int] = set()  # метки областей помещений МОП (помещение или часть)
         self.comp_notes: dict[int, list[str]] = defaultdict(list)
         self.next_id = max(100000, int(model.lab.max()) + 1)
 
@@ -248,6 +249,8 @@ class Splitter:
             self.next_id += 1
             sub[lab2 == p] = pid
             self.part_apt[pid] = c.apt
+            if c.kind == "mop":
+                self.mop_labels.add(pid)
             for m in marks_p:
                 self.mark_seed[m] = pid
             if len(marks_p) > 1:
@@ -348,7 +351,7 @@ class Splitter:
         multi = {
             cid
             for cid, marks in self.comp_marks.items()
-            if len({rl.room_id for rl in marks}) >= 2 and model.comps[cid].kind == "room"
+            if len({rl.room_id for rl in marks}) >= 2 and model.comps[cid].kind in ("room", "mop")
         }
         for cid in sorted(multi):
             self.process_comp(model.comps[cid])
@@ -356,6 +359,12 @@ class Splitter:
             if cid not in multi:
                 for rl in marks:
                     self.mark_seed[rl.room_id] = cid
+                if model.comps[cid].kind == "mop":
+                    self.mop_labels.add(cid)
+
+    def label_zoned(self, lbl: int) -> bool:
+        """Область размечается зоной: помещение квартиры (по графу дверей) или МОП."""
+        return self.label_apt(lbl) is not None or lbl in self.mop_labels
 
     def label_apt(self, lbl: int) -> int | None:
         """Квартира области по метке (помещение детектора или выделенная часть)."""

@@ -177,7 +177,7 @@ async def _insert_zones(
     """Зоны и машино-места файла -> зоны листа через сервис зон.
 
     Невалидная для сервера зона пропускается. Возвращает: создано всего, отклонено, из созданных -
-    помещений квартир (машино-места на стены и конструкции не влияют).
+    помещений квартир и МОП (машино-места на стены и конструкции не влияют).
     """
     created = rejected = rooms = 0
     bodies: list[CadZoneCreate] = []
@@ -188,7 +188,11 @@ async def _insert_zones(
                     revision_id=revision.id,
                     page_index=document.page_index,
                     kind=zone.kind,
-                    apartment_no=zone.apartment_no[:MAX_TEXT],
+                    apartment_no=(
+                        None
+                        if zone.kind == "room_mop" or zone.apartment_no is None
+                        else zone.apartment_no[:MAX_TEXT]
+                    ),
                     room_mark=None if zone.room_mark is None else zone.room_mark[:MAX_TEXT],
                     name=None if zone.name is None else zone.name[:MAX_TEXT],
                     points=zone.points,
@@ -224,7 +228,7 @@ async def _insert_zones(
             rejected += 1
             continue
         created += 1
-        if body.kind == "room_apartment":
+        if body.kind in ("room_apartment", "room_mop"):
             rooms += 1
     return created, rejected, rooms
 

@@ -211,7 +211,7 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
     assert candidate["schema"] == "quantor.cad_mep.candidate.v1"
     prov = candidate["provenance"]
     assert isinstance(prov, dict)
-    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v7"
+    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v8"
     assert prov["pdf_sha256"] == _sha(inputs["pdf"])
     assert prov["view_dxf_sha256"] == _sha(inputs["dxf"])
     params = load_params(None)

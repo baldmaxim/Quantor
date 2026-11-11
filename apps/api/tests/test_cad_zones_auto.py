@@ -67,6 +67,15 @@ zones = [
 doc = {"schema": "quantor.cad_mep.zones.v1", "generator_version": "cad_mep.v1",
        "page_index": int(args.page_index), "scale_mm_per_pt": 35.0, "zones": zones,
        "unmatched_marks": [], "summary": []}
+if mode == "mop":
+    doc["zones"] = [
+        {"kind": "room_apartment", "apartment_no": "0042", "room_mark": "3-1/6", "name": "Спальня",
+         "points": rect},
+        {"kind": "room_mop", "apartment_no": None, "room_mark": "3-3.2", "name": "Тамбур-шлюз",
+         "expl_area_m2": 3.5, "poly_area_m2": 3.53, "points": rect, "notes": []},
+        {"kind": "room_mop", "apartment_no": None, "room_mark": "3-3.4",
+         "name": "Лестничная клетка", "points": rect},
+    ]
 if mode == "parking":
     doc["zones"] = []
     doc["parking_spaces"] = [
@@ -304,6 +313,37 @@ async def test_handler_inserts_zones_through_the_zone_service_and_stores_zones_j
         # Разметка уже есть - второй запуск вручную закрыт.
         again = await api.post(_zones_url(project_id, job_id))
         assert again.status_code == 409 and again.json()["detail"]["code"] == "CAD_ZONES_NOT_EMPTY"
+
+
+async def test_handler_inserts_mop_zones_with_derived_room_type(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    zones_tools: Path,
+    tmp_path: Path,
+) -> None:
+    (zones_tools / "mode").write_text("mop")
+    settings = zones_settings(zones_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        queued = await api.post(_zones_url(project_id, job_id))
+        job = await _run_zones_worker(db_session, fake_storage, settings, queued.json()["job_id"])
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        assert cad_service.result_of(job)["counts"] == {"in_file": 3, "created": 3, "rejected": 0}
+
+        listed = await api.get(f"/api/v1/projects/{project_id}/cad/zones?revision_id={revision_id}")
+        assert listed.status_code == 200
+        by_mark = {z["room_mark"]: z for z in listed.json()}
+        assert by_mark["3-1/6"]["kind"] == "room_apartment"
+        assert by_mark["3-1/6"]["apartment_no"] == "0042"
+        for mark, name, room_type in (
+            ("3-3.2", "Тамбур-шлюз", "airlock"),
+            ("3-3.4", "Лестничная клетка", "stair"),
+        ):
+            zone = by_mark[mark]
+            assert (zone["kind"], zone["apartment_no"], zone["name"]) == ("room_mop", None, name)
+            assert zone["room_type"] == room_type
+            assert zone["area_m2"] is not None
 
 
 async def test_handler_inserts_parking_spaces_when_there_are_no_room_zones(
