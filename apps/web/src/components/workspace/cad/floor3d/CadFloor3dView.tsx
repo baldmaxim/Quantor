@@ -17,10 +17,12 @@ import {
 } from '@/lib/cad/floor3d-queries';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
 import type { CadLayerCategory } from '@/lib/cad/layer-categories';
+import { useMepLayerVisibility } from '@/lib/cad/mep-layers';
+import { useCadMepRoutes3d } from '@/lib/cad/mep-routes3d-queries';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
 
-import { CadFloor3dCanvas, type IFloor3dViewRequest } from './CadFloor3dCanvas';
+import { CadFloor3dCanvas, type ICadFloor3dRoutes, type IFloor3dViewRequest } from './CadFloor3dCanvas';
 import { CadFloor3dDxfButton } from './CadFloor3dDxfButton';
 import { CadFloor3dHeights } from './CadFloor3dHeights';
 import { CadFloor3dHoleList } from './CadFloor3dHoleList';
@@ -95,6 +97,22 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
 
   const model = query.data ?? null;
   const plan = useMemo(() => (model ? buildFloor3dPlan(model) : null), [model]);
+
+  // Трассы механики листа: сбой чтения или их отсутствие 3D-вид не ломают. Слои трасс скрываются той
+  // же маской, что и в 2D (общее хранилище), поэтому одна истина на плане и в 3D.
+  const routesState = useCadMepRoutes3d({
+    projectId: params.projectId,
+    revisionId: params.revisionId,
+    pageIndex: params.pageIndex,
+    view: params.view,
+    enabled: model !== null,
+  });
+  const routesMask = useMepLayerVisibility().mask;
+  const routesData = routesState.status === 'ready' ? routesState.data : null;
+  const routes = useMemo<ICadFloor3dRoutes | null>(
+    () => (routesData && model ? { polylines: routesData.polylines, baseZMm: model.base_z_mm } : null),
+    [routesData, model],
+  );
 
   const [showSlabCap, setShowSlabCap] = useState(false);
   const [viewRequest, setViewRequest] = useState<IFloor3dViewRequest | null>(null);
@@ -190,6 +208,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const notReady = query.isError && extractCode(query.error) === WALLS_NOT_READY;
   const outdated = model?.warnings.some((item) => item.code === 'walls_outdated') ?? false;
   const skipped = plan?.skipped.wallsWithoutTop ?? 0;
+  const routesStale = routesState.status === 'stale';
+  const routesMismatch = routesData !== null && !routesData.heights_match;
 
   let content: ReactNode;
   if (query.isPending) {
@@ -232,6 +252,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
       <>
         <CadFloor3dCanvas
           plan={plan}
+          routes={routes}
+          hiddenRoutesMask={routesMask}
           showSlabCap={showSlabCap}
           viewRequest={viewRequest}
           selected={selected}
@@ -367,11 +389,21 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
             </CadFloor3dInfoPanel>
           )}
         </div>
-        {(outdated || skipped > 0) && (
+        {(outdated || skipped > 0 || routesStale || routesMismatch) && (
           <div className="flex flex-none flex-col gap-[var(--s-2)] border-b border-border bg-surface px-[var(--s-4)] py-[var(--s-3)]">
             {outdated && (
               <p role="alert" className="text-xs text-danger">
                 Пересчитайте конструкции: результат построен прежней версией, плиты и перемычек в нём нет.
+              </p>
+            )}
+            {routesStale && (
+              <p role="note" className="text-xs text-warning">
+                Трассы построены старой версией генератора — перестройте трассы.
+              </p>
+            )}
+            {routesMismatch && (
+              <p role="note" className="text-xs text-warning">
+                Высоты трасс не совпадают с уровнями листа — перестройте трассы.
               </p>
             )}
             {skipped > 0 && (

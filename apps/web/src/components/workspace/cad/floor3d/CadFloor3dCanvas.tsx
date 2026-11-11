@@ -10,8 +10,14 @@ import {
   type IFloor3dSnapState,
 } from '@/lib/cad/floor3d-engine';
 import { highlightOf, highlightsOf, visibilityOf, type IFloor3dPlan } from '@/lib/cad/floor3d-geometry';
+import {
+  buildFloor3dRoutes,
+  readFloor3dRouteColors,
+  type IFloor3dRoutePolyline,
+} from '@/lib/cad/floor3d-routes';
 import { buildFloor3dScene, readFloor3dColors, type IFloor3dPick } from '@/lib/cad/floor3d-scene';
 import { EXTRA_CATEGORIES, type CadLayerCategory } from '@/lib/cad/layer-categories';
+import { isMepLayerHidden } from '@/lib/cad/mep-layers';
 import { useTheme } from '@/lib/theme';
 
 import { CadFloor3dMeasureLabel } from './CadFloor3dMeasureLabel';
@@ -23,8 +29,19 @@ export interface IFloor3dViewRequest {
   readonly seq: number;
 }
 
+/** Трассы механики листа: полилинии в мм DXF, Z от отметки этажа модели. */
+export interface ICadFloor3dRoutes {
+  readonly polylines: readonly IFloor3dRoutePolyline[];
+  /** Отметка этажа модели (`base_z_mm`), мм. */
+  readonly baseZMm: number;
+}
+
 interface ICadFloor3dCanvasProps {
   readonly plan: IFloor3dPlan;
+  /** Трассы механики; `null` - трасс нет. */
+  readonly routes?: ICadFloor3dRoutes | null;
+  /** Маска слоёв трасс, скрытых человеком (общая с 2D). */
+  readonly hiddenRoutesMask?: number;
   readonly showSlabCap: boolean;
   readonly viewRequest: IFloor3dViewRequest | null;
   /** Выбранный элемент: подсвечивается оверлеем. */
@@ -41,6 +58,7 @@ interface ICadFloor3dCanvasProps {
   readonly onError: (message: string) => void;
 }
 
+const NO_ROUTES_MASK = 0;
 const NO_IDS: ReadonlySet<string> = new Set<string>();
 const NO_CATEGORIES: ReadonlySet<CadLayerCategory> = new Set<CadLayerCategory>();
 const ALL_CATEGORIES: readonly CadLayerCategory[] = [
@@ -57,6 +75,8 @@ const ALL_CATEGORIES: readonly CadLayerCategory[] = [
  */
 export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   plan,
+  routes = null,
+  hiddenRoutesMask = NO_ROUTES_MASK,
   showSlabCap,
   viewRequest,
   selected,
@@ -105,6 +125,32 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
       plan.prisms.length === 0 ? null : buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap }),
     );
   }, [plan, showSlabCap, theme]);
+
+  // Трассы механики: отдельная группа сцены, пересобирается при смене данных, плана и темы.
+  const routeScene = useRef<ReturnType<typeof buildFloor3dRoutes> | null>(null);
+  useEffect(() => {
+    if (routes === null || routes.polylines.length === 0) {
+      routeScene.current = null;
+      engine.current?.setRoutes(null);
+      return;
+    }
+    const built = buildFloor3dRoutes(routes.polylines, readFloor3dRouteColors(), {
+      center: plan.center,
+      baseZMm: routes.baseZMm,
+    });
+    routeScene.current = built;
+    engine.current?.setRoutes(built);
+  }, [routes, plan.center, theme]);
+
+  // Видимость слоёв трасс - после пересборки (эффект выше): та же маска, что у слоёв трасс в 2D.
+  useEffect(() => {
+    const built = routeScene.current;
+    if (built === null) return;
+    for (const polyline of routes?.polylines ?? []) {
+      built.setLayerVisible(polyline.layer, !isMepLayerHidden(hiddenRoutesMask, polyline.layer));
+    }
+    engine.current?.refresh();
+  }, [routes, plan.center, theme, hiddenRoutesMask]);
 
   // Видимость категорий - после пересборки модели (эффект выше); сцена при этом не пересобирается.
   useEffect(() => {

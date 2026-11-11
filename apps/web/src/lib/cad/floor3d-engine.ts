@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import type { IFloor3dHighlight } from './floor3d-geometry';
+import type { IFloor3dRoutes } from './floor3d-routes';
 import type { CadLayerCategory } from './layer-categories';
 import {
   buildFeatureEdges,
@@ -41,6 +42,10 @@ export interface IFloor3dEngine {
   setHighlight: (targets: readonly IFloor3dHighlight[]) => void;
   /** Показать или скрыть категорию без пересборки сцены; переживает пересборку модели. */
   setCategoryVisible: (category: CadLayerCategory, visible: boolean) => void;
+  /** Трассы механики: отдельная группа вне модели, в клик не входит; прежняя освобождается, `null` - снять. */
+  setRoutes: (routes: IFloor3dRoutes | null) => void;
+  /** Перерисовать кадр после смены видимости трасс. */
+  refresh: () => void;
   /** Режим измерения: клики ставят точки, а не выбирают элемент; выход очищает замер. */
   setMeasuring: (on: boolean) => void;
   dispose: () => void;
@@ -150,6 +155,7 @@ export const createFloor3dEngine = (
   controls.addEventListener('start', options.onMove);
 
   let model: IFloor3dScene | null = null;
+  let routes: IFloor3dRoutes | null = null;
   let fitted = false;
   let highlight: readonly IFloor3dHighlight[] = [];
   const hiddenCategories = new Set<CadLayerCategory>();
@@ -492,6 +498,16 @@ export const createFloor3dEngine = (
         place(ISO_DIRECTION);
       } else requestRender();
     },
+    setRoutes: (next) => {
+      if (routes !== null) {
+        scene.remove(routes.group);
+        routes.dispose();
+      }
+      routes = next;
+      if (next !== null) scene.add(next.group);
+      requestRender();
+    },
+    refresh: requestRender,
     setHighlight: (targets) => {
       highlight = targets;
       model?.setHighlight(targets);
@@ -545,6 +561,11 @@ export const createFloor3dEngine = (
         scene.remove(model.group);
         model.dispose();
         model = null;
+      }
+      if (routes !== null) {
+        scene.remove(routes.group);
+        routes.dispose();
+        routes = null;
       }
       renderer.dispose();
       renderer.forceContextLoss();

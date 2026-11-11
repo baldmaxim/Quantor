@@ -13,6 +13,8 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
   readCadFloor3D: vi.fn(),
   readCadConstructions: vi.fn(),
   readCadProjectLevels: vi.fn(),
+  readCadMepRoutes3D: vi.fn(),
+  listCadJobs: vi.fn(),
   putCadFloor3dHole: vi.fn(),
   putCadSheetLevels: vi.fn(),
   putCadProjectLevels: vi.fn(),
@@ -63,7 +65,23 @@ const mount = () => {
 
 const ok = <T,>(data: T) => Promise.resolve({ data });
 
+const routes3dFixture = (patch: Partial<client.CadMepRoutes3dOut> = {}): client.CadMepRoutes3dOut => ({
+  job_id: 'j2',
+  generator_version: 'cad_mep.v7',
+  floor_elevation_mm: 3000,
+  floor_height_mm: 2800,
+  levels_elevation_mm: 3000,
+  levels_height_mm: 2800,
+  heights_match: true,
+  polylines: [{ layer: 'M-OV-T1', pts: [[0, 0, 100], [1000, 0, 100]] }],
+  ...patch,
+});
+
 beforeEach(() => {
+  vi.mocked(client.listCadJobs).mockImplementation(() => ok({ items: [] }) as never);
+  vi.mocked(client.readCadMepRoutes3D).mockImplementation(
+    () => Promise.reject({ detail: { code: 'CAD_ROUTES_NOT_FOUND' } }) as never,
+  );
   vi.mocked(client.readCadConstructions).mockImplementation(
     () => ok({ constructions: [] }) as never,
   );
@@ -271,5 +289,57 @@ describe('3D-вид этажа', () => {
     fireEvent.pointerDown(toggle);
     fireEvent.click(toggle);
     expect(screen.queryByRole('dialog', { name: 'Высоты и отверстия плиты' })).toBeNull();
+  });
+
+  describe('трассы механики', () => {
+    const open = async () => {
+      vi.mocked(client.readCadFloor3D).mockImplementation(() => ok(floor3dFixture()) as never);
+      mount();
+      await screen.findByTestId('floor3d-heights');
+    };
+
+    it('трасс нет - плашек нет', async () => {
+      await open();
+      await waitFor(() => expect(client.readCadMepRoutes3D).toHaveBeenCalled());
+      expect(screen.queryByText(/перестройте трассы/)).toBeNull();
+    });
+
+    it('задание старее v7 - плашка про старую версию генератора', async () => {
+      vi.mocked(client.readCadMepRoutes3D).mockImplementation(
+        () => Promise.reject({ detail: { code: 'CAD_ROUTES3D_MISSING' } }) as never,
+      );
+      await open();
+      expect(
+        await screen.findByText('Трассы построены старой версией генератора — перестройте трассы.'),
+      ).toBeTruthy();
+    });
+
+    it('высоты трасс не совпадают с уровнями листа - плашка', async () => {
+      vi.mocked(client.readCadMepRoutes3D).mockImplementation(
+        () => ok(routes3dFixture({ heights_match: false })) as never,
+      );
+      await open();
+      expect(
+        await screen.findByText('Высоты трасс не совпадают с уровнями листа — перестройте трассы.'),
+      ).toBeTruthy();
+    });
+
+    it('высоты совпадают - плашек нет, сбой чтения трасс 3D-вид не ломает', async () => {
+      vi.mocked(client.readCadMepRoutes3D).mockImplementation(() => ok(routes3dFixture()) as never);
+      await open();
+      await waitFor(() => expect(client.readCadMepRoutes3D).toHaveBeenCalled());
+      expect(screen.queryByText(/перестройте трассы/)).toBeNull();
+      expect(screen.getByTestId('canvas')).toBeTruthy();
+    });
+
+    it('ошибка чтения трасс: вид на месте, плашек нет', async () => {
+      vi.mocked(client.readCadMepRoutes3D).mockImplementation(
+        () => Promise.reject({ detail: { code: 'CAD_ENGINE_FAILED' } }) as never,
+      );
+      await open();
+      await waitFor(() => expect(client.readCadMepRoutes3D).toHaveBeenCalled());
+      expect(screen.queryByText(/перестройте трассы/)).toBeNull();
+      expect(screen.getByTestId('canvas')).toBeTruthy();
+    });
   });
 });
