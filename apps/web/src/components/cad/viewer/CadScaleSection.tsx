@@ -11,6 +11,8 @@ import {
   NO_VALUE,
 } from '@/lib/cad/view-format';
 
+import { CadControlsTable } from './CadControlsTable';
+
 interface ICadScaleSectionProps {
   scale: CadScaleRead | null;
 }
@@ -60,6 +62,7 @@ export const CadScaleSection: FC<ICadScaleSectionProps> = ({ scale }) => {
             Отклонение от размерных цепочек: {formatDeviationPercent(scale.deviation)}
           </p>
         )}
+        <CadControlsTable controls={scale.controls} />
         {reasons.length > 0 && (
           <div
             role="alert"

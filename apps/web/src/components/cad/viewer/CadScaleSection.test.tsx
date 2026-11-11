@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { CadScaleSection } from './CadScaleSection';
@@ -25,6 +25,22 @@ describe('CadScaleSection', () => {
       /Выпуск разрешён/,
       /HOLD/,
     ].forEach((pattern) => expect(screen.queryByText(pattern)).toBeNull());
+  });
+
+  it('таблица контролей по размерным цепочкам после строки масштаба', () => {
+    render(<CadScaleSection scale={scale()} />);
+    const table = screen.getByRole('table');
+    ['Цепочка', 'Роль', 'Подпись, мм', 'По масштабу, мм', 'Невязка, мм', 'Допуск, мм'].forEach(
+      (name) => expect(within(table).getByText(name)).toBeInTheDocument(),
+    );
+    expect(within(table).getByText(/^3\s000/)).toBeInTheDocument();
+    expect(within(table).getAllByRole('row')).toHaveLength(3);
+  });
+
+  it('без контролей таблицы нет', () => {
+    render(<CadScaleSection scale={scale({ controls: [] })} />);
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByText(/Размерных цепочек для контроля не найдено/)).toBeInTheDocument();
   });
 
   it('масштаб калибровки человека: 1:N из мм/pt и отклонение от цепочек в процентах', () => {
