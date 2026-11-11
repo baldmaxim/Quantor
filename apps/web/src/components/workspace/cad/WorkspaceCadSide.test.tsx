@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { diagnostics } from '@/components/cad/viewer/fixtures';
 
-const mocks = vi.hoisted(() => ({ detail: vi.fn(), convert: vi.fn() }));
+const mocks = vi.hoisted(() => ({ detail: vi.fn() }));
 
 vi.mock('@/components/cad/CadJobDetail', () => ({
   CadJobDetail: (props: { jobId: string; selectedPage: number | null }) => {
@@ -20,29 +20,6 @@ vi.mock('@/components/cad/CadJobList', () => ({
 }));
 vi.mock('@/components/cad/CadResult', () => ({
   CadResult: (props: { attempt: number }) => <p>результат попытки {props.attempt}</p>,
-}));
-vi.mock('./WorkspaceCadPipeline', () => ({
-  WorkspaceCadPipeline: (props: {
-    convert: { pageIndex: number; onJobCreated: (id: string, p: number[]) => void } | null;
-    openablePanels: string[];
-    onOpenPanel: (id: string) => void;
-  }) => {
-    mocks.convert(props);
-    return (
-      <div>
-        <button
-          type="button"
-          onClick={() => props.convert?.onJobCreated('new', [props.convert.pageIndex])}
-        >
-          Преобразовать лист в CAD
-        </button>
-        <button type="button" onClick={() => props.onOpenPanel('constructions')}>
-          Открыть Конструкции
-        </button>
-        <span>доступно: {props.openablePanels.join(',')}</span>
-      </div>
-    );
-  },
 }));
 vi.mock('@/components/cad/viewer/CadRemarksPanel', () => ({
   CadRemarksPanel: () => <p>панель замечаний</p>,
@@ -61,7 +38,6 @@ import type {
   IWorkspaceCadSideProps,
   IWorkspaceCadZones,
 } from './types';
-import type { IWorkspaceCadPipeline } from './useWorkspaceCadPipeline';
 import {
   WorkspaceCadSide,
   type IWorkspaceCadSideJobs,
@@ -112,9 +88,6 @@ const VIEW: NonNullable<IWorkspaceCadSideProps['view']> = {
 };
 
 const ZONES = {} as IWorkspaceCadZones;
-
-const pipelineOf = (label: string): IWorkspaceCadPipeline =>
-  ({ sheet: null, steps: [], summary: { tone: 'neutral', label } }) as unknown as IWorkspaceCadPipeline;
 
 const mount = (
   patch: Partial<IWorkspaceCadSideProps> & IWorkspaceCadSideJobs & IWorkspaceCadSidePipeline = {},
@@ -174,53 +147,22 @@ describe('WorkspaceCadSide', () => {
     expect(screen.queryByRole('button', { name: 'Преобразовать лист в CAD' })).toBeNull();
   });
 
-  it('задание листа упало: в «Задании» кнопки запуска нет, запуск - в «Обработке»', () => {
-    mount({ view: null, job: { ...JOB, failed: true }, pipeline: pipelineOf('Ошибка: CAD') });
-    fireEvent.click(screen.getByRole('tab', { name: 'Задание' }));
+  it('задание листа упало: в «Задании» кнопки запуска нет, запуск - у бейджа в шапке', () => {
+    mount({ view: null, job: { ...JOB, failed: true } });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Задание']);
     expect(screen.getByText('ход задания j1')).toBeVisible();
-    // Кнопка запуска смонтирована один раз, в скрытой «Обработке»: в «Задании» её нет.
     expect(screen.queryByRole('button', { name: 'Преобразовать лист в CAD' })).toBeNull();
-    expect(screen.getAllByRole('button', { name: 'Преобразовать лист в CAD', hidden: true })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('tab', { name: 'Обработка' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Преобразовать лист в CAD' }));
-    expect(onConvertCreated).toHaveBeenCalledWith('new', [0]);
-    expect(mocks.convert.mock.calls.at(-1)?.[0]).toMatchObject({ convert: { pageIndex: 0 } });
   });
 
-  it('«Обработка» - первый раздел и открыта по умолчанию, пока лист не готов', () => {
-    mount({ pipeline: pipelineOf('Ждёт одобрения') });
-    expect(screen.getAllByRole('tab')[0]).toHaveTextContent('Обработка');
-    expect(screen.getByRole('tab', { name: 'Обработка' })).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('лист готов: по умолчанию открыты «Слои»', () => {
-    mount({ pipeline: pipelineOf('Готово') });
+  it('вкладки «Обработка» нет, по умолчанию открыты «Слои»', () => {
+    mount();
+    expect(screen.queryByRole('tab', { name: 'Обработка' })).toBeNull();
     expect(screen.getByRole('tab', { name: 'Слои' })).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('действие шага открывает раздел «Конструкции»', () => {
-    const constructions: IWorkspaceCadConstructions = {
-      status: 'not-ready',
-      data: null,
-      notReadyText: null,
-      loadError: null,
-      onReload: vi.fn(),
-      calculating: false,
-      actionError: null,
-      onCompute: vi.fn(),
-      levelsSaving: false,
-      onSaveLevels: vi.fn(),
-      activeGroup: null,
-      onSelectGroup: vi.fn(),
-    };
-    mount({ pipeline: pipelineOf('Ошибка: Конструкции'), constructions });
-    fireEvent.click(screen.getByRole('button', { name: 'Открыть Конструкции' }));
-    expect(screen.getByRole('tab', { name: 'Конструкции' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('раздел, открытый снаружи, главнее выбора по умолчанию и сообщает о смене', () => {
     const onSideTabChange = vi.fn();
-    mount({ pipeline: pipelineOf('Ждёт одобрения'), sideTab: 'scale', onSideTabChange });
+    mount({ sideTab: 'scale', onSideTabChange });
     expect(screen.getByRole('tab', { name: 'Масштаб' })).toHaveAttribute('aria-selected', 'true');
     fireEvent.click(screen.getByRole('tab', { name: 'Файлы' }));
     expect(onSideTabChange).toHaveBeenCalledWith('files');
@@ -273,14 +215,11 @@ describe('WorkspaceCadSide', () => {
     mount({ state: 'none', job: null, view: null });
     expect(screen.getByText('Лист не преобразовывался')).toBeInTheDocument();
     expect(screen.queryByRole('tab')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Преобразовать лист в CAD' })).toBeNull();
   });
 
-  it('лист не преобразовывался, есть «Обработка»: она первая и открыта, запуск в ней', () => {
-    mount({ state: 'none', job: null, view: null, pipeline: pipelineOf('Нужна калибровка') });
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Обработка', 'Задание']);
-    fireEvent.click(screen.getByRole('button', { name: 'Преобразовать лист в CAD' }));
-    expect(onConvertCreated).toHaveBeenCalledWith('new', [0]);
+  it('лист не преобразовывался: подсказка ведёт к статусу листа в шапке', () => {
+    mount({ state: 'none', job: null, view: null });
+    expect(screen.getByText(/нажмите статус листа вверху справа/)).toBeInTheDocument();
   });
 
   it('лист не выбран', () => {

@@ -25,6 +25,7 @@ import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
 import { WorkspaceCadBar } from '@/components/workspace/cad/WorkspaceCadBar';
 import { useWorkspaceCadPipeline } from '@/components/workspace/cad/useWorkspaceCadPipeline';
 import { WorkspaceCadSide } from '@/components/workspace/cad/WorkspaceCadSide';
+import { openablePanels } from '@/components/workspace/cad/WorkspaceCadPipeline';
 import { WorkspacePipelineBadge } from '@/components/workspace/cad/WorkspacePipelineBadge';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
 import { SheetList } from '@/components/workspace/SheetList';
@@ -161,7 +162,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const [zoomPercent, setZoomPercent] = useState(100);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [regionSearch, setRegionSearch] = useState('');
-  // Открытый раздел правой панели CAD: бейдж обработки в шапке открывает «Обработку».
+  // Открытый раздел правой панели CAD: действия окна «Обработка» у бейджа открывают его.
   const [cadSideTab, setCadSideTab] = useState<string | null>(null);
 
   const pages = sheets.data?.items ?? [];
@@ -469,14 +470,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
     [sheetPageIndex, pageWidth, pageHeight],
   );
 
-  // Конвейер открытого листа: один запрос на бейдж в шапке и раздел «Обработка».
+  // Конвейер открытого листа: один запрос на бейдж в шапке и окно «Обработка листа».
   const pipeline = useWorkspaceCadPipeline({
     projectId,
     revisionId,
     pageIndex: sheetPageIndex,
     enabled: cadOn,
   });
-  const openPipeline = () => setCadSideTab('pipeline');
   // Лист подписывается этажом по заголовку плана; нет заголовка - номером листа. Для списка листов
   // берётся тот же ответ конвейера, нового запроса нет.
   const floorTitleByPage = useMemo(
@@ -592,7 +592,17 @@ const WorkspacePage = ({ params }: IPageProps) => {
               )}
 
               <div className="flex items-center px-[var(--s-5)]">
-                <WorkspacePipelineBadge pipeline={pipeline} cadOn={cadOn} onOpen={openPipeline} />
+                <WorkspacePipelineBadge
+                  pipeline={pipeline}
+                  cadOn={cadOn}
+                  convert={cad.side.convert}
+                  openablePanels={openablePanels(
+                    cad.side.view !== null,
+                    cad.side.view?.mep != null,
+                    (cad.side.constructions ?? null) !== null,
+                  )}
+                  onOpenPanel={setCadSideTab}
+                />
               </div>
             </>
           }
@@ -988,7 +998,6 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   <WorkspaceCadSide
                     {...cad.side}
                     jobs={cad.left}
-                    pipeline={pipeline}
                     sideTab={cadSideTab}
                     onSideTabChange={setCadSideTab}
                   />

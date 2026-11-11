@@ -19,6 +19,16 @@ import { WorkspaceCadConvert } from './WorkspaceCadConvert';
 export const PIPELINE_PANEL_CONSTRUCTIONS = 'constructions';
 export const PIPELINE_PANEL_MEP = 'mep';
 
+/** Разделы правой панели, в которые ведут действия шагов и которые в панели сейчас есть. */
+export const openablePanels = (
+  hasView: boolean,
+  hasMep: boolean,
+  hasConstructions: boolean,
+): string[] => [
+  ...(hasView && hasMep ? [PIPELINE_PANEL_MEP] : []),
+  ...(hasView && hasConstructions ? [PIPELINE_PANEL_CONSTRUCTIONS] : []),
+];
+
 export interface IWorkspaceCadPipelineProps {
   readonly pipeline: IWorkspaceCadPipeline;
   /** Запуск преобразования листа (единственное место запуска); `null` - лист не выбран. */
@@ -48,8 +58,8 @@ const nextStep = (steps: readonly IPipelineStep[]): IPipelineStep | null =>
 const BUTTON = 'self-start max-md:h-[44px]';
 
 /**
- * Панель «Обработка»: шаги конвейера открытого листа и одно следующее действие. Запуск
- * преобразования и калибровка живут только здесь (`WorkspaceCadConvert`).
+ * Содержимое окна «Обработка листа» у бейджа в шапке: шаги конвейера открытого листа и одно
+ * следующее действие. Запуск преобразования и калибровка живут только здесь (`WorkspaceCadConvert`).
  */
 export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
   pipeline,

@@ -18,8 +18,6 @@ import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 
 import { ConstructionsPanel } from './ConstructionsPanel';
 import type { IWorkspaceCadLeftProps, IWorkspaceCadSideProps } from './types';
-import { WorkspaceCadPipeline } from './WorkspaceCadPipeline';
-import type { IWorkspaceCadPipeline } from './useWorkspaceCadPipeline';
 
 /** Список заданий ревизии: раздел «Задания» (выбор задания переводит рабочую область на его лист). */
 export interface IWorkspaceCadSideJobs {
@@ -29,26 +27,14 @@ export interface IWorkspaceCadSideJobs {
   > | null;
 }
 
-/**
- * Раздел «Обработка» (конвейер листа, первый в панели) и управление открытым разделом снаружи:
- * бейдж в шапке рабочей области открывает «Обработку», не зная устройства панели.
- */
+/** Управление открытым разделом снаружи: страница открывает раздел по действию окна «Обработка». */
 export interface IWorkspaceCadSidePipeline {
-  readonly pipeline?: IWorkspaceCadPipeline | null;
   /** Открытый раздел, которым владеет страница; нет - раздел хранится в панели. */
   readonly sideTab?: string | null;
   readonly onSideTabChange?: (id: string) => void;
 }
 
-const PIPELINE_TAB = 'pipeline';
-
 const HINT = 'p-[var(--s-5)] text-xs text-muted';
-
-/** Разделы, в которые ведут действия шагов «Обработки», и которые в панели сейчас есть. */
-const openablePanels = (hasView: boolean, hasMep: boolean, hasConstructions: boolean): string[] => [
-  ...(hasView && hasMep ? ['mep'] : []),
-  ...(hasView && hasConstructions ? ['constructions'] : []),
-];
 
 /**
  * Правая панель вкладки CAD: слои, замечания, масштаб, файлы (с результатом), трассы механики и
@@ -57,7 +43,6 @@ const openablePanels = (hasView: boolean, hasMep: boolean, hasConstructions: boo
  * Раздел «Зоны» - разметка помещений и дверей листа - есть и у листа без задания.
  * Раздел «Конструкции» (кладка и монолит, ADR-0038) - у листа с видом.
  * Раздел «Задания» (список заданий ревизии) - последний, если передан `jobs`.
- * Раздел «Обработка» (шаги конвейера листа, единственное место запуска преобразования) - первый.
  * Показано только задание открытого листа. С идущим или упавшим заданием - только раздел
  * «Задание»: диагностики вида у него нет. Ширину и сворачивание панели ведёт каркас рабочей области.
  */
@@ -70,22 +55,19 @@ export const WorkspaceCadSide: FC<
   loadError,
   onRetry,
   job,
-  convert,
   viewLoading,
   viewError,
   view,
   zones = null,
   constructions = null,
   jobs = null,
-  pipeline = null,
   sideTab: sideTabProp = null,
   onSideTabChange,
 }) => {
   // Раздел живёт здесь (или у страницы): при переходе на другой лист панель остаётся на выбранном
-  // разделе. Пока раздел не выбран, открыта «Обработка», если лист обработан не до конца.
+  // разделе. Пока раздел не выбран, открыты «Слои».
   const [innerTab, setInnerTab] = useState<string | null>(null);
-  const defaultTab = pipeline && pipeline.summary?.label !== 'Готово' ? PIPELINE_TAB : 'layers';
-  const sideTab = sideTabProp ?? innerTab ?? defaultTab;
+  const sideTab = sideTabProp ?? innerTab ?? 'layers';
   const setSideTab = (id: string) => {
     setInnerTab(id);
     onSideTabChange?.(id);
@@ -114,22 +96,6 @@ export const WorkspaceCadSide: FC<
 
   const zonesTab: ICadSideTab | null = zones
     ? { id: 'zones', label: 'Зоны', content: <CadZonesPanel {...zones} /> }
-    : null;
-
-  // Раздел «Обработка» - шаги конвейера листа и следующее действие; всегда первый.
-  const pipelineTab: ICadSideTab | null = pipeline
-    ? {
-        id: PIPELINE_TAB,
-        label: 'Обработка',
-        content: (
-          <WorkspaceCadPipeline
-            pipeline={pipeline}
-            convert={convert}
-            openablePanels={openablePanels(view !== null, view?.mep != null, constructions !== null)}
-            onOpenPanel={setSideTab}
-          />
-        ),
-      }
     : null;
 
   // Раздел «Задания» - очередь и история заданий ревизии; всегда последний.
@@ -168,17 +134,16 @@ export const WorkspaceCadSide: FC<
         )}
         <p className="text-sm">Лист не преобразовывался</p>
         <p className="text-xs text-muted">
-          Запустите преобразование в разделе «Обработка»: результат появится здесь.
+          Запустите преобразование: нажмите статус листа вверху справа, результат появится здесь.
         </p>
       </div>
     );
     // Зоны размечают и лист без задания: эталон для движка нужен до преобразования.
-    if (pipelineTab === null && zonesTab === null && jobsTab === null) return none;
+    if (zonesTab === null && jobsTab === null) return none;
     return (
       <CadSidePanel
         label="Панель CAD"
         tabs={[
-          ...(pipelineTab ? [pipelineTab] : []),
           { id: 'job', label: 'Задание', content: none },
           ...(zonesTab ? [zonesTab] : []),
           ...(jobsTab ? [jobsTab] : []),
@@ -224,7 +189,6 @@ export const WorkspaceCadSide: FC<
 
   const tabs: readonly ICadSideTab[] = view
     ? [
-        ...(pipelineTab ? [pipelineTab] : []),
         {
           id: 'layers',
           label: 'Слои',
@@ -280,7 +244,6 @@ export const WorkspaceCadSide: FC<
         ...(jobsTab ? [jobsTab] : []),
       ]
     : [
-        ...(pipelineTab ? [pipelineTab] : []),
         ...(zonesTab ? [zonesTab] : []),
         jobTab,
         ...(jobsTab ? [jobsTab] : []),
