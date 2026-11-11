@@ -143,6 +143,36 @@ def test_job_json_carries_operator_scales_with_legacy_page_numbers(runner: Modul
     }
 
 
+def test_parse_params_accepts_auto_pages_and_job_json_skips_them(runner: ModuleType) -> None:
+    """Лист без калибровки (ADR-0045): `{"auto": true}`, движку масштаб оператора не передаётся."""
+    scales = {"0": {"auto": True}, "2": {"mm_per_pt": 35.2778, "calibration_id": "cal-2"}}
+    params = runner.parse_params(_params(scales=scales))
+    assert params["scales"] == scales
+    job = runner.job_document([1, 3], params)
+    assert job["operator_pages"] is True
+    assert job["operator_scales"] == {"3": {"mm_per_pt": 35.2778, "calibration_id": "cal-2"}}
+    everything = runner.parse_params(_params(scales={"0": {"auto": True}, "2": {"auto": True}}))
+    assert runner.job_document([1, 3], everything)["operator_scales"] == {}
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"auto": False},
+        {"auto": 1},
+        {"auto": "true"},
+        {"auto": True, "mm_per_pt": 70.0},
+        {"auto": True, "calibration_id": "a"},
+        {},
+    ],
+)
+def test_parse_params_rejects_bad_auto_entry(runner: ModuleType, entry: dict[str, Any]) -> None:
+    scales = {"0": entry, "2": {"mm_per_pt": 70.0, "calibration_id": "a"}}
+    with pytest.raises(runner.RunnerError) as error:
+        runner.parse_params(_params(scales=scales))
+    assert error.value.exit_code == runner.EXIT_PARAMS
+
+
 # ------------------------------------------------------------------ гейт DXF
 
 
@@ -242,6 +272,19 @@ def test_gate_needs_review_with_operator_calibration_releases_dxf(
     assert view["scale_source"] == "operator_calibration" and view["scale_deviation"] == 0.023
     assert (out / "views/p001_v01/plan_candidates.dxf").is_file()
     assert (out / "views/p001_v01/scale.json").is_file()
+
+
+def test_gate_chains_passed_without_operator_releases_dxf(
+    stubbed: ModuleType, tmp_path: Path
+) -> None:
+    """Лист без калибровки: `dimension_checks_passed` по цепочкам даёт DXF (ADR-0045)."""
+    scale = {"status": "dimension_checks_passed", "source": "dimension_chains"}
+    status, error, pages, out = _collect(stubbed, tmp_path, scale)
+    assert (status, error) == ("completed_requires_review", None)
+    [view] = pages[0]["views"]
+    assert view["scale_status"] == "dimension_checks_passed"
+    assert view["scale_source"] == "dimension_chains" and view["dxf"]["entities"] == 3
+    assert (out / "views/p001_v01/plan_candidates.dxf").is_file()
 
 
 def test_gate_needs_review_by_dimension_chains_is_a_violation(

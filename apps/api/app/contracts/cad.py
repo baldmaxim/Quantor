@@ -35,7 +35,10 @@ class CadConvertCreate(BaseModel):
     """Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.
 
     Лист выбирает человек. Масштаб клиент не передаёт: сервер берёт действующую калибровку
-    листа (ADR-0018); без неё — 409 `CAD_CALIBRATION_REQUIRED`.
+    листа (ADR-0018). Лист без калибровки: при `auto_scale=false` — 409
+    `CAD_CALIBRATION_REQUIRED`; при `auto_scale=true` масштаб определяет движок по размерным
+    цепочкам (ADR-0045), а если не подтвердил — задание листа падает с
+    `CAD_AUTO_SCALE_UNCONFIRMED`. Калиброванные листы всегда идут по масштабу человека.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -43,6 +46,7 @@ class CadConvertCreate(BaseModel):
     pages: list[Annotated[int, Field(ge=0)]] = Field(min_length=1, max_length=50)
     finishes: bool = False
     schedules: bool = False
+    auto_scale: bool = False
 
     @field_validator("pages")
     @classmethod

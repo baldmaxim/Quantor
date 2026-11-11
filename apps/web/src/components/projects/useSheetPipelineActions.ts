@@ -58,7 +58,7 @@ export const useSheetPipelineActions = (
       };
       switch (action.kind) {
         case 'convert': {
-          const job = await create.mutateAsync({ pages: [action.pageIndex] });
+          const job = await create.mutateAsync({ pages: [action.pageIndex], autoScale: true });
           // Тот же ключ идемпотентности: сервер вернул текущее задание, CAD не перезапускался.
           if (convertJobId !== null && job.job_id === convertJobId) {
             setNotices((previous) => ({ ...previous, [action.id]: ALREADY_CURRENT }));

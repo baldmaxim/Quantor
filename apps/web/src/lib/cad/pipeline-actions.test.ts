@@ -6,6 +6,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  isBulkLaunchable,
   isMachineAction,
   nextPipelineAction,
   sheetRows,
@@ -42,6 +43,9 @@ const view = (overrides: Partial<CadPipelineViewRead> = {}): CadPipelineViewRead
 const sheet = (overrides: Partial<CadPipelineSheetRead> = {}): CadPipelineSheetRead => ({
   page_index: 0,
   page_label: null,
+  title: null,
+  is_plan: true,
+  scale_source: 'calibration',
   calibrated: true,
   convert: stage(),
   views: [view()],
@@ -65,28 +69,43 @@ const rowOf = (rows: IPipelineRow[], key: string, at: number | null = null) =>
 const labels = (row: IPipelineRow) => row.actions.map((item) => item.label);
 
 describe('шаги: калибровка и преобразование', () => {
-  it('не откалиброван: ссылка «Откалибровать» в рабочую область, запуска нет', () => {
-    const rows = rowsOf(sheet({ calibrated: false, convert: null, views: [] }));
+  it('не откалиброван: запуск без блокировки, калибровка - вторичная ссылка', () => {
+    const rows = rowsOf(sheet({ calibrated: false, scale_source: null, convert: null, views: [] }));
     const calibration = rowOf(rows, 'calibration');
+    expect(calibration.step.detail).toBe('по размерам автоматически');
     expect(calibration.actions).toHaveLength(1);
-    expect(calibration.actions[0]).toMatchObject({ kind: 'link', label: 'Откалибровать' });
+    expect(calibration.actions[0]).toMatchObject({
+      kind: 'link',
+      intent: 'open',
+      label: 'Откалибровать вручную',
+    });
     expect(calibration.actions[0]?.href).toBe(
       '/projects/p-1/workspace?revision=rev-1&page=3&tab=cad',
     );
-    // Преобразование заблокировано калибровкой, действий нет.
-    expect(rowOf(rows, 'convert').actions).toEqual([]);
+    // Преобразование не заблокировано калибровкой.
+    expect(rowOf(rows, 'convert').actions[0]).toMatchObject({
+      kind: 'convert',
+      label: 'Преобразовать в CAD',
+    });
+  });
+
+  it('масштаб авто: калибровка выполнена, ручная остаётся ссылкой', () => {
+    const rows = rowsOf(sheet({ calibrated: false, scale_source: 'auto', views: [] }));
+    const calibration = rowOf(rows, 'calibration');
+    expect(calibration.step).toMatchObject({ state: 'done', detail: 'Масштаб: авто' });
+    expect(labels(calibration)).toEqual(['Откалибровать вручную']);
   });
 
   it('откалиброван: калибровка без действий', () => {
     expect(rowOf(rowsOf(sheet()), 'calibration').actions).toEqual([]);
   });
 
-  it('преобразование не запускалось: «Запустить»', () => {
+  it('преобразование не запускалось: «Преобразовать в CAD»', () => {
     const rows = rowsOf(sheet({ convert: null, views: [] }));
     expect(rowOf(rows, 'convert').actions[0]).toMatchObject({
       kind: 'convert',
       intent: 'start',
-      label: 'Запустить',
+      label: 'Преобразовать в CAD',
       pageIndex: 0,
       confirm: false,
     });
@@ -104,6 +123,41 @@ describe('шаги: калибровка и преобразование', () =>
       intent: 'fix',
       label: 'Повторить',
       jobId: 'cad_pdf_convert-f',
+    });
+  });
+
+  describe('масштаб не подтверждён (CAD_AUTO_SCALE_UNCONFIRMED)', () => {
+    const unconfirmed = failedOf('cad_pdf_convert', 'CAD_AUTO_SCALE_UNCONFIRMED');
+
+    it('лист без калибровки: «Повторить» нет, главная ссылка «Откалибровать вручную»', () => {
+      const rows = rowsOf(
+        sheet({ calibrated: false, scale_source: null, convert: unconfirmed, views: [] }),
+      );
+      const convert = rowOf(rows, 'convert');
+      expect(convert.actions).toHaveLength(1);
+      expect(convert.actions[0]).toMatchObject({
+        kind: 'link',
+        intent: 'fix',
+        label: 'Откалибровать вручную',
+        href: '/projects/p-1/workspace?revision=rev-1&page=3&tab=cad',
+      });
+      expect(convert.step.detail).toContain('Масштаб листа не подтверждён');
+      // Ссылка не дублируется на строке калибровки.
+      expect(rowOf(rows, 'calibration').actions).toEqual([]);
+      const next = nextPipelineAction(rows);
+      expect(next?.row.key).toBe('convert');
+      expect(next?.action.label).toBe('Откалибровать вручную');
+    });
+
+    it('после калибровки: «Преобразовать заново» без подтверждения, не повтор', () => {
+      const rows = rowsOf(sheet({ calibrated: true, convert: unconfirmed, views: [] }));
+      expect(rowOf(rows, 'convert').actions).toHaveLength(1);
+      expect(rowOf(rows, 'convert').actions[0]).toMatchObject({
+        kind: 'convert',
+        intent: 'fix',
+        label: 'Преобразовать заново',
+        confirm: false,
+      });
     });
   });
 
@@ -344,10 +398,10 @@ describe('виды', () => {
 });
 
 describe('следующий шаг', () => {
-  it('нет калибровки: переход к калибровке', () => {
+  it('нет калибровки: следующий шаг - запуск преобразования, не калибровка', () => {
     const next = nextPipelineAction(rowsOf(sheet({ calibrated: false, convert: null, views: [] })));
-    expect(next?.row.key).toBe('calibration');
-    expect(next?.action.kind).toBe('link');
+    expect(next?.row.key).toBe('convert');
+    expect(next?.action.kind).toBe('convert');
   });
 
   it('есть калибровка, преобразования не было: запуск преобразования', () => {
@@ -414,5 +468,35 @@ describe('следующий шаг', () => {
     expect(nextPipelineAction(rowsOf(done))).toBeNull();
     const running = sheet({ convert: stage({ status: 'running' }), views: [] });
     expect(nextPipelineAction(rowsOf(running))).toBeNull();
+  });
+});
+
+describe('isBulkLaunchable', () => {
+  const unconfirmed = failedOf('cad_pdf_convert', 'CAD_AUTO_SCALE_UNCONFIRMED');
+
+  it('нетронутый лист доступен', () => {
+    expect(isBulkLaunchable(sheet({ calibrated: false, convert: null, views: [] }))).toBe(true);
+  });
+
+  it('преобразование упало по другой причине: недоступен (повтор — в строке)', () => {
+    expect(isBulkLaunchable(sheet({ convert: failedOf('cad_pdf_convert') }))).toBe(false);
+  });
+
+  it('масштаб не подтверждён без калибровки: недоступен', () => {
+    expect(isBulkLaunchable(sheet({ calibrated: false, convert: unconfirmed }))).toBe(false);
+  });
+
+  it('масштаб не подтверждён, но лист откалиброван: доступен', () => {
+    expect(isBulkLaunchable(sheet({ calibrated: true, convert: unconfirmed }))).toBe(true);
+  });
+
+  it('идёт и готово: недоступен', () => {
+    expect(isBulkLaunchable(sheet({ convert: stage({ status: 'running', progress: 0.2 }) }))).toBe(
+      false,
+    );
+    expect(isBulkLaunchable(sheet({ convert: stage({ status: 'queued', progress: null }) }))).toBe(
+      false,
+    );
+    expect(isBulkLaunchable(sheet())).toBe(false);
   });
 });

@@ -44,6 +44,9 @@ const view = (overrides: Partial<CadPipelineViewRead> = {}): CadPipelineViewRead
 const sheet = (overrides: Partial<CadPipelineSheetRead> = {}): CadPipelineSheetRead => ({
   page_index: 0,
   page_label: null,
+  title: null,
+  is_plan: true,
+  scale_source: 'calibration',
   calibrated: true,
   convert: stage(),
   views: [view()],
@@ -69,18 +72,48 @@ describe('шаги листа', () => {
     ]);
   });
 
-  it('некалиброванный лист без задания: калибровка не сделана, остальное заблокировано', () => {
-    const s = sheet({ calibrated: false, convert: null, views: [] });
+  it('нетронутый лист: калибровка и CAD не начаты, остальное заблокировано, итог «Не запущено»', () => {
+    const s = sheet({ calibrated: false, scale_source: null, convert: null, views: [] });
     expect(sheetSteps(s).map((step) => step.state)).toEqual([
+      'todo',
       'todo',
       'blocked',
       'blocked',
       'blocked',
       'blocked',
       'blocked',
-      'blocked',
     ]);
-    expect(sheetSummary(s)).toEqual({ tone: 'warning', label: 'Нужно: откалибровать лист' });
+    expect(sheetSummary(s)).toEqual({ tone: 'neutral', label: 'Не запущено' });
+    expect(sheetProgress(s)).toEqual({ done: 0, total: 6 });
+  });
+
+  it('масштаб авто: калибровка выполнена с подписью «Масштаб: авто»', () => {
+    const s = sheet({ calibrated: false, scale_source: 'auto', views: [] });
+    expect(state(s, 'calibration')).toMatchObject({ state: 'done', detail: 'Масштаб: авто' });
+    expect(state(s, 'convert')?.state).toBe('done');
+    expect(sheetSummary(s).label).not.toContain('откалибровать');
+  });
+
+  it('масштаб не подтверждён: ошибка CAD с причиной, калибровка нужна человеку', () => {
+    const s = sheet({
+      calibrated: false,
+      scale_source: null,
+      convert: stage({
+        status: 'failed',
+        result_status: null,
+        error_code: 'CAD_AUTO_SCALE_UNCONFIRMED',
+      }),
+      views: [],
+    });
+    expect(state(s, 'calibration')).toMatchObject({
+      state: 'todo',
+      detail: 'нужна ручная калибровка',
+    });
+    expect(state(s, 'convert')).toMatchObject({
+      state: 'failed',
+      detail: expect.stringContaining('Масштаб листа не подтверждён') as string,
+    });
+    expect(sheetSummary(s)).toEqual({ tone: 'danger', label: 'Ошибка: CAD' });
   });
 
   it('калиброван, задания нет: CAD ждёт запуска', () => {

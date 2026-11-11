@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -45,6 +46,10 @@ class CadPipelineViewRead(BaseModel):
 class CadPipelineSheetRead(BaseModel):
     page_index: int
     page_label: str | None
+    # Название листа, по которому решали, план ли это: штамп, а без него — подпись страницы.
+    title: str | None
+    # Название листа содержит слово «план» (ADR-0045): такие листы входят в массовый запуск.
+    is_plan: bool
     # Есть действующая калибровка листа.
     calibrated: bool
     # Заголовок плана (корпус, секция, этаж) из последнего успешного `cad_walls` листа;
@@ -52,6 +57,9 @@ class CadPipelineSheetRead(BaseModel):
     floor_title: CadSheetFloorTitle | None = None
     # Последнее задание `cad_pdf_convert`, в котором есть этот лист.
     convert: CadPipelineStageRead | None
+    # Каким масштабом сделано это задание: калибровкой человека или движком по размерным цепочкам
+    # (ADR-0045); `null` - задания нет.
+    scale_source: Literal["calibration", "auto"] | None
     views: list[CadPipelineViewRead]
 
 

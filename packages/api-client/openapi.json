@@ -2510,8 +2510,13 @@
       },
       "CadConvertCreate": {
         "additionalProperties": false,
-        "description": "Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.\n\nЛист выбирает человек. Масштаб клиент не передаёт: сервер берёт действующую калибровку\nлиста (ADR-0018); без неё — 409 `CAD_CALIBRATION_REQUIRED`.",
+        "description": "Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.\n\nЛист выбирает человек. Масштаб клиент не передаёт: сервер берёт действующую калибровку\nлиста (ADR-0018). Лист без калибровки: при `auto_scale=false` — 409\n`CAD_CALIBRATION_REQUIRED`; при `auto_scale=true` масштаб определяет движок по размерным\nцепочкам (ADR-0045), а если не подтвердил — задание листа падает с\n`CAD_AUTO_SCALE_UNCONFIRMED`. Калиброванные листы всегда идут по масштабу человека.",
         "properties": {
+          "auto_scale": {
+            "default": false,
+            "title": "Auto Scale",
+            "type": "boolean"
+          },
           "finishes": {
             "default": false,
             "title": "Finishes",
@@ -5949,6 +5954,10 @@
               }
             ]
           },
+          "is_plan": {
+            "title": "Is Plan",
+            "type": "boolean"
+          },
           "page_index": {
             "title": "Page Index",
             "type": "integer"
@@ -5964,6 +5973,32 @@
             ],
             "title": "Page Label"
           },
+          "scale_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "calibration",
+                  "auto"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Source"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
           "views": {
             "items": {
               "$ref": "#/components/schemas/CadPipelineViewRead"
@@ -5975,8 +6010,11 @@
         "required": [
           "page_index",
           "page_label",
+          "title",
+          "is_plan",
           "calibrated",
           "convert",
+          "scale_source",
           "views"
         ],
         "title": "CadPipelineSheetRead",

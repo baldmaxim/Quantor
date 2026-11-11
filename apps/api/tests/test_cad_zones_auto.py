@@ -527,9 +527,12 @@ async def test_pipeline_calibrated_page_without_jobs(
             {
                 "page_index": 0,
                 "page_label": None,
+                "title": None,
+                "is_plan": False,
                 "calibrated": True,
                 "floor_title": None,
                 "convert": None,
+                "scale_source": None,
                 "views": [],
             }
         ]

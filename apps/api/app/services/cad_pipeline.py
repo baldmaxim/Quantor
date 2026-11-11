@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from pydantic import ValidationError
 from sqlalchemy import func, select
@@ -30,6 +30,8 @@ from app.models.cad_decision import DECISION_MEP_ACCEPTANCE, DECISION_VIEW_APPRO
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
 from app.services import cad_walls
+from app.services import documents as documents_service
+from app.services.cad_plan_sheets import is_plan_title
 
 _PIPELINE_TYPES: Final = (
     JobType.CAD_PDF_CONVERT,
@@ -88,6 +90,18 @@ def _floor_title(job: Job) -> CadSheetFloorTitle | None:
         return None
 
 
+def _scale_source(convert: Job | None, page_index: int) -> Literal["calibration", "auto"] | None:
+    """Масштаб задания листа по его параметрам: `{"auto": true}` - движок, иначе калибровка."""
+    if convert is None:
+        return None
+    params = convert.payload.get("params")
+    scales = params.get("scales") if isinstance(params, dict) else None
+    entry = scales.get(str(page_index)) if isinstance(scales, dict) else None
+    if not isinstance(entry, dict):
+        return None
+    return "auto" if entry.get("auto") is True else "calibration"
+
+
 def _view_rows(convert: Job | None, page_index: int) -> list[dict[str, Any]]:
     if convert is None:
         return []
@@ -143,17 +157,22 @@ async def build_pipeline(
             .where(Sheet.revision_id == revision_id)
         )
     )
-    labels = dict(
-        (
-            await session.execute(
-                select(Sheet.page_index, Sheet.page_label).where(
-                    Sheet.revision_id == revision_id, Sheet.page_index.in_(job_pages | calibrated)
-                )
+    # Все листы ревизии: листы-планы входят в конвейер и без работы (массовый запуск, ADR-0045).
+    sheet_rows = (
+        await session.execute(
+            select(Sheet.id, Sheet.page_index, Sheet.page_label).where(
+                Sheet.revision_id == revision_id
             )
         )
-        .tuples()
-        .all()
+    ).all()
+    stamp_titles = await documents_service.sheet_titles(
+        session, sheet_ids=[row.id for row in sheet_rows]
     )
+    labels: dict[int, str | None] = {row.page_index: row.page_label for row in sheet_rows}
+    titles_by_page: dict[int, str | None] = {
+        row.page_index: stamp_titles.get(row.id) or row.page_label for row in sheet_rows
+    }
+    plan_pages = {index for index, title in titles_by_page.items() if is_plan_title(title)}
     zone_counts: dict[int, int] = dict(
         (
             await session.execute(
@@ -198,7 +217,7 @@ async def build_pipeline(
             titles[page_index] = (view, title)
 
     sheets: list[CadPipelineSheetRead] = []
-    for page_index in sorted(job_pages | calibrated):
+    for page_index in sorted(job_pages | calibrated | plan_pages):
         convert = latest_convert.get(page_index)
         convert_attempt = None if convert is None else cad_service.result_of(convert).get("attempt")
         children = by_page.get(page_index, {})
@@ -236,9 +255,12 @@ async def build_pipeline(
             CadPipelineSheetRead(
                 page_index=page_index,
                 page_label=labels.get(page_index),
+                title=titles_by_page.get(page_index),
+                is_plan=page_index in plan_pages,
                 calibrated=page_index in calibrated,
                 floor_title=titles[page_index][1] if page_index in titles else None,
                 convert=None if convert is None else stage_of(convert),
+                scale_source=_scale_source(convert, page_index),
                 views=views,
             )
         )

@@ -1247,9 +1247,16 @@ export type CadConstructionsTotalsRead = {
  * Постановка. `pages` — page_index с 0 (как у листов Quantor), 1..50 без повторов.
  *
  * Лист выбирает человек. Масштаб клиент не передаёт: сервер берёт действующую калибровку
- * листа (ADR-0018); без неё — 409 `CAD_CALIBRATION_REQUIRED`.
+ * листа (ADR-0018). Лист без калибровки: при `auto_scale=false` — 409
+ * `CAD_CALIBRATION_REQUIRED`; при `auto_scale=true` масштаб определяет движок по размерным
+ * цепочкам (ADR-0045), а если не подтвердил — задание листа падает с
+ * `CAD_AUTO_SCALE_UNCONFIRMED`. Калиброванные листы всегда идут по масштабу человека.
  */
 export type CadConvertCreate = {
+    /**
+     * Auto Scale
+     */
+    auto_scale?: boolean;
     /**
      * Finishes
      */
@@ -2794,6 +2801,10 @@ export type CadPipelineSheetRead = {
     convert: CadPipelineStageRead | null;
     floor_title?: CadSheetFloorTitle | null;
     /**
+     * Is Plan
+     */
+    is_plan: boolean;
+    /**
      * Page Index
      */
     page_index: number;
@@ -2801,6 +2812,14 @@ export type CadPipelineSheetRead = {
      * Page Label
      */
     page_label: string | null;
+    /**
+     * Scale Source
+     */
+    scale_source: 'calibration' | 'auto' | null;
+    /**
+     * Title
+     */
+    title: string | null;
     /**
      * Views
      */

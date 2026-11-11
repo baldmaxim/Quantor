@@ -80,6 +80,20 @@ class PageScale:
     calibration_id: str
 
 
+@dataclass(frozen=True, slots=True)
+class AutoScale:
+    """Лист без калибровки человека: масштаб определяет движок по размерным цепочкам (ADR-0045).
+
+    Масштаб по надписи «М 1:NN» не принимается никогда (ADR-0018); если цепочки масштаб не
+    подтвердили, задание падает с `CAD_AUTO_SCALE_UNCONFIRMED`.
+    """
+
+
+AUTO_SCALE: Final = AutoScale()
+# Масштаб страницы в постановке: калибровка человека либо автоопределение движком.
+ScaleChoice = PageScale | AutoScale
+
+
 def page_scale_of(calibration: ScaleCalibration) -> PageScale:
     value = float(calibration.mm_per_pt)
     if not math.isfinite(value) or value <= 0:
@@ -87,14 +101,21 @@ def page_scale_of(calibration: ScaleCalibration) -> PageScale:
     return PageScale(mm_per_pt=value, calibration_id=str(calibration.id))
 
 
+def _scale_entry(scale: ScaleChoice) -> dict[str, Any]:
+    if isinstance(scale, AutoScale):
+        return {"auto": True}
+    return {"mm_per_pt": scale.mm_per_pt, "calibration_id": scale.calibration_id}
+
+
 def build_params(
-    pages: list[int], scales: Mapping[int, PageScale], settings: Settings
+    pages: list[int], scales: Mapping[int, ScaleChoice], settings: Settings
 ) -> dict[str, Any]:
     """Параметры движка v2. Отделка и ведомости объёмов выключены всегда.
 
     Лист выбирает человек (`page_selection=operator`), масштаб каждой страницы — его
-    калибровка. Ключ `scales` — индекс страницы с 0 строкой; идентификатор калибровки входит
-    в параметры, поэтому новая калибровка даёт новый ключ идемпотентности.
+    калибровка либо пометка `{"auto": true}` (движок определяет сам, ADR-0045). Ключ `scales` —
+    индекс страницы с 0 строкой; идентификатор калибровки и пометка входят в параметры, поэтому
+    новая калибровка или другой способ масштаба дают новый ключ идемпотентности.
     """
     ordered = sorted(pages)
     if set(scales) != set(ordered):
@@ -104,13 +125,7 @@ def build_params(
         "mode": "architecture",
         "pages": ordered,
         "page_selection": PAGE_SELECTION,
-        "scales": {
-            str(index): {
-                "mm_per_pt": scales[index].mm_per_pt,
-                "calibration_id": scales[index].calibration_id,
-            }
-            for index in ordered
-        },
+        "scales": {str(index): _scale_entry(scales[index]) for index in ordered},
         "finishes": False,
         "schedules": False,
         "limits": {
@@ -185,13 +200,18 @@ async def revision_in_project(
 
 
 async def resolve_scales(
-    session: AsyncSession, *, revision: DocumentRevision, pages: list[int]
-) -> dict[int, PageScale]:
-    """Действующая калибровка листа для каждой выбранной страницы (ADR-0018).
+    session: AsyncSession,
+    *,
+    revision: DocumentRevision,
+    pages: list[int],
+    auto_scale: bool = False,
+) -> dict[int, ScaleChoice]:
+    """Масштаб каждой выбранной страницы: калибровка листа (ADR-0018) или автомасштаб.
 
     Страница ревизии — `Sheet` с тем же `page_index` (с 0); действующая калибровка — та, что
-    помечена `is_default`. Нет листа или калибровки хотя бы у одной страницы — 409
-    `CAD_CALIBRATION_REQUIRED` со списком таких страниц. Клиент масштаб не передаёт.
+    помечена `is_default`; она берётся всегда. Нет листа или калибровки: при `auto_scale` страница
+    идёт без масштаба человека (`AUTO_SCALE`, ADR-0045), иначе — 409 `CAD_CALIBRATION_REQUIRED`
+    со списком таких страниц. Клиент масштаб не передаёт; `ScaleCalibration` не создаётся.
     """
     rows = await session.execute(
         select(Sheet.page_index, ScaleCalibration)
@@ -201,9 +221,13 @@ async def resolve_scales(
         )
         .where(Sheet.revision_id == revision.id, Sheet.page_index.in_(pages))
     )
-    found = {index: page_scale_of(calibration) for index, calibration in rows.all()}
+    found: dict[int, ScaleChoice] = {
+        index: page_scale_of(calibration) for index, calibration in rows.all()
+    }
     missing = sorted(set(pages) - set(found))
-    if missing:
+    if missing and auto_scale:
+        found.update(dict.fromkeys(missing, AUTO_SCALE))
+    elif missing:
         raise DomainError(
             ErrorCode.CAD_CALIBRATION_REQUIRED,
             issue={"pages": ",".join(str(index) for index in missing)},
@@ -218,10 +242,11 @@ async def schedule_convert(
     revision: DocumentRevision,
     pages: list[int],
     settings: Settings,
+    auto_scale: bool = False,
 ) -> Job:
     if not is_pdf(revision):
         raise DomainError(ErrorCode.CAD_INPUT_INVALID, "Источник ревизии не PDF")
-    scales = await resolve_scales(session, revision=revision, pages=pages)
+    scales = await resolve_scales(session, revision=revision, pages=pages, auto_scale=auto_scale)
     params = build_params(pages, scales, settings)
     return await jobs_service.enqueue(
         session,
@@ -298,6 +323,8 @@ def find_artifact(job: Job, name: str, attempt: int | None = None) -> dict[str, 
 _NOT_RETRYABLE_REASONS: Final = {
     ErrorCode.CAD_INPUT_INVALID.value: "PDF не прошёл входной контроль движка: повтор того же "
     "файла даст тот же отказ. Загрузите исправленный PDF новой ревизией.",
+    ErrorCode.CAD_AUTO_SCALE_UNCONFIRMED.value: "Масштаб не подтверждён размерами чертежа: "
+    "повтор даст тот же отказ. Откалибруйте лист вручную и преобразуйте заново.",
     ErrorCode.CAD_PARAMS_INVALID.value: "Параметры вне контракта или страница вне PDF: "
     "поставьте задание с другим выбором страниц.",
     ErrorCode.CAD_INPUT_LIMIT_EXCEEDED.value: "PDF превышает пределы преобразования: уменьшите "

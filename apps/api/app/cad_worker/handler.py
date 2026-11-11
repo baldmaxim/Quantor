@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain import JobStatus
-from app.errors import ErrorCode
+from app.errors import MESSAGES, ErrorCode
 from app.models import DocumentRevision, Job
 from app.services import cad as cad_service
 from app.services import cad_progress, cad_walls, cad_zones_auto
@@ -239,6 +239,42 @@ def _page_summary(report: dict[str, Any]) -> list[dict[str, Any]]:
     return pages
 
 
+# Масштаб по размерным цепочкам, принятый без калибровки человека (ADR-0045). Надпись «М 1:NN»
+# основанием не служит никогда (ADR-0018): `printed_scale_only` и `needs_review` сюда не входят.
+_AUTO_SCALE_STATUS = "dimension_checks_passed"
+_AUTO_SCALE_SOURCE = "dimension_chains"
+
+
+def _auto_pages(params: dict[str, Any]) -> list[int]:
+    """Страницы задания без калибровки человека (`scales[i] == {"auto": true}`), индексы с 0."""
+    scales = params.get("scales")
+    if not isinstance(scales, dict):
+        return []
+    return sorted(
+        int(key)
+        for key, entry in scales.items()
+        if isinstance(entry, dict) and entry.get("auto") is True and str(key).isdigit()
+    )
+
+
+def _unconfirmed_auto_pages(params: dict[str, Any], report: dict[str, Any]) -> list[int]:
+    """Автостраницы, у которых ни один вид не получил масштаб по размерным цепочкам.
+
+    Страница подтверждена, если у вида статус `dimension_checks_passed` и источник
+    `dimension_chains`. Виды без подтверждения DXF не имеют (гейт runner), поэтому страница с
+    одним подтверждённым видом принимается; страница без видов или без подтверждённых — нет.
+    """
+    confirmed: set[int] = set()
+    for page in report.get("pages", []):
+        if any(
+            view.get("scale_status") == _AUTO_SCALE_STATUS
+            and view.get("scale_source") == _AUTO_SCALE_SOURCE
+            for view in page.get("views", [])
+        ):
+            confirmed.add(int(page["index"]))
+    return [index for index in _auto_pages(params) if index not in confirmed]
+
+
 async def _file_chunks(path: Path) -> AsyncIterator[bytes]:
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(_CHUNK), b""):
@@ -425,6 +461,13 @@ async def execute_cad_pdf_convert(
         if code != 0:
             raise _failure_from_report(out, code)
         report, files = _verified_outputs(out, revision, str(job.payload["params_sha256"]))
+        unconfirmed = _unconfirmed_auto_pages(params, report)
+        if unconfirmed:
+            raise CadError(
+                ErrorCode.CAD_AUTO_SCALE_UNCONFIRMED,
+                MESSAGES[ErrorCode.CAD_AUTO_SCALE_UNCONFIRMED],
+                {"unconfirmed_pages": unconfirmed, "pages": _page_summary(report)},
+            )
         if not await _still_owned(session, job, owner, attempt):
             log.warning("cad_lease_lost", job_id=str(job.id))
             return job

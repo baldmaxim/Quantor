@@ -54,6 +54,10 @@ MANIFEST_SCHEMA = "quantor.cad_engine.manifest.v1"
 # scale.json вида (движок после ADR-0036): status — passed | needs_review | failed,
 # source — operator_calibration | dimension_chains.
 SCALE_PASSED = "passed"
+# Масштаб по размерным цепочкам без калибровки человека (ADR-0045): scale.json хранит статус
+# `dimension_checks_passed` и источник `dimension_chains`.
+SCALE_CHAINS_PASSED = "dimension_checks_passed"
+SCALE_SOURCE_CHAINS = "dimension_chains"
 SCALE_NEEDS_REVIEW = "needs_review"
 SCALE_FAILED = "failed"
 SCALE_SOURCE_OPERATOR = "operator_calibration"
@@ -223,11 +227,20 @@ def extract_archive(archive: Path, target: Path, pins: dict[str, Any]) -> None:
 
 
 def _parse_scales(raw: Any, pages: list[int]) -> dict[str, dict[str, Any]]:
-    """scales: ключ — индекс страницы с 0 строкой, ровно для выбранных страниц."""
+    """scales: ключ — индекс страницы с 0 строкой, ровно для выбранных страниц.
+
+    Значение — калибровка человека (`mm_per_pt`, `calibration_id`) либо `{"auto": true}`: лист без
+    калибровки, масштаб определяет движок по размерным цепочкам (ADR-0045).
+    """
     if not isinstance(raw, dict) or set(raw) != {str(p) for p in pages}:
         raise RunnerError(EXIT_PARAMS, "params_invalid", "scales: ключи должны совпадать с pages")
     scales: dict[str, dict[str, Any]] = {}
     for key, entry in raw.items():
+        if isinstance(entry, dict) and set(entry) == {"auto"}:
+            if entry["auto"] is not True:
+                raise RunnerError(EXIT_PARAMS, "params_invalid", f"scales.{key}.auto: только true")
+            scales[key] = {"auto": True}
+            continue
         if not isinstance(entry, dict) or set(entry) != {"mm_per_pt", "calibration_id"}:
             raise RunnerError(EXIT_PARAMS, "params_invalid",
                               f"scales.{key}: нужны mm_per_pt и calibration_id")
@@ -282,10 +295,14 @@ def parse_params(raw: bytes) -> dict[str, Any]:
 
 
 def operator_scales_for_job(params: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Масштабы оператора для job.json: ключ — pdf_page с 1 строкой (как `legacy_page`)."""
+    """Масштабы оператора для job.json: ключ — pdf_page с 1 строкой (как `legacy_page`).
+
+    Страницы без калибровки (`auto`) в перечень не входят: у движка для них остаётся путь по
+    размерным цепочкам (`source=dimension_chains`, без сверки с оператором).
+    """
     return {str(legacy_page(int(index))): {"mm_per_pt": entry["mm_per_pt"],
                                            "calibration_id": entry["calibration_id"]}
-            for index, entry in params["scales"].items()}
+            for index, entry in params["scales"].items() if not entry.get("auto")}
 
 
 def job_document(pages: list[int], params: dict[str, Any]) -> dict[str, Any]:
@@ -719,9 +736,12 @@ def collect(attempt: Path, out: Path, inventory: dict[str, Any], exit_code: int,
                     continue
                 # DXF разрешён при passed, а при needs_review — только по калибровке человека;
                 # needs_review по размерным цепочкам без калибровки оператора DXF не даёт.
+                # Лист без калибровки (ADR-0045): только `dimension_checks_passed` по цепочкам.
                 if not (view["scale_status"] == SCALE_PASSED
                         or (view["scale_status"] == SCALE_NEEDS_REVIEW
-                            and view["scale_source"] == SCALE_SOURCE_OPERATOR)):
+                            and view["scale_source"] == SCALE_SOURCE_OPERATOR)
+                        or (view["scale_status"] == SCALE_CHAINS_PASSED
+                            and view["scale_source"] == SCALE_SOURCE_CHAINS)):
                     raise RunnerError(EXIT_ENGINE, "gate_violation", "DXF без подтверждённого масштаба")
                 legacy = attempt / f"PDF_{page_entry['legacy_pdf_page']:03d}_Вид_{view['view']:02d}"
                 checks_src = legacy / CHECKS_FILE

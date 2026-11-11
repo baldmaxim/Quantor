@@ -18,7 +18,8 @@ import { CadPipelineSheetControls } from './CadPipelineSheetControls';
 /**
  * Лист в панели «Обработка»: итог одной строкой, дорожка шагов конвейера и переход в рабочую
  * область на вкладку CAD. Нажатие на шапку раскрывает управление шагами (запуск, повтор, причина
- * отказа). Необязательный 3D DXF в дорожку не входит и показан отдельной меткой.
+ * отказа). Необязательный 3D DXF в дорожку не входит и показан отдельной меткой. Слева -
+ * чекбокс выбора для массового запуска: отдельная тап-цель, строку не раскрывает.
  */
 
 export interface ICadPipelineSheetRowProps {
@@ -27,6 +28,11 @@ export interface ICadPipelineSheetRowProps {
   readonly sheet: CadPipelineSheetRead;
   /** Позиция листа в рабочей области (с 1). */
   readonly position: number;
+  /** Лист выбран для массового запуска. */
+  readonly selected: boolean;
+  /** Лист доступен массовому запуску; иначе чекбокс неактивен. */
+  readonly selectable: boolean;
+  readonly onSelectedChange: (checked: boolean) => void;
 }
 
 const FLOOR3D_BADGES: Partial<Record<PipelineStepState, { tone: BadgeTone; label: string }>> = {
@@ -40,6 +46,9 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   revisionId,
   sheet,
   position,
+  selected,
+  selectable,
+  onSelectedChange,
 }) => {
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -66,6 +75,16 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   return (
     <li className="flex flex-col gap-[var(--s-3)] border-b border-border py-[var(--s-4)] last:border-b-0">
       <div className="flex items-center gap-[var(--s-4)]">
+        <label className="flex size-[44px] flex-none cursor-pointer items-center justify-center">
+          <input
+            type="checkbox"
+            aria-label={`Выбрать лист ${sheet.page_label ?? sheet.page_index + 1}`}
+            checked={selected}
+            disabled={!selectable}
+            onChange={(event) => onSelectedChange(event.target.checked)}
+            className="size-5 accent-accent"
+          />
+        </label>
         <button
           type="button"
           aria-expanded={open}
@@ -87,6 +106,14 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
               {name}
             </span>
             {floorTitle && <span className="text-xs text-muted">{sheetName}</span>}
+            {sheet.title && (
+              <span className="text-xs text-muted [overflow-wrap:anywhere]">{sheet.title}</span>
+            )}
+            {sheet.scale_source === 'auto' && (
+              <StatusBadge tone="neutral" dot={false}>
+                Масштаб: авто
+              </StatusBadge>
+            )}
             <StatusBadge tone={summary.tone} wrap>
               {summary.label}
             </StatusBadge>

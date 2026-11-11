@@ -155,7 +155,12 @@ async def create_cad_job(
         body.pages, finishes=body.finishes, schedules=body.schedules
     )
     job = await cad_service.schedule_convert(
-        session, project=project, revision=revision, pages=pages, settings=settings
+        session,
+        project=project,
+        revision=revision,
+        pages=pages,
+        settings=settings,
+        auto_scale=body.auto_scale,
     )
     await session.commit()
     return await job_read(session, job)

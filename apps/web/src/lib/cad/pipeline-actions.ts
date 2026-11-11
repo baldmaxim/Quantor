@@ -6,7 +6,9 @@ import type {
 
 import { floor3dDxfUrl } from './floor3d-dxf';
 import {
+  AUTO_SCALE_UNCONFIRMED,
   convertStep,
+  isAutoScaleUnconfirmed,
   PIPELINE_STEP_LABELS,
   sheetSteps,
   VIEW_KEYS,
@@ -124,11 +126,42 @@ const linkTo = (
     context,
   );
 
-const calibrationActions = (step: IPipelineStep, context: IContext): IPipelineAction[] =>
-  step.state === 'todo' ? [linkTo(context, 'calibration:link', 'Откалибровать', null, false)] : [];
+/** Ссылка на ручную калибровку листа в рабочей области. */
+const MANUAL_CALIBRATION = 'Откалибровать вручную';
+
+/** Подпись калибровки у листа без неё: масштаб определится по размерам чертежа. */
+const CALIBRATION_BY_DIMENSIONS = 'по размерам автоматически';
+
+/**
+ * Ручная калибровка - второстепенное действие: преобразование идёт и без неё (масштаб по размерам).
+ * После отказа `CAD_AUTO_SCALE_UNCONFIRMED` ссылка уходит на строку преобразования как главное
+ * действие, здесь она не дублируется.
+ */
+const calibrationActions = (context: IContext): IPipelineAction[] =>
+  context.sheet.calibrated || isAutoScaleUnconfirmed(context.sheet)
+    ? []
+    : [linkTo(context, 'calibration:link', MANUAL_CALIBRATION, null, false)];
 
 const convertActions = (step: IPipelineStep, context: IContext): IPipelineAction[] => {
   const convert = context.sheet.convert;
+  if (step.state === 'failed' && convert && convert.error_code === AUTO_SCALE_UNCONFIRMED) {
+    // Повтор с теми же параметрами вернёт то же упавшее задание: без калибровки - только она,
+    // после калибровки параметры другие, и преобразование создаёт новое задание.
+    if (isAutoScaleUnconfirmed(context.sheet)) {
+      return [
+        {
+          ...linkTo(context, 'convert:calibrate', MANUAL_CALIBRATION, null, false),
+          intent: 'fix',
+        },
+      ];
+    }
+    return [
+      action(
+        { id: 'convert:again', kind: 'convert', intent: 'fix', label: 'Преобразовать заново' },
+        context,
+      ),
+    ];
+  }
   if (step.state === 'failed' && convert) {
     return [
       action(
@@ -160,7 +193,12 @@ const convertActions = (step: IPipelineStep, context: IContext): IPipelineAction
   if (step.state === 'todo') {
     return [
       action(
-        { id: 'convert:start', kind: 'convert', intent: 'start', label: 'Запустить' },
+        {
+          id: 'convert:start',
+          kind: 'convert',
+          intent: 'start',
+          label: 'Преобразовать в CAD',
+        },
         context,
       ),
     ];
@@ -355,9 +393,12 @@ export const sheetRows = (
       key: 'calibration',
       view: null,
       viewLabel: null,
-      step: calibration,
+      step:
+        calibration.state === 'todo' && calibration.detail === null
+          ? { ...calibration, detail: CALIBRATION_BY_DIMENSIONS }
+          : calibration,
       stage: null,
-      actions: calibrationActions(calibration, context),
+      actions: calibrationActions(context),
     },
     {
       id: 'convert',
@@ -431,5 +472,23 @@ const firstCandidate = (
  */
 export const nextPipelineAction = (rows: readonly IPipelineRow[]): IPipelineNext | null => {
   const main = rows.filter((row) => row.key !== 'floor3d');
-  return firstCandidate(main, ['failed']) ?? firstCandidate(main, ['todo', 'review']);
+  // Не начатая калибровка - необязательна (масштаб по размерам), «следующим шагом» не предлагается.
+  const pending = main.filter((row) => row.key !== 'calibration');
+  return firstCandidate(main, ['failed']) ?? firstCandidate(pending, ['todo', 'review']);
+};
+
+/**
+ * Лист доступен массовому запуску: преобразование не запускалось или упало с
+ * `CAD_AUTO_SCALE_UNCONFIRMED`, а лист с тех пор откалиброван человеком.
+ */
+export const isBulkLaunchable = (sheet: CadPipelineSheetRead): boolean => {
+  if (sheet.convert === null) return true;
+  // Повтор с теми же параметрами вернёт то же упавшее задание (идемпотентность), поэтому массово
+  // ставится только лист, у которого параметры сменились: автомасштаб не подтвердился, а теперь
+  // есть калибровка человека. Остальные отказы повторяются кнопкой «Повторить» в строке листа.
+  return (
+    sheet.calibrated &&
+    convertStep(sheet).state === 'failed' &&
+    sheet.convert.error_code === AUTO_SCALE_UNCONFIRMED
+  );
 };

@@ -42,6 +42,9 @@ export const pipelineSheet = (
 ): CadPipelineSheetRead => ({
   page_index: 2,
   page_label: null,
+  title: null,
+  is_plan: true,
+  scale_source: 'calibration',
   calibrated: true,
   convert: stage(),
   views: [pipelineView()],
@@ -57,7 +60,9 @@ export const pipelineOfSheet = (
   sheets: sheet ? [sheet] : [],
   steps: sheet
     ? sheetSteps(sheet)
-    : sheetSteps({ page_index: 2, page_label: null, calibrated: false, convert: null, views: [] }),
+    : sheetSteps(
+        pipelineSheet({ page_label: null, calibrated: false, convert: null, views: [], scale_source: null }),
+      ),
   summary: sheet ? sheetSummary(sheet) : null,
   isPending: false,
   isError: false,

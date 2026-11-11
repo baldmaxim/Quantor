@@ -1,6 +1,7 @@
 import type * as ApiClient from '@quantor/api-client';
 import type {
   CadPipelineRead,
+  CadPipelineSheetRead,
   CadPipelineStageRead,
   DocumentRead,
   DocumentRevisionRead,
@@ -74,10 +75,14 @@ const stage = (overrides: Partial<CadPipelineStageRead> = {}): CadPipelineStageR
   ...overrides,
 });
 
-const pipelineWith = (sheets: CadPipelineRead['sheets']): CadPipelineRead => ({
+/** Лист конвейера: `title`, `is_plan` и `scale_source` заполняются по умолчанию. */
+type SheetInput = Omit<CadPipelineSheetRead, 'title' | 'is_plan' | 'scale_source'> &
+  Partial<Pick<CadPipelineSheetRead, 'title' | 'is_plan' | 'scale_source'>>;
+
+const pipelineWith = (sheets: SheetInput[]): CadPipelineRead => ({
   revision_id: 'rev-1',
   server_time: '2026-11-11T10:00:00Z',
-  sheets,
+  sheets: sheets.map((sheet) => ({ title: null, is_plan: true, scale_source: null, ...sheet })),
 });
 
 const renderPanel = (node: ReactNode) => {
@@ -173,7 +178,9 @@ describe('панель обработки документа', () => {
       'href',
       '/projects/p-1/workspace?revision=rev-1&page=6&tab=cad',
     );
-    expect(screen.getByText('Нужно: откалибровать лист')).toBeInTheDocument();
+    // Нетронутый лист: не «нужно человеку», а «не запущено».
+    expect(screen.getByText('Не запущено')).toBeInTheDocument();
+    expect(screen.queryByText(/откалибровать лист/)).not.toBeInTheDocument();
   });
 
   it('листов нет: подсказка', async () => {
@@ -182,7 +189,7 @@ describe('панель обработки документа', () => {
 
     expect(
       await screen.findByText(
-        'Листы ещё не обрабатывались: откройте документ, откалибруйте лист и запустите преобразование в CAD.',
+        'В документе не найдено листов со словом „План“ в названии и листов с работой CAD',
       ),
     ).toBeInTheDocument();
   });
@@ -329,11 +336,13 @@ describe('панель обработки документа', () => {
       await user.click(toggle);
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
       expect(within(sheet).getByRole('list', { name: 'Шаги листа' })).toBeInTheDocument();
-      // Не начатое преобразование: главная кнопка следующего шага и «Запустить» у шага.
+      // Не начатое преобразование: главная кнопка следующего шага и «Преобразовать в CAD» у шага.
       expect(
         within(sheet).getByRole('button', { name: 'Следующий шаг: CAD' }),
       ).toBeInTheDocument();
-      expect(within(sheet).getByRole('button', { name: 'Запустить' })).toBeInTheDocument();
+      expect(
+        within(sheet).getByRole('button', { name: 'Преобразовать в CAD' }),
+      ).toBeInTheDocument();
       // «Открыть» не переключает раскрытие.
       await user.click(within(sheet).getByRole('link', { name: 'Открыть Лист 1 в CAD' }));
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -342,7 +351,7 @@ describe('панель обработки документа', () => {
       expect(within(sheet).queryByRole('list', { name: 'Шаги листа' })).not.toBeInTheDocument();
     });
 
-    it('не откалиброван: вместо запуска - переход к калибровке', async () => {
+    it('не откалиброван: запуск доступен, калибровка - второстепенная ссылка', async () => {
       const user = userEvent.setup();
       mocks.pipeline.mockResolvedValue({
         data: pipelineWith([
@@ -353,11 +362,68 @@ describe('панель обработки документа', () => {
 
       const sheet = (await screen.findByText('Лист 1')).closest('li') as HTMLElement;
       await user.click(within(sheet).getByRole('button', { expanded: false }));
-      expect(within(sheet).getByRole('link', { name: 'Перейти: Калибровка' })).toHaveAttribute(
+      expect(
+        within(sheet).getByRole('button', { name: 'Следующий шаг: CAD' }),
+      ).toBeInTheDocument();
+      expect(within(sheet).queryByRole('link', { name: 'Перейти: Калибровка' })).toBeNull();
+      expect(within(sheet).getByRole('link', { name: 'Откалибровать вручную' })).toHaveAttribute(
         'href',
         '/projects/p-1/workspace?revision=rev-1&page=1&tab=cad',
       );
-      expect(within(sheet).getByRole('link', { name: 'Откалибровать' })).toBeInTheDocument();
+    });
+
+    it('«Преобразовать в CAD» ставит задание с auto_scale', async () => {
+      const user = userEvent.setup();
+      mocks.pipeline.mockResolvedValue({
+        data: pipelineWith([
+          { page_index: 0, page_label: '1', calibrated: false, convert: null, views: [] },
+        ]),
+      });
+      mocks.createJob.mockResolvedValue({ data: { job_id: 'job-new' } });
+      renderPanel(panel());
+
+      const sheet = (await screen.findByText('Лист 1')).closest('li') as HTMLElement;
+      await user.click(within(sheet).getByRole('button', { expanded: false }));
+      await user.click(within(sheet).getByRole('button', { name: 'Преобразовать в CAD' }));
+
+      await waitFor(() => expect(mocks.createJob).toHaveBeenCalledTimes(1));
+      expect(mocks.createJob.mock.calls[0]?.[0]).toMatchObject({
+        body: { pages: [0], finishes: false, schedules: false, auto_scale: true },
+      });
+    });
+
+    it('масштаб не подтверждён: «Откалибровать вручную» вместо «Повторить»', async () => {
+      const user = userEvent.setup();
+      mocks.pipeline.mockResolvedValue({
+        data: pipelineWith([
+          {
+            page_index: 0,
+            page_label: '1',
+            calibrated: false,
+            convert: stage({
+              job_id: 'job-u',
+              status: 'failed',
+              result_status: null,
+              error_code: 'CAD_AUTO_SCALE_UNCONFIRMED',
+            }),
+            views: [],
+          },
+        ]),
+      });
+      renderPanel(panel());
+
+      const sheet = (await screen.findByText('Лист 1')).closest('li') as HTMLElement;
+      await user.click(within(sheet).getByRole('button', { expanded: false }));
+      // Главная ссылка сверху и та же ссылка у шага CAD.
+      const links = within(sheet).getAllByRole('link', { name: 'Откалибровать вручную' });
+      expect(links).toHaveLength(2);
+      for (const link of links) {
+        expect(link).toHaveAttribute('href', '/projects/p-1/workspace?revision=rev-1&page=1&tab=cad');
+      }
+      expect(within(sheet).queryByRole('button', { name: 'Повторить' })).toBeNull();
+      expect(
+        within(sheet).getAllByText(/Масштаб листа не подтверждён/).length,
+      ).toBeGreaterThan(0);
     });
 
     it('упавший шаг: «Повторить» вызывает повтор задания, обновляет конвейер', async () => {

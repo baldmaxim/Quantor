@@ -153,6 +153,8 @@ class ErrorCode(StrEnum):
     CAD_REMARKS_BINDING_MISMATCH = "CAD_REMARKS_BINDING_MISMATCH"
     # У выбранной страницы нет действующей калибровки листа (ADR-0018, ADR-0036 п. 4).
     CAD_CALIBRATION_REQUIRED = "CAD_CALIBRATION_REQUIRED"
+    # Лист без калибровки, масштаб по размерным цепочкам движок не подтвердил (ADR-0045).
+    CAD_AUTO_SCALE_UNCONFIRMED = "CAD_AUTO_SCALE_UNCONFIRMED"
     # Трассы механики (ADR-0036 п. 8): гейты решений человека и отказ генератора.
     CAD_OPEN_REMARKS = "CAD_OPEN_REMARKS"
     CAD_ALREADY_DECIDED = "CAD_ALREADY_DECIDED"
@@ -318,6 +320,8 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_REMARKS_BINDING_MISMATCH: "Замечания относятся к другому результату CAD",
     ErrorCode.CAD_CALIBRATION_REQUIRED: "Откалибруйте масштаб выбранных листов перед "
     "преобразованием в CAD",
+    ErrorCode.CAD_AUTO_SCALE_UNCONFIRMED: "Масштаб листа не подтверждён размерами чертежа — "
+    "откалибруйте лист вручную и преобразуйте заново",
     ErrorCode.CAD_OPEN_REMARKS: "Есть неисправленные замечания к этому результату",
     ErrorCode.CAD_ALREADY_DECIDED: "Решение по этому результату уже принято",
     ErrorCode.CAD_VIEW_NOT_APPROVED: "Вид не одобрен для построения трасс",
@@ -482,6 +486,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_RESULT_NOT_READY: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_REMARKS_BINDING_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_CALIBRATION_REQUIRED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_AUTO_SCALE_UNCONFIRMED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_OPEN_REMARKS: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_ALREADY_DECIDED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_VIEW_NOT_APPROVED: status.HTTP_409_CONFLICT,

@@ -179,9 +179,38 @@ export const viewSteps = (view: CadPipelineViewRead): Record<ViewStepKey, IPipel
   };
 };
 
+/** Код отказа преобразования: масштаб не подтверждён размерами чертежа (ADR-0045). */
+export const AUTO_SCALE_UNCONFIRMED = 'CAD_AUTO_SCALE_UNCONFIRMED';
+
+/**
+ * Автоматический масштаб не подтвердился, а ручной калибровки нет: повтор тех же параметров даст
+ * тот же отказ, листу нужна калибровка человека.
+ */
+export const isAutoScaleUnconfirmed = (sheet: CadPipelineSheetRead): boolean =>
+  !sheet.calibrated &&
+  sheet.convert !== null &&
+  stageState(sheet.convert) === 'failed' &&
+  sheet.convert.error_code === AUTO_SCALE_UNCONFIRMED;
+
+const CALIBRATION_AUTO = 'Масштаб: авто';
+const CALIBRATION_MANUAL_NEEDED = 'нужна ручная калибровка';
+
+/**
+ * Калибровка не блокирует преобразование: без неё масштаб определяется по размерам чертежа.
+ * Решения человека она требует только после отказа `CAD_AUTO_SCALE_UNCONFIRMED`.
+ */
+const calibrationStep = (sheet: CadPipelineSheetRead): IPipelineStep => {
+  if (sheet.calibrated) return make('calibration', 'done');
+  if (isAutoScaleUnconfirmed(sheet)) return make('calibration', 'todo', CALIBRATION_MANUAL_NEEDED);
+  if (sheet.convert !== null && sheet.scale_source === 'auto') {
+    return make('calibration', 'done', CALIBRATION_AUTO);
+  }
+  return make('calibration', 'todo');
+};
+
 export const convertStep = (sheet: CadPipelineSheetRead): IPipelineStep => {
   const stage = sheet.convert;
-  if (stage === null) return make('convert', sheet.calibrated ? 'todo' : 'blocked');
+  if (stage === null) return make('convert', 'todo');
   const step = stageStep('convert', stage);
   if (step.state === 'done' && stage.result_status === RESULT_NO_CAD) {
     return make('convert', 'done', 'DXF не выпущен');
@@ -203,7 +232,7 @@ const worst = (steps: readonly IPipelineStep[]): IPipelineStep => {
  * не выполнено, шаги после него заблокированы; если DXF не выпущен - пропущены.
  */
 export const sheetSteps = (sheet: CadPipelineSheetRead): IPipelineStep[] => {
-  const calibration = make('calibration', sheet.calibrated ? 'done' : 'todo');
+  const calibration = calibrationStep(sheet);
   const convert = convertStep(sheet);
 
   if (convert.state !== 'done') {
@@ -243,13 +272,12 @@ export const sheetProgress = (sheet: CadPipelineSheetRead): { done: number; tota
 
 /** Что должен сделать человек на шаге, ждущем его. */
 const HUMAN_ACTIONS: Readonly<Partial<Record<PipelineStepKey, string>>> = {
-  calibration: 'откалибровать лист',
   approval: 'одобрить вид',
   routes: 'принять трассы',
 };
 
 const needsHuman = (step: IPipelineStep): boolean =>
-  step.state === 'review' || (step.state === 'todo' && (step.key === 'calibration' || step.key === 'approval'));
+  step.state === 'review' || (step.state === 'todo' && step.key === 'approval');
 
 /**
  * Одна строка о состоянии листа. Порядок: ошибка, идёт, нужен человек, не запущено, готово.
@@ -272,7 +300,13 @@ export const sheetSummary = (sheet: CadPipelineSheetRead): IPipelineSummary => {
     return { tone: 'warning', label: `Нужно: ${HUMAN_ACTIONS[human.key] ?? human.label}` };
   }
 
-  const idle = steps.find((step) => step.state === 'todo');
+  // Нетронутый лист: ни калибровки, ни задания. Ждёт запуска, решения человека не требует.
+  if (sheet.convert === null && !sheet.calibrated) {
+    return { tone: 'neutral', label: 'Не запущено' };
+  }
+
+  // Калибровка - необязательный шаг (масштаб определяется автоматически): сама по себе «не запущено» не даёт.
+  const idle = steps.find((step) => step.state === 'todo' && step.key !== 'calibration');
   if (idle) return { tone: 'warning', label: `Не запущено: ${idle.label}` };
 
   // DXF не выпущен: все шаги после CAD пропущены - это не «готово», а конечная точка.
@@ -280,7 +314,11 @@ export const sheetSummary = (sheet: CadPipelineSheetRead): IPipelineSummary => {
     return { tone: 'neutral', label: 'CAD: DXF не выпущен' };
   }
 
-  if (steps.every((step) => step.state === 'done' || step.state === 'skipped')) {
+  if (
+    steps.every(
+      (step) => step.key === 'calibration' || step.state === 'done' || step.state === 'skipped',
+    )
+  ) {
     return { tone: 'success', label: 'Готово' };
   }
 

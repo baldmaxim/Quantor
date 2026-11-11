@@ -61,7 +61,7 @@ export const CadPipelineSheetControls: FC<ICadPipelineSheetControlsProps> = ({
           compact
           className="self-start max-md:h-[44px] max-md:w-full"
         >
-          {`Перейти: ${next.row.step.label}`}
+          {next.action.intent === 'fix' ? next.action.label : `Перейти: ${next.row.step.label}`}
         </ButtonLink>
       )}
       {next && isMachineAction(next.action) && (

@@ -9,6 +9,8 @@ const CAD_MESSAGES: Readonly<Record<string, string>> = {
   CAD_PARAMS_INVALID: 'Параметры преобразования вне контракта: проверьте выбор страниц.',
   CAD_INPUT_LIMIT_EXCEEDED: 'PDF превышает пределы преобразования: выберите меньше страниц.',
   CAD_CALIBRATION_REQUIRED: calibrationRequiredText([]),
+  CAD_AUTO_SCALE_UNCONFIRMED:
+    'Масштаб листа не подтверждён размерами чертежа — откалибруйте лист вручную и преобразуйте заново.',
   CAD_ENGINE_FAILED: 'Движок CAD не выдал проверенный результат.',
   CAD_ENGINE_UNAVAILABLE: 'Движок CAD не установлен или не прошёл проверку.',
   CAD_RESULT_NOT_READY: 'Результат преобразования ещё не готов.',

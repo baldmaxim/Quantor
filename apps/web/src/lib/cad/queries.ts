@@ -189,6 +189,11 @@ export const useCadEvents = (
 interface ICreateCadJobInput {
   /** Индексы страниц PDF с 0, 1..50 без повторов: лист выбирает человек (ADR-0036). */
   readonly pages: readonly number[];
+  /**
+   * Лист без калибровки: `true` - масштаб по размерным цепочкам (ADR-0045), иначе 409
+   * `CAD_CALIBRATION_REQUIRED`. Калиброванный лист всегда идёт по масштабу человека.
+   */
+  readonly autoScale?: boolean;
 }
 
 /** Создаёт задание. Если такое уже идёт, сервер возвращает его же — дубля нет. */
@@ -198,12 +203,17 @@ export const useCreateCadJob = (
 ): UseMutationResult<CadJobRead, unknown, ICreateCadJobInput> => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ pages }) =>
+    mutationFn: async ({ pages, autoScale }) =>
       unwrap(
         await createCadJob({
           throwOnError: true,
           path: { project_id: projectId, revision_id: revisionId },
-          body: { pages: [...pages], finishes: false, schedules: false },
+          body: {
+            pages: [...pages],
+            finishes: false,
+            schedules: false,
+            ...(autoScale === undefined ? {} : { auto_scale: autoScale }),
+          },
         }),
       ),
     onSuccess: (job) => {

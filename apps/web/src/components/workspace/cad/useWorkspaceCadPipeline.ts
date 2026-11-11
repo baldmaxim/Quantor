@@ -149,7 +149,16 @@ export const useWorkspaceCadPipeline = ({
   const steps = useMemo<readonly IPipelineStep[]>(() => {
     if (sheet !== null) return sheetSteps(sheet);
     if (pageIndex === null || !data) return [];
-    return sheetSteps({ page_index: pageIndex, page_label: null, calibrated: false, convert: null, views: [] });
+    return sheetSteps({
+      page_index: pageIndex,
+      page_label: null,
+      title: null,
+      is_plan: true,
+      scale_source: null,
+      calibrated: false,
+      convert: null,
+      views: [],
+    });
   }, [sheet, pageIndex, data]);
   const summary = useMemo(() => (sheet ? sheetSummary(sheet) : null), [sheet]);
 
