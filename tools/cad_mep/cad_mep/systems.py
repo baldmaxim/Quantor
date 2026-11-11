@@ -6,10 +6,9 @@
 from __future__ import annotations
 
 import numpy as np
-from shapely.errors import GEOSException
 from shapely.geometry import LineString
 
-from cad_mep import facade, fire, heating
+from cad_mep import facade, fire, heating, heatsrc
 from cad_mep.dxfin import Door
 from cad_mep.issues import Issue
 from cad_mep.labels import Labels
@@ -18,31 +17,7 @@ from cad_mep.params import Params
 from cad_mep.result import Line3D, NodeMark, Pt, Pt3, Result
 from cad_mep.rooms import Apartment, Model, Shaft
 from cad_mep.route import RouteGrid, Tree, node_path, spt, tree_chains
-
-
-def _offset(chain: list[Pt], dist: float) -> list[Pt]:
-    """Параллельная линия на dist от цепочки; сторона — «слева» при ходе по +X (иначе +Y)."""
-    if len(chain) < 2 or abs(dist) < 1e-6:
-        return chain
-    flip = (chain[-1][0] - chain[0][0], chain[-1][1] - chain[0][1])
-    rev = flip[0] < -1e-6 or (abs(flip[0]) <= 1e-6 and flip[1] < 0)
-    pts = chain[::-1] if rev else chain
-    try:
-        oc = LineString(pts).offset_curve(dist, join_style="mitre", mitre_limit=3.0)
-    except (GEOSException, ValueError):
-        return chain
-    if oc.is_empty or oc.geom_type != "LineString":
-        # мультилиния при острых углах — берём самую длинную часть
-        if oc.geom_type == "MultiLineString":
-            oc = max(oc.geoms, key=lambda g: g.length)
-        else:
-            return chain
-    out = [(float(x), float(y)) for x, y, *_ in oc.coords]
-    d_same = abs(out[0][0] - pts[0][0]) + abs(out[0][1] - pts[0][1])
-    d_flip = abs(out[-1][0] - pts[0][0]) + abs(out[-1][1] - pts[0][1])
-    if d_same > d_flip:
-        out = out[::-1]
-    return out[::-1] if rev else out
+from cad_mep.treeoff import offset_tree
 
 
 class Planner:
@@ -75,6 +50,13 @@ class Planner:
         self.vk_mop: list[Shaft] = []
         self.ov_mop: list[Shaft] = []
         self.coll: dict[int, tuple[int, Pt]] = {}
+        self.coll_room: dict[int, str | None] = {}
+        ys, xs = np.nonzero(rg.pas)  # порядок совпадает с нумерацией узлов rg.idx
+        self.node_comp = rg.comp_of[ys, xs]
+        self.node_d = rg.d[ys, xs]
+        self.node_mop = rg.mop[ys, xs]
+        self.apt_of_comp = {c.id: c.apt for c in m.comps.values() if c.apt is not None}
+        self._foreign: dict[int, dict[int, float]] = {}
         self.entry: dict[int, tuple[int, Pt, int]] = {}
         self.pk_nodes: list[int] = []
 
@@ -113,11 +95,13 @@ class Planner:
         chains: list[list[Pt]],
         z: float,
         apt: int | None,
+        root: Pt,
         drops: dict[tuple[int, int], float] | None = None,
+        tips: bool = False,
     ) -> None:
+        """Цепочки дерева слоя со смещением слоя; стыки на тройниках и концы — без разрывов."""
         off = self.offsets.get(layer, 0.0)
-        for ch in chains:
-            oc = _offset(ch, off)
+        for ch, oc in zip(chains, offset_tree(chains, root, off, tips), strict=True):
             pts3: list[Pt3] = [(x, y, z) for x, y in oc]
             if drops:
                 for end in (0, -1):
@@ -127,6 +111,17 @@ class Planner:
                         z2 = drops[key]
                         pts3 = [(x, y, z2), *pts3] if end == 0 else [*pts3, (x, y, z2)]
             self.res.lines.append(Line3D(layer, pts3, apt, "route"))
+
+    def node_xy(self, node: int) -> Pt:
+        return (float(self.rg.xy[node][0]), float(self.rg.xy[node][1]))
+
+    def foreign(self, apt: int) -> dict[int, float]:
+        """Узлы, закрытые для путей квартиры: МОП и чужие квартиры (inf)."""
+        if apt not in self._foreign:
+            owner = np.array([self.apt_of_comp.get(int(c), -1) for c in self.node_comp])
+            bad = self.node_mop | ((self.node_comp > 0) & (owner != apt))
+            self._foreign[apt] = dict.fromkeys(np.nonzero(bad)[0].tolist(), float("inf"))
+        return self._foreign[apt]
 
     def leadin(self, sh: Shaft, layer: str, z: float, node: int) -> None:
         xy = self.riser(sh, layer)
@@ -186,16 +181,6 @@ class Planner:
             if "ВК" in s.systems and s.place == "mop" and s.contour_status == "found"
         ]
         for ap in m.apts.values():
-            n, xy = self.collector(ap)
-            if n is None or xy is None:
-                self.issue(
-                    "heat_no_collector",
-                    f"{ap.number}: отопление — не найден коллектор у входной двери",
-                    ap,
-                )
-            else:
-                self.coll[ap.idx] = (n, xy)
-        for ap in m.apts.values():
             if ap.entry_door is None:
                 self.issue(
                     "water_no_entry_door", f"{ap.number}: водоснабжение — нет входной двери", ap
@@ -212,6 +197,17 @@ class Planner:
                 )
                 continue
             self.entry[ap.idx] = (n_in, (float(rg.xy[n_in][0]), float(rg.xy[n_in][1])), n_mop)
+        for ap in m.apts.values():
+            col = heatsrc.find_collector(self, ap)
+            if col is None:
+                self.issue(
+                    "heat_no_collector",
+                    f"{ap.number}: отопление — не найден коллектор у входной двери",
+                    ap,
+                )
+            else:
+                self.coll[ap.idx] = (col.node, col.xy)
+                self.coll_room[ap.idx] = col.room_id
         for s in (s for s in m.shafts if "ПК" in s.systems):
             n = rg.node(
                 *(s.mop_exit or s.label_pt), r_mm=self.p.num("pk_node_radius_mm"), only_mop=True
@@ -225,27 +221,6 @@ class Planner:
             v[2] for v in self.entry.values()
         }
         self.fire_targets = set(self.pk_nodes)
-
-    # ---------- квартира
-    def collector(self, ap: Apartment) -> tuple[int | None, Pt | None]:
-        """Коллектор — у входной двери на collector_offset_mm от стены, ближе всего к двери."""
-        if ap.entry_door is None or ap.entry_apt_comp is None:
-            return None, None
-        rg = self.rg
-        off = self.p.num("collector_offset_mm")
-        mask = (rg.comp_of == ap.entry_apt_comp) & (rg.d >= off) & (rg.d < off + 2 * rg.step)
-        ys, xs = np.nonzero(mask)
-        if len(ys) == 0:
-            mask = (rg.comp_of == ap.entry_apt_comp) & (rg.d >= self.p.num("collector_fallback_mm"))
-            ys, xs = np.nonzero(mask)
-            if len(ys) == 0:
-                return None, None
-        mx, my = ap.entry_door.mid
-        px, py = (xs + 0.5) * rg.step, (ys + 0.5) * rg.step
-        dd = np.hypot(px - mx, py - my)
-        dd = np.where(dd < self.p.num("collector_door_clear_mm"), 1e9, dd)  # не в самом проёме
-        k = int(np.argmin(dd))
-        return int(rg.idx[ys[k], xs[k]]), (float(px[k]), float(py[k]))
 
     # ---------- водоснабжение
     def water(self) -> None:
@@ -274,9 +249,10 @@ class Planner:
             for lay in ("M-VK-V1", "M-VK-T3"):
                 self.riser(sh, lay)
                 self.leadin(sh, lay, self.z_ceil, n0)
-                self.add_chains(lay, chains, self.z_ceil, None, drops)
+                self.add_chains(lay, chains, self.z_ceil, None, self.node_xy(n0), drops)
             # Т4 — по коридору до последней квартиры ветки (с каждой стороны от шахты), без вводов
             sx = sh.centroid[0]
+            p4s: list[list[int]] = []
             for side in (-1, 1):
                 grp = [a for a in apt_ids if (entry[a][1][0] - sx) * side > 0]
                 if not grp:
@@ -284,12 +260,23 @@ class Planner:
                 last = max(grp, key=lambda a: forest[entry[a][2]])
                 p4 = self.path_from(forest, n0, entry[last][2])
                 if p4:
-                    self.riser(sh, "M-VK-T4")
-                    self.leadin(sh, "M-VK-T4", self.z_ceil, n0)
-                    self.add_chains(
-                        "M-VK-T4", tree_chains(rg, [p4], self.simplify), self.z_ceil, None
+                    p4s.append(p4)
+                    res.nodes.append(
+                        NodeMark(
+                            "M-NODE", "t4_end", self.node_xy(p4[-1]), self.z_ceil, last, "water"
+                        )
                     )
                     self.apt_info(m.apts[last])["t4_last_of_branch"] = True
+            if p4s:
+                self.riser(sh, "M-VK-T4")
+                self.leadin(sh, "M-VK-T4", self.z_ceil, n0)
+                self.add_chains(
+                    "M-VK-T4",
+                    tree_chains(rg, p4s, self.simplify),
+                    self.z_ceil,
+                    None,
+                    self.node_xy(n0),
+                )
             for a in apt_ids:
                 ap = m.apts[a]
                 info = self.apt_info(ap)

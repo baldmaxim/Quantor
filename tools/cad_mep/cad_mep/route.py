@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import heapq
 import math
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 
@@ -163,12 +163,16 @@ def spt(
     sources: Sequence[int],
     targets: Collection[int] | None = None,
     first: bool = False,
+    init: Mapping[int, float] | None = None,
+    extra: Mapping[int, float] | None = None,
 ) -> Tree:
     """Дейкстра по состояниям (клетка, направление): ход вперёд и поворот на 90° со штрафом.
 
     Несколько источников — одно «лесное» дерево: путь к цели идёт от ближайшего источника.
     Обход прекращается, когда достигнуты все targets (значения в остальных клетках не итоговые);
     first — уже на первой достигнутой цели, то есть на ближайшей к источникам.
+    init — стартовая цена источника (по умолчанию 0); extra — добавка к цене входа в клетку
+    (штраф занятости; inf закрывает клетку). Без init и extra поведение прежнее.
     """
     n = len(rg.weight)
     inf = math.inf
@@ -176,14 +180,16 @@ def spt(
     pred = [-1] * (4 * n)
     heap: list[tuple[float, int]] = []
     for src in sources:
+        c0 = init.get(src, 0.0) if init is not None else 0.0
         for k in range(4):
-            dist[src * 4 + k] = 0.0
-            heap.append((0.0, src * 4 + k))
+            dist[src * 4 + k] = c0
+            heap.append((c0, src * 4 + k))
     heapq.heapify(heap)
     remaining = set(targets) if targets else None
     nbr, wgt, turn = rg.nbr, rg.weight, rg.turn
     pop, push = heapq.heappop, heapq.heappush
     half = rg.step * 0.5
+    ex_get = extra.get if extra else None
     while heap:
         d, s = pop(heap)
         if d > dist[s]:
@@ -196,6 +202,8 @@ def spt(
         nb = nbr[k][c]
         if nb >= 0:
             nd = d + half * (wgt[c] + wgt[nb])
+            if ex_get is not None:
+                nd += ex_get(nb, 0.0)
             t = nb * 4 + k
             if nd < dist[t]:
                 dist[t] = nd
@@ -248,6 +256,7 @@ def tree_chains(
     special_set = set(special)
     seen: set[tuple[int, int]] = set()
     chains: list[list[tuple[float, float]]] = []
+    shape: set[tuple[tuple[int, int], ...]] = set()
     for s in special:
         for nb in sorted(adj.get(s, ())):
             if (s, nb) in seen:
@@ -267,5 +276,10 @@ def tree_chains(
                     simple = line.simplify(tol_mm, preserve_topology=False)
                     if isinstance(simple, LineString):
                         line = simple
-            chains.append([(float(x), float(y)) for x, y in line.coords])
+            out = [(float(x), float(y)) for x, y in line.coords]
+            key = tuple((round(x), round(y)) for x, y in out)
+            if key in shape or key[::-1] in shape:
+                continue  # параллельные пути с одинаковой формой — одна цепочка
+            shape.add(key)
+            chains.append(out)
     return chains

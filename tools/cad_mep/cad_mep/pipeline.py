@@ -16,11 +16,13 @@ from cad_mep import (
     facade,
     rooms,
     route,
+    topology,
 )
 from cad_mep.errors import EXIT_NO_ROUTES, MepError
 from cad_mep.issues import Issue
 from cad_mep.plan import build_plan_model, open_plan
 from cad_mep.raster import raster_polys
+from cad_mep.result import Result
 from cad_mep.systems import Planner
 from cad_mep.version import GENERATOR_VERSION
 
@@ -66,6 +68,30 @@ def _validate(args: Args) -> None:
             raise MepError(code, f"нет файла {p.name}")
     if not args.view_folder or "/" in args.view_folder or ".." in args.view_folder:
         raise MepError("view_folder_invalid", "view-folder: ожидалось имя вида вида pNNN_vNN")
+
+
+def _topology_issues(res: Result, topo: dict[str, object]) -> None:
+    """По одному замечанию на слой с висячими концами и на слой с самопересечениями."""
+    layers = topo.get("layers")
+    if not isinstance(layers, dict):
+        return
+    for layer, info in layers.items():
+        if int(info["dangling"]):
+            res.issues.append(
+                Issue(
+                    "route_dangling_ends",
+                    f"{layer}: {info['dangling']} висячих концов трассы из {info['ends']}, "
+                    f"первые (мм DXF): {info['dangling_samples']}",
+                )
+            )
+        if int(info["same_layer_crossings"]):
+            res.issues.append(
+                Issue(
+                    "route_line_crossings",
+                    f"{layer}: {info['same_layer_crossings']} пересечений линий слоя, "
+                    f"первые (мм DXF): {info['crossing_samples']}",
+                )
+            )
 
 
 def generate(args: Args) -> dict[str, object]:
@@ -142,6 +168,8 @@ def generate(args: Args) -> dict[str, object]:
                 f"{beams['points_in_other_apartments']}",
             )
         )
+    topo = topology.route_topology(res, params, (fx0, fy0))
+    _topology_issues(res, topo)
     folder = args.out / "views" / args.view_folder
     folder.mkdir(parents=True, exist_ok=True)
     dxf_path = folder / "mep_routes.dxf"
@@ -188,6 +216,7 @@ def generate(args: Args) -> dict[str, object]:
         crossings,
         dxf_info,
         beams,
+        topo,
     )
     _dump(folder / "preview.json", preview)
     _dump(folder / "candidate.json", cand)

@@ -6,6 +6,7 @@ import math
 from typing import TYPE_CHECKING
 
 from cad_mep import aup
+from cad_mep.result import NodeMark
 from cad_mep.rooms import Shaft
 from cad_mep.route import Tree, node_path, spt, tree_chains
 
@@ -47,16 +48,22 @@ def route(pl: Planner) -> None:
         pl.issue("fire_no_path", "пожаротушение: путь от шахт ВК до ПК не найден")
         return
     paths = [p for p in (node_path(btree, n) for n in pl.pk_nodes) if p]
+    for n in pl.pk_nodes:  # метка шкафа ПК: конечная точка ВПВ для проверки топологии
+        xy = (float(rg.xy[n][0]), float(rg.xy[n][1]))
+        res.nodes.append(NodeMark("M-NODE", "pk", xy, pl.z_ceil, None, "fire"))
     pl.riser(best, "M-PT-VPV")
     pl.leadin(best, "M-PT-VPV", pl.z_ceil, bn0)
-    pl.add_chains("M-PT-VPV", tree_chains(rg, paths, pl.simplify), pl.z_ceil, None)
+    root = pl.node_xy(bn0)
+    pl.add_chains("M-PT-VPV", tree_chains(rg, paths, pl.simplify), pl.z_ceil, None, root)
     # АУП: ветка от той же шахты до дальних точек каждого внеквартирного помещения
     aup_rooms = aup.regions(rg, pl.m, pl.expl, pl.p)
     ap_paths = aup.extend(rg, bn0, aup_rooms, pl.p)
     if ap_paths:
         pl.riser(best, "M-PT-AUP")
         pl.leadin(best, "M-PT-AUP", pl.z_ceil, bn0)
-        pl.add_chains("M-PT-AUP", tree_chains(rg, ap_paths, pl.simplify), pl.z_ceil, None)
+        pl.add_chains(
+            "M-PT-AUP", tree_chains(rg, ap_paths, pl.simplify), pl.z_ceil, None, root, tips=True
+        )
     else:
         pl.issue("fire_aup_no_ends", "АУП: внеквартирные помещения для ветки не найдены")
     cover = aup.coverage(rg, aup_rooms, ap_paths, pl.p)

@@ -1,84 +1,109 @@
-"""Отопление: стволы от шахт ОВ до коллекторов, приборы и лучи квартир (дерево от коллектора)."""
+"""Отопление: подводки пучком от этажного шкафа (шахты ОВ) до коллекторов; лучи — beams.py."""
 
 from __future__ import annotations
 
-import math
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from cad_mep import heatdev
-from cad_mep.heatdev import HeatRoom
-from cad_mep.result import NodeMark
-from cad_mep.rooms import Apartment
-from cad_mep.route import RouteGrid, node_path, spt, tree_chains
+from cad_mep import beams, heatdev, heatsrc
+from cad_mep.bundle import Bundle, far_to_near
+from cad_mep.heatsrc import Root
+from cad_mep.lanes import Layout
+from cad_mep.result import NodeMark, Pt
 
 if TYPE_CHECKING:
     from cad_mep.systems import Planner
 
+LAYERS = ("M-OV-T1", "M-OV-T2")
 
-def beam_tree(
-    rg: RouteGrid, root: int, targets: list[int]
-) -> tuple[list[list[int]], dict[int, float], list[int]]:
-    """Дерево лучей квартиры от коллектора.
 
-    Каждый следующий прибор — ближайший к уже построенному дереву — подключается к ближайшей
-    его точке. Путь касается дерева только началом, поэтому петель нет. Возвращает пути,
-    длину по дереву от коллектора до каждой клетки (мм) и приборы, до которых пути нет.
-    """
-    along: dict[int, float] = {root: 0.0}
-    paths: list[list[int]] = []
-    left = sorted(set(targets) - {root})
-    while left:
-        tree = spt(rg, sorted(along), left, first=True)
-        best = min(left, key=lambda n: (tree[n], n))
-        if not math.isfinite(tree[best]):
-            break
-        path = node_path(tree, best)
-        base = along[path[0]]
-        for i, cell in enumerate(path):
-            along.setdefault(cell, base + i * rg.step)
-        paths.append(path)
-        left.remove(best)
-    return paths, along, left
+@dataclass
+class Feed:
+    """Подводка квартиры: путь от корня до коллектора и раскладка коридорного пучка."""
+
+    cells: list[int]
+    edge: int  # с этого ребра подводка идёт по полосам квартиры (до него — по коридорным)
+    layout: Layout
+    idx: int  # номер пути в раскладке коридорного пучка
+    root_xy: Pt
+
+
+def _corridor(pl: Planner, root: Root) -> dict[int, Feed]:
+    """Пучок от узла шахты: у каждой квартиры своя пара полос T1/T2, без тройников."""
+    rg, p, res = pl.rg, pl.p, pl.res
+    sh, n0 = root.shaft, root.node
+    apts = [a for a in root.apts if a in pl.coll]
+    by_node = {pl.coll[a][0]: a for a in apts}
+    bundle = Bundle(rg, n0, p)
+    paths: dict[int, list[int]] = {}
+    for t in far_to_near(rg, n0, list(by_node)):
+        path = bundle.reach(t)
+        if path:
+            paths[by_node[t]] = path
+    for lay in LAYERS:
+        pl.riser(sh, lay)
+        pl.leadin(sh, lay, pl.z_heat, n0)
+    res.nodes.append(NodeMark("M-NODE", "cabinet", pl.node_xy(n0), pl.z_heat, None, "heating"))
+    order = sorted(paths)
+    cut: list[list[int]] = []
+    edge_of: dict[int, int] = {}
+    for a in order:
+        cells = paths[a]
+        last_out = max((k for k, c in enumerate(cells) if pl.node_mop[c]), default=-1)
+        edge_of[a] = max(last_out - 1, 0)
+        cut.append(cells[: min(len(cells), last_out + 2)])
+    layout = Layout(
+        rg,
+        cut,
+        [2] * len(cut),
+        p.num("bundle_corridor_step_mm"),
+        p.num("topo_terminal_radius_mm") - 5,
+    )
+    root_xy = pl.node_xy(n0)
+    feeds: dict[int, Feed] = {}
+    for i, a in enumerate(order):
+        feeds[a] = Feed(paths[a], edge_of[a], layout, i, root_xy)
+        info = pl.apt_info(pl.m.apts[a])
+        info["heat_shaft"] = sh.id
+        info["heat_path_to_collector_m"] = round((len(paths[a]) - 1) * rg.step / 1000, 2)
+    return feeds
 
 
 def route(pl: Planner) -> None:
-    """Стволы от шахт ОВ до коллекторов, затем приборы и лучи каждой квартиры."""
+    """Источники и подводки, затем приборы и лучи каждой квартиры."""
     m, rg, res = pl.m, pl.rg, pl.res
-    shafts = pl.ov_mop
-    pick, forest, node_of = pl.assign(shafts, {a: v[0] for a, v in pl.coll.items()})
-    shaft_node = {sh.id: n for n, sh in node_of.items()}
-    by_shaft: dict[str, list[int]] = {}
-    for ai, sh in pick.items():
-        by_shaft.setdefault(sh.id, []).append(ai)
-    for ai in pl.coll:
-        if ai not in pick:
-            pl.issue(
-                "heat_no_path",
-                f"{m.apts[ai].number}: отопление — путь от шахты ОВ до коллектора не найден",
-                m.apts[ai],
-            )
-    for sid in sorted(by_shaft):
-        apt_ids = by_shaft[sid]
-        sh = next(s for s in shafts if s.id == sid)
-        n0 = shaft_node[sid]
-        paths = {a: node_path(forest, pl.coll[a][0]) for a in apt_ids}
-        for lay in ("M-OV-T1", "M-OV-T2"):
-            pl.riser(sh, lay)
-            pl.leadin(sh, lay, pl.z_heat, n0)
-        chains = tree_chains(rg, list(paths.values()), pl.simplify)
-        for lay in ("M-OV-T1", "M-OV-T2"):
-            pl.add_chains(lay, chains, pl.z_heat, None)
-        for a in apt_ids:
-            info = pl.apt_info(m.apts[a])
-            info["heat_shaft"] = sh.id
-            info["heat_path_to_collector_m"] = round(pl.path_len_mm(paths[a]) / 1000, 2)
-    # приборы и лучи внутри квартир
+    cabinet = pl.p.text("heating_source") == "floor_cabinet"
+    roots = heatsrc.cabinets(pl) if cabinet else heatsrc.ov_roots(pl)
+    placed: dict[int, list[heatdev.HeatRoom]] = {}
     for ap in m.apts.values():
         rooms, issues = heatdev.place(m, pl.L, rg, pl.prof, pl.p, ap)
         res.heat_rooms += rooms
         res.issues += issues
+        placed[ap.idx] = rooms
+    feeds: dict[int, Feed] = {}
+    for root in roots:
+        feeds.update(_corridor(pl, root))
+    for ai in pl.coll:
+        if ai not in feeds:
+            pl.issue(
+                "heat_no_path",
+                f"{m.apts[ai].number}: отопление — путь от "
+                f"{'этажного шкафа' if cabinet else 'шахты ОВ'} до коллектора не найден",
+                m.apts[ai],
+            )
+    if cabinet and pl.ov_mop:
+        ids = ", ".join(s.id for s in pl.ov_mop)
+        pl.issue(
+            "heat_ov_shafts_unused",
+            f"справка: отопление идёт от этажного шкафа у шахты ВК, шахты ОВ в МОП ({ids}) "
+            "трассами не используются (heating_source = floor_cabinet)",
+        )
+    for ap in m.apts.values():
+        rooms = placed[ap.idx]
+        info = pl.apt_info(ap)
         if ap.idx in pl.coll:
-            beams(pl, ap, rooms)
+            info["collector_room"] = pl.coll_room.get(ap.idx)
+            beams.apartment(pl, ap, rooms, feeds.get(ap.idx))
         for room in rooms:
             if room.devices:
                 continue
@@ -102,32 +127,3 @@ def route(pl: Planner) -> None:
                 f"прибора: {why}",
                 ap,
             )
-
-
-def beams(pl: Planner, ap: Apartment, rooms: list[HeatRoom]) -> None:
-    """Лучи квартиры: дерево от коллектора до приборов, подача и обратка парой."""
-    rg, res = pl.rg, pl.res
-    root, xy = pl.coll[ap.idx]
-    info = pl.apt_info(ap)
-    res.nodes.append(NodeMark("M-NODE", "collector", xy, pl.z_heat, ap.idx, "heating"))
-    paths, along, lost = beam_tree(rg, root, [d.node for r in rooms for d in r.devices])
-    if lost:
-        pl.issue(
-            "heat_beam_unreachable",
-            f"{ap.number}: луч отопления — путь до {len(lost)} приборов не найден",
-            ap,
-        )
-    for room in rooms:
-        if room.devices and all(d.node in lost for d in room.devices):
-            room.status = "unreachable"
-        room.devices = [d for d in room.devices if d.node not in lost]
-        for d in room.devices:
-            d.path_m = round(along[d.node] / 1000, 2)
-            res.nodes.append(
-                NodeMark("M-NODE", "device", d.xy, pl.z_heat, ap.idx, "heating", room.room_id)
-            )
-    chains = tree_chains(rg, paths, pl.simplify)
-    for lay in ("M-OV-T1", "M-OV-T2"):
-        pl.add_chains(lay, chains, pl.z_heat, ap.idx)
-    info["heat_beams_m"] = round(sum(pl.path_len_mm(p) for p in paths) / 1000, 2)
-    res.beam_paths[ap.idx] = [[(float(rg.xy[n][0]), float(rg.xy[n][1])) for n in p] for p in paths]

@@ -41,7 +41,7 @@ def wall_crossings(
         core = erode(core)
     per_layer: dict[str, dict[str, object]] = {}
     for ln in res.lines:
-        if ln.kind != "route":
+        if ln.kind not in ("route", "jumper"):
             continue
         bad = 0
         first: list[int] | None = None
@@ -97,6 +97,22 @@ def beam_trees(m: Model, res: Result) -> dict[str, object]:
         "apartments_not_tree": not_tree,
         "loops_area_m2": round(area / 1e6, 4),
         "points_in_other_apartments": foreign,
+    }
+
+
+def topology_check(topo: dict[str, object]) -> dict[str, object]:
+    """FAIL при висячих концах или самопересечениях слоя; пересечения слоёв — справочно."""
+    totals = topo.get("totals")
+    if not isinstance(totals, dict):
+        return {"passed": False, "status": "FAIL", "dangling_ends": None}
+    dangling, same = int(totals["dangling"]), int(totals["same_layer_crossings"])
+    return {
+        "passed": dangling == 0 and same == 0,
+        "status": "PASS" if dangling == 0 and same == 0 else "FAIL",
+        "dangling_ends": dangling,
+        "same_layer_crossings": same,
+        "cross_layer_crossings": int(totals["cross_layer_crossings"]),
+        "branch_ends": int(totals["branch_ends"]),
     }
 
 

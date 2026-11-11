@@ -152,10 +152,11 @@ def build_floor(
     hall: bool = False,
     open_kitchen: int | None = None,
     closed_bedroom: int | None = None,
+    wet: bool = True,
 ) -> Floor:
     """Этаж; варианты: hall — лифтовой холл в западном торце коридора за дверью;
     open_kitchen — квартира без стены между прихожей и кухней; closed_bedroom — квартира, у
-    спальни которой нет двери."""
+    спальни которой нет двери; wet=False — без санузлов (коллектор у входной двери)."""
     f = Floor()
     # наружные стены: продольные (юг, север) и глухие торцы
     _facade(f, 0, 500, glazing)
@@ -189,6 +190,16 @@ def build_floor(
                 _hwall(f, fy(3000.0), hx0, hx1, [(min(gx), max(gx))])
                 f.doors.append(Door((fx(8550.0), fy(3000.0)), (fx(9450.0), fy(3000.0))))
             f.doors.append(Door((fx(8550.0), fy(5000.0)), (fx(9450.0), fy(5000.0))))
+            if wet:
+                # санузел в восточной части прихожей, дверь в западную часть
+                _vwall(
+                    f,
+                    fx(WET_X),
+                    min(fy(3000.0), fy(4940.0)),
+                    max(fy(3000.0), fy(4940.0)),
+                    [(min(gy), max(gy))],
+                )
+                f.doors.append(Door((fx(WET_X), gy[0]), (fx(WET_X), gy[1])))
     if with_shafts:
         # ОВ и ПК — на северной стене коридора, ВК и ПК рядом с ним — на южной; короб выступает
         # в коридор на 0,4 м, боковые стены толще (300 мм), чтобы выход шахты был строго в коридор
@@ -205,15 +216,21 @@ def build_floor(
             f.labels.append((text, (x0 + x1) / 2, (y0 + y1) / 2))
     # марки помещений: квартиры 1..4 (юг-запад, юг-восток, север-запад, север-восток), коридор
     marks: dict[int, list[tuple[float, float]]] = {
-        1: [(3000, 2700), (9000, 4000), (9000, 1700)],
-        2: [(mx(3000), 2700), (mx(9000), 4000), (mx(9000), 1700)],
-        3: [(3000, my(2700)), (9000, my(4000)), (9000, my(1700))],
-        4: [(mx(3000), my(2700)), (mx(9000), my(4000)), (mx(9000), my(1700))],
+        1: [(3000, 2700), (9000, 4000), (9000, 1700), (11000, 4000)],
+        2: [(mx(3000), 2700), (mx(9000), 4000), (mx(9000), 1700), (mx(11000), 4000)],
+        3: [(3000, my(2700)), (9000, my(4000)), (9000, my(1700)), (11000, my(4000))],
+        4: [
+            (mx(3000), my(2700)),
+            (mx(9000), my(4000)),
+            (mx(9000), my(1700)),
+            (mx(11000), my(4000)),
+        ],
     }
     for k, pts in marks.items():
-        for n, (x, y) in enumerate(pts, start=1):
+        for n, (x, y) in enumerate(pts[: 4 if wet else 3], start=1):
             f.labels.append((f"1-{k}/{n}", x, y))
-            f.expl.append((f"1-{k}/{n}", EXPL_NAMES[n], EXPL_AREAS[n]))
+            area = EXPL_AREAS_WET[n] if wet else EXPL_AREAS[n]
+            f.expl.append((f"1-{k}/{n}", EXPL_NAMES[n], area))
     f.labels.append(("1-0.1", 7000.0, 6000.0))
     if hall:
         # лифтовой холл: западный торец коридора за стеной с дверью
@@ -231,8 +248,10 @@ def drop_labels(floor: Floor, ids: set[str]) -> None:
     floor.labels = [lab for lab in floor.labels if lab[0] not in ids]
 
 
-EXPL_NAMES = {1: "Спальня", 2: "Прихожая", 3: "Кухня"}
+EXPL_NAMES = {1: "Спальня", 2: "Прихожая", 3: "Кухня", 4: "Санузел"}
 EXPL_AREAS = {1: 24.15, 2: 11.05, 3: 14.35}
+EXPL_AREAS_WET = {1: 24.15, 2: 7.29, 3: 14.35, 4: 3.36}
+WET_X = 10000.0  # стена санузла в восточной части прихожей
 HALL_X = 3000.0
 
 
@@ -282,6 +301,9 @@ def write_pdf(
         page.draw_line(
             pymupdf.Point(*_pt(x0, y0)), pymupdf.Point(*_pt(x1, y1)), color=(0, 0, 0), width=0.24
         )
+    for x0, y0, x1, y1 in floor.outlines:
+        a, b = _pt(x0, y1), _pt(x1, y0)
+        page.draw_rect(pymupdf.Rect(a[0], a[1], b[0], b[1]), color=(0, 0, 0), fill=None, width=0.24)
     tw = pymupdf.TextWriter(page.rect)
     for text, x, y in floor.labels:
         px, py = _pt(x, y)
@@ -301,9 +323,6 @@ def write_pdf(
         _text(tw, name, 500, y)
         _text(tw, f"{area:.2f}".replace(".", ","), 580, y)
         y += 10.0
-    for x0, y0, x1, y1 in floor.outlines:
-        a, b = _pt(x0, y1), _pt(x1, y0)
-        page.draw_rect(pymupdf.Rect(a[0], a[1], b[0], b[1]), color=(0, 0, 0), fill=None, width=0.24)
     tw.write_text(page)
     for title in neighbor_titles:
         other = doc.new_page(width=900, height=500)

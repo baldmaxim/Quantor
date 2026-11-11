@@ -18,13 +18,13 @@ class Line3D:
     layer: str
     pts: list[Pt3]
     apt: int | None = None  # None — общий участок / стояк
-    kind: str = "route"  # route | riser | leadin
+    kind: str = "route"  # route | jumper | riser | leadin
 
 
 @dataclass
 class NodeMark:
     layer: str  # M-NODE | M-RISER
-    kind: str  # collector | device | meter | riser
+    kind: str  # collector | device | meter | riser | cabinet | pk
     xy: Pt
     z: float
     apt: int | None = None

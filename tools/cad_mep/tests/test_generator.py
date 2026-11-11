@@ -98,11 +98,20 @@ def run_a(inputs: dict[str, Path], tmp_path_factory: pytest.TempPathFactory) -> 
     return out / "views" / FOLDER
 
 
+INFO_ISSUES = {"heat_ov_shafts_unused"}  # справка, не замечание: проверяется отдельно
+
+
+def _load_candidate(path: Path, keep_info: bool = False) -> dict[str, object]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    if not keep_info:
+        data["issues"] = [i for i in data["issues"] if i["code"] not in INFO_ISSUES]
+    return data
+
+
 @pytest.fixture(scope="module")
 def candidate(run_a: Path) -> dict[str, object]:
-    data = json.loads((run_a / "candidate.json").read_text(encoding="utf-8"))
-    assert isinstance(data, dict)
-    return data
+    return _load_candidate(run_a / "candidate.json", keep_info=True)
 
 
 def test_outputs_exist(run_a: Path) -> None:
@@ -158,7 +167,7 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
     assert candidate["schema"] == "quantor.cad_mep.candidate.v1"
     prov = candidate["provenance"]
     assert isinstance(prov, dict)
-    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v4"
+    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v5"
     assert prov["pdf_sha256"] == _sha(inputs["pdf"])
     assert prov["view_dxf_sha256"] == _sha(inputs["dxf"])
     params = load_params(None)
@@ -181,7 +190,11 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
         "source": "derived",
         "evidence": "стр. 1 +47,600 → стр. 2 +50,900",
     }
-    assert candidate["issues"] == []
+    # единственное замечание — справка: шахты ОВ шкафом не используются; route_* нет
+    issues = candidate["issues"]
+    assert isinstance(issues, list)
+    assert [i["code"] for i in issues] == ["heat_ov_shafts_unused"]
+    assert checks_topology_ok(candidate)
     assert isinstance(candidate["assumptions"], list) and candidate["assumptions"]
     routes = candidate["routes"]
     assert isinstance(routes, dict)
@@ -207,8 +220,28 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
     assert {(("ОВ",), "mop"), (("ВК",), "mop"), (("ВК",), "apartment"), (("ПК",), "mop")} <= by_key
     # помещения сверены с экспликацией
     rooms = candidate["rooms"]
-    assert isinstance(rooms, list) and len(rooms) == 13
+    assert isinstance(rooms, list) and len(rooms) == 17
     assert all(r["comp"] is not None and abs(r["delta_pct"]) < 10 for r in rooms), rooms
+
+
+def checks_topology_ok(candidate: dict[str, object]) -> bool:
+    checks = candidate["checks"]
+    assert isinstance(checks, dict)
+    topo = checks["route_topology"]
+    return bool(topo["passed"]) and topo["dangling_ends"] == 0 and topo["same_layer_crossings"] == 0
+
+
+def test_candidate_has_route_topology(candidate: dict[str, object]) -> None:
+    topo = candidate["topology"]
+    assert isinstance(topo, dict)
+    assert set(topo) == {"layers", "systems", "totals"}
+    assert set(topo["layers"]) <= set(ROUTE_LAYERS)
+    assert {"lines", "length_m", "ends", "dangling", "same_layer_crossings"} <= set(topo["totals"])
+    for info in topo["layers"].values():
+        assert {"dangling_samples", "crossing_samples", "branch_ends"} <= set(info)
+    checks = candidate["checks"]
+    assert isinstance(checks, dict)
+    assert checks["route_topology"]["dangling_ends"] == topo["totals"]["dangling"]
 
 
 def test_preview_same_frame(run_a: Path, inputs: dict[str, Path]) -> None:
@@ -246,9 +279,7 @@ def test_deterministic(
 
 
 def _candidate_of(out: Path) -> dict[str, object]:
-    data = json.loads((out / "views" / FOLDER / "candidate.json").read_text(encoding="utf-8"))
-    assert isinstance(data, dict)
-    return data
+    return _load_candidate(out / "views" / FOLDER / "candidate.json")
 
 
 def test_elevation_mismatch_is_issue(
@@ -586,7 +617,7 @@ def test_heated_room_criterion_and_completeness(tmp_path: Path) -> None:
 
 def test_niche_open_to_heated_room_needs_no_device(tmp_path: Path) -> None:
     """Ниша без окна в общем помещении с кухней — без прибора, с замечанием; глухая — FAIL."""
-    floor = synth.build_floor()
+    floor = synth.build_floor(wet=False)  # номер 1-1/4 нужен под нишу
     # Кв 1011: ниша в помещении кухни, марка дальше от фасада, чем марка кухни
     floor.labels.append(("1-1/4", 9000.0, 2600.0))
     floor.expl.append(("1-1/4", "Кухня-ниша", 3.0))
@@ -599,7 +630,8 @@ def test_niche_open_to_heated_room_needs_no_device(tmp_path: Path) -> None:
     assert isinstance(issues, list)
     by_code: dict[str, list[str]] = {}
     for i in issues:
-        by_code.setdefault(i["code"], []).append(i["message"])
+        if i["code"] != "collector_fallback_entry":  # без санузлов коллектор у входа
+            by_code.setdefault(i["code"], []).append(i["message"])
     assert sorted(by_code) == ["heated_room_without_device", "room_heated_by_adjacent"]
     assert by_code["room_heated_by_adjacent"] == [
         "Кв 1011: 1-1/4 Кухня-ниша — своего остекления нет, открыта в 1-1/3: прибор не "
@@ -662,3 +694,45 @@ def test_aup_low_coverage_is_reported(inputs: dict[str, Path], tmp_path: Path) -
     assert isinstance(checks, dict)
     assert checks["aup_coverage"]["passed"] is False
     assert [r["covered_share"] for r in checks["aup_coverage"]["rooms"]] == [0.0]
+
+
+def test_collector_in_wet_room(candidate: dict[str, object]) -> None:
+    """Коллектор — в санузле по экспликации (1-k/4), замечаний о запасном правиле нет."""
+    apts = candidate["apartments"]
+    assert isinstance(apts, list)
+    for a in apts:
+        k = a["number"][-1]
+        assert a["heat"]["collector_room"] == f"1-{k}/4", a["number"]
+    issues = candidate["issues"]
+    assert isinstance(issues, list)
+    assert "collector_fallback_entry" not in [i["code"] for i in issues]
+
+
+def test_collector_falls_back_to_entry_without_wet_room(tmp_path: Path) -> None:
+    """Без санузла в экспликации коллектор у входа с замечанием, топология чистая."""
+    data = _variant(tmp_path, synth.build_floor(wet=False))
+    raw_apts, raw_issues = data["apartments"], data["issues"]
+    assert isinstance(raw_apts, list) and isinstance(raw_issues, list)
+    assert all(a["heat"]["collector_room"] is None for a in raw_apts)
+    codes = [i["code"] for i in raw_issues]
+    assert codes.count("collector_fallback_entry") == 4
+    assert not [c for c in codes if c.startswith("route_")]
+    assert checks_topology_ok(data)
+
+
+def test_heating_source_ov_shafts_keeps_stems_in_ov_shafts(
+    inputs: dict[str, Path], tmp_path: Path
+) -> None:
+    """heating_source = ov_shafts: стояки в шахтах ОВ (как v4), справки про неиспользуемые нет."""
+    raw = json.loads((ROOT / "params" / "v1.json").read_text(encoding="utf-8"))
+    raw["heating_source"]["value"] = "ov_shafts"
+    params = tmp_path / "params.json"
+    params.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    proc = _run(inputs, tmp_path / "out", params=params)
+    assert proc.returncode == 0, proc.stderr
+    data = _candidate_of(tmp_path / "out")
+    apts, issues = data["apartments"], data["issues"]
+    assert isinstance(apts, list) and isinstance(issues, list)
+    assert {a["heat"]["shaft"] for a in apts} == {"S00", "S02"}
+    assert issues == []
+    assert checks_topology_ok(data)

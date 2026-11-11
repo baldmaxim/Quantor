@@ -6,7 +6,7 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from cad_mep.checks import lengths_by_layer, lengths_by_system
+from cad_mep.checks import lengths_by_layer, lengths_by_system, topology_check
 from cad_mep.elevations import Value
 from cad_mep.frame import Frame, TieStats
 from cad_mep.heatdev import HEATED_BY_ADJACENT
@@ -60,6 +60,7 @@ def build_candidate(
     crossings: dict[str, dict[str, object]],
     dxf_info: dict[str, int],
     beams: JsonObj,
+    topology: JsonObj,
 ) -> JsonObj:
     dx, dy = frame.x0, frame.y0
 
@@ -164,6 +165,8 @@ def build_candidate(
                     "path_shaft_to_collector_m": info.get("heat_path_to_collector_m"),
                     # лучи — дерево от коллектора: длина осей дерева в плане
                     "beams_plan_m": info.get("heat_beams_m"),
+                    "jumpers_plan_m": info.get("heat_jumpers_m"),
+                    "collector_room": info.get("collector_room"),
                     "heated_rooms": len(heat_rooms.get(ap.idx, [])),
                     "rooms_with_devices": sum(
                         1 for r in heat_rooms.get(ap.idx, []) if r["devices"]
@@ -263,6 +266,7 @@ def build_candidate(
             "heated_rooms_without_device": list(no_device),
         },
         "heat_beams_are_trees": beams,
+        "route_topology": topology_check(topology),
         "aup_coverage": {
             "passed": bool(cover_rows)
             and all(float(str(r["covered_share"])) >= cover_min for r in cover_rows),
@@ -324,6 +328,7 @@ def build_candidate(
         "issues": [
             {"code": i.code, "message": i.message, "apartment": i.apartment} for i in res.issues
         ],
+        "topology": topology,
         "checks": checks,
     }
 
