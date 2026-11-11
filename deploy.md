@@ -40,6 +40,22 @@
    строка `готово: <sha>`, выпуск записывается в `RELEASE`. Иначе — `ВЫКЛАДКА НЕ ЧИСТАЯ`,
    `RELEASE` не меняется.
 
+## Деплой без GitHub Actions
+
+Если `publish.yml` не запускается (startup_failure, очередь не двигается), образы собираются на своей
+машине и уезжают на сервер по ssh, реестр не нужен:
+
+```bash
+deploy/ship-local.sh                 # origin/main
+deploy/ship-local.sh <git-ref>       # конкретный коммит; --build-only — только собрать
+```
+
+Скрипт берёт чистые `git worktree` Quantor и CAD_engine (по `pins.json`, сверка sha256), собирает
+api/web/admin/cad-worker как `publish.yml`, передаёт их `docker save | ssh docker load`, кладёт на
+сервер `update.sh` из образа и запускает его с `SKIP_PULL=1`. Нужны docker, jq и клон CAD_engine рядом
+с Quantor (`CAD_ENGINE_REPO`). Образов такой сборки в GHCR нет; коммиты раньше появления `SKIP_PULL`
+этим путём не выкатываются. Собирать на сервере нельзя: 2 vCPU / 4 ГБ и соседи.
+
 ## CAD-исполнитель (PDF → DXF, ADR-0036)
 
 Сервис `cad-worker` (образ `quantor-cad-worker`) берёт только задания `cad_pdf_convert`, по одному.

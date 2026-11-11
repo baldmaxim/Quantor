@@ -25,7 +25,12 @@ COMPOSE=(docker compose -p quantor)
 
 echo "→ выкатывается ${TAG}"
 # Именно pull: `up -d` не перекачивает образ, если тег уже есть на диске.
-"${COMPOSE[@]}" pull minio api worker cad-worker web admin
+# SKIP_PULL=1 — образы уже загружены по ssh (deploy/ship-local.sh), реестр не нужен.
+if [ "${SKIP_PULL:-0}" = 1 ]; then
+  echo "   pull пропущен (SKIP_PULL=1): образы загружены на сервер"
+else
+  "${COMPOSE[@]}" pull minio api worker cad-worker web admin
+fi
 
 echo -n "→ описание развёртывания: "
 tmp_compose="$(mktemp)"
