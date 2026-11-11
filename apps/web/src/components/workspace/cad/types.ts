@@ -12,6 +12,7 @@ import type {
   CadZoneRead,
 } from '@quantor/api-client';
 
+import type { ICadZoneLayers } from '@/components/cad/viewer/CadZoneLayers';
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { IConstructionIndex } from '@/lib/cad/constructions';
 import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
@@ -209,6 +210,8 @@ export interface IWorkspaceCadLayers {
     readonly visible: boolean;
     readonly onVisibleChange: (visible: boolean) => void;
   } | null;
+  /** Блок «Зоны» (цвет, скрытие по типам, подписи); `null` или нет - на листе зон нет. */
+  readonly zones?: ICadZoneLayers | null;
 }
 
 /** Выбранное route-задание: то, что нужно блоку «Принять трассы». */

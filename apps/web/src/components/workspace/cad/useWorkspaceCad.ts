@@ -420,6 +420,7 @@ export const useWorkspaceCad = ({
     onRegionsVisibleChange: setCadRegionsVisible,
     regionsAvailable: overlayVisible,
     constructions: constructionsState.layers,
+    zones: zonesState.layers,
   };
 
   const side: IWorkspaceCadSideProps = {

@@ -13,10 +13,18 @@ import { beginLayerPaint, boundsIntersectAny, visibleRects } from '@/lib/viewer/
 import type { PixelRect } from '@/lib/viewer/layer-paint';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 
+import { ZONE_CATEGORIES, zoneCategory, type ZoneCategory } from './zone-categories';
+import { doorLabelFits, fitRoomLabel, LABEL_LINE_HEIGHT, roomLabelLines } from './zone-labels';
+import { apartmentColorIndex, APARTMENT_PALETTE_SIZE, type IZoneView } from './zone-view';
 import { zoneCanvasLabel, zoneCentroid, type ZoneKind } from './zones';
 
 export interface IZoneColors {
+  /** Цвет черновика помещения квартиры при разметке. */
   readonly apartment: string;
+  /** Цвет по категории помещения (режим «по типу»). */
+  readonly categories: Readonly<Record<ZoneCategory, string>>;
+  /** Палитра квартир (режим «по квартирам»). */
+  readonly apartments: readonly string[];
   readonly mop: string;
   readonly door: string;
   /** Подложка подписи (бумага листа). */
@@ -28,8 +36,10 @@ export interface IZoneColors {
 export interface IZonePaintData {
   readonly zones: readonly CadZoneRead[];
   readonly colors: IZoneColors;
-  /** Выделенная зона: рисуется толще. */
+  /** Выделенная зона: рисуется толще и не скрывается. */
   readonly activeId: string | null;
+  /** Окраска, скрытые категории и подписи. */
+  readonly view: IZoneView;
 }
 
 const LINE_WIDTH = 2;
@@ -37,7 +47,7 @@ const ACTIVE_LINE_WIDTH = 4;
 const FILL_ALPHA = 0.18;
 const ACTIVE_FILL_ALPHA = 0.3;
 const TICK = 6;
-const FONT = '600 12px system-ui, sans-serif';
+const FONT = '600 11px system-ui, sans-serif';
 /** Запас отсечения на толщину штриха и подпись. */
 const MARGIN = 80;
 
@@ -46,6 +56,10 @@ export const readZoneColors = (): IZoneColors => {
   if (typeof window === 'undefined') {
     return {
       apartment: 'CanvasText',
+      categories: Object.fromEntries(
+        ZONE_CATEGORIES.map((category) => [category, 'CanvasText']),
+      ) as Record<ZoneCategory, string>,
+      apartments: Array.from({ length: APARTMENT_PALETTE_SIZE }, () => 'CanvasText'),
       mop: 'CanvasText',
       door: 'CanvasText',
       paper: 'Canvas',
@@ -54,8 +68,15 @@ export const readZoneColors = (): IZoneColors => {
   }
   const style = getComputedStyle(document.documentElement);
   const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
+  const categories = Object.fromEntries(
+    ZONE_CATEGORIES.map((category) => [category, token(`--cad-zone-${category}`, 'CanvasText')]),
+  ) as Record<ZoneCategory, string>;
   return {
     apartment: token('--cad-zone-apartment', 'CanvasText'),
+    categories,
+    apartments: Array.from({ length: APARTMENT_PALETTE_SIZE }, (_, index) =>
+      token(`--cad-zone-apt-${index + 1}`, 'CanvasText'),
+    ),
     mop: token('--cad-zone-mop', 'CanvasText'),
     door: token('--cad-zone-door', 'CanvasText'),
     paper: token('--canvas', 'Canvas'),
@@ -126,26 +147,54 @@ const traceRoom = (context: CanvasRenderingContext2D, screen: readonly ScreenPoi
   context.closePath();
 };
 
-const drawLabel = (
+const measureWith = (context: CanvasRenderingContext2D) => (text: string) => {
+  context.font = FONT;
+  return context.measureText(text).width;
+};
+
+/** Строки подписи по центру `at`, с подложкой цвета бумаги. */
+const drawLabelLines = (
   context: CanvasRenderingContext2D,
-  text: string,
+  lines: readonly string[],
   at: ScreenPoint,
   colors: IZoneColors,
 ) => {
-  if (text === '') return;
   context.font = FONT;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.lineJoin = 'round';
   context.lineWidth = 3;
-  context.strokeStyle = colors.paper;
-  context.strokeText(text, at.x, at.y);
-  context.fillStyle = colors.ink;
-  context.fillText(text, at.x, at.y);
+  lines.forEach((line, index) => {
+    const y = at.y + (index - (lines.length - 1) / 2) * LABEL_LINE_HEIGHT;
+    context.strokeStyle = colors.paper;
+    context.strokeText(line, at.x, y);
+    context.fillStyle = colors.ink;
+    context.fillText(line, at.x, y);
+  });
 };
 
-const drawRoom = (context: CanvasRenderingContext2D, shape: IShape, data: IZonePaintData) => {
-  const color = zoneColor(data.colors, shape.zone.kind);
+/** Цвет помещения: по квартире или по категории; МОП и дверь - свои цвета в обоих режимах. */
+const roomColor = (
+  zone: CadZoneRead,
+  data: IZonePaintData,
+  apartments: ReadonlyMap<string, number>,
+): string => {
+  const { colors, view } = data;
+  if (zone.kind === 'room_mop') return colors.mop;
+  if (view.colorMode === 'apartment' && zone.apartment_no !== null) {
+    const index = apartments.get(zone.apartment_no);
+    if (index !== undefined) return colors.apartments[index] ?? colors.categories.other;
+  }
+  return colors.categories[zoneCategory(zone)];
+};
+
+const drawRoom = (
+  context: CanvasRenderingContext2D,
+  shape: IShape,
+  data: IZonePaintData,
+  apartments: ReadonlyMap<string, number>,
+) => {
+  const color = roomColor(shape.zone, data, apartments);
   const active = shape.zone.id === data.activeId;
   traceRoom(context, shape.screen);
   context.globalAlpha = active ? ACTIVE_FILL_ALPHA : FILL_ALPHA;
@@ -156,7 +205,13 @@ const drawRoom = (context: CanvasRenderingContext2D, shape: IShape, data: IZoneP
   context.lineWidth = active ? ACTIVE_LINE_WIDTH : LINE_WIDTH;
   context.lineJoin = 'round';
   context.stroke();
-  drawLabel(context, zoneCanvasLabel(shape.zone), shape.center, data.colors);
+  if (!data.view.labelsOn) return;
+  const lines = fitRoomLabel(
+    roomLabelLines(shape.zone, data.view.labels),
+    { width: shape.maxX - shape.minX, height: shape.maxY - shape.minY },
+    measureWith(context),
+  );
+  if (lines.length > 0) drawLabelLines(context, lines, shape.center, data.colors);
 };
 
 const drawDoor = (context: CanvasRenderingContext2D, shape: IShape, data: IZonePaintData) => {
@@ -184,12 +239,15 @@ const drawDoor = (context: CanvasRenderingContext2D, shape: IShape, data: IZoneP
     context.lineTo(end.x + nx, end.y + ny);
   }
   context.stroke();
-  drawLabel(
-    context,
-    zoneCanvasLabel(shape.zone),
-    { x: (first.x + second.x) / 2 + nx * 2, y: (second.y + first.y) / 2 + ny * 2 },
-    data.colors,
-  );
+  const text = zoneCanvasLabel(shape.zone);
+  if (data.view.labelsOn && doorLabelFits(text, length, measureWith(context))) {
+    drawLabelLines(
+      context,
+      [text],
+      { x: (first.x + second.x) / 2 + nx * 2, y: (second.y + first.y) / 2 + ny * 2 },
+      data.colors,
+    );
+  }
 };
 
 /**
@@ -199,26 +257,33 @@ const drawDoor = (context: CanvasRenderingContext2D, shape: IShape, data: IZoneP
 export const createZonesPainter = (
   data: IZonePaintData,
   options: { readonly clear: boolean },
-): LayerPainter => ({
-  paint: (context, placement, ratio, area) => {
-    const rects = options.clear
-      ? beginLayerPaint(context, ratio, area, MARGIN)
-      : beginOverPaint(context, ratio, area);
-    // Выделенная зона - последней, чтобы контур не прятался под соседними.
-    const ordered = [...data.zones].sort(
-      (first, second) => Number(first.id === data.activeId) - Number(second.id === data.activeId),
-    );
-    for (const zone of ordered) {
-      const shape = shapeOf(zone, placement);
-      if (!hits(shape, rects)) continue;
-      if (zone.kind === 'door') drawDoor(context, shape, data);
-      else drawRoom(context, shape, data);
-    }
-    context.restore();
-  },
+): LayerPainter => {
+  const apartments = apartmentColorIndex(data.zones);
+  // Скрытая категория не рисуется и не держит слой; выделенная зона видна всегда.
+  const shown = data.zones.filter(
+    (zone) => zone.id === data.activeId || !data.view.hidden.has(zoneCategory(zone)),
+  );
+  return {
+    paint: (context, placement, ratio, area) => {
+      const rects = options.clear
+        ? beginLayerPaint(context, ratio, area, MARGIN)
+        : beginOverPaint(context, ratio, area);
+      // Выделенная зона - последней, чтобы контур не прятался под соседними.
+      const ordered = [...shown].sort(
+        (first, second) => Number(first.id === data.activeId) - Number(second.id === data.activeId),
+      );
+      for (const zone of ordered) {
+        const shape = shapeOf(zone, placement);
+        if (!hits(shape, rects)) continue;
+        if (zone.kind === 'door') drawDoor(context, shape, data);
+        else drawRoom(context, shape, data, apartments);
+      }
+      context.restore();
+    },
 
-  touches: (placement, ratio, area) => {
-    const rects = visibleRects(area, ratio, MARGIN);
-    return data.zones.some((zone) => hits(shapeOf(zone, placement), rects));
-  },
-});
+    touches: (placement, ratio, area) => {
+      const rects = visibleRects(area, ratio, MARGIN);
+      return shown.some((zone) => hits(shapeOf(zone, placement), rects));
+    },
+  };
+};

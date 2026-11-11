@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from 'react';
 
+import type { ICadZoneLayers } from '@/components/cad/viewer/CadZoneLayers';
 import { cadErrorText } from '@/lib/cad/errors';
+import { presentZoneCategories } from '@/lib/cad/zone-categories';
 import { readStoredNumber, writeStoredNumber } from '@/lib/cad/useStoredNumber';
 import {
   DEFAULT_DOOR_HEIGHT_MM,
@@ -22,6 +24,7 @@ import { useTheme } from '@/lib/theme';
 import type { Camera } from '@/lib/viewer/camera';
 
 import type { IWorkspaceCadZones } from './types';
+import { useZoneView } from './useZoneView';
 
 const DOOR_HEIGHT_KEY = 'quantor.cad.zone-door-height';
 const NO_ZONES: IWorkspaceCadZones['zones'] = [];
@@ -45,6 +48,8 @@ export interface IWorkspaceCadZonesState {
   readonly zones: IWorkspaceCadZones;
   /** Зоны листа и выделенная для рисовальщика слоя; `null` - рисовать нечего. */
   readonly paintData: IZonePaintData | null;
+  /** Блок «Зоны» панели «Слои»; `null` - на листе зон нет. */
+  readonly layers: ICadZoneLayers | null;
   /** Данные слоя захвата; `null` - режим рисования выключен. */
   readonly capture: {
     camera: Camera;
@@ -121,9 +126,27 @@ export const useWorkspaceCadZones = ({
   const selected =
     activeId !== null && zoneList.some((zone) => zone.id === activeId) ? activeId : null;
 
+  const zoneView = useZoneView();
   const paintData = useMemo<IZonePaintData | null>(
-    () => (active && zoneList.length > 0 ? { zones: zoneList, colors, activeId: selected } : null),
-    [active, zoneList, colors, selected],
+    () =>
+      active && zoneList.length > 0
+        ? { zones: zoneList, colors, activeId: selected, view: zoneView.view }
+        : null,
+    [active, zoneList, colors, selected, zoneView.view],
+  );
+  const layers = useMemo<ICadZoneLayers | null>(
+    () =>
+      zoneList.length > 0
+        ? {
+            categories: presentZoneCategories(zoneList),
+            view: zoneView.view,
+            onSetHidden: zoneView.onSetHidden,
+            onColorModeChange: zoneView.onColorModeChange,
+            onLabelsOnChange: zoneView.onLabelsOnChange,
+            onLabelChange: zoneView.onLabelChange,
+          }
+        : null,
+    [zoneList, zoneView],
   );
 
   const onComplete = (points: [number, number][]) => {
@@ -196,6 +219,7 @@ export const useWorkspaceCadZones = ({
   return {
     zones,
     paintData,
+    layers,
     capture:
       drawingOn && pageSize !== null
         ? {

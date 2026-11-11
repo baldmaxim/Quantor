@@ -8,6 +8,7 @@ import { formatInt } from '@/lib/cad/view-format';
 import { MAX_PDF_OPACITY, MIN_PDF_OPACITY } from '@/lib/cad/view-mode';
 
 import { CadLayerGroup } from './CadLayerGroup';
+import { CadZoneLayers, type ICadZoneLayers } from './CadZoneLayers';
 
 interface ICadLayersPanelProps {
   /** Слои DXF; пусто - блока слоёв нет. */
@@ -39,6 +40,8 @@ interface ICadLayersPanelProps {
     visible: boolean;
     onVisibleChange: (visible: boolean) => void;
   } | null;
+  /** Зоны листа (цвет по типу, скрытие, подписи); нет - блока нет. */
+  zones?: ICadZoneLayers | null;
   /** Трассы механики выбранного route-задания; нет - группы нет. */
   mep?: {
     /** Имена слоёв DXF трасс. */
@@ -74,6 +77,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   onRegionsVisibleChange,
   regionsAvailable,
   constructions = null,
+  zones = null,
   mep = null,
 }) => {
   const groups = useMemo(() => groupLayers(layers), [layers]);
@@ -167,6 +171,8 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
           </div>
         </fieldset>
       )}
+
+      {zones && zones.categories.length > 0 && <CadZoneLayers {...zones} />}
 
       {mep && (
         <fieldset className="min-w-0 border-0 p-0" data-testid="mep-layers">
