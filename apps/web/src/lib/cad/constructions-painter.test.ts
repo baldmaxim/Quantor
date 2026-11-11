@@ -32,7 +32,7 @@ const recording = () => {
   return { context, calls };
 };
 
-const data = (selected: string[] = []): IConstructionPaintData => ({
+const data = (selected: string[] = [], showAll = true): IConstructionPaintData => ({
   shapes: buildShapes(
     [
       construction({ id: 'm' }),
@@ -48,6 +48,7 @@ const data = (selected: string[] = []): IConstructionPaintData => ({
   ),
   colors: COLORS,
   selected: new Set(selected),
+  showAll,
 });
 
 describe('рисовальщик конструкций', () => {
@@ -91,6 +92,42 @@ describe('рисовальщик конструкций', () => {
     expect(calls.some((call) => call.name === 'fill')).toBe(false);
     expect(painter.touches(PLACEMENT, 1, strip)).toBe(false);
     expect(painter.touches(PLACEMENT, 1, [{ x: 100, y: 480, width: 100, height: 40 }])).toBe(true);
+  });
+});
+
+describe('показ только выбранных (showAll = false)', () => {
+  it('невыбранные не рисуются: без выбора нет ни заливки, ни обводки, touches ложен', () => {
+    const { context, calls } = recording();
+    const painter = createConstructionsPainter(data([], false), { clear: true });
+    painter.paint(context, PLACEMENT, 1, null);
+    expect(calls.some((call) => call.name === 'fill' || call.name === 'stroke')).toBe(false);
+    expect(painter.touches(PLACEMENT, 1, [{ x: 0, y: 0, width: 1000, height: 1000 }])).toBe(false);
+  });
+
+  it('выбранная рисуется со стилем выбора, остальные - нет', () => {
+    const { context, calls } = recording();
+    const painter = createConstructionsPainter(data(['m'], false), { clear: true });
+    painter.paint(context, PLACEMENT, 1, null);
+    const fills = calls.filter((call) => call.name === 'fill');
+    expect(fills).toHaveLength(1);
+    expect(fills[0]?.fill).toBe('brown');
+    expect(fills[0]?.alpha).toBe(0.45);
+    const strokes = calls.filter((call) => call.name === 'stroke');
+    expect(strokes).toHaveLength(1);
+    expect(strokes[0]?.stroke).toBe('blue');
+    expect(painter.touches(PLACEMENT, 1, [{ x: 100, y: 480, width: 100, height: 40 }])).toBe(true);
+  });
+
+  it('«не в ВОР» при showAll = false не рисуется даже у выбранной', () => {
+    const { context, calls } = recording();
+    createConstructionsPainter({ ...data(['m'], false), notInVor: new Set(['m']) }, { clear: true }).paint(
+      context,
+      PLACEMENT,
+      1,
+      null,
+    );
+    expect(calls.some((call) => call.stroke === 'red')).toBe(false);
+    expect(calls.some((call) => call.name === 'clip')).toBe(false);
   });
 });
 

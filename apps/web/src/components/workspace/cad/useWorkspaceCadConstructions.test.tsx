@@ -84,7 +84,8 @@ describe('useWorkspaceCadConstructions', () => {
     await waitFor(() => expect(result.current.side?.status).toBe('ready'));
     expect(result.current.paintData?.shapes.map((shape) => shape.id)).toEqual(['a', 'b', 'o']);
     expect(result.current.picker).not.toBeNull();
-    expect(result.current.layers?.visible).toBe(true);
+    expect(result.current.paintData?.showAll).toBe(false);
+    expect(result.current.layers?.visible).toBe(false);
     expect(mocks.read.mock.calls[0]?.[0]).toMatchObject({
       path: { project_id: 'p1', job_id: 'j1', page_index: 0, view: 1 },
     });
@@ -161,13 +162,29 @@ describe('useWorkspaceCadConstructions', () => {
     expect(result.current.side?.activeGroup).toBeNull();
   });
 
-  it('слой выключен, вкладка закрыта или идёт другое рисование: нет ни слоя, ни выбора', async () => {
+  it('галка слоя меняет только полный показ: выбор и данные отрисовки остаются', async () => {
+    const { result } = mount();
+    await waitFor(() => expect(result.current.picker).not.toBeNull());
+    expect(result.current.paintData?.showAll).toBe(false);
+    act(() => result.current.layers?.onVisibleChange(true));
+    expect(result.current.paintData?.showAll).toBe(true);
+    expect(result.current.picker).not.toBeNull();
+    act(() => result.current.layers?.onVisibleChange(false));
+    expect(result.current.paintData?.showAll).toBe(false);
+    expect(result.current.picker).not.toBeNull();
+  });
+
+  it('выбор группы из свода попадает в selected при выключенном полном показе', async () => {
+    const { result } = mount();
+    await waitFor(() => expect(result.current.side?.status).toBe('ready'));
+    act(() => result.current.side?.onSelectGroup('g', ['a', 'b']));
+    expect(result.current.paintData?.showAll).toBe(false);
+    expect([...(result.current.paintData?.selected ?? [])]).toEqual(['a', 'b']);
+  });
+
+  it('вкладка закрыта или идёт другое рисование: нет ни слоя, ни выбора', async () => {
     const { result, rerender } = mount();
     await waitFor(() => expect(result.current.picker).not.toBeNull());
-    act(() => result.current.layers?.onVisibleChange(false));
-    expect(result.current.paintData).toBeNull();
-    expect(result.current.picker).toBeNull();
-    act(() => result.current.layers?.onVisibleChange(true));
     rerender(input({ blocked: true }));
     expect(result.current.picker).toBeNull();
     expect(result.current.paintData).not.toBeNull();

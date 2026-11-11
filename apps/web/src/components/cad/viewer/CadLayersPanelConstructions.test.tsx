@@ -26,11 +26,11 @@ const mount = (constructions: { visible: boolean; onVisibleChange: (value: boole
     />,
   );
 
-describe('CadLayersPanel: переключатель «Конструкции»', () => {
+describe('CadLayersPanel: переключатель «Контуры всех конструкций»', () => {
   it('галка отражает видимость и переключает слой', () => {
     const onVisibleChange = vi.fn();
     mount({ visible: true, onVisibleChange });
-    const box = screen.getByRole('checkbox', { name: 'Конструкции' });
+    const box = screen.getByRole('checkbox', { name: 'Контуры всех конструкций' });
     expect(box).toBeChecked();
     fireEvent.click(box);
     expect(onVisibleChange).toHaveBeenCalledWith(false);
@@ -38,6 +38,6 @@ describe('CadLayersPanel: переключатель «Конструкции»'
 
   it('конструкций нет - переключателя нет', () => {
     mount(null);
-    expect(screen.queryByRole('checkbox', { name: 'Конструкции' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: 'Контуры всех конструкций' })).toBeNull();
   });
 });

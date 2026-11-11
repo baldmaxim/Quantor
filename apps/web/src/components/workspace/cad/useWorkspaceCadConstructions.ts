@@ -56,7 +56,7 @@ interface IInput {
 
 export interface IWorkspaceCadConstructionsState {
   readonly side: IWorkspaceCadConstructions | null;
-  /** Слой «Конструкции» панели слоёв; `null` - конструкций на листе нет. */
+  /** Галка «Контуры всех конструкций» панели слоёв (полный показ); `null` - конструкций на листе нет. */
   readonly layers: { visible: boolean; onVisibleChange: (visible: boolean) => void } | null;
   /** Данные рисовальщика; `null` - рисовать нечего. */
   readonly paintData: IConstructionPaintData | null;
@@ -93,7 +93,7 @@ export const useWorkspaceCadConstructions = ({
     return readConstructionColors();
   }, [theme]);
 
-  const [visible, setVisible] = useStoredBoolean(CAD_CONSTRUCTIONS_VISIBLE_KEY, true);
+  const [visible, setVisible] = useStoredBoolean(CAD_CONSTRUCTIONS_VISIBLE_KEY, false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(NO_IDS);
   const [groupKey, setGroupKey] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -138,8 +138,8 @@ export const useWorkspaceCadConstructions = ({
 
   const paintData = useMemo<IConstructionPaintData | null>(
     () =>
-      active && visible && shapes.length > 0
-        ? { shapes, colors, selected: live, notInVor: vor.notInVor }
+      active && shapes.length > 0
+        ? { shapes, colors, selected: live, showAll: visible, notInVor: vor.notInVor }
         : null,
     [active, visible, shapes, colors, live, vor.notInVor],
   );
@@ -183,7 +183,7 @@ export const useWorkspaceCadConstructions = ({
       : null;
 
   const picker: IWorkspaceCadConstructionPicker | null =
-    active && visible && !blocked && pageSize !== null && shapes.length > 0
+    active && !blocked && pageSize !== null && shapes.length > 0
       ? {
           camera,
           page: pageSize,

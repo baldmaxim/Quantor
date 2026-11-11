@@ -35,7 +35,7 @@ interface ICadLayersPanelProps {
   onRegionsVisibleChange: (visible: boolean) => void;
   /** Слой распознавания включён на панели инструментов; нет - флажок недоступен. */
   regionsAvailable: boolean;
-  /** Слой «Конструкции» (кладка и монолит листа); нет - переключателя нет. */
+  /** Полный показ контуров конструкций (без него - только выбранные); нет - переключателя нет. */
   constructions?: {
     visible: boolean;
     onVisibleChange: (visible: boolean) => void;
@@ -111,9 +111,9 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
               onChange={(event) => constructions.onVisibleChange(event.target.checked)}
               className="size-5 shrink-0"
             />
-            Конструкции
+            Контуры всех конструкций
           </label>
-          <p className="text-xs text-muted">Кладка и монолит с величинами поверх чертежа</p>
+          <p className="text-xs text-muted">Без галки рисуются только выбранные конструкции</p>
         </div>
       )}
 

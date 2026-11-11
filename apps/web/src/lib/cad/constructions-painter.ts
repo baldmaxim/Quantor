@@ -28,7 +28,15 @@ export interface IConstructionPaintData {
   readonly shapes: readonly IConstructionShape[];
   readonly colors: IConstructionColors;
   readonly selected: ReadonlySet<string>;
-  /** Конструкции «не в ВОР»; не задано - ВОР не загружен или подсветка выключена, ничего не рисуется. */
+  /**
+   * Полный показ (галка «Контуры всех конструкций»). `false` - рисуются только выбранные: кладка,
+   * монолит и зоны уже видны слоями DXF, обводки не дублируются.
+   */
+  readonly showAll: boolean;
+  /**
+   * Конструкции «не в ВОР»; не задано - ВОР не загружен или подсветка выключена, ничего не рисуется.
+   * Рисуются только при полном показе.
+   */
   readonly notInVor?: ReadonlySet<string>;
 }
 
@@ -47,6 +55,10 @@ const HATCH_STEP = 8;
 const HATCH_MAX_LINES = 300;
 /** Запас отсечения на толщину контура. */
 const MARGIN = 8;
+
+/** Конструкции, которые слой рисует: при полном показе все, иначе только выбранные. */
+const drawnShapes = (data: IConstructionPaintData): readonly IConstructionShape[] =>
+  data.showAll ? data.shapes : data.shapes.filter((shape) => data.selected.has(shape.id));
 
 /** Читает цвета из токенов темы. */
 export const readConstructionColors = (): IConstructionColors => {
@@ -226,7 +238,7 @@ export const createConstructionsPainter = (
     const rects = options.clear
       ? beginLayerPaint(context, ratio, area, MARGIN)
       : beginOverPaint(context, ratio, area);
-    const visible = data.shapes.filter((shape) => {
+    const visible = drawnShapes(data).filter((shape) => {
       const box = screenBox(shape, placement);
       return boundsIntersectAny(box.minX, box.minY, box.maxX, box.maxY, rects);
     });
@@ -235,7 +247,10 @@ export const createConstructionsPainter = (
       ...visible.filter((shape) => !data.selected.has(shape.id)),
       ...visible.filter((shape) => data.selected.has(shape.id)),
     ];
-    const hatchView = data.notInVor && data.notInVor.size > 0 && rects.length > 0 ? boundsOfRects(rects) : null;
+    const hatchView =
+      data.showAll && data.notInVor && data.notInVor.size > 0 && rects.length > 0
+        ? boundsOfRects(rects)
+        : null;
     for (const shape of ordered) {
       drawShape(context, shape, placement, data);
       if (hatchView && data.notInVor?.has(shape.id)) {
@@ -247,7 +262,7 @@ export const createConstructionsPainter = (
 
   touches: (placement, ratio, area) => {
     const rects = visibleRects(area, ratio, MARGIN);
-    return data.shapes.some((shape) => {
+    return drawnShapes(data).some((shape) => {
       const box = screenBox(shape, placement);
       return boundsIntersectAny(box.minX, box.minY, box.maxX, box.maxY, rects);
     });

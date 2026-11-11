@@ -18,8 +18,11 @@ import { GridIndex, type NormalizedBounds } from '@/lib/viewer/spatial-index';
 import { cadToNormalized, type ICadFrame, type IPageSize } from './frame';
 import type { ConstructionKind, ConstructionStatus } from './construction-labels';
 
-/** Ключ localStorage: показывать ли слой «Конструкции» на вкладке CAD (по умолчанию - да). */
-export const CAD_CONSTRUCTIONS_VISIBLE_KEY = 'quantor.cad.constructions-visible';
+/**
+ * Ключ localStorage: рисовать ли контуры всех конструкций на вкладке CAD (по умолчанию - нет,
+ * рисуются только выбранные). Ключ сменён (v2), чтобы сохранённое раньше «да» не включало полный показ.
+ */
+export const CAD_CONSTRUCTIONS_VISIBLE_KEY = 'quantor.cad.constructions-visible.v2';
 
 /** Контуры конструкции в нормализованных координатах: внешнее кольцо, затем отверстия. */
 export type Ring = readonly NormalizedPoint[];
