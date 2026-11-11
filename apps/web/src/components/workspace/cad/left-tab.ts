@@ -1,15 +1,16 @@
 import type { LeftTab } from '@/store/workspace';
 
 /**
- * Какая левая вкладка действительно открыта. Выключенный пилот или флаг `cad.export` закрывают
- * свою вкладку: запомненный выбор не открывает возможность, а уступает место листам, при этом
+ * Какая левая вкладка действительно открыта. Выключенный пилот, флаг `cad.export` или показ
+ * распознанных блоков закрывают свою вкладку: запомненный выбор не открывает возможность, а уступает место листам, при этом
  * хранилище не переписывается - включение флага вернёт человека туда, где он был.
  */
 export const resolveLeftTab = (
   tab: LeftTab,
-  access: { readonly takeoff: boolean; readonly cad: boolean },
+  access: { readonly takeoff: boolean; readonly cad: boolean; readonly recognition: boolean },
 ): LeftTab => {
   if (tab === 'takeoff' && !access.takeoff) return 'documents';
+  if (tab === 'recognition' && !access.recognition) return 'documents';
   if (tab === 'cad' && !access.cad) return 'documents';
   return tab;
 };

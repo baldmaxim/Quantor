@@ -15,6 +15,8 @@ import { create } from 'zustand';
  */
 
 export type LeftTab = 'documents' | 'recognition' | 'takeoff' | 'cad';
+/** Левая вкладка режима «Листы»: всё, кроме CAD. */
+export type SheetsTab = Exclude<LeftTab, 'cad'>;
 export type Tool = 'pointer' | 'pan' | 'scale';
 
 const MIN_LEFT = 200;
@@ -26,6 +28,8 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 interface WorkspaceState {
   leftTab: LeftTab;
+  /** Последняя не-CAD вкладка: переключатель «Листы | CAD» возвращает человека на неё. */
+  sheetsTab: SheetsTab;
   leftWidth: number | null;
   rightWidth: number | null;
   leftCollapsed: boolean;
@@ -47,6 +51,7 @@ interface WorkspaceState {
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   leftTab: 'documents',
+  sheetsTab: 'documents',
   // null означает «ширина из токена»: пока пользователь не тянул разделитель,
   // панель должна слушаться дизайн-системы, в том числе на широком мониторе.
   leftWidth: null,
@@ -54,10 +59,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   leftCollapsed: false,
   rightCollapsed: false,
   tool: 'pointer',
-  overlayVisible: true,
+  // Распознанные блоки - второстепенный просмотр: по умолчанию скрыты, включает пользователь.
+  overlayVisible: false,
   hiddenTypes: new Set<string>(),
 
-  setLeftTab: (leftTab) => set({ leftTab }),
+  setLeftTab: (leftTab) => set(leftTab === 'cad' ? { leftTab } : { leftTab, sheetsTab: leftTab }),
   setLeftWidth: (width) => set({ leftWidth: clamp(width, MIN_LEFT, MAX_LEFT) }),
   setRightWidth: (width) => set({ rightWidth: clamp(width, MIN_RIGHT, MAX_RIGHT) }),
   toggleLeft: () => set((state) => ({ leftCollapsed: !state.leftCollapsed })),

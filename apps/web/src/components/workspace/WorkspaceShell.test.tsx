@@ -145,8 +145,8 @@ describe('каркас рабочей области', () => {
       expect(useWorkspaceStore.getState().hiddenTypes.has('stamp')).toBe(false);
     });
 
-    it('слой распознавания включён по умолчанию', () => {
-      expect(useWorkspaceStore.getState().overlayVisible).toBe(true);
+    it('слой распознавания скрыт по умолчанию', () => {
+      expect(useWorkspaceStore.getState().overlayVisible).toBe(false);
     });
   });
 });

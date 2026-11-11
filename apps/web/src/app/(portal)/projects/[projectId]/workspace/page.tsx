@@ -14,6 +14,7 @@ import { CadZoneCapture } from '@/components/cad/viewer/CadZoneCapture';
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
+import { WorkspaceModeSwitch } from '@/components/workspace/WorkspaceModeSwitch';
 import { resolveLeftTab } from '@/components/workspace/cad/left-tab';
 import { CadConstructionPicker } from '@/components/workspace/cad/CadConstructionPicker';
 import { CadFloor3dLazy } from '@/components/workspace/cad/floor3d/CadFloor3dLazy';
@@ -97,14 +98,13 @@ const isReadyDxf = (result: ISheetResult | undefined): boolean =>
 
 const leftTabs = (
   takeoff: ITakeoffAccess,
-  cad: boolean,
+  recognition: boolean,
 ): readonly { id: LeftTab; label: string; enabled: boolean; hint?: string }[] => [
   { id: 'documents', label: 'Листы', enabled: true },
-  { id: 'recognition', label: 'Распознавание', enabled: true },
+  // Распознанные блоки - второстепенный просмотр: вкладка есть, только пока показ блоков включён.
+  ...(recognition ? [{ id: 'recognition' as const, label: 'Распознавание', enabled: true }] : []),
   // Обмер — пилотная возможность: вкладка следует тому же флагу, что и сервер (ADR-0023).
   { id: 'takeoff', label: 'Обмеры', enabled: takeoff.enabled, hint: takeoff.hint },
-  // CAD без флага `cad.export` не показывается вовсе (ADR-0036).
-  ...(cad ? [{ id: 'cad' as const, label: 'CAD', enabled: true }] : []),
 ];
 
 const WorkspacePage = ({ params }: IPageProps) => {
@@ -128,6 +128,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const [cadLeftWide, setCadLeftWide] = useState(false);
   const leftTab = useWorkspaceStore((state) => state.leftTab);
   const setLeftTab = useWorkspaceStore((state) => state.setLeftTab);
+  const sheetsTab = useWorkspaceStore((state) => state.sheetsTab);
   const tool = useWorkspaceStore((state) => state.tool);
   const setTool = useWorkspaceStore((state) => state.setTool);
   const overlayVisible = useWorkspaceStore((state) => state.overlayVisible);
@@ -142,7 +143,11 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const features = useFeatures();
   const takeoff = takeoffAccess(features);
   const cadOn = cadEnabled(features);
-  const activeTab: LeftTab = resolveLeftTab(leftTab, { takeoff: takeoff.enabled, cad: cadOn });
+  const activeTab: LeftTab = resolveLeftTab(leftTab, {
+    takeoff: takeoff.enabled,
+    cad: cadOn,
+    recognition: overlayVisible,
+  });
   const activeTool = tool === 'scale' && !takeoff.enabled ? 'pointer' : tool;
 
   const camera = useMemo(() => new Camera(), []);
@@ -518,6 +523,16 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 </span>
               </div>
 
+              {/* CAD без флага `cad.export` не показывается вовсе (ADR-0036). */}
+              {cadOn && (
+                <div className="flex shrink-0 items-center px-[var(--s-4)]">
+                  <WorkspaceModeSwitch
+                    mode={activeTab === 'cad' ? 'cad' : 'sheets'}
+                    onChange={(mode) => setLeftTab(mode === 'cad' ? 'cad' : sheetsTab)}
+                  />
+                </div>
+              )}
+
               <div className="flex items-center px-[var(--s-5)]">
                 <StatusBadge tone="neutral">Заданий нет</StatusBadge>
               </div>
@@ -597,7 +612,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               <ToolDivider />
 
               <ToolButton
-                label="Слой распознавания"
+                label={overlayVisible ? 'Скрыть распознанные блоки' : 'Показать распознанные блоки'}
                 wide
                 active={overlayVisible}
                 onClick={toggleOverlay}
@@ -692,32 +707,35 @@ const WorkspacePage = ({ params }: IPageProps) => {
           leftSize={activeTab === 'cad' ? (cadLeftWide ? 'wide' : 'narrow') : null}
           left={
             <>
-              <div
-                role="tablist"
-                aria-label="Разделы панели"
-                className="scroll-area flex overflow-x-auto border-b border-border"
-              >
-                {leftTabs(takeoff, cadOn).map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === tab.id}
-                    disabled={!tab.enabled}
-                    title={tab.hint ? `${tab.label} — ${tab.hint}` : tab.label}
-                    onClick={() => tab.enabled && setLeftTab(tab.id)}
-                    className={cx(
-                      'flex-1 border-r border-border px-[var(--s-3)] py-[var(--s-3)] text-xs whitespace-nowrap transition-colors last:border-r-0',
-                      activeTab === tab.id
-                        ? 'text-text shadow-[inset_0_-2px_0_var(--accent)]'
-                        : 'text-muted',
-                      tab.enabled ? 'hover:text-text' : 'cursor-not-allowed opacity-40',
-                    )}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+              {/* В режиме CAD своя полоса подвкладок внутри WorkspaceCadLeft. */}
+              {activeTab !== 'cad' && (
+                <div
+                  role="tablist"
+                  aria-label="Разделы панели"
+                  className="scroll-area flex overflow-x-auto border-b border-border"
+                >
+                  {leftTabs(takeoff, overlayVisible).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === tab.id}
+                      disabled={!tab.enabled}
+                      title={tab.hint ? `${tab.label} — ${tab.hint}` : tab.label}
+                      onClick={() => tab.enabled && setLeftTab(tab.id)}
+                      className={cx(
+                        'flex-1 border-r border-border px-[var(--s-3)] py-[var(--s-3)] text-xs whitespace-nowrap transition-colors last:border-r-0',
+                        activeTab === tab.id
+                          ? 'text-text shadow-[inset_0_-2px_0_var(--accent)]'
+                          : 'text-muted',
+                        tab.enabled ? 'hover:text-text' : 'cursor-not-allowed opacity-40',
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
                 {activeTab === 'documents' && (
@@ -831,7 +849,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
               {cad.capture && <CadRemarkCapture {...cad.capture} />}
               {cad.zoneCapture && <CadZoneCapture {...cad.zoneCapture} />}
               {cad.constructionPicker && (
-                <CadConstructionPicker {...cad.constructionPicker} disabled={activeTool === 'scale'} />
+                <CadConstructionPicker
+                  {...cad.constructionPicker}
+                  disabled={activeTool === 'scale'}
+                />
               )}
               {activeTab === 'cad' && cad.floor3d && (
                 <CadFloor3dLazy
