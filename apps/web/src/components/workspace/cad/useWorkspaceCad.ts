@@ -271,6 +271,8 @@ export const useWorkspaceCad = ({
     pageIndex,
     pageSize,
     camera,
+    preview,
+    frame,
     load: enabled && opened && revisionId !== null,
     active,
     remarksCapturing: remarks.capturing,

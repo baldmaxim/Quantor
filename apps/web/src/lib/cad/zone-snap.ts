@@ -4,8 +4,9 @@
  *
  * Чистая логика без DOM. Расстояния меряются в пикселях экрана: нормализованные доли по x и y
  * неизотропны (лист не квадратный), поэтому разности переводятся в пиксели масштабом листа.
- * Приоритет: вершина > ребро. Индекс строится один раз на смену набора зон, а не на каждое
- * движение указателя.
+ * Дополнительно - углы и грани стен листа (`walls`, см. zone-snap-walls.ts).
+ * Приоритет в радиусе: угол стены > вершина зоны (и своего черновика) > грань стены > ребро зоны.
+ * Индексы строятся один раз на смену набора зон / геометрии, а не на каждое движение указателя.
  */
 
 import type { CadZoneRead } from '@quantor/api-client';
@@ -16,7 +17,7 @@ import { GridIndex } from '@/lib/viewer/spatial-index';
 /** Радиус привязки, пикселей экрана. */
 export const SNAP_RADIUS_PX = 10;
 
-export type SnapKind = 'vertex' | 'edge' | 'ortho' | 'none';
+export type SnapKind = 'corner' | 'vertex' | 'edge' | 'ortho' | 'none';
 
 export interface ISnapResult {
   readonly point: NormalizedPoint;
@@ -49,6 +50,8 @@ export interface ISnapIndex {
 
 export interface ISnapOptions {
   readonly index: ISnapIndex;
+  /** Углы (вершины) и грани (отрезки) стен листа; нет - привязка только к зонам. */
+  readonly walls?: ISnapIndex | null;
   readonly scale: ISnapScale;
   /** Уже поставленные вершины черновика по порядку; последняя - опорная для ortho. */
   readonly placed: readonly NormalizedPoint[];
@@ -109,13 +112,15 @@ const windowAround = (point: NormalizedPoint, scale: ISnapScale, radiusPx: numbe
 const samePoint = (a: NormalizedPoint, b: NormalizedPoint): boolean => a.x === b.x && a.y === b.y;
 
 /**
- * Ближайшая вершина в радиусе: вершины готовых зон и поставленные вершины черновика.
- * Последняя поставленная (и совпадающая с ней вершина зоны) не цель: звено нулевой длины
+ * Ближайшая вершина индекса в радиусе, плюс `extra` (поставленные вершины черновика).
+ * Опорная (последняя поставленная) вершина и совпадающая с ней не цель: звено нулевой длины
  * бессмысленно.
  */
 const nearestVertex = (
   target: NormalizedPoint,
-  { index, scale, placed }: ISnapOptions,
+  index: ISnapIndex | null | undefined,
+  extra: readonly NormalizedPoint[],
+  { scale, placed }: ISnapOptions,
   radiusPx: number,
 ): NormalizedPoint | null => {
   let best: NormalizedPoint | null = null;
@@ -129,20 +134,24 @@ const nearestVertex = (
       best = vertex;
     }
   };
-  for (const at of index.vertexGrid.search(windowAround(target, scale, radiusPx))) {
-    const vertex = index.vertices[at];
-    if (vertex) consider(vertex);
+  if (index) {
+    for (const at of index.vertexGrid.search(windowAround(target, scale, radiusPx))) {
+      const vertex = index.vertices[at];
+      if (vertex) consider(vertex);
+    }
   }
-  placed.slice(0, -1).forEach(consider);
+  extra.forEach(consider);
   return best;
 };
 
-/** Ближайшая к точке точка ребра в радиусе (проекция на отрезок в пикселях). */
+/** Ближайшая к точке точка ребра индекса в радиусе (проекция на отрезок в пикселях). */
 const nearestOnEdge = (
   target: NormalizedPoint,
-  { index, scale }: ISnapOptions,
+  index: ISnapIndex | null | undefined,
+  { scale }: ISnapOptions,
   radiusPx: number,
 ): NormalizedPoint | null => {
+  if (!index) return null;
   let best: NormalizedPoint | null = null;
   let bestDistance = radiusPx;
   for (const at of index.edgeGrid.search(windowAround(target, scale, radiusPx))) {
@@ -173,15 +182,16 @@ const nearestOnEdge = (
   return best;
 };
 
-/** Пересечение оси ortho (через anchor) с ближайшим ребром около точки проекции. */
+/** Пересечение оси ortho (через anchor) с ближайшим ребром индекса около точки проекции. */
 const orthoEdgeCrossing = (
   anchor: NormalizedPoint,
   horizontal: boolean,
   projected: NormalizedPoint,
-  options: ISnapOptions,
+  index: ISnapIndex | null | undefined,
+  { scale }: ISnapOptions,
   radiusPx: number,
 ): NormalizedPoint | null => {
-  const { index, scale } = options;
+  if (!index) return null;
   let best: NormalizedPoint | null = null;
   let bestDistance = radiusPx;
   for (const at of index.edgeGrid.search(windowAround(projected, scale, radiusPx))) {
@@ -206,10 +216,37 @@ const orthoEdgeCrossing = (
   return best;
 };
 
+/** Точечная привязка: угол стены > вершина зоны или черновика. */
+const pointSnap = (
+  target: NormalizedPoint,
+  options: ISnapOptions,
+  radiusPx: number,
+): ISnapResult | null => {
+  const corner = nearestVertex(target, options.walls, [], options, radiusPx);
+  if (corner) return { point: corner, kind: 'corner' };
+  const vertex = nearestVertex(
+    target,
+    options.index,
+    options.placed.slice(0, -1),
+    options,
+    radiusPx,
+  );
+  return vertex ? { point: vertex, kind: 'vertex' } : null;
+};
+
+/** Привязка к рёбрам: грань стены важнее ребра зоны. */
+const edgeSnap = (
+  target: NormalizedPoint,
+  options: ISnapOptions,
+  radiusPx: number,
+): NormalizedPoint | null =>
+  nearestOnEdge(target, options.walls, options, radiusPx) ??
+  nearestOnEdge(target, options.index, options, radiusPx);
+
 /**
  * Точка с учётом привязки. Alt - привязка выключена. Shift при поставленной вершине - ortho:
- * через предыдущую вершину по оси с большим сдвигом на экране; вершина рядом с проекцией
- * важнее, затем пересечение оси с ребром, иначе чистая проекция.
+ * через предыдущую вершину по оси с большим сдвигом на экране; угол или вершина рядом с проекцией
+ * важнее, затем пересечение оси с гранью стены или ребром зоны, иначе чистая проекция.
  */
 export const snapPoint = (raw: NormalizedPoint, options: ISnapOptions): ISnapResult => {
   const { scale, placed, shift, alt } = options;
@@ -221,16 +258,18 @@ export const snapPoint = (raw: NormalizedPoint, options: ISnapOptions): ISnapRes
     const horizontal =
       Math.abs((raw.x - anchor.x) * scale.x) >= Math.abs((raw.y - anchor.y) * scale.y);
     const projected = horizontal ? { x: raw.x, y: anchor.y } : { x: anchor.x, y: raw.y };
-    const vertex = nearestVertex(projected, options, radiusPx);
-    if (vertex) return { point: vertex, kind: 'vertex' };
-    const crossing = orthoEdgeCrossing(anchor, horizontal, projected, options, radiusPx);
+    const hit = pointSnap(projected, options, radiusPx);
+    if (hit) return hit;
+    const crossing =
+      orthoEdgeCrossing(anchor, horizontal, projected, options.walls, options, radiusPx) ??
+      orthoEdgeCrossing(anchor, horizontal, projected, options.index, options, radiusPx);
     if (crossing && !samePoint(crossing, anchor)) return { point: crossing, kind: 'edge' };
     return { point: projected, kind: 'ortho' };
   }
 
-  const vertex = nearestVertex(raw, options, radiusPx);
-  if (vertex) return { point: vertex, kind: 'vertex' };
-  const edge = nearestOnEdge(raw, options, radiusPx);
+  const hit = pointSnap(raw, options, radiusPx);
+  if (hit) return hit;
+  const edge = edgeSnap(raw, options, radiusPx);
   if (edge) return { point: edge, kind: 'edge' };
   return { point: raw, kind: 'none' };
 };

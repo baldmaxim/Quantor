@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CadZoneRead } from '@quantor/api-client';
 
+import { buildSnapIndex, type ISnapIndex } from '@/lib/cad/zone-snap';
 import { Camera } from '@/lib/viewer/camera';
 
 import { CadZoneCapture } from './CadZoneCapture';
@@ -68,7 +69,11 @@ describe('CadZoneCapture', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  const mount = (kind: 'room_apartment' | 'door', zones: readonly CadZoneRead[] = []) => {
+  const mount = (
+    kind: 'room_apartment' | 'door',
+    zones: readonly CadZoneRead[] = [],
+    walls: ISnapIndex | null = null,
+  ) => {
     const camera = new Camera();
     const onComplete = vi.fn();
     const onExit = vi.fn();
@@ -78,6 +83,7 @@ describe('CadZoneCapture', () => {
         page={PAGE}
         kind={kind}
         zones={zones}
+        walls={walls}
         onComplete={onComplete}
         onExit={onExit}
       />,
@@ -226,6 +232,37 @@ describe('CadZoneCapture', () => {
       tap(layer, 404, 103);
       fireEvent.keyDown(document, { key: 'Enter' });
       expect(onComplete.mock.calls[0]?.[0]?.[4]).toEqual([0.4, 0.1]);
+    });
+
+    it('точка ставится в угол и на грань стены листа', () => {
+      const walls = buildSnapIndex([
+        {
+          closed: true,
+          points: [
+            [0.2, 0.2],
+            [0.4, 0.2],
+            [0.4, 0.4],
+            [0.2, 0.4],
+          ],
+        },
+      ]);
+      const { layer, onComplete } = mount('door', [], walls);
+      tap(layer, 203, 198); // угол (0.2, 0.2)
+      tap(layer, 300, 396); // грань y = 0.4
+      const [first, second] = onComplete.mock.calls[0]?.[0] ?? [];
+      expect(first).toEqual([0.2, 0.2]);
+      expect(second?.[0]).toBeCloseTo(0.3, 10);
+      expect(second?.[1]).toBeCloseTo(0.4, 10);
+    });
+
+    it('без стен привязки к ним нет', () => {
+      const { layer, onComplete } = mount('door', [], null);
+      tap(layer, 203, 198);
+      tap(layer, 300, 300);
+      expect(onComplete).toHaveBeenCalledWith([
+        [0.203, 0.198],
+        [0.3, 0.3],
+      ]);
     });
 
     it('колесо с Shift в режиме рисования масштабирует, а не панорамирует', () => {

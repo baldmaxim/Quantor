@@ -14,8 +14,8 @@ export interface ISnapMarkerColors {
 }
 
 /**
- * Метка привязки на холсте черновика: вершина - квадрат, ребро - ромб, ortho - тонкая
- * направляющая через опорную вершину и точку. Без привязки (`none`) ничего не рисует.
+ * Метка привязки на холсте черновика: угол стены - закрашенный квадрат, вершина - квадрат,
+ * ребро и грань - ромб, ortho - тонкая направляющая через опорную вершину и точку. Без привязки (`none`) ничего не рисует.
  */
 export const drawSnapMarker = (
   context: CanvasRenderingContext2D,
@@ -58,7 +58,11 @@ export const drawSnapMarker = (
     return;
   }
 
-  if (snap.kind === 'vertex') {
+  if (snap.kind === 'corner') {
+    stroke(() => context.rect(at.x - HALF, at.y - HALF, HALF * 2, HALF * 2));
+    context.fillStyle = colors.ink;
+    context.fillRect(at.x - HALF + 1, at.y - HALF + 1, HALF * 2 - 2, HALF * 2 - 2);
+  } else if (snap.kind === 'vertex') {
     stroke(() => context.rect(at.x - HALF, at.y - HALF, HALF * 2, HALF * 2));
   } else if (snap.kind === 'edge') {
     stroke(() => {

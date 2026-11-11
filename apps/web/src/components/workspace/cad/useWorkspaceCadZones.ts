@@ -2,8 +2,12 @@
 
 import { useMemo, useState } from 'react';
 
+import type { CadPreviewRead } from '@quantor/api-client';
+
 import type { ICadZoneLayers } from '@/components/cad/viewer/CadZoneLayers';
 import { cadErrorText } from '@/lib/cad/errors';
+import type { ICadFrame } from '@/lib/cad/frame';
+import type { ISnapIndex } from '@/lib/cad/zone-snap';
 import { presentZoneCategories } from '@/lib/cad/zone-categories';
 import { readStoredNumber, writeStoredNumber } from '@/lib/cad/useStoredNumber';
 import {
@@ -25,6 +29,7 @@ import type { Camera } from '@/lib/viewer/camera';
 
 import type { IWorkspaceCadZones } from './types';
 import { useZoneView } from './useZoneView';
+import { useWallSnapIndex } from './useWallSnapIndex';
 
 const DOOR_HEIGHT_KEY = 'quantor.cad.zone-door-height';
 const NO_ZONES: IWorkspaceCadZones['zones'] = [];
@@ -36,6 +41,9 @@ interface IInput {
   /** Размер листа у отрисовщика (pt при масштабе 1); `null` - ещё не известен. */
   pageSize: { width: number; height: number } | null;
   camera: Camera;
+  /** Предпросмотр и кадр показанного вида CAD: из них берутся углы и грани стен для привязки. */
+  preview?: CadPreviewRead | null;
+  frame?: ICadFrame | null;
   /** Флаг `cad.export` включён и вкладка CAD открывалась хотя бы раз. */
   load: boolean;
   /** Вкладка CAD открыта: зоны рисуются и рисование работает только на ней. */
@@ -56,6 +64,8 @@ export interface IWorkspaceCadZonesState {
     page: { width: number; height: number };
     kind: ZoneKind;
     zones: IWorkspaceCadZones['zones'];
+    /** Углы и грани стен листа; `null` - стен для привязки нет. */
+    walls: ISnapIndex | null;
     onComplete: (points: [number, number][]) => void;
     onExit: () => void;
   } | null;
@@ -75,6 +85,8 @@ export const useWorkspaceCadZones = ({
   pageIndex,
   pageSize,
   camera,
+  preview = null,
+  frame = null,
   load,
   active,
   remarksCapturing,
@@ -148,6 +160,8 @@ export const useWorkspaceCadZones = ({
         : null,
     [zoneList, zoneView],
   );
+
+  const walls = useWallSnapIndex(preview, frame, pageSize, drawingOn);
 
   const onComplete = (points: [number, number][]) => {
     if (revisionId === null || pageIndex === null) return;
@@ -227,6 +241,7 @@ export const useWorkspaceCadZones = ({
             page: pageSize,
             kind,
             zones: zoneList,
+            walls,
             onComplete,
             onExit: () => setDrawing(false),
           }

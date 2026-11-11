@@ -15,6 +15,7 @@ import {
   buildSnapIndex,
   snapPoint,
   zonesToSnapShapes,
+  type ISnapIndex,
   type ISnapResult,
 } from '@/lib/cad/zone-snap';
 import { drawSnapMarker } from '@/lib/cad/zone-snap-marker';
@@ -43,6 +44,8 @@ interface ICadZoneCaptureProps {
   kind: ZoneKind;
   /** Готовые зоны листа: их вершины и рёбра - цели привязки. */
   zones: readonly CadZoneRead[];
+  /** Углы и грани стен листа (индекс из предпросмотра CAD); нет - привязка только к зонам. */
+  walls?: ISnapIndex | null;
   /** Контур или линия двери готовы: точки [x, y] в долях листа от левого верхнего угла. */
   onComplete: (points: [number, number][]) => void;
   /** Esc при пустом черновике: режим рисования закрыт. */
@@ -83,6 +86,7 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
   page,
   kind,
   zones,
+  walls = null,
   onComplete,
   onExit,
 }) => {
@@ -105,11 +109,12 @@ export const CadZoneCapture: FC<ICadZoneCaptureProps> = ({
     callbacks.current = { onComplete, onExit };
   });
 
-  // Привязка точки экрана к зонам листа и черновику; масштаб - текущий размер листа в пикселях.
+  // Привязка точки экрана к стенам, зонам листа и черновику; масштаб - текущий размер листа в пикселях.
   const snapAt = (screen: ScreenPoint): ISnapResult => {
     const placement = placeViewportPage(page, camera.getState());
     return snapPoint(toNormalizedPoint(screen, placement), {
       index: snapIndex,
+      walls,
       scale: { x: placement.width, y: placement.height },
       placed: controller.getState().points,
       shift: modifiers.current.shift,
