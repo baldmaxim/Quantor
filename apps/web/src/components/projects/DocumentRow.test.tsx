@@ -128,4 +128,40 @@ describe('строка документа', () => {
     expect(screen.queryByRole('link', { name: /Открыть/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Не распознан')).not.toBeInTheDocument();
   });
+
+  it('имя файла — ссылка, растянутая на всю строку, и ведёт туда же, куда «Открыть»', () => {
+    render(<DocumentRow projectId="p-1" document={pdf()} revisions={[revision()]} total={1} />);
+
+    const name = screen.getByRole('link', { name: 'План 3 этажа.pdf' });
+    const button = screen.getByRole('link', { name: 'Открыть План 3 этажа.pdf' });
+
+    expect(name).toHaveAttribute('href', '/projects/p-1/workspace?revision=rev-1');
+    expect(name).toHaveAttribute('href', button.getAttribute('href'));
+    // Псевдоэлемент на всю строку: строка — контейнер позиционирования.
+    expect(name.className).toContain('after:absolute');
+    expect(name.className).toContain('after:inset-0');
+    expect(name.closest('div.relative')).not.toBeNull();
+  });
+
+  it('вторичные действия лежат поверх растянутой ссылки и не открывают документ строкой', () => {
+    render(<DocumentRow projectId="p-1" document={pdf()} revisions={[revision()]} total={1} />);
+
+    const button = screen.getByRole('link', { name: 'Открыть План 3 этажа.pdf' });
+    expect(button.className).toContain('relative');
+    expect(button.className).toContain('z-10');
+  });
+
+  it('строка без возможности открытия не содержит ссылок', () => {
+    render(
+      <DocumentRow
+        projectId="p-1"
+        document={pdf()}
+        revisions={[revision({ geometry_status: 'pending', sheet_count: 0 })]}
+        total={1}
+      />,
+    );
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('План 3 этажа.pdf')).toBeInTheDocument();
+  });
 });

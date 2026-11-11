@@ -27,6 +27,7 @@ import {
   type IOverlayAvailability,
 } from '@/lib/cad/workspace-cad';
 import { isRouteJob } from '@/lib/cad/mep-jobs';
+import { pickAutoRoute } from '@/lib/cad/route-autoselect';
 import { jobCoversPage } from '@/lib/cad/workspace-url';
 
 interface IInput {
@@ -49,6 +50,11 @@ export interface IWorkspaceCadJobData {
   readonly jobs: readonly CadJobSummaryRead[];
   /** Выбранное route-задание (трассы механики) этого листа; `null` - показан сам вид. */
   readonly routeSummary: CadJobSummaryRead | null;
+  /**
+   * Route-задание, выбранное автоматически: самое новое успешное для показанного вида листа.
+   * `null`, когда трассы выбраны явно (`routeSummary`) или для вида их нет.
+   */
+  readonly autoRoute: CadJobSummaryRead | null;
   /** Показанное задание: из адреса, если оно закрывает лист, иначе последнее по листу. */
   readonly jobId: string | null;
   readonly kind: SheetResultKind | null;
@@ -75,6 +81,7 @@ export interface IWorkspaceCadJobData {
  *
  * Route-задание (трассы механики) в «последнее задание листа» не входит. Если оно выбрано в адресе,
  * показан вид его родителя (DXF вида под трассами), а само задание отдаётся как `routeSummary`.
+ * Без явного выбора трассы показанного вида подбираются сами (`autoRoute`).
  */
 export const useWorkspaceCadJob = ({
   projectId,
@@ -137,7 +144,13 @@ export const useWorkspaceCadJob = ({
     [job, pageIndex, revisionId, projectId, view],
   );
 
-  const diagnosticsQuery = useCadView(params ?? IDLE_VIEW_PARAMS, params !== null);
+  // Явный выбор (задание в адресе) приоритетнее; без него слои трасс берутся у новейшего успешного.
+  const autoRoute = useMemo(
+    () => (routeSummary === null ? pickAutoRoute(items, { parentJobId: jobId, pageIndex, view }) : null),
+    [routeSummary, items, jobId, pageIndex, view],
+  );
+
+  const diagnosticsQuery = useCadView(params ?? IDLE_VIEW_PARAMS, params !== null, job?.status);
   const diagnostics = params !== null ? (diagnosticsQuery.data ?? null) : null;
   const previewQuery = useCadPreview(
     params ?? IDLE_VIEW_PARAMS,
@@ -162,6 +175,7 @@ export const useWorkspaceCadJob = ({
     refetchJobs: () => void jobs.refetch(),
     jobs: items,
     routeSummary,
+    autoRoute,
     jobId,
     kind,
     job,

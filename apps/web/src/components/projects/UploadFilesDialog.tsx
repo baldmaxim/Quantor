@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { classifyFiles, FileDropzone, type PickedFile } from '@/components/projects/FileDropzone';
 import { useUploadQueue } from '@/components/projects/UploadQueue';
+import { getUploadDialogState } from '@/components/projects/uploadDialogState';
 import { UploadQueueList } from '@/components/projects/UploadQueueList';
 import { Button, Dialog, DialogActions } from '@/components/ui';
 
@@ -30,10 +31,20 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
 
   const accepted = files.filter((item) => item.accepted);
   const busy = queue.running;
-  const finished = queue.items.length > 0 && !queue.running;
+  const { primary, canUpload } = getUploadDialogState({
+    pendingCount: accepted.length,
+    running: busy,
+    items: queue.items,
+  });
 
   const submit = async () => {
-    await queue.start({ projectId, files: accepted.map((item) => item.file) });
+    await queue.start({
+      projectId,
+      files: accepted.map((item) => item.file),
+      keepDone: true,
+      // Загруженный файл уходит из очереди выбранных; упавшие остаются для повтора.
+      onFileDone: (done) => setFiles((current) => current.filter((item) => item.file !== done)),
+    });
     // Обновляем и карточку, и список: там и там виден ход импорта.
     await queryClient.invalidateQueries({ queryKey: ['project', projectId] });
     await queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -57,18 +68,26 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
             </Button>
           )}
           <DialogActions>
-            <Button onClick={onClose} disabled={busy}>
-              {finished ? 'Закрыть' : 'Отмена'}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => void submit()}
-              disabled={accepted.length === 0}
-              loading={busy}
-              loadingLabel="Загружаем…"
-            >
-              Загрузить
-            </Button>
+            {primary === 'done' ? (
+              <Button variant="primary" onClick={onClose}>
+                Готово
+              </Button>
+            ) : (
+              <>
+                <Button onClick={onClose} disabled={busy}>
+                  Отмена
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => void submit()}
+                  disabled={!canUpload}
+                  loading={busy}
+                  loadingLabel="Загружаем…"
+                >
+                  Загрузить
+                </Button>
+              </>
+            )}
           </DialogActions>
         </>
       }

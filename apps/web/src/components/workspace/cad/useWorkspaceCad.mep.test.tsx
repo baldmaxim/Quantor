@@ -220,6 +220,22 @@ describe('useWorkspaceCad: трассы механики', () => {
     expect(result.current.painter).not.toBeNull();
   });
 
+  it('автовыбор: на виде с готовыми трассами слои трасс есть без выбора задания', () => {
+    const { result } = mount({ jobParam: PARENT, viewParam: 2 });
+    const side = result.current.side;
+    expect(result.current.bar?.view).toBe(2);
+    expect(side.view?.layers.mep?.names).toEqual(['M-OV-T1', 'M-OV-T2', 'M-NODE']);
+    // Выбор не навязан: вкладка «Трассы», замечания и список слева остаются на виде родителя.
+    expect(side.view?.mep?.route).toBeNull();
+    expect(result.current.left?.selectedJobId).toBe(PARENT);
+    expect(mocks.bindings.at(-1)).toMatchObject({ jobId: PARENT, attempt: 2 });
+  });
+
+  it('автовыбор: на виде без трасс слоёв трасс нет', () => {
+    const { result } = mount({ jobParam: PARENT, viewParam: 1 });
+    expect(result.current.side.view?.layers.mep ?? null).toBeNull();
+  });
+
   it('замечания привязаны к route-заданию и его DXF', () => {
     mount({ jobParam: ROUTE });
     expect(mocks.bindings.at(-1)).toMatchObject({

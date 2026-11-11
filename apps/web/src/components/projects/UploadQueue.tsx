@@ -32,21 +32,28 @@ interface StartOptions {
   readonly projectId: string;
   readonly files: readonly File[];
   readonly documentId?: string;
+  /** Оставить в списке уже загруженные («готово»); прочие записи заменяются новой попыткой. */
+  readonly keepDone?: boolean;
+  /** Вызывается, когда файл успешно загружен. */
+  readonly onFileDone?: (file: File) => void;
 }
 
 export const useUploadQueue = () => {
   const [items, setItems] = useState<readonly UploadItem[]>([]);
   const [running, setRunning] = useState(false);
   const controller = useRef<AbortController | null>(null);
+  const runCounter = useRef(0);
 
   const patch = useCallback((id: string, changes: Partial<UploadItem>) => {
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...changes } : item)));
   }, []);
 
   const start = useCallback(
-    async ({ projectId, files, documentId }: StartOptions): Promise<boolean> => {
+    async ({ projectId, files, documentId, keepDone = false, onFileDone }: StartOptions): Promise<boolean> => {
+      runCounter.current += 1;
+      const run = runCounter.current;
       const queue: UploadItem[] = files.map((file, index) => ({
-        id: `${index}-${file.name}`,
+        id: `${run}-${index}-${file.name}`,
         name: file.name,
         size: file.size,
         stage: 'ожидание',
@@ -56,7 +63,9 @@ export const useUploadQueue = () => {
         duplicate: false,
       }));
 
-      setItems(queue);
+      setItems((current) =>
+        keepDone ? [...current.filter((item) => item.stage === 'готово'), ...queue] : queue,
+      );
       setRunning(true);
       controller.current = new AbortController();
 
@@ -77,6 +86,7 @@ export const useUploadQueue = () => {
             onProgress: ({ fraction }) => patch(id, { fraction }),
           });
           patch(id, { stage: 'готово', fraction: 1, duplicate: result.is_duplicate });
+          onFileDone?.(file);
         } catch (error) {
           allSucceeded = false;
 

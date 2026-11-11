@@ -91,6 +91,7 @@ class TestAttachToLoadedPdf:
         pdf_revision = await db_session.get(DocumentRevision, pdf_revision_id)
         assert pdf_revision is not None
         metadata_before = dict(pdf_revision.source_metadata)
+        assert pdf_revision.processing_status is ProcessingStatus.UNPROCESSED
         objects_before = set(fake_storage.objects)
 
         job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
@@ -143,6 +144,8 @@ class TestAttachToLoadedPdf:
         )
         assert package_revision is not None
         assert package_revision.processing_status is ProcessingStatus.READY
+        # Прикреплённое распознавание делает «готовой» и саму PDF-ревизию.
+        assert pdf_revision.processing_status is ProcessingStatus.READY
 
     async def test_existing_sheets_keep_their_raster_size(
         self,
@@ -242,7 +245,9 @@ class TestOldPathUnchanged:
     ) -> None:
         project_id = await _new_project(api)
         # Другой PDF в проекте: хеш не совпадает с PDF из пакета.
-        await _upload_file(api, project_id, "other.pdf", PDF_BYTES + b"other", "application/pdf")
+        other = await _upload_file(
+            api, project_id, "other.pdf", PDF_BYTES + b"other", "application/pdf"
+        )
         archive = await _upload_zip(api, project_id)
 
         job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
@@ -255,3 +260,7 @@ class TestOldPathUnchanged:
         )
         assert revision is not None
         assert revision.source_metadata["imported_from_revision_id"] == archive["revision"]["id"]
+        # Загруженный PDF без пакета остаётся нераспознанным.
+        other_revision = await db_session.get(DocumentRevision, uuid.UUID(other["revision"]["id"]))
+        assert other_revision is not None
+        assert other_revision.processing_status is ProcessingStatus.UNPROCESSED

@@ -489,6 +489,11 @@ async def _attach(
     await documents_service.set_processing_status(
         session, revision=package_revision, status=ProcessingStatus.READY
     )
+    # Распознанное теперь есть и у самого PDF: «не распознан» про него больше неверно.
+    # Содержимое ревизии не меняется — только ход обработки (ADR-0003, ADR-0037).
+    await documents_service.set_processing_status(
+        session, revision=target, status=ProcessingStatus.READY
+    )
     if target.geometry_status is GeometryStatus.PENDING:
         await geometry.schedule_extract(session, project=project, revision=target)
     await session.flush()

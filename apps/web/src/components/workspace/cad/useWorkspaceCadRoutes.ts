@@ -19,7 +19,7 @@ interface IInput {
   /** Запросы разрешены: флаг включён и вкладка открывалась. */
   load: boolean;
   pageIndex: number | null;
-  /** Выбранное route-задание; `null` - трассы не выбраны и ничего не читается. */
+  /** Route-задание (выбранное явно или автоматически); `null` - трасс нет и ничего не читается. */
   route: CadJobSummaryRead | null;
 }
 
@@ -60,7 +60,7 @@ export const useWorkspaceCadRoutes = ({
   );
   const readable = params !== null;
 
-  const diagnosticsQuery = useCadView(params ?? IDLE_VIEW_PARAMS, readable);
+  const diagnosticsQuery = useCadView(params ?? IDLE_VIEW_PARAMS, readable, job?.status);
   const diagnostics = readable ? (diagnosticsQuery.data ?? null) : null;
   const previewQuery = useCadPreview(
     params ?? IDLE_VIEW_PARAMS,

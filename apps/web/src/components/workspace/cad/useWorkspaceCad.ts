@@ -153,13 +153,13 @@ export const useWorkspaceCad = ({
   });
   const { diagnostics, preview, frame, params, availability } = data;
 
-  // Трассы механики: выбранное route-задание рисуется поверх DXF вида его родителя.
+  // Трассы механики: выбранное (явно или автоматически) route-задание рисуется поверх DXF вида его родителя.
   const routes = useWorkspaceCadRoutes({
     projectId,
     revisionId,
     load: enabled && opened && revisionId !== null,
     pageIndex,
-    route: data.routeSummary,
+    route: data.routeSummary ?? data.autoRoute,
   });
   const mepVisibility = useMepLayerVisibility();
   const routePreview = useMemo(
