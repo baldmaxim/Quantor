@@ -13,8 +13,8 @@ const InfoIcon: FC = () => (
   <svg
     aria-hidden="true"
     viewBox="0 0 24 24"
-    width="20"
-    height="20"
+    width="16"
+    height="16"
     fill="none"
     stroke="currentColor"
     strokeWidth="1.8"
@@ -28,7 +28,7 @@ const InfoIcon: FC = () => (
 );
 
 /**
- * Кнопка (i) верхней панели 3D-вида и всплывающая панель с содержимым (высоты листа, отверстия плиты).
+ * Кнопка (i) верхней панели 3D-вида (иконочный ToolButton, прижата вправо) и всплывающая панель с содержимым (высоты листа, отверстия плиты).
  * Родитель верхней панели должен быть `relative`: всплывающая панель привязана к нему и на телефоне
  * не шире экрана. Закрытие - Esc, щелчок вне панели, повторное нажатие на (i). Содержимое остаётся
  * смонтированным при закрытии: незаконченная правка высот не теряется.
@@ -64,13 +64,14 @@ export const CadFloor3dInfoPanel: FC<ICadFloor3dInfoPanelProps> = ({ children })
         ref={button}
         type="button"
         aria-label={LABEL}
+        title={LABEL}
         aria-expanded={open}
         aria-controls={panelId}
         aria-haspopup="dialog"
         onClick={() => setOpen((current) => !current)}
         className={cx(
-          'press grid h-[44px] w-[44px] flex-none place-items-center rounded-[var(--radius-sm)] border border-border bg-surface text-muted hover:bg-surface-muted hover:text-text',
-          open && 'border-accent text-accent',
+          'press ml-auto grid h-[var(--h-ctl-ws)] w-[30px] flex-none place-items-center rounded-[var(--radius-sm)]',
+          open ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-surface-muted hover:text-text',
         )}
       >
         <InfoIcon />

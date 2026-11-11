@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type FC } from 'react';
 
-import { Button } from '@/components/ui';
+import { ToolButton } from '@/components/workspace/Toolbar';
 import type { FloorTitleLike } from '@/lib/cad/floor-title';
 import { useFloor3dDxf } from '@/lib/cad/floor3d-dxf';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
@@ -44,34 +44,30 @@ export const CadFloor3dDxfButton: FC<ICadFloor3dDxfButtonProps> = ({
   }, [dxf.readyJobId]);
 
   const preparing = dxf.phase === 'preparing';
+  const label = preparing ? 'Готовим DXF…' : dxf.phase === 'failed' ? 'Повторить' : 'Скачать 3D DXF';
+  const hint =
+    hasCandidates && dxf.phase !== 'failed'
+      ? 'отверстия-кандидаты войдут в DXF как отверстия'
+      : 'трёхмерный DXF для AutoCAD';
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-[var(--s-3)] gap-y-[var(--s-2)]">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-[var(--s-2)] gap-y-[var(--s-1)]">
       {dxf.phase === 'ready' ? (
         <a
           ref={link}
           href={dxf.url ?? undefined}
           download={dxf.fileName}
-          className="press flex min-h-[44px] items-center text-xs text-accent underline md:min-h-0"
+          className="press flex h-[var(--h-ctl-ws)] flex-none items-center rounded-[var(--radius-sm)] px-[var(--s-4)] text-xs whitespace-nowrap text-accent hover:bg-surface-muted"
         >
           Скачать ещё раз
         </a>
       ) : (
-        <Button
-          disabled={disabled || preparing}
-          className="max-md:h-[44px]"
-          onClick={dxf.start}
-        >
-          {preparing ? 'Готовим DXF…' : dxf.phase === 'failed' ? 'Повторить' : 'Скачать 3D DXF'}
-        </Button>
+        <ToolButton wide label={label} hint={hint} disabled={disabled || preparing} onClick={dxf.start}>
+          {label}
+        </ToolButton>
       )}
       {dxf.phase === 'failed' && dxf.error !== null && (
         <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
           {dxf.error}
-        </p>
-      )}
-      {hasCandidates && dxf.phase !== 'failed' && (
-        <p role="note" className="text-xs text-muted">
-          Отверстия-кандидаты войдут в DXF как отверстия
         </p>
       )}
     </div>

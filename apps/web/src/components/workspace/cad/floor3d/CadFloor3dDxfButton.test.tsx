@@ -121,7 +121,10 @@ describe('Скачать 3D DXF', () => {
 
   it('подсказка про отверстия-кандидаты', () => {
     mount(true);
-    expect(screen.getByText('Отверстия-кандидаты войдут в DXF как отверстия')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Скачать 3D DXF' })).toHaveAttribute(
+      'title',
+      'Скачать 3D DXF — отверстия-кандидаты войдут в DXF как отверстия',
+    );
   });
 
   it('имя файла по заголовку плана: floor3d_K9_S3_14.dxf', async () => {

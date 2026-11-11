@@ -243,6 +243,16 @@ describe('3D-вид этажа', () => {
     expect(canvas).toHaveAttribute('data-measuring', 'false');
   });
 
+  it('«Плита сверху»: кнопка-переключатель с aria-pressed', async () => {
+    vi.mocked(client.readCadFloor3D).mockImplementation(() => ok(floor3dFixture()) as never);
+    mount();
+    await screen.findByTestId('canvas');
+    const toggle = screen.getByRole('button', { name: 'Плита сверху' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('заголовок 3D-вида - этаж по заголовку плана; без заголовка подписи нет', async () => {
     vi.mocked(client.readCadFloor3D).mockImplementation(
       () => ok(floor3dFixture({ title: { corps: '9', section: '3', floors: ['15'], text: null } })) as never,

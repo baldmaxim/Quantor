@@ -41,6 +41,7 @@ export const WorkspaceCadBar: FC<IWorkspaceCadBarProps> = ({
         {floor3d && (
           <SegmentedControl
             label="Режим холста"
+            compact
             value={floor3d.mode}
             options={[
               { value: 'plan', label: 'План' },
