@@ -4,8 +4,13 @@ import { useState, type FC, type ReactNode } from 'react';
 
 import type { CadZoneRead } from '@quantor/api-client';
 
+import { CadRoomTypeSelect } from '@/components/cad/finishes/CadRoomTypeSelect';
+import { CadZoneFinishBar } from '@/components/cad/finishes/CadZoneFinishBar';
 import { ClearableInput } from '@/components/ui/ClearableInput';
 import { Button, cx } from '@/components/ui';
+import type { IWorkspaceCadZoneFinish } from '@/components/workspace/cad/types';
+import type { RoomType } from '@/lib/cad/room-types';
+import { canSplitZoneKind } from '@/lib/cad/zone-split';
 import {
   PARKING_TYPE_LABELS,
   ZONE_KIND_LABELS,
@@ -30,6 +35,16 @@ interface ICadZoneListProps {
   onDelete: (id: string) => void;
   /** Сменить тип у машино-места; не передан - тип в списке не правится. */
   onSetParkingType?: (id: string, type: ParkingType) => void;
+  /** Сменить тип помещения у зоны; не передан - тип в списке не правится. */
+  onSetRoomType?: (id: string, type: RoomType | null) => void;
+  /** Выбор зон и назначение шаблона отделки; не передан - выбора нет. */
+  finish?: IWorkspaceCadZoneFinish | null;
+  /** Включён режим правки контура или разреза; пока он идёт, кнопки запуска не нужны. */
+  shapeBusy?: boolean;
+  /** Почему править контур нельзя; `null` - можно. */
+  shapeDisabledReason?: string | null;
+  onStartEdit?: (id: string) => void;
+  onStartSplit?: (id: string) => void;
 }
 
 const sumText = (sum: IZoneSum): string =>
@@ -79,10 +94,27 @@ export const CadZoneList: FC<ICadZoneListProps> = ({
   onRename,
   onDelete,
   onSetParkingType,
+  onSetRoomType,
+  finish = null,
+  shapeBusy = false,
+  shapeDisabledReason = null,
+  onStartEdit,
+  onStartSplit,
 }) => {
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [checked, setChecked] = useState<ReadonlySet<string>>(new Set());
   const groups = groupZones(zones);
+  // Отделка есть у помещений квартир и МОП; у двери и машино-места её нет.
+  const roomZones = zones.filter(
+    (zone) => zone.kind === 'room_apartment' || zone.kind === 'room_mop',
+  );
+  const toggleChecked = (id: string) => {
+    const next = new Set(checked);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setChecked(next);
+  };
 
   const row = (zone: CadZoneRead) => {
     const active = zone.id === activeId;
@@ -120,16 +152,42 @@ export const CadZoneList: FC<ICadZoneListProps> = ({
             </Button>
           </form>
         ) : (
-          <button
-            type="button"
-            aria-pressed={active}
-            onClick={() => onActivate(active ? null : zone.id)}
-            className="flex min-w-0 flex-col items-start gap-[2px] text-left"
-          >
-            <span className="min-w-0 text-sm break-words">{zoneTitle(zone)}</span>
-            <span className="text-xs text-muted">{zoneValues(zone)}</span>
-          </button>
+          <div className="flex min-w-0 items-start gap-[var(--s-2)]">
+            {finish !== null && (zone.kind === 'room_apartment' || zone.kind === 'room_mop') && (
+              <label className="-m-[var(--s-2)] grid h-[44px] w-[44px] shrink-0 cursor-pointer place-items-center">
+                <input
+                  type="checkbox"
+                  aria-label={`Выбрать зону: ${zoneTitle(zone)}`}
+                  checked={checked.has(zone.id)}
+                  onChange={() => toggleChecked(zone.id)}
+                  className="h-[18px] w-[18px] accent-[var(--accent)]"
+                />
+              </label>
+            )}
+            <button
+              type="button"
+              aria-pressed={active}
+              onClick={() => onActivate(active ? null : zone.id)}
+              className="flex min-w-0 flex-1 flex-col items-start gap-[2px] text-left"
+            >
+              <span className="min-w-0 text-sm break-words">{zoneTitle(zone)}</span>
+              <span className="text-xs text-muted">{zoneValues(zone)}</span>
+            </button>
+          </div>
         )}
+
+        {onSetRoomType &&
+          (zone.kind === 'room_apartment' || zone.kind === 'room_mop') &&
+          editing?.id !== zone.id && (
+            <CadRoomTypeSelect
+              kind={zone.kind}
+              label={`Тип помещения: ${zoneTitle(zone)}`}
+              value={zone.room_type}
+              source={zone.room_type_source}
+              disabled={saving}
+              onChange={(type) => onSetRoomType(zone.id, type)}
+            />
+          )}
 
         {zone.kind === 'parking_space' && onSetParkingType && editing?.id !== zone.id && (
           <ParkingTypeSelect
@@ -178,6 +236,30 @@ export const CadZoneList: FC<ICadZoneListProps> = ({
               >
                 Удалить
               </Button>
+              {active && zone.kind !== 'door' && onStartEdit && (
+                <Button
+                  compact
+                  variant="ghost"
+                  disabled={shapeBusy || shapeDisabledReason !== null}
+                  title={shapeDisabledReason ?? undefined}
+                  className="max-md:h-[44px]"
+                  onClick={() => onStartEdit(zone.id)}
+                >
+                  Изменить контур
+                </Button>
+              )}
+              {active && canSplitZoneKind(zone.kind) && onStartSplit && (
+                <Button
+                  compact
+                  variant="ghost"
+                  disabled={shapeBusy || shapeDisabledReason !== null}
+                  title={shapeDisabledReason ?? undefined}
+                  className="max-md:h-[44px]"
+                  onClick={() => onStartSplit(zone.id)}
+                >
+                  Разрезать
+                </Button>
+              )}
             </div>
           )
         )}
@@ -191,6 +273,17 @@ export const CadZoneList: FC<ICadZoneListProps> = ({
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-5)]" data-testid="cad-zone-list">
+      {finish !== null && roomZones.length > 0 && (
+        <CadZoneFinishBar
+          zones={roomZones}
+          checked={checked}
+          onCheckedChange={setChecked}
+          templates={finish.templates}
+          assigning={finish.assigning}
+          error={finish.error}
+          onAssign={finish.onAssign}
+        />
+      )}
       {groups.apartments.map((group) => (
         <Group
           key={group.apartmentNo}

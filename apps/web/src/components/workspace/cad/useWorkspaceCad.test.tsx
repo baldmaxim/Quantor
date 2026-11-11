@@ -43,6 +43,10 @@ vi.mock('@/lib/cad/zones-queries', () => ({
   useUpdateCadZone: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteCadZone: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+vi.mock('@/lib/cad/finishes-queries', () => ({
+  useCadFinishTemplates: () => ({ data: undefined }),
+  useAssignCadFinishTemplate: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
 vi.mock('@/lib/cad/constructions-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof ConstructionQueries>()),
   useCadConstructions: () => ({

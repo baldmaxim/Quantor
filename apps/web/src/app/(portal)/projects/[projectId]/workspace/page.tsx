@@ -13,6 +13,8 @@ import { Suspense, use, useEffect, useMemo, useState } from 'react';
 
 import { CadRemarkCapture } from '@/components/cad/viewer/CadRemarkCapture';
 import { CadZoneCapture } from '@/components/cad/viewer/CadZoneCapture';
+import { CadZoneEdit } from '@/components/cad/viewer/CadZoneEdit';
+import { CadZoneSplit } from '@/components/cad/viewer/CadZoneSplit';
 import { DrawingViewport } from '@/components/viewer/DrawingViewport';
 import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
@@ -911,6 +913,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
               />
               {cad.capture && <CadRemarkCapture {...cad.capture} />}
               {cad.zoneCapture && <CadZoneCapture {...cad.zoneCapture} />}
+              {cad.zoneEdit && <CadZoneEdit key={cad.zoneEdit.zoneId} {...cad.zoneEdit} />}
+              {cad.zoneSplit && <CadZoneSplit key={cad.zoneSplit.zoneId} {...cad.zoneSplit} />}
               {cad.constructionPicker && (
                 <CadConstructionPicker
                   {...cad.constructionPicker}
@@ -921,11 +925,11 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 <CadFloor3dOverlay
                   projectId={projectId}
                   params={cad.floor3d?.params ?? null}
+                  link={cad.floor3d?.link ?? null}
                   onSelectFloor={(floor) => void openBuildingFloor(floor)}
                   onExit={() => cad.floor3dPending?.onExit()}
                 />
               )}
-                  link={cad.floor3d?.link ?? null}
               {draftPhase === 'complete' && draftA && draftB && sheetId && (
                 <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">
                   <ScaleDialog

@@ -41,6 +41,8 @@ export const CadZonesPanel: FC<IWorkspaceCadZones> = ({
   parkingType,
   onParkingTypeChange,
   onSetParkingType,
+  onSetRoomType,
+  finish = null,
   drawing,
   drawDisabledReason,
   onStartDrawing,
@@ -51,6 +53,10 @@ export const CadZonesPanel: FC<IWorkspaceCadZones> = ({
   error,
   onRename,
   onDelete,
+  shapeEdit,
+  shapeEditDisabledReason,
+  onStartEdit,
+  onStartSplit,
 }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const open = pickerOpen || drawing;
@@ -192,6 +198,12 @@ export const CadZonesPanel: FC<IWorkspaceCadZones> = ({
           onRename={onRename}
           onDelete={onDelete}
           onSetParkingType={onSetParkingType}
+          onSetRoomType={onSetRoomType}
+          finish={finish}
+          shapeBusy={shapeEdit !== null}
+          shapeDisabledReason={shapeEditDisabledReason}
+          onStartEdit={onStartEdit}
+          onStartSplit={onStartSplit}
         />
       )}
     </div>

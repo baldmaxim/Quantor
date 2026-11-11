@@ -3,6 +3,7 @@ import type {
   CadConstructionRead,
   CadConstructionsRead,
   CadDecisionRead,
+  CadFinishTemplateRead,
   CadJobRead,
   CadRouteJobRead,
   CadSheetFloorTitle,
@@ -13,12 +14,14 @@ import type {
   CadZoneRead,
 } from '@quantor/api-client';
 
+import type { IFinishAssignOutcome } from '@/components/cad/finishes/CadZoneFinishBar';
 import type { ICadZoneLayers } from '@/components/cad/viewer/CadZoneLayers';
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { IConstructionIndex } from '@/lib/cad/constructions';
-import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
-import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { CadExtraCategory } from '@/lib/cad/layer-categories';
+import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
+import type { RoomType } from '@/lib/cad/room-types';
+import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { IVorSource } from '@/lib/cad/vor-queries';
 import type { ParkingType, ZoneKind } from '@/lib/cad/zones';
 import type { Camera, CameraState, Viewport } from '@/lib/viewer/camera';
@@ -38,6 +41,28 @@ export interface IWorkspaceCadRemarks {
   readonly onActivate: (id: string | null) => void;
   readonly onFocusCamera: (state: CameraState) => void;
   readonly viewport: () => Viewport;
+}
+
+/** Назначение шаблона отделки зонам из списка зон (ADR-0042). */
+export interface IWorkspaceCadZoneFinish {
+  readonly templates: readonly CadFinishTemplateRead[];
+  readonly assigning: boolean;
+  /** Отказ последнего назначения. */
+  readonly error: string | null;
+  /** Назначить шаблон зонам; `null` снимает явное назначение. `null` в ответе - отказ. */
+  readonly onAssign: (
+    zoneIds: readonly string[],
+    templateId: string | null,
+  ) => Promise<IFinishAssignOutcome | null>;
+}
+
+/** Раздел «Отделка»: к какому листу относится ведомость (шаблоны - на весь проект). */
+export interface IWorkspaceCadFinishes {
+  readonly projectId: string;
+  readonly revisionId: string | null;
+  readonly pageIndex: number | null;
+  /** Флаг `cad.export` включён и вкладка CAD открывалась: без этого запросов нет. */
+  readonly load: boolean;
 }
 
 /** Раздел «Зоны»: помещения квартир, МОП и двери открытого листа. */
@@ -61,6 +86,10 @@ export interface IWorkspaceCadZones {
   readonly onParkingTypeChange: (type: ParkingType) => void;
   /** Сменить тип у готового машино-места. */
   readonly onSetParkingType: (id: string, type: ParkingType) => void;
+  /** Сменить тип помещения у зоны (МОП или квартира); нет - тип в списке не правится. */
+  readonly onSetRoomType?: (id: string, type: RoomType | null) => void;
+  /** Выбор зон и назначение шаблона отделки; `null` или нет - выбора нет. */
+  readonly finish?: IWorkspaceCadZoneFinish | null;
   /** Режим рисования включён: поверх холста лежит слой захвата. */
   readonly drawing: boolean;
   /** Почему рисовать нельзя (не заполнено поле, страница не загружена); `null` - можно. */
@@ -75,6 +104,12 @@ export interface IWorkspaceCadZones {
   readonly error: string | null;
   readonly onRename: (id: string, name: string) => void;
   readonly onDelete: (id: string) => void;
+  /** Включён режим правки контура или разреза зоны-помещения; `null` - выключен. */
+  readonly shapeEdit: { readonly id: string; readonly mode: 'edit' | 'split' } | null;
+  /** Почему править контур нельзя (страница не загружена, идёт отметка замечания); `null` - можно. */
+  readonly shapeEditDisabledReason: string | null;
+  readonly onStartEdit: (id: string) => void;
+  readonly onStartSplit: (id: string) => void;
 }
 
 /** ВОР Заказчика в разделе «Конструкции»: только объект сверки, на расчёт не влияет (ADR-0038 п. 5). */
@@ -208,6 +243,14 @@ export interface IWorkspaceCadLayers {
   readonly onToggleLayer: (index: number) => void;
   /** Скрыть или показать несколько слоёв разом (переключатель группы). */
   readonly onSetLayersHidden: (indices: readonly number[], hidden: boolean) => void;
+  /** Открыт режим «3D»: слои без категории конструкций доступны только в плане. */
+  readonly mode3d?: boolean;
+  /** Строки «Плита» и «Перемычки» без слоя DXF: видимость в плане (плита) и в 3D. */
+  readonly categories?: {
+    readonly slab: boolean;
+    readonly lintel: boolean;
+    readonly onChange: (category: CadExtraCategory, visible: boolean) => void;
+  } | null;
   readonly pdfOpacity: number;
   readonly onPdfOpacityChange: (value: number) => void;
   readonly pdfOpacityActive: boolean;
@@ -239,14 +282,6 @@ export interface IWorkspaceCadMepRoute {
   readonly revokedDecisions: readonly CadDecisionRead[];
   /** Отказ чтения задания, вида или превью. */
   readonly error: string | null;
-  /** Открыт режим «3D»: слои без категории конструкций доступны только в плане. */
-  readonly mode3d?: boolean;
-  /** Строки «Плита» и «Перемычки» без слоя DXF: видимость в плане (плита) и в 3D. */
-  readonly categories?: {
-    readonly slab: boolean;
-    readonly lintel: boolean;
-    readonly onChange: (category: CadExtraCategory, visible: boolean) => void;
-  } | null;
 }
 
 /** Вкладка «Трассы»: одобрение вида, построение, принятие, скачивание. */
@@ -338,4 +373,6 @@ export interface IWorkspaceCadSideProps {
   readonly zones?: IWorkspaceCadZones | null;
   /** Раздел «Конструкции»; `null` или нет - раздела нет. */
   readonly constructions?: IWorkspaceCadConstructions | null;
+  /** Раздел «Отделка» (нужен и раздел «Зоны»: выбор зон идёт через него); `null` или нет - раздела нет. */
+  readonly finishes?: IWorkspaceCadFinishes | null;
 }

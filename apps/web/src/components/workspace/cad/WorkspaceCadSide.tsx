@@ -4,6 +4,7 @@ import { useState, type FC } from 'react';
 
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
 import { CadJobList } from '@/components/cad/CadJobList';
+import { CadFinishPanel } from '@/components/cad/finishes/CadFinishPanel';
 import { CadMepPanel } from '@/components/cad/mep/CadMepPanel';
 import { CadRisersPanel } from '@/components/cad/risers/CadRisersPanel';
 import { CadResult } from '@/components/cad/CadResult';
@@ -42,6 +43,7 @@ const HINT = 'p-[var(--s-5)] text-xs text-muted';
  * задание листа рабочей области.
  *
  * Раздел «Зоны» - разметка помещений и дверей листа - есть и у листа без задания.
+ * Раздел «Отделка» (ADR-0042) - шаблоны проекта и ведомость листа - стоит сразу после «Зон».
  * Раздел «Конструкции» (кладка и монолит, ADR-0038) - у листа с видом.
  * Раздел «Задания» (список заданий ревизии) - последний, если передан `jobs`.
  * Показано только задание открытого листа. С идущим или упавшим заданием - только раздел
@@ -61,6 +63,7 @@ export const WorkspaceCadSide: FC<
   view,
   zones = null,
   constructions = null,
+  finishes = null,
   jobs = null,
   sideTab: sideTabProp = null,
   onSideTabChange,
@@ -98,6 +101,26 @@ export const WorkspaceCadSide: FC<
   const zonesTab: ICadSideTab | null = zones
     ? { id: 'zones', label: 'Зоны', content: <CadZonesPanel {...zones} /> }
     : null;
+
+  // Раздел «Отделка»: шаблоны проекта и ведомость листа; зону на листе выделяют через «Зоны».
+  const finishTab: ICadSideTab | null =
+    finishes && zones
+      ? {
+          id: 'finishes',
+          label: 'Отделка',
+          content: (
+            <CadFinishPanel
+              projectId={finishes.projectId}
+              revisionId={finishes.revisionId}
+              pageIndex={finishes.pageIndex}
+              // Ведомость считается на сервере: раздел читает её, только пока открыт.
+              load={finishes.load && sideTab === 'finishes'}
+              activeId={zones.activeId}
+              onActivate={zones.onActivate}
+            />
+          ),
+        }
+      : null;
 
   // Раздел «Задания» - очередь и история заданий ревизии; всегда последний.
   const jobsTab: ICadSideTab | null = jobs
@@ -147,6 +170,7 @@ export const WorkspaceCadSide: FC<
         tabs={[
           { id: 'job', label: 'Задание', content: none },
           ...(zonesTab ? [zonesTab] : []),
+          ...(finishTab ? [finishTab] : []),
           ...(jobsTab ? [jobsTab] : []),
         ]}
         active={sideTab}
@@ -240,6 +264,7 @@ export const WorkspaceCadSide: FC<
             ]
           : []),
         ...(zonesTab ? [zonesTab] : []),
+        ...(finishTab ? [finishTab] : []),
         ...(constructions
           ? [
               {
@@ -254,6 +279,7 @@ export const WorkspaceCadSide: FC<
       ]
     : [
         ...(zonesTab ? [zonesTab] : []),
+        ...(finishTab ? [finishTab] : []),
         jobTab,
         ...(jobsTab ? [jobsTab] : []),
       ];

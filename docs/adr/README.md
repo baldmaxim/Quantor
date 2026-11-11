@@ -45,3 +45,4 @@ ADR не переписываются задним числом. Если реш
 | [0034](0034-avtomaticheskaya-trassirovka-pozharotusheniya.md)                 | Автоматическая трассировка пожаротушения: кандидаты в исполнителе заданий       | принято                |
 | [0035](0035-model-zdaniya-i-versiya-tendera.md)                               | Версия тендера и контур модели здания                                           | принято   |
 | [0041](0041-reestr-stoyakov-iz-ios-v-pilote-cad.md)                           | Реестр стояков из ИОС как вход трасс CAD (cad_mep.v6)                           | принято                |
+| [0042](0042-otdelka-pomeshchenij-v-pilote-cad.md)                             | Отделка помещений по зонам в пилоте CAD                                         | принято                |

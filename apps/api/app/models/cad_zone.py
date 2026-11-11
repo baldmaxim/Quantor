@@ -15,6 +15,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.contracts.cad_room_types import ROOM_TYPE_VALUES
 from app.db.base import Base
 from app.models.mixins import TimestampMixin, uuid_pk
 
@@ -39,6 +40,11 @@ DOOR_HEIGHT_MIN_MM = 1500
 DOOR_HEIGHT_MAX_MM = 3500
 
 _KIND_CHECK = "kind in (" + ", ".join(f"'{value}'" for value in ZONE_KIND_VALUES) + ")"
+_ROOM_TYPE_CHECK = (
+    "room_type is null or room_type in ("
+    + ", ".join(f"'{value}'" for value in ROOM_TYPE_VALUES)
+    + ")"
+)
 _PARKING_TYPE_CHECK = (
     "parking_type is null or parking_type in ("
     + ", ".join(f"'{value}'" for value in PARKING_TYPE_VALUES)
@@ -72,11 +78,18 @@ class CadZone(TimestampMixin, Base):
     door_height_mm: Mapped[int | None] = mapped_column(Integer)
     # Тип машино-места паркинга; задан у `parking_space` и только у него.
     parking_type: Mapped[str | None] = mapped_column(String(32))
+    # Тип помещения, заданный человеком (ADR-0042); пусто - действует тип, выведенный из названия.
+    room_type: Mapped[str | None] = mapped_column(String(32))
+    # Явно назначенный шаблон отделки; шаблон удалён - назначение снимается.
+    finish_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        pg.UUID(as_uuid=True), ForeignKey("cad_finish_templates.id", ondelete="SET NULL")
+    )
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
 
     __table_args__ = (
         Index("ix_cad_zones_revision_page", "revision_id", "page_index"),
+        Index("ix_cad_zones_finish_template_id", "finish_template_id"),
         CheckConstraint("page_index >= 0", name="page_index_non_negative"),
         CheckConstraint(_KIND_CHECK, name="kind_known"),
         CheckConstraint(
@@ -88,6 +101,7 @@ class CadZone(TimestampMixin, Base):
             f"{DOOR_HEIGHT_MIN_MM} and {DOOR_HEIGHT_MAX_MM})",
             name="door_height_valid",
         ),
+        CheckConstraint(_ROOM_TYPE_CHECK, name="room_type_known"),
         CheckConstraint(_PARKING_TYPE_CHECK, name="parking_type_known"),
         CheckConstraint(
             "(kind = 'parking_space') = (parking_type is not null)",

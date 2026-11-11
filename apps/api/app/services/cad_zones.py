@@ -14,9 +14,16 @@ import uuid
 from dataclasses import dataclass
 from typing import Final
 
+from pydantic import TypeAdapter
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contracts.cad_room_types import (
+    APARTMENT_ROOM_TYPES,
+    MOP_ROOM_TYPES,
+    CadRoomType,
+    CadRoomTypeSource,
+)
 from app.contracts.cad_zones import (
     CadParkingType,
     CadZoneCreate,
@@ -26,10 +33,45 @@ from app.contracts.cad_zones import (
 )
 from app.domain import GeometryType, QuantityState
 from app.errors import DomainError, ErrorCode
-from app.models import CadZone, Measurement, PageGeometry, ScaleCalibration, Sheet
+from app.models import (
+    CadFinishTemplate,
+    CadZone,
+    Measurement,
+    PageGeometry,
+    ScaleCalibration,
+    Sheet,
+)
 from app.models.cad_zone import DOOR_HEIGHT_MAX_MM, DOOR_HEIGHT_MIN_MM
 from app.services import quantity
 from app.services.takeoff import validate_geometry, validate_points
+
+# Виды зон-помещений: только им задаются тип помещения и шаблон отделки (ADR-0042).
+ROOM_KINDS: Final = ("room_apartment", "room_mop")
+
+_ROOM_TYPE_ADAPTER: Final[TypeAdapter[CadRoomType]] = TypeAdapter(CadRoomType)
+
+# Вывод типа из названия (ADR-0042 п. 1): подстроки в нижнем регистре, порядок проверки важен -
+# первое совпадение выигрывает («тамбур-шлюз» раньше «тамбур», «лифтовой холл» раньше «холл»).
+_MOP_RULES: Final[tuple[tuple[tuple[str, ...], CadRoomType], ...]] = (
+    (("тамбур-шлюз", "шлюз"), "airlock"),
+    (("лифт",), "lift_hall"),
+    (("тамбур",), "vestibule"),
+    (("лестн",), "stair"),
+    (("вестибюл", "входн"), "entrance_hall"),
+    (("пуи", "уборочн"), "pui"),
+    (("мусор",), "garbage"),
+    (("электрощит", "щитов", "венткам", "итп", "насосн", "тех"), "tech"),
+    (("коридор", "холл"), "corridor"),
+)
+_APARTMENT_RULES: Final[tuple[tuple[tuple[str, ...], CadRoomType], ...]] = (
+    (("кухн", "столов"), "kitchen"),
+    (("сануз", "с/у", "ванн", "душ"), "bath"),
+    (("туалет", "уборн", "wc"), "wc"),
+    (("прихож", "коридор", "холл", "тамбур"), "hall"),
+    (("гардероб", "кладов", "постироч", "хоз"), "storage"),
+    (("балкон", "лодж", "террас"), "balcony"),
+    (("комнат", "спальн", "гостин", "кабинет", "детск"), "living"),
+)
 
 # Дверь - отрезок, а не точка: две совпавшие вершины ширины не дают.
 _MIN_DOOR_SEGMENT: Final = 1e-6
@@ -52,6 +94,36 @@ class ZoneFields:
     points: list[list[float]]
     door_height_mm: int | None
     parking_type: str | None = None
+    room_type: str | None = None
+    finish_template_id: uuid.UUID | None = None
+
+
+def derive_room_type(kind: str, name: str | None) -> CadRoomType | None:
+    """Тип помещения по виду и названию зоны; у двери и машино-места типа нет."""
+    rules: tuple[tuple[tuple[str, ...], CadRoomType], ...]
+    default: CadRoomType
+    if kind == "room_mop":
+        rules, default = _MOP_RULES, "mop_other"
+    elif kind == "room_apartment":
+        rules, default = _APARTMENT_RULES, "apt_other"
+    else:
+        return None
+    text = (name or "").lower()
+    for substrings, code in rules:
+        if any(part in text for part in substrings):
+            return code
+    return default
+
+
+def effective_room_type(
+    kind: str, stored: str | None, name: str | None
+) -> tuple[CadRoomType | None, CadRoomTypeSource | None]:
+    """Действующий тип: заданный человеком, иначе выведенный из названия; у двери - `None`."""
+    if kind not in ROOM_KINDS:
+        return None, None
+    if stored is not None:
+        return _ROOM_TYPE_ADAPTER.validate_python(stored), "manual"
+    return derive_room_type(kind, name), "derived"
 
 
 def _clean(value: str | None) -> str | None:
@@ -97,6 +169,18 @@ def validate_fields(fields: ZoneFields) -> ZoneFields:
             raise _invalid("Машино-место: тип обязателен")
     elif fields.parking_type is not None:
         raise _invalid("Тип задаётся только машино-месту")
+    if fields.kind in ROOM_KINDS:
+        if fields.room_type is not None:
+            allowed = MOP_ROOM_TYPES if fields.kind == "room_mop" else APARTMENT_ROOM_TYPES
+            if fields.room_type not in allowed:
+                raise _invalid(
+                    f"Тип помещения {fields.room_type} не подходит виду зоны {fields.kind}"
+                )
+    else:
+        if fields.room_type is not None:
+            raise _invalid("Тип помещения не задаётся двери и машино-месту")
+        if fields.finish_template_id is not None:
+            raise _invalid("Шаблон отделки не назначается двери и машино-месту")
     return ZoneFields(
         kind=fields.kind,
         apartment_no=apartment_no,
@@ -105,6 +189,8 @@ def validate_fields(fields: ZoneFields) -> ZoneFields:
         points=points,
         door_height_mm=fields.door_height_mm if fields.kind == "door" else None,
         parking_type=fields.parking_type,
+        room_type=fields.room_type,
+        finish_template_id=fields.finish_template_id,
     )
 
 
@@ -117,6 +203,8 @@ def _fields_of(zone: CadZone) -> ZoneFields:
         points=[[float(x), float(y)] for x, y in zone.points],
         door_height_mm=zone.door_height_mm,
         parking_type=zone.parking_type,
+        room_type=zone.room_type,
+        finish_template_id=zone.finish_template_id,
     )
 
 
@@ -128,6 +216,8 @@ def _apply(zone: CadZone, fields: ZoneFields) -> None:
     zone.points = fields.points
     zone.door_height_mm = fields.door_height_mm
     zone.parking_type = fields.parking_type
+    zone.room_type = fields.room_type
+    zone.finish_template_id = fields.finish_template_id
 
 
 async def list_zones(
@@ -150,6 +240,21 @@ async def get_zone(
     return zone
 
 
+async def require_template(
+    session: AsyncSession, *, project_id: uuid.UUID, template_id: uuid.UUID | None
+) -> None:
+    """Шаблон отделки назначается только из своего проекта."""
+    if template_id is None:
+        return
+    found = await session.scalar(
+        select(CadFinishTemplate.id).where(
+            CadFinishTemplate.id == template_id, CadFinishTemplate.project_id == project_id
+        )
+    )
+    if found is None:
+        raise _invalid("Шаблон отделки не найден в проекте")
+
+
 async def create_zone(
     session: AsyncSession,
     *,
@@ -167,8 +272,11 @@ async def create_zone(
             points=[[x, y] for x, y in body.points],
             door_height_mm=body.door_height_mm,
             parking_type=body.parking_type,
+            room_type=body.room_type,
+            finish_template_id=body.finish_template_id,
         )
     )
+    await require_template(session, project_id=project_id, template_id=fields.finish_template_id)
     zone = CadZone(
         workspace_id=workspace_id,
         project_id=project_id,
@@ -192,14 +300,17 @@ def _fields_dict(fields: ZoneFields) -> dict[str, object]:
         "points": fields.points,
         "door_height_mm": fields.door_height_mm,
         "parking_type": fields.parking_type,
+        "room_type": fields.room_type,
+        "finish_template_id": fields.finish_template_id,
     }
 
 
 async def update_zone(session: AsyncSession, *, zone: CadZone, body: CadZoneUpdate) -> CadZone:
     """Переданные поля заменяют хранимые; итог проверяется как новая зона.
 
-    Смена вида сбрасывает вид-зависимые поля (№ квартиры, высоту), если их не передали: прежние
-    значения не принадлежат новому виду.
+    Смена вида сбрасывает вид-зависимые поля (№ квартиры, высоту, тип помещения), если их не
+    передали: прежние значения не принадлежат новому виду. Явный null у `room_type` возвращает
+    выведенный тип, у `finish_template_id` - снимает назначение.
     """
     sent = body.model_fields_set
     current = _fields_of(zone)
@@ -225,8 +336,20 @@ async def update_zone(session: AsyncSession, *, zone: CadZone, body: CadZoneUpda
             if "parking_type" in sent
             else (None if changed else current.parking_type)
         ),
+        room_type=(
+            body.room_type if "room_type" in sent else (None if changed else current.room_type)
+        ),
+        finish_template_id=(
+            body.finish_template_id
+            if "finish_template_id" in sent
+            else (current.finish_template_id if kind in ROOM_KINDS else None)
+        ),
     )
-    _apply(zone, validate_fields(merged))
+    fields = validate_fields(merged)
+    await require_template(
+        session, project_id=zone.project_id, template_id=fields.finish_template_id
+    )
+    _apply(zone, fields)
     await session.flush()
     await session.refresh(zone)
     return zone
@@ -311,6 +434,7 @@ def zone_read(zone: CadZone, scale: PageScale) -> CadZoneRead:
         if polygon.geometry_issue is not None:
             issue = polygon.geometry_issue.value
 
+    room_type, room_type_source = effective_room_type(zone.kind, zone.room_type, zone.name)
     return CadZoneRead(
         id=zone.id,
         revision_id=zone.revision_id,
@@ -322,6 +446,9 @@ def zone_read(zone: CadZone, scale: PageScale) -> CadZoneRead:
         points=[(x, y) for x, y in points],
         door_height_mm=zone.door_height_mm,
         parking_type=_parking_type(zone.parking_type),
+        room_type=room_type,
+        room_type_source=room_type_source,
+        finish_template_id=zone.finish_template_id,
         area_m2=area,
         perimeter_m=perimeter,
         width_m=width,

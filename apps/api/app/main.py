@@ -20,6 +20,7 @@ from app.api import health
 from app.api.v1.cad import qa_router as cad_qa_router
 from app.api.v1.cad_building3d import qa_router as cad_building3d_qa_router
 from app.api.v1.cad_constructions import qa_router as cad_constructions_qa_router
+from app.api.v1.cad_finishes import qa_router as cad_finishes_qa_router
 from app.api.v1.cad_floor3d import qa_router as cad_floor3d_qa_router
 from app.api.v1.cad_mep import qa_router as cad_mep_qa_router
 from app.api.v1.cad_pipeline import qa_router as cad_pipeline_qa_router
@@ -101,6 +102,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # PDF -> CAD (ADR-0036): маршруты есть всегда, закрывает их флаг пространства `cad.export`.
     # `/pipeline` раньше `/{job_id}` из cad_qa_router.
     app.include_router(cad_pipeline_qa_router)
+    # Отделка помещений (ADR-0042): `/cad/finishes` раньше `/{job_id}` из cad_qa_router.
+    app.include_router(cad_finishes_qa_router)
     app.include_router(cad_qa_router)
     app.include_router(cad_mep_qa_router)
     app.include_router(cad_zones_qa_router)

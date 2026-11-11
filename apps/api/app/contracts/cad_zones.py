@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.contracts.cad_room_types import CadRoomType, CadRoomTypeSource
 from app.domain import MAX_MEASUREMENT_POINTS
 
 CadZoneKind = Literal["room_apartment", "room_mop", "door", "parking_space"]
@@ -42,6 +43,9 @@ class CadZoneCreate(BaseModel):
     points: list[ZonePoint] = Field(min_length=2, max_length=MAX_MEASUREMENT_POINTS)
     door_height_mm: int | None = None
     parking_type: CadParkingType | None = None
+    # Тип помещения (ADR-0042): не передан - сервер выводит из названия; у двери и места - нет.
+    room_type: CadRoomType | None = None
+    finish_template_id: UUID | None = None
 
 
 class CadZoneUpdate(BaseModel):
@@ -58,6 +62,9 @@ class CadZoneUpdate(BaseModel):
     )
     door_height_mm: int | None = None
     parking_type: CadParkingType | None = None
+    # Явный null очищает: тип снова выводится из названия, назначение шаблона снимается.
+    room_type: CadRoomType | None = None
+    finish_template_id: UUID | None = None
 
 
 class CadZoneRead(BaseModel):
@@ -71,6 +78,11 @@ class CadZoneRead(BaseModel):
     points: list[ZonePoint]
     door_height_mm: int | None
     parking_type: CadParkingType | None
+    # Действующий тип помещения: заданный человеком или выведенный из названия (ADR-0042).
+    # У двери и машино-места - null, как и источник.
+    room_type: CadRoomType | None
+    room_type_source: CadRoomTypeSource | None
+    finish_template_id: UUID | None
     # Площадь и периметр помещения, ширина двери: сервер, по геометрии страницы и действующей
     # калибровке листа. `null` — не определено (не 0): причина в `calibration_missing`
     # или `geometry_issue`.

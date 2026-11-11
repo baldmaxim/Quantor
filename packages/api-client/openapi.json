@@ -2860,6 +2860,1239 @@
         "title": "CadEventsRead",
         "type": "object"
       },
+      "CadFinishAreaByBaseRead": {
+        "description": "Площадь стен зоны по основаниям (м2, без надпроёмных частей и откосов); null - нет.",
+        "properties": {
+          "gkl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gkl"
+          },
+          "masonry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Masonry"
+          },
+          "monolith": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monolith"
+          }
+        },
+        "required": [
+          "monolith",
+          "masonry",
+          "gkl"
+        ],
+        "title": "CadFinishAreaByBaseRead",
+        "type": "object"
+      },
+      "CadFinishAssign": {
+        "additionalProperties": false,
+        "description": "Массовое назначение шаблона зонам проекта; `null` снимает явное назначение.",
+        "properties": {
+          "template_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "zone_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Zone Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "zone_ids",
+          "template_id"
+        ],
+        "title": "CadFinishAssign",
+        "type": "object"
+      },
+      "CadFinishAssignResult": {
+        "properties": {
+          "assigned": {
+            "minimum": 0.0,
+            "title": "Assigned",
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishAssignSkip"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "skipped_count": {
+            "minimum": 0.0,
+            "title": "Skipped Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assigned",
+          "skipped_count",
+          "skipped"
+        ],
+        "title": "CadFinishAssignResult",
+        "type": "object"
+      },
+      "CadFinishAssignSkip": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "door",
+              "parking_space",
+              "not_found"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "zone_id": {
+            "format": "uuid",
+            "title": "Zone Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "zone_id",
+          "reason"
+        ],
+        "title": "CadFinishAssignSkip",
+        "type": "object"
+      },
+      "CadFinishLayer": {
+        "additionalProperties": false,
+        "description": "Слой отделки поверхности: работа, материал, число слоёв, толщина, расход.",
+        "properties": {
+          "bases": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "monolith",
+                    "masonry",
+                    "gkl"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 3,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Основания, по которым идёт слой стен (monolith, masonry, gkl); null - все. Только для слоёв стен",
+            "title": "Bases"
+          },
+          "coats": {
+            "default": 1,
+            "description": "Число слоёв (раз)",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Coats",
+            "type": "integer"
+          },
+          "consumption": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Расход на м² поверхности (на м² · мм, если по толщине)",
+            "title": "Consumption"
+          },
+          "consumption_per_mm": {
+            "default": false,
+            "description": "Расход задан на м² · мм: количество умножается на толщину",
+            "title": "Consumption Per Mm",
+            "type": "boolean"
+          },
+          "consumption_unit": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Единица количества материала (кг, л, шт, м³); обязательна при расходе",
+            "title": "Consumption Unit"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "thickness_mm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 200.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Mm"
+          },
+          "work": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Work",
+            "type": "string"
+          }
+        },
+        "required": [
+          "work"
+        ],
+        "title": "CadFinishLayer",
+        "type": "object"
+      },
+      "CadFinishLayerRead": {
+        "description": "Слой отделки зоны с количеством; `null` - не определено (не 0).",
+        "properties": {
+          "area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area M2"
+          },
+          "bases": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "monolith",
+                    "masonry",
+                    "gkl"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bases"
+          },
+          "coats": {
+            "title": "Coats",
+            "type": "integer"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "material_qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Qty"
+          },
+          "material_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Unit"
+          },
+          "surface": {
+            "enum": [
+              "floor",
+              "walls",
+              "ceiling"
+            ],
+            "title": "Surface",
+            "type": "string"
+          },
+          "thickness_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Mm"
+          },
+          "work": {
+            "title": "Work",
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "work",
+          "material",
+          "coats",
+          "thickness_mm",
+          "bases",
+          "area_m2",
+          "material_qty",
+          "material_unit"
+        ],
+        "title": "CadFinishLayerRead",
+        "type": "object"
+      },
+      "CadFinishRoomTypeRead": {
+        "properties": {
+          "ceiling_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ceiling Area M2"
+          },
+          "floor_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Area M2"
+          },
+          "room_type": {
+            "enum": [
+              "lift_hall",
+              "vestibule",
+              "airlock",
+              "corridor",
+              "stair",
+              "entrance_hall",
+              "pui",
+              "garbage",
+              "tech",
+              "mop_other",
+              "living",
+              "kitchen",
+              "bath",
+              "wc",
+              "hall",
+              "storage",
+              "balcony",
+              "apt_other"
+            ],
+            "title": "Room Type",
+            "type": "string"
+          },
+          "wall_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Area M2"
+          },
+          "zone_count": {
+            "title": "Zone Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "room_type",
+          "zone_count",
+          "floor_area_m2",
+          "wall_area_m2",
+          "ceiling_area_m2"
+        ],
+        "title": "CadFinishRoomTypeRead",
+        "type": "object"
+      },
+      "CadFinishSheetRead": {
+        "description": "Ведомость отделки листа: зоны, итоги по работам, итоги по типам помещений, предупреждения.",
+        "properties": {
+          "by_room_type": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishRoomTypeRead"
+            },
+            "title": "By Room Type",
+            "type": "array"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishTotalRead"
+            },
+            "title": "Totals",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishWarningRead"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishZoneRead"
+            },
+            "title": "Zones",
+            "type": "array"
+          }
+        },
+        "required": [
+          "revision_id",
+          "page_index",
+          "zones",
+          "totals",
+          "by_room_type",
+          "warnings"
+        ],
+        "title": "CadFinishSheetRead",
+        "type": "object"
+      },
+      "CadFinishTemplatePatch": {
+        "additionalProperties": false,
+        "description": "Частичная правка шаблона: переданное заменяет хранимое; явный null у высоты очищает её.",
+        "properties": {
+          "ceiling_layers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CadFinishLayer"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ceiling Layers"
+          },
+          "floor_layers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CadFinishLayer"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Layers"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "room_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "lift_hall",
+                    "vestibule",
+                    "airlock",
+                    "corridor",
+                    "stair",
+                    "entrance_hall",
+                    "pui",
+                    "garbage",
+                    "tech",
+                    "mop_other",
+                    "living",
+                    "kitchen",
+                    "bath",
+                    "wc",
+                    "hall",
+                    "storage",
+                    "balcony",
+                    "apt_other"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 18,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Types"
+          },
+          "wall_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 6000.0,
+                "minimum": 1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Height Mm"
+          },
+          "wall_layers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CadFinishLayer"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Layers"
+          },
+          "walls_include_reveals": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walls Include Reveals"
+          }
+        },
+        "title": "CadFinishTemplatePatch",
+        "type": "object"
+      },
+      "CadFinishTemplateRead": {
+        "properties": {
+          "ceiling_layers": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishLayer"
+            },
+            "title": "Ceiling Layers",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "floor_layers": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishLayer"
+            },
+            "title": "Floor Layers",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "room_types": {
+            "items": {
+              "enum": [
+                "lift_hall",
+                "vestibule",
+                "airlock",
+                "corridor",
+                "stair",
+                "entrance_hall",
+                "pui",
+                "garbage",
+                "tech",
+                "mop_other",
+                "living",
+                "kitchen",
+                "bath",
+                "wc",
+                "hall",
+                "storage",
+                "balcony",
+                "apt_other"
+              ],
+              "type": "string"
+            },
+            "title": "Room Types",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "wall_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Height Mm"
+          },
+          "wall_layers": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishLayer"
+            },
+            "title": "Wall Layers",
+            "type": "array"
+          },
+          "walls_include_reveals": {
+            "title": "Walls Include Reveals",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "room_types",
+          "wall_height_mm",
+          "walls_include_reveals",
+          "floor_layers",
+          "wall_layers",
+          "ceiling_layers",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CadFinishTemplateRead",
+        "type": "object"
+      },
+      "CadFinishTemplateWrite": {
+        "additionalProperties": false,
+        "description": "Новый шаблон отделки проекта.",
+        "properties": {
+          "ceiling_layers": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishLayer"
+            },
+            "maxItems": 20,
+            "title": "Ceiling Layers",
+            "type": "array"
+          },
+          "floor_layers": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishLayer"
+            },
+            "maxItems": 20,
+            "title": "Floor Layers",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "room_types": {
+            "items": {
+              "enum": [
+                "lift_hall",
+                "vestibule",
+                "airlock",
+                "corridor",
+                "stair",
+                "entrance_hall",
+                "pui",
+                "garbage",
+                "tech",
+                "mop_other",
+                "living",
+                "kitchen",
+                "bath",
+                "wc",
+                "hall",
+                "storage",
+                "balcony",
+                "apt_other"
+              ],
+              "type": "string"
+            },
+            "maxItems": 18,
+            "title": "Room Types",
+            "type": "array"
+          },
+          "wall_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 6000.0,
+                "minimum": 1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Height Mm"
+          },
+          "wall_layers": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishLayer"
+            },
+            "maxItems": 20,
+            "title": "Wall Layers",
+            "type": "array"
+          },
+          "walls_include_reveals": {
+            "default": false,
+            "description": "Откосы дверных проёмов входят в площадь слоёв стен (ADR-0042, п. 6)",
+            "title": "Walls Include Reveals",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CadFinishTemplateWrite",
+        "type": "object"
+      },
+      "CadFinishTotalRead": {
+        "properties": {
+          "area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area M2"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "material_qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Qty"
+          },
+          "material_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Unit"
+          },
+          "surface": {
+            "enum": [
+              "floor",
+              "walls",
+              "ceiling"
+            ],
+            "title": "Surface",
+            "type": "string"
+          },
+          "work": {
+            "title": "Work",
+            "type": "string"
+          },
+          "zone_count": {
+            "title": "Zone Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "surface",
+          "work",
+          "material",
+          "material_unit",
+          "area_m2",
+          "material_qty",
+          "zone_count"
+        ],
+        "title": "CadFinishTotalRead",
+        "type": "object"
+      },
+      "CadFinishWallsBreakdownRead": {
+        "description": "Привязка рёбер зоны к конструкциям листа (ADR-0042, п. 6).\n\n`linked=false` - привязки нет (нет конструкций, кадра листа или контур зоны непригоден), все\nостальные поля null. Длины (м) известны при `linked`; площади - ещё и при известной высоте\nстен. Окон в результате конструкций нет: наружные стены без вычета окон.",
+        "properties": {
+          "area_by_base": {
+            "$ref": "#/components/schemas/CadFinishAreaByBaseRead"
+          },
+          "door_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door M"
+          },
+          "door_over_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door Over Area M2"
+          },
+          "gap_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap M"
+          },
+          "gkl_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gkl M"
+          },
+          "linked": {
+            "title": "Linked",
+            "type": "boolean"
+          },
+          "masonry_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Masonry M"
+          },
+          "monolith_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monolith M"
+          },
+          "open_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open M"
+          },
+          "reveal_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reveal Area M2"
+          },
+          "reveal_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reveal M"
+          }
+        },
+        "required": [
+          "linked",
+          "monolith_m",
+          "masonry_m",
+          "gkl_m",
+          "door_m",
+          "gap_m",
+          "open_m",
+          "area_by_base",
+          "door_over_area_m2",
+          "reveal_m",
+          "reveal_area_m2"
+        ],
+        "title": "CadFinishWallsBreakdownRead",
+        "type": "object"
+      },
+      "CadFinishWarningRead": {
+        "properties": {
+          "code": {
+            "enum": [
+              "calibration_missing",
+              "geometry_issue",
+              "wall_height_missing",
+              "no_template",
+              "gap_unknown_height",
+              "door_height_missing",
+              "windows_not_detected",
+              "edges_unlinked"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "zone_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Zone Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "zone_ids"
+        ],
+        "title": "CadFinishWarningRead",
+        "type": "object"
+      },
+      "CadFinishZoneRead": {
+        "properties": {
+          "apartment_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartment No"
+          },
+          "ceiling_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ceiling Area M2"
+          },
+          "floor_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Area M2"
+          },
+          "kind": {
+            "enum": [
+              "room_apartment",
+              "room_mop",
+              "door",
+              "parking_space"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/CadFinishLayerRead"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "perimeter_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Perimeter M"
+          },
+          "room_mark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Mark"
+          },
+          "room_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lift_hall",
+                  "vestibule",
+                  "airlock",
+                  "corridor",
+                  "stair",
+                  "entrance_hall",
+                  "pui",
+                  "garbage",
+                  "tech",
+                  "mop_other",
+                  "living",
+                  "kitchen",
+                  "bath",
+                  "wc",
+                  "hall",
+                  "storage",
+                  "balcony",
+                  "apt_other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Type"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "template_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "explicit",
+                  "by_type"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Source"
+          },
+          "wall_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Area M2"
+          },
+          "wall_height_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Height Mm"
+          },
+          "wall_height_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "template",
+                  "levels"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Height Source"
+          },
+          "walls_breakdown": {
+            "$ref": "#/components/schemas/CadFinishWallsBreakdownRead"
+          },
+          "zone_id": {
+            "format": "uuid",
+            "title": "Zone Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "zone_id",
+          "name",
+          "apartment_no",
+          "room_mark",
+          "kind",
+          "room_type",
+          "template_id",
+          "template_source",
+          "floor_area_m2",
+          "ceiling_area_m2",
+          "perimeter_m",
+          "wall_height_mm",
+          "wall_height_source",
+          "wall_area_m2",
+          "walls_breakdown",
+          "layers"
+        ],
+        "title": "CadFinishZoneRead",
+        "type": "object"
+      },
       "CadFloor3dDoorRead": {
         "description": "Полотно двери в разрыве стены: тонкая призма от отметки этажа до высоты двери.",
         "properties": {
@@ -7279,6 +8512,18 @@
             ],
             "title": "Door Height Mm"
           },
+          "finish_template_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Template Id"
+          },
           "kind": {
             "enum": [
               "room_apartment",
@@ -7364,6 +8609,37 @@
               }
             ],
             "title": "Room Mark"
+          },
+          "room_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lift_hall",
+                  "vestibule",
+                  "airlock",
+                  "corridor",
+                  "stair",
+                  "entrance_hall",
+                  "pui",
+                  "garbage",
+                  "tech",
+                  "mop_other",
+                  "living",
+                  "kitchen",
+                  "bath",
+                  "wc",
+                  "hall",
+                  "storage",
+                  "balcony",
+                  "apt_other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Type"
           }
         },
         "required": [
@@ -7418,6 +8694,18 @@
               }
             ],
             "title": "Door Height Mm"
+          },
+          "finish_template_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Template Id"
           },
           "geometry_issue": {
             "anyOf": [
@@ -7527,6 +8815,52 @@
             ],
             "title": "Room Mark"
           },
+          "room_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lift_hall",
+                  "vestibule",
+                  "airlock",
+                  "corridor",
+                  "stair",
+                  "entrance_hall",
+                  "pui",
+                  "garbage",
+                  "tech",
+                  "mop_other",
+                  "living",
+                  "kitchen",
+                  "bath",
+                  "wc",
+                  "hall",
+                  "storage",
+                  "balcony",
+                  "apt_other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Type"
+          },
+          "room_type_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "manual",
+                  "derived"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Type Source"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -7555,6 +8889,9 @@
           "points",
           "door_height_mm",
           "parking_type",
+          "room_type",
+          "room_type_source",
+          "finish_template_id",
           "area_m2",
           "perimeter_m",
           "width_m",
@@ -7592,6 +8929,18 @@
               }
             ],
             "title": "Door Height Mm"
+          },
+          "finish_template_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Template Id"
           },
           "kind": {
             "anyOf": [
@@ -7682,6 +9031,37 @@
               }
             ],
             "title": "Room Mark"
+          },
+          "room_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lift_hall",
+                  "vestibule",
+                  "airlock",
+                  "corridor",
+                  "stair",
+                  "entrance_hall",
+                  "pui",
+                  "garbage",
+                  "tech",
+                  "mop_other",
+                  "living",
+                  "kitchen",
+                  "bath",
+                  "wc",
+                  "hall",
+                  "storage",
+                  "balcony",
+                  "apt_other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Type"
           }
         },
         "title": "CadZoneUpdate",
@@ -31680,6 +33060,212 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/cad/finish-templates": {
+      "get": {
+        "operationId": "list_cad_finish_templates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CadFinishTemplateRead"
+                  },
+                  "title": "Response List Cad Finish Templates",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Шаблоны отделки проекта",
+        "tags": [
+          "cad-finishes"
+        ]
+      },
+      "post": {
+        "description": "409 `CAD_FINISH_TEMPLATE_NAME_TAKEN` - название занято; `CAD_FINISH_ROOM_TYPE_TAKEN` - тип\nпомещения уже у другого шаблона проекта.",
+        "operationId": "create_cad_finish_template",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadFinishTemplateWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadFinishTemplateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать шаблон отделки проекта",
+        "tags": [
+          "cad-finishes"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/finish-templates/{template_id}": {
+      "delete": {
+        "operationId": "delete_cad_finish_template",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить шаблон отделки (явные назначения зонам снимаются)",
+        "tags": [
+          "cad-finishes"
+        ]
+      },
+      "patch": {
+        "operationId": "update_cad_finish_template",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadFinishTemplatePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadFinishTemplateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Изменить шаблон отделки",
+        "tags": [
+          "cad-finishes"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/cad/levels": {
       "get": {
         "operationId": "read_cad_project_levels",
@@ -32646,6 +34232,59 @@
         "summary": "Создать зону листа",
         "tags": [
           "cad-zones"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/zones/finish-assign": {
+      "post": {
+        "operationId": "assign_cad_finish_template",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadFinishAssign"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadFinishAssignResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Назначить шаблон отделки зонам проекта (null снимает); двери пропускаются",
+        "tags": [
+          "cad-finishes"
         ]
       }
     },
@@ -33748,6 +35387,69 @@
         "summary": "Отозвать решение (одобрение вида или принятие трасс); запись остаётся",
         "tags": [
           "cad-mep"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/finishes": {
+      "get": {
+        "operationId": "read_cad_finishes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadFinishSheetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ведомость отделки листа: зоны, слои, итоги, предупреждения (рабочая таблица, не ВОР)",
+        "tags": [
+          "cad-finishes"
         ]
       }
     },

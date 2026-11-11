@@ -21,6 +21,9 @@ const zone = (patch: Partial<CadZoneRead>): CadZoneRead => ({
   ],
   door_height_mm: null,
   parking_type: null,
+  room_type: null,
+  room_type_source: null,
+  finish_template_id: null,
   area_m2: 12.5,
   perimeter_m: 14,
   width_m: null,
@@ -57,6 +60,10 @@ const props = (patch: Partial<IWorkspaceCadZones> = {}): IWorkspaceCadZones => (
   error: null,
   onRename: vi.fn(),
   onDelete: vi.fn(),
+  shapeEdit: null,
+  shapeEditDisabledReason: null,
+  onStartEdit: vi.fn(),
+  onStartSplit: vi.fn(),
   ...patch,
 });
 
@@ -232,5 +239,43 @@ describe('CadZonesPanel', () => {
     expect(screen.getByText('Контур пересекается')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
     expect(onReload).toHaveBeenCalledTimes(1);
+  });
+  it('у выбранной зоны-помещения есть «Изменить контур» и «Разрезать»; у двери и невыбранной - нет', () => {
+    const onStartEdit = vi.fn();
+    const onStartSplit = vi.fn();
+    const zones = [
+      zone({ id: 'a' }),
+      zone({ id: 'b', kind: 'room_mop', apartment_no: null }),
+      zone({ id: 'd', kind: 'door', apartment_no: null, room_mark: null }),
+    ];
+    const { rerender } = render(
+      <CadZonesPanel {...props({ zones, activeId: null, onStartEdit, onStartSplit })} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Изменить контур' })).toBeNull();
+
+    rerender(<CadZonesPanel {...props({ zones, activeId: 'a', onStartEdit, onStartSplit })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить контур' }));
+    expect(onStartEdit).toHaveBeenCalledWith('a');
+    fireEvent.click(screen.getByRole('button', { name: 'Разрезать' }));
+    expect(onStartSplit).toHaveBeenCalledWith('a');
+
+    rerender(<CadZonesPanel {...props({ zones, activeId: 'd', onStartEdit, onStartSplit })} />);
+    expect(screen.queryByRole('button', { name: 'Изменить контур' })).toBeNull();
+  });
+
+  it('пока идёт правка или нельзя править, кнопки контура отключены', () => {
+    const zones = [zone({ id: 'a' })];
+    const { rerender } = render(
+      <CadZonesPanel {...props({ zones, activeId: 'a', shapeEdit: { id: 'a', mode: 'edit' } })} />,
+    );
+    expect(screen.getByRole('button', { name: 'Изменить контур' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Разрезать' })).toBeDisabled();
+
+    rerender(
+      <CadZonesPanel
+        {...props({ zones, activeId: 'a', shapeEditDisabledReason: 'Сначала закончите отметку.' })}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Разрезать' })).toBeDisabled();
   });
 });

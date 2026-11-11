@@ -96,6 +96,9 @@ export interface IWorkspaceCad {
   side: IWorkspaceCadSideProps;
   /** Данные слоя рисования зоны; `null` - режим рисования выключен. */
   zoneCapture: IWorkspaceCadZonesState['capture'];
+  /** Правка контура и разрез зоны; `null` - режим выключен. */
+  zoneEdit: IWorkspaceCadZonesState['edit'];
+  zoneSplit: IWorkspaceCadZonesState['split'];
   /** Выбор конструкции щелчком и её карточка; `null` - выбор выключен. */
   constructionPicker: IWorkspaceCadConstructionPicker | null;
   /** Вид «3D» открыт поверх холста (ADR-0039): параметры листа и вида; `null` - режим «План». */
@@ -198,16 +201,16 @@ export const useWorkspaceCad = ({
     setCropVisible(false);
   }
 
-  const layerNames = useMemo(() => preview?.layers ?? [], [preview]);
-  const visibleLayers = useMemo<ReadonlySet<number>>(
-    () => new Set(layerNames.map((_, index) => index).filter((index) => !hiddenLayers.has(index))),
   // Слои - один источник правды для плана и 3D: по именам, не сбрасываются при смене режима и вида.
-    [layerNames, hiddenLayers],
+  const layerNames = useMemo(() => preview?.layers ?? [], [preview]);
   const visibility = useCadLayerVisibility(
     params ? layerVisibilityKey(params.jobId, params.pageIndex) : null,
     layerNames,
   );
   const { hiddenLayers } = visibility;
+  const visibleLayers = useMemo<ReadonlySet<number>>(
+    () => new Set(layerNames.map((_, index) => index).filter((index) => !hiddenLayers.has(index))),
+    [layerNames, hiddenLayers],
   );
   const cropContext = diagnostics?.scale?.context_crop_pt;
   const cropRect = useMemo(
@@ -279,16 +282,13 @@ export const useWorkspaceCad = ({
     camera,
     load: enabled && opened && revisionId !== null,
     active,
-    blocked: remarks.capturing || zonesState.capture !== null,
+    blocked:
+      remarks.capturing ||
+      zonesState.capture !== null ||
+      zonesState.edit !== null ||
+      zonesState.split !== null,
+    hiddenCategories: visibility.hiddenCategories,
   });
-  const constructionsPainter = useMemo(
-    () =>
-      constructionsState.paintData
-        ? createConstructionsPainter(constructionsState.paintData, { clear: cadPainter === null })
-        : null,
-    [constructionsState.paintData, cadPainter],
-  );
-
   // Выбрана конструкция - подложка DXF приглушается, чтобы чужие линии не читались как выделение.
   const dimmed = constructionsState.selection.selectedIds.size > 0;
 
@@ -328,6 +328,14 @@ export const useWorkspaceCad = ({
     routePaths,
   ]);
   const cadPainter = useMemo(() => (paintData ? createCadPainter(paintData) : null), [paintData]);
+  const constructionsPainter = useMemo(
+    () =>
+      constructionsState.paintData
+        ? createConstructionsPainter(constructionsState.paintData, { clear: cadPainter === null })
+        : null,
+    [constructionsState.paintData, cadPainter],
+  );
+
   const zonesPainter = useMemo(
     () =>
       zonesState.paintData
@@ -350,7 +358,6 @@ export const useWorkspaceCad = ({
               {
                 clear:
                   cadPainter === null && constructionsPainter === null && zonesPainter === null,
-    hiddenCategories: visibility.hiddenCategories,
               },
             )
           : null,
@@ -526,6 +533,12 @@ export const useWorkspaceCad = ({
       : null,
     zones: zonesState.zones,
     constructions: constructionsState.side,
+    finishes: {
+      projectId,
+      revisionId,
+      pageIndex,
+      load: enabled && opened && revisionId !== null,
+    },
   };
 
   const link = { ...constructionsState.selection, hiddenCategories: visibility.hiddenCategories };
@@ -541,6 +554,8 @@ export const useWorkspaceCad = ({
     bar,
     side,
     zoneCapture: zonesState.capture,
+    zoneEdit: zonesState.edit,
+    zoneSplit: zonesState.split,
     constructionPicker: constructionsState.picker,
     floor3d,
     floor3dPending:

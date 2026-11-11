@@ -18,6 +18,7 @@ import {
 
 import { unwrap } from '@/lib/queries';
 
+import { invalidateFinishSheets } from './finishes-queries';
 import type { ParkingType, ZoneKind } from './zones';
 
 /**
@@ -90,9 +91,13 @@ export const useCreateCadZone = (
         }),
       ),
     onSuccess: (zone) =>
-      client.invalidateQueries({
-        queryKey: zoneKeys.page(projectId, zone.revision_id, zone.page_index),
-      }),
+      Promise.all([
+        client.invalidateQueries({
+          queryKey: zoneKeys.page(projectId, zone.revision_id, zone.page_index),
+        }),
+        // Ведомость отделки считается по зонам: правка зоны её перечитывает.
+        invalidateFinishSheets(client, projectId, zone.revision_id),
+      ]),
   });
 };
 
@@ -109,9 +114,13 @@ export const useUpdateCadZone = (
     mutationFn: async ({ id, patch }) =>
       unwrap(await updateCadZone({ throwOnError: true, path: { zone_id: id }, body: patch })),
     onSuccess: (zone) =>
-      client.invalidateQueries({
-        queryKey: zoneKeys.page(projectId, zone.revision_id, zone.page_index),
-      }),
+      Promise.all([
+        client.invalidateQueries({
+          queryKey: zoneKeys.page(projectId, zone.revision_id, zone.page_index),
+        }),
+        // Ведомость отделки считается по зонам: правка зоны её перечитывает.
+        invalidateFinishSheets(client, projectId, zone.revision_id),
+      ]),
   });
 };
 
@@ -123,6 +132,9 @@ export const useDeleteCadZone = (
   return useMutation({
     mutationFn: async (id) => deleteCadZone({ throwOnError: true, path: { zone_id: id } }),
     onSuccess: () =>
-      client.invalidateQueries({ queryKey: zoneKeys.revision(projectId, revisionId ?? '') }),
+      Promise.all([
+        client.invalidateQueries({ queryKey: zoneKeys.revision(projectId, revisionId ?? '') }),
+        invalidateFinishSheets(client, projectId, revisionId ?? ''),
+      ]),
   });
 };

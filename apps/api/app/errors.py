@@ -175,6 +175,9 @@ class ErrorCode(StrEnum):
     CAD_ROUTES3D_MISSING = "CAD_ROUTES3D_MISSING"
     # ВОР Заказчика в контуре CAD (ADR-0038 п. 5): файл не разобран как таблица ВОР.
     CAD_VOR_PARSE_FAILED = "CAD_VOR_PARSE_FAILED"
+    # Шаблоны отделки помещений (ADR-0042): название занято / тип помещения уже у другого шаблона.
+    CAD_FINISH_TEMPLATE_NAME_TAKEN = "CAD_FINISH_TEMPLATE_NAME_TAKEN"
+    CAD_FINISH_ROOM_TYPE_TAKEN = "CAD_FINISH_ROOM_TYPE_TAKEN"
 
     # --- поставщики моделей ---
     MODEL_PROVIDER_NOT_CONFIGURED = "MODEL_PROVIDER_NOT_CONFIGURED"
@@ -333,11 +336,15 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_WALLS_BUSY: "Расчёт конструкций этого вида уже идёт",
     ErrorCode.CAD_ZONES_NOT_EMPTY: "На виде уже есть зоны — автоматическая разметка не запускается",
     ErrorCode.CAD_ZONES_BUSY: "Разметка зон уже идёт",
-    ErrorCode.CAD_VOR_PARSE_FAILED: "Файл не удалось разобрать как ВОР",
-    ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
-    ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
     ErrorCode.CAD_ROUTES_NOT_FOUND: "Для листа нет построенных трасс механики",
     ErrorCode.CAD_ROUTES3D_MISSING: "Трассы построены прежней версией: перестройте трассы",
+    ErrorCode.CAD_VOR_PARSE_FAILED: "Файл не удалось разобрать как ВОР",
+    ErrorCode.CAD_FINISH_TEMPLATE_NAME_TAKEN: "Шаблон отделки с таким названием уже есть в проекте",
+    ErrorCode.CAD_FINISH_ROOM_TYPE_TAKEN: (
+        "Тип помещения уже назначен другому шаблону отделки проекта"
+    ),
+    ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
+    ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: "Поставщик моделей не настроен",
     ErrorCode.TENDERHUB_DISABLED: "Интеграция с TenderHUB не настроена",
     ErrorCode.TENDERHUB_AUTH_FAILED: "TenderHUB не принял ключ доступа",
@@ -486,15 +493,17 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_WALLS_BUSY: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_ZONES_NOT_EMPTY: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_ZONES_BUSY: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_ROUTES_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.CAD_ROUTES3D_MISSING: status.HTTP_404_NOT_FOUND,
     ErrorCode.CAD_VOR_PARSE_FAILED: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_FINISH_TEMPLATE_NAME_TAKEN: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_FINISH_ROOM_TYPE_TAKEN: status.HTTP_409_CONFLICT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: status.HTTP_409_CONFLICT,
     # Отказы внешней системы — 502: клиент не виноват, но и повторять запрос бессмысленно,
     # пока не поправят ключ или доступ на той стороне.
     ErrorCode.TENDERHUB_DISABLED: status.HTTP_503_SERVICE_UNAVAILABLE,
-    ErrorCode.CAD_ROUTES_NOT_FOUND: status.HTTP_404_NOT_FOUND,
-    ErrorCode.CAD_ROUTES3D_MISSING: status.HTTP_404_NOT_FOUND,
     ErrorCode.TENDERHUB_AUTH_FAILED: status.HTTP_502_BAD_GATEWAY,
     ErrorCode.TENDERHUB_FORBIDDEN: status.HTTP_502_BAD_GATEWAY,
     ErrorCode.TENDERHUB_RATE_LIMITED: status.HTTP_429_TOO_MANY_REQUESTS,

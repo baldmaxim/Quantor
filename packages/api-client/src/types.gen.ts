@@ -1429,6 +1429,518 @@ export type CadEventsRead = {
 };
 
 /**
+ * CadFinishAreaByBaseRead
+ *
+ * Площадь стен зоны по основаниям (м2, без надпроёмных частей и откосов); null - нет.
+ */
+export type CadFinishAreaByBaseRead = {
+    /**
+     * Gkl
+     */
+    gkl: number | null;
+    /**
+     * Masonry
+     */
+    masonry: number | null;
+    /**
+     * Monolith
+     */
+    monolith: number | null;
+};
+
+/**
+ * CadFinishAssign
+ *
+ * Массовое назначение шаблона зонам проекта; `null` снимает явное назначение.
+ */
+export type CadFinishAssign = {
+    /**
+     * Template Id
+     */
+    template_id: string | null;
+    /**
+     * Zone Ids
+     */
+    zone_ids: Array<string>;
+};
+
+/**
+ * CadFinishAssignResult
+ */
+export type CadFinishAssignResult = {
+    /**
+     * Assigned
+     */
+    assigned: number;
+    /**
+     * Skipped
+     */
+    skipped: Array<CadFinishAssignSkip>;
+    /**
+     * Skipped Count
+     */
+    skipped_count: number;
+};
+
+/**
+ * CadFinishAssignSkip
+ */
+export type CadFinishAssignSkip = {
+    /**
+     * Reason
+     */
+    reason: 'door' | 'parking_space' | 'not_found';
+    /**
+     * Zone Id
+     */
+    zone_id: string;
+};
+
+/**
+ * CadFinishLayer
+ *
+ * Слой отделки поверхности: работа, материал, число слоёв, толщина, расход.
+ */
+export type CadFinishLayer = {
+    /**
+     * Bases
+     *
+     * Основания, по которым идёт слой стен (monolith, masonry, gkl); null - все. Только для слоёв стен
+     */
+    bases?: Array<'monolith' | 'masonry' | 'gkl'> | null;
+    /**
+     * Coats
+     *
+     * Число слоёв (раз)
+     */
+    coats?: number;
+    /**
+     * Consumption
+     *
+     * Расход на м² поверхности (на м² · мм, если по толщине)
+     */
+    consumption?: number | null;
+    /**
+     * Consumption Per Mm
+     *
+     * Расход задан на м² · мм: количество умножается на толщину
+     */
+    consumption_per_mm?: boolean;
+    /**
+     * Consumption Unit
+     *
+     * Единица количества материала (кг, л, шт, м³); обязательна при расходе
+     */
+    consumption_unit?: string | null;
+    /**
+     * Material
+     */
+    material?: string | null;
+    /**
+     * Thickness Mm
+     */
+    thickness_mm?: number | null;
+    /**
+     * Work
+     */
+    work: string;
+};
+
+/**
+ * CadFinishLayerRead
+ *
+ * Слой отделки зоны с количеством; `null` - не определено (не 0).
+ */
+export type CadFinishLayerRead = {
+    /**
+     * Area M2
+     */
+    area_m2: number | null;
+    /**
+     * Bases
+     */
+    bases: Array<'monolith' | 'masonry' | 'gkl'> | null;
+    /**
+     * Coats
+     */
+    coats: number;
+    /**
+     * Material
+     */
+    material: string | null;
+    /**
+     * Material Qty
+     */
+    material_qty: number | null;
+    /**
+     * Material Unit
+     */
+    material_unit: string | null;
+    /**
+     * Surface
+     */
+    surface: 'floor' | 'walls' | 'ceiling';
+    /**
+     * Thickness Mm
+     */
+    thickness_mm: number | null;
+    /**
+     * Work
+     */
+    work: string;
+};
+
+/**
+ * CadFinishRoomTypeRead
+ */
+export type CadFinishRoomTypeRead = {
+    /**
+     * Ceiling Area M2
+     */
+    ceiling_area_m2: number | null;
+    /**
+     * Floor Area M2
+     */
+    floor_area_m2: number | null;
+    /**
+     * Room Type
+     */
+    room_type: 'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other';
+    /**
+     * Wall Area M2
+     */
+    wall_area_m2: number | null;
+    /**
+     * Zone Count
+     */
+    zone_count: number;
+};
+
+/**
+ * CadFinishSheetRead
+ *
+ * Ведомость отделки листа: зоны, итоги по работам, итоги по типам помещений, предупреждения.
+ */
+export type CadFinishSheetRead = {
+    /**
+     * By Room Type
+     */
+    by_room_type: Array<CadFinishRoomTypeRead>;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Totals
+     */
+    totals: Array<CadFinishTotalRead>;
+    /**
+     * Warnings
+     */
+    warnings: Array<CadFinishWarningRead>;
+    /**
+     * Zones
+     */
+    zones: Array<CadFinishZoneRead>;
+};
+
+/**
+ * CadFinishTemplatePatch
+ *
+ * Частичная правка шаблона: переданное заменяет хранимое; явный null у высоты очищает её.
+ */
+export type CadFinishTemplatePatch = {
+    /**
+     * Ceiling Layers
+     */
+    ceiling_layers?: Array<CadFinishLayer> | null;
+    /**
+     * Floor Layers
+     */
+    floor_layers?: Array<CadFinishLayer> | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Room Types
+     */
+    room_types?: Array<'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other'> | null;
+    /**
+     * Wall Height Mm
+     */
+    wall_height_mm?: number | null;
+    /**
+     * Wall Layers
+     */
+    wall_layers?: Array<CadFinishLayer> | null;
+    /**
+     * Walls Include Reveals
+     */
+    walls_include_reveals?: boolean | null;
+};
+
+/**
+ * CadFinishTemplateRead
+ */
+export type CadFinishTemplateRead = {
+    /**
+     * Ceiling Layers
+     */
+    ceiling_layers: Array<CadFinishLayer>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Floor Layers
+     */
+    floor_layers: Array<CadFinishLayer>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Room Types
+     */
+    room_types: Array<'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other'>;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Wall Height Mm
+     */
+    wall_height_mm: number | null;
+    /**
+     * Wall Layers
+     */
+    wall_layers: Array<CadFinishLayer>;
+    /**
+     * Walls Include Reveals
+     */
+    walls_include_reveals: boolean;
+};
+
+/**
+ * CadFinishTemplateWrite
+ *
+ * Новый шаблон отделки проекта.
+ */
+export type CadFinishTemplateWrite = {
+    /**
+     * Ceiling Layers
+     */
+    ceiling_layers?: Array<CadFinishLayer>;
+    /**
+     * Floor Layers
+     */
+    floor_layers?: Array<CadFinishLayer>;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Room Types
+     */
+    room_types?: Array<'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other'>;
+    /**
+     * Wall Height Mm
+     */
+    wall_height_mm?: number | null;
+    /**
+     * Wall Layers
+     */
+    wall_layers?: Array<CadFinishLayer>;
+    /**
+     * Walls Include Reveals
+     *
+     * Откосы дверных проёмов входят в площадь слоёв стен (ADR-0042, п. 6)
+     */
+    walls_include_reveals?: boolean;
+};
+
+/**
+ * CadFinishTotalRead
+ */
+export type CadFinishTotalRead = {
+    /**
+     * Area M2
+     */
+    area_m2: number | null;
+    /**
+     * Material
+     */
+    material: string | null;
+    /**
+     * Material Qty
+     */
+    material_qty: number | null;
+    /**
+     * Material Unit
+     */
+    material_unit: string | null;
+    /**
+     * Surface
+     */
+    surface: 'floor' | 'walls' | 'ceiling';
+    /**
+     * Work
+     */
+    work: string;
+    /**
+     * Zone Count
+     */
+    zone_count: number;
+};
+
+/**
+ * CadFinishWallsBreakdownRead
+ *
+ * Привязка рёбер зоны к конструкциям листа (ADR-0042, п. 6).
+ *
+ * `linked=false` - привязки нет (нет конструкций, кадра листа или контур зоны непригоден), все
+ * остальные поля null. Длины (м) известны при `linked`; площади - ещё и при известной высоте
+ * стен. Окон в результате конструкций нет: наружные стены без вычета окон.
+ */
+export type CadFinishWallsBreakdownRead = {
+    area_by_base: CadFinishAreaByBaseRead;
+    /**
+     * Door M
+     */
+    door_m: number | null;
+    /**
+     * Door Over Area M2
+     */
+    door_over_area_m2: number | null;
+    /**
+     * Gap M
+     */
+    gap_m: number | null;
+    /**
+     * Gkl M
+     */
+    gkl_m: number | null;
+    /**
+     * Linked
+     */
+    linked: boolean;
+    /**
+     * Masonry M
+     */
+    masonry_m: number | null;
+    /**
+     * Monolith M
+     */
+    monolith_m: number | null;
+    /**
+     * Open M
+     */
+    open_m: number | null;
+    /**
+     * Reveal Area M2
+     */
+    reveal_area_m2: number | null;
+    /**
+     * Reveal M
+     */
+    reveal_m: number | null;
+};
+
+/**
+ * CadFinishWarningRead
+ */
+export type CadFinishWarningRead = {
+    /**
+     * Code
+     */
+    code: 'calibration_missing' | 'geometry_issue' | 'wall_height_missing' | 'no_template' | 'gap_unknown_height' | 'door_height_missing' | 'windows_not_detected' | 'edges_unlinked';
+    /**
+     * Zone Ids
+     */
+    zone_ids: Array<string>;
+};
+
+/**
+ * CadFinishZoneRead
+ */
+export type CadFinishZoneRead = {
+    /**
+     * Apartment No
+     */
+    apartment_no: string | null;
+    /**
+     * Ceiling Area M2
+     */
+    ceiling_area_m2: number | null;
+    /**
+     * Floor Area M2
+     */
+    floor_area_m2: number | null;
+    /**
+     * Kind
+     */
+    kind: 'room_apartment' | 'room_mop' | 'door' | 'parking_space';
+    /**
+     * Layers
+     */
+    layers: Array<CadFinishLayerRead>;
+    /**
+     * Name
+     */
+    name: string | null;
+    /**
+     * Perimeter M
+     */
+    perimeter_m: number | null;
+    /**
+     * Room Mark
+     */
+    room_mark: string | null;
+    /**
+     * Room Type
+     */
+    room_type: 'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other' | null;
+    /**
+     * Template Id
+     */
+    template_id: string | null;
+    /**
+     * Template Source
+     */
+    template_source: 'explicit' | 'by_type' | null;
+    /**
+     * Wall Area M2
+     */
+    wall_area_m2: number | null;
+    /**
+     * Wall Height Mm
+     */
+    wall_height_mm: number | null;
+    /**
+     * Wall Height Source
+     */
+    wall_height_source: 'template' | 'levels' | null;
+    walls_breakdown: CadFinishWallsBreakdownRead;
+    /**
+     * Zone Id
+     */
+    zone_id: string;
+};
+
+/**
  * CadFloor3dDoorRead
  *
  * Полотно двери в разрыве стены: тонкая призма от отметки этажа до высоты двери.
@@ -3591,6 +4103,10 @@ export type CadZoneCreate = {
      */
     door_height_mm?: number | null;
     /**
+     * Finish Template Id
+     */
+    finish_template_id?: string | null;
+    /**
      * Kind
      */
     kind: 'room_apartment' | 'room_mop' | 'door' | 'parking_space';
@@ -3621,6 +4137,10 @@ export type CadZoneCreate = {
      * Room Mark
      */
     room_mark?: string | null;
+    /**
+     * Room Type
+     */
+    room_type?: 'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other' | null;
 };
 
 /**
@@ -3647,6 +4167,10 @@ export type CadZoneRead = {
      * Door Height Mm
      */
     door_height_mm: number | null;
+    /**
+     * Finish Template Id
+     */
+    finish_template_id: string | null;
     /**
      * Geometry Issue
      */
@@ -3691,6 +4215,14 @@ export type CadZoneRead = {
      */
     room_mark: string | null;
     /**
+     * Room Type
+     */
+    room_type: 'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other' | null;
+    /**
+     * Room Type Source
+     */
+    room_type_source: 'manual' | 'derived' | null;
+    /**
      * Updated At
      */
     updated_at: string;
@@ -3715,6 +4247,10 @@ export type CadZoneUpdate = {
      */
     door_height_mm?: number | null;
     /**
+     * Finish Template Id
+     */
+    finish_template_id?: string | null;
+    /**
      * Kind
      */
     kind?: 'room_apartment' | 'room_mop' | 'door' | 'parking_space' | null;
@@ -3737,6 +4273,10 @@ export type CadZoneUpdate = {
      * Room Mark
      */
     room_mark?: string | null;
+    /**
+     * Room Type
+     */
+    room_type?: 'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other' | null;
 };
 
 /**
@@ -17005,6 +17545,136 @@ export type ReadCadBuilding3dResponses = {
 
 export type ReadCadBuilding3dResponse = ReadCadBuilding3dResponses[keyof ReadCadBuilding3dResponses];
 
+export type ListCadFinishTemplatesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/finish-templates';
+};
+
+export type ListCadFinishTemplatesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCadFinishTemplatesError = ListCadFinishTemplatesErrors[keyof ListCadFinishTemplatesErrors];
+
+export type ListCadFinishTemplatesResponses = {
+    /**
+     * Response List Cad Finish Templates
+     *
+     * Successful Response
+     */
+    200: Array<CadFinishTemplateRead>;
+};
+
+export type ListCadFinishTemplatesResponse = ListCadFinishTemplatesResponses[keyof ListCadFinishTemplatesResponses];
+
+export type CreateCadFinishTemplateData = {
+    body: CadFinishTemplateWrite;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/finish-templates';
+};
+
+export type CreateCadFinishTemplateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCadFinishTemplateError = CreateCadFinishTemplateErrors[keyof CreateCadFinishTemplateErrors];
+
+export type CreateCadFinishTemplateResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadFinishTemplateRead;
+};
+
+export type CreateCadFinishTemplateResponse = CreateCadFinishTemplateResponses[keyof CreateCadFinishTemplateResponses];
+
+export type DeleteCadFinishTemplateData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Template Id
+         */
+        template_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/finish-templates/{template_id}';
+};
+
+export type DeleteCadFinishTemplateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteCadFinishTemplateError = DeleteCadFinishTemplateErrors[keyof DeleteCadFinishTemplateErrors];
+
+export type DeleteCadFinishTemplateResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteCadFinishTemplateResponse = DeleteCadFinishTemplateResponses[keyof DeleteCadFinishTemplateResponses];
+
+export type UpdateCadFinishTemplateData = {
+    body: CadFinishTemplatePatch;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Template Id
+         */
+        template_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/finish-templates/{template_id}';
+};
+
+export type UpdateCadFinishTemplateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateCadFinishTemplateError = UpdateCadFinishTemplateErrors[keyof UpdateCadFinishTemplateErrors];
+
+export type UpdateCadFinishTemplateResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadFinishTemplateRead;
+};
+
+export type UpdateCadFinishTemplateResponse = UpdateCadFinishTemplateResponses[keyof UpdateCadFinishTemplateResponses];
+
 export type ReadCadProjectLevelsData = {
     body?: never;
     path: {
@@ -17560,6 +18230,36 @@ export type CreateCadZoneResponses = {
 };
 
 export type CreateCadZoneResponse = CreateCadZoneResponses[keyof CreateCadZoneResponses];
+
+export type AssignCadFinishTemplateData = {
+    body: CadFinishAssign;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/zones/finish-assign';
+};
+
+export type AssignCadFinishTemplateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AssignCadFinishTemplateError = AssignCadFinishTemplateErrors[keyof AssignCadFinishTemplateErrors];
+
+export type AssignCadFinishTemplateResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadFinishAssignResult;
+};
+
+export type AssignCadFinishTemplateResponse = AssignCadFinishTemplateResponses[keyof AssignCadFinishTemplateResponses];
 
 export type ReadCadConstructionsData = {
     body?: never;
@@ -18180,6 +18880,45 @@ export type RevokeCadDecisionResponses = {
 };
 
 export type RevokeCadDecisionResponse = RevokeCadDecisionResponses[keyof RevokeCadDecisionResponses];
+
+export type ReadCadFinishesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    query: {
+        /**
+         * Page Index
+         */
+        page_index: number;
+    };
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/finishes';
+};
+
+export type ReadCadFinishesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadFinishesError = ReadCadFinishesErrors[keyof ReadCadFinishesErrors];
+
+export type ReadCadFinishesResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadFinishSheetRead;
+};
+
+export type ReadCadFinishesResponse = ReadCadFinishesResponses[keyof ReadCadFinishesResponses];
 
 export type ReadCadPipelineData = {
     body?: never;
