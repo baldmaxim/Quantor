@@ -230,6 +230,13 @@ export const DrawingViewport = ({
     return camera.subscribe(applyCamera);
   }, [camera, applyCamera]);
 
+  // Актуальный applyCamera для наблюдателя размера: сам наблюдатель от него не зависит,
+  // иначе каждая новая функция заново вписывала бы лист.
+  const applyCameraRef = useRef(applyCamera);
+  useEffect(() => {
+    applyCameraRef.current = applyCamera;
+  }, [applyCamera]);
+
   // Жест затих — растянутые зумом слои перерисовываются резкими, а лист получает недостающий
   // растр. Одно определение затихания на оба: слои и лист резкость набирают вместе.
   //
@@ -247,21 +254,32 @@ export const DrawingViewport = ({
     };
   }, [camera, settleLayers, settleRaster]);
 
-  // Вписываем лист при его смене и при изменении размера области. Новый размер области
-  // меняет и холсты слоёв — их подгонит кадр камеры, который вызовет вписка.
+  // Вписываем лист только при его смене. Изменение размера области (панели слева и справа)
+  // вид не сбрасывает: лист остаётся на том же месте экрана, область лишь открывает или
+  // закрывает края. Сдвиг левой кромки области компенсируется смещением камеры; холсты
+  // слоёв под новый размер подгоняет принудительный кадр камеры.
   useEffect(() => {
     const element = host.current;
     if (!element || !page) return;
 
-    const fit = () => {
-      camera.fitPage(
-        { width: page.width, height: page.height },
-        { width: element.clientWidth, height: element.clientHeight },
-      );
+    camera.fitPage(
+      { width: page.width, height: page.height },
+      { width: element.clientWidth, height: element.clientHeight },
+    );
+
+    let left = element.getBoundingClientRect().left;
+    let top = element.getBoundingClientRect().top;
+    const keepPlace = () => {
+      const rect = element.getBoundingClientRect();
+      const deltaX = left - rect.left;
+      const deltaY = top - rect.top;
+      left = rect.left;
+      top = rect.top;
+      if (deltaX !== 0 || deltaY !== 0) camera.panBy(deltaX, deltaY);
+      applyCameraRef.current(camera.getState());
     };
 
-    fit();
-    const observer = new ResizeObserver(fit);
+    const observer = new ResizeObserver(keepPlace);
     observer.observe(element);
     return () => observer.disconnect();
   }, [page, camera]);
