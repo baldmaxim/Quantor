@@ -88,4 +88,4 @@ docker save "${images[@]}" | gzip -1 | ssh -o LogLevel=ERROR "$SSH_HOST" 'gunzip
 echo "→ update.sh на сервере"
 ssh -o LogLevel=ERROR "$SSH_HOST" "set -e; cd $REMOTE_DIR; \
   h=\$(docker create $REG/quantor-api:$SHA true); docker cp \$h:/app/deploy/update.sh update.sh; \
-  docker rm -f \$h >/dev/null; SKIP_PULL=1 ./update.sh $SHA"
+  docker rm -f \$h >/dev/null; SKIP_PULL=1 bash ./update.sh $SHA"
