@@ -107,7 +107,7 @@ export const ConstructionsTotals: FC<IConstructionsTotalsProps> = ({
       {totals.length === 0 ? (
         <p className="text-xs text-muted">Посчитанных конструкций нет: итоги по группам не набраны.</p>
       ) : (
-        <div className="scroll-area overflow-x-auto overscroll-x-contain">
+        <div className="scroll-area overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-auto">
           <table className="w-full min-w-[420px] border-collapse text-xs">
             <thead>
               <tr>

@@ -30,7 +30,9 @@ export const CadControlsTable: FC<ICadControlsTableProps> = ({ controls }) => {
 
   return (
     <div
-      className="scroll-area max-w-full overflow-x-auto overscroll-x-contain rounded-[var(--radius-md)] border border-border"
+      // Таблица прокручивается только по горизонтали. Вертикальное колесо уходит панели:
+      // `.scroll-area` даёт `overscroll-behavior: contain` по обеим осям и иначе гасит его.
+      className="scroll-area max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-auto rounded-[var(--radius-md)] border border-border"
       tabIndex={0}
       role="region"
       aria-label="Контроли масштаба"
