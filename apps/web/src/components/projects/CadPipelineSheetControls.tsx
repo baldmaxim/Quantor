@@ -86,6 +86,7 @@ export const CadPipelineSheetControls: FC<ICadPipelineSheetControlsProps> = ({
             row={row}
             pendingId={actions.pendingId}
             error={row.actions.map((action) => actions.errors[action.id]).find(Boolean) ?? null}
+            notice={row.actions.map((action) => actions.notices[action.id]).find(Boolean) ?? null}
             onAction={request}
           />
         ))}

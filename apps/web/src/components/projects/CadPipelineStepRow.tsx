@@ -18,6 +18,8 @@ export interface ICadPipelineStepRowProps {
   /** Идущее действие листа; пока оно есть, остальные кнопки заблокированы. */
   readonly pendingId: string | null;
   readonly error: string | null;
+  /** Пояснение без ошибки: действие ничего не изменило. */
+  readonly notice?: string | null;
   readonly onAction: (action: IPipelineAction) => void;
 }
 
@@ -29,6 +31,7 @@ export const CadPipelineStepRow: FC<ICadPipelineStepRowProps> = ({
   row,
   pendingId,
   error,
+  notice = null,
   onAction,
 }) => {
   const { step, stage } = row;
@@ -102,6 +105,11 @@ export const CadPipelineStepRow: FC<ICadPipelineStepRowProps> = ({
       {error && (
         <p role="alert" className="m-0 text-xs text-danger [overflow-wrap:anywhere]">
           {error}
+        </p>
+      )}
+      {notice && !error && (
+        <p role="status" className="m-0 text-xs text-muted [overflow-wrap:anywhere]">
+          {notice}
         </p>
       )}
     </li>

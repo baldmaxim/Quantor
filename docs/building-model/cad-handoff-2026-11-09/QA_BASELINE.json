@@ -1,0 +1,28 @@
+{
+  "state": "Backend QA verified; browser UI task delegated",
+  "backend_task": "DEV-QUANTOR-CAD-ENGINE-PACKAGING",
+  "ui_task": "DEV-QUANTOR-CAD-TOOL-UI",
+  "backend_base": "1bd678f83cc6d66170905313fe8f7b7555829179",
+  "backend_branch": "codex/quantor-cad-packaging-20261109-080722z",
+  "engine_version": "2026.11.09+80cc6563f45a",
+  "engine_archive_sha256": "2757a9edc2b95ae1a79b8915643d78b4a10801d8830b5f9d3514f31ee7890de4",
+  "backend_patch_sha256": "e17f368114eabb110be4f410dcf9b311e97bab5d4640cfd45ae402f029efbbba",
+  "runner_sha256": "424315cbd1b9620d52e688ca73a739af419a5cbefe88eef25753fde5c2c3484b",
+  "linux_lock_sha256": "8c3571144aef342d28e97415975c9a56f97338abe2cce0e2394addc6cf1ef271",
+  "platform": "x86_64 CPython 3.12.14; separate API and engine virtual environments; wheel hashes checked in clean environment",
+  "engine_tests": 24,
+  "portal_passed": 58,
+  "portal_skipped": 0,
+  "object_storage": "Test double of Quantor object storage; real PostgreSQL and engine subprocess",
+  "verified": [
+    "PDF upload and job enqueue",
+    "Linux CAD subprocess",
+    "DXF R2018 with 8 entities and 0 audit errors on synthetic input",
+    "download SHA and manifest",
+    "bad input and no DXF without verified scale",
+    "retry and workspace isolation",
+    "lease loss and process-group timeout"
+  ],
+  "production_gate": "CAD_QA_ENABLED is restricted to local/test by Quantor Settings; ADR-0016/0034/0035 and dependency decisions apply",
+  "known_engine_limitation": "PDFContext fails closed when confirmed-scale view contains fills without black strokes"
+}

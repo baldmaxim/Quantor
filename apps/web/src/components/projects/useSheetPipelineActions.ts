@@ -21,12 +21,18 @@ import { unwrap } from '@/lib/queries';
  * После любого исхода конвейер ревизии перечитывается: его опрос подхватит идущее задание.
  */
 
+export const ALREADY_CURRENT =
+  'Уже актуально: лист преобразован текущей версией движка с этой калибровкой — CAD не перезапускался. ' +
+  'Изменения стен, плиты и зон применяются пересчётом шага «Конструкции» или «Зоны».';
+
 export interface ISheetPipelineActions {
   readonly run: (action: IPipelineAction) => void;
   /** Идущее действие; `null` - ничего не запускается. */
   readonly pendingId: string | null;
   /** Тексты отказов по идентификатору действия. */
   readonly errors: Readonly<Record<string, string>>;
+  /** Пояснения без ошибки по идентификатору действия: «уже актуально». */
+  readonly notices: Readonly<Record<string, string>>;
 }
 
 export const useSheetPipelineActions = (
@@ -38,6 +44,7 @@ export const useSheetPipelineActions = (
   const create = useCreateCadJob(projectId, revisionId);
   const retry = useRetryCadJob(projectId, revisionId, convertJobId ?? '');
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
+  const [notices, setNotices] = useState<Readonly<Record<string, string>>>({});
   // Синхронная защита от двойного нажатия: isPending обновляется после рендера.
   const launching = useRef(false);
 
@@ -50,9 +57,14 @@ export const useSheetPipelineActions = (
         view: action.view ?? 0,
       };
       switch (action.kind) {
-        case 'convert':
-          await create.mutateAsync({ pages: [action.pageIndex] });
+        case 'convert': {
+          const job = await create.mutateAsync({ pages: [action.pageIndex] });
+          // Тот же ключ идемпотентности: сервер вернул текущее задание, CAD не перезапускался.
+          if (convertJobId !== null && job.job_id === convertJobId) {
+            setNotices((previous) => ({ ...previous, [action.id]: ALREADY_CURRENT }));
+          }
           return;
+        }
         case 'retry':
           if (action.jobId === convertJobId) {
             await retry.mutateAsync();
@@ -90,9 +102,10 @@ export const useSheetPipelineActions = (
     (action: IPipelineAction) => {
       if (launching.current) return;
       launching.current = true;
-      setErrors((previous) =>
-        Object.fromEntries(Object.entries(previous).filter(([id]) => id !== action.id)),
-      );
+      const without = (previous: Readonly<Record<string, string>>) =>
+        Object.fromEntries(Object.entries(previous).filter(([id]) => id !== action.id));
+      setErrors(without);
+      setNotices(without);
       mutation.mutate(action, {
         onError: (error) =>
           setErrors((previous) => ({ ...previous, [action.id]: cadErrorText(error) })),
@@ -105,5 +118,6 @@ export const useSheetPipelineActions = (
     run,
     pendingId: mutation.isPending ? (mutation.variables?.id ?? null) : null,
     errors,
+    notices,
   };
 };
