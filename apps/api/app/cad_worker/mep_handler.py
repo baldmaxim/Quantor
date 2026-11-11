@@ -275,15 +275,17 @@ def _verified_route_outputs(
     """Состав out/ строго по контракту; пишет report.json и manifest.json исполнителя.
 
     Обязательны три файла вида: `mep_routes.dxf` (R2018), `preview.json` и `candidate.json`
-    нужных схем. `report.json` генератора, если он есть, сохраняется; `manifest.json` всегда
-    свой: список файлов с sha256 и размером.
+    нужных схем; `routes3d.json` (3D-трассы, ADR-0041) принимается, если генератор его выдал.
+    `report.json` генератора, если он есть, сохраняется; `manifest.json` всегда свой: список
+    файлов с sha256 и размером.
     """
     folder = source.folder
     required = {f"{folder}/{name}" for name in (cad_mep_service.ROUTES_DXF, "preview.json")} | {
         f"{folder}/candidate.json"
     }
     present = {p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file()}
-    extra = present - required - {"report.json", "manifest.json"}
+    routes3d = f"{folder}/{cad_mep_service.ROUTES3D_JSON}"
+    extra = present - required - {"report.json", "manifest.json", routes3d}
     if extra or not required <= present:
         raise CadError(ErrorCode.CAD_ENGINE_FAILED, "состав out/ не совпал с контрактом генератора")
     for name in sorted(present):
@@ -299,6 +301,12 @@ def _verified_route_outputs(
     candidate = _read_json_file(out / folder / "candidate.json")
     if candidate.get("schema") != cad_mep_service.CANDIDATE_SCHEMA:
         raise CadError(ErrorCode.CAD_ENGINE_FAILED, "candidate.json вне контракта")
+    # 3D-трассы (ADR-0041) пишет генератор с v7: прежняя версия файла не даёт, это не отказ.
+    has_routes3d = routes3d in present
+    if has_routes3d:
+        routes3d_doc = _read_json_file(out / routes3d)
+        if routes3d_doc.get("schema") != cad_mep_service.ROUTES3D_SCHEMA:
+            raise CadError(ErrorCode.CAD_ENGINE_FAILED, "routes3d.json вне контракта")
     if "report.json" not in present:
         report = {
             "schema": "quantor.cad_mep.report.v1",
@@ -323,7 +331,7 @@ def _verified_route_outputs(
         _read_json_file(out / "report.json")
     files = [
         {"name": name, "sha256": _sha256(out / name), "size": (out / name).stat().st_size}
-        for name in sorted(required | {"report.json"})
+        for name in sorted(required | {"report.json"} | ({routes3d} if has_routes3d else set()))
     ]
     manifest = {
         "schema": "quantor.cad_mep.manifest.v1",

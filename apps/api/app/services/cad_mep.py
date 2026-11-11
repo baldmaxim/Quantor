@@ -44,6 +44,8 @@ DECISION_KEY: Final = ("kind", "job_id", "attempt", "page_index", "view")
 
 ROUTES_DXF: Final = "mep_routes.dxf"
 CANDIDATE_JSON: Final = "candidate.json"
+ROUTES3D_JSON: Final = "routes3d.json"
+ROUTES3D_SCHEMA: Final = "cad_mep_routes3d.v1"
 PREVIEW_JSON: Final = "preview.json"
 CANDIDATE_SCHEMA: Final = "quantor.cad_mep.candidate.v1"
 PREVIEW_SCHEMA: Final = "quantor.cad_engine.preview.v1"
@@ -804,3 +806,75 @@ async def revoke_decision(
     await session.flush()
     await session.refresh(decision)
     return decision
+
+
+def sheet_level_default(value_mm: int | None, low: int, high: int) -> int | None:
+    """Уровень листа как значение по умолчанию для трасс; вне пределов задания - не определён."""
+    return value_mm if value_mm is not None and low <= value_mm <= high else None
+
+
+def merge_floor_params(
+    *,
+    requested_elevation_mm: int | None,
+    requested_height_mm: int | None,
+    level_elevation_mm: int | None,
+    level_height_mm: int | None,
+) -> tuple[int | None, int | None]:
+    """Отметка и высота для трасс: явное значение запроса главнее уровней листа (ADR-0039).
+
+    Уровни листа - те же, по которым строится 3D-вид этажа; не определены - `None`, и генератор
+    выводит значение сам, как прежде.
+    """
+    elevation = (
+        requested_elevation_mm
+        if requested_elevation_mm is not None
+        else sheet_level_default(level_elevation_mm, ELEVATION_MIN_MM, ELEVATION_MAX_MM)
+    )
+    height = (
+        requested_height_mm
+        if requested_height_mm is not None
+        else sheet_level_default(level_height_mm, FLOOR_HEIGHT_MIN_MM, FLOOR_HEIGHT_MAX_MM)
+    )
+    return elevation, height
+
+
+def heights_match(
+    routes_elevation_mm: int | None,
+    routes_height_mm: int | None,
+    level_elevation_mm: int | None,
+    level_height_mm: int | None,
+) -> bool:
+    """Обе пары (отметка, высота) известны и равны; иначе - нет."""
+    values = (routes_elevation_mm, routes_height_mm, level_elevation_mm, level_height_mm)
+    return None not in values and (routes_elevation_mm, routes_height_mm) == (
+        level_elevation_mm,
+        level_height_mm,
+    )
+
+
+async def latest_succeeded_route_job(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    page_index: int,
+    view: int,
+) -> Job | None:
+    """Новейшее успешное `cad_mep_route` листа (ревизия, страница, вид) - как в web-автовыборе."""
+    found: Job | None = await session.scalar(
+        select(Job)
+        .where(
+            Job.job_type == JobType.CAD_MEP_ROUTE,
+            Job.workspace_id == workspace_id,
+            Job.project_id == project_id,
+            Job.status == JobStatus.SUCCEEDED,
+            Job.payload["revision_id"].astext == str(revision_id),
+            Job.payload["page_index"].astext == str(page_index),
+            Job.payload["view"].astext == str(view),
+        )
+        .order_by(Job.created_at.desc())
+        .limit(1)
+        .execution_options(populate_existing=True)
+    )
+    return found

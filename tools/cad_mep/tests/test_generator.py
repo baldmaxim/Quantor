@@ -9,6 +9,7 @@ import sys
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from ezdxf.entities.polyline import Polyline
@@ -121,8 +122,45 @@ def candidate(run_a: Path) -> dict[str, object]:
 
 
 def test_outputs_exist(run_a: Path) -> None:
-    for name in ("mep_routes.dxf", "preview.json", "candidate.json"):
+    for name in ("mep_routes.dxf", "preview.json", "candidate.json", "routes3d.json"):
         assert (run_a / name).is_file(), name
+
+
+def _routes3d(out: Path) -> dict[str, Any]:
+    data = json.loads((out / "routes3d.json").read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    return data
+
+
+def test_routes3d_matches_dxf_polylines(run_a: Path) -> None:
+    """routes3d.json: те же 3D-полилинии слоёв трасс и стояков, что в DXF, Z - от отметки этажа."""
+    data = _routes3d(run_a)
+    assert list(data) == ["schema", "frame", "floor_elevation_mm", "floor_height_mm", "polylines"]
+    assert data["schema"] == "cad_mep_routes3d.v1" and data["frame"] == "view_dxf_mm"
+    assert (data["floor_elevation_mm"], data["floor_height_mm"]) == (ELEVATION, HEIGHT)
+    polylines = data["polylines"]
+    doc = readfile(str(run_a / "mep_routes.dxf"))
+    in_dxf = [
+        e for e in doc.modelspace() if isinstance(e, Polyline) and e.dxf.layer in ROUTE_LAYERS
+    ]
+    assert len(polylines) == len(in_dxf) > 20
+    for row, e in zip(polylines, in_dxf, strict=True):  # порядок как в DXF
+        assert row["layer"] == e.dxf.layer
+        pts = [(round(p[0]), round(p[1]), round(p[2]) - ELEVATION) for p in e.points()]
+        assert [tuple(p) for p in row["pts"]] == pts
+        assert all(isinstance(v, int) for p in row["pts"] for v in p)
+
+
+def test_routes3d_heights_follow_params(run_a: Path) -> None:
+    params = load_params(None)
+    z_heat = round(params.num("z_heat_mm"))
+    z_ceil = HEIGHT - round(params.num("ceiling_below_slab_mm"))
+    by_layer: dict[str, set[int]] = {}
+    for row in _routes3d(run_a)["polylines"]:
+        by_layer.setdefault(row["layer"], set()).update(p[2] for p in row["pts"])
+    assert by_layer["M-OV-T1"] >= {z_heat} and min(by_layer["M-OV-T1"]) >= 0
+    assert z_ceil in by_layer["M-VK-T4"]  # ВК под потолком
+    assert max(max(zs) for zs in by_layer.values()) <= HEIGHT
 
 
 def test_dxf_layers_and_audit(run_a: Path) -> None:
@@ -173,7 +211,7 @@ def test_candidate_content(candidate: dict[str, object], inputs: dict[str, Path]
     assert candidate["schema"] == "quantor.cad_mep.candidate.v1"
     prov = candidate["provenance"]
     assert isinstance(prov, dict)
-    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v6"
+    assert prov["generator_version"] == GENERATOR_VERSION == "cad_mep.v7"
     assert prov["pdf_sha256"] == _sha(inputs["pdf"])
     assert prov["view_dxf_sha256"] == _sha(inputs["dxf"])
     params = load_params(None)
@@ -280,7 +318,7 @@ def test_deterministic(
     proc = _run(inputs, out)
     assert proc.returncode == 0, proc.stderr
     b = out / "views" / FOLDER
-    for name in ("mep_routes.dxf", "candidate.json", "preview.json"):
+    for name in ("mep_routes.dxf", "candidate.json", "preview.json", "routes3d.json"):
         assert _sha(run_a / name) == _sha(b / name), name
 
 

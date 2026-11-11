@@ -275,3 +275,65 @@ def view_mep_read(
         route_jobs=routes,
         revoked_decisions=[decision_read(*row) for row in state.revoked.get(key, [])],
     )
+
+
+class CadMepRoute3dPolyline(BaseModel):
+    """3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    layer: Annotated[str, Field(min_length=1, max_length=64)]
+    pts: Annotated[list[tuple[int, int, int]], Field(min_length=2)]
+
+
+class CadMepRoutes3dFile(BaseModel):
+    """Файл `routes3d.json` генератора (`cad_mep_routes3d.v1`): трассы с Z от отметки этажа."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    schema_id: Literal["cad_mep_routes3d.v1"] = Field(alias="schema")
+    frame: Literal["view_dxf_mm"]
+    floor_elevation_mm: int | None
+    floor_height_mm: int | None
+    polylines: list[CadMepRoute3dPolyline]
+
+
+class CadMepRoutes3dOut(BaseModel):
+    """Трассы листа в 3D: вершины в мм DXF вида, Z - над отметкой этажа (верх плиты)."""
+
+    job_id: UUID
+    generator_version: str | None
+    # Высоты, от которых построены трассы (из файла).
+    floor_elevation_mm: int | None
+    floor_height_mm: int | None
+    # Действующие уровни листа сейчас (из 3D-вида); None - не определены.
+    levels_elevation_mm: int | None
+    levels_height_mm: int | None
+    # Обе пары известны и равны; иначе - false (трассы стоит перестроить).
+    heights_match: bool
+    polylines: list[CadMepRoute3dPolyline]
+
+
+def routes3d_read(
+    job: Job,
+    data: CadMepRoutes3dFile,
+    *,
+    levels_elevation_mm: int | None,
+    levels_height_mm: int | None,
+) -> CadMepRoutes3dOut:
+    version = job.payload.get("generator_version")
+    return CadMepRoutes3dOut(
+        job_id=job.id,
+        generator_version=version if isinstance(version, str) else None,
+        floor_elevation_mm=data.floor_elevation_mm,
+        floor_height_mm=data.floor_height_mm,
+        levels_elevation_mm=levels_elevation_mm,
+        levels_height_mm=levels_height_mm,
+        heights_match=cad_mep_service.heights_match(
+            data.floor_elevation_mm,
+            data.floor_height_mm,
+            levels_elevation_mm,
+            levels_height_mm,
+        ),
+        polylines=data.polylines,
+    )

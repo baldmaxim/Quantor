@@ -1443,6 +1443,10 @@ export type CadFloor3dDoorRead = {
      */
     door_height_source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
     /**
+     * Host Id
+     */
+    host_id?: string | null;
+    /**
      * Opening Id
      */
     opening_id: string;
@@ -1512,6 +1516,10 @@ export type CadFloor3dLintelRead = {
      * Door Height Source
      */
     door_height_source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    /**
+     * Host Id
+     */
+    host_id?: string | null;
     /**
      * Kind
      */
@@ -1856,10 +1864,6 @@ export type CadJobRead = {
     parent_job_id: string | null;
     /**
      * Requested Pages
-    /**
-     * Host Id
-     */
-    host_id?: string | null;
      */
     requested_pages: Array<number> | null;
     /**
@@ -1930,10 +1934,6 @@ export type CadJobSummaryRead = {
      */
     finished_at: string | null;
     /**
-    /**
-     * Host Id
-     */
-    host_id?: string | null;
      * Job Id
      */
     job_id: string;
@@ -2071,6 +2071,66 @@ export type CadMepRecomputeCreate = {
      * Floor Height Mm
      */
     floor_height_mm?: number | null;
+};
+
+/**
+ * CadMepRoute3dPolyline
+ *
+ * 3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.
+ */
+export type CadMepRoute3dPolyline = {
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Pts
+     */
+    pts: Array<[
+        number,
+        number,
+        number
+    ]>;
+};
+
+/**
+ * CadMepRoutes3dOut
+ *
+ * Трассы листа в 3D: вершины в мм DXF вида, Z - над отметкой этажа (верх плиты).
+ */
+export type CadMepRoutes3dOut = {
+    /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm: number | null;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number | null;
+    /**
+     * Generator Version
+     */
+    generator_version: string | null;
+    /**
+     * Heights Match
+     */
+    heights_match: boolean;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Levels Elevation Mm
+     */
+    levels_elevation_mm: number | null;
+    /**
+     * Levels Height Mm
+     */
+    levels_height_mm: number | null;
+    /**
+     * Polylines
+     */
+    polylines: Array<CadMepRoute3dPolyline>;
 };
 
 /**
@@ -16992,6 +17052,49 @@ export type PutCadProjectLevelsResponses = {
 };
 
 export type PutCadProjectLevelsResponse = PutCadProjectLevelsResponses[keyof PutCadProjectLevelsResponses];
+
+export type ReadCadMepRoutes3dData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/mep/routes3d';
+};
+
+export type ReadCadMepRoutes3dErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadMepRoutes3dError = ReadCadMepRoutes3dErrors[keyof ReadCadMepRoutes3dErrors];
+
+export type ReadCadMepRoutes3dResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadMepRoutes3dOut;
+};
+
+export type ReadCadMepRoutes3dResponse = ReadCadMepRoutes3dResponses[keyof ReadCadMepRoutes3dResponses];
 
 export type ReadCadSheetRisersData = {
     body?: never;

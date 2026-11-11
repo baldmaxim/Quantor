@@ -2884,6 +2884,17 @@
             ],
             "title": "Door Height Source"
           },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Id"
+          },
           "opening_id": {
             "title": "Opening Id",
             "type": "string"
@@ -2996,6 +3007,17 @@
               }
             ],
             "title": "Door Height Source"
+          },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Id"
           },
           "kind": {
             "enum": [
@@ -3876,17 +3898,6 @@
           "error_message",
           "engine_version",
           "result_status",
-          "host_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Host Id"
-          },
           "review_required",
           "known_limitation",
           "pages",
@@ -4000,17 +4011,6 @@
             "title": "Result Status"
           },
           "status": {
-          "host_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Host Id"
-          },
             "$ref": "#/components/schemas/JobStatus"
           },
           "view": {
@@ -4297,6 +4297,133 @@
           }
         },
         "title": "CadMepRecomputeCreate",
+        "type": "object"
+      },
+      "CadMepRoute3dPolyline": {
+        "additionalProperties": false,
+        "description": "3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.",
+        "properties": {
+          "layer": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Layer",
+            "type": "string"
+          },
+          "pts": {
+            "items": {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 2,
+            "title": "Pts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layer",
+          "pts"
+        ],
+        "title": "CadMepRoute3dPolyline",
+        "type": "object"
+      },
+      "CadMepRoutes3dOut": {
+        "description": "Трассы листа в 3D: вершины в мм DXF вида, Z - над отметкой этажа (верх плиты).",
+        "properties": {
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Mm"
+          },
+          "generator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator Version"
+          },
+          "heights_match": {
+            "title": "Heights Match",
+            "type": "boolean"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "levels_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels Elevation Mm"
+          },
+          "levels_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels Height Mm"
+          },
+          "polylines": {
+            "items": {
+              "$ref": "#/components/schemas/CadMepRoute3dPolyline"
+            },
+            "title": "Polylines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "job_id",
+          "generator_version",
+          "floor_elevation_mm",
+          "floor_height_mm",
+          "levels_elevation_mm",
+          "levels_height_mm",
+          "heights_match",
+          "polylines"
+        ],
+        "title": "CadMepRoutes3dOut",
         "type": "object"
       },
       "CadMepRoutesCreate": {
@@ -31571,6 +31698,77 @@
         "summary": "Задать толщину плиты проекта из разрезов (применяется ко всем листам проекта)",
         "tags": [
           "cad-floor3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/mep/routes3d": {
+      "get": {
+        "operationId": "read_cad_mep_routes3d",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadMepRoutes3dOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Трассы механики листа в 3D: вершины в мм DXF вида, Z от отметки этажа",
+        "tags": [
+          "cad-mep"
         ]
       }
     },

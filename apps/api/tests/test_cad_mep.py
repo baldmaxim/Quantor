@@ -79,6 +79,12 @@ folder.mkdir(parents=True)
     "schema": "quantor.cad_engine.preview.v1", "units": "mm", "layers": ["M-OV-T1"],
     "paths": [{"layer": 0, "closed": False, "fill": False, "points": [0, 0, 1000, 0]}],
     "bbox": [0, 0, 1000, 0], "truncated": False, "flatten_mm": 0}))
+if not (pathlib.Path(__file__).parent / "no_routes3d").exists():  # прежний генератор
+    (folder / "routes3d.json").write_text(json.dumps({
+        "schema": "cad_mep_routes3d.v1", "frame": "view_dxf_mm",
+        "floor_elevation_mm": elevation, "floor_height_mm": height,
+        "polylines": [{"layer": "M-OV-T1", "pts": [[0, 0, 50], [1000, 0, 50]]},
+                      {"layer": "M-VK-V1", "pts": [[500, 500, 0], [500, 500, 2900]]}]}))
 if elevation != 77777:
     (folder / "candidate.json").write_text(json.dumps({
         "schema": "quantor.cad_mep.candidate.v1",
@@ -262,7 +268,7 @@ def test_new_routes_are_in_openapi_and_job_type_is_registered() -> None:
 
 def test_route_artifact_names_are_closed_and_dxf_needs_the_route_pattern() -> None:
     revision, job = uuid.uuid4(), uuid.uuid4()
-    for name in ("mep_routes.dxf", "candidate.json", "preview.json"):
+    for name in ("mep_routes.dxf", "candidate.json", "preview.json", "routes3d.json"):
         key = cad_service.artifact_storage_key(revision, job, 1, f"{FOLDER}/{name}")
         assert key.endswith(f"/attempt-1/{FOLDER}/{name}")
     for bad in (f"{FOLDER}/other.dxf", "mep_routes.dxf", f"{FOLDER}/../mep_routes.dxf"):
@@ -460,6 +466,7 @@ async def test_worker_builds_routes_and_acceptance_opens_the_dxf(
             f"{FOLDER}/mep_routes.dxf",
             f"{FOLDER}/preview.json",
             f"{FOLDER}/candidate.json",
+            f"{FOLDER}/routes3d.json",
         }
         [view] = read["pages"][0]["views"]
         assert view["dxf"] == f"{FOLDER}/mep_routes.dxf" and view["acceptance"] is None
@@ -1064,3 +1071,54 @@ async def test_worker_refuses_a_registry_that_does_not_match_its_hash(
         assert "sha256" in (job.error_message or "")
         assert not (tools / "risers_seen.json").exists()
         assert not any((tmp_path / "work").rglob("*"))
+
+
+# ------------------------------------------------------------------ 3D-трассы (routes3d.json)
+
+
+async def test_routes3d_json_reaches_the_artifacts_and_manifest(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _, revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        route_id = await _approve_and_queue(api, base, job_id)
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        name = f"{FOLDER}/routes3d.json"
+        artifact = cad_service.find_artifact(job, name)
+        assert artifact is not None
+        key = cad_service.artifact_storage_key(uuid.UUID(revision_id), job.id, 1, name)
+        assert artifact["key"] == key
+        stored = json.loads(fake_storage.objects[key])
+        assert stored["schema"] == "cad_mep_routes3d.v1" and stored["frame"] == "view_dxf_mm"
+        assert artifact["sha256"] == _sha(fake_storage.objects[key])
+        manifest_key = cad_service.artifact_storage_key(
+            uuid.UUID(revision_id), job.id, 1, "manifest.json"
+        )
+        manifest = json.loads(fake_storage.objects[manifest_key])
+        assert name in {row["name"] for row in manifest["files"]}
+        assert (await api.get(f"{base}/{route_id}/artifacts/{name}")).status_code == 200
+
+
+async def test_routes_from_a_generator_without_routes3d_still_succeed(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    (tools / "no_routes3d").write_text("1", encoding="utf-8")
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, job_id, base = await _parent(api, db_session, fake_storage)
+        route_id = await _approve_and_queue(api, base, job_id)
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        names = {row["name"] for row in (await api.get(f"{base}/{route_id}")).json()["artifacts"]}
+        assert f"{FOLDER}/routes3d.json" not in names
+        assert f"{FOLDER}/mep_routes.dxf" in names

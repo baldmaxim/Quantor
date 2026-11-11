@@ -170,6 +170,9 @@ class ErrorCode(StrEnum):
     # Автоматическая разметка зон: на листе уже есть зоны / разметка этого вида уже идёт.
     CAD_ZONES_NOT_EMPTY = "CAD_ZONES_NOT_EMPTY"
     CAD_ZONES_BUSY = "CAD_ZONES_BUSY"
+    # Трассы в 3D (ADR-0041): у листа нет успешных трасс / трассы построены без routes3d.json.
+    CAD_ROUTES_NOT_FOUND = "CAD_ROUTES_NOT_FOUND"
+    CAD_ROUTES3D_MISSING = "CAD_ROUTES3D_MISSING"
     # ВОР Заказчика в контуре CAD (ADR-0038 п. 5): файл не разобран как таблица ВОР.
     CAD_VOR_PARSE_FAILED = "CAD_VOR_PARSE_FAILED"
 
@@ -333,6 +336,8 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_VOR_PARSE_FAILED: "Файл не удалось разобрать как ВОР",
     ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
     ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
+    ErrorCode.CAD_ROUTES_NOT_FOUND: "Для листа нет построенных трасс механики",
+    ErrorCode.CAD_ROUTES3D_MISSING: "Трассы построены прежней версией: перестройте трассы",
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: "Поставщик моделей не настроен",
     ErrorCode.TENDERHUB_DISABLED: "Интеграция с TenderHUB не настроена",
     ErrorCode.TENDERHUB_AUTH_FAILED: "TenderHUB не принял ключ доступа",
@@ -488,6 +493,8 @@ STATUS_CODES: dict[ErrorCode, int] = {
     # Отказы внешней системы — 502: клиент не виноват, но и повторять запрос бессмысленно,
     # пока не поправят ключ или доступ на той стороне.
     ErrorCode.TENDERHUB_DISABLED: status.HTTP_503_SERVICE_UNAVAILABLE,
+    ErrorCode.CAD_ROUTES_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.CAD_ROUTES3D_MISSING: status.HTTP_404_NOT_FOUND,
     ErrorCode.TENDERHUB_AUTH_FAILED: status.HTTP_502_BAD_GATEWAY,
     ErrorCode.TENDERHUB_FORBIDDEN: status.HTTP_502_BAD_GATEWAY,
     ErrorCode.TENDERHUB_RATE_LIMITED: status.HTTP_429_TOO_MANY_REQUESTS,

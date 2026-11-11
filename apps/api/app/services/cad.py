@@ -47,10 +47,10 @@ ARTIFACT_NAME: Final = re.compile(
     r"(?:plan_candidates\.dxf|scale\.json|cad_checks\.json|checks\.json|preview\.json))$"
 )
 # Артефакты задания трасс механики (`cad_mep_route`, ADR-0036 п. 8): отчёт и манифест как у
-# движка, плюс DXF трасс и кандидат — в каталоге того же вида.
+# движка, плюс DXF трасс, кандидат и 3D-трассы (`routes3d.json`, ADR-0041) — в каталоге вида.
 ROUTE_ARTIFACT_NAME: Final = re.compile(
     r"^(?:report\.json|manifest\.json|"
-    r"views/p\d{3}_v\d{2}/(?:mep_routes\.dxf|candidate\.json|preview\.json))$"
+    r"views/p\d{3}_v\d{2}/(?:mep_routes\.dxf|candidate\.json|preview\.json|routes3d\.json))$"
 )
 # Артефакт задания конструкций (`cad_walls`, ADR-0038): один файл в каталоге вида.
 WALLS_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/walls\.json$")

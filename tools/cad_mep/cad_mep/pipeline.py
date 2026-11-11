@@ -1,4 +1,4 @@
-"""Конвейер: PDF + DXF вида + калибровка -> mep_routes.dxf, preview.json, candidate.json."""
+"""Конвейер: PDF + DXF вида + калибровка -> mep_routes.dxf, preview/candidate/routes3d.json."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from cad_mep import (
     risers,
     rooms,
     route,
+    routes3d,
     topology,
 )
 from cad_mep.errors import EXIT_NO_ROUTES, MepError
@@ -100,7 +101,7 @@ def _topology_issues(res: Result, topo: dict[str, object]) -> None:
 
 
 def generate(args: Args) -> dict[str, object]:
-    """Строит три файла в <out>/views/<view-folder>/. Возвращает краткую сводку."""
+    """Строит четыре файла в <out>/views/<view-folder>/. Возвращает краткую сводку."""
     _validate(args)
     registry = risers.load_risers(args.risers) if args.risers is not None else []
     plan = open_plan(
@@ -235,6 +236,10 @@ def generate(args: Args) -> dict[str, object]:
         risers.registry_json(registry) if registry else None,
     )
     _dump(folder / "preview.json", preview)
+    routes3d.write(
+        folder / "routes3d.json",
+        routes3d.build(res, (fx0, fy0), float(floor_elevation), float(floor_height)),
+    )
     _dump(folder / "candidate.json", cand)
     return {
         "ok": True,
