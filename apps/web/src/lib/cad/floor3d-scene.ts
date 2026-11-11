@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import type { IFloor3dPlan, IHoleSpec, IPrismSpec, Point2, PrismCategory } from './floor3d-geometry';
+import type { IFloor3dHighlight, IFloor3dPlan, IHoleSpec, IPrismSpec, Point2, PrismCategory } from './floor3d-geometry';
 import { itemAtTriangle } from './floor3d-geometry';
 
 /**
@@ -23,6 +23,8 @@ export interface IFloor3dColors {
   readonly candidate: string;
   readonly enabled: string;
   readonly edge: string;
+  /** Выделение выбранного элемента и маркеры измерения. */
+  readonly accent: string;
   /** Контур отверстия в состоянии «Не отверстие». */
   readonly muted: string;
 }
@@ -39,6 +41,7 @@ export const readFloor3dColors = (): IFloor3dColors => {
       candidate: FALLBACK_COLOR,
       enabled: FALLBACK_COLOR,
       edge: FALLBACK_COLOR,
+      accent: FALLBACK_COLOR,
       muted: FALLBACK_COLOR,
     };
   }
@@ -52,6 +55,7 @@ export const readFloor3dColors = (): IFloor3dColors => {
     candidate: token('--danger'),
     enabled: token('--success'),
     edge: token('--text'),
+    accent: token('--accent'),
     muted: token('--muted'),
   };
 };
@@ -71,6 +75,8 @@ export interface IFloor3dScene {
   /** Меши, по которым работает клик. */
   readonly pickables: readonly THREE.Mesh[];
   readonly slabCap: THREE.Object3D | null;
+  /** Оверлей выделения поверх слитой геометрии; `null` - снять. Прежний освобождается. */
+  setHighlight: (target: IFloor3dHighlight | null) => void;
   dispose: () => void;
 }
 
@@ -265,11 +271,81 @@ export const buildFloor3dScene = (
     }
   }
 
+  // Выделение: отдельный оверлей, в клик не входит. Заливка акцентом с прозрачностью и контур рёбер;
+  // polygonOffset убирает мерцание на совпадающих гранях, контур рисуется поверх (depthTest выключен).
+  let overlay: THREE.Group | null = null;
+  const overlayDisposables: { dispose: () => void }[] = [];
+  const clearOverlay = (): void => {
+    if (overlay !== null) group.remove(overlay);
+    overlay = null;
+    for (const item of overlayDisposables.splice(0)) item.dispose();
+  };
+  const own = <T extends { dispose: () => void }>(item: T): T => {
+    overlayDisposables.push(item);
+    return item;
+  };
+  const setHighlight = (target: IFloor3dHighlight | null): void => {
+    clearOverlay();
+    if (target === null) return;
+    const accent = new THREE.Color(colors.accent);
+    const next = new THREE.Group();
+    const lineMaterial = own(new THREE.LineBasicMaterial({ color: accent, depthTest: false }));
+    if (target.kind === 'prism') {
+      const geometry = prismGeometry(target.spec);
+      if (geometry === null) return;
+      own(geometry);
+      const fillMaterial = own(
+        new THREE.MeshBasicMaterial({
+          color: accent,
+          transparent: true,
+          opacity: 0.45,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2,
+        }),
+      );
+      next.add(new THREE.Mesh(geometry, fillMaterial));
+      const edges = own(new THREE.EdgesGeometry(geometry, 30));
+      const lines = new THREE.LineSegments(edges, lineMaterial);
+      lines.renderOrder = 10;
+      next.add(lines);
+    } else {
+      const spec = target.spec;
+      const geometry = holeGeometry(spec, lift * 2);
+      if (geometry !== null) {
+        own(geometry);
+        next.add(
+          new THREE.Mesh(
+            geometry,
+            own(
+              new THREE.MeshBasicMaterial({
+                color: accent,
+                transparent: true,
+                opacity: 0.35,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+              }),
+            ),
+          ),
+        );
+      }
+      const points = spec.contour.map(([u, v]) => new THREE.Vector3(u, spec.y + lift * 2, -v));
+      const loop = new THREE.LineLoop(own(new THREE.BufferGeometry().setFromPoints(points)), lineMaterial);
+      loop.renderOrder = 10;
+      next.add(loop);
+    }
+    overlay = next;
+    group.add(next);
+  };
+
   return {
     group,
     pickables,
     slabCap,
+    setHighlight,
     dispose: () => {
+      clearOverlay();
       for (const item of disposables) item.dispose();
       group.clear();
     },

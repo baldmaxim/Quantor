@@ -11,6 +11,7 @@ import { CadFloor3dView } from './CadFloor3dView';
 vi.mock('@quantor/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof client>()),
   readCadFloor3D: vi.fn(),
+  readCadConstructions: vi.fn(),
   readCadProjectLevels: vi.fn(),
   putCadFloor3dHole: vi.fn(),
   putCadSheetLevels: vi.fn(),
@@ -19,13 +20,26 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
 
 // Холст three.js в jsdom не нужен (нет WebGL): подставка отдаёт «щелчок по отверстию».
 vi.mock('./CadFloor3dCanvas', () => ({
-  CadFloor3dCanvas: ({ onPick }: { onPick: (pick: unknown, anchor: unknown) => void }) => (
-    <button
-      type="button"
-      onClick={() => onPick({ kind: 'hole', category: 'hole', id: 'h1' }, { x: 20, y: 20 })}
-    >
-      щелчок по отверстию
-    </button>
+  CadFloor3dCanvas: ({
+    onPick,
+    measuring,
+    selected,
+  }: {
+    onPick: (pick: unknown, anchor: unknown) => void;
+    measuring: boolean;
+    selected: { id: string } | null;
+  }) => (
+    <div data-testid="canvas" data-measuring={String(measuring)} data-selected={selected?.id ?? ''}>
+      <button
+        type="button"
+        onClick={() => onPick({ kind: 'hole', category: 'hole', id: 'h1' }, { x: 20, y: 20 })}
+      >
+        щелчок по отверстию
+      </button>
+      <button type="button" onClick={() => onPick(null, { x: 1, y: 1 })}>
+        щелчок в пустоту
+      </button>
+    </div>
   ),
 }));
 
@@ -50,6 +64,9 @@ const mount = () => {
 const ok = <T,>(data: T) => Promise.resolve({ data });
 
 beforeEach(() => {
+  vi.mocked(client.readCadConstructions).mockImplementation(
+    () => ok({ constructions: [] }) as never,
+  );
   vi.mocked(client.readCadProjectLevels).mockImplementation(() =>
     ok({ slab_thickness_mm: null, slab_source_ref: null, updated_at: null }) as never,
   );
@@ -167,5 +184,43 @@ describe('3D-вид этажа', () => {
         }),
       ),
     );
+  });
+
+  it('выделение: клик ставит, клик в пустоту, Esc и закрытие плашки снимают', async () => {
+    vi.mocked(client.readCadFloor3D).mockImplementation(() => ok(floor3dFixture()) as never);
+    mount();
+    const canvas = await screen.findByTestId('canvas');
+    fireEvent.click(screen.getByRole('button', { name: 'щелчок по отверстию' }));
+    expect(canvas).toHaveAttribute('data-selected', 'h1');
+    fireEvent.click(screen.getByRole('button', { name: 'щелчок в пустоту' }));
+    expect(canvas).toHaveAttribute('data-selected', '');
+    fireEvent.click(screen.getByRole('button', { name: 'щелчок по отверстию' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(canvas).toHaveAttribute('data-selected', '');
+    fireEvent.click(screen.getByRole('button', { name: 'щелчок по отверстию' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть карточку' }));
+    expect(canvas).toHaveAttribute('data-selected', '');
+  });
+
+  it('«Измерить»: режим вкл/выкл, плашка в режиме не открывается, Esc выходит', async () => {
+    vi.mocked(client.readCadFloor3D).mockImplementation(() => ok(floor3dFixture()) as never);
+    mount();
+    const canvas = await screen.findByTestId('canvas');
+    const toggle = screen.getByRole('button', { name: 'Измерить' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(canvas).toHaveAttribute('data-measuring', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'щелчок по отверстию' }));
+    expect(screen.queryByTestId('floor3d-popover')).toBeNull();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(canvas).toHaveAttribute('data-measuring', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'щелчок по отверстию' }));
+    expect(screen.getByTestId('floor3d-popover')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(canvas).toHaveAttribute('data-measuring', 'true');
+    expect(screen.queryByTestId('floor3d-popover')).toBeNull();
+    fireEvent.click(toggle);
+    expect(canvas).toHaveAttribute('data-measuring', 'false');
   });
 });

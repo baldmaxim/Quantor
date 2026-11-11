@@ -4,7 +4,7 @@ import { cx } from '@quantor/ui';
 import { useEffect, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
-import { WALLS_NOT_READY, isWallsActive, wallsJobStatus } from '@/lib/cad/constructions-queries';
+import { WALLS_NOT_READY, isWallsActive, useCadConstructions, wallsJobStatus } from '@/lib/cad/constructions-queries';
 import { cadErrorText } from '@/lib/cad/errors';
 import { buildFloor3dPlan } from '@/lib/cad/floor3d-geometry';
 import {
@@ -57,6 +57,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
   const setHole = useSetFloor3dHole(params);
   const saveSheet = useSaveFloor3dSheetLevels(params);
   const saveProject = useSaveCadProjectLevels(params.projectId);
+  // Тот же запрос и ключ, что у вкладки «Конструкции»: кеш общий. Из него - длина, площадь, объём стены.
+  const constructions = useCadConstructions(params, true);
 
   const model = query.data ?? null;
   const plan = useMemo(() => (model ? buildFloor3dPlan(model) : null), [model]);
@@ -72,30 +74,42 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
     anchor: { x: number; y: number };
     bounds: { width: number; height: number };
   } | null>(null);
+  // Выбранный элемент подсвечивается, пока не снят: клик в пустоту, Esc, закрытие плашки.
+  const [selected, setSelected] = useState<IFloor3dPick | null>(null);
+  const [measuring, setMeasuring] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
 
   const closePick = () => {
     setPicked(null);
+    setSelected(null);
     setPopoverError(null);
   };
 
+  const toggleMeasuring = () => {
+    closePick();
+    setMeasuring((on) => !on);
+  };
+
   useEffect(() => {
-    if (picked === null) return undefined;
+    if (picked === null && selected === null && !measuring) return undefined;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setPicked(null);
-        setPopoverError(null);
-      }
+      if (event.key !== 'Escape') return;
+      if (measuring) setMeasuring(false);
+      else closePick();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [picked]);
+  }, [picked, selected, measuring]);
 
   const request = (kind: IFloor3dViewRequest['kind']) =>
     setViewRequest((current) => ({ kind, seq: (current?.seq ?? 0) + 1 }));
 
   const onPick = (pick: IFloor3dPick | null, anchor: { x: number; y: number }) => {
+    // В режиме измерения клик ставит точку замера и плашку не открывает.
+    if (measuring) return;
     setPopoverError(null);
+    // Плита плашки не имеет - её не подсвечиваем.
+    setSelected(pick !== null && pick.category !== 'slab' ? pick : null);
     const rect = stage.current?.getBoundingClientRect();
     setPicked(
       pick === null || !rect ? null : { pick, anchor, bounds: { width: rect.width, height: rect.height } },
@@ -149,14 +163,21 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
           plan={plan}
           showSlabCap={showSlabCap}
           viewRequest={viewRequest}
+          selected={selected}
+          measuring={measuring}
           onPick={onPick}
-          onMove={closePick}
+          // Камера пошла - плашка у курсора устарела, а выделение остаётся.
+          onMove={() => {
+            setPicked(null);
+            setPopoverError(null);
+          }}
           onError={setCanvasError}
         />
         {picked !== null && (
           <CadFloor3dPopover
             pick={picked.pick}
             model={model}
+            constructions={constructions.data}
             anchor={picked.anchor}
             bounds={picked.bounds}
             saving={setHole.isPending}
@@ -193,6 +214,14 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
           <Button disabled={!interactive} className="max-md:h-[44px]" onClick={() => request('fit')}>
             Вписать
           </Button>
+          <Button
+            disabled={!interactive}
+            aria-pressed={measuring}
+            className={cx('max-md:h-[44px]', measuring && 'border-accent text-accent')}
+            onClick={toggleMeasuring}
+          >
+            Измерить
+          </Button>
           <label className="flex min-h-[44px] items-center gap-[var(--s-3)] text-xs md:min-h-0">
             <input
               type="checkbox"
@@ -226,6 +255,14 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
         )}
         <div ref={stage} className="relative min-h-0 flex-1 overflow-hidden">
           {content}
+          {interactive && measuring && (
+            <p
+              role="status"
+              className="pointer-events-none absolute top-[var(--s-4)] left-[var(--s-4)] max-w-[calc(100%-16px)] rounded-[var(--radius-sm)] bg-surface/80 px-[var(--s-3)] py-[var(--s-2)] text-xs"
+            >
+              Измерение: укажите две точки. Esc - выход.
+            </p>
+          )}
           {interactive && (
             <ul
               aria-label="Условные обозначения"

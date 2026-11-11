@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { floor3dFixture } from './floor3d-fixtures';
-import { buildFloor3dPlan, itemAtTriangle, toScenePoint } from './floor3d-geometry';
+import { buildFloor3dPlan, highlightOf, itemAtTriangle, toScenePoint } from './floor3d-geometry';
 
 describe('перевод координат', () => {
   const center = { x: 5000, y: 3000, z: 4000 };
@@ -152,5 +152,34 @@ describe('треугольник -> элемент', () => {
     expect(itemAtTriangle(starts, 40, 40)).toBe(-1);
     expect(itemAtTriangle(starts, 40, -1)).toBe(-1);
     expect(itemAtTriangle([], 0, 0)).toBe(-1);
+  });
+});
+
+describe('план оверлея выделения', () => {
+  const plan = buildFloor3dPlan(floor3dFixture());
+
+  it('стена - призма из плана с теми же высотами', () => {
+    const target = highlightOf(plan, { kind: 'prism', category: 'masonry', id: 'w1' });
+    expect(target?.kind).toBe('prism');
+    expect(target?.kind === 'prism' && target.spec.id).toBe('w1');
+    expect(target?.kind === 'prism' && target.spec.yTop).toBeCloseTo(1.5, 6);
+  });
+
+  it('перемычка - призма категории lintel', () => {
+    const target = highlightOf(plan, { kind: 'prism', category: 'lintel', id: 'o1' });
+    expect(target?.kind === 'prism' && target.spec.category).toBe('lintel');
+  });
+
+  it('отверстие - любое состояние, включая «Не отверстие»', () => {
+    for (const key of ['h1', 'h2', 'h3']) {
+      const target = highlightOf(plan, { kind: 'hole', category: 'hole', id: key });
+      expect(target?.kind === 'hole' && target.spec.key).toBe(key);
+    }
+  });
+
+  it('нет выбора, нет в плане (стена без высоты), чужая категория - null', () => {
+    expect(highlightOf(plan, null)).toBeNull();
+    expect(highlightOf(plan, { kind: 'prism', category: 'monolith', id: 'w2' })).toBeNull();
+    expect(highlightOf(plan, { kind: 'prism', category: 'lintel', id: 'w1' })).toBeNull();
   });
 });

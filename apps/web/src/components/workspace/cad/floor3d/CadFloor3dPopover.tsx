@@ -1,6 +1,6 @@
 'use client';
 
-import type { CadFloor3dRead } from '@quantor/api-client';
+import type { CadConstructionsRead, CadFloor3dRead } from '@quantor/api-client';
 import type { FC, ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
@@ -8,9 +8,11 @@ import { KIND_LABELS } from '@/lib/cad/construction-labels';
 import { formatMeters } from '@/lib/cad/floor3d-geometry';
 import { heightSourceText } from '@/lib/cad/floor3d-heights';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
+import { wallQuantities } from '@/lib/cad/floor3d-volume';
+import { formatNumber } from '@/lib/cad/view-format';
 
 const WIDTH_PX = 252;
-const HEIGHT_ESTIMATE_PX = 200;
+const HEIGHT_ESTIMATE_PX = 340;
 const GAP_PX = 12;
 const EDGE_PX = 8;
 
@@ -23,6 +25,8 @@ const HOLE_STATE_TEXT = {
 interface ICadFloor3dPopoverProps {
   readonly pick: IFloor3dPick;
   readonly model: CadFloor3dRead;
+  /** Конструкции листа (тот же запрос, что у вкладки): источник длины, площади и объёма стены. */
+  readonly constructions?: Pick<CadConstructionsRead, 'constructions'> | null;
   /** Точка клика от угла холста и размер холста, px. */
   readonly anchor: { readonly x: number; readonly y: number };
   readonly bounds: { readonly width: number; readonly height: number };
@@ -46,6 +50,7 @@ const Row: FC<{ readonly label: string; readonly value: string }> = ({ label, va
 export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
   pick,
   model,
+  constructions = null,
   anchor,
   bounds,
   saving,
@@ -61,6 +66,9 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
     if (!wall) return null;
     title = KIND_LABELS[wall.kind];
     const top = wall.z_top_mm;
+    const quantities = wallQuantities(constructions, wall.construction_key);
+    const orUndefined = (value: number | null | undefined, digits: number, unit: string): string =>
+      value === null || value === undefined ? 'не определено' : formatNumber(value, digits, unit);
     body = (
       <>
         <Row label="Семейство" value={wall.family === 'monolith' ? 'монолит' : 'кладка'} />
@@ -71,6 +79,17 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
         <Row label="Низ, м" value={formatMeters(wall.z_bottom_mm)} />
         <Row label="Верх, м" value={top === null ? 'не определён' : formatMeters(top)} />
         <Row label="Высота стены, м" value={top === null ? 'не определена' : formatMeters(top - wall.z_bottom_mm)} />
+        <Row label="Длина по оси" value={orUndefined(quantities?.lengthM, 2, 'м')} />
+        <Row label="Высота в расчёте" value={orUndefined(quantities?.heightMm, 0, 'мм')} />
+        <Row label="Площадь стены" value={orUndefined(quantities?.wallAreaM2, 2, 'м²')} />
+        {quantities === null || quantities.volumeM3 === null ? (
+          <p className="text-xs text-muted">Объём не определён</p>
+        ) : (
+          <Row label="Объём" value={formatNumber(quantities.volumeM3, 3, 'м³')} />
+        )}
+        {quantities !== null && (
+          <Row label="Состояние" value={quantities.accepted ? 'принято' : 'проверить'} />
+        )}
       </>
     );
   } else if (pick.kind === 'prism' && pick.category === 'lintel') {

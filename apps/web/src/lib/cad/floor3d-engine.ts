@@ -1,7 +1,20 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-import { pickOf, type IFloor3dPick, type IFloor3dScene } from './floor3d-scene';
+import type { IFloor3dHighlight } from './floor3d-geometry';
+import {
+  midpoint,
+  snapToNearestVertex,
+  type IScreenPoint,
+  type SceneVec3,
+} from './floor3d-measure';
+import {
+  pickOf,
+  readFloor3dColors,
+  type IFloor3dPick,
+  type IFloor3dPickData,
+  type IFloor3dScene,
+} from './floor3d-scene';
 
 /**
  * Рендер 3D-вида этажа (ADR-0039): renderer, камера и орбитальное управление мышью и касанием.
@@ -18,6 +31,10 @@ export interface IFloor3dEngine {
   setModel: (scene: IFloor3dScene | null) => void;
   setView: (kind: Floor3dViewKind) => void;
   fit: () => void;
+  /** Выделить элемент оверлеем; `null` - снять. Переживает пересборку модели только через повторный вызов. */
+  setHighlight: (target: IFloor3dHighlight | null) => void;
+  /** Режим измерения: клики ставят точки, а не выбирают элемент; выход очищает замер. */
+  setMeasuring: (on: boolean) => void;
   dispose: () => void;
 }
 
@@ -27,6 +44,15 @@ export interface IFloor3dEngineOptions {
   readonly onPick: (pick: IFloor3dPick | null, anchor: { x: number; y: number }) => void;
   /** Камера пошла двигаться: карточка у курсора устарела. */
   readonly onMove: () => void;
+  /** Состояние замера: точки сцены и экранная точка середины отрезка (px от угла холста); `null` - замера нет. */
+  readonly onMeasure: (state: IFloor3dMeasureState | null) => void;
+}
+
+export interface IFloor3dMeasureState {
+  /** Одна точка - маркер, две - отрезок. */
+  readonly points: readonly SceneVec3[];
+  /** Середина отрезка на экране; `null` - отрезка нет или он за камерой. */
+  readonly mid: IScreenPoint | null;
 }
 
 const FOV_DEG = 45;
@@ -65,6 +91,7 @@ export const createFloor3dEngine = (
     if (disposed) return;
     const moving = controls.update();
     renderer.render(scene, camera);
+    emitMeasure(false);
     if (moving) requestRender();
   };
   function requestRender(): void {
@@ -76,6 +103,66 @@ export const createFloor3dEngine = (
 
   let model: IFloor3dScene | null = null;
   let fitted = false;
+  let highlight: IFloor3dHighlight | null = null;
+
+  // Замер: маркеры и линия лежат в сцене отдельно от модели, поверх всего (depthTest выключен).
+  let measuring = false;
+  let points: SceneVec3[] = [];
+  let lastMid: IScreenPoint | null = null;
+  const measureGroup = new THREE.Group();
+  measureGroup.renderOrder = 20;
+  scene.add(measureGroup);
+  const clearMeasureObjects = (): void => {
+    for (const child of [...measureGroup.children]) {
+      measureGroup.remove(child);
+      const item = child as THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material };
+      item.geometry?.dispose();
+      item.material?.dispose();
+    }
+  };
+  const toScreen = (point: SceneVec3): IScreenPoint | null => {
+    const projected = new THREE.Vector3(point[0], point[1], point[2]).project(camera);
+    if (projected.z > 1 || projected.z < -1) return null;
+    return {
+      x: ((projected.x + 1) / 2) * Math.max(1, dom.clientWidth),
+      y: ((1 - projected.y) / 2) * Math.max(1, dom.clientHeight),
+    };
+  };
+  const emitMeasure = (force: boolean): void => {
+    if (!measuring || points.length === 0) {
+      if (force) options.onMeasure(null);
+      return;
+    }
+    const a = points[0] as SceneVec3;
+    const b = points[1];
+    const mid = b === undefined ? null : toScreen(midpoint(a, b));
+    const moved =
+      (mid === null) !== (lastMid === null) ||
+      (mid !== null && lastMid !== null && Math.hypot(mid.x - lastMid.x, mid.y - lastMid.y) > 0.5);
+    if (!force && !moved) return;
+    lastMid = mid;
+    options.onMeasure({ points: [...points], mid });
+  };
+  const redrawMeasure = (): void => {
+    clearMeasureObjects();
+    if (points.length === 0) return;
+    const accent = new THREE.Color(readFloor3dColors().accent);
+    const positions = points.map((point) => new THREE.Vector3(point[0], point[1], point[2]));
+    const dots = new THREE.Points(
+      new THREE.BufferGeometry().setFromPoints(positions),
+      new THREE.PointsMaterial({ color: accent, size: 10, sizeAttenuation: false, depthTest: false }),
+    );
+    dots.renderOrder = 20;
+    measureGroup.add(dots);
+    if (positions.length === 2) {
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(positions),
+        new THREE.LineBasicMaterial({ color: accent, depthTest: false }),
+      );
+      line.renderOrder = 20;
+      measureGroup.add(line);
+    }
+  };
 
   const place = (direction: THREE.Vector3): void => {
     if (model === null) return;
@@ -125,6 +212,10 @@ export const createFloor3dEngine = (
     ndc.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
     const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    if (measuring) {
+      addMeasurePoint(anchor);
+      return;
+    }
     for (const hit of raycaster.intersectObjects([...model.pickables], false)) {
       const pick = pickOf(hit.object, hit.faceIndex);
       if (pick !== null) {
@@ -133,6 +224,27 @@ export const createFloor3dEngine = (
       }
     }
     options.onPick(null, anchor);
+  };
+  // Точка замера: попадание луча в видимую призму; ближайшая вершина треугольника в 12 px - привязка.
+  const addMeasurePoint = (anchor: IScreenPoint): void => {
+    if (model === null) return;
+    const prisms = model.pickables.filter((mesh) => (mesh.userData.pick as IFloor3dPickData).kind === 'prism');
+    const hit = raycaster.intersectObjects(prisms, false)[0];
+    if (hit === undefined) return;
+    const position = hit.object instanceof THREE.Mesh ? hit.object.geometry.getAttribute('position') : null;
+    const vertices: SceneVec3[] = [];
+    if (hit.face && position) {
+      for (const index of [hit.face.a, hit.face.b, hit.face.c]) {
+        const vertex = new THREE.Vector3().fromBufferAttribute(position, index).applyMatrix4(hit.object.matrixWorld);
+        vertices.push([vertex.x, vertex.y, vertex.z]);
+      }
+    }
+    const { point } = snapToNearestVertex([hit.point.x, hit.point.y, hit.point.z], vertices, anchor, toScreen);
+    points = points.length >= 2 ? [point] : [...points, point];
+    redrawMeasure();
+    lastMid = null;
+    emitMeasure(true);
+    requestRender();
   };
   dom.addEventListener('pointerdown', onDown);
   dom.addEventListener('pointerup', onUp);
@@ -144,6 +256,7 @@ export const createFloor3dEngine = (
         model.dispose();
       }
       model = next;
+      if (next !== null) next.setHighlight(highlight);
       if (next === null) {
         requestRender();
         return;
@@ -153,6 +266,22 @@ export const createFloor3dEngine = (
         fitted = true;
         place(ISO_DIRECTION);
       } else requestRender();
+    },
+    setHighlight: (target) => {
+      highlight = target;
+      model?.setHighlight(target);
+      requestRender();
+    },
+    setMeasuring: (on) => {
+      if (measuring === on) return;
+      measuring = on;
+      if (!on) {
+        points = [];
+        lastMid = null;
+        clearMeasureObjects();
+        options.onMeasure(null);
+        requestRender();
+      }
     },
     setView: (kind) => place(kind === 'top' ? TOP_DIRECTION : ISO_DIRECTION),
     fit: () => {
@@ -169,6 +298,8 @@ export const createFloor3dEngine = (
       controls.removeEventListener('change', requestRender);
       controls.removeEventListener('start', options.onMove);
       controls.dispose();
+      clearMeasureObjects();
+      scene.remove(measureGroup);
       if (model !== null) {
         scene.remove(model.group);
         model.dispose();

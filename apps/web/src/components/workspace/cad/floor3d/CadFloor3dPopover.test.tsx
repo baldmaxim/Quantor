@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { construction, constructionsRead } from '@/lib/cad/constructions-fixtures';
 import { floor3dFixture } from '@/lib/cad/floor3d-fixtures';
 
 import { CadFloor3dPopover } from './CadFloor3dPopover';
@@ -45,5 +46,67 @@ describe('плашка отверстия: кнопки по состоянию'
     expect(screen.queryByRole('button', { name: 'Не отверстие' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Отверстие' }));
     expect(onDecide).toHaveBeenCalledWith('h3', true);
+  });
+});
+
+describe('плашка стены: величины из конструкций листа', () => {
+  const mountWall = (data: ReturnType<typeof constructionsRead> | null) =>
+    render(
+      <CadFloor3dPopover
+        pick={{ kind: 'prism', category: 'masonry', id: 'w1' }}
+        model={floor3dFixture()}
+        constructions={data}
+        anchor={{ x: 10, y: 10 }}
+        bounds={{ width: 600, height: 400 }}
+        saving={false}
+        error={null}
+        onDecide={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+  it('длина, высота, площадь, объём, номинал и состояние', () => {
+    mountWall(
+      constructionsRead({
+        constructions: [
+          construction({
+            id: 'w1',
+            accepted: true,
+            computed: { ...construction({ id: 'x' }).computed, length_m: 10, height_mm: 2800, wall_area_m2: 28, volume_m3: 5.6 },
+          }),
+        ],
+      }),
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('Длина по оси: 10 м');
+    expect(dialog).toHaveTextContent('Высота в расчёте: 2 800 мм');
+    expect(dialog).toHaveTextContent('Площадь стены: 28 м²');
+    expect(dialog).toHaveTextContent('Объём: 5,6 м³');
+    expect(dialog).toHaveTextContent('Толщина (номинал): 200 мм');
+    expect(dialog).toHaveTextContent('Состояние: принято');
+  });
+
+  it('не принято - «проверить»', () => {
+    mountWall(constructionsRead({ constructions: [construction({ id: 'w1', accepted: false })] }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('Состояние: проверить');
+  });
+
+  it('нет данных конструкций - «Объём не определён», не 0', () => {
+    mountWall(null);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('Объём не определён');
+    expect(dialog).not.toHaveTextContent('0 м³');
+    expect(dialog).not.toHaveTextContent('Состояние:');
+  });
+
+  it('конструкция есть, объёма нет - «Объём не определён»', () => {
+    mountWall(
+      constructionsRead({
+        constructions: [
+          construction({ id: 'w1', computed: { ...construction({ id: 'x' }).computed, volume_m3: null } }),
+        ],
+      }),
+    );
+    expect(screen.getByRole('dialog')).toHaveTextContent('Объём не определён');
   });
 });

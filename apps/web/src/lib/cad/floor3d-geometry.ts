@@ -299,6 +299,28 @@ export const itemAtTriangle = (starts: readonly number[], total: number, face: n
   return low;
 };
 
+/** Что подсвечивать при выборе: призма (стена, перемычка) или контур отверстия. */
+export type IFloor3dHighlight =
+  | { readonly kind: 'prism'; readonly spec: IPrismSpec }
+  | { readonly kind: 'hole'; readonly spec: IHoleSpec };
+
+/**
+ * План оверлея выделения по выбранному элементу: берётся из плана, а не из мешей, поэтому не зависит
+ * от слияния геометрии. Элемента нет в плане (не построен) - `null`.
+ */
+export const highlightOf = (
+  plan: IFloor3dPlan,
+  pick: { readonly kind: 'prism' | 'hole'; readonly category: string; readonly id: string } | null,
+): IFloor3dHighlight | null => {
+  if (pick === null) return null;
+  if (pick.kind === 'hole') {
+    const hole = [...plan.holes, ...plan.disabledHoles].find((item) => item.key === pick.id);
+    return hole === undefined ? null : { kind: 'hole', spec: hole };
+  }
+  const prism = plan.prisms.find((item) => item.category === pick.category && item.id === pick.id);
+  return prism === undefined ? null : { kind: 'prism', spec: prism };
+};
+
 /** Метры с двумя знаками для отметок в карточке. */
 export const formatMeters = (valueMm: number): string =>
   (valueMm / MM_IN_M).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
