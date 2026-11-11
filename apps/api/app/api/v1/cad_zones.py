@@ -12,14 +12,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.api.v1.deps import AuthDep, SessionDep, require, require_feature
+from app.api.v1.cad_constructions import _sheet
+from app.api.v1.deps import AuthDep, SessionDep, SettingsDep, require, require_feature
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
 from app.contracts.cad_zones import CadZoneCreate, CadZoneRead, CadZoneUpdate
+from app.contracts.cad_zones_auto import CadZonesJobRead
 from app.errors import not_found
 from app.models import CadZone
 from app.services import cad as cad_service
-from app.services import cad_zones
+from app.services import cad_zones, cad_zones_auto
 from app.services import projects as projects_service
 
 router = APIRouter(
@@ -124,6 +126,40 @@ async def delete_cad_zone(zone_id: uuid.UUID, session: SessionDep, context: Auth
     await cad_zones.delete_zone(session, zone=zone)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/zones/auto",
+    response_model=CadZonesJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Запустить автоматическую разметку зон вида: поставить задание cad_zones",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def start_cad_zones_auto(
+    project_id: uuid.UUID,
+    job_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    session: SessionDep,
+    context: AuthDep,
+    settings: SettingsDep,
+) -> CadZonesJobRead:
+    """409 `CAD_ZONES_NOT_EMPTY` - на листе уже есть зоны; 409 `CAD_ZONES_BUSY` - разметка идёт."""
+    sheet = await _sheet(session, context, project_id, job_id, page_index, view)
+    job = await cad_zones_auto.schedule_manual(
+        session, parent=sheet.parent, page_index=page_index, view=view, settings=settings
+    )
+    response = CadZonesJobRead(
+        job_id=job.id,
+        parent_job_id=sheet.parent.id,
+        page_index=page_index,
+        view=view,
+        status=job.status,
+        attempt=job.attempt,
+        created_at=job.created_at,
+    )
+    await session.commit()
+    return response
 
 
 # Отдельная группа под общим требованием опознания; флаг пространства - на самом `router`.

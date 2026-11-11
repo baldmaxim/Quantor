@@ -13,8 +13,8 @@ import { DocumentRow } from './DocumentRow';
  * Документы проекта по разделам проектной документации.
  *
  * Раздел определяется по шифру в имени файла (`lib/documentSections`), у PDF отмечен
- * распознанный пакет того же имени. Группы сворачиваются; свёрнутые разделы помнятся
- * в localStorage на проект. Хранилище может быть недоступно — тогда выбор живёт до
+ * распознанный пакет того же имени. Клик по строке выбирает документ (`onSelect`). Группы
+ * сворачиваются; свёрнутые разделы помнятся в localStorage на проект. Хранилище может быть недоступно — тогда выбор живёт до
  * закрытия вкладки.
  */
 
@@ -28,6 +28,9 @@ export interface IDocumentSectionsProps {
   readonly documents: readonly DocumentRead[];
   /** `undefined`/`null`, пока ревизии документа не загружены. */
   readonly revisionsOf: (documentId: string) => IRevisionsInfo | null | undefined;
+  /** Выбранный документ: его обработка показана рядом со списком. */
+  readonly selectedId?: string | null;
+  readonly onSelect?: (documentId: string) => void;
 }
 
 export const collapsedKey = (projectId: string): string =>
@@ -59,6 +62,8 @@ export const DocumentSections: FC<IDocumentSectionsProps> = ({
   projectId,
   documents,
   revisionsOf,
+  selectedId = null,
+  onSelect,
 }) => {
   const groups = useMemo(() => groupDocuments(documents), [documents]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<SectionId>>(() =>
@@ -113,6 +118,8 @@ export const DocumentSections: FC<IDocumentSectionsProps> = ({
                       revisions={info?.items ?? null}
                       total={info?.total ?? 0}
                       packageCount={packages.length}
+                      selected={document.id === selectedId}
+                      onSelect={onSelect}
                     />
                   );
                 })}

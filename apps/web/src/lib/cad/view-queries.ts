@@ -29,8 +29,9 @@ import { cadErrorText } from './errors';
 const READY_STALE_MS = 5 * 60_000;
 
 /** Время свежести ответа: готовый результат (есть предпросмотр) неизменяем, остальное устаревает сразу. */
-export const viewStaleTime = (data: Pick<CadViewDiagnosticsRead, 'preview_available'> | undefined): number =>
-  data?.preview_available === true ? READY_STALE_MS : 0;
+export const viewStaleTime = (
+  data: Pick<CadViewDiagnosticsRead, 'preview_available'> | undefined,
+): number => (data?.preview_available === true ? READY_STALE_MS : 0);
 
 /** Диагностику надо перечитать: задание завершено, а в кэше ответ без предпросмотра. */
 export const viewNeedsRefresh = (
@@ -150,6 +151,16 @@ export const useCadPreview = (
     staleTime: READY_STALE_MS,
     retry: retryNetwork,
   });
+
+/**
+ * Отсутствие предпросмотра (404, результат не готов) - обычный ответ для вида без DXF, а не отказ.
+ * Тихим оно остаётся, пока диагностика не обещала предпросмотр.
+ */
+export const isQuietPreviewError = (error: unknown, previewPromised: boolean): boolean => {
+  if (previewPromised) return false;
+  const code = extractCode(error);
+  return code === 'NOT_FOUND' || code === 'CAD_RESULT_NOT_READY';
+};
 
 const LOCAL_MESSAGES: Readonly<Record<string, string>> = {
   CAD_RESULT_NOT_READY: 'Результат попытки ещё не готов',

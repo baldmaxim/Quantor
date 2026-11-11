@@ -11,6 +11,7 @@ import {
   overlayAvailability,
   overlayPaintData,
   pickWorkspaceView,
+  summaryViewParams,
   workspaceMarks,
   workspaceViewParams,
 } from './workspace-cad';
@@ -181,5 +182,76 @@ describe('отметки замечаний', () => {
     expect(
       workspaceMarks([{ id: 'a', status: 'open', bbox_pt: [1, 1, 5, 5] }], null, null),
     ).toEqual([]);
+  });
+});
+
+describe('summaryViewParams: чтение вида по сводке задания', () => {
+  const summary = {
+    job_id: JOB_ID,
+    status: 'succeeded' as const,
+    attempt: 2,
+    result_status: 'completed_requires_review',
+  };
+
+  it('завершённое задание с читаемым итогом: попытка из сводки, вид выбранный или первый', () => {
+    expect(summaryViewParams('p1', 'r1', summary, 3, null)).toEqual({
+      projectId: 'p1',
+      revisionId: 'r1',
+      jobId: JOB_ID,
+      attempt: 2,
+      pageIndex: 3,
+      view: 1,
+    });
+    expect(summaryViewParams('p1', 'r1', summary, 3, 4)?.view).toBe(4);
+  });
+
+  it.each([
+    ['идёт', { status: 'running' as const }],
+    ['отказ', { status: 'failed' as const }],
+    ['нет итога', { result_status: null }],
+    ['итог не читается', { result_status: 'failed' }],
+    ['нет попытки', { attempt: 0 }],
+  ])('%s - читать нечего', (_, patch) => {
+    expect(summaryViewParams('p1', 'r1', { ...summary, ...patch }, 0, null)).toBeNull();
+  });
+});
+
+describe('overlayPaintData: готовые нормализованные пути', () => {
+  it('переданные пути берутся как есть и не пересчитываются при смене скрытых слоёв', () => {
+    const page = { width: 1000, height: 500 };
+    const frame = frameOf(FRAME_OK);
+    const shown = preview();
+    const ready = [
+      {
+        layer: 0,
+        closed: false,
+        fill: false,
+        points: new Float64Array([0, 0, 1, 1]),
+        bounds: [0, 0, 1, 1] as const,
+      },
+    ];
+    const first = overlayPaintData(shown, frame, page, 'ink', [], { paths: ready });
+    const second = overlayPaintData(shown, frame, page, 'ink', [], {
+      paths: ready,
+      hiddenLayers: new Set([0]),
+    });
+    expect(first?.paths).toBe(ready);
+    expect(second?.paths).toBe(ready);
+    expect(second?.visibleLayers.has(0)).toBe(false);
+  });
+
+  it('DXF скрыт - путей нет', () => {
+    const data = overlayPaintData(
+      preview(),
+      frameOf(FRAME_OK),
+      { width: 10, height: 10 },
+      'ink',
+      [],
+      {
+        dxfVisible: false,
+        crop: { rect: [0, 0, 1, 1], color: 'c' },
+      },
+    );
+    expect(data?.paths).toHaveLength(0);
   });
 });

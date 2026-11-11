@@ -424,6 +424,10 @@ class JobType(StrEnum):
     # tools/cad_walls/run_floor3d_dxf.py подпроцессом в том же cad-worker. Основной исполнитель
     # этот тип не берёт.
     CAD_FLOOR3D_DXF = "cad_floor3d_dxf"
+    # Автоматическая разметка зон квартир по DXF вида (ADR-0036): CLI tools/cad_mep/run_zones.py
+    # подпроцессом в том же cad-worker; результат пишется зонами листа через сервис зон. Основной
+    # исполнитель этот тип не берёт.
+    CAD_ZONES = "cad_zones"
 
 
 class JobStatus(StrEnum):

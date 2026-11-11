@@ -1,9 +1,14 @@
-import type { CadJobRead, CadPreviewRead, CadViewDiagnosticsRead } from '@quantor/api-client';
+import type {
+  CadJobRead,
+  CadJobSummaryRead,
+  CadPreviewRead,
+  CadViewDiagnosticsRead,
+} from '@quantor/api-client';
 
 import type { NormalizedRect } from '@/lib/viewer/coordinates';
 
 import type { ICadPaintData } from './cad-painter';
-import { overlayPaths, type ICadFrame, type IPageSize } from './frame';
+import { overlayPaths, type ICadFrame, type INormalizedPath, type IPageSize } from './frame';
 import { assignLayerColors } from './layer-colors';
 import { bboxPtToNormalized, type BboxPt, type IRemark, type IRemarkBinding } from './remarks';
 import type { IRemarkMark } from './remarks-painter';
@@ -18,6 +23,9 @@ import type { ICadViewParams } from './view-queries';
 
 /** Непрозрачность DXF в рабочей области: геометрия всегда непрозрачная, гаснет только подложка PDF. */
 export const WORKSPACE_CAD_OPACITY = 1;
+
+/** Пустой набор путей: общий объект, чтобы кеш путей рисовальщика не плодил записи. */
+const NO_PATHS: readonly INormalizedPath[] = [];
 
 /** Идентификатор несохранённого участка на листе. */
 export const WORKSPACE_DRAFT_ID = '__draft__';
@@ -57,6 +65,33 @@ export const workspaceViewParams = (
 ): ICadViewParams | null =>
   view !== null && job.result_attempt !== null && isReadableJob(job)
     ? { projectId, revisionId, jobId: job.job_id, attempt: job.result_attempt, pageIndex, view }
+    : null;
+
+/**
+ * Параметры чтения вида по сводке задания (без полного задания): только для завершённого
+ * задания с читаемым итогом. Попытка - текущая попытка задания (у завершённого она же результат),
+ * вид - выбранный или первый. Ответ другой попытки или вида запрос отбрасывает сам (см. `sameView`),
+ * когда полное задание придёт, параметры берутся уже из него.
+ */
+export const summaryViewParams = (
+  projectId: string,
+  revisionId: string,
+  summary: Pick<CadJobSummaryRead, 'job_id' | 'status' | 'attempt' | 'result_status'>,
+  pageIndex: number,
+  chosenView: number | null,
+): ICadViewParams | null =>
+  summary.status === 'succeeded' &&
+  summary.attempt >= 1 &&
+  summary.result_status !== null &&
+  READABLE_RESULTS.has(summary.result_status)
+    ? {
+        projectId,
+        revisionId,
+        jobId: summary.job_id,
+        attempt: summary.attempt,
+        pageIndex,
+        view: chosenView ?? 1,
+      }
     : null;
 
 /** Параметры «ничего не читать»: пустые идентификаторы под выключенными запросами. */
@@ -108,6 +143,11 @@ export interface IOverlayPaintOptions {
   readonly hiddenLayers?: ReadonlySet<number>;
   /** Область проверки масштаба на листе. */
   readonly crop?: { readonly rect: NormalizedRect; readonly color: string } | null;
+  /**
+   * Уже нормализованные пути `preview` (по `preview`, кадру и размеру листа). Переключение слоя
+   * не меняет ни одного из них, поэтому вызывающий считает пути отдельно и один раз.
+   */
+  readonly paths?: readonly INormalizedPath[];
 }
 
 /**
@@ -122,13 +162,15 @@ export const overlayPaintData = (
   layerPalette: readonly string[] = [],
   options: IOverlayPaintOptions = {},
 ): ICadPaintData | null => {
-  const { dxfVisible = true, hiddenLayers, crop = null } = options;
+  const { dxfVisible = true, hiddenLayers, crop = null, paths } = options;
   if (!page) return null;
   const geometry = dxfVisible && preview !== null && frame !== null ? { preview, frame } : null;
   if (geometry === null && crop === null) return null;
   const layers = preview?.layers ?? [];
   return {
-    paths: geometry ? overlayPaths(geometry.preview.paths, geometry.frame, page) : [],
+    paths: geometry
+      ? (paths ?? overlayPaths(geometry.preview.paths, geometry.frame, page))
+      : NO_PATHS,
     visibleLayers: new Set(
       layers.map((_, index) => index).filter((index) => !hiddenLayers?.has(index)),
     ),

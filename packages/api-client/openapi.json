@@ -1103,6 +1103,168 @@
         "title": "CadAttemptRead",
         "type": "object"
       },
+      "CadBuilding3dFloorRead": {
+        "description": "Этаж здания: адрес листа, отметки и контур плиты в мм системы DXF.",
+        "properties": {
+          "base_z_mm": {
+            "title": "Base Z Mm",
+            "type": "integer"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "elevation_known": {
+            "title": "Elevation Known",
+            "type": "boolean"
+          },
+          "floor_height_known": {
+            "title": "Floor Height Known",
+            "type": "boolean"
+          },
+          "floor_height_mm": {
+            "title": "Floor Height Mm",
+            "type": "integer"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "outline": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Outline",
+            "type": "array"
+          },
+          "outline_source": {
+            "enum": [
+              "slab",
+              "bbox"
+            ],
+            "title": "Outline Source",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "slab_thickness_known": {
+            "title": "Slab Thickness Known",
+            "type": "boolean"
+          },
+          "slab_thickness_mm": {
+            "title": "Slab Thickness Mm",
+            "type": "integer"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "revision_id",
+          "page_index",
+          "view",
+          "document_id",
+          "label",
+          "elevation_known",
+          "base_z_mm",
+          "floor_height_mm",
+          "floor_height_known",
+          "slab_thickness_mm",
+          "slab_thickness_known",
+          "outline",
+          "outline_source",
+          "bbox"
+        ],
+        "title": "CadBuilding3dFloorRead",
+        "type": "object"
+      },
+      "CadBuilding3dRead": {
+        "properties": {
+          "floors": {
+            "items": {
+              "$ref": "#/components/schemas/CadBuilding3dFloorRead"
+            },
+            "title": "Floors",
+            "type": "array"
+          },
+          "units": {
+            "const": "mm",
+            "title": "Units",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/CadBuilding3dWarningRead"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "units",
+          "floors",
+          "warnings"
+        ],
+        "title": "CadBuilding3dRead",
+        "type": "object"
+      },
+      "CadBuilding3dWarningRead": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "CadBuilding3dWarningRead",
+        "type": "object"
+      },
       "CadChecksRead": {
         "properties": {
           "all_source_fills_valid": {
@@ -4104,6 +4266,256 @@
         "title": "CadPagesPlanRead",
         "type": "object"
       },
+      "CadPipelineRead": {
+        "properties": {
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "sheets": {
+            "items": {
+              "$ref": "#/components/schemas/CadPipelineSheetRead"
+            },
+            "title": "Sheets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "revision_id",
+          "server_time",
+          "sheets"
+        ],
+        "title": "CadPipelineRead",
+        "type": "object"
+      },
+      "CadPipelineSheetRead": {
+        "properties": {
+          "calibrated": {
+            "title": "Calibrated",
+            "type": "boolean"
+          },
+          "convert": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadPipelineStageRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "page_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Label"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/CadPipelineViewRead"
+            },
+            "title": "Views",
+            "type": "array"
+          }
+        },
+        "required": [
+          "page_index",
+          "page_label",
+          "calibrated",
+          "convert",
+          "views"
+        ],
+        "title": "CadPipelineSheetRead",
+        "type": "object"
+      },
+      "CadPipelineStageRead": {
+        "description": "Последнее задание этапа: статус задания, ход и итог текущей попытки.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_type": {
+            "title": "Job Type",
+            "type": "string"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "result_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Status"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_type",
+          "status",
+          "progress",
+          "stage",
+          "result_status",
+          "error_code",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "CadPipelineStageRead",
+        "type": "object"
+      },
+      "CadPipelineViewRead": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "floor3d": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadPipelineStageRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_dxf": {
+            "title": "Has Dxf",
+            "type": "boolean"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "routes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadPipelineStageRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "routes_accepted": {
+            "title": "Routes Accepted",
+            "type": "boolean"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "walls": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadPipelineStageRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zones": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadPipelineStageRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zones_count": {
+            "title": "Zones Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "view",
+          "has_dxf",
+          "walls",
+          "zones",
+          "zones_count",
+          "approved",
+          "routes",
+          "routes_accepted",
+          "floor3d"
+        ],
+        "title": "CadPipelineViewRead",
+        "type": "object"
+      },
       "CadPreviewPathRead": {
         "properties": {
           "closed": {
@@ -6615,6 +7027,52 @@
           }
         },
         "title": "CadZoneUpdate",
+        "type": "object"
+      },
+      "CadZonesJobRead": {
+        "description": "Задание `cad_zones`, поставленное на автоматическую разметку вида.",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "parent_job_id": {
+            "format": "uuid",
+            "title": "Parent Job Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "parent_job_id",
+          "page_index",
+          "view",
+          "status",
+          "attempt",
+          "created_at"
+        ],
+        "title": "CadZonesJobRead",
         "type": "object"
       },
       "CalcAmount": {
@@ -18962,7 +19420,8 @@
           "cad_pdf_convert",
           "cad_mep_route",
           "cad_walls",
-          "cad_floor3d_dxf"
+          "cad_floor3d_dxf",
+          "cad_zones"
         ],
         "title": "JobType",
         "type": "string"
@@ -30487,6 +30946,49 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/cad/building3d": {
+      "get": {
+        "operationId": "read_cad_building3d",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadBuilding3dRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Общий вид здания: этажи проекта (листы CAD) с отметками и контуром плиты",
+        "tags": [
+          "cad-building3d"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/cad/levels": {
       "get": {
         "operationId": "read_cad_project_levels",
@@ -31934,6 +32436,78 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/zones/auto": {
+      "post": {
+        "description": "409 `CAD_ZONES_NOT_EMPTY` - на листе уже есть зоны; 409 `CAD_ZONES_BUSY` - разметка идёт.",
+        "operationId": "start_cad_zones_auto",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadZonesJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить автоматическую разметку зон вида: поставить задание cad_zones",
+        "tags": [
+          "cad-zones"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/documents": {
       "get": {
         "operationId": "list_project_documents",
@@ -32258,6 +32832,59 @@
         "summary": "Отозвать решение (одобрение вида или принятие трасс); запись остаётся",
         "tags": [
           "cad-mep"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/pipeline": {
+      "get": {
+        "operationId": "read_cad_pipeline",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadPipelineRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Состояние конвейера CAD ревизии: этапы по каждому листу и виду",
+        "tags": [
+          "cad-pipeline"
         ]
       }
     },

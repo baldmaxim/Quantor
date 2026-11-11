@@ -1,6 +1,7 @@
 import type { DocumentRead, DocumentRevisionRead } from '@quantor/api-client';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 
 import { DocumentRow } from './DocumentRow';
 
@@ -129,29 +130,80 @@ describe('строка документа', () => {
     expect(screen.queryByText('Не распознан')).not.toBeInTheDocument();
   });
 
-  it('имя файла — ссылка, растянутая на всю строку, и ведёт туда же, куда «Открыть»', () => {
+  it('имя файла — кнопка выбора, растянутая на всю строку; ссылкой не является', () => {
     render(<DocumentRow projectId="p-1" document={pdf()} revisions={[revision()]} total={1} />);
 
-    const name = screen.getByRole('link', { name: 'План 3 этажа.pdf' });
-    const button = screen.getByRole('link', { name: 'Открыть План 3 этажа.pdf' });
+    const name = screen.getByRole('button', { name: 'План 3 этажа.pdf' });
 
-    expect(name).toHaveAttribute('href', '/projects/p-1/workspace?revision=rev-1');
-    expect(name).toHaveAttribute('href', button.getAttribute('href'));
+    expect(screen.queryByRole('link', { name: 'План 3 этажа.pdf' })).not.toBeInTheDocument();
     // Псевдоэлемент на всю строку: строка — контейнер позиционирования.
     expect(name.className).toContain('after:absolute');
     expect(name.className).toContain('after:inset-0');
     expect(name.closest('div.relative')).not.toBeNull();
   });
 
-  it('вторичные действия лежат поверх растянутой ссылки и не открывают документ строкой', () => {
-    render(<DocumentRow projectId="p-1" document={pdf()} revisions={[revision()]} total={1} />);
+  it('клик и клавиатура выбирают документ, не уходя со страницы', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <DocumentRow
+        projectId="p-1"
+        document={pdf()}
+        revisions={[revision()]}
+        total={1}
+        onSelect={onSelect}
+      />,
+    );
 
-    const button = screen.getByRole('link', { name: 'Открыть План 3 этажа.pdf' });
-    expect(button.className).toContain('relative');
-    expect(button.className).toContain('z-10');
+    const name = screen.getByRole('button', { name: 'План 3 этажа.pdf' });
+    await user.click(name);
+    expect(onSelect).toHaveBeenLastCalledWith('doc-1');
+
+    name.focus();
+    await user.keyboard('{Enter}');
+    await user.keyboard(' ');
+    expect(onSelect).toHaveBeenCalledTimes(3);
   });
 
-  it('строка без возможности открытия не содержит ссылок', () => {
+  it('«Открыть» ведёт в рабочую область и документ не выбирает', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <DocumentRow
+        projectId="p-1"
+        document={pdf()}
+        revisions={[revision()]}
+        total={1}
+        onSelect={onSelect}
+      />,
+    );
+
+    const open = screen.getByRole('link', { name: 'Открыть План 3 этажа.pdf' });
+    expect(open).toHaveAttribute('href', '/projects/p-1/workspace?revision=rev-1');
+    // Ссылка лежит поверх растянутой кнопки.
+    expect(open.className).toContain('relative');
+    expect(open.className).toContain('z-10');
+
+    open.addEventListener('click', (event) => event.preventDefault());
+    await user.click(open);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('выбранная строка отмечена aria-current и подсвечена токеном', () => {
+    const { rerender } = render(
+      <DocumentRow projectId="p-1" document={pdf()} revisions={[revision()]} total={1} />,
+    );
+    const name = () => screen.getByRole('button', { name: 'План 3 этажа.pdf' });
+    expect(name()).not.toHaveAttribute('aria-current');
+
+    rerender(
+      <DocumentRow projectId="p-1" document={pdf()} revisions={[revision()]} total={1} selected />,
+    );
+    expect(name()).toHaveAttribute('aria-current', 'true');
+    expect(name().closest('div.relative')?.className).toContain('bg-accent-soft');
+  });
+
+  it('строка без возможности открытия не содержит ссылок, но выбирается', () => {
     render(
       <DocumentRow
         projectId="p-1"

@@ -1,7 +1,6 @@
 'use client';
 
 import type { DocumentRead, DocumentRevisionRead } from '@quantor/api-client';
-import Link from 'next/link';
 import type { FC } from 'react';
 
 import { ButtonLink, Skeleton, StatusBadge, cx } from '@/components/ui';
@@ -18,9 +17,10 @@ import { documentOpenState, isViewable, latestOpenableRevision } from '@/lib/ope
  * распознавание, от которого он не зависит. Действие «Открыть» стоит у каждого готового
  * документа — верхняя кнопка страницы одна, а документов в проекте бывает несколько.
  *
- * Открывается вся строка: ссылка на имени растянута на строку псевдоэлементом, поэтому работают
- * Enter, Ctrl/средний клик и контекстное меню ссылки. Кнопка «Открыть» ведёт туда же и лежит
- * поверх растянутой ссылки, как и любые другие действия строки.
+ * Строка выбирается: кнопка на имени растянута на строку псевдоэлементом, поэтому работают
+ * клик по любому месту строки, Enter и Space. Выбранный документ показывается справа в панели
+ * «Обработка». Кнопка «Открыть» - ссылка в рабочую область - лежит поверх растянутой кнопки и
+ * клика по строке не вызывает.
  */
 
 const ICONS: Record<string, typeof IconPdf> = {
@@ -39,6 +39,8 @@ export interface IDocumentRowProps {
   readonly total: number;
   /** Сколько распознанных пакетов того же имени скрыто в этой строке. */
   readonly packageCount?: number;
+  readonly selected?: boolean;
+  readonly onSelect?: (documentId: string) => void;
 }
 
 export const DocumentRow: FC<IDocumentRowProps> = ({
@@ -47,6 +49,8 @@ export const DocumentRow: FC<IDocumentRowProps> = ({
   revisions,
   total,
   packageCount = 0,
+  selected = false,
+  onSelect,
 }) => {
   const Icon = ICONS[document.document_kind] ?? IconPdf;
   const latest = revisions?.at(-1) ?? null;
@@ -64,23 +68,21 @@ export const DocumentRow: FC<IDocumentRowProps> = ({
     <div
       className={cx(
         'relative grid min-h-[44px] grid-cols-[22px_1fr_auto] items-center gap-[var(--s-5)] border-b border-border py-[var(--s-4)] last:border-b-0',
-        href && 'hover:bg-surface-muted',
+        selected ? 'bg-accent-soft' : 'hover:bg-surface-muted',
       )}
     >
       <Icon className="text-muted" />
 
       <div className="min-w-0">
         <p className="truncate text-sm">
-          {href ? (
-            <Link
-              href={href}
-              className="cursor-pointer focus-visible:outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-[var(--focus)]"
-            >
-              {document.display_name}
-            </Link>
-          ) : (
-            document.display_name
-          )}
+          <button
+            type="button"
+            aria-current={selected ? 'true' : undefined}
+            onClick={() => onSelect?.(document.id)}
+            className="max-w-full cursor-pointer truncate text-left [-webkit-tap-highlight-color:transparent] [touch-action:manipulation] focus-visible:outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-[var(--focus)]"
+          >
+            {document.display_name}
+          </button>
         </p>
         <p className="mono text-xs text-muted">
           {documentKind(document.document_kind)}

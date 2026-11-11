@@ -10,13 +10,19 @@ import { useMemo } from 'react';
 
 import { cadErrorText } from '@/lib/cad/errors';
 import { useCadJob } from '@/lib/cad/queries';
-import { cadViewErrorText, useCadPreview, useCadView, type ICadViewParams } from '@/lib/cad/view-queries';
-import { IDLE_VIEW_PARAMS, workspaceViewParams } from '@/lib/cad/workspace-cad';
+import {
+  cadViewErrorText,
+  isQuietPreviewError,
+  useCadPreview,
+  useCadView,
+  type ICadViewParams,
+} from '@/lib/cad/view-queries';
+import { IDLE_VIEW_PARAMS, summaryViewParams, workspaceViewParams } from '@/lib/cad/workspace-cad';
 
 interface IInput {
   projectId: string;
   revisionId: string | null;
-  /** Запросы разрешены: флаг включён и вкладка открывалась. */
+  /** Запросы разрешены: флаг `cad.export` включён и ревизия открыта. */
   load: boolean;
   pageIndex: number | null;
   /** Route-задание (выбранное явно или автоматически); `null` - трасс нет и ничего не читается. */
@@ -58,16 +64,36 @@ export const useWorkspaceCadRoutes = ({
         : null,
     [job, route, pageIndex, revisionId, projectId],
   );
+  // Диагностика и предпросмотр трасс идут параллельно с чтением полного задания: у завершённого
+  // route-задания вид и страница известны из сводки. Ответ другой попытки отбрасывается сам.
+  const earlyParams = useMemo<ICadViewParams | null>(
+    () =>
+      load &&
+      job === null &&
+      route &&
+      pageIndex !== null &&
+      revisionId !== null &&
+      route.view !== null
+        ? summaryViewParams(projectId, revisionId, route, pageIndex, route.view)
+        : null,
+    [load, job, route, pageIndex, revisionId, projectId],
+  );
+  const readParams = params ?? earlyParams;
   const readable = params !== null;
 
-  const diagnosticsQuery = useCadView(params ?? IDLE_VIEW_PARAMS, readable, job?.status);
-  const diagnostics = readable ? (diagnosticsQuery.data ?? null) : null;
-  const previewQuery = useCadPreview(
-    params ?? IDLE_VIEW_PARAMS,
-    readable && diagnostics?.preview_available === true,
+  const diagnosticsQuery = useCadView(
+    readParams ?? IDLE_VIEW_PARAMS,
+    readParams !== null,
+    job?.status ?? route?.status,
   );
-  const preview = readable && diagnostics?.preview_available === true ? (previewQuery.data ?? null) : null;
+  const diagnostics = readParams !== null ? (diagnosticsQuery.data ?? null) : null;
+  const previewQuery = useCadPreview(
+    readParams ?? IDLE_VIEW_PARAMS,
+    readParams !== null && diagnostics?.preview_available !== false,
+  );
+  const preview = diagnostics?.preview_available === true ? (previewQuery.data ?? null) : null;
 
+  const previewPromised = diagnostics?.preview_available === true;
   const error =
     routeId === null
       ? null
@@ -75,7 +101,9 @@ export const useWorkspaceCadRoutes = ({
         ? cadErrorText(jobQuery.error)
         : readable && diagnosticsQuery.isError
           ? cadViewErrorText(diagnosticsQuery.error).text
-          : readable && previewQuery.isError
+          : readable &&
+              previewQuery.isError &&
+              !isQuietPreviewError(previewQuery.error, previewPromised)
             ? cadViewErrorText(previewQuery.error).text
             : null;
 

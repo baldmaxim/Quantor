@@ -1,8 +1,10 @@
 'use client';
 
-import type { DocumentRevisionRead, ProjectJobSummary } from '@quantor/api-client';
-import { use, useState, ViewTransition } from 'react';
+import type { DocumentRevisionRead } from '@quantor/api-client';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, use, useRef, useState, ViewTransition } from 'react';
 
+import { DocumentPipelinePanel } from '@/components/projects/DocumentPipelinePanel';
 import { DocumentSections } from '@/components/projects/DocumentSections';
 import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
 import { TopBar } from '@/components/shell/TopBar';
@@ -11,13 +13,10 @@ import {
   ButtonLink,
   EmptyState,
   ErrorState,
-  Field,
-  ProgressRow,
   Skeleton,
   StatusBadge,
 } from '@/components/ui';
-import { errorMessage } from '@/lib/errors';
-import { formatWhen, projectStatus } from '@/lib/format';
+import { projectStatus } from '@/lib/format';
 import {
   chooseOpenTarget,
   documentOpenState,
@@ -26,7 +25,6 @@ import {
   type OpenState,
 } from '@/lib/openability';
 import { CAD_FEATURE } from '@/lib/cad/access';
-import { workspaceCadHref } from '@/lib/cad/workspace-url';
 import { CALC_FEATURE } from '@/lib/calc/access';
 import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 import { useDocumentsRevisions, useFeatures, useProject, useProjectDocuments } from '@/lib/queries';
@@ -47,13 +45,13 @@ interface IPageProps {
 const workspaceHref = (projectId: string, revisionId: string): string =>
   `/projects/${projectId}/workspace?revision=${revisionId}`;
 
-// CAD живёт во вкладке рабочей области: сюда ведёт и кнопка «PDF → CAD».
-const cadWorkspaceHref = (projectId: string, revisionId: string): string =>
-  workspaceCadHref(projectId, { revision: revisionId, position: null, job: null, view: null });
-
 const ProjectPage = ({ params }: IPageProps) => {
   const { projectId } = use(params);
   const [uploading, setUploading] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const project = useProject(projectId);
   const documents = useProjectDocuments(projectId);
@@ -72,6 +70,29 @@ const ProjectPage = ({ params }: IPageProps) => {
     .filter((state): state is OpenState => state !== null);
 
   const status = projectStatus(project.data?.last_job);
+
+  // Выбранный документ живёт в адресе (`?doc=`); без него или с чужим id - документ верхней
+  // кнопки, а за неимением - первый.
+  const requested = searchParams.get('doc');
+  const selected =
+    items.find((document) => document.id === requested) ??
+    items.find((document) => document.id === target?.document.id) ??
+    items[0] ??
+    null;
+
+  const selectDocument = (documentId: string): void => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('doc', documentId);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+
+    // Узкий экран: панель под списком, к ней нужно подвести. Широкий - она рядом.
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      requestAnimationFrame(() =>
+        panelRef.current?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' }),
+      );
+    }
+  };
 
   return (
     <>
@@ -93,19 +114,6 @@ const ProjectPage = ({ params }: IPageProps) => {
                 Расчёты
               </ButtonLink>
             )}
-            {features[CAD_FEATURE] === true &&
-              (target ? (
-                <ButtonLink
-                  href={cadWorkspaceHref(projectId, target.revision.id)}
-                  transitionTypes={['nav-forward']}
-                >
-                  PDF → CAD
-                </ButtonLink>
-              ) : (
-                <Button disabled title={noTargetReason(states)}>
-                  PDF → CAD
-                </Button>
-              ))}
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
             {target ? (
               <ButtonLink href={workspaceHref(projectId, target.revision.id)} variant="primary">
@@ -163,32 +171,38 @@ const ProjectPage = ({ params }: IPageProps) => {
                   projectId={projectId}
                   documents={items}
                   revisionsOf={(documentId) => revisions.byDocument.get(documentId)}
+                  selectedId={selected?.id ?? null}
+                  onSelect={selectDocument}
                 />
               )}
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
-            <h2 className="border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
-              Импорт
-            </h2>
-            <div className="px-[var(--s-6)] py-[var(--s-5)]">
-              {project.isPending && <Skeleton className="h-[96px] w-full" />}
-
-              {project.isError && (
-                <ErrorState title="Проект недоступен" onRetry={() => void project.refetch()} />
-              )}
-
-              {project.data && !project.data.last_job && (
-                <p className="text-sm text-muted">
-                  Заданий не было. Импорт запускается при загрузке распознанного пакета; обычный PDF
-                  готовится к просмотру и без него.
-                </p>
-              )}
-
-              {project.data?.last_job && <JobCard job={project.data.last_job} />}
-            </div>
-          </section>
+          <div ref={panelRef} className="scroll-mt-[var(--s-6)]">
+            {selected ? (
+              <DocumentPipelinePanel
+                key={selected.id}
+                projectId={projectId}
+                document={selected}
+                revisions={revisions.byDocument.get(selected.id)?.items ?? null}
+                cadEnabled={features[CAD_FEATURE] === true}
+                importJob={project.data?.last_job ?? null}
+              />
+            ) : (
+              <section className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
+                <h2 className="border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
+                  Обработка
+                </h2>
+                <div className="px-[var(--s-6)] py-[var(--s-5)]">
+                  {documents.isPending ? (
+                    <Skeleton className="h-[96px] w-full" />
+                  ) : (
+                    <p className="text-sm text-muted">Выберите документ, чтобы увидеть обработку.</p>
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
         </div>
       </main>
 
@@ -201,40 +215,17 @@ const ProjectPage = ({ params }: IPageProps) => {
   );
 };
 
-const JobCard = ({ job }: { job: ProjectJobSummary }) => {
-  const running = job.status === 'queued' || job.status === 'running';
-
-  return (
-    <div className="flex flex-col gap-[var(--s-5)]">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-[var(--s-6)] gap-y-[var(--s-2)]">
-        <Field label="Задание">{job.job_type}</Field>
-        <Field label="Состояние">{job.status}</Field>
-        {job.stage && <Field label="Стадия">{job.stage}</Field>}
-        {job.error_code && <Field label="Код ошибки">{job.error_code}</Field>}
-        {job.finished_at && <Field label="Завершено">{formatWhen(job.finished_at)}</Field>}
-      </dl>
-
-      {running && <ProgressRow value={job.progress} label="Импорт пакета" />}
-
-      {job.error_code && <p className="text-sm text-danger">{errorMessage(job.error_code)}</p>}
-
-      {job.status === 'failed' && (
-        <p className="text-sm text-muted">
-          Пакет остался в хранилище — повторная загрузка запустит импорт заново.
-        </p>
-      )}
-    </div>
-  );
-};
-
+// useSearchParams требует границы приостановки: без неё маршрут не предрендерится.
 const ProjectRoute = ({ params }: IPageProps) => (
-  <ViewTransition
-    enter={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
-    exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
-    default="none"
-  >
-    <ProjectPage params={params} />
-  </ViewTransition>
+  <Suspense fallback={null}>
+    <ViewTransition
+      enter={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      default="none"
+    >
+      <ProjectPage params={params} />
+    </ViewTransition>
+  </Suspense>
 );
 
 export default ProjectRoute;

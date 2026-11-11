@@ -251,6 +251,7 @@ def test_new_routes_are_in_openapi_and_job_type_is_registered() -> None:
         JobType.CAD_MEP_ROUTE,
         JobType.CAD_WALLS,
         JobType.CAD_FLOOR3D_DXF,
+        JobType.CAD_ZONES,
     }
     assert JobType.CAD_MEP_ROUTE.value == "cad_mep_route"
 

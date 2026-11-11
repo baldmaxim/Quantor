@@ -14,6 +14,7 @@ import { useCadJob, useCadJobs } from '@/lib/cad/queries';
 import { jobResultKind, latestSheetJobs, type SheetResultKind } from '@/lib/cad/sheet-results';
 import {
   cadViewErrorText,
+  isQuietPreviewError,
   useCadPreview,
   useCadView,
   type ICadViewParams,
@@ -23,6 +24,7 @@ import {
   matchingPreview,
   overlayAvailability,
   pickWorkspaceView,
+  summaryViewParams,
   workspaceViewParams,
   type IOverlayAvailability,
 } from '@/lib/cad/workspace-cad';
@@ -33,7 +35,7 @@ import { jobCoversPage } from '@/lib/cad/workspace-url';
 interface IInput {
   projectId: string;
   revisionId: string | null;
-  /** Запросы разрешены: флаг включён и вкладка открывалась. */
+  /** Запросы разрешены: флаг `cad.export` включён и ревизия открыта. */
   load: boolean;
   /** Индекс страницы листа в рабочей области. */
   pageIndex: number | null;
@@ -146,15 +148,40 @@ export const useWorkspaceCadJob = ({
 
   // Явный выбор (задание в адресе) приоритетнее; без него слои трасс берутся у новейшего успешного.
   const autoRoute = useMemo(
-    () => (routeSummary === null ? pickAutoRoute(items, { parentJobId: jobId, pageIndex, view }) : null),
+    () =>
+      routeSummary === null ? pickAutoRoute(items, { parentJobId: jobId, pageIndex, view }) : null,
     [routeSummary, items, jobId, pageIndex, view],
   );
 
-  const diagnosticsQuery = useCadView(params ?? IDLE_VIEW_PARAMS, params !== null, job?.status);
-  const diagnostics = params !== null ? (diagnosticsQuery.data ?? null) : null;
+  // Завершённое задание читается сразу по сводке списка, не дожидаясь полного задания: вид,
+  // диагностика и предпросмотр идут параллельно с ним. Пока полного задания нет, ответ
+  // принимается только при совпадении попытки и вида (иначе запрос тихо отбрасывается).
+  const earlyParams = useMemo<ICadViewParams | null>(
+    () =>
+      load && job === null && summary && pageIndex !== null && revisionId !== null
+        ? summaryViewParams(
+            projectId,
+            revisionId,
+            summary,
+            pageIndex,
+            routeSummary !== null ? routeSummary.view : explicit !== null ? viewParam : null,
+          )
+        : null,
+    [load, job, summary, pageIndex, revisionId, projectId, routeSummary, explicit, viewParam],
+  );
+  const readParams = params ?? earlyParams;
+
+  const diagnosticsQuery = useCadView(
+    readParams ?? IDLE_VIEW_PARAMS,
+    readParams !== null,
+    job?.status ?? summary?.status,
+  );
+  const diagnostics = readParams !== null ? (diagnosticsQuery.data ?? null) : null;
+  // Предпросмотр не ждёт диагностику: известный ответ «предпросмотра нет» его отключает, а
+  // отсутствие (404) - не ошибка и не повторяется.
   const previewQuery = useCadPreview(
-    params ?? IDLE_VIEW_PARAMS,
-    params !== null && diagnostics?.preview_available === true,
+    readParams ?? IDLE_VIEW_PARAMS,
+    readParams !== null && diagnostics?.preview_available !== false,
   );
   const preview = diagnostics ? matchingPreview(diagnostics, previewQuery.data) : null;
   const frameConfirmed = diagnostics?.frame.confirmed === true;
@@ -163,11 +190,12 @@ export const useWorkspaceCadJob = ({
     [preview, frameConfirmed],
   );
 
-  const diagnosticsError = diagnosticsQuery.isError
-    ? cadViewErrorText(diagnosticsQuery.error)
-    : jobQuery.isError
-      ? { code: 'CAD_JOB', text: cadErrorText(jobQuery.error) }
-      : null;
+  const diagnosticsError =
+    diagnosticsQuery.isError && params !== null
+      ? cadViewErrorText(diagnosticsQuery.error)
+      : jobQuery.isError
+        ? { code: 'CAD_JOB', text: cadErrorText(jobQuery.error) }
+        : null;
 
   return {
     jobsPending: jobs.isPending,
@@ -188,7 +216,9 @@ export const useWorkspaceCadJob = ({
     preview,
     previewPending: previewQuery.isPending,
     previewError: previewQuery.isError
-      ? cadViewErrorText(previewQuery.error).text
+      ? isQuietPreviewError(previewQuery.error, diagnostics?.preview_available === true)
+        ? null
+        : cadViewErrorText(previewQuery.error).text
       : previewQuery.data !== undefined && preview === null
         ? 'Предпросмотр не относится к DXF этой попытки.'
         : null,

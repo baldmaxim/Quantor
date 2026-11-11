@@ -3,8 +3,9 @@
 import type { FC } from 'react';
 
 import { cx } from '@/components/ui';
+import type { WorkspaceMode } from '@/store/workspace';
 
-export type WorkspaceMode = 'sheets' | 'cad';
+export type { WorkspaceMode };
 
 interface IWorkspaceModeSwitchProps {
   mode: WorkspaceMode;

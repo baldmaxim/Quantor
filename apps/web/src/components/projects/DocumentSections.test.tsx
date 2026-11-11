@@ -1,7 +1,7 @@
 import type { DocumentRead } from '@quantor/api-client';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { collapsedKey, DocumentSections } from './DocumentSections';
 
@@ -33,6 +33,84 @@ const renderSections = () =>
 
 describe('документы по разделам', () => {
   beforeEach(() => window.localStorage.clear());
+
+  it('клик по строке выбирает документ, выбранный отмечен', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <DocumentSections
+        projectId="p-1"
+        documents={DOCS}
+        revisionsOf={() => null}
+        selectedId="3"
+        onSelect={onSelect}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'М-П-ИОС2.1_ver4.pdf' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'М-П-ИОС2.2_ver4.pdf' })).not.toHaveAttribute(
+      'aria-current',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'М-П-ИОС2.2_ver4.pdf' }));
+    expect(onSelect).toHaveBeenCalledWith('4');
+
+    rerender(
+      <DocumentSections
+        projectId="p-1"
+        documents={DOCS}
+        revisionsOf={() => null}
+        selectedId="4"
+        onSelect={onSelect}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'М-П-ИОС2.2_ver4.pdf' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+  });
+
+  it('«Открыть» ведёт в рабочую область и документ не выбирает', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <DocumentSections
+        projectId="p-1"
+        documents={[DOCS[4] as DocumentRead]}
+        revisionsOf={() => ({
+          total: 1,
+          items: [
+            {
+              id: 'rev-5',
+              document_id: '5',
+              revision_label: null,
+              source_filename: 'Письмо.pdf',
+              source_mime: 'application/pdf',
+              source_size: 1000,
+              source_sha256: 'a'.repeat(64),
+              processing_status: 'unprocessed',
+              processing_error_code: null,
+              geometry_status: 'ready',
+              geometry_error_code: null,
+              sheet_count: 1,
+              source_metadata: {},
+              created_at: '2026-09-01T10:00:00Z',
+            },
+          ],
+        })}
+        onSelect={onSelect}
+      />,
+    );
+
+    const open = screen.getByRole('link', { name: 'Открыть Письмо.pdf' });
+    expect(open).toHaveAttribute('href', '/projects/p-1/workspace?revision=rev-5');
+    open.addEventListener('click', (event) => event.preventDefault());
+    await user.click(open);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 
   it('заголовки групп с числом документов, пакет привязан к PDF', () => {
     renderSections();

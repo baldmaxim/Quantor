@@ -5,7 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { diagnostics } from '@/components/cad/viewer/fixtures';
 
-import { useCadView, viewNeedsRefresh, viewStaleTime, type ICadViewParams } from './view-queries';
+import {
+  isQuietPreviewError,
+  useCadView,
+  viewNeedsRefresh,
+  viewStaleTime,
+  type ICadViewParams,
+} from './view-queries';
 
 const mocks = vi.hoisted(() => ({ readCadView: vi.fn() }));
 
@@ -24,7 +30,13 @@ const PARAMS: ICadViewParams = {
 };
 
 const reply = (previewAvailable: boolean) => ({
-  data: diagnostics({ job_id: 'j', attempt: 1, page_index: 0, view: 1, preview_available: previewAvailable }),
+  data: diagnostics({
+    job_id: 'j',
+    attempt: 1,
+    page_index: 0,
+    view: 1,
+    preview_available: previewAvailable,
+  }),
 });
 
 describe('viewStaleTime / viewNeedsRefresh', () => {
@@ -81,5 +93,20 @@ describe('useCadView: диагностика до готовности не за
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(result.current.data?.preview_available).toBe(false);
     expect(mocks.readCadView).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('isQuietPreviewError', () => {
+  const notFound = { detail: { code: 'NOT_FOUND' } };
+
+  it('нет предпросмотра (404, результат не готов) - не ошибка, пока диагностика его не обещала', () => {
+    expect(isQuietPreviewError(notFound, false)).toBe(true);
+    expect(isQuietPreviewError({ detail: { code: 'CAD_RESULT_NOT_READY' } }, false)).toBe(true);
+  });
+
+  it('обещанный предпросмотр, которого нет, и другие отказы - ошибка', () => {
+    expect(isQuietPreviewError(notFound, true)).toBe(false);
+    expect(isQuietPreviewError({ detail: { code: 'CAD_ENGINE_FAILED' } }, false)).toBe(false);
+    expect(isQuietPreviewError(new Error('сеть'), false)).toBe(false);
   });
 });

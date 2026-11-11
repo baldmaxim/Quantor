@@ -1,9 +1,38 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { SheetPlacement } from '@/lib/viewer/coordinates';
 
 import { createCadPainter, type ICadPaintData } from './cad-painter';
 import type { INormalizedPath } from './frame';
+
+/** `Path2D` jsdom не даёт: заглушка запоминает команды и вложенные пути. */
+class FakePath2D {
+  static created = 0;
+  readonly ops: [string, ...number[]][] = [];
+  readonly added: FakePath2D[] = [];
+  constructor() {
+    FakePath2D.created += 1;
+  }
+  moveTo(x: number, y: number) {
+    this.ops.push(['moveTo', x, y]);
+  }
+  lineTo(x: number, y: number) {
+    this.ops.push(['lineTo', x, y]);
+  }
+  closePath() {
+    this.ops.push(['closePath']);
+  }
+  addPath(path: FakePath2D) {
+    this.added.push(path);
+  }
+}
+
+beforeAll(() => {
+  vi.stubGlobal('Path2D', FakePath2D);
+});
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 const PLACEMENT: SheetPlacement = { x: 0, y: 0, width: 1000, height: 500, rotation: 0 };
 
@@ -45,6 +74,7 @@ const fakeContext = () => {
     clip: record('clip'),
     clearRect: record('clearRect'),
     scale: record('scale'),
+    translate: record('translate'),
     fillRect: record('fillRect'),
     moveTo: record('moveTo'),
     lineTo: record('lineTo'),
@@ -77,6 +107,7 @@ const colorRecorder = () => {
     clip: () => undefined,
     clearRect: () => undefined,
     scale: () => undefined,
+    translate: () => undefined,
     fillRect: () => undefined,
     moveTo: () => undefined,
     lineTo: () => undefined,
@@ -147,12 +178,50 @@ describe('createCadPainter', () => {
     expect(hidden.calls).not.toContain('stroke');
   });
 
-  it('ставит точки по размещению листа', () => {
+  it('пути строятся один раз в листовых единицах, на кадре - перенос и масштаб', () => {
     const { context } = fakeContext();
     const placement = { ...PLACEMENT, x: 10, y: 20 };
     createCadPainter(data()).paint(context, placement, 1, null);
-    expect(context.moveTo).toHaveBeenCalledWith(10 + 0.1 * 1000, 20 + 0.1 * 500);
-    expect(context.lineTo).toHaveBeenCalledWith(10 + 0.2 * 1000, 20 + 0.2 * 500);
+    expect(context.translate).toHaveBeenCalledWith(10, 20);
+    // 1000 px ширины на 1000 единиц пути: масштаб 1 по обеим осям (пропорции листа 0,5 учтены в пути).
+    expect(context.scale).toHaveBeenCalledWith(1, 1);
+    const [path] = vi.mocked(context.stroke).mock.calls[0] as unknown as [FakePath2D];
+    expect(path.ops).toEqual([
+      ['moveTo', 0.1 * 1000, 0.1 * 500],
+      ['lineTo', 0.2 * 1000, 0.2 * 500],
+    ]);
+  });
+
+  it('Path2D кешируется на массиве путей: новый рисовальщик (смена слоя) их не пересобирает', () => {
+    const paths = [
+      path([0.1, 0.1, 0.2, 0.2], { layer: 0 }),
+      path([0.3, 0.1, 0.4, 0.2], { layer: 1 }),
+    ];
+    const first = fakeContext();
+    createCadPainter(data({ paths, visibleLayers: new Set([0, 1]) })).paint(
+      first.context,
+      PLACEMENT,
+      1,
+      null,
+    );
+    const before = FakePath2D.created;
+    const second = fakeContext();
+    const painter = createCadPainter(data({ paths, visibleLayers: new Set([1]) }));
+    painter.paint(second.context, PLACEMENT, 1, null);
+    painter.paint(second.context, PLACEMENT, 1, null);
+    expect(FakePath2D.created).toBe(before);
+  });
+
+  it('слои одного цвета склеиваются в один проход', () => {
+    const { context } = fakeContext();
+    createCadPainter(
+      data({
+        paths: [path([0.1, 0.1, 0.2, 0.2], { layer: 0 }), path([0.3, 0.1, 0.4, 0.2], { layer: 1 })],
+        visibleLayers: new Set([0, 1]),
+        layerColors: ['red', 'red'],
+      }),
+    ).paint(context, PLACEMENT, 1, null);
+    expect(context.stroke).toHaveBeenCalledTimes(1);
   });
 
   it('замкнутая заливка закрывает контур и заливает', () => {
@@ -161,7 +230,8 @@ describe('createCadPainter', () => {
       data({ paths: [path([0.1, 0.1, 0.3, 0.1, 0.3, 0.3], { closed: true, fill: true })] }),
     ).paint(context, PLACEMENT, 1, null);
     expect(calls).toContain('fill');
-    expect(calls).toContain('closePath');
+    const [fillPath] = vi.mocked(context.fill).mock.calls[0] as unknown as [FakePath2D];
+    expect(fillPath.ops.at(-1)).toEqual(['closePath']);
   });
 
   it('touches: пути вне полосы - рисовать нечего, внутри - есть', () => {

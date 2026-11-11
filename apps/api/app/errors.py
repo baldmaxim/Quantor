@@ -167,6 +167,9 @@ class ErrorCode(StrEnum):
     # Конструкции кладки и монолита (ADR-0038): результата ещё нет / расчёт этого вида идёт.
     CAD_WALLS_NOT_READY = "CAD_WALLS_NOT_READY"
     CAD_WALLS_BUSY = "CAD_WALLS_BUSY"
+    # Автоматическая разметка зон: на листе уже есть зоны / разметка этого вида уже идёт.
+    CAD_ZONES_NOT_EMPTY = "CAD_ZONES_NOT_EMPTY"
+    CAD_ZONES_BUSY = "CAD_ZONES_BUSY"
     # ВОР Заказчика в контуре CAD (ADR-0038 п. 5): файл не разобран как таблица ВОР.
     CAD_VOR_PARSE_FAILED = "CAD_VOR_PARSE_FAILED"
 
@@ -325,6 +328,8 @@ MESSAGES: dict[ErrorCode, str] = {
     ),
     ErrorCode.CAD_WALLS_NOT_READY: "Конструкции вида ещё не посчитаны",
     ErrorCode.CAD_WALLS_BUSY: "Расчёт конструкций этого вида уже идёт",
+    ErrorCode.CAD_ZONES_NOT_EMPTY: "На виде уже есть зоны — автоматическая разметка не запускается",
+    ErrorCode.CAD_ZONES_BUSY: "Разметка зон уже идёт",
     ErrorCode.CAD_VOR_PARSE_FAILED: "Файл не удалось разобрать как ВОР",
     ErrorCode.JOB_NOT_RETRYABLE: "Этот отказ повтором не чинится",
     ErrorCode.WORKER_UNAVAILABLE: "Исполнитель заданий недоступен",
@@ -474,6 +479,8 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_RECOMPUTE_SAME_PARAMS: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_WALLS_NOT_READY: status.HTTP_404_NOT_FOUND,
     ErrorCode.CAD_WALLS_BUSY: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_ZONES_NOT_EMPTY: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_ZONES_BUSY: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_VOR_PARSE_FAILED: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ViewportSheet } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
 import { FLOOR3D_MODE_KEY } from '@/lib/cad/floor3d-queries';
-import { cropToNormalized } from '@/lib/cad/frame';
+import { cropToNormalized, overlayPaths } from '@/lib/cad/frame';
 import { readCadPaintColors } from '@/lib/cad/paint-colors';
 import { isRouteJob } from '@/lib/cad/mep-jobs';
 import { useMepLayerVisibility } from '@/lib/cad/mep-layers';
@@ -104,9 +104,9 @@ const NO_LAYERS: ReadonlySet<number> = new Set<number>();
  * CAD текущего листа в рабочей области: задание и вид листа, DXF на камере рабочей области,
  * замечания, левая и правая панели вкладки. Один хук связывает вкладку и единственный холст.
  *
- * Запросы идут только при включённом `cad.export` и только после первого открытия вкладки: DXF
- * при этом остаётся и на других вкладках (режим в хранилище рабочей области), а рамки замечаний
- * рисуются, пока вкладка открыта. Панорама и зум идут мимо состояния React: камера передаётся
+ * Задания, вид и предпросмотр DXF читаются при включённом `cad.export` сразу, в том числе в режиме
+ * «Листы»; зоны и конструкции - только после первого открытия CAD. DXF остаётся и на других
+ * вкладках (режим в хранилище рабочей области), а рамки замечаний рисуются, пока CAD открыт. Панорама и зум идут мимо состояния React: камера передаётся
  * холсту как есть (ADR-0004), непрозрачность PDF ставится CSS на стопку страницы.
  */
 export const useWorkspaceCad = ({
@@ -141,16 +141,18 @@ export const useWorkspaceCad = ({
     if (tab) setLeftTab(tab);
   }, [tabParam, setLeftTab]);
 
-  // Данные грузятся после первого открытия вкладки и дальше не выключаются: так DXF держится на
-  // других вкладках, а тому, кто CAD не открывал, запросы не уходят.
+  // Зоны и конструкции грузятся после первого открытия CAD и дальше не выключаются.
   const [opened, setOpened] = useState(false);
   if (enabled && active && !opened) setOpened(true);
 
+  // Задания, вид и предпросмотр DXF читаются сразу при включённом `cad.export`: наложение видно и в
+  // режиме «Листы», не дожидаясь захода в CAD. Остальное (зоны, конструкции) - после открытия.
+  const loadOverlay = enabled && revisionId !== null;
   const pageIndex = sheet?.page_index ?? null;
   const data = useWorkspaceCadJob({
     projectId,
     revisionId,
-    load: enabled && opened && revisionId !== null,
+    load: loadOverlay,
     pageIndex,
     jobParam,
     viewParam,
@@ -161,13 +163,14 @@ export const useWorkspaceCad = ({
   const routes = useWorkspaceCadRoutes({
     projectId,
     revisionId,
-    load: enabled && opened && revisionId !== null,
+    load: loadOverlay,
     pageIndex,
     route: data.routeSummary ?? data.autoRoute,
   });
   const mepVisibility = useMepLayerVisibility();
   const routePreview = useMemo(
-    () => (routes.diagnostics ? matchingPreview(routes.diagnostics, routes.preview ?? undefined) : null),
+    () =>
+      routes.diagnostics ? matchingPreview(routes.diagnostics, routes.preview ?? undefined) : null,
     [routes.diagnostics, routes.preview],
   );
 
@@ -212,15 +215,35 @@ export const useWorkspaceCad = ({
     [active, cropAvailable, cropVisible, cropRect, cropColor],
   );
 
+  // Нормализация путей - дорогая часть, а зависит только от превью, кадра и листа: переключение
+  // слоя или маски трасс её не повторяет и не сбрасывает кеш путей рисовальщика.
+  const dxfPaths = useMemo(
+    () => (preview && frame && pageSize ? overlayPaths(preview.paths, frame, pageSize) : undefined),
+    [preview, frame, pageSize],
+  );
+  const routePaths = useMemo(
+    () =>
+      routePreview && frame && pageSize
+        ? overlayPaths(routePreview.paths, frame, pageSize)
+        : undefined,
+    [routePreview, frame, pageSize],
+  );
+
   const paintData = useMemo(() => {
     const base = overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
       dxfVisible: render.dxfVisible,
       hiddenLayers,
       crop,
+      paths: dxfPaths,
     });
     const route =
       render.dxfVisible && routePreview
-        ? { preview: routePreview, colors: colors.mep, hiddenMask: mepVisibility.mask }
+        ? {
+            preview: routePreview,
+            colors: colors.mep,
+            hiddenMask: mepVisibility.mask,
+            paths: routePaths,
+          }
         : null;
     return mergeRoutePaint(base, layerNames.length, route, frame, pageSize, colors.ink);
   }, [
@@ -236,6 +259,8 @@ export const useWorkspaceCad = ({
     routePreview,
     mepVisibility.mask,
     layerNames,
+    dxfPaths,
+    routePaths,
   ]);
   const cadPainter = useMemo(() => (paintData ? createCadPainter(paintData) : null), [paintData]);
 
@@ -309,11 +334,21 @@ export const useWorkspaceCad = ({
         remarks.marks.length > 0
           ? createRemarksPainter(
               { marks: remarks.marks, colors: colors.remarks, activeId: remarks.activeId },
-              { clear: cadPainter === null && constructionsPainter === null && zonesPainter === null },
+              {
+                clear:
+                  cadPainter === null && constructionsPainter === null && zonesPainter === null,
+              },
             )
           : null,
       ),
-    [cadPainter, constructionsPainter, zonesPainter, remarks.marks, remarks.activeId, colors.remarks],
+    [
+      cadPainter,
+      constructionsPainter,
+      zonesPainter,
+      remarks.marks,
+      remarks.activeId,
+      colors.remarks,
+    ],
   );
 
   // --- переходы: всё в адрес рабочей области ---
@@ -324,7 +359,11 @@ export const useWorkspaceCad = ({
   };
 
   // Задание выбрано (из списка или только что создано): рабочая область встаёт на его лист.
-  const openJob = (jobId: string, pages: readonly number[] | null, jobView: number | null = null) => {
+  const openJob = (
+    jobId: string,
+    pages: readonly number[] | null,
+    jobView: number | null = null,
+  ) => {
     const target = pageForJob({ requested_pages: pages ? [...pages] : null }, pageIndex);
     const changes = { job: jobId, view: jobView !== null ? String(jobView) : null };
     if (target !== null && target !== pageIndex) goToSheet(target, changes);
@@ -342,7 +381,11 @@ export const useWorkspaceCad = ({
           onSelectJob: (jobId) => {
             const item = data.jobs.find((entry) => entry.job_id === jobId);
             // Трассы открываются на своём виде: вид задан самим заданием.
-            openJob(jobId, item?.requested_pages ?? null, item && isRouteJob(item) ? item.view : null);
+            openJob(
+              jobId,
+              item?.requested_pages ?? null,
+              item && isRouteJob(item) ? item.view : null,
+            );
           },
         }
       : null;
@@ -457,7 +500,9 @@ export const useWorkspaceCad = ({
           }
         : null,
     viewLoading:
-      state === 'ready' && data.diagnosticsError === null && (data.job === null || data.diagnosticsPending),
+      state === 'ready' &&
+      data.diagnosticsError === null &&
+      (data.job === null || data.diagnosticsPending),
     viewError: state === 'ready' ? data.diagnosticsError : null,
     view: diagnostics
       ? {
@@ -485,9 +530,7 @@ export const useWorkspaceCad = ({
     painter,
     pageOpacity: render.pdfOpacity,
     capture:
-      remarks.capturing && pageSize
-        ? { camera, page: pageSize, onDrawn: remarks.onDrawn }
-        : null,
+      remarks.capturing && pageSize ? { camera, page: pageSize, onDrawn: remarks.onDrawn } : null,
     left,
     bar,
     side,

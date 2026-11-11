@@ -1,10 +1,12 @@
 'use client';
 
 import type {
+  CadBuilding3dFloorRead,
   MeasurementQuantityRead,
   RegionRead,
   TakeoffItemQuantityRead,
 } from '@quantor/api-client';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useEffect, useMemo, useState } from 'react';
@@ -16,13 +18,15 @@ import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
 import { RegionInspector } from '@/components/workspace/RegionInspector';
 import { WorkspaceModeSwitch } from '@/components/workspace/WorkspaceModeSwitch';
-import { resolveLeftTab } from '@/components/workspace/cad/left-tab';
+import { resolveLeftTab, resolveMode } from '@/components/workspace/cad/left-tab';
 import { CadConstructionPicker } from '@/components/workspace/cad/CadConstructionPicker';
+import { CadBuilding3dLazy } from '@/components/workspace/cad/building3d/CadBuilding3dLazy';
 import { CadFloor3dLazy } from '@/components/workspace/cad/floor3d/CadFloor3dLazy';
 import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
 import { WorkspaceCadBar } from '@/components/workspace/cad/WorkspaceCadBar';
-import { WorkspaceCadLeft } from '@/components/workspace/cad/WorkspaceCadLeft';
+import { useWorkspaceCadPipeline } from '@/components/workspace/cad/useWorkspaceCadPipeline';
 import { WorkspaceCadSide } from '@/components/workspace/cad/WorkspaceCadSide';
+import { WorkspacePipelineBadge } from '@/components/workspace/cad/WorkspacePipelineBadge';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
 import { SheetList } from '@/components/workspace/SheetList';
 import { TakeoffPanel, type TakeoffGeometry } from '@/components/workspace/TakeoffPanel';
@@ -33,7 +37,7 @@ import { ScaleDraft, type ScaleDraftPhase } from '@/lib/viewer/scale-draft';
 import { ToolController } from '@/lib/viewer/tool-controller';
 import type { ToolMode } from '@/lib/viewer/tool-machine';
 import { useDocumentBackend } from '@/components/viewer/useDocumentBackend';
-import { EmptyState, ErrorState, InspectorSection, StatusBadge, cx } from '@/components/ui';
+import { EmptyState, ErrorState, InspectorSection, cx } from '@/components/ui';
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -50,9 +54,10 @@ import { ToolButton, ToolDivider, ToolField } from '@/components/workspace/Toolb
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
+import { resolveSheetPosition } from '@/lib/cad/building3d-queries';
 import { useCadJobs } from '@/lib/cad/queries';
 import { latestSheetJobs, type ISheetResult } from '@/lib/cad/sheet-results';
-import { parseWorkspaceJob } from '@/lib/cad/workspace-url';
+import { parseWorkspaceJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
 import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
 import { REGIONS_FORMS, blockType, countOf, revisionTitle } from '@/lib/format';
@@ -124,10 +129,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const content = useContentUrl(revisionId);
   const { backend, loading, errorCode } = useDocumentBackend(content.data?.url ?? null);
 
-  const [cadLeftWide, setCadLeftWide] = useState(false);
+  const storedMode = useWorkspaceStore((state) => state.mode);
+  const setMode = useWorkspaceStore((state) => state.setMode);
   const leftTab = useWorkspaceStore((state) => state.leftTab);
   const setLeftTab = useWorkspaceStore((state) => state.setLeftTab);
-  const sheetsTab = useWorkspaceStore((state) => state.sheetsTab);
   const tool = useWorkspaceStore((state) => state.tool);
   const setTool = useWorkspaceStore((state) => state.setTool);
   const overlayVisible = useWorkspaceStore((state) => state.overlayVisible);
@@ -144,9 +149,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const cadOn = cadEnabled(features);
   const activeTab: LeftTab = resolveLeftTab(leftTab, {
     takeoff: takeoff.enabled,
-    cad: cadOn,
     recognition: overlayVisible,
   });
+  // Режим (Листы | CAD) не зависит от левой вкладки: в CAD доступны те же вкладки, что в «Листах».
+  const mode = resolveMode(storedMode, cadOn);
   const activeTool = tool === 'scale' && !takeoff.enabled ? 'pointer' : tool;
 
   const camera = useMemo(() => new Camera(), []);
@@ -155,6 +161,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const [zoomPercent, setZoomPercent] = useState(100);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [regionSearch, setRegionSearch] = useState('');
+  // Открытый раздел правой панели CAD: бейдж обработки в шапке открывает «Обработку».
+  const [cadSideTab, setCadSideTab] = useState<string | null>(null);
 
   const pages = sheets.data?.items ?? [];
   // Готовые результаты CAD по листам; без флага cad.export задания не запрашиваются.
@@ -419,9 +427,26 @@ const WorkspacePage = ({ params }: IPageProps) => {
     router.replace(`/projects/${projectId}/workspace?${next.toString()}`, { scroll: false });
   };
 
-  const goToPage = (index: number) => {
+  const goToPage = (index: number, extra: Record<string, string | null> = {}) => {
     const clamped = Math.min(Math.max(index, 0), pages.length - 1);
-    setQuery({ page: String(clamped + 1), region: null });
+    setQuery({ page: String(clamped + 1), region: null, ...extra });
+  };
+
+  // Этаж из колонки «Здание»: открывается лист этажа (ревизия, позиция листа, задание, вид).
+  // Страница в адресе - позиция листа в ревизии; у чужой ревизии она берётся из её списка листов.
+  const queryClient = useQueryClient();
+  const openBuildingFloor = async (floor: CadBuilding3dFloorRead) => {
+    const position =
+      floor.revision_id === revisionId
+        ? (sheetPosition(pages, floor.page_index) ?? floor.page_index + 1)
+        : await resolveSheetPosition(queryClient, floor.revision_id, floor.page_index);
+    setQuery({
+      revision: floor.revision_id,
+      page: String(position),
+      job: floor.job_id,
+      view: String(floor.view),
+      region: null,
+    });
   };
 
   // Размер листа берётся у отрисовщика, а не из полей пакета: `width_px` — это пиксели
@@ -444,6 +469,15 @@ const WorkspacePage = ({ params }: IPageProps) => {
     [sheetPageIndex, pageWidth, pageHeight],
   );
 
+  // Конвейер открытого листа: один запрос на бейдж в шапке и раздел «Обработка».
+  const pipeline = useWorkspaceCadPipeline({
+    projectId,
+    revisionId,
+    pageIndex: sheetPageIndex,
+    enabled: cadOn,
+  });
+  const openPipeline = () => setCadSideTab('pipeline');
+
   const cadSelection = parseWorkspaceJob(searchParams);
   const cad = useWorkspaceCad({
     projectId,
@@ -454,7 +488,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
     camera,
     viewportSize,
     enabled: cadOn,
-    active: activeTab === 'cad',
+    active: mode === 'cad',
     tabParam: searchParams.get('tab'),
     jobParam: cadSelection.job,
     viewParam: cadSelection.view,
@@ -526,14 +560,14 @@ const WorkspacePage = ({ params }: IPageProps) => {
               {cadOn && (
                 <div className="flex shrink-0 items-center px-[var(--s-4)]">
                   <WorkspaceModeSwitch
-                    mode={activeTab === 'cad' ? 'cad' : 'sheets'}
-                    onChange={(mode) => setLeftTab(mode === 'cad' ? 'cad' : sheetsTab)}
+                    mode={mode}
+                    onChange={setMode}
                   />
                 </div>
               )}
 
               <div className="flex items-center px-[var(--s-5)]">
-                <StatusBadge tone="neutral">Заданий нет</StatusBadge>
+                <WorkspacePipelineBadge pipeline={pipeline} cadOn={cadOn} onOpen={openPipeline} />
               </div>
             </>
           }
@@ -703,38 +737,35 @@ const WorkspacePage = ({ params }: IPageProps) => {
             </>
           }
           leftTitle={project.data?.name ?? '…'}
-          leftSize={activeTab === 'cad' ? (cadLeftWide ? 'wide' : 'narrow') : null}
           left={
             <>
-              {/* В режиме CAD своя полоса подвкладок внутри WorkspaceCadLeft. */}
-              {activeTab !== 'cad' && (
-                <div
-                  role="tablist"
-                  aria-label="Разделы панели"
-                  className="scroll-area flex overflow-x-auto border-b border-border"
-                >
-                  {leftTabs(takeoff, overlayVisible).map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={activeTab === tab.id}
-                      disabled={!tab.enabled}
-                      title={tab.hint ? `${tab.label} — ${tab.hint}` : tab.label}
-                      onClick={() => tab.enabled && setLeftTab(tab.id)}
-                      className={cx(
-                        'flex-1 border-r border-border px-[var(--s-3)] py-[var(--s-3)] text-xs whitespace-nowrap transition-colors last:border-r-0',
-                        activeTab === tab.id
-                          ? 'text-text shadow-[inset_0_-2px_0_var(--accent)]'
-                          : 'text-muted',
-                        tab.enabled ? 'hover:text-text' : 'cursor-not-allowed opacity-40',
-                      )}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Левая панель в режимах «Листы» и CAD одна и та же. */}
+              <div
+                role="tablist"
+                aria-label="Разделы панели"
+                className="scroll-area flex overflow-x-auto border-b border-border"
+              >
+                {leftTabs(takeoff, overlayVisible).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    disabled={!tab.enabled}
+                    title={tab.hint ? `${tab.label} — ${tab.hint}` : tab.label}
+                    onClick={() => tab.enabled && setLeftTab(tab.id)}
+                    className={cx(
+                      'flex-1 border-r border-border px-[var(--s-3)] py-[var(--s-3)] text-xs whitespace-nowrap transition-colors last:border-r-0',
+                      activeTab === tab.id
+                        ? 'text-text shadow-[inset_0_-2px_0_var(--accent)]'
+                        : 'text-muted',
+                      tab.enabled ? 'hover:text-text' : 'cursor-not-allowed opacity-40',
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
               <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
                 {activeTab === 'documents' && (
@@ -747,7 +778,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       cad: isReadyDxf(cadResults.get(item.page_index)),
                     }))}
                     activeIndex={pageIndex}
-                    onSelect={goToPage}
+                    onSelect={(index) =>
+                      // В CAD открытие листа сбрасывает выбранное задание и вид: задание принадлежит листу.
+                      goToPage(index, mode === 'cad' ? { job: null, view: null } : {})
+                    }
                   />
                 )}
 
@@ -762,13 +796,6 @@ const WorkspacePage = ({ params }: IPageProps) => {
                     selectedId={selectedRegionId}
                     onSelect={(id) => setQuery({ region: id })}
                   />
-                )}
-
-                {/* Вкладка CAD не размонтируется после первого открытия: отмеченные листы сохраняются. */}
-                {cad.left && cad.opened && (
-                  <div hidden={activeTab !== 'cad'} className="h-full">
-                    <WorkspaceCadLeft {...cad.left} onWideChange={setCadLeftWide} />
-                  </div>
                 )}
 
                 {activeTab === 'takeoff' && (
@@ -825,7 +852,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               contentError={content.isError}
               projectId={projectId}
               onRetry={() => void content.refetch()}
-              top={activeTab === 'cad' && cad.bar ? <WorkspaceCadBar {...cad.bar} /> : null}
+              top={mode === 'cad' && cad.bar ? <WorkspaceCadBar {...cad.bar} /> : null}
             >
               <DrawingViewport
                 backend={backend}
@@ -853,11 +880,24 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   disabled={activeTool === 'scale'}
                 />
               )}
-              {activeTab === 'cad' && cad.floor3d && (
-                <CadFloor3dLazy
-                  key={`${cad.floor3d.params.jobId}:${cad.floor3d.params.pageIndex}:${cad.floor3d.params.view}`}
-                  params={cad.floor3d.params}
-                />
+              {mode === 'cad' && cad.floor3d && (
+                <div className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg lg:flex-row">
+                  <CadBuilding3dLazy
+                    projectId={projectId}
+                    current={{
+                      jobId: cad.floor3d.params.jobId,
+                      pageIndex: cad.floor3d.params.pageIndex,
+                      view: cad.floor3d.params.view,
+                    }}
+                    onSelectFloor={(floor) => void openBuildingFloor(floor)}
+                  />
+                  <div className="relative min-h-0 min-w-0 flex-1">
+                    <CadFloor3dLazy
+                      key={`${cad.floor3d.params.jobId}:${cad.floor3d.params.pageIndex}:${cad.floor3d.params.view}`}
+                      params={cad.floor3d.params}
+                    />
+                  </div>
+                </div>
               )}
               {draftPhase === 'complete' && draftA && draftB && sheetId && (
                 <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">
@@ -898,7 +938,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
           rightTitle={
             activeTab === 'takeoff'
               ? 'Свойства измерения'
-              : activeTab === 'cad'
+              : mode === 'cad'
                 ? 'CAD'
                 : 'Свойства области'
           }
@@ -906,10 +946,10 @@ const WorkspacePage = ({ params }: IPageProps) => {
             <div
               className={cx(
                 'flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain',
-                activeTab !== 'cad' && 'gap-[var(--s-5)] p-[var(--s-4)]',
+                mode !== 'cad' && 'gap-[var(--s-5)] p-[var(--s-4)]',
               )}
             >
-              {activeTab === 'cad' ? (
+              {mode === 'cad' ? (
                 <>
                   {overlayVisible && selectedRegion && (
                     <div className="flex-none border-b border-border p-[var(--s-4)]">
@@ -930,7 +970,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       />
                     </div>
                   )}
-                  <WorkspaceCadSide {...cad.side} />
+                  <WorkspaceCadSide
+                    {...cad.side}
+                    jobs={cad.left}
+                    pipeline={pipeline}
+                    sideTab={cadSideTab}
+                    onSideTabChange={setCadSideTab}
+                  />
                 </>
               ) : activeTab === 'takeoff' ? (
                 <MeasurementInspector

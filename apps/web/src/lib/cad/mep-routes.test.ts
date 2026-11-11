@@ -13,7 +13,13 @@ const page = { width: 200, height: 100 };
 
 const base: ICadPaintData = {
   paths: [
-    { layer: 0, closed: false, fill: false, points: new Float64Array([0, 0, 1, 1]), bounds: [0, 0, 1, 1] },
+    {
+      layer: 0,
+      closed: false,
+      fill: false,
+      points: new Float64Array([0, 0, 1, 1]),
+      bounds: [0, 0, 1, 1],
+    },
   ],
   visibleLayers: new Set([0, 1]),
   opacity: 1,
@@ -40,7 +46,14 @@ describe('mergeRoutePaint', () => {
   });
 
   it('слои трасс идут после слоёв родителя, цвета - по именам слоёв', () => {
-    const merged = mergeRoutePaint(base, 2, { preview: routePreview, colors, hiddenMask: 0 }, frame, page, '#ink');
+    const merged = mergeRoutePaint(
+      base,
+      2,
+      { preview: routePreview, colors, hiddenMask: 0 },
+      frame,
+      page,
+      '#ink',
+    );
     expect(merged?.paths).toHaveLength(3);
     expect(merged?.paths.map((path) => path.layer)).toEqual([0, 2, 3]);
     expect(merged?.layerColors).toEqual(['#a', '#b', '#red', '#grey']);
@@ -49,18 +62,57 @@ describe('mergeRoutePaint', () => {
 
   it('скрытый человеком слой трасс не рисуется, слои родителя не затронуты', () => {
     const hiddenMask = withMepLayersHidden(0, ['M-NODE'], true);
-    const merged = mergeRoutePaint(base, 2, { preview: routePreview, colors, hiddenMask }, frame, page, '#ink');
+    const merged = mergeRoutePaint(
+      base,
+      2,
+      { preview: routePreview, colors, hiddenMask },
+      frame,
+      page,
+      '#ink',
+    );
     expect(merged?.visibleLayers.has(2)).toBe(true);
     expect(merged?.visibleLayers.has(3)).toBe(false);
     expect(merged?.visibleLayers.has(0)).toBe(true);
   });
 
   it('координаты трасс переводятся тем же кадром, что и DXF вида', () => {
-    const merged = mergeRoutePaint(null, 0, { preview: routePreview, colors, hiddenMask: 0 }, frame, page, '#ink');
+    const merged = mergeRoutePaint(
+      null,
+      0,
+      { preview: routePreview, colors, hiddenMask: 0 },
+      frame,
+      page,
+      '#ink',
+    );
     // 1000 мм = 100 pt при 10 мм/pt; origin по Y = 100 pt от верха: y = 100/100 = 1.
     const first = merged?.paths[0];
     expect(first?.layer).toBe(0);
     expect(Array.from(first?.points ?? [])).toEqual([0, 1, 0.5, 1]);
+  });
+
+  it('готовые пути трасс не пересчитываются, а склейка стабильна при смене маски слоёв', () => {
+    const ready = [
+      {
+        layer: 0,
+        closed: false,
+        fill: false,
+        points: new Float64Array([0, 0, 1, 0]),
+        bounds: [0, 0, 1, 0],
+      },
+    ] as const;
+    const input = { preview: routePreview, colors, paths: ready };
+    const first = mergeRoutePaint(base, 2, { ...input, hiddenMask: 0 }, frame, page, '#ink');
+    const second = mergeRoutePaint(
+      base,
+      2,
+      { ...input, hiddenMask: withMepLayersHidden(0, ['M-NODE'], true) },
+      frame,
+      page,
+      '#ink',
+    );
+    expect(first?.paths.map((path) => path.layer)).toEqual([0, 2]);
+    // Тот же массив: кеш Path2D рисовальщика переживает смену маски.
+    expect(second?.paths).toBe(first?.paths);
   });
 
   it('нет кадра или листа - трассы не рисуются', () => {

@@ -22,6 +22,7 @@ import {
 import { extractCode } from '@/lib/errors';
 import { unwrap } from '@/lib/queries';
 
+import { building3dKeys } from './building3d-queries';
 import { WALLS_POLL_MS, isWallsActive, wallsJobStatus } from './constructions-queries';
 import type { ICadViewParams } from './view-queries';
 
@@ -110,6 +111,7 @@ export const useSaveFloor3dSheetLevels = (
     onSuccess: () => {
       if (!params) return;
       void client.invalidateQueries({ queryKey: floor3dKeys.view(params) });
+      void client.invalidateQueries({ queryKey: building3dKeys.project(params.projectId) });
       void client.invalidateQueries({
         queryKey: ['cad-constructions', params.projectId, params.revisionId, params.jobId, params.pageIndex, params.view],
       });
@@ -140,6 +142,7 @@ export const useSaveCadProjectLevels = (
     onSuccess: (saved) => {
       client.setQueryData<CadProjectLevelsRead>(floor3dKeys.projectLevels(projectId), saved);
       void client.invalidateQueries({ queryKey: floor3dKeys.project(projectId) });
+      void client.invalidateQueries({ queryKey: building3dKeys.project(projectId) });
       void client.invalidateQueries({ queryKey: ['cad-constructions', projectId] });
     },
   });

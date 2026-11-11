@@ -32,7 +32,7 @@ from app.domain import JobStatus
 from app.errors import ErrorCode
 from app.models import DocumentRevision, Job
 from app.services import cad as cad_service
-from app.services import cad_progress, cad_walls
+from app.services import cad_progress, cad_walls, cad_zones_auto
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
@@ -473,6 +473,8 @@ async def execute_cad_pdf_convert(
     done = await jobs_service.succeed(session, job=job, payload={"cad_result": result})
     # Конструкции видов (ADR-0038): задания появляются в той же транзакции, что и успех конвертации.
     await cad_walls.enqueue_after_convert(session, done, settings)
+    # Зоны квартир: только для листов без разметки человека; сбой постановки конвертацию не рушит.
+    await cad_zones_auto.enqueue_after_convert(session, done, settings)
     return done
 
 

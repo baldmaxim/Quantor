@@ -556,6 +556,106 @@ export type CadAttemptRead = {
 };
 
 /**
+ * CadBuilding3dFloorRead
+ *
+ * Этаж здания: адрес листа, отметки и контур плиты в мм системы DXF.
+ */
+export type CadBuilding3dFloorRead = {
+    /**
+     * Base Z Mm
+     */
+    base_z_mm: number;
+    /**
+     * Bbox
+     */
+    bbox: Array<number> | null;
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Elevation Known
+     */
+    elevation_known: boolean;
+    /**
+     * Floor Height Known
+     */
+    floor_height_known: boolean;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Outline
+     */
+    outline: Array<Array<number>>;
+    /**
+     * Outline Source
+     */
+    outline_source: 'slab' | 'bbox';
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Slab Thickness Known
+     */
+    slab_thickness_known: boolean;
+    /**
+     * Slab Thickness Mm
+     */
+    slab_thickness_mm: number;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadBuilding3dRead
+ */
+export type CadBuilding3dRead = {
+    /**
+     * Floors
+     */
+    floors: Array<CadBuilding3dFloorRead>;
+    /**
+     * Units
+     */
+    units: 'mm';
+    /**
+     * Warnings
+     */
+    warnings: Array<CadBuilding3dWarningRead>;
+};
+
+/**
+ * CadBuilding3dWarningRead
+ */
+export type CadBuilding3dWarningRead = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
  * CadChecksRead
  */
 export type CadChecksRead = {
@@ -1960,6 +2060,122 @@ export type CadPagesPlanRead = {
 };
 
 /**
+ * CadPipelineRead
+ */
+export type CadPipelineRead = {
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Server Time
+     */
+    server_time: string;
+    /**
+     * Sheets
+     */
+    sheets: Array<CadPipelineSheetRead>;
+};
+
+/**
+ * CadPipelineSheetRead
+ */
+export type CadPipelineSheetRead = {
+    /**
+     * Calibrated
+     */
+    calibrated: boolean;
+    convert: CadPipelineStageRead | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Label
+     */
+    page_label: string | null;
+    /**
+     * Views
+     */
+    views: Array<CadPipelineViewRead>;
+};
+
+/**
+ * CadPipelineStageRead
+ *
+ * Последнее задание этапа: статус задания, ход и итог текущей попытки.
+ */
+export type CadPipelineStageRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Job Type
+     */
+    job_type: string;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Result Status
+     */
+    result_status: string | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    status: JobStatus;
+};
+
+/**
+ * CadPipelineViewRead
+ */
+export type CadPipelineViewRead = {
+    /**
+     * Approved
+     */
+    approved: boolean;
+    floor3d: CadPipelineStageRead | null;
+    /**
+     * Has Dxf
+     */
+    has_dxf: boolean;
+    /**
+     * Page
+     */
+    page: number;
+    routes: CadPipelineStageRead | null;
+    /**
+     * Routes Accepted
+     */
+    routes_accepted: boolean;
+    /**
+     * View
+     */
+    view: number;
+    walls: CadPipelineStageRead | null;
+    zones: CadPipelineStageRead | null;
+    /**
+     * Zones Count
+     */
+    zones_count: number;
+};
+
+/**
  * CadPreviewPathRead
  */
 export type CadPreviewPathRead = {
@@ -3224,6 +3440,39 @@ export type CadZoneUpdate = {
      * Room Mark
      */
     room_mark?: string | null;
+};
+
+/**
+ * CadZonesJobRead
+ *
+ * Задание `cad_zones`, поставленное на автоматическую разметку вида.
+ */
+export type CadZonesJobRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Parent Job Id
+     */
+    parent_job_id: string;
+    status: JobStatus;
+    /**
+     * View
+     */
+    view: number;
 };
 
 /**
@@ -9772,7 +10021,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones';
 
 /**
  * LengthUnit
@@ -16411,6 +16660,36 @@ export type UpdateProjectResponses = {
 
 export type UpdateProjectResponse = UpdateProjectResponses[keyof UpdateProjectResponses];
 
+export type ReadCadBuilding3dData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/building3d';
+};
+
+export type ReadCadBuilding3dErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadBuilding3dError = ReadCadBuilding3dErrors[keyof ReadCadBuilding3dErrors];
+
+export type ReadCadBuilding3dResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadBuilding3dRead;
+};
+
+export type ReadCadBuilding3dResponse = ReadCadBuilding3dResponses[keyof ReadCadBuilding3dResponses];
+
 export type ReadCadProjectLevelsData = {
     body?: never;
     path: {
@@ -17224,6 +17503,48 @@ export type RecomputeCadWallsResponses = {
 
 export type RecomputeCadWallsResponse = RecomputeCadWallsResponses[keyof RecomputeCadWallsResponses];
 
+export type StartCadZonesAutoData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/zones/auto';
+};
+
+export type StartCadZonesAutoErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartCadZonesAutoError = StartCadZonesAutoErrors[keyof StartCadZonesAutoErrors];
+
+export type StartCadZonesAutoResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadZonesJobRead;
+};
+
+export type StartCadZonesAutoResponse = StartCadZonesAutoResponses[keyof StartCadZonesAutoResponses];
+
 export type ListProjectDocumentsData = {
     body?: never;
     path: {
@@ -17415,6 +17736,40 @@ export type RevokeCadDecisionResponses = {
 };
 
 export type RevokeCadDecisionResponse = RevokeCadDecisionResponses[keyof RevokeCadDecisionResponses];
+
+export type ReadCadPipelineData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/pipeline';
+};
+
+export type ReadCadPipelineErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadPipelineError = ReadCadPipelineErrors[keyof ReadCadPipelineErrors];
+
+export type ReadCadPipelineResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadPipelineRead;
+};
+
+export type ReadCadPipelineResponse = ReadCadPipelineResponses[keyof ReadCadPipelineResponses];
 
 export type ReadCadJobData = {
     body?: never;

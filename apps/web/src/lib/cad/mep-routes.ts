@@ -1,7 +1,7 @@
 import type { CadPreviewRead } from '@quantor/api-client';
 
 import type { ICadPaintData } from './cad-painter';
-import { overlayPaths, type ICadFrame, type IPageSize } from './frame';
+import { overlayPaths, type ICadFrame, type INormalizedPath, type IPageSize } from './frame';
 import { isMepLayerHidden } from './mep-layers';
 
 /**
@@ -17,7 +17,46 @@ export interface IRoutePaintInput {
   readonly colors: Readonly<Record<string, string>>;
   /** Маска слоёв трасс, скрытых человеком. */
   readonly hiddenMask: number;
+  /**
+   * Уже нормализованные пути `preview` (слои - индексы самого превью, без сдвига). Считаются один
+   * раз по превью, кадру и листу, чтобы смена маски не пересчитывала геометрию.
+   */
+  readonly paths?: readonly INormalizedPath[];
 }
+
+const NO_PATHS: readonly INormalizedPath[] = [];
+
+/**
+ * Склейка путей DXF вида и трасс со сдвигом слоёв трасс. Результат запоминается по тройке
+ * (пути вида, пути трасс, сдвиг): массив один и тот же, пока те же исходные данные, и кеш
+ * `Path2D` рисовальщика переживает смену маски слоёв.
+ */
+const mergedCache = new WeakMap<
+  readonly INormalizedPath[],
+  WeakMap<readonly INormalizedPath[], Map<number, readonly INormalizedPath[]>>
+>();
+
+const mergedPaths = (
+  base: readonly INormalizedPath[],
+  route: readonly INormalizedPath[],
+  offset: number,
+): readonly INormalizedPath[] => {
+  let byBase = mergedCache.get(route);
+  if (!byBase) {
+    byBase = new WeakMap();
+    mergedCache.set(route, byBase);
+  }
+  let byOffset = byBase.get(base);
+  if (!byOffset) {
+    byOffset = new Map();
+    byBase.set(base, byOffset);
+  }
+  const cached = byOffset.get(offset);
+  if (cached) return cached;
+  const merged = [...base, ...route.map((path) => ({ ...path, layer: path.layer + offset }))];
+  byOffset.set(offset, merged);
+  return merged;
+};
 
 /**
  * Данные рисовальщика с трассами поверх DXF вида. Без трасс - `base` как есть. `base` пуст, а трассы
@@ -34,10 +73,7 @@ export const mergeRoutePaint = (
   if (!route || !frame || !page) return base;
   const offset = base ? baseLayerCount : 0;
   const names = route.preview.layers;
-  const paths = overlayPaths(route.preview.paths, frame, page).map((path) => ({
-    ...path,
-    layer: path.layer + offset,
-  }));
+  const routePaths = route.paths ?? overlayPaths(route.preview.paths, frame, page);
 
   const visible = new Set(base?.visibleLayers ?? []);
   names.forEach((name, index) => {
@@ -49,7 +85,7 @@ export const mergeRoutePaint = (
   );
 
   return {
-    paths: [...(base?.paths ?? []), ...paths],
+    paths: mergedPaths(base?.paths ?? NO_PATHS, routePaths, offset),
     visibleLayers: visible,
     opacity: base?.opacity ?? 1,
     layerColors: [...baseColors, ...names.map((name) => route.colors[name] ?? ink)],

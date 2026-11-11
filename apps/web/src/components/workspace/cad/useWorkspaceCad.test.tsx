@@ -163,7 +163,7 @@ beforeEach(() => {
   mocks.jobsData.current = { items: [], server_time: '' };
   mocks.jobData.current = undefined;
   mocks.diagnosticsPatch.current = {};
-  useWorkspaceStore.setState({ leftTab: 'documents', tool: 'pointer' });
+  useWorkspaceStore.setState({ leftTab: 'documents', mode: 'sheets', tool: 'pointer' });
 });
 
 describe('useWorkspaceCad: запросы', () => {
@@ -173,22 +173,55 @@ describe('useWorkspaceCad: запросы', () => {
     expect(mocks.job).toHaveBeenCalledWith('p1', null, null);
   });
 
-  it('вкладка CAD ещё не открывалась - запросы не уходят; после открытия идут и остаются', () => {
+  it('режим «Листы»: задания и вид читаются сразу, без захода в CAD; открытие CAD их не перезапускает', () => {
+    recognized();
     const hook = mount({ active: false });
-    expect(mocks.jobs).toHaveBeenLastCalledWith('p1', null);
+    expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1');
+    // Первый вызов - вид самого задания (второй - трассы, их тут нет).
+    expect(mocks.view.mock.calls[0]?.[1]).toBe(true);
+    expect(mocks.preview.mock.calls[0]?.[1]).toBe(true);
     expect(hook.result.current.opened).toBe(false);
+    // Наложение DXF готово к рисованию и вне вкладки CAD.
+    expect(hook.result.current.painter).not.toBeNull();
 
     hook.rerender(inputs({ active: true }));
     expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1');
+    expect(hook.result.current.opened).toBe(true);
 
     hook.rerender(inputs({ active: false }));
     expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1');
     expect(hook.result.current.opened).toBe(true);
   });
 
+  it('завершённое задание: диагностика и предпросмотр идут по сводке, не дожидаясь полного задания', () => {
+    mocks.jobsData.current = { items: [summary({ attempt: 1 })] };
+    mocks.jobData.current = undefined;
+    mount();
+    const params = {
+      projectId: 'p1',
+      revisionId: 'r1',
+      jobId: JOB_ID,
+      attempt: 1,
+      pageIndex: 0,
+      view: 1,
+    };
+    expect(mocks.view).toHaveBeenCalledWith(params, true, 'succeeded');
+    expect(mocks.preview).toHaveBeenCalledWith(params, true);
+  });
+
+  it('идущее задание: по сводке ничего не читается', () => {
+    mocks.jobsData.current = {
+      items: [summary({ attempt: 1, status: 'running', result_status: null })],
+    };
+    mocks.jobData.current = undefined;
+    mount();
+    expect(mocks.view.mock.calls.every((call) => call[1] === false)).toBe(true);
+    expect(mocks.preview.mock.calls.every((call) => call[1] === false)).toBe(true);
+  });
+
   it('?tab=cad открывает вкладку CAD в хранилище', () => {
     mount({ tabParam: 'cad' });
-    expect(useWorkspaceStore.getState().leftTab).toBe('cad');
+    expect(useWorkspaceStore.getState().mode).toBe('cad');
   });
 
   it('другое значение tab вкладку не меняет', () => {

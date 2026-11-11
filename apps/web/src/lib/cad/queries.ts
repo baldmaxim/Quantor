@@ -61,6 +61,14 @@ export const cadKeys = {
 
 const POLL_INTERVAL = 2000;
 
+/**
+ * Свежесть списка и задания, у которых ничего не идёт: результат неизменяем, а решения человека
+ * и повторы обновляют запросы явно (`invalidateQueries`). Идущее задание устаревает сразу.
+ */
+const SETTLED_STALE_MS = 5 * 60_000;
+/** Список заданий короче: новые задания могут появиться из другой вкладки. */
+const SETTLED_LIST_STALE_MS = 60_000;
+
 export const isActiveStatus = (status: string | null | undefined): boolean =>
   status === 'queued' || status === 'running';
 
@@ -78,6 +86,10 @@ export const useCadJobs = (
           path: { project_id: projectId, revision_id: revisionId ?? '' },
         }),
       ),
+    staleTime: (query) =>
+      query.state.data?.items.some((item) => isActiveStatus(item.status))
+        ? 0
+        : SETTLED_LIST_STALE_MS,
     refetchInterval: (query) =>
       query.state.data?.items.some((item) => isActiveStatus(item.status)) ? POLL_INTERVAL : false,
   });
@@ -107,6 +119,10 @@ export const useCadJob = (
       }
       return job;
     },
+    staleTime: (query) =>
+      query.state.data === undefined || isActiveStatus(query.state.data.status)
+        ? 0
+        : SETTLED_STALE_MS,
     refetchInterval: (query) => (isActiveStatus(query.state.data?.status) ? POLL_INTERVAL : false),
   });
 

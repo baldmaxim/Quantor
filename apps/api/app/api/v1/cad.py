@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
@@ -50,7 +50,7 @@ from app.errors import DomainError, ErrorCode, http_error, not_found
 from app.models import CadRemark, DocumentRevision, Job, Project
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_progress, cad_remarks, cad_views
+from app.services import cad_preview_cache, cad_progress, cad_remarks, cad_views
 from app.services import jobs as jobs_service
 from app.services import projects as projects_service
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
@@ -449,6 +449,10 @@ async def read_cad_view(
     )
 
 
+# Неизменяемый ответ: клиент не ходит за ним повторно пять минут, затем сверяет по ETag.
+PREVIEW_CACHE_CONTROL = "private, max-age=300"
+
+
 @router.get(
     "/{job_id}/views/{page_index}/{view}/preview",
     response_model=CadPreviewRead,
@@ -456,6 +460,7 @@ async def read_cad_view(
     dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def read_cad_preview(
+    request: Request,
     project_id: uuid.UUID,
     revision_id: uuid.UUID,
     job_id: uuid.UUID,
@@ -465,7 +470,7 @@ async def read_cad_preview(
     context: AuthDep,
     storage: StorageDep,
     attempt_no: int | None = Query(default=None, ge=1, alias="attempt"),
-) -> CadPreviewRead:
+) -> Response:
     job = await _job(session, context, project_id, revision_id, job_id)
     result, _row = _succeeded_view(job, page_index, view, attempt_no)
     attempt = int(result["attempt"])
@@ -476,7 +481,32 @@ async def read_cad_preview(
     is_route = job.job_type is JobType.CAD_MEP_ROUTE
     dxf_name = f"{folder}/{cad_mep_service.ROUTES_DXF if is_route else 'plan_candidates.dxf'}"
     dxf = cad_service.find_artifact(job, dxf_name, attempt)
-    raw = await _read_artifact_json(storage, job, revision_id, attempt, f"{folder}/preview.json")
+    preview_name = f"{folder}/preview.json"
+    preview_file = cad_service.find_artifact(job, preview_name, attempt)
+    # Завершённое задание неизменяемо (DXF и preview.json привязаны хешем): ответ кешируется
+    # в процессе и отдаётся с ETag. Доступ к заданию проверен выше, до обращения к кешу.
+    cache_key = (
+        cad_preview_cache.make_key(
+            job.id,
+            attempt,
+            page_index,
+            view,
+            str(dxf.get("sha256")),
+            str(preview_file.get("sha256")),
+        )
+        if job.status is JobStatus.SUCCEEDED and dxf is not None and preview_file is not None
+        else None
+    )
+    headers: dict[str, str] = {}
+    if cache_key is not None:
+        etag = cad_preview_cache.etag_of(cache_key)
+        headers = {"ETag": etag, "Cache-Control": PREVIEW_CACHE_CONTROL}
+        if cad_preview_cache.etag_matches(request.headers.get("if-none-match"), etag):
+            return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+        cached = cad_preview_cache.preview_cache.get(cache_key)
+        if cached is not None:
+            return Response(content=cached, media_type="application/json", headers=headers)
+    raw = await _read_artifact_json(storage, job, revision_id, attempt, preview_name)
     if dxf is None or raw is None:
         raise not_found("Предпросмотр")
     # Предпросмотр обязан описывать ровно тот DXF, что выпущен этой попыткой. У трасс генератор
@@ -509,21 +539,28 @@ async def read_cad_preview(
         storage, source, revision_id, source_attempt, f"{folder}/cad_checks.json"
     )
     bbox = raw.get("bbox")
-    return CadPreviewRead(
-        job_id=job.id,
-        attempt=attempt,
-        page_index=page_index,
-        view=view,
-        units="mm",
-        dxf_sha256=str(dxf["sha256"]),
-        layers=layers,
-        paths=paths,
-        point_count=sum(len(p.points) // 2 for p in paths),
-        truncated=raw.get("truncated") is True,
-        flatten_mm=float(raw.get("flatten_mm") or 0),
-        bbox=tuple(bbox) if isinstance(bbox, list) and len(bbox) == 4 else None,
-        frame=cad_views.frame_from(scale, cad_checks),
+    body = (
+        CadPreviewRead(
+            job_id=job.id,
+            attempt=attempt,
+            page_index=page_index,
+            view=view,
+            units="mm",
+            dxf_sha256=str(dxf["sha256"]),
+            layers=layers,
+            paths=paths,
+            point_count=sum(len(p.points) // 2 for p in paths),
+            truncated=raw.get("truncated") is True,
+            flatten_mm=float(raw.get("flatten_mm") or 0),
+            bbox=tuple(bbox) if isinstance(bbox, list) and len(bbox) == 4 else None,
+            frame=cad_views.frame_from(scale, cad_checks),
+        )
+        .model_dump_json()
+        .encode()
     )
+    if cache_key is not None:
+        cad_preview_cache.preview_cache.put(cache_key, body)
+    return Response(content=body, media_type="application/json", headers=headers)
 
 
 # ------------------------------------------------------------------ замечания проверяющего
