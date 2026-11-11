@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, status
 from pydantic import ValidationError
 
 from app.api.v1.cad import _read_artifact_json
@@ -18,6 +18,7 @@ from app.api.v1.cad_constructions import _load_walls, _Sheet, _sheet, _Walls
 from app.api.v1.deps import AuthDep, SessionDep, StorageDep, require, require_feature
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
+from app.contracts.cad_constructions import CadWallsJobRead
 from app.contracts.cad_floor3d import (
     HOLE_KEY_MAX,
     CadFloor3dHolePut,
@@ -30,7 +31,7 @@ from app.contracts.cad_floor3d import (
 from app.errors import DomainError, ErrorCode, not_found
 from app.services import cad as cad_service
 from app.services import cad_construction_store as construction_store
-from app.services import cad_floor3d, cad_views, cad_zones
+from app.services import cad_floor3d, cad_floor3d_dxf, cad_views, cad_zones
 from app.services import cad_floor3d_store as store
 from app.services import projects as projects_service
 
@@ -194,6 +195,42 @@ async def read_cad_floor3d(
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
     return await _floor3d(session, storage, sheet, walls)
+
+
+@router.post(
+    SHEET_PREFIX + "/floor3d/dxf",
+    response_model=CadWallsJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Выгрузить 3D-модель этажа в 3D DXF для AutoCAD: поставить задание cad_floor3d_dxf",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def create_cad_floor3d_dxf(
+    project_id: uuid.UUID,
+    job_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+) -> CadWallsJobRead:
+    """Модель собирается тем же сервисом, что у GET floor3d; DXF - файл `floor3d.dxf` задания."""
+    sheet = await _sheet(session, context, project_id, job_id, page_index, view)
+    walls = await _load_walls(session, storage, sheet)
+    model = await _floor3d(session, storage, sheet, walls)
+    job = await cad_floor3d_dxf.schedule(
+        session, storage, parent=sheet.parent, page_index=page_index, view=view, model=model
+    )
+    response = CadWallsJobRead(
+        job_id=job.id,
+        parent_job_id=sheet.parent.id,
+        page_index=page_index,
+        view=view,
+        status=job.status,
+        attempt=job.attempt,
+        created_at=job.created_at,
+    )
+    await session.commit()
+    return response
 
 
 @router.put(

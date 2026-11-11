@@ -192,7 +192,12 @@ def test_main_worker_never_claims_cad_and_cad_worker_claims_only_cad() -> None:
     assert JobType.CAD_PDF_CONVERT.value not in registry.supported_types()
     worker = Worker(clean_settings(), HANDLERS)
     assert sorted(worker._supported_types()) == sorted(
-        [JobType.CAD_PDF_CONVERT.value, JobType.CAD_MEP_ROUTE.value, JobType.CAD_WALLS.value]
+        [
+            JobType.CAD_PDF_CONVERT.value,
+            JobType.CAD_MEP_ROUTE.value,
+            JobType.CAD_WALLS.value,
+            JobType.CAD_FLOOR3D_DXF.value,
+        ]
     )
 
 

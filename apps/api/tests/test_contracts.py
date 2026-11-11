@@ -70,13 +70,16 @@ class TestStageBoundaries:
         решением. На Stage 2A к импорту пакета добавилось извлечение геометрии страниц —
         оно читает размеры страницы и ничего не распознаёт. Трек «Модель здания» добавил
         конвертацию PDF → CAD: детерминированный движок в отдельном исполнителе за гейтом
-        CAD_QA_ENABLED (только local/test), модели он не вызывает.
+        CAD_QA_ENABLED (только local/test), модели он не вызывает. Конструкции CAD и выгрузка
+        3D DXF — детерминированные скрипты в исполнителе CAD, моделей не вызывают.
         """
         assert [job_type.value for job_type in JobType] == [
             "legacy_import",
             "pdf_geometry_extract",
             "cad_pdf_convert",
             "cad_mep_route",
+            "cad_walls",
+            "cad_floor3d_dxf",
         ]
 
     def test_no_job_type_invokes_a_model(self) -> None:

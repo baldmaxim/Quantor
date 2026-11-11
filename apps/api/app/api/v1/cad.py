@@ -194,7 +194,18 @@ async def download_cad_artifact(
     # Прошлая попытка route-задания (после пересчёта) - только просмотр.
     attempt_no: int | None = Query(default=None, ge=1, alias="attempt"),
 ) -> StreamingResponse:
-    job = await _job(session, context, project_id, revision_id, job_id)
+    await _scope(session, context, project_id, revision_id)
+    # Скачивание шире общего доступа к заданию: файлы отдаёт и задание 3D DXF этажа (ADR-0039).
+    job = await cad_service.get_cad_job(
+        session,
+        workspace_id=context.tenant,
+        project_id=project_id,
+        revision_id=revision_id,
+        job_id=job_id,
+        job_types=cad_service.CAD_ARTIFACT_JOB_TYPES,
+    )
+    if job is None:
+        raise not_found("Задание")
     if attempt_no is None and job.status is not JobStatus.SUCCEEDED:
         raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
     artifact = cad_service.find_artifact(job, name, attempt_no)

@@ -420,6 +420,10 @@ class JobType(StrEnum):
     # Конструкции кладки и монолита по DXF вида (ADR-0038): скрипт tools/cad_walls подпроцессом
     # в том же cad-worker. Основной исполнитель этот тип не берёт.
     CAD_WALLS = "cad_walls"
+    # 3D DXF этажа для AutoCAD по модели 3D-вида (ADR-0036 п. 6, ADR-0039): скрипт
+    # tools/cad_walls/run_floor3d_dxf.py подпроцессом в том же cad-worker. Основной исполнитель
+    # этот тип не берёт.
+    CAD_FLOOR3D_DXF = "cad_floor3d_dxf"
 
 
 class JobStatus(StrEnum):

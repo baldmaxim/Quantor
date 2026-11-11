@@ -54,9 +54,14 @@ ROUTE_ARTIFACT_NAME: Final = re.compile(
 )
 # Артефакт задания конструкций (`cad_walls`, ADR-0038): один файл в каталоге вида.
 WALLS_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/walls\.json$")
+# Артефакт задания 3D DXF этажа (`cad_floor3d_dxf`, ADR-0039): один файл в каталоге вида.
+FLOOR3D_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/floor3d\.dxf$")
 CONTENT_TYPES: Final = {".dxf": "application/dxf", ".json": "application/json"}
 # Типы заданий контура CAD: у обоих один и тот же вид доступа (пространство, проект, ревизия).
 CAD_JOB_TYPES: Final = (JobType.CAD_PDF_CONVERT, JobType.CAD_MEP_ROUTE)
+# Задания, чьи файлы отдаёт скачивание артефактов: к ним добавлено задание 3D DXF этажа. В список
+# и историю заданий ревизии оно не входит (у него нет страниц и видов результата).
+CAD_ARTIFACT_JOB_TYPES: Final = (*CAD_JOB_TYPES, JobType.CAD_FLOOR3D_DXF)
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +137,7 @@ def artifact_storage_key(revision_id: uuid.UUID, job_id: uuid.UUID, attempt: int
         ARTIFACT_NAME.fullmatch(name)
         or ROUTE_ARTIFACT_NAME.fullmatch(name)
         or WALLS_ARTIFACT_NAME.fullmatch(name)
+        or FLOOR3D_ARTIFACT_NAME.fullmatch(name)
     ):
         raise ValueError("недопустимое имя артефакта или номер попытки CAD")
     return f"revisions/{revision_id}/cad/{job_id}/attempt-{attempt}/{name}"
@@ -237,12 +243,13 @@ async def get_cad_job(
     project_id: uuid.UUID,
     revision_id: uuid.UUID,
     job_id: uuid.UUID,
+    job_types: tuple[JobType, ...] = CAD_JOB_TYPES,
 ) -> Job | None:
     """Задание CAD видно только в своём пространстве, проекте и ревизии; иначе — None (404)."""
     job = await jobs_service.get_job(session, workspace_id=workspace_id, job_id=job_id)
     if (
         job is None
-        or job.job_type not in CAD_JOB_TYPES
+        or job.job_type not in job_types
         or job.project_id != project_id
         or job.payload.get("revision_id") != str(revision_id)
     ):

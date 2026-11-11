@@ -19,6 +19,7 @@ import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
 
 import { CadFloor3dCanvas, type IFloor3dViewRequest } from './CadFloor3dCanvas';
+import { CadFloor3dDxfButton } from './CadFloor3dDxfButton';
 import { CadFloor3dHeights } from './CadFloor3dHeights';
 import { CadFloor3dHoleList } from './CadFloor3dHoleList';
 import { CadFloor3dPopover } from './CadFloor3dPopover';
@@ -202,6 +203,12 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({ params }) => {
             />
             Плита сверху
           </label>
+          <CadFloor3dDxfButton
+            params={params}
+            model={model}
+            disabled={!interactive}
+            hasCandidates={model?.slab_holes.some((hole) => hole.state === 'candidate') ?? false}
+          />
         </div>
         {(outdated || skipped > 0) && (
           <div className="flex flex-none flex-col gap-[var(--s-2)] border-b border-border bg-surface px-[var(--s-4)] py-[var(--s-3)]">

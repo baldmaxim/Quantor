@@ -9760,7 +9760,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf';
 
 /**
  * LengthUnit
@@ -16967,6 +16967,48 @@ export type ReadCadFloor3dResponses = {
 };
 
 export type ReadCadFloor3dResponse = ReadCadFloor3dResponses[keyof ReadCadFloor3dResponses];
+
+export type CreateCadFloor3dDxfData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/floor3d/dxf';
+};
+
+export type CreateCadFloor3dDxfErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCadFloor3dDxfError = CreateCadFloor3dDxfErrors[keyof CreateCadFloor3dDxfErrors];
+
+export type CreateCadFloor3dDxfResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadWallsJobRead;
+};
+
+export type CreateCadFloor3dDxfResponse = CreateCadFloor3dDxfResponses[keyof CreateCadFloor3dDxfResponses];
 
 export type PutCadFloor3dHoleData = {
     body: CadFloor3dHolePut;

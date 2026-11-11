@@ -18946,7 +18946,8 @@
           "pdf_geometry_extract",
           "cad_pdf_convert",
           "cad_mep_route",
-          "cad_walls"
+          "cad_walls",
+          "cad_floor3d_dxf"
         ],
         "title": "JobType",
         "type": "string"
@@ -31471,6 +31472,78 @@
           }
         },
         "summary": "Модель этажа для 3D-вида: плита, отверстия, стены, перемычки, высоты с источниками",
+        "tags": [
+          "cad-floor3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/floor3d/dxf": {
+      "post": {
+        "description": "Модель собирается тем же сервисом, что у GET floor3d; DXF - файл `floor3d.dxf` задания.",
+        "operationId": "create_cad_floor3d_dxf",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadWallsJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выгрузить 3D-модель этажа в 3D DXF для AutoCAD: поставить задание cad_floor3d_dxf",
         "tags": [
           "cad-floor3d"
         ]

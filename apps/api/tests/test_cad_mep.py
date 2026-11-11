@@ -246,7 +246,12 @@ def test_new_routes_are_in_openapi_and_job_type_is_registered() -> None:
         "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/decisions/{decision_id}/revoke"
         in paths
     )
-    assert set(HANDLERS) == {JobType.CAD_PDF_CONVERT, JobType.CAD_MEP_ROUTE, JobType.CAD_WALLS}
+    assert set(HANDLERS) == {
+        JobType.CAD_PDF_CONVERT,
+        JobType.CAD_MEP_ROUTE,
+        JobType.CAD_WALLS,
+        JobType.CAD_FLOOR3D_DXF,
+    }
     assert JobType.CAD_MEP_ROUTE.value == "cad_mep_route"
 
 
