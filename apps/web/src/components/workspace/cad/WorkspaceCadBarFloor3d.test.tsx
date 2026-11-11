@@ -21,26 +21,26 @@ const mount = (mode: 'plan' | '3d', onModeChange = vi.fn()) => {
   return { props, onModeChange };
 };
 
-describe('переключатель «План | 3D»', () => {
-  it('показывает оба режима; режим «План» выбран, «Вписать» плана на месте', () => {
+describe('переключатель «План ⇄ 3D»', () => {
+  it('один переключатель; режим «План» — выключен, «Вписать» плана на месте', () => {
     mount('plan');
-    const group = screen.getByRole('group', { name: 'Режим холста' });
-    expect(group).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'План' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('switch', { name: 'Режим холста: 3D' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('button', { name: 'Вписать' })).toBeInTheDocument();
   });
 
-  it('«3D» сообщает о выборе режима', () => {
+  it('клик на плане включает 3D', () => {
     const { onModeChange } = mount('plan');
-    fireEvent.click(screen.getByRole('button', { name: '3D' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Режим холста: 3D' }));
     expect(onModeChange).toHaveBeenCalledWith('3d');
   });
 
-  it('в режиме «3D» «Вписать» плана скрыта: у вида свои кнопки', () => {
-    mount('3d');
-    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'true');
+  it('клик в 3D возвращает на план; «Вписать» плана скрыта', () => {
+    const { onModeChange } = mount('3d');
+    const toggle = screen.getByRole('switch', { name: 'Режим холста: 3D' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByRole('button', { name: 'Вписать' })).toBeNull();
+    fireEvent.click(toggle);
+    expect(onModeChange).toHaveBeenCalledWith('plan');
   });
 
   it('без floor3d переключателя нет', () => {
@@ -55,6 +55,6 @@ describe('переключатель «План | 3D»', () => {
         loading={false}
       />,
     );
-    expect(screen.queryByRole('group', { name: 'Режим холста' })).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
   });
 });
