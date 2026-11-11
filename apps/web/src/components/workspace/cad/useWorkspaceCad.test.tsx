@@ -386,11 +386,12 @@ describe('useWorkspaceCad: наложение и непрозрачность PD
     expect(result.current.side.view?.layers.pdfOpacityActive).toBe(true);
   });
 
-  it('в строке над холстом нет ни режима, ни кнопок масштаба: только «Вписать»', () => {
+  it('в строке над холстом нет ни режима наложения, ни кнопок масштаба: «Вписать» и «План | 3D»', () => {
     recognized();
     const { result } = mount();
     expect(Object.keys(result.current.bar ?? {}).sort()).toEqual([
       'diagnostics',
+      'floor3d',
       'loading',
       'notices',
       'onFit',
@@ -398,6 +399,21 @@ describe('useWorkspaceCad: наложение и непрозрачность PD
       'view',
       'views',
     ]);
+  });
+
+  it('«3D»: режим запоминается, вид открывается с параметрами листа; «План» его закрывает', () => {
+    recognized();
+    const { result } = mount();
+    expect(result.current.bar?.floor3d?.mode).toBe('plan');
+    expect(result.current.floor3d).toBeNull();
+    act(() => result.current.bar?.floor3d?.onModeChange('3d'));
+    expect(result.current.bar?.floor3d?.mode).toBe('3d');
+    expect(result.current.floor3d?.params).toEqual(
+      expect.objectContaining({ pageIndex: expect.any(Number), view: expect.any(Number) }),
+    );
+    expect(window.localStorage.getItem('quantor.cad.view-3d')).toBe('1');
+    act(() => result.current.bar?.floor3d?.onModeChange('plan'));
+    expect(result.current.floor3d).toBeNull();
   });
 
   it('ползунок меняет прозрачность PDF и хранится в localStorage', () => {

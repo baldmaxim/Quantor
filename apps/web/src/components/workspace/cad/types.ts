@@ -168,6 +168,11 @@ export interface IWorkspaceCadBarProps {
   /** Предупреждения о показанной геометрии (упрощена, предпросмотр не принят). */
   readonly notices: readonly { readonly tone: 'note' | 'alert'; readonly text: string }[];
   readonly loading: boolean;
+  /** Переключатель «План | 3D» (ADR-0039); нет - переключателя нет. */
+  readonly floor3d?: {
+    readonly mode: 'plan' | '3d';
+    readonly onModeChange: (mode: 'plan' | '3d') => void;
+  } | null;
 }
 
 /** Группа «Трассы механики» панели «Слои»: слои route-задания, которые есть в превью. */

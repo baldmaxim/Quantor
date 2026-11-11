@@ -16,6 +16,7 @@ import { usePageGeometry } from '@/components/viewer/usePageGeometry';
 import { MeasurementInspector } from '@/components/workspace/MeasurementInspector';
 import { resolveLeftTab } from '@/components/workspace/cad/left-tab';
 import { CadConstructionPicker } from '@/components/workspace/cad/CadConstructionPicker';
+import { CadFloor3dLazy } from '@/components/workspace/cad/floor3d/CadFloor3dLazy';
 import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
 import { WorkspaceCadBar } from '@/components/workspace/cad/WorkspaceCadBar';
 import { WorkspaceCadLeft } from '@/components/workspace/cad/WorkspaceCadLeft';
@@ -831,6 +832,12 @@ const WorkspacePage = ({ params }: IPageProps) => {
               {cad.zoneCapture && <CadZoneCapture {...cad.zoneCapture} />}
               {cad.constructionPicker && (
                 <CadConstructionPicker {...cad.constructionPicker} disabled={activeTool === 'scale'} />
+              )}
+              {activeTab === 'cad' && cad.floor3d && (
+                <CadFloor3dLazy
+                  key={`${cad.floor3d.params.jobId}:${cad.floor3d.params.pageIndex}:${cad.floor3d.params.view}`}
+                  params={cad.floor3d.params}
+                />
               )}
               {draftPhase === 'complete' && draftA && draftB && sheetId && (
                 <div className="absolute top-[var(--s-4)] left-[var(--s-4)] z-10">

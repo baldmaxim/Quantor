@@ -19,6 +19,7 @@ export const WorkspaceCadBar: FC<IWorkspaceCadBarProps> = ({
   onFit,
   notices,
   loading,
+  floor3d = null,
 }) => {
   return (
     <div
@@ -37,7 +38,18 @@ export const WorkspaceCadBar: FC<IWorkspaceCadBarProps> = ({
             />
           )}
         </div>
-        <Button onClick={onFit}>Вписать</Button>
+        {floor3d && (
+          <SegmentedControl
+            label="Режим холста"
+            value={floor3d.mode}
+            options={[
+              { value: 'plan', label: 'План' },
+              { value: '3d', label: '3D' },
+            ]}
+            onChange={floor3d.onModeChange}
+          />
+        )}
+        {floor3d?.mode !== '3d' && <Button onClick={onFit}>Вписать</Button>}
       </div>
       {(notices.length > 0 || loading) && (
         <div className="flex max-h-[96px] flex-col gap-[var(--s-2)] overflow-auto overscroll-contain">

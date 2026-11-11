@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { ViewportSheet } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
+import { FLOOR3D_MODE_KEY } from '@/lib/cad/floor3d-queries';
 import { cropToNormalized } from '@/lib/cad/frame';
 import { readCadPaintColors } from '@/lib/cad/paint-colors';
 import { isRouteJob } from '@/lib/cad/mep-jobs';
@@ -30,6 +31,7 @@ import { sheetWorkspaceHref } from '@/lib/cad/sheets';
 import { matchingPreview, overlayPaintData, remarkBindingOf } from '@/lib/cad/workspace-cad';
 import { pageForJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { useTheme } from '@/lib/theme';
+import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { Camera, Viewport } from '@/lib/viewer/camera';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 import { useWorkspaceStore } from '@/store/workspace';
@@ -96,6 +98,8 @@ export interface IWorkspaceCad {
   zoneCapture: IWorkspaceCadZonesState['capture'];
   /** Выбор конструкции щелчком и её карточка; `null` - выбор выключен. */
   constructionPicker: IWorkspaceCadConstructionPicker | null;
+  /** Вид «3D» открыт поверх холста (ADR-0039): параметры листа и вида; `null` - режим «План». */
+  floor3d: { readonly params: ICadViewParams } | null;
 }
 
 const NO_LAYERS: ReadonlySet<number> = new Set<number>();
@@ -133,6 +137,7 @@ export const useWorkspaceCad = ({
   const setLeftTab = useWorkspaceStore((state) => state.setLeftTab);
   const [sliderOpacity, setSliderOpacity] = useStoredNumber(PDF_OPACITY_KEY, DEFAULT_PDF_OPACITY);
   const [cadRegionsVisible, setCadRegionsVisible] = useStoredBoolean(CAD_REGIONS_VISIBLE_KEY, false);
+  const [view3d, setView3d] = useStoredBoolean(FLOOR3D_MODE_KEY, false);
   const overlayVisible = useWorkspaceStore((state) => state.overlayVisible);
 
   // `?tab=cad` открывает вкладку один раз на значение адреса. Вкладку закрывает флаг в странице,
@@ -373,6 +378,10 @@ export const useWorkspaceCad = ({
           onFit: () => page && camera.fitPage(page, viewportSize()),
           notices,
           loading: diagnostics.preview_available && preview === null && data.previewPending,
+          floor3d: {
+            mode: view3d ? '3d' : 'plan',
+            onModeChange: (next) => setView3d(next === '3d'),
+          },
         }
       : null;
 
@@ -492,5 +501,6 @@ export const useWorkspaceCad = ({
     side,
     zoneCapture: zonesState.capture,
     constructionPicker: constructionsState.picker,
+    floor3d: bar !== null && view3d && params !== null ? { params } : null,
   };
 };
