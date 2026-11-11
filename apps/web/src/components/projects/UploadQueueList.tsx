@@ -36,6 +36,8 @@ export const UploadQueueList = ({ items }: { items: readonly UploadItem[] }) => 
             </StatusBadge>
           </div>
 
+          {item.note && <p className="text-xs text-muted">{item.note}</p>}
+
           {item.stage === 'загрузка' && (
             <ProgressRow value={item.fraction} label={`Загрузка ${item.name}`} />
           )}

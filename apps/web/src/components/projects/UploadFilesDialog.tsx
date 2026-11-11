@@ -3,11 +3,18 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { classifyFiles, FileDropzone, type PickedFile } from '@/components/projects/FileDropzone';
+import {
+  classifyFiles,
+  FileDropzone,
+  packagePicked,
+  type PickedFile,
+} from '@/components/projects/FileDropzone';
+import { FolderReport, type FolderReportData } from '@/components/projects/FolderReport';
 import { useUploadQueue } from '@/components/projects/UploadQueue';
 import { getUploadDialogState } from '@/components/projects/uploadDialogState';
 import { UploadQueueList } from '@/components/projects/UploadQueueList';
 import { Button, Dialog, DialogActions } from '@/components/ui';
+import { planFolderUpload, type IFolderEntry } from '@/lib/uploads/packageFolder';
 
 /**
  * Загрузка файлов в существующий проект.
@@ -27,6 +34,7 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
   const queryClient = useQueryClient();
 
   const [files, setFiles] = useState<readonly PickedFile[]>([]);
+  const [folderReport, setFolderReport] = useState<FolderReportData | null>(null);
   const queue = useUploadQueue();
 
   const accepted = files.filter((item) => item.accepted);
@@ -36,6 +44,13 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
     running: busy,
     items: queue.items,
   });
+
+  const addFolder = (entries: IFolderEntry[]) => {
+    const plan = planFolderUpload(entries);
+    const added = [...plan.packages.map(packagePicked), ...classifyFiles(plan.plainFiles)];
+    setFiles((current) => [...current, ...added]);
+    setFolderReport({ warnings: plan.warnings, skipped: plan.skipped, added: added.length });
+  };
 
   const submit = async () => {
     await queue.start({
@@ -58,6 +73,7 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
       title="Загрузить файлы"
       onExited={() => {
         setFiles([]);
+        setFolderReport(null);
         queue.reset();
       }}
       footer={
@@ -97,7 +113,10 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
         disabled={busy}
         onAdd={(added) => setFiles((current) => [...current, ...classifyFiles(added)])}
         onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))}
+        onAddFolder={addFolder}
       />
+
+      <FolderReport report={folderReport} />
 
       <UploadQueueList items={queue.items} />
     </Dialog>

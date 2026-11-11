@@ -1,8 +1,8 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { classifyFiles, FileDropzone } from './FileDropzone';
+import { classifyFiles, FileDropzone, packagePicked } from './FileDropzone';
 
 /**
  * Приём файлов.
@@ -89,5 +89,69 @@ describe('разбор выбранных файлов', () => {
     expect(picked).toHaveLength(2);
     expect(picked[0]?.accepted).toBe(true);
     expect(picked[1]?.accepted).toBe(false);
+  });
+});
+
+describe('выбор папки', () => {
+  const setFolderSupport = (supported: boolean) => {
+    if (supported) {
+      Object.defineProperty(HTMLInputElement.prototype, 'webkitdirectory', {
+        configurable: true,
+        value: false,
+        writable: true,
+      });
+    } else {
+      Reflect.deleteProperty(HTMLInputElement.prototype, 'webkitdirectory');
+    }
+  };
+
+  afterEach(() => setFolderSupport(false));
+
+  it('кнопка «Выбрать папку» скрыта там, где браузер не умеет выбирать папки', () => {
+    setFolderSupport(false);
+    render(<FileDropzone files={[]} onAdd={vi.fn()} onRemove={vi.fn()} onAddFolder={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: 'Выбрать папку' })).toBeNull();
+  });
+
+  it('без обработчика папок кнопки нет даже в поддерживающем браузере', () => {
+    setFolderSupport(true);
+    render(<FileDropzone files={[]} onAdd={vi.fn()} onRemove={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: 'Выбрать папку' })).toBeNull();
+  });
+
+  it('выбранная папка уходит в onAddFolder с относительными путями', async () => {
+    setFolderSupport(true);
+    const user = userEvent.setup();
+    const onAddFolder = vi.fn();
+    render(
+      <FileDropzone files={[]} onAdd={vi.fn()} onRemove={vi.fn()} onAddFolder={onAddFolder} />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Выбрать папку' })).toBeInTheDocument();
+    const input = screen.getByLabelText('Выбрать папку', { selector: 'input' });
+    expect(input).toHaveAttribute('webkitdirectory');
+
+    const inner = new File(['x'], 'АР_blocks.json');
+    Object.defineProperty(inner, 'webkitRelativePath', { value: 'TENDER/data/АР_blocks.json' });
+    await user.upload(input as HTMLInputElement, inner);
+
+    expect(onAddFolder).toHaveBeenCalledWith([{ file: inner, path: 'TENDER/data/АР_blocks.json' }]);
+  });
+
+  it('пакет из папки подписан и помечен как импортируемый', () => {
+    const pkg = {
+      stem: 'АР',
+      pdf: file('АР.pdf'),
+      resultsMd: file('АР_results.md'),
+      resultsHtml: file('АР_results.html'),
+      blocks: file('АР_blocks.json'),
+    };
+    render(<FileDropzone files={[packagePicked(pkg)]} onAdd={vi.fn()} onRemove={vi.fn()} />);
+
+    expect(screen.getByText('АР.zip')).toBeInTheDocument();
+    expect(screen.getByText('пакет из папки: 4 файла')).toBeInTheDocument();
+    expect(screen.getByText('Импортировать')).toBeInTheDocument();
   });
 });

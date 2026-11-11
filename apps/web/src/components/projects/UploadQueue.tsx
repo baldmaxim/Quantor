@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 
 import { errorMessage } from '@/lib/errors';
 import { UploadError, uploadFile } from '@/lib/upload';
+import { isLazyPackage, type UploadSource } from '@/lib/uploads/buildPackageZip';
 
 /**
  * Очередь загрузки.
@@ -26,16 +27,19 @@ export interface UploadItem {
   readonly errorText: string | null;
   /** Такой файл уже был в проекте — создана не новая, а найдена прежняя ревизия. */
   readonly duplicate: boolean;
+  /** Пояснение под именем, например «пакет из папки: 4 файла». */
+  readonly note?: string | null;
 }
 
 interface StartOptions {
   readonly projectId: string;
-  readonly files: readonly File[];
+  /** Файлы или отложенные пакеты из папки: ZIP собирается перед своей загрузкой. */
+  readonly files: readonly UploadSource[];
   readonly documentId?: string;
   /** Оставить в списке уже загруженные («готово»); прочие записи заменяются новой попыткой. */
   readonly keepDone?: boolean;
   /** Вызывается, когда файл успешно загружен. */
-  readonly onFileDone?: (file: File) => void;
+  readonly onFileDone?: (source: UploadSource) => void;
 }
 
 export const useUploadQueue = () => {
@@ -49,7 +53,13 @@ export const useUploadQueue = () => {
   }, []);
 
   const start = useCallback(
-    async ({ projectId, files, documentId, keepDone = false, onFileDone }: StartOptions): Promise<boolean> => {
+    async ({
+      projectId,
+      files,
+      documentId,
+      keepDone = false,
+      onFileDone,
+    }: StartOptions): Promise<boolean> => {
       runCounter.current += 1;
       const run = runCounter.current;
       const queue: UploadItem[] = files.map((file, index) => ({
@@ -61,6 +71,7 @@ export const useUploadQueue = () => {
         errorCode: null,
         errorText: null,
         duplicate: false,
+        note: isLazyPackage(file) ? file.note : null,
       }));
 
       setItems((current) =>
@@ -71,13 +82,31 @@ export const useUploadQueue = () => {
 
       let allSucceeded = true;
 
-      for (const [index, file] of files.entries()) {
+      for (const [index, source] of files.entries()) {
         const id = queue[index]?.id;
         if (id === undefined) continue;
 
         patch(id, { stage: 'загрузка', fraction: 0 });
 
         try {
+          // Пакеты из папки собираются по одному, перед своей загрузкой: все разом
+          // держали бы в памяти десятки мегабайт каждый.
+          let file: File;
+          if (isLazyPackage(source)) {
+            try {
+              file = await source.build();
+            } catch {
+              throw new UploadError('PACKAGE_BUILD_FAILED', 'Не удалось собрать пакет из папки', 0);
+            }
+            patch(id, { size: file.size });
+            // Отмену, нажатую во время сборки, XHR уже не увидит: слушатель ещё не вешался.
+            if (controller.current.signal.aborted) {
+              throw new DOMException('Загрузка отменена', 'AbortError');
+            }
+          } else {
+            file = source;
+          }
+
           const result = await uploadFile({
             projectId,
             file,
@@ -86,7 +115,7 @@ export const useUploadQueue = () => {
             onProgress: ({ fraction }) => patch(id, { fraction }),
           });
           patch(id, { stage: 'готово', fraction: 1, duplicate: result.is_duplicate });
-          onFileDone?.(file);
+          onFileDone?.(source);
         } catch (error) {
           allSucceeded = false;
 

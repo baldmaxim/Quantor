@@ -1,11 +1,22 @@
 'use client';
 
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 
 import { StatusBadge, cx } from '@/components/ui';
 import { IconBim, IconPdf, IconZip } from '@/components/ui/icons';
 import { formatBytes } from '@/lib/format';
 import { ACCEPT_ATTRIBUTE, extensionOf, isAccepted } from '@/lib/upload';
+import { isLazyPackage, toLazyPackage, type UploadSource } from '@/lib/uploads/buildPackageZip';
+import {
+  entriesFromInput,
+  type IFolderEntry,
+  type IFolderPackage,
+} from '@/lib/uploads/packageFolder';
+import {
+  grabDroppedEntries,
+  hasDirectory,
+  readDroppedEntries,
+} from '@/lib/uploads/readDroppedEntries';
 
 /**
  * Приём файлов перетаскиванием и выбором.
@@ -16,7 +27,8 @@ import { ACCEPT_ATTRIBUTE, extensionOf, isAccepted } from '@/lib/upload';
  */
 
 export interface PickedFile {
-  readonly file: File;
+  /** Файл или пакет из папки, который соберётся в ZIP перед загрузкой. */
+  readonly file: UploadSource;
   readonly accepted: boolean;
 }
 
@@ -24,6 +36,8 @@ interface IFileDropzoneProps {
   files: readonly PickedFile[];
   onAdd: (files: File[]) => void;
   onRemove: (index: number) => void;
+  /** Папка выбрана или брошена. Без обработчика папки не принимаются. */
+  onAddFolder?: (entries: IFolderEntry[]) => void;
   disabled?: boolean;
 }
 
@@ -45,14 +59,43 @@ const ICONS: Record<string, typeof IconPdf> = {
   ifc: IconBim,
 };
 
-export const FileDropzone = ({ files, onAdd, onRemove, disabled = false }: IFileDropzoneProps) => {
+/** Возможности браузера не меняются на лету: подписываться не на что. */
+const subscribeNever = (): (() => void) => () => undefined;
+
+export const FileDropzone = ({
+  files,
+  onAdd,
+  onRemove,
+  onAddFolder,
+  disabled = false,
+}: IFileDropzoneProps) => {
   const [dragging, setDragging] = useState(false);
+  // Выбор папки есть не везде (iOS Safari): кнопку показываем только там, где он работает.
+  const canPickFolder = useSyncExternalStore(
+    subscribeNever,
+    () => 'webkitdirectory' in HTMLInputElement.prototype,
+    () => false,
+  );
   const input = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Атрибута нет в типах React, а в JSX он не сработал бы как булев: ставим руками.
+    folderInput.current?.setAttribute('webkitdirectory', '');
+    folderInput.current?.setAttribute('directory', '');
+  }, []);
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragging(false);
     if (disabled) return;
+
+    // Записи читаем сразу: после первого await список элементов drop очищается.
+    const dropped = onAddFolder ? grabDroppedEntries(event.dataTransfer.items) : [];
+    if (onAddFolder && hasDirectory(dropped)) {
+      void readDroppedEntries(dropped).then(onAddFolder);
+      return;
+    }
     onAdd(Array.from(event.dataTransfer.files));
   };
 
@@ -75,14 +118,38 @@ export const FileDropzone = ({ files, onAdd, onRemove, disabled = false }: IFile
         <p className="text-xs text-muted">
           ZIP-пакет распознавалки, PDF, а также RVT, NWD, NWC и IFC на хранение
         </p>
-        <button
-          type="button"
+        <div className="flex flex-wrap justify-center gap-x-[var(--s-6)] gap-y-[var(--s-3)]">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => input.current?.click()}
+            className="text-sm text-accent underline underline-offset-4 disabled:no-underline"
+          >
+            или выберите на диске
+          </button>
+          {onAddFolder && canPickFolder && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => folderInput.current?.click()}
+              className="text-sm text-accent underline underline-offset-4 disabled:no-underline"
+            >
+              Выбрать папку
+            </button>
+          )}
+        </div>
+        <input
+          ref={folderInput}
+          type="file"
+          className="visually-hidden"
+          aria-label="Выбрать папку"
+          tabIndex={-1}
           disabled={disabled}
-          onClick={() => input.current?.click()}
-          className="text-sm text-accent underline underline-offset-4 disabled:no-underline"
-        >
-          или выберите на диске
-        </button>
+          onChange={(event) => {
+            onAddFolder?.(entriesFromInput(Array.from(event.target.files ?? [])));
+            event.target.value = '';
+          }}
+        />
         <input
           ref={input}
           type="file"
@@ -123,6 +190,7 @@ interface IPickedRowProps {
 
 const PickedRow = ({ picked, disabled, onRemove }: IPickedRowProps) => {
   const extension = extensionOf(picked.file.name);
+  const note = isLazyPackage(picked.file) ? picked.file.note : null;
   const Icon = ICONS[extension] ?? IconPdf;
   const capability = CAPABILITY[extension];
 
@@ -141,6 +209,7 @@ const PickedRow = ({ picked, disabled, onRemove }: IPickedRowProps) => {
         </span>
         <span className="flex flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
           <span className="mono text-xs text-muted">{formatBytes(picked.file.size)}</span>
+          {note && <span className="text-xs text-muted">{note}</span>}
           {picked.accepted && capability ? (
             <StatusBadge tone={capability.tone} dot={false} wrap>
               {capability.text}
@@ -169,3 +238,9 @@ const PickedRow = ({ picked, disabled, onRemove }: IPickedRowProps) => {
 /** Помечает файлы как принимаемые или нет, не отбрасывая их молча. */
 export const classifyFiles = (files: readonly File[]): PickedFile[] =>
   files.map((file) => ({ file, accepted: isAccepted(file.name) }));
+
+/** Полный комплект из папки как строка очереди: ZIP соберётся перед загрузкой. */
+export const packagePicked = (pkg: IFolderPackage): PickedFile => ({
+  file: toLazyPackage(pkg),
+  accepted: true,
+});
