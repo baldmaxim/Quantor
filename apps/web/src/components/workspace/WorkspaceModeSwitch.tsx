@@ -37,7 +37,7 @@ export const WorkspaceModeSwitch: FC<IWorkspaceModeSwitchProps> = ({ mode, onCha
             'min-h-11 touch-manipulation px-[var(--s-4)] text-xs whitespace-nowrap transition-colors duration-150 first:rounded-l-md last:rounded-r-md motion-reduce:transition-none md:min-h-8',
             checked
               ? 'bg-surface-muted text-text shadow-[inset_0_-2px_0_var(--accent)]'
-              : 'text-muted hover:text-text',
+              : 'cursor-pointer text-muted hover:bg-surface-muted hover:text-text',
           )}
         >
           {item.label}

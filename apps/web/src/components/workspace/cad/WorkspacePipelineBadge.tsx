@@ -187,7 +187,7 @@ export const WorkspacePipelineBadge: FC<IWorkspacePipelineBadgeProps> = ({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`Обработка листа: ${label}`}
-        className="inline-flex min-h-[44px] touch-manipulation items-center md:min-h-8"
+        className="inline-flex min-h-[44px] cursor-pointer touch-manipulation items-center rounded-[var(--radius-xs)] px-[var(--s-3)] transition-colors duration-150 hover:bg-surface-muted aria-expanded:bg-surface-muted motion-reduce:transition-none md:min-h-8"
       >
         <StatusBadge tone={tone}>{label}</StatusBadge>
       </button>
