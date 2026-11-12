@@ -24,6 +24,7 @@ from app.models.calc_rules import CalcRuleDefinition, CalcRuleReview, CalcRuleVe
 from app.models.calc_runs import CalcRun, CalcRunResult, CalcRunStep
 from app.models.calc_synthesis import CalcSynthesisDecision, CalcSynthesisRun
 from app.models.control_plane import FeatureFlagOverride, SettingOverride
+from app.models.doc_question import DocQuestionAnswer, DocQuestionCandidate
 from app.models.document import Document, DocumentRevision
 from app.models.identity import (
     AuthSession,
@@ -75,6 +76,8 @@ __all__ = [
     "CalcSourceInspection",
     "CalcSynthesisDecision",
     "CalcSynthesisRun",
+    "DocQuestionAnswer",
+    "DocQuestionCandidate",
     "Document",
     "DocumentRevision",
     "FeatureFlagOverride",

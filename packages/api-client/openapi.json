@@ -20385,6 +20385,943 @@
         "title": "DiagnosticsReport",
         "type": "object"
       },
+      "DocAnswerFlatOut": {
+        "description": "Подтверждённый ответ с происхождением: контракт для CAD-трасс (В5).",
+        "properties": {
+          "answer_id": {
+            "format": "uuid",
+            "title": "Answer Id",
+            "type": "string"
+          },
+          "catalog_version": {
+            "title": "Catalog Version",
+            "type": "string"
+          },
+          "confirmed_at": {
+            "format": "date-time",
+            "title": "Confirmed At",
+            "type": "string"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "norm_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Norm Ref"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "question_code": {
+            "title": "Question Code",
+            "type": "string"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "receiver_param": {
+            "title": "Receiver Param",
+            "type": "string"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DocScopeOut"
+          },
+          "source": {
+            "$ref": "#/components/schemas/DocAnswerSource"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Text"
+          }
+        },
+        "required": [
+          "answer_id",
+          "question_code",
+          "receiver_param",
+          "value",
+          "value_text",
+          "source",
+          "scope",
+          "file_name",
+          "revision_id",
+          "page_index",
+          "quote",
+          "norm_ref",
+          "note",
+          "catalog_version",
+          "confirmed_at"
+        ],
+        "title": "DocAnswerFlatOut",
+        "type": "object"
+      },
+      "DocAnswerOut": {
+        "properties": {
+          "candidate_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "catalog_version": {
+            "title": "Catalog Version",
+            "type": "string"
+          },
+          "confirmed_at": {
+            "format": "date-time",
+            "title": "Confirmed At",
+            "type": "string"
+          },
+          "confirmed_by": {
+            "format": "uuid",
+            "title": "Confirmed By",
+            "type": "string"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "norm_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Norm Ref"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "question_code": {
+            "title": "Question Code",
+            "type": "string"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          },
+          "scope_building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Building"
+          },
+          "scope_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Section"
+          },
+          "source": {
+            "$ref": "#/components/schemas/DocAnswerSource"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Text"
+          }
+        },
+        "required": [
+          "id",
+          "question_code",
+          "source",
+          "scope_building",
+          "scope_section",
+          "value",
+          "value_text",
+          "candidate_id",
+          "file_name",
+          "revision_id",
+          "page_index",
+          "quote",
+          "norm_ref",
+          "note",
+          "catalog_version",
+          "confirmed_by",
+          "confirmed_at"
+        ],
+        "title": "DocAnswerOut",
+        "type": "object"
+      },
+      "DocAnswerSource": {
+        "enum": [
+          "document",
+          "manual",
+          "norm_assumption",
+          "not_in_project"
+        ],
+        "title": "DocAnswerSource",
+        "type": "string"
+      },
+      "DocAnswersOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DocAnswerFlatOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "DocAnswersOut",
+        "type": "object"
+      },
+      "DocAssumptionOut": {
+        "description": "Норматив-допущение каталога: предложение со ссылкой на пункт СП, а не ответ проекта.",
+        "properties": {
+          "mm_from": {
+            "title": "Mm From",
+            "type": "integer"
+          },
+          "mm_to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mm To"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mm_from",
+          "mm_to",
+          "reference",
+          "status",
+          "note"
+        ],
+        "title": "DocAssumptionOut",
+        "type": "object"
+      },
+      "DocCandidateOut": {
+        "properties": {
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "occurrences": {
+            "title": "Occurrences",
+            "type": "integer"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "page_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Label"
+          },
+          "question_code": {
+            "title": "Question Code",
+            "type": "string"
+          },
+          "quote": {
+            "title": "Quote",
+            "type": "string"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DocCandidateStatus"
+          },
+          "value": {
+            "$ref": "#/components/schemas/DocValueOut"
+          },
+          "value_text": {
+            "title": "Value Text",
+            "type": "string"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "question_code",
+          "value",
+          "value_text",
+          "quote",
+          "revision_id",
+          "page_index",
+          "page_label",
+          "file_name",
+          "building",
+          "section",
+          "level",
+          "score",
+          "occurrences",
+          "status",
+          "versions",
+          "created_at"
+        ],
+        "title": "DocCandidateOut",
+        "type": "object"
+      },
+      "DocCandidateStatus": {
+        "enum": [
+          "candidate",
+          "rejected"
+        ],
+        "title": "DocCandidateStatus",
+        "type": "string"
+      },
+      "DocQuestionCode": {
+        "enum": [
+          "corridor_ceiling_height",
+          "clear_height",
+          "corridor_floor_buildup",
+          "slab_thickness",
+          "sprinkler_model",
+          "sprinkler_ceiling_gap",
+          "hot_over_cold_gap",
+          "duct_section",
+          "cable_tray_section"
+        ],
+        "title": "DocQuestionCode",
+        "type": "string"
+      },
+      "DocQuestionOut": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/DocAnswerOut"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "assumption": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocAssumptionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/DocCandidateOut"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "max_mm": {
+            "title": "Max Mm",
+            "type": "integer"
+          },
+          "min_mm": {
+            "title": "Min Mm",
+            "type": "integer"
+          },
+          "receiver_param": {
+            "title": "Receiver Param",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "value_kind": {
+            "title": "Value Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "title",
+          "receiver_param",
+          "value_kind",
+          "min_mm",
+          "max_mm",
+          "assumption",
+          "candidates",
+          "answers"
+        ],
+        "title": "DocQuestionOut",
+        "type": "object"
+      },
+      "DocQuestionsOut": {
+        "properties": {
+          "catalog_version": {
+            "title": "Catalog Version",
+            "type": "string"
+          },
+          "last_search": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocSearchSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/DocQuestionOut"
+            },
+            "title": "Questions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "catalog_version",
+          "questions",
+          "last_search"
+        ],
+        "title": "DocQuestionsOut",
+        "type": "object"
+      },
+      "DocScopeOut": {
+        "description": "Область ответа; оба поля null - весь проект.",
+        "properties": {
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          }
+        },
+        "required": [
+          "building",
+          "section"
+        ],
+        "title": "DocScopeOut",
+        "type": "object"
+      },
+      "DocSearchSummary": {
+        "description": "Итог последнего задания поиска; числа, которых нет в итоге задания, - null.",
+        "properties": {
+          "candidates": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidates"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "no_text_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "No Text Files",
+            "type": "array"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "questions_found": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Questions Found"
+          },
+          "revisions_no_text": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisions No Text"
+          },
+          "revisions_scanned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisions Scanned"
+          },
+          "revisions_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisions Total"
+          },
+          "revisions_unreadable": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisions Unreadable"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "unreadable_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unreadable Files",
+            "type": "array"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "progress",
+          "stage",
+          "error_code",
+          "created_at",
+          "finished_at",
+          "questions_found",
+          "candidates",
+          "revisions_total",
+          "revisions_scanned",
+          "revisions_no_text",
+          "no_text_files",
+          "revisions_unreadable",
+          "unreadable_files",
+          "versions"
+        ],
+        "title": "DocSearchSummary",
+        "type": "object"
+      },
+      "DocValueOut": {
+        "description": "Нормализованное значение: мм целыми числами, диапазон, «ширина×высота» либо текст.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "numbers": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Numbers",
+            "type": "array"
+          },
+          "qualifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifier"
+          }
+        },
+        "required": [
+          "kind",
+          "display",
+          "numbers",
+          "qualifier",
+          "code"
+        ],
+        "title": "DocValueOut",
+        "type": "object"
+      },
+      "DocumentAnswerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "format": "uuid",
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "scope_building": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Building"
+          },
+          "scope_section": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Section"
+          },
+          "source": {
+            "const": "document",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "candidate_id"
+        ],
+        "title": "DocumentAnswerIn",
+        "type": "object"
+      },
       "DocumentKind": {
         "description": "Природа документа. BIM-форматы принимаются на хранение, но не разбираются.",
         "enum": [
@@ -21675,7 +22612,8 @@
           "cad_floor3d_dxf",
           "cad_zones",
           "cad_sections",
-          "sheet_passport_extract"
+          "sheet_passport_extract",
+          "doc_questions_search"
         ],
         "title": "JobType",
         "type": "string"
@@ -21804,6 +22742,106 @@
           }
         },
         "title": "LogoutResponse",
+        "type": "object"
+      },
+      "ManualAnswerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Note",
+            "type": "string"
+          },
+          "scope_building": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Building"
+          },
+          "scope_section": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Section"
+          },
+          "source": {
+            "const": "manual",
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/ManualValueIn"
+          },
+          "value_text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Value Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "value_text",
+          "value",
+          "note"
+        ],
+        "title": "ManualAnswerIn",
+        "type": "object"
+      },
+      "ManualValueIn": {
+        "additionalProperties": false,
+        "description": "Значение ручного ответа: размеры в мм целыми; `display` собирает сервер по виду вопроса.\n\nlength_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота\n(для воздуховода круглого сечения - один диаметр с code=\"round\"); text - необязательные\nчисла в границах каталога; enum - без чисел, code только rosette_down / rosette_up.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "numbers": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 8,
+            "title": "Numbers",
+            "type": "array"
+          },
+          "qualifier": {
+            "anyOf": [
+              {
+                "enum": [
+                  "min",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifier"
+          }
+        },
+        "title": "ManualValueIn",
         "type": "object"
       },
       "MeasurementBatchCreate": {
@@ -23130,6 +24168,108 @@
         ],
         "title": "NodeRole",
         "type": "string"
+      },
+      "NormAssumptionAnswerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "scope_building": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Building"
+          },
+          "scope_section": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Section"
+          },
+          "source": {
+            "const": "norm_assumption",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "NormAssumptionAnswerIn",
+        "type": "object"
+      },
+      "NotInProjectAnswerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "scope_building": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Building"
+          },
+          "scope_section": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Section"
+          },
+          "source": {
+            "const": "not_in_project",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "NotInProjectAnswerIn",
+        "type": "object"
       },
       "OriginalPrediction": {
         "additionalProperties": false,
@@ -36846,6 +37986,318 @@
         "summary": "Запустить автоматическую разметку зон вида: поставить задание cad_zones",
         "tags": [
           "cad-zones"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/doc-answers": {
+      "get": {
+        "operationId": "list_doc_answers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAnswersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Подтверждённые ответы проекта с происхождением: плоский список для CAD-трасс",
+        "tags": [
+          "doc-questions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/doc-questions": {
+      "get": {
+        "operationId": "get_doc_questions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocQuestionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Каталог вопросов с кандидатами и ответами по областям и итог последнего поиска",
+        "tags": [
+          "doc-questions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/doc-questions/answers/{answer_id}": {
+      "delete": {
+        "operationId": "remove_doc_answer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить подтверждённый ответ",
+        "tags": [
+          "doc-questions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/doc-questions/candidates/{candidate_id}/reject": {
+      "post": {
+        "operationId": "reject_doc_candidate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocCandidateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отклонить кандидата; повторный поиск его не воскрешает",
+        "tags": [
+          "doc-questions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/doc-questions/search": {
+      "post": {
+        "operationId": "start_doc_questions_search",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить поиск ответов на вопросы к документации; активное задание возвращается",
+        "tags": [
+          "doc-questions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/doc-questions/{code}/answers": {
+      "post": {
+        "operationId": "put_doc_answer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DocQuestionCode"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "mapping": {
+                    "document": "#/components/schemas/DocumentAnswerIn",
+                    "manual": "#/components/schemas/ManualAnswerIn",
+                    "norm_assumption": "#/components/schemas/NormAssumptionAnswerIn",
+                    "not_in_project": "#/components/schemas/NotInProjectAnswerIn"
+                  },
+                  "propertyName": "source"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/DocumentAnswerIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ManualAnswerIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NormAssumptionAnswerIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NotInProjectAnswerIn"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Подтвердить ответ на вопрос; ответ в той же области заменяется",
+        "tags": [
+          "doc-questions"
         ]
       }
     },

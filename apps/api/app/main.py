@@ -28,6 +28,7 @@ from app.api.v1.cad_risers import qa_router as cad_risers_qa_router
 from app.api.v1.cad_sections import qa_router as cad_sections_qa_router
 from app.api.v1.cad_vor import qa_router as cad_vor_qa_router
 from app.api.v1.cad_zones import qa_router as cad_zones_qa_router
+from app.api.v1.doc_questions import qa_router as doc_questions_qa_router
 from app.api.v1.router import api_v1_router
 from app.api.v1.sheet_passports import qa_router as sheet_passports_qa_router
 from app.auth.session_cookie import SessionCookieMiddleware
@@ -122,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cad_building3d_qa_router)
     # Паспорт листа (ADR-0043, С1): маршруты закрыты флагом пространства `project.consistency`.
     app.include_router(sheet_passports_qa_router)
+    app.include_router(doc_questions_qa_router)
     return app
 
 

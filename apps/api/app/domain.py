@@ -435,6 +435,10 @@ class JobType(StrEnum):
     # Паспорт листа по текстовому слою PDF проекта (ADR-0043, С1): разбор pypdf в основном
     # исполнителе, результат - кандидаты `sheet_passports`; подтверждает человек.
     SHEET_PASSPORT_EXTRACT = "sheet_passport_extract"
+    # Поиск ответов на вопросы к документации по тексту страниц PDF (ADR-0043, шаг 2, В3): шаблоны
+    # каталога consistency.doc_questions.v1 в основном исполнителе, результат - кандидаты
+    # `doc_question_candidates`; ответом их делает человек. Числа модель не выдаёт.
+    DOC_QUESTIONS_SEARCH = "doc_questions_search"
 
 
 class JobStatus(StrEnum):

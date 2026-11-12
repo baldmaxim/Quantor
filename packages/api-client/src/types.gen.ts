@@ -10269,6 +10269,454 @@ export type DiagnosticsReport = {
 };
 
 /**
+ * DocAnswerFlatOut
+ *
+ * Подтверждённый ответ с происхождением: контракт для CAD-трасс (В5).
+ */
+export type DocAnswerFlatOut = {
+    /**
+     * Answer Id
+     */
+    answer_id: string;
+    /**
+     * Catalog Version
+     */
+    catalog_version: string;
+    /**
+     * Confirmed At
+     */
+    confirmed_at: string;
+    /**
+     * File Name
+     */
+    file_name: string | null;
+    /**
+     * Norm Ref
+     */
+    norm_ref: string | null;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+    /**
+     * Question Code
+     */
+    question_code: string;
+    /**
+     * Quote
+     */
+    quote: string | null;
+    /**
+     * Receiver Param
+     */
+    receiver_param: string;
+    /**
+     * Revision Id
+     */
+    revision_id: string | null;
+    scope: DocScopeOut;
+    source: DocAnswerSource;
+    value: DocValueOut | null;
+    /**
+     * Value Text
+     */
+    value_text: string | null;
+};
+
+/**
+ * DocAnswerOut
+ */
+export type DocAnswerOut = {
+    /**
+     * Candidate Id
+     */
+    candidate_id: string | null;
+    /**
+     * Catalog Version
+     */
+    catalog_version: string;
+    /**
+     * Confirmed At
+     */
+    confirmed_at: string;
+    /**
+     * Confirmed By
+     */
+    confirmed_by: string;
+    /**
+     * File Name
+     */
+    file_name: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Norm Ref
+     */
+    norm_ref: string | null;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+    /**
+     * Question Code
+     */
+    question_code: string;
+    /**
+     * Quote
+     */
+    quote: string | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string | null;
+    /**
+     * Scope Building
+     */
+    scope_building: string | null;
+    /**
+     * Scope Section
+     */
+    scope_section: string | null;
+    source: DocAnswerSource;
+    value: DocValueOut | null;
+    /**
+     * Value Text
+     */
+    value_text: string | null;
+};
+
+/**
+ * DocAnswerSource
+ */
+export type DocAnswerSource = 'document' | 'manual' | 'norm_assumption' | 'not_in_project';
+
+/**
+ * DocAnswersOut
+ */
+export type DocAnswersOut = {
+    /**
+     * Items
+     */
+    items: Array<DocAnswerFlatOut>;
+};
+
+/**
+ * DocAssumptionOut
+ *
+ * Норматив-допущение каталога: предложение со ссылкой на пункт СП, а не ответ проекта.
+ */
+export type DocAssumptionOut = {
+    /**
+     * Mm From
+     */
+    mm_from: number;
+    /**
+     * Mm To
+     */
+    mm_to: number | null;
+    /**
+     * Note
+     */
+    note: string;
+    /**
+     * Reference
+     */
+    reference: string;
+    /**
+     * Status
+     */
+    status: string;
+};
+
+/**
+ * DocCandidateOut
+ */
+export type DocCandidateOut = {
+    /**
+     * Building
+     */
+    building: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Level
+     */
+    level: string | null;
+    /**
+     * Occurrences
+     */
+    occurrences: number;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Label
+     */
+    page_label: string | null;
+    /**
+     * Question Code
+     */
+    question_code: string;
+    /**
+     * Quote
+     */
+    quote: string;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Score
+     */
+    score: number;
+    /**
+     * Section
+     */
+    section: string | null;
+    status: DocCandidateStatus;
+    value: DocValueOut;
+    /**
+     * Value Text
+     */
+    value_text: string;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * DocCandidateStatus
+ */
+export type DocCandidateStatus = 'candidate' | 'rejected';
+
+/**
+ * DocQuestionCode
+ */
+export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section';
+
+/**
+ * DocQuestionOut
+ */
+export type DocQuestionOut = {
+    /**
+     * Answers
+     */
+    answers: Array<DocAnswerOut>;
+    assumption: DocAssumptionOut | null;
+    /**
+     * Candidates
+     */
+    candidates: Array<DocCandidateOut>;
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Max Mm
+     */
+    max_mm: number;
+    /**
+     * Min Mm
+     */
+    min_mm: number;
+    /**
+     * Receiver Param
+     */
+    receiver_param: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Value Kind
+     */
+    value_kind: string;
+};
+
+/**
+ * DocQuestionsOut
+ */
+export type DocQuestionsOut = {
+    /**
+     * Catalog Version
+     */
+    catalog_version: string;
+    last_search: DocSearchSummary | null;
+    /**
+     * Questions
+     */
+    questions: Array<DocQuestionOut>;
+};
+
+/**
+ * DocScopeOut
+ *
+ * Область ответа; оба поля null - весь проект.
+ */
+export type DocScopeOut = {
+    /**
+     * Building
+     */
+    building: string | null;
+    /**
+     * Section
+     */
+    section: string | null;
+};
+
+/**
+ * DocSearchSummary
+ *
+ * Итог последнего задания поиска; числа, которых нет в итоге задания, - null.
+ */
+export type DocSearchSummary = {
+    /**
+     * Candidates
+     */
+    candidates: number | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * No Text Files
+     */
+    no_text_files: Array<string>;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Questions Found
+     */
+    questions_found: number | null;
+    /**
+     * Revisions No Text
+     */
+    revisions_no_text: number | null;
+    /**
+     * Revisions Scanned
+     */
+    revisions_scanned: number | null;
+    /**
+     * Revisions Total
+     */
+    revisions_total: number | null;
+    /**
+     * Revisions Unreadable
+     */
+    revisions_unreadable: number | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Unreadable Files
+     */
+    unreadable_files: Array<string>;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * DocValueOut
+ *
+ * Нормализованное значение: мм целыми числами, диапазон, «ширина×высота» либо текст.
+ */
+export type DocValueOut = {
+    /**
+     * Code
+     */
+    code: string | null;
+    /**
+     * Display
+     */
+    display: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Numbers
+     */
+    numbers: Array<number>;
+    /**
+     * Qualifier
+     */
+    qualifier: string | null;
+};
+
+/**
+ * DocumentAnswerIn
+ */
+export type DocumentAnswerIn = {
+    /**
+     * Candidate Id
+     */
+    candidate_id: string;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Scope Building
+     */
+    scope_building?: string | null;
+    /**
+     * Scope Section
+     */
+    scope_section?: string | null;
+    /**
+     * Source
+     */
+    source: 'document';
+};
+
+/**
  * DocumentKind
  *
  * Природа документа. BIM-форматы принимаются на хранение, но не разбираются.
@@ -10943,7 +11391,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'sheet_passport_extract';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'sheet_passport_extract' | 'doc_questions_search';
 
 /**
  * LengthUnit
@@ -11021,6 +11469,57 @@ export type LogoutResponse = {
      * Ok
      */
     ok?: boolean;
+};
+
+/**
+ * ManualAnswerIn
+ */
+export type ManualAnswerIn = {
+    /**
+     * Note
+     */
+    note: string;
+    /**
+     * Scope Building
+     */
+    scope_building?: string | null;
+    /**
+     * Scope Section
+     */
+    scope_section?: string | null;
+    /**
+     * Source
+     */
+    source: 'manual';
+    value: ManualValueIn;
+    /**
+     * Value Text
+     */
+    value_text: string;
+};
+
+/**
+ * ManualValueIn
+ *
+ * Значение ручного ответа: размеры в мм целыми; `display` собирает сервер по виду вопроса.
+ *
+ * length_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота
+ * (для воздуховода круглого сечения - один диаметр с code="round"); text - необязательные
+ * числа в границах каталога; enum - без чисел, code только rosette_down / rosette_up.
+ */
+export type ManualValueIn = {
+    /**
+     * Code
+     */
+    code?: string | null;
+    /**
+     * Numbers
+     */
+    numbers?: Array<number>;
+    /**
+     * Qualifier
+     */
+    qualifier?: 'min' | 'max' | null;
 };
 
 /**
@@ -11723,6 +12222,50 @@ export type NetworkSystem = {
  * Топологическая роль узла сети. Роль — не класс: класс задаёт профиль.
  */
 export type NodeRole = 'source' | 'terminal' | 'junction' | 'equipment' | 'device' | 'transition' | 'endpoint' | 'unresolved_anchor';
+
+/**
+ * NormAssumptionAnswerIn
+ */
+export type NormAssumptionAnswerIn = {
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Scope Building
+     */
+    scope_building?: string | null;
+    /**
+     * Scope Section
+     */
+    scope_section?: string | null;
+    /**
+     * Source
+     */
+    source: 'norm_assumption';
+};
+
+/**
+ * NotInProjectAnswerIn
+ */
+export type NotInProjectAnswerIn = {
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Scope Building
+     */
+    scope_building?: string | null;
+    /**
+     * Scope Section
+     */
+    scope_section?: string | null;
+    /**
+     * Source
+     */
+    source: 'not_in_project';
+};
 
 /**
  * OriginalPrediction
@@ -19498,6 +20041,206 @@ export type StartCadZonesAutoResponses = {
 };
 
 export type StartCadZonesAutoResponse = StartCadZonesAutoResponses[keyof StartCadZonesAutoResponses];
+
+export type ListDocAnswersData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/doc-answers';
+};
+
+export type ListDocAnswersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListDocAnswersError = ListDocAnswersErrors[keyof ListDocAnswersErrors];
+
+export type ListDocAnswersResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocAnswersOut;
+};
+
+export type ListDocAnswersResponse = ListDocAnswersResponses[keyof ListDocAnswersResponses];
+
+export type GetDocQuestionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/doc-questions';
+};
+
+export type GetDocQuestionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetDocQuestionsError = GetDocQuestionsErrors[keyof GetDocQuestionsErrors];
+
+export type GetDocQuestionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocQuestionsOut;
+};
+
+export type GetDocQuestionsResponse = GetDocQuestionsResponses[keyof GetDocQuestionsResponses];
+
+export type RemoveDocAnswerData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Answer Id
+         */
+        answer_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/doc-questions/answers/{answer_id}';
+};
+
+export type RemoveDocAnswerErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveDocAnswerError = RemoveDocAnswerErrors[keyof RemoveDocAnswerErrors];
+
+export type RemoveDocAnswerResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RemoveDocAnswerResponse = RemoveDocAnswerResponses[keyof RemoveDocAnswerResponses];
+
+export type RejectDocCandidateData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Candidate Id
+         */
+        candidate_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/doc-questions/candidates/{candidate_id}/reject';
+};
+
+export type RejectDocCandidateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RejectDocCandidateError = RejectDocCandidateErrors[keyof RejectDocCandidateErrors];
+
+export type RejectDocCandidateResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocCandidateOut;
+};
+
+export type RejectDocCandidateResponse = RejectDocCandidateResponses[keyof RejectDocCandidateResponses];
+
+export type StartDocQuestionsSearchData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/doc-questions/search';
+};
+
+export type StartDocQuestionsSearchErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartDocQuestionsSearchError = StartDocQuestionsSearchErrors[keyof StartDocQuestionsSearchErrors];
+
+export type StartDocQuestionsSearchResponses = {
+    /**
+     * Successful Response
+     */
+    202: JobRead;
+};
+
+export type StartDocQuestionsSearchResponse = StartDocQuestionsSearchResponses[keyof StartDocQuestionsSearchResponses];
+
+export type PutDocAnswerData = {
+    /**
+     * Body
+     */
+    body: ({
+        source: 'document';
+    } & DocumentAnswerIn) | ({
+        source: 'manual';
+    } & ManualAnswerIn) | ({
+        source: 'norm_assumption';
+    } & NormAssumptionAnswerIn) | ({
+        source: 'not_in_project';
+    } & NotInProjectAnswerIn);
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        code: DocQuestionCode;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/doc-questions/{code}/answers';
+};
+
+export type PutDocAnswerErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutDocAnswerError = PutDocAnswerErrors[keyof PutDocAnswerErrors];
+
+export type PutDocAnswerResponses = {
+    /**
+     * Successful Response
+     */
+    200: DocAnswerOut;
+};
+
+export type PutDocAnswerResponse = PutDocAnswerResponses[keyof PutDocAnswerResponses];
 
 export type ListProjectDocumentsData = {
     body?: never;
