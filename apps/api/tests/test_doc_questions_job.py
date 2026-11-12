@@ -73,7 +73,7 @@ async def test_search_saves_candidates_with_scope_and_reports_no_text(
 
         view = (await api.get(questions_url(project_id))).json()
         assert view["catalog_version"] == DOC_QUESTIONS_VERSION
-        assert len(view["questions"]) == 9
+        assert len(view["questions"]) == 10
         by_code = {item["code"]: item for item in view["questions"]}
         slab = by_code["slab_thickness"]["candidates"]
         assert len(slab) == 1

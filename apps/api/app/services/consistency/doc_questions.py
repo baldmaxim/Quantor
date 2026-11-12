@@ -33,6 +33,7 @@ class DocQuestionCode(StrEnum):
     HOT_OVER_COLD_GAP = "hot_over_cold_gap"
     DUCT_SECTION = "duct_section"
     CABLE_TRAY_SECTION = "cable_tray_section"
+    APARTMENT_PARTITION_HEIGHT = "apartment_partition_height"
 
 
 class DocValueKind(StrEnum):
@@ -204,6 +205,8 @@ _FLOOR_TO_FLOOR: Final = (
     ),
 )
 _SMOKE_CALC_LABEL: Final = "ИОС4 / ОВ: расчёты дымоудаления"
+# Кладка внутриквартирных перегородок: «маячный ряд», камень «ПОЛИГРАН 80», сами перегородки.
+_PARTITION_CTX: Final = (_rx(r"маячн\w+\s+ряд|полигран\s*80|внутриквартирн\w+\s+перегородк"),)
 
 
 # --------------------------------------------------------------------------- каталог v1
@@ -482,6 +485,29 @@ DOC_QUESTIONS: Final[tuple[DocQuestion, ...]] = (
         ),
         min_mm=20,
         max_mm=1000,
+    ),
+    DocQuestion(
+        code=DocQuestionCode.APARTMENT_PARTITION_HEIGHT,
+        title="Высота кладки внутриквартирных перегородок (маячный ряд), мм",
+        receiver_param="apartment_partition_height_mm",
+        value_kind=DocValueKind.LENGTH_MM,
+        extractor=ExtractorKind.LENGTH,
+        sources=(
+            DocSource("ПЗ АР", _AR, (_K.TEXT,)),
+            DocSource("Таблицы АР", _AR, (_K.TABLE,)),
+            DocSource("Прочие листы АР", _AR),
+        ),
+        anchors=(
+            _anchor(r"маячн\w+\s+ряд\w*", 20),
+            _anchor(r"полигран\s*80", 15),
+            _anchor(r"внутриквартирн\w+\s+перегородк\w*", 12),
+            # «высотой 188 мм» - число после слова о высоте; без контекста перегородок не якорь.
+            _anchor(r"высот\w*\s+(?:не\s+менее\s+)?\d{2,4}\s*мм", 8),
+        ),
+        context=_PARTITION_CTX,
+        context_required=True,
+        min_mm=100,
+        max_mm=3000,
     ),
 )
 

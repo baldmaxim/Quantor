@@ -27,6 +27,10 @@ MAX_BULK_KEYS: Final = 2000
 # Происхождение величины: observed - прочитано из документации; derived - выведено из неё;
 # assumption - допущение параметров скрипта; manual - ввод человека.
 CadValueSource = Literal["observed", "derived", "assumption", "manual"]
+# Основание высоты конструкции: sheet - высота стены листа; manual - ввод человека;
+# apartment_partition - высота маячного ряда внутриквартирных перегородок из «Вопросов к
+# документации».
+CadHeightBasis = Literal["sheet", "manual", "apartment_partition"]
 # `floor_slab` — плита перекрытия листа: одна на лист, контур и отверстия — из ключа `slab`.
 CadConstructionKind = Literal[
     "masonry",
@@ -290,7 +294,7 @@ class CadConstructionProps(BaseModel):
         default=None, ge=0, le=90, description="Индекс звукоизоляции Rw, дБ"
     )
     height_override_mm: int | None = Field(
-        default=None, ge=500, le=10000, description="Высота конструкции вместо расчётной, мм"
+        default=None, ge=100, le=10000, description="Высота конструкции вместо расчётной, мм"
     )
     thickness_override_mm: int | None = Field(
         default=None, ge=30, le=1500, description="Толщина вместо номинала скрипта, мм"
@@ -360,6 +364,18 @@ class CadLevelValueRead(BaseModel):
     default_mm: int | None
 
 
+class CadPartitionHeightRead(BaseModel):
+    """Высота маячного ряда перегородок: принятый ответ «Вопросов к документации»."""
+
+    height_mm: int
+    # observed - ответ из документа; manual - значение ввёл человек.
+    source: CadValueSource
+    answer_id: UUID
+    file_name: str | None
+    page_index: int | None
+    quote: str | None
+
+
 class CadHeightsRead(BaseModel):
     """Высоты листа с источниками. Не определилось — `None` («требует ввода»), не 0."""
 
@@ -375,6 +391,8 @@ class CadHeightsRead(BaseModel):
     wall_height_source: CadValueSource | None
     evidence: str | None
     message: str | None
+    # Принятая высота маячного ряда перегородок; `None` - ответа нет.
+    apartment_partition_height: CadPartitionHeightRead | None = None
 
 
 class CadSheetLevelsRead(BaseModel):
@@ -410,6 +428,8 @@ class CadConstructionComputedRead(BaseModel):
     sources: CadComputedSourcesRead
     warnings: list[CadConstructionWarning]
     area_m2: float | None = None
+    # Основание высоты; у плиты (высоты нет) - `None`.
+    height_basis: CadHeightBasis | None = None
 
 
 class CadConstructionMaterialRead(BaseModel):
@@ -493,6 +513,8 @@ class CadConstructionsSummaryRead(BaseModel):
     orphaned_props: int = 0
     # Параметры, перенесённые на новые адреса конструкций по геометрии в этом запросе.
     props_carried_over: int = 0
+    # Внутриквартирные перегородки, посчитанные по высоте маячного ряда.
+    apartment_partition_count: int = 0
 
 
 class CadWallsWarningRead(BaseModel):

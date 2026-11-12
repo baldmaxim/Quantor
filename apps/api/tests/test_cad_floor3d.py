@@ -421,6 +421,20 @@ def test_door_leaf_runs_from_floor_to_door_height() -> None:
     assert model.lintels[0].z_bottom_mm == door.z_top_mm
 
 
+def test_door_reaching_wall_top_keeps_its_leaf_cut_by_the_wall() -> None:
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = LEAF
+    levels = CadSheetLevelsRead(
+        floor_height_mm=None, slab_thickness_mm=None, door_height_mm=3200, floor_elevation_mm=None
+    )
+    model = build(extras=extras, overrides=levels)
+    (door,) = model.doors
+    assert (door.z_bottom_mm, door.z_top_mm) == (BASE, BASE + 2800)
+    assert door.door_height_mm == 3200
+    assert model.lintels == []
+    assert "opening_reaches_wall_top" in {w.code for w in model.warnings}
+
+
 def test_door_leaf_follows_zone_height() -> None:
     extras = raw_extras()
     extras["openings"][0]["leaf"] = LEAF

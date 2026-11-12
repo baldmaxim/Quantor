@@ -38,7 +38,7 @@ from app.contracts.cad_floor3d import (
 from app.errors import DomainError, ErrorCode, not_found
 from app.services import cad as cad_service
 from app.services import cad_construction_store as construction_store
-from app.services import cad_floor3d, cad_floor3d_dxf, cad_views, cad_zones
+from app.services import cad_floor3d, cad_floor3d_dxf, cad_partitions, cad_views, cad_zones
 from app.services import cad_floor3d_store as store
 from app.services import projects as projects_service
 from app.services.cad_walls_version import current_walls_generator
@@ -143,6 +143,15 @@ async def _floor3d(
         session, revision_id=sheet.revision_id, page_index=sheet.page_index, view=sheet.view
     )
     zones, zone_warnings = await _door_zones(session, storage, sheet)
+    partition = await cad_partitions.load_partition_context(
+        session,
+        storage,
+        project_id=sheet.project_id,
+        parent=sheet.parent,
+        revision_id=sheet.revision_id,
+        page_index=sheet.page_index,
+        view=sheet.view,
+    )
     return cad_floor3d.build_floor3d(
         walls.document,
         _extras(walls),
@@ -153,6 +162,7 @@ async def _floor3d(
         door_zones=zones,
         extra_warnings=zone_warnings,
         current_generator=current_walls_generator(settings),
+        partition=partition,
     )
 
 

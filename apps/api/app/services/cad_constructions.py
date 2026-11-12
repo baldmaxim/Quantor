@@ -8,9 +8,10 @@
 Формулы (мм, результат в м, м2, м3):
 
 - толщина `t` = переопределение человека, иначе номинал скрипта; номинала нет — `thickness_check`;
-- высота `H` = переопределение человека, иначе (высота этажа - толщина плиты); высота этажа и
-  толщина плиты — переопределение листа, иначе значение из walls.json; нет высоты —
-  `height_missing`;
+- высота `H` = переопределение человека, иначе высота маячного ряда (внутриквартирная
+  перегородка, ответ принят в «Вопросах к документации»), иначе (высота этажа - толщина плиты);
+  высота этажа и толщина плиты — переопределение листа, иначе значение из walls.json; нет
+  высоты — `height_missing`;
 - материал: ввод человека (`props.material`), иначе подсказка из условных обозначений листа, если
   она однозначна (`matched`); props автоматически не заполняются; нет материала при подсказке
   `not_in_legend` или `conflict` — предупреждение `material_check` (на статус не влияет);
@@ -41,6 +42,7 @@
 from __future__ import annotations
 
 import math
+import uuid
 from collections import defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -58,10 +60,12 @@ from app.contracts.cad_constructions import (
     CadConstructionsSummaryRead,
     CadConstructionWarning,
     CadGroupElement,
+    CadHeightBasis,
     CadHeightsRead,
     CadLevelValueRead,
     CadMaterial,
     CadOpeningRead,
+    CadPartitionHeightRead,
     CadSheetLevelsRead,
     CadValueSource,
     WallsConstruction,
@@ -222,7 +226,11 @@ def effective_levels(
     )
 
 
-def heights_read(heights: WallsHeights, levels: EffectiveLevels) -> CadHeightsRead:
+def heights_read(
+    heights: WallsHeights,
+    levels: EffectiveLevels,
+    partition_height: PartitionHeight | None = None,
+) -> CadHeightsRead:
     return CadHeightsRead(
         floor_elevation_mm=levels.elevation_mm,
         floor_elevation_source=levels.elevation_source,
@@ -234,6 +242,7 @@ def heights_read(heights: WallsHeights, levels: EffectiveLevels) -> CadHeightsRe
         wall_height_source=levels.wall_height_source,
         evidence=heights.evidence,
         message=heights.message,
+        apartment_partition_height=None if partition_height is None else partition_height.read(),
     )
 
 
@@ -278,6 +287,249 @@ def effective_material(
     )
 
 
+# --------------------------------------------------------------------------- маячный ряд
+
+# Внутриквартирная перегородка: тонкая кладка между помещениями одной квартиры. Её выкладывает
+# подрядчик только «маячным рядом» (ПЗ АР), на всю высоту её возводит собственник.
+PARTITION_MAX_THICKNESS_MM: Final = 100.0
+# Зона «касается» конструкции, если расстояние между контурами не больше этого значения: контуры
+# зон идут по внутренним граням стен, перегородка до них не доходит на толщину отделки.
+PARTITION_ZONE_REACH_MM: Final = 150.0
+# Назначение, заданное человеком, при котором конструкция - не внутриквартирная перегородка.
+_NOT_PARTITION_PURPOSES: Final = frozenset({"external", "inter_apartment", "mop", "shaft"})
+APARTMENT_ROOM_KIND: Final = "room_apartment"
+
+WARNING_PARTITION_HEIGHT_UNKNOWN: Final = "apartment_partition_height_unknown"
+WARNING_APARTMENT_ZONES_MISSING: Final = "apartment_zones_missing"
+MESSAGE_PARTITION_HEIGHT_UNKNOWN: Final = (
+    "Высота маячного ряда внутриквартирных перегородок не подтверждена в «Вопросах к "
+    "документации»: перегородки посчитаны на высоту этажа"
+)
+MESSAGE_APARTMENT_ZONES_MISSING: Final = (
+    "На листе нет зон квартир: внутриквартирные перегородки не определены, высота маячного ряда "
+    "к ним не применена"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PartitionZone:
+    """Зона помещения (квартира или МОП) в мм DXF листа: контур и номер квартиры."""
+
+    kind: str
+    apartment_no: str | None
+    shell: list[list[float]]
+
+
+@dataclass(frozen=True, slots=True)
+class PartitionHeight:
+    """Принятая высота маячного ряда: ответ «Вопросов к документации» и его происхождение."""
+
+    height_mm: int
+    # observed - ответ из документа; manual - значение ввёл человек.
+    source: CadValueSource
+    answer_id: uuid.UUID
+    file_name: str | None = None
+    page_index: int | None = None
+    quote: str | None = None
+
+    def read(self) -> CadPartitionHeightRead:
+        return CadPartitionHeightRead(
+            height_mm=self.height_mm,
+            source=self.source,
+            answer_id=self.answer_id,
+            file_name=self.file_name,
+            page_index=self.page_index,
+            quote=self.quote,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PartitionContext:
+    """Вход классификации перегородок листа: зоны помещений в мм листа и принятый ответ."""
+
+    zones: Sequence[PartitionZone] = ()
+    height: PartitionHeight | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ConstructionHeight:
+    """Высота конструкции с происхождением и основанием."""
+
+    height_mm: int | None
+    source: CadValueSource | None
+    basis: CadHeightBasis
+
+
+def construction_height(
+    props: CadConstructionProps,
+    levels: EffectiveLevels,
+    partition_height: PartitionHeight | None = None,
+) -> ConstructionHeight:
+    """Высота конструкции: ввод человека, затем маячный ряд, затем высота стены листа.
+
+    `partition_height` передаётся только внутриквартирной перегородке при принятом ответе.
+    Общая функция расчёта, 3D этажа и перемычек.
+    """
+    if props.height_override_mm is not None:
+        return ConstructionHeight(props.height_override_mm, "manual", "manual")
+    if partition_height is not None:
+        return ConstructionHeight(
+            partition_height.height_mm, partition_height.source, "apartment_partition"
+        )
+    return ConstructionHeight(levels.wall_height_mm, levels.wall_height_source, "sheet")
+
+
+def _cross(o: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> float:
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _point_segment_distance(
+    p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length2 = dx * dx + dy * dy
+    if length2 == 0.0:
+        return math.hypot(p[0] - a[0], p[1] - a[1])
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length2))
+    return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
+
+
+def _segments_distance(
+    a: tuple[float, float], b: tuple[float, float], c: tuple[float, float], d: tuple[float, float]
+) -> float:
+    if _cross(a, b, c) * _cross(a, b, d) < 0 and _cross(c, d, a) * _cross(c, d, b) < 0:
+        return 0.0  # отрезки пересекаются
+    return min(
+        _point_segment_distance(a, c, d),
+        _point_segment_distance(b, c, d),
+        _point_segment_distance(c, a, b),
+        _point_segment_distance(d, a, b),
+    )
+
+
+def _rings_within(a: list[list[float]], b: list[list[float]], reach: float) -> bool:
+    """Расстояние между многоугольниками не больше `reach` (ноль, если они пересекаются)."""
+    if len(a) < 3 or len(b) < 3:
+        return False
+    if _in_ring((a[0][0], a[0][1]), b) or _in_ring((b[0][0], b[0][1]), a):
+        return True  # один внутри другого
+    for i in range(len(a)):
+        p0, p1 = (a[i][0], a[i][1]), (a[(i + 1) % len(a)][0], a[(i + 1) % len(a)][1])
+        lo_x, hi_x = min(p0[0], p1[0]) - reach, max(p0[0], p1[0]) + reach
+        lo_y, hi_y = min(p0[1], p1[1]) - reach, max(p0[1], p1[1]) + reach
+        for j in range(len(b)):
+            q0, q1 = (b[j][0], b[j][1]), (b[(j + 1) % len(b)][0], b[(j + 1) % len(b)][1])
+            if (
+                max(q0[0], q1[0]) < lo_x
+                or min(q0[0], q1[0]) > hi_x
+                or max(q0[1], q1[1]) < lo_y
+                or min(q0[1], q1[1]) > hi_y
+            ):
+                continue
+            if _segments_distance(p0, p1, q0, q1) <= reach:
+                return True
+    return False
+
+
+def _touched_zones(shell: list[list[float]], zones: Sequence[PartitionZone]) -> list[PartitionZone]:
+    """Зоны, до контура которых от контура конструкции не дальше `PARTITION_ZONE_REACH_MM`."""
+    if len(shell) < 3:
+        return []
+    box = _bbox(shell)
+    reach = PARTITION_ZONE_REACH_MM
+    touched: list[PartitionZone] = []
+    for zone in zones:
+        if len(zone.shell) < 3:
+            continue
+        zone_box = _bbox(zone.shell)
+        if (
+            zone_box[2] < box[0] - reach
+            or zone_box[0] > box[2] + reach
+            or zone_box[3] < box[1] - reach
+            or zone_box[1] > box[3] + reach
+        ):
+            continue
+        if _rings_within(shell, zone.shell, reach):
+            touched.append(zone)
+    return touched
+
+
+def is_apartment_partition(
+    construction: WallsConstruction,
+    props: CadConstructionProps,
+    zones: Sequence[PartitionZone],
+) -> bool:
+    """Внутриквартирная перегородка: тонкая кладка, касающаяся помещений одной квартиры.
+
+    Кладка (не монолит и не каркасная перегородка) номинальной толщины не более 100 мм; все
+    помещения, которых касается её контур (с запасом 150 мм), - квартира с одним и тем же
+    непустым номером. Назначение, заданное человеком (наружная, межквартирная, МОП, шахта),
+    правило отменяет; «внутренняя» его не отменяет. Нет зон - не перегородка.
+    """
+    if construction.kind != "masonry":
+        return False
+    nominal = construction.thickness_nominal_mm
+    if nominal is None or nominal > PARTITION_MAX_THICKNESS_MM:
+        return False
+    if props.purpose in _NOT_PARTITION_PURPOSES:
+        return False
+    touched = _touched_zones(construction.polygon.shell, zones)
+    if not touched or any(zone.kind != APARTMENT_ROOM_KIND for zone in touched):
+        return False
+    numbers = {(zone.apartment_no or "").strip() for zone in touched}
+    return len(numbers) == 1 and "" not in numbers
+
+
+def partition_candidate_ids(
+    items: Sequence[WallsConstruction],
+    props_by_key: PropsByKey,
+    zones: Sequence[PartitionZone],
+) -> frozenset[str]:
+    """Адреса внутриквартирных перегородок листа (по геометрии и зонам, без учёта ответа)."""
+    if not zones:
+        return frozenset()
+    return frozenset(
+        item.id
+        for item in items
+        if is_apartment_partition(
+            item, props_by_key.get(item.id, (CadConstructionProps(), False))[0], zones
+        )
+    )
+
+
+def partition_heights_by_id(
+    candidates: Collection[str], partition: PartitionContext | None
+) -> dict[str, PartitionHeight]:
+    """Высота маячного ряда по адресам перегородок; ответа нет - пусто."""
+    if partition is None or partition.height is None:
+        return {}
+    return dict.fromkeys(candidates, partition.height)
+
+
+def partition_warnings(
+    partition: PartitionContext | None, candidates: Collection[str], props_by_key: PropsByKey
+) -> list[tuple[str, str]]:
+    """Предупреждения о маячном ряде: `(код, текст)`; без входа классификации их нет.
+
+    Ответ принят, а зон квартир на листе нет - классифицировать нельзя. Ответа нет, а
+    перегородки-кандидаты (без ручной высоты) есть - они посчитаны на высоту этажа.
+    """
+    if partition is None:
+        return []
+    if partition.height is not None:
+        if not any(zone.kind == APARTMENT_ROOM_KIND for zone in partition.zones):
+            return [(WARNING_APARTMENT_ZONES_MISSING, MESSAGE_APARTMENT_ZONES_MISSING)]
+        return []
+    pending = [
+        key
+        for key in candidates
+        if props_by_key.get(key, (CadConstructionProps(), False))[0].height_override_mm is None
+    ]
+    if pending:
+        return [(WARNING_PARTITION_HEIGHT_UNKNOWN, MESSAGE_PARTITION_HEIGHT_UNKNOWN)]
+    return []
+
+
 @dataclass(frozen=True, slots=True)
 class Computed:
     """Величины конструкции без округления (для итогов) и их представление для ответа."""
@@ -292,6 +544,7 @@ class Computed:
     warnings: list[CadConstructionWarning] = field(default_factory=list)
     # Площадь плиты нетто, м2; у стен `None`.
     area_m2: float | None = None
+    height_basis: CadHeightBasis | None = None
 
     def read(self) -> CadConstructionComputedRead:
         return CadConstructionComputedRead(
@@ -304,6 +557,7 @@ class Computed:
             sources=self.sources,
             warnings=self.warnings,
             area_m2=_round(self.area_m2, 3),
+            height_basis=self.height_basis,
         )
 
 
@@ -331,10 +585,13 @@ def compute_construction(
     props: CadConstructionProps,
     levels: EffectiveLevels,
     material: CadConstructionMaterialRead | None = None,
+    partition_height: PartitionHeight | None = None,
 ) -> Computed:
     """Величины одной конструкции; `host_openings` — проёмы, чья несущая стена — она.
 
     `material` — действующий материал (по умолчанию из `effective_material`).
+    `partition_height` — высота маячного ряда, если это внутриквартирная перегородка и ответ
+    принят (приоритет: ввод человека, маячный ряд, высота стены листа).
     """
     if material is None:
         material = effective_material(construction, props)
@@ -347,12 +604,8 @@ def compute_construction(
     else:
         thickness, thickness_source = None, None
 
-    height: int | None
-    height_source: CadValueSource | None
-    if props.height_override_mm is not None:
-        height, height_source = props.height_override_mm, "manual"
-    else:
-        height, height_source = levels.wall_height_mm, levels.wall_height_source
+    chosen = construction_height(props, levels, partition_height)
+    height, height_source = chosen.height_mm, chosen.source
 
     # Дверь без разрыва (`no_data`): полигон стены сплошной, надпроёмной части нет вовсе.
     doors = (
@@ -427,6 +680,7 @@ def compute_construction(
             gap_opening_height=_gap_height_source(gaps) if gaps else None,
         ),
         warnings=warnings,
+        height_basis=chosen.basis,
     )
 
 
@@ -437,6 +691,8 @@ class SheetResult:
     openings: list[CadOpeningRead]
     totals: list[CadConstructionGroupRead]
     summary: CadConstructionsSummaryRead
+    # Предупреждения о маячном ряде перегородок: `(код, текст)`.
+    partition_warnings: list[tuple[str, str]] = field(default_factory=list)
 
 
 PropsByKey = Mapping[str, tuple[CadConstructionProps, bool]]
@@ -559,11 +815,13 @@ def compute_lintels(
     items: list[WallsConstruction],
     props_by_key: PropsByKey,
     levels: EffectiveLevels,
+    partition_heights: Mapping[str, PartitionHeight] | None = None,
 ) -> tuple[dict[float, LintelGroup], int]:
     """Монолитные перемычки над проёмами стен не из монолита: группы по толщине хозяина.
 
-    Объём = площадь контура в плане x (высота хозяина - высота двери). Возвращает группы и число
-    перемычек без определимого объёма (нет хозяина, толщины или высоты).
+    Объём = площадь контура в плане x (высота хозяина - высота двери). Высота хозяина - как у
+    `construction_height` (у внутриквартирной перегородки - маячный ряд). Возвращает группы и
+    число перемычек без определимого объёма (нет хозяина, толщины или высоты).
     """
     hosts = {c.id: c for c in items}
     groups: dict[float, LintelGroup] = defaultdict(LintelGroup)
@@ -588,11 +846,9 @@ def compute_lintels(
             if props.thickness_override_mm is not None
             else host.thickness_nominal_mm
         )
-        height = (
-            props.height_override_mm
-            if props.height_override_mm is not None
-            else levels.wall_height_mm
-        )
+        height = construction_height(
+            props, levels, None if partition_heights is None else partition_heights.get(host.id)
+        ).height_mm
         opening_height = (
             opening.opening_height_mm
             if opening.kind == "gap" and opening.opening_height_mm is not None
@@ -616,14 +872,20 @@ def compute_sheet(
     overrides: CadSheetLevelsRead,
     project_slab: ProjectSlab | None = None,
     slab: SlabInput | None = None,
+    partition: PartitionContext | None = None,
 ) -> SheetResult:
     """Конструкции листа с величинами и итоги по группам (вид x толщина x материал).
 
     `slab` — плита перекрытия листа; её добавляют в конец списка и считают как конструкцию.
-    Без неё (3D-вид, общий вид здания) поведение прежнее.
+    Без неё (3D-вид, общий вид здания) поведение прежнее. `partition` — зоны помещений и принятая
+    высота маячного ряда; без него высота перегородок - как у остальных стен листа.
     """
     levels = effective_levels(document.heights, overrides, project_slab)
     items_all = [*document.constructions, *document.frame_partitions]
+    candidates = partition_candidate_ids(
+        document.constructions, props_by_key, () if partition is None else partition.zones
+    )
+    partition_heights = partition_heights_by_id(candidates, partition)
     known = {c.id for c in items_all}
     by_host: dict[str, list[WallsOpening]] = defaultdict(list)
     for opening in document.openings:
@@ -639,7 +901,14 @@ def compute_sheet(
     for item in items_all:
         props, accepted = props_by_key.get(item.id, (CadConstructionProps(), False))
         material = effective_material(item, props)
-        computed = compute_construction(item, by_host.get(item.id, []), props, levels, material)
+        computed = compute_construction(
+            item,
+            by_host.get(item.id, []),
+            props,
+            levels,
+            material,
+            partition_heights.get(item.id),
+        )
         if computed.status == "thickness_check":
             check_count += 1
         elif computed.status == "height_missing":
@@ -682,7 +951,7 @@ def compute_sheet(
         return (KIND_ORDER.index(key[0]), key[1], key[2] or "")
 
     lintel_groups, lintels_without_volume = compute_lintels(
-        document, items_all, props_by_key, levels
+        document, items_all, props_by_key, levels, partition_heights
     )
     lintel_element: CadGroupElement = "lintel"
     lintel_totals = [
@@ -744,6 +1013,9 @@ def compute_sheet(
             if o.kind == "door" and (o.host_id is None or o.host_id not in known)
         ),
         lintels_without_volume=lintels_without_volume,
+        apartment_partition_count=sum(
+            1 for c in constructions if c.computed.height_basis == "apartment_partition"
+        ),
     )
     openings = [
         CadOpeningRead(
@@ -762,11 +1034,14 @@ def compute_sheet(
         for o in document.openings
     ]
     return SheetResult(
-        heights=heights_read(document.heights, levels),
+        heights=heights_read(
+            document.heights, levels, None if partition is None else partition.height
+        ),
         constructions=constructions,
         openings=openings,
         totals=totals,
         summary=summary,
+        partition_warnings=partition_warnings(partition, candidates, props_by_key),
     )
 
 

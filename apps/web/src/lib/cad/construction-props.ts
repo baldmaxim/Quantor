@@ -40,7 +40,7 @@ export const NUMBER_RANGES: Readonly<Record<NumberField, readonly [number, numbe
   block_height_mm: [10, 2000],
   joint_mm: [1, 30],
   sound_rw_db: [0, 90],
-  height_override_mm: [500, 10000],
+  height_override_mm: [100, 10000],
   thickness_override_mm: [30, 1500],
 };
 

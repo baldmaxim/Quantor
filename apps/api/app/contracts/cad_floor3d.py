@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.contracts.cad_constructions import (
     CadConstructionKind,
+    CadHeightBasis,
     CadHeightsRead,
     CadSheetFloorTitle,
     CadValueSource,
@@ -133,6 +134,8 @@ class CadFloor3dWallRead(BaseModel):
     z_bottom_mm: int
     # `None` — высота стены не определена (предупреждение `wall_height_missing`), не 0.
     z_top_mm: int | None
+    # Основание высоты: лист, ввод человека или маячный ряд внутриквартирной перегородки.
+    height_basis: CadHeightBasis = "sheet"
 
 
 class CadFloor3dLintelRead(BaseModel):

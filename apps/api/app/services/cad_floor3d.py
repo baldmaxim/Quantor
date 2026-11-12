@@ -9,7 +9,8 @@
 Высоты (мм): база `b` — верх плиты: `heights.slab_top_elevation_mm` из walls.json v1.9 (отметка
 листа АР — чистый пол минус пирог пола), иначе отметка листа (старый файл и ручная отметка этажа
 человека — без вычета пирога), иначе 0. Плита — от `b - t` до `b`; стена — от `b` до
-`b + (высота этажа - t)` (или своя высота конструкции от человека). Проёмы отсчитываются от
+`b + (высота этажа - t)` (или своя высота конструкции от человека; у внутриквартирной перегородки
+при принятом ответе «Вопросов к документации» - `b +` высота маячного ряда). Проёмы отсчитываются от
 чистого пола `f` (= `b` + пирог пола, если база взята из верха плиты, иначе `f = b`): перемычка
 над проёмом — от `f + высота проёма` до верха стены; полотно двери — от `f` до
 `f + высота проёма`. Высота проёма — зона двери человека, содержащая середину перемычки
@@ -46,7 +47,7 @@ from app.contracts.cad_floor3d import (
     WallsFloorExtras,
 )
 from app.services import cad_constructions
-from app.services.cad_constructions import ProjectSlab
+from app.services.cad_constructions import PartitionContext, ProjectSlab
 from app.services.cad_walls_version import walls_outdated
 
 _MM2_IN_M2: Final = 1e6
@@ -292,8 +293,13 @@ def build_floor3d(
     door_zones: Sequence[DoorZoneMm],
     extra_warnings: Sequence[CadFloor3dWarningRead] = (),
     current_generator: str | None = None,
+    partition: PartitionContext | None = None,
 ) -> CadFloor3dRead:
-    """Модель этажа: плита с отверстиями, стены, перемычки, высоты с источниками, предупреждения."""
+    """Модель этажа: плита с отверстиями, стены, перемычки, высоты с источниками, предупреждения.
+
+    `partition` - зоны помещений листа и принятая высота маячного ряда; без него перегородки
+    строятся на высоту стены листа.
+    """
     levels = cad_constructions.effective_levels(document.heights, overrides, project_slab)
     warnings: list[CadFloor3dWarningRead] = list(extra_warnings)
     warnings.extend(
@@ -340,15 +346,32 @@ def build_floor3d(
             )
         )
 
+    candidates = cad_constructions.partition_candidate_ids(
+        document.constructions, props_by_key, () if partition is None else partition.zones
+    )
+    partition_heights = cad_constructions.partition_heights_by_id(candidates, partition)
+    warnings.extend(
+        CadFloor3dWarningRead(code=code, message=message)
+        for code, message in cad_constructions.partition_warnings(
+            partition, candidates, props_by_key
+        )
+    )
+
     walls: list[CadFloor3dWallRead] = []
     top_by_id: dict[str, int | None] = {}
+    # Стены с маячным рядом: проёмы в них не считаются, до верха стены они «достают» всегда.
+    beacon_row_ids: set[str] = set()
     wall_height_missing = False
     # Каркасные перегородки ГКЛ лежат отдельно от конструкций; в 3D строятся так же, как стены.
     wall_items = [*document.constructions, *document.frame_partitions]
     for item in wall_items:
         props = props_by_key.get(item.id, (CadConstructionProps(), False))[0]
-        height = props.height_override_mm if props.height_override_mm is not None else wall_height
-        z_top = None if height is None else base + height
+        chosen = cad_constructions.construction_height(
+            props, levels, partition_heights.get(item.id)
+        )
+        if chosen.basis == "apartment_partition":
+            beacon_row_ids.add(item.id)
+        z_top = None if chosen.height_mm is None else base + chosen.height_mm
         wall_height_missing = wall_height_missing or z_top is None
         top_by_id[item.id] = z_top
         walls.append(
@@ -361,6 +384,7 @@ def build_floor3d(
                 holes=item.polygon.holes,
                 z_bottom_mm=base,
                 z_top_mm=z_top,
+                height_basis=chosen.basis,
             )
         )
 
@@ -372,6 +396,7 @@ def build_floor3d(
     sheet_top = None if wall_height is None else base + wall_height
     door_height_missing = False
     no_contour = 0
+    no_lintel_room = 0
     for opening in document.openings:
         if outdated:
             break
@@ -399,21 +424,25 @@ def build_floor3d(
             door_height_missing = True
             continue
         z_bottom = opening_floor + height_mm
-        if z_bottom >= top:
-            continue
+        # проём до верха стены и выше: перемычки нет, полотно — до верха стены
+        reaches_top = z_bottom >= top
         leaf = leaf_by_id.get(opening.id)
-        if leaf is not None:
+        if leaf is not None and top > opening_floor:
             doors.append(
                 CadFloor3dDoorRead(
                     opening_id=opening.id,
                     host_id=opening.host_id,
                     shell=leaf,
                     z_bottom_mm=opening_floor,
-                    z_top_mm=z_bottom,
+                    z_top_mm=min(z_bottom, top),
                     door_height_mm=height_mm,
                     door_height_source=source,
                 )
             )
+        if reaches_top:
+            if opening.host_id not in beacon_row_ids:
+                no_lintel_room += 1
+            continue
         lintels.append(
             CadFloor3dLintelRead(
                 opening_id=opening.id,
@@ -442,6 +471,16 @@ def build_floor3d(
                 message="Высота двери не определена: перемычки без высоты не построены.",
             )
         )
+    if no_lintel_room:
+        warnings.append(
+            CadFloor3dWarningRead(
+                code="opening_reaches_wall_top",
+                message=(
+                    f"Проёмов до верха стены и выше (перемычки нет, полотно обрезано по стене): "
+                    f"{no_lintel_room}."
+                ),
+            )
+        )
     if no_contour:
         warnings.append(
             CadFloor3dWarningRead(
@@ -456,7 +495,9 @@ def build_floor3d(
     return CadFloor3dRead(
         units="mm",
         generator=document.generator,
-        heights=cad_constructions.heights_read(document.heights, levels),
+        heights=cad_constructions.heights_read(
+            document.heights, levels, None if partition is None else partition.height
+        ),
         title=document.heights.title,
         base_z_mm=base,
         elevation_known=levels.elevation_mm is not None,

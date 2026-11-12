@@ -379,7 +379,7 @@ async def read_cad_vor_coverage(
     """Количества ВОР с количествами CAD не сравниваются: ВОР на объект, лист - его часть."""
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
-    result, _levels = await _totals(session, sheet, walls)
+    result, _levels = await _totals(session, storage, sheet, walls)
     document = await vor_service.current_document(session, project_id=project_id)
     links = await vor_service.load_links(session, project_id=project_id)
     thicknesses = (

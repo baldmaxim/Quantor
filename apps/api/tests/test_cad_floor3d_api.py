@@ -17,9 +17,17 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dev import DEV_USER_ID
 from app.domain import Role
 from app.main import create_app
-from app.models import CadProjectLevels, CadSheetLevels, CadSlabHoleDecision, Job, Workspace
+from app.models import (
+    CadProjectLevels,
+    CadSheetLevels,
+    CadSlabHoleDecision,
+    DocQuestionAnswer,
+    Job,
+    Workspace,
+)
 from tests.cad_pins_helper import write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_constructions_api import (
@@ -560,3 +568,96 @@ async def test_recompute_walls_sends_room_zones_in_mm_as_job_input(
         assert zone["kind"] == "room_apartment"
         for got, want in zip(zone["shell"], corners_mm, strict=True):
             assert got == pytest.approx(list(want), abs=0.2)
+
+
+# ------------------------------------------------------------------ маячный ряд перегородок
+
+
+async def _apartment_zones(api: AsyncClient, project_id: str, revision_id: str) -> None:
+    """Две комнаты квартиры 1 по обе стороны перегородки bbbbbbbbbbbb (100 мм, y 0-200)."""
+    factor, origin = 35.2778, (10.0, 20.0)
+    for y_from, y_to in ((200.0, 700.0), (-1800.0, 0.0)):
+        corners = [(0.0, y_from), (5000.0, y_from), (5000.0, y_to), (0.0, y_to)]
+        created = await api.post(
+            f"/api/v1/projects/{project_id}/cad/zones",
+            json={
+                "revision_id": revision_id,
+                "page_index": 0,
+                "kind": "room_apartment",
+                "apartment_no": "1",
+                "points": [
+                    [
+                        (origin[0] + x / factor) / float(A3_WIDTH),
+                        (origin[1] - y / factor) / float(A3_HEIGHT),
+                    ]
+                    for x, y in corners
+                ],
+            },
+        )
+        assert created.status_code == 201, created.text
+
+
+async def test_beacon_row_height_applies_to_constructions_and_3d_by_the_accepted_answer(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        await _apartment_zones(api, project_id, revision_id)
+
+        # Ответа нет: перегородка на высоту этажа, предупреждение и в конструкциях, и в 3D.
+        before = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert "apartment_partition_height_unknown" in [w["code"] for w in before["warnings"]]
+        partition = next(c for c in before["constructions"] if c["id"] == "bbbbbbbbbbbb")
+        assert partition["computed"]["height_mm"] == 2800
+        assert partition["computed"]["height_basis"] == "sheet"
+        assert before["summary"]["apartment_partition_count"] == 0
+        floor_before = (await api.get(_floor(project_id, job_id))).json()
+        assert "apartment_partition_height_unknown" in _codes(floor_before)
+
+        answer = DocQuestionAnswer(
+            project_id=uuid.UUID(project_id),
+            question_code="apartment_partition_height",
+            source="document",
+            value={"kind": "length_mm", "display": "188", "numbers": [188]},
+            file_name="АР ПЗ.pdf",
+            page_index=4,
+            quote="высотой 188 мм",
+            catalog_version="test",
+            confirmed_by=DEV_USER_ID,
+        )
+        db_session.add(answer)
+        await db_session.commit()
+
+        after = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert "apartment_partition_height_unknown" not in [w["code"] for w in after["warnings"]]
+        partition = next(c for c in after["constructions"] if c["id"] == "bbbbbbbbbbbb")
+        assert partition["computed"]["height_mm"] == 188
+        assert partition["computed"]["height_basis"] == "apartment_partition"
+        assert partition["computed"]["sources"]["height"] == "observed"
+        # 5000 x 100 x 188 мм; дверей нет, разрыв без высоты проёма в объём не входит.
+        assert partition["computed"]["volume_m3"] == pytest.approx(5000 * 100 * 188 / 1e9, abs=1e-4)
+        wall = next(c for c in after["constructions"] if c["id"] == "aaaaaaaaaaaa")
+        assert (wall["computed"]["height_mm"], wall["computed"]["height_basis"]) == (2800, "sheet")
+        assert after["summary"]["apartment_partition_count"] == 1
+        assert after["heights"]["apartment_partition_height"] == {
+            "height_mm": 188,
+            "source": "observed",
+            "answer_id": str(answer.id),
+            "file_name": "АР ПЗ.pdf",
+            "page_index": 4,
+            "quote": "высотой 188 мм",
+        }
+
+        floor = (await api.get(_floor(project_id, job_id))).json()
+        walls = {w["construction_key"]: w for w in floor["walls"]}
+        assert walls["bbbbbbbbbbbb"]["z_top_mm"] == BASE + 188
+        assert walls["bbbbbbbbbbbb"]["height_basis"] == "apartment_partition"
+        assert walls["aaaaaaaaaaaa"]["z_top_mm"] == BASE + 2800
+        assert "apartment_partition_height_unknown" not in _codes(floor)

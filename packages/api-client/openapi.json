@@ -1615,6 +1615,22 @@
             ],
             "title": "Area M2"
           },
+          "height_basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "sheet",
+                  "manual",
+                  "apartment_partition"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Basis"
+          },
           "height_mm": {
             "anyOf": [
               {
@@ -1981,7 +1997,7 @@
             "anyOf": [
               {
                 "maximum": 10000.0,
-                "minimum": 500.0,
+                "minimum": 100.0,
                 "type": "integer"
               },
               {
@@ -2460,6 +2476,11 @@
       "CadConstructionsSummaryRead": {
         "description": "Что в итоги групп не вошло.",
         "properties": {
+          "apartment_partition_count": {
+            "default": 0,
+            "title": "Apartment Partition Count",
+            "type": "integer"
+          },
           "door_openings_without_host": {
             "title": "Door Openings Without Host",
             "type": "integer"
@@ -4544,6 +4565,16 @@
             "title": "Family",
             "type": "string"
           },
+          "height_basis": {
+            "default": "sheet",
+            "enum": [
+              "sheet",
+              "manual",
+              "apartment_partition"
+            ],
+            "title": "Height Basis",
+            "type": "string"
+          },
           "holes": {
             "items": {
               "items": {
@@ -4712,6 +4743,16 @@
       "CadHeightsRead": {
         "description": "Высоты листа с источниками. Не определилось — `None` («требует ввода»), не 0.",
         "properties": {
+          "apartment_partition_height": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadPartitionHeightRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "door_height": {
             "$ref": "#/components/schemas/CadLevelValueRead"
           },
@@ -6044,6 +6085,73 @@
           "requested"
         ],
         "title": "CadPagesPlanRead",
+        "type": "object"
+      },
+      "CadPartitionHeightRead": {
+        "description": "Высота маячного ряда перегородок: принятый ответ «Вопросов к документации».",
+        "properties": {
+          "answer_id": {
+            "format": "uuid",
+            "title": "Answer Id",
+            "type": "string"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "height_mm": {
+            "title": "Height Mm",
+            "type": "integer"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "source": {
+            "enum": [
+              "observed",
+              "derived",
+              "assumption",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "height_mm",
+          "source",
+          "answer_id",
+          "file_name",
+          "page_index",
+          "quote"
+        ],
+        "title": "CadPartitionHeightRead",
         "type": "object"
       },
       "CadPipelineRead": {
@@ -21174,7 +21282,8 @@
           "sprinkler_ceiling_gap",
           "hot_over_cold_gap",
           "duct_section",
-          "cable_tray_section"
+          "cable_tray_section",
+          "apartment_partition_height"
         ],
         "title": "DocQuestionCode",
         "type": "string"

@@ -52,7 +52,7 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
 from app.services import cad_construction_store as store
-from app.services import cad_constructions, cad_slab, cad_walls
+from app.services import cad_constructions, cad_partitions, cad_slab, cad_walls
 from app.services import cad_floor3d_store as floor3d_store
 from app.services import jobs as jobs_service
 from app.services.cad_walls_cache import CachedWalls, walls_cache
@@ -241,7 +241,11 @@ def _known_keys(walls: _Walls) -> set[str]:
 
 
 async def _totals(
-    session: SessionDep, sheet: _Sheet, walls: _Walls, loaded: store.PropsLoad | None = None
+    session: SessionDep,
+    storage: StorageDep,
+    sheet: _Sheet,
+    walls: _Walls,
+    loaded: store.PropsLoad | None = None,
 ) -> tuple[cad_constructions.SheetResult, CadSheetLevelsRead]:
     """Расчёт листа; `loaded` — сверенные параметры вызывающего (после записи читаются заново)."""
     levels = await store.load_levels(
@@ -257,7 +261,17 @@ async def _totals(
     # Толщина плиты проекта из разреза (ADR-0039) сильнее walls.json, слабее переопределения листа.
     project_slab = await store.load_project_slab(session, project_id=sheet.project_id)
     slab = await _slab(session, sheet, walls)
-    return await _compute(walls, loaded, levels, project_slab, slab), levels
+    # Высота маячного ряда внутриквартирных перегородок и зоны квартир листа.
+    partition = await cad_partitions.load_partition_context(
+        session,
+        storage,
+        project_id=sheet.project_id,
+        parent=sheet.parent,
+        revision_id=sheet.revision_id,
+        page_index=sheet.page_index,
+        view=sheet.view,
+    )
+    return await _compute(walls, loaded, levels, project_slab, slab, partition), levels
 
 
 async def _compute(
@@ -266,10 +280,17 @@ async def _compute(
     levels: CadSheetLevelsRead,
     project_slab: cad_constructions.ProjectSlab | None,
     slab: cad_constructions.SlabInput | None,
+    partition: cad_constructions.PartitionContext | None,
 ) -> cad_constructions.SheetResult:
     # Аргументы — pydantic-модели и dataclass, не ORM: расчёт идёт в потоке, не на event loop.
     result = await asyncio.to_thread(
-        cad_constructions.compute_sheet, walls.document, loaded.props, levels, project_slab, slab
+        cad_constructions.compute_sheet,
+        walls.document,
+        loaded.props,
+        levels,
+        project_slab,
+        slab,
+        partition,
     )
     summary = result.summary.model_copy(
         update={"orphaned_props": loaded.orphaned, "props_carried_over": loaded.carried_over}
@@ -305,7 +326,7 @@ async def read_cad_constructions(
 ) -> CadConstructionsRead:
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
-    result, levels = await _totals(session, sheet, walls)
+    result, levels = await _totals(session, storage, sheet, walls)
     if result.summary.props_carried_over:
         # Перенос параметров на новые адреса — запись в базу при чтении.
         await session.commit()
@@ -313,6 +334,10 @@ async def read_cad_constructions(
     warnings = [
         CadWallsWarningRead(code=w.code, message=w.message) for w in document.checks.warnings
     ]
+    warnings.extend(
+        CadWallsWarningRead(code=code, message=message)
+        for code, message in result.partition_warnings
+    )
     if result.summary.orphaned_props:
         warnings.append(
             CadWallsWarningRead(
@@ -390,7 +415,7 @@ async def bulk_cad_construction_props(
         entries=updates,
         user_id=context.principal.user_id,
     )
-    result, levels = await _totals(session, sheet, walls, loaded)
+    result, levels = await _totals(session, storage, sheet, walls, loaded)
     response = CadConstructionsBulkRead(
         **_totals_read(result, levels).model_dump(), changed=len(updates)
     )
@@ -431,7 +456,7 @@ async def put_cad_construction_props(
         entries={construction_key: (body.props, accepted)},
         user_id=context.principal.user_id,
     )
-    result, _levels = await _totals(session, sheet, walls, loaded)
+    result, _levels = await _totals(session, storage, sheet, walls, loaded)
     updated = next(c for c in result.constructions if c.id == construction_key)
     await session.commit()
     return updated
@@ -464,7 +489,7 @@ async def put_cad_sheet_levels(
         levels=body,
         user_id=context.principal.user_id,
     )
-    result, levels = await _totals(session, sheet, walls)
+    result, levels = await _totals(session, storage, sheet, walls)
     response = _totals_read(result, levels)
     await session.commit()
     return response

@@ -810,6 +810,10 @@ export type CadConstructionComputedRead = {
      */
     area_m2?: number | null;
     /**
+     * Height Basis
+     */
+    height_basis?: 'sheet' | 'manual' | 'apartment_partition' | null;
+    /**
      * Height Mm
      */
     height_mm: number | null;
@@ -1204,6 +1208,10 @@ export type CadConstructionsRead = {
  * Что в итоги групп не вошло.
  */
 export type CadConstructionsSummaryRead = {
+    /**
+     * Apartment Partition Count
+     */
+    apartment_partition_count?: number;
     /**
      * Door Openings Without Host
      */
@@ -2191,6 +2199,10 @@ export type CadFloor3dWallRead = {
      */
     family: 'masonry' | 'monolith' | 'frame_partition';
     /**
+     * Height Basis
+     */
+    height_basis?: 'sheet' | 'manual' | 'apartment_partition';
+    /**
      * Holes
      */
     holes: Array<Array<Array<number>>>;
@@ -2270,6 +2282,7 @@ export type CadFrameRead = {
  * Высоты листа с источниками. Не определилось — `None` («требует ввода»), не 0.
  */
 export type CadHeightsRead = {
+    apartment_partition_height?: CadPartitionHeightRead | null;
     door_height: CadLevelValueRead;
     /**
      * Evidence
@@ -2843,6 +2856,38 @@ export type CadPagesPlanRead = {
      * Total
      */
     total: number | null;
+};
+
+/**
+ * CadPartitionHeightRead
+ *
+ * Высота маячного ряда перегородок: принятый ответ «Вопросов к документации».
+ */
+export type CadPartitionHeightRead = {
+    /**
+     * Answer Id
+     */
+    answer_id: string;
+    /**
+     * File Name
+     */
+    file_name: string | null;
+    /**
+     * Height Mm
+     */
+    height_mm: number;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+    /**
+     * Quote
+     */
+    quote: string | null;
+    /**
+     * Source
+     */
+    source: 'observed' | 'derived' | 'assumption' | 'manual';
 };
 
 /**
@@ -10647,7 +10692,7 @@ export type DocCandidateStatus = 'candidate' | 'rejected';
 /**
  * DocQuestionCode
  */
-export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section';
+export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section' | 'apartment_partition_height';
 
 /**
  * DocQuestionOut
