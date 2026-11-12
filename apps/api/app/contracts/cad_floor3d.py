@@ -96,7 +96,7 @@ class WallsFloorExtras(BaseModel):
 
 CadFloor3dHoleState = Literal["candidate", "enabled", "disabled"]
 CadFloor3dFamily = Literal["masonry", "monolith", "frame_partition"]
-CadFloor3dOpeningKind = Literal["door", "gap"]
+CadFloor3dOpeningKind = Literal["door", "gap", "window"]
 
 
 class CadFloor3dSlabRead(BaseModel):

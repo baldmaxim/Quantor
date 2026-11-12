@@ -2086,7 +2086,7 @@ export type CadFloor3dLintelRead = {
     /**
      * Kind
      */
-    kind: 'door' | 'gap';
+    kind: 'door' | 'gap' | 'window';
     /**
      * Material
      */
@@ -2797,7 +2797,7 @@ export type CadOpeningRead = {
     /**
      * Kind
      */
-    kind: 'door' | 'gap';
+    kind: 'door' | 'gap' | 'window';
     /**
      * Status
      */
@@ -13616,7 +13616,7 @@ export type SectionDim = {
     /**
      * Role
      */
-    role: 'clear' | 'structure' | 'other';
+    role: 'clear' | 'structure' | 'sill' | 'window' | 'above_window' | 'other';
     /**
      * Value Mm
      */

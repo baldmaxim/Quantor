@@ -23,6 +23,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contracts.cad_sections import (
+    ACCEPTED_SECTIONS_SCHEMAS as _ACCEPTED_SECTIONS_SCHEMAS,
+)
+from app.contracts.cad_sections import (
     SectionLevelRead,
     SectionsFile,
 )
@@ -45,7 +48,9 @@ from app.services import jobs as jobs_service
 from app.services.consistency.doc_questions import DocQuestionCode
 
 SECTIONS_JSON: Final = "sections.json"
-SECTIONS_SCHEMA: Final = "cad_sections.v2"
+SECTIONS_SCHEMA: Final = "cad_sections.v3"
+# Принимаются v2 и v3 (v3 = v2 + окна разреза).
+ACCEPTED_SECTIONS_SCHEMAS: Final = _ACCEPTED_SECTIONS_SCHEMAS
 RUNNER_NAME: Final = "run_sections.py"
 RESULT_READY: Final = "sections_ready"
 

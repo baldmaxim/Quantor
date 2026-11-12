@@ -5,9 +5,10 @@ CLI не импортируется: он работает подпроцесс�
 
     <python> -I run_sections.py --pdf [--pages i j ...] --params --out
 
-`--out` - файл `sections.json` (схема `cad_sections.v2`). Код выхода 2 - ошибка входа, причина -
-одной строкой JSON `{"code", "message"}` в stderr. Общие части (аренда, загрузка, отказ задания) -
-из `handler`. Параметры и версия - пин генератора `cad_mep` (отдельного пина у разрезов нет).
+`--out` - файл `sections.json` (схема `cad_sections.v2` или `v3`). Код выхода 2 - ошибка входа,
+причина - одной строкой JSON `{"code", "message"}` в stderr. Общие части (аренда, загрузка,
+отказ задания) - из `handler`. Параметры и версия - пин генератора `cad_mep` (отдельного пина у
+разрезов нет).
 
 Результат публикуется одной транзакцией с успехом задания: артефакт `sections.json` и строки
 `cad_section_levels` (прежние строки ревизии заменяются, решения переносятся). Ошибка генератора
@@ -101,7 +102,7 @@ def _verified_output(
     if path.stat().st_size > cad_service.MAX_JSON_ARTIFACT_BYTES:
         raise CadError(ErrorCode.CAD_ENGINE_FAILED, "sections.json больше допустимого размера")
     raw = _read_json_file(path)
-    if raw.get("schema") != cad_sections.SECTIONS_SCHEMA:
+    if raw.get("schema") not in cad_sections.ACCEPTED_SECTIONS_SCHEMAS:
         raise CadError(ErrorCode.CAD_ENGINE_FAILED, "sections.json вне контракта")
     try:
         document = SectionsFile.model_validate(raw)

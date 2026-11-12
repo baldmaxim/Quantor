@@ -4342,7 +4342,8 @@
           "kind": {
             "enum": [
               "door",
-              "gap"
+              "gap",
+              "window"
             ],
             "title": "Kind",
             "type": "string"
@@ -5963,7 +5964,8 @@
           "kind": {
             "enum": [
               "door",
-              "gap"
+              "gap",
+              "window"
             ],
             "title": "Kind",
             "type": "string"
@@ -26737,6 +26739,9 @@
             "enum": [
               "clear",
               "structure",
+              "sill",
+              "window",
+              "above_window",
               "other"
             ],
             "title": "Role",

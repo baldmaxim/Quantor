@@ -60,7 +60,11 @@ DOOR_ZONE_TOLERANCE_MM: Final = 300.0
 DOOR_WITHOUT_GAP: Final = "door_without_gap"
 # Код предупреждения cad_walls v1.9: плита по стенам, без зон помещений (контур требует проверки).
 SLAB_WITHOUT_ZONES: Final = "slab_without_zones"
-_PASSED_WARNING_CODES: Final = frozenset({DOOR_WITHOUT_GAP, SLAB_WITHOUT_ZONES})
+# Код предупреждения cad_walls v1.12: пролёт остекления без стены-хозяина (окно не построено).
+WINDOW_BAY_WITHOUT_HOST: Final = "window_bay_without_host"
+_PASSED_WARNING_CODES: Final = frozenset(
+    {DOOR_WITHOUT_GAP, SLAB_WITHOUT_ZONES, WINDOW_BAY_WITHOUT_HOST}
+)
 
 Point = tuple[float, float]
 Ring = list[list[float]]
@@ -397,9 +401,14 @@ def build_floor3d(
     door_height_missing = False
     no_contour = 0
     no_lintel_room = 0
+    windows_without_height = 0
     for opening in document.openings:
         if outdated:
             break
+        if opening.kind == "window" and opening.opening_height_mm is None:
+            # окно без высоты: проём не строится, стена сплошная; высоту двери не подставляем
+            windows_without_height += 1
+            continue
         shell = lintel_by_id.get(opening.id)
         if shell is None:
             # дверь без разрыва: причина — предупреждение `door_without_gap` из walls.json
@@ -410,12 +419,15 @@ def build_floor3d(
         if top is None:
             wall_height_missing = True
             continue
-        zone_height = _zone_height_at(ring_centroid(shell), door_zones)
+        # зона двери человека - только для дверей и разрывов; высота окна - из walls.json
+        zone_height = (
+            None if opening.kind == "window" else _zone_height_at(ring_centroid(shell), door_zones)
+        )
         height_mm: int | None
         source: CadValueSource | None
         if zone_height is not None:
             height_mm, source = zone_height, "manual"
-        elif opening.kind == "gap" and opening.opening_height_mm is not None:
+        elif opening.kind != "door" and opening.opening_height_mm is not None:
             height_mm = opening.opening_height_mm
             source = cad_constructions.source_of(opening.opening_height_status or "assumption")
         else:
@@ -462,6 +474,13 @@ def build_floor3d(
             CadFloor3dWarningRead(
                 code="wall_height_missing",
                 message="Высота этажа не определена: высота стен и перемычек не построена.",
+            )
+        )
+    if windows_without_height:
+        warnings.append(
+            CadFloor3dWarningRead(
+                code=cad_constructions.WINDOW_HEIGHT_UNKNOWN,
+                message="Высота окна неизвестна: окна не построены, стена сплошная.",
             )
         )
     if door_height_missing:

@@ -154,7 +154,8 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
     const lintel = model.lintels.find((item) => item.opening_id === pick.id);
     if (!lintel) return null;
     const monolith = lintel.material === 'monolith';
-    const over = lintel.kind === 'door' ? 'над дверью' : 'над проёмом';
+    const over =
+      lintel.kind === 'door' ? 'над дверью' : lintel.kind === 'window' ? 'над окном' : 'над проёмом';
     title = `${monolith ? 'Монолит' : 'Перемычка'} ${over}`;
     body = (
       <>

@@ -122,13 +122,25 @@ class WallsConstruction(BaseModel):
     material_hint: WallsMaterialHint | None = None
 
 
+class WallsWindow(BaseModel):
+    """Пролёт остекления плана АР, из которого движок построил окно (cad_walls v1.12)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    bay_id: str
+
+
 class WallsOpening(BaseModel):
-    """Проём: дверь (по блоку DXF) или безымянный разрыв стены (`gap`, нет данных о проёме)."""
+    """Проём: дверь (по блоку DXF), безымянный разрыв стены (`gap`) или окно (`window`, v1.12).
+
+    Окно: `leaf`/`block_name` пусты, `handle` - полилиния пролёта, `lintel` - прямоугольник проёма,
+    высота (`opening_height_mm`) по плану не определяется (`None`, статус `unknown`).
+    """
 
     model_config = ConfigDict(extra="ignore")
 
     id: str
-    kind: Literal["door", "gap"]
+    kind: Literal["door", "gap", "window"]
     status: Literal["ok", "estimate", "no_data"]
     host_id: str | None
     adjacent_ids: list[str]
@@ -138,6 +150,8 @@ class WallsOpening(BaseModel):
     block_name: str | None
     handle: str | None
     center: list[float]
+    # Пролёт остекления (только у `window`).
+    window: WallsWindow | None = None
     # Контур перемычки в плане (4 точки) и её материал (`monolith`, `masonry`, `frame_partition`):
     # нет у дверей без разрыва и в старых walls.json.
     lintel: list[list[float]] | None = None
@@ -463,7 +477,7 @@ class CadConstructionRead(BaseModel):
 
 class CadOpeningRead(BaseModel):
     id: str
-    kind: Literal["door", "gap"]
+    kind: Literal["door", "gap", "window"]
     status: Literal["ok", "estimate", "no_data"]
     host_id: str | None
     adjacent_ids: list[str]
@@ -502,7 +516,7 @@ class CadConstructionsSummaryRead(BaseModel):
     total_count: int
     thickness_check_count: int
     height_missing_count: int
-    # Разрывы стен без данных о проёме (окна, порталы): в объём не входят.
+    # Разрывы стен и окна без высоты проёма (порталы, окна v1.12): в объём не входят.
     unaccounted_gap_openings: int
     # Двери, у которых скрипт не нашёл несущую стену: надпроёмная часть не учтена.
     door_openings_without_host: int

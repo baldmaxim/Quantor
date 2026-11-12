@@ -1,9 +1,10 @@
-"""Контракты задания «Разрезы» (`cad_sections`): файл генератора `cad_sections.v2` и ответы API.
+"""Контракты задания «Разрезы» (`cad_sections`): файл генератора и ответы API.
 
-Генератор (`cad_mep/run_sections.py` движка) распознаёт разрезы АР по тексту PDF и пишет
-кандидатов уровней; сервер их не пересчитывает: высота в свету и толщина перекрытия - значения
-генератора, принимает или отклоняет человек. Координаты разметки - нормализованные 0..1 от
-левого верхнего угла отображаемой страницы, поворот уже учтён (ADR-0008).
+Файл генератора - схема `cad_sections.v2` или `v3`. Генератор (`cad_mep/run_sections.py` движка)
+распознаёт разрезы АР по тексту PDF и пишет кандидатов уровней; сервер их не пересчитывает: высота
+в свету и толщина перекрытия - значения генератора, принимает или отклоняет человек. Координаты
+разметки - нормализованные 0..1 от левого верхнего угла отображаемой страницы, поворот уже учтён
+(ADR-0008).
 """
 
 from __future__ import annotations
@@ -14,7 +15,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-SECTIONS_SCHEMA = "cad_sections.v2"
+SECTIONS_SCHEMA = "cad_sections.v3"
+# Принимаются v2 и v3 (v3 = v2 + роли размеров окон и `windows[]` у уровня); прочие - вне контракта.
+ACCEPTED_SECTIONS_SCHEMAS = frozenset({"cad_sections.v2", SECTIONS_SCHEMA})
 MAX_DECIDE_LEVELS = 500
 MAX_REQUEST_PAGES = 1000
 
@@ -22,7 +25,8 @@ UnitCoord = Annotated[float, Field(ge=0.0, le=1.0)]
 # Прямоугольник [x0, y0, x1, y1] в долях отображаемой страницы.
 Box = tuple[UnitCoord, UnitCoord, UnitCoord, UnitCoord]
 LevelStatus = Literal["candidate", "accepted", "rejected"]
-DimRole = Literal["clear", "structure", "other"]
+# `sill`, `window`, `above_window` - оконная цепочка (v3): подоконник, окно, надоконная часть.
+DimRole = Literal["clear", "structure", "sill", "window", "above_window", "other"]
 Decision = Literal["accept", "reject", "reset"]
 
 
@@ -47,6 +51,24 @@ class SectionMarkup(BaseModel):
     dims: list[SectionDim]
 
 
+class SectionWindow(BaseModel):
+    """Окно на уровне разреза (v3): отметки от чистого пола уровня, кандидат.
+
+    `dims` - индексы звеньев подоконника, окна и надоконной части в `markup.dims` уровня.
+    Связи окна разреза с проёмом плана нет: высоты окон в проёмы плана не переносятся.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    sill_mm: int
+    height_mm: int
+    head_mm: int
+    source: Literal["observed"]
+    dims: list[Annotated[int, Field(ge=0)]]
+    bbox: Box
+    cut: str | None = None
+
+
 class SectionLevelFile(BaseModel):
     """Уровень из `sections.json`: кандидат, поля сверх контракта сервер не читает."""
 
@@ -61,6 +83,8 @@ class SectionLevelFile(BaseModel):
     source: Literal["observed"]
     evidence: str
     markup: SectionMarkup
+    # Только `cad_sections.v3`; в v2 поля нет. Сервер окна не хранит и в расчёт не берёт.
+    windows: list[SectionWindow] = Field(default_factory=list)
 
 
 class SectionPageFile(BaseModel):

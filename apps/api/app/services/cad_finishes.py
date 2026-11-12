@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -249,11 +249,16 @@ def _edge_input(
         lintel = lintel_by_id.get(opening.id)
         if lintel is None or len(lintel) < 3:
             continue
+        # Окно (v1.12): без высоты проёма отделке не мешает. Окно в разрыве стены (`ok`) остаётся
+        # безымянным разрывом, как было до v1.12; окно в сплошной стене (`no_data`) - не проём.
+        if opening.kind == "window" and opening.status == "no_data":
+            continue
+        edge_kind: Literal["door", "gap"] = "door" if opening.kind == "door" else "gap"
         host = base_by_id.get(opening.host_id) if opening.host_id is not None else None
         openings.append(
             EdgeOpening(
                 opening.id,
-                opening.kind,
+                edge_kind,
                 _points(lintel),
                 opening.width_mm,
                 opening.thickness_mm,

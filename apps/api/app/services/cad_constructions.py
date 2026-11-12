@@ -34,6 +34,10 @@
   хозяине в объём не идёт; происхождение высоты - `sources.gap_opening_height`. Разрыв без высоты
   (старый файл) в объём и площадь не входит и даёт предупреждение `opening_no_data` у несущей
   конструкции и счёт в `unaccounted_gap_openings`;
+- окно (`window`, cad_walls v1.12): высота по плану не определяется. Окно без высоты не вычитается
+  из кладки, надоконная часть и перемычка не строятся (допущений нет): счёт в
+  `unaccounted_gap_openings`, предупреждение листа `window_height_unknown`. Окно с высотой
+  (`opening_height_mm`) считается как разрыв с известной высотой;
 - плита перекрытия (`floor_slab`, одна на лист): площадь нетто = контур минус включённые
   отверстия; толщина = переопределение человека, иначе толщина плиты листа; объём = нетто x
   толщина; нет толщины — `thickness_check`, в итоги не входит.
@@ -569,8 +573,22 @@ def _round(value: float | None, digits: int) -> float | None:
     return None if value is None else round(value, digits)
 
 
+WINDOW_HEIGHT_UNKNOWN: Final = "window_height_unknown"
+WINDOW_HEIGHT_UNKNOWN_MESSAGE: Final = "Высота окна неизвестна: окна не вычтены из кладки"
+
+
+def has_opening_height(opening: WallsOpening) -> bool:
+    """Разрыв или окно с высотой проёма из walls.json (дверь высоту из файла не берёт)."""
+    return opening.kind in ("gap", "window") and opening.opening_height_mm is not None
+
+
+def windows_without_height(openings: Sequence[WallsOpening]) -> int:
+    """Окна без высоты: в объём не входят, надоконная часть не строится."""
+    return sum(1 for o in openings if o.kind == "window" and o.opening_height_mm is None)
+
+
 def _gap_above_mm(opening: WallsOpening, wall_height_mm: int) -> float:
-    """Надпроёмная часть разрыва: высота стены минус высота проёма (у разрыва она задана)."""
+    """Надпроёмная часть разрыва или окна: высота стены минус высота проёма (она задана)."""
     return max(0.0, float(wall_height_mm) - float(opening.opening_height_mm or 0))
 
 
@@ -620,12 +638,9 @@ def compute_construction(
     # В объём хозяина не идут монолитные перемычки в кладке и перегородках: у них своя группа.
     host_is_monolith = _is_monolith_kind(construction.kind)
     volume_doors = [o for o in doors if host_is_monolith or not is_monolith_lintel(o)]
-    # Разрыв с заданной высотой (v1.9): надпроёмная часть считается как у двери; без высоты — нет.
-    gaps = (
-        [o for o in host_openings if o.kind == "gap" and o.opening_height_mm is not None]
-        if props.count_openings
-        else []
-    )
+    # Разрыв или окно с заданной высотой (v1.9, v1.12): надпроёмная часть считается как у двери;
+    # без высоты — нет.
+    gaps = [o for o in host_openings if has_opening_height(o)] if props.count_openings else []
     volume_gaps = [o for o in gaps if host_is_monolith or not is_monolith_lintel(o)]
     door_height = levels.door_height.value_mm
     warnings: list[CadConstructionWarning] = []
@@ -635,7 +650,7 @@ def compute_construction(
     if height is None or door_height_missing:
         warnings.append("height_missing")
     if any(
-        o.opening_height_mm is None if o.kind == "gap" else o.status == "no_data"
+        o.opening_height_mm is None if o.kind != "door" else o.status == "no_data"
         for o in host_openings
     ):
         warnings.append("opening_no_data")
@@ -695,7 +710,7 @@ class SheetResult:
     openings: list[CadOpeningRead]
     totals: list[CadConstructionGroupRead]
     summary: CadConstructionsSummaryRead
-    # Предупреждения о маячном ряде перегородок: `(код, текст)`.
+    # Предупреждения листа (маячный ряд перегородок, окна без высоты): `(код, текст)`.
     partition_warnings: list[tuple[str, str]] = field(default_factory=list)
 
 
@@ -834,6 +849,8 @@ def compute_lintels(
     for opening in document.openings:
         if opening.kind == "door" and opening.status == "no_data":
             continue
+        if opening.kind == "window" and opening.opening_height_mm is None:
+            continue  # окно без высоты: перемычка не строится, допущения о высоте нет
         if not is_monolith_lintel(opening) or opening.lintel is None:
             continue
         host = hosts.get(opening.host_id) if opening.host_id is not None else None
@@ -855,7 +872,7 @@ def compute_lintels(
         ).height_mm
         opening_height = (
             opening.opening_height_mm
-            if opening.kind == "gap" and opening.opening_height_mm is not None
+            if opening.kind != "door" and opening.opening_height_mm is not None
             else door_height
         )
         if thickness is None or height is None or opening_height is None:
@@ -1009,7 +1026,7 @@ def compute_sheet(
         thickness_check_count=check_count,
         height_missing_count=height_missing_count,
         unaccounted_gap_openings=sum(
-            1 for o in document.openings if o.kind == "gap" and o.opening_height_mm is None
+            1 for o in document.openings if o.kind != "door" and o.opening_height_mm is None
         ),
         door_openings_without_host=sum(
             1
@@ -1045,7 +1062,14 @@ def compute_sheet(
         openings=openings,
         totals=totals,
         summary=summary,
-        partition_warnings=partition_warnings(partition, candidates, props_by_key),
+        partition_warnings=[
+            *partition_warnings(partition, candidates, props_by_key),
+            *(
+                [(WINDOW_HEIGHT_UNKNOWN, WINDOW_HEIGHT_UNKNOWN_MESSAGE)]
+                if windows_without_height(document.openings)
+                else []
+            ),
+        ],
     )
 
 

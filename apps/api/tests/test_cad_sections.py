@@ -3,7 +3,9 @@
 Генератор не нужен: `cad_mep/run_sections.py` подменён заглушкой, которая пишет фиксированный
 `sections.json` (синтетика) по CLI-контракту. Режим заглушки задаёт файл `mode` рядом со скриптом:
 `fail` - код выхода 2, `bad_schema`/`bad_sha`/`bad_page`/`extra_file` - файл вне контракта,
-`v2` - у уровня Б другая толщина перекрытия (решение по нему не переносится).
+`v2` - у уровня Б другая толщина перекрытия (решение по нему не переносится),
+`v3` - схема `cad_sections.v3` с окном и ролями sill/window/above_window у первого уровня,
+`bad_v4` - неизвестная схема `cad_sections.v4`.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dev import DEV_USER_ID
 from app.cad_worker import HANDLERS
 from app.cad_worker.sections_handler import execute_cad_sections
+from app.contracts.cad_sections import SectionLevelFile
 from app.core.config import Settings
 from app.core.workspace import DEV_WORKSPACE_ID
 from app.domain import JobStatus, JobType
@@ -90,8 +93,21 @@ if args.pages:
     sections = [s for s in sections if s["page_index"] in wanted]
 if mode == "bad_page":
     sections[0]["page_index"] = 7
+schemas = {"bad_schema": "cad_sections.v1", "v3": "cad_sections.v3", "bad_v4": "cad_sections.v4"}
+if mode in ("v3", "bad_v4"):
+    first = sections[0]["levels"][0]
+    first["markup"]["dims"] = [
+        {"value_mm": 300, "role": "structure", "bbox": box},
+        {"value_mm": 900, "role": "sill", "bbox": box},
+        {"value_mm": 1500, "role": "window", "bbox": box},
+        {"value_mm": 600, "role": "above_window", "bbox": box},
+    ]
+    first["windows"] = [
+        {"sill_mm": 900, "height_mm": 1500, "head_mm": 2400, "source": "observed",
+         "dims": [1, 2, 3], "bbox": [0.1, 0.1, 0.2, 0.2], "cut": "1-1"}
+    ]
 doc = {
-    "schema": "cad_sections.v1" if mode == "bad_schema" else "cad_sections.v2",
+    "schema": schemas.get(mode, "cad_sections.v2"),
     "generator_version": "cad_mep.v9",
     "source": {"pdf_sha256": "0" * 64 if mode == "bad_sha"
                else hashlib.sha256(pathlib.Path(args.pdf).read_bytes()).hexdigest(),
@@ -289,6 +305,62 @@ async def test_job_publishes_candidates_and_the_artifact(
         assert read["issues"][1]["page_index"] is None and read["issues"][1]["bbox"] is None
 
 
+async def test_v3_file_with_windows_is_accepted_and_the_new_roles_reach_the_api(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    sections_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = sections_settings(sections_tools, tmp_path)
+    _set_mode(sections_tools, "v3")
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id = await _upload(api, BROKEN_PDF)
+        job_id = await _queue(api, project_id, revision_id)
+        job = await _run_worker(db_session, fake_storage, settings, job_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        levels = (await api.get(_levels_url(project_id, revision_id))).json()["levels"]
+        assert [d["role"] for d in levels[0]["markup"]["dims"]] == [
+            "structure",
+            "sill",
+            "window",
+            "above_window",
+        ]
+        # окна разреза в уровень API не попадают: высоты окон плана из них не берутся
+        assert "windows" not in levels[0]
+
+
+def test_sections_file_reads_windows_in_v3_and_defaults_them_to_empty_in_v2() -> None:
+    box = [0.1, 0.1, 0.2, 0.2]
+    level: dict[str, Any] = {
+        "elevation_mm": 47600,
+        "upper_elevation_mm": 50900,
+        "source": "observed",
+        "evidence": "отм.",
+        "markup": {
+            "upper_mark": box,
+            "lower_mark": box,
+            "band": box,
+            "dims": [{"value_mm": 900, "role": "sill", "bbox": box}],
+        },
+    }
+    assert SectionLevelFile.model_validate(level).windows == []
+    window = {
+        "sill_mm": 900,
+        "height_mm": 1500,
+        "head_mm": 2400,
+        "source": "observed",
+        "dims": [0],
+        "bbox": box,
+        "cut": None,
+    }
+    parsed = SectionLevelFile.model_validate({**level, "windows": [window]})
+    assert [(w.sill_mm, w.height_mm, w.head_mm, w.dims) for w in parsed.windows] == [
+        (900, 1500, 2400, [0])
+    ]
+    assert SectionLevelFile.model_validate({**level, "windows": []}).windows == []
+
+
 async def test_scheduling_is_idempotent_and_pages_reach_the_generator(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],
@@ -324,6 +396,7 @@ async def test_scheduling_is_idempotent_and_pages_reach_the_generator(
     [
         ("fail", "CAD_INPUT_INVALID", "Разрезы не найдены"),
         ("bad_schema", "CAD_ENGINE_FAILED", "вне контракта"),
+        ("bad_v4", "CAD_ENGINE_FAILED", "вне контракта"),
         ("bad_sha", "CAD_ENGINE_FAILED", "другому PDF"),
         ("bad_page", "CAD_ENGINE_FAILED", "вне задания"),
         ("extra_file", "CAD_ENGINE_FAILED", "состав out/"),
