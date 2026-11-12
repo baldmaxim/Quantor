@@ -2438,6 +2438,10 @@ export type CadJobRead = {
      * View
      */
     view: number | null;
+    /**
+     * Warnings
+     */
+    warnings?: Array<string>;
 };
 
 /**
@@ -10903,7 +10907,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'sheet_passport_extract';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'sheet_passport_extract';
 
 /**
  * LengthUnit
@@ -12823,6 +12827,318 @@ export type ScaleStatus = 'calibrated' | 'uncalibrated';
  */
 export type ScaleVerificationWrite = {
     state: VerificationState;
+};
+
+/**
+ * SectionDim
+ *
+ * Размер на разрезе: значение, роль (в свету / конструкция / прочее) и рамка.
+ */
+export type SectionDim = {
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Role
+     */
+    role: 'clear' | 'structure' | 'other';
+    /**
+     * Value Mm
+     */
+    value_mm: number;
+};
+
+/**
+ * SectionIssueRead
+ */
+export type SectionIssueRead = {
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ] | null;
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+};
+
+/**
+ * SectionLevelRead
+ */
+export type SectionLevelRead = {
+    /**
+     * Clear Height Mm
+     */
+    clear_height_mm: number | null;
+    /**
+     * Corps
+     */
+    corps: string | null;
+    /**
+     * Cut
+     */
+    cut: string | null;
+    /**
+     * Decided At
+     */
+    decided_at: string | null;
+    /**
+     * Decided By
+     */
+    decided_by: string | null;
+    /**
+     * Elevation Mm
+     */
+    elevation_mm: number;
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Floor
+     */
+    floor: number | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    markup: SectionMarkup;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Seq
+     */
+    seq: number;
+    /**
+     * Status
+     */
+    status: 'candidate' | 'accepted' | 'rejected';
+    /**
+     * Structure Mm
+     */
+    structure_mm: number | null;
+    /**
+     * Upper Elevation Mm
+     */
+    upper_elevation_mm: number;
+};
+
+/**
+ * SectionMarkup
+ *
+ * Разметка уровня на странице: отметки, полоса между ними и размеры.
+ */
+export type SectionMarkup = {
+    /**
+     * Band
+     */
+    band: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Dims
+     */
+    dims: Array<SectionDim>;
+    /**
+     * Lower Mark
+     */
+    lower_mark: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Upper Mark
+     */
+    upper_mark: [
+        number,
+        number,
+        number,
+        number
+    ];
+};
+
+/**
+ * SectionPageRead
+ */
+export type SectionPageRead = {
+    /**
+     * Corps
+     */
+    corps: string | null;
+    /**
+     * Cuts
+     */
+    cuts: Array<string>;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Size Pt
+     */
+    page_size_pt: [
+        number,
+        number
+    ];
+    /**
+     * Rotation
+     */
+    rotation: number;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Title
+     */
+    title: string | null;
+};
+
+/**
+ * SectionsDecide
+ *
+ * Решение человека по уровням: принять, отклонить или вернуть в кандидаты.
+ */
+export type SectionsDecide = {
+    /**
+     * Decision
+     */
+    decision: 'accept' | 'reject' | 'reset';
+    /**
+     * Level Ids
+     */
+    level_ids: Array<string>;
+};
+
+/**
+ * SectionsDecided
+ */
+export type SectionsDecided = {
+    /**
+     * Levels
+     */
+    levels: Array<SectionLevelRead>;
+};
+
+/**
+ * SectionsJobCreate
+ *
+ * Постановка задания: ревизия с PDF и, если нужно, подмножество страниц (индексы с 0).
+ */
+export type SectionsJobCreate = {
+    /**
+     * Page Indexes
+     */
+    page_indexes?: Array<number> | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+};
+
+/**
+ * SectionsJobRead
+ */
+export type SectionsJobRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Page Indexes
+     */
+    page_indexes: Array<number> | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Status
+     */
+    status: string;
+};
+
+/**
+ * SectionsRead
+ *
+ * Последнее задание ревизии, кандидаты уровней и данные артефакта выполненного задания.
+ */
+export type SectionsRead = {
+    /**
+     * Issues
+     */
+    issues: Array<SectionIssueRead>;
+    job: SectionsJobRead | null;
+    /**
+     * Levels
+     */
+    levels: Array<SectionLevelRead>;
+    /**
+     * Pages
+     */
+    pages: Array<SectionPageRead>;
+    /**
+     * Result Job Id
+     */
+    result_job_id: string | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
 };
 
 /**
@@ -18212,6 +18528,101 @@ export type PutCadSheetRisersResponses = {
 };
 
 export type PutCadSheetRisersResponse = PutCadSheetRisersResponses[keyof PutCadSheetRisersResponses];
+
+export type ReadCadSectionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    url: '/api/v1/projects/{project_id}/cad/sections';
+};
+
+export type ReadCadSectionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadSectionsError = ReadCadSectionsErrors[keyof ReadCadSectionsErrors];
+
+export type ReadCadSectionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SectionsRead;
+};
+
+export type ReadCadSectionsResponse = ReadCadSectionsResponses[keyof ReadCadSectionsResponses];
+
+export type CreateCadSectionsJobData = {
+    body: SectionsJobCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/sections/jobs';
+};
+
+export type CreateCadSectionsJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCadSectionsJobError = CreateCadSectionsJobErrors[keyof CreateCadSectionsJobErrors];
+
+export type CreateCadSectionsJobResponses = {
+    /**
+     * Successful Response
+     */
+    202: SectionsJobRead;
+};
+
+export type CreateCadSectionsJobResponse = CreateCadSectionsJobResponses[keyof CreateCadSectionsJobResponses];
+
+export type DecideCadSectionLevelsData = {
+    body: SectionsDecide;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/sections/levels/decide';
+};
+
+export type DecideCadSectionLevelsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DecideCadSectionLevelsError = DecideCadSectionLevelsErrors[keyof DecideCadSectionLevelsErrors];
+
+export type DecideCadSectionLevelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SectionsDecided;
+};
+
+export type DecideCadSectionLevelsResponse = DecideCadSectionLevelsResponses[keyof DecideCadSectionLevelsResponses];
 
 export type ListCadVorDocumentsData = {
     body?: never;

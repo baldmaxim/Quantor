@@ -5130,6 +5130,13 @@
               }
             ],
             "title": "View"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [
@@ -21539,6 +21546,7 @@
           "cad_walls",
           "cad_floor3d_dxf",
           "cad_zones",
+          "cad_sections",
           "sheet_passport_extract"
         ],
         "title": "JobType",
@@ -25012,6 +25020,686 @@
           "state"
         ],
         "title": "ScaleVerificationWrite",
+        "type": "object"
+      },
+      "SectionDim": {
+        "description": "Размер на разрезе: значение, роль (в свету / конструкция / прочее) и рамка.",
+        "properties": {
+          "bbox": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "title": "Bbox",
+            "type": "array"
+          },
+          "role": {
+            "enum": [
+              "clear",
+              "structure",
+              "other"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "value_mm": {
+            "title": "Value Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value_mm",
+          "role",
+          "bbox"
+        ],
+        "title": "SectionDim",
+        "type": "object"
+      },
+      "SectionIssueRead": {
+        "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "maxItems": 4,
+                "minItems": 4,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "page_index",
+          "bbox"
+        ],
+        "title": "SectionIssueRead",
+        "type": "object"
+      },
+      "SectionLevelRead": {
+        "properties": {
+          "clear_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clear Height Mm"
+          },
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "cut": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "elevation_mm": {
+            "title": "Elevation Mm",
+            "type": "integer"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "markup": {
+            "$ref": "#/components/schemas/SectionMarkup"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "candidate",
+              "accepted",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "structure_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structure Mm"
+          },
+          "upper_elevation_mm": {
+            "title": "Upper Elevation Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "seq",
+          "page_index",
+          "cut",
+          "corps",
+          "section",
+          "floor",
+          "elevation_mm",
+          "upper_elevation_mm",
+          "clear_height_mm",
+          "structure_mm",
+          "evidence",
+          "markup",
+          "status",
+          "decided_by",
+          "decided_at"
+        ],
+        "title": "SectionLevelRead",
+        "type": "object"
+      },
+      "SectionMarkup": {
+        "description": "Разметка уровня на странице: отметки, полоса между ними и размеры.",
+        "properties": {
+          "band": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "title": "Band",
+            "type": "array"
+          },
+          "dims": {
+            "items": {
+              "$ref": "#/components/schemas/SectionDim"
+            },
+            "title": "Dims",
+            "type": "array"
+          },
+          "lower_mark": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "title": "Lower Mark",
+            "type": "array"
+          },
+          "upper_mark": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            ],
+            "title": "Upper Mark",
+            "type": "array"
+          }
+        },
+        "required": [
+          "upper_mark",
+          "lower_mark",
+          "band",
+          "dims"
+        ],
+        "title": "SectionMarkup",
+        "type": "object"
+      },
+      "SectionPageRead": {
+        "properties": {
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "cuts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cuts",
+            "type": "array"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "page_size_pt": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Page Size Pt",
+            "type": "array"
+          },
+          "rotation": {
+            "title": "Rotation",
+            "type": "integer"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "page_index",
+          "title",
+          "corps",
+          "section",
+          "cuts",
+          "page_size_pt",
+          "rotation"
+        ],
+        "title": "SectionPageRead",
+        "type": "object"
+      },
+      "SectionsDecide": {
+        "additionalProperties": false,
+        "description": "Решение человека по уровням: принять, отклонить или вернуть в кандидаты.",
+        "properties": {
+          "decision": {
+            "enum": [
+              "accept",
+              "reject",
+              "reset"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "level_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Level Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "level_ids",
+          "decision"
+        ],
+        "title": "SectionsDecide",
+        "type": "object"
+      },
+      "SectionsDecided": {
+        "properties": {
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/SectionLevelRead"
+            },
+            "title": "Levels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "levels"
+        ],
+        "title": "SectionsDecided",
+        "type": "object"
+      },
+      "SectionsJobCreate": {
+        "additionalProperties": false,
+        "description": "Постановка задания: ревизия с PDF и, если нужно, подмножество страниц (индексы с 0).",
+        "properties": {
+          "page_indexes": {
+            "anyOf": [
+              {
+                "items": {
+                  "minimum": 0.0,
+                  "type": "integer"
+                },
+                "maxItems": 1000,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Indexes"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_id"
+        ],
+        "title": "SectionsJobCreate",
+        "type": "object"
+      },
+      "SectionsJobRead": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "page_indexes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Indexes"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "revision_id",
+          "status",
+          "attempt",
+          "error_code",
+          "error_message",
+          "page_indexes",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "SectionsJobRead",
+        "type": "object"
+      },
+      "SectionsRead": {
+        "description": "Последнее задание ревизии, кандидаты уровней и данные артефакта выполненного задания.",
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/SectionIssueRead"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionsJobRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/SectionLevelRead"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/SectionPageRead"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "result_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Job Id"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_id",
+          "job",
+          "result_job_id",
+          "levels",
+          "issues",
+          "pages"
+        ],
+        "title": "SectionsRead",
         "type": "object"
       },
       "SessionResponse": {
@@ -34357,6 +35045,165 @@
         "summary": "Сохранить реестр стояков листа (заменяется целиком; пустой список - реестра нет)",
         "tags": [
           "cad-risers"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/sections": {
+      "get": {
+        "operationId": "read_cad_sections",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Разрезы ревизии: последнее задание, кандидаты уровней, замечания генератора",
+        "tags": [
+          "cad-sections"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/sections/jobs": {
+      "post": {
+        "operationId": "create_cad_sections_job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SectionsJobCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionsJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Поставить распознавание разрезов АР по исходному PDF ревизии",
+        "tags": [
+          "cad-sections"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/sections/levels/decide": {
+      "post": {
+        "operationId": "decide_cad_section_levels",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SectionsDecide"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionsDecided"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Принять, отклонить или вернуть в кандидаты уровни разрезов (решение человека)",
+        "tags": [
+          "cad-sections"
         ]
       }
     },
