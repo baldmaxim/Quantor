@@ -40,3 +40,11 @@ def test_cad_mep_pin_matches_the_engine_sources() -> None:
 
 def test_cad_walls_pin_matches_the_engine_sources() -> None:
     _check_pin("cad_walls")
+
+
+def test_engine_constants_match_the_pin() -> None:
+    """Исполнитель сверяет манифест движка с константами cad.py — они равны pins.json."""
+    pins = Path(__file__).resolve().parents[3] / "tools" / "cad_engine" / "pins.json"
+    engine = json.loads(pins.read_text(encoding="utf-8"))["engine"]
+    assert engine["version"] == cad_service.ENGINE_VERSION
+    assert engine["archive_sha256"] == cad_service.ENGINE_ARCHIVE_SHA256
