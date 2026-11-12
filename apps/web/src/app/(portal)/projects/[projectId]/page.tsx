@@ -115,6 +115,14 @@ const ProjectPage = ({ params }: IPageProps) => {
                 Листы комплекта
               </ButtonLink>
             )}
+            {features[CONSISTENCY_FEATURE] === true && (
+              <ButtonLink
+                href={`/projects/${projectId}/doc-questions`}
+                transitionTypes={['nav-forward']}
+              >
+                Вопросы к документации
+              </ButtonLink>
+            )}
             {features[CALC_FEATURE] === true && (
               <ButtonLink href={`/projects/${projectId}/calc`} transitionTypes={['nav-forward']}>
                 Расчёты
