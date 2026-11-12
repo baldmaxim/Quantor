@@ -1213,6 +1213,14 @@ export type CadConstructionsSummaryRead = {
      */
     lintels_without_volume?: number;
     /**
+     * Orphaned Props
+     */
+    orphaned_props?: number;
+    /**
+     * Props Carried Over
+     */
+    props_carried_over?: number;
+    /**
      * Thickness Check Count
      */
     thickness_check_count: number;
@@ -1618,9 +1626,17 @@ export type CadFinishRoomTypeRead = {
      */
     floor_area_m2: number | null;
     /**
+     * Incomplete
+     */
+    incomplete: boolean;
+    /**
      * Room Type
      */
     room_type: 'lift_hall' | 'vestibule' | 'airlock' | 'corridor' | 'stair' | 'entrance_hall' | 'pui' | 'garbage' | 'tech' | 'mop_other' | 'living' | 'kitchen' | 'bath' | 'wc' | 'hall' | 'storage' | 'balcony' | 'apt_other';
+    /**
+     * Unknown Zone Count
+     */
+    unknown_zone_count: number;
     /**
      * Wall Area M2
      */
@@ -1796,6 +1812,10 @@ export type CadFinishTotalRead = {
      */
     area_m2: number | null;
     /**
+     * Incomplete
+     */
+    incomplete: boolean;
+    /**
      * Material
      */
     material: string | null;
@@ -1811,6 +1831,10 @@ export type CadFinishTotalRead = {
      * Surface
      */
     surface: 'floor' | 'walls' | 'ceiling';
+    /**
+     * Unknown Zone Count
+     */
+    unknown_zone_count: number;
     /**
      * Work
      */

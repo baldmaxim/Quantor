@@ -2456,6 +2456,16 @@
             "title": "Lintels Without Volume",
             "type": "integer"
           },
+          "orphaned_props": {
+            "default": 0,
+            "title": "Orphaned Props",
+            "type": "integer"
+          },
+          "props_carried_over": {
+            "default": 0,
+            "title": "Props Carried Over",
+            "type": "integer"
+          },
           "thickness_check_count": {
             "title": "Thickness Check Count",
             "type": "integer"
@@ -3247,6 +3257,10 @@
             ],
             "title": "Floor Area M2"
           },
+          "incomplete": {
+            "title": "Incomplete",
+            "type": "boolean"
+          },
           "room_type": {
             "enum": [
               "lift_hall",
@@ -3271,6 +3285,10 @@
             "title": "Room Type",
             "type": "string"
           },
+          "unknown_zone_count": {
+            "title": "Unknown Zone Count",
+            "type": "integer"
+          },
           "wall_area_m2": {
             "anyOf": [
               {
@@ -3292,7 +3310,9 @@
           "zone_count",
           "floor_area_m2",
           "wall_area_m2",
-          "ceiling_area_m2"
+          "ceiling_area_m2",
+          "unknown_zone_count",
+          "incomplete"
         ],
         "title": "CadFinishRoomTypeRead",
         "type": "object"
@@ -3681,6 +3701,10 @@
             ],
             "title": "Area M2"
           },
+          "incomplete": {
+            "title": "Incomplete",
+            "type": "boolean"
+          },
           "material": {
             "anyOf": [
               {
@@ -3723,6 +3747,10 @@
             "title": "Surface",
             "type": "string"
           },
+          "unknown_zone_count": {
+            "title": "Unknown Zone Count",
+            "type": "integer"
+          },
           "work": {
             "title": "Work",
             "type": "string"
@@ -3739,7 +3767,9 @@
           "material_unit",
           "area_m2",
           "material_qty",
-          "zone_count"
+          "zone_count",
+          "unknown_zone_count",
+          "incomplete"
         ],
         "title": "CadFinishTotalRead",
         "type": "object"
