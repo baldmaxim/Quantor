@@ -3,15 +3,15 @@
   "runner_version": "0.1.0",
   "engine": {
     "name": "quantor-cad-legacy-ar",
-    "version": "2026.11.12+a72f55d0d364",
-    "archive_name": "Quantor_CAD_source_2026.11.12_a72f55d0d364.zip",
+    "version": "2026.11.13+ac1dd789d113",
+    "archive_name": "Quantor_CAD_source_2026.11.13_ac1dd789d113.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "66a56aba54f51c8c30b2205df3594c8180bc5c71",
-    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.12_a72f55d0d364.zip",
-    "archive_sha256": "a7f9a7d9a5aa3ff29d594dead11d5d7f1bb149ebc41fe599f14ce0453a1d62ba",
-    "manifest_sha256": "a1ff5e9b29b62fb9723cc2c076a92b679229d7b29d124b096b95b2cc72ffa6e0",
-    "source_snapshot_sha256": "a72f55d0d364981105d719eae0cfef8e926d5860ba14c72d444507cad929fe03",
-    "archive_entries": 244,
+    "repo_ref": "82b89b2cf081f9a3eb771bade7e6d984c8bbbc1c",
+    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.13_ac1dd789d113.zip",
+    "archive_sha256": "11a0b8bd6bede226f520609b0b74992a67bd5b8af4e3033292790a107477c405",
+    "manifest_sha256": "7dbcda7ca620aa08b0f89ea93c533066601b13fc8cf73f1402586373e9b055cf",
+    "source_snapshot_sha256": "ac1dd789d11372699ff16968e900596adc75dfd25486f8b52ebf24c0339886fd",
+    "archive_entries": 246,
     "max_unpacked_bytes": 4194304,
     "worker": "АР_Обработка/90_Пайплайн/pdf_job_monitor/worker.py",
     "intake": "АР_Обработка/90_Пайплайн/pdf_job_monitor"
@@ -30,13 +30,13 @@
   "generators": {
     "path": "generators",
     "cad_mep": {
-      "generator_version": "cad_mep.v12.1",
+      "generator_version": "cad_mep.v12.3",
       "params_path": "generators/cad_mep/params/v1.json",
-      "params_sha256": "411edf8ed894d32fe1cd3295a5fcff099e3bbc14338aefed6d4cae8d68e74e9c",
-      "params_canonical_sha256": "0f2549d26181995d88b8b8c8c7c2c1be15859c919574f0f94ba31480b1e18950"
+      "params_sha256": "cf52f5e04a4a3a8a9188c31a27848f5f05a3bdbc619fcb1bf5d45b99ee5ec3d3",
+      "params_canonical_sha256": "e706bff1987d195725782f62b42d5b9ea9392d0b0b9dd88803b939b9309c92b1"
     },
     "cad_walls": {
-      "generator_version": "cad_walls.v1.8",
+      "generator_version": "cad_walls.v1.10",
       "params_path": "generators/cad_walls/params/v1.json",
       "params_sha256": "851afc712d45a61d7dd868045c0dee3e8037b18cec4333f20a26360c5fbcf04b",
       "params_canonical_sha256": "f951aa994d7752b06cbdc9a6a15b94b4fe0192a4c66f6834136fc697cffb4cfe",
