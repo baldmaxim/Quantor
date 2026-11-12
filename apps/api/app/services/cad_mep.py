@@ -50,6 +50,11 @@ ELEVATION_MIN_MM: Final = -100_000
 ELEVATION_MAX_MM: Final = 1_000_000
 FLOOR_HEIGHT_MIN_MM: Final = 2000
 FLOOR_HEIGHT_MAX_MM: Final = 6000
+# Уровни для генератора из разрезов: высота «чистый пол - низ плиты» и толщина плиты (пределы CLI).
+CLEAR_HEIGHT_MIN_MM: Final = 1500
+CLEAR_HEIGHT_MAX_MM: Final = 6000
+SLAB_THICKNESS_MIN_MM: Final = 100
+SLAB_THICKNESS_MAX_MM: Final = 600
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,11 +97,15 @@ def route_idempotency_key(
     params_sha256: str,
     generator_version: str,
     risers_sha256: str = "",
+    clear_height_mm: int | None = None,
+    slab_thickness_mm: int | None = None,
 ) -> str:
-    """То же одобрение, параметры, версия генератора и реестр стояков - то же задание.
+    """То же одобрение, параметры, версия генератора, реестр стояков и уровни - то же задание.
 
     Реестр стояков (ADR-0041) входит в ключ своим sha256 (пустая строка - реестра нет): другой
-    реестр - новое задание, а не пересчёт старого.
+    реестр - новое задание, а не пересчёт старого. Так же входят высота в свету из принятых
+    разрезов и толщина плиты проекта, если они переданы генератору: другая высота - новое задание.
+    Не переданные значения ключ не меняют (ключи прежних заданий остаются прежними).
 
     Отметка пола и высота этажа в ключ не входят: это параметры попытки, и их правят пересчётом
     (`recompute_routes`) - новой попыткой того же задания, а не новым заданием.
@@ -108,6 +117,8 @@ def route_idempotency_key(
                 params_sha256,
                 generator_version,
                 risers_sha256,
+                *((f"clear={clear_height_mm}",) if clear_height_mm is not None else ()),
+                *((f"slab={slab_thickness_mm}",) if slab_thickness_mm is not None else ()),
             )
         ).encode()
     ).hexdigest()
@@ -430,6 +441,10 @@ async def schedule_routes(
     floor_height_mm: int | None,
     user_id: uuid.UUID,
     settings: Settings,
+    clear_height_mm: int | None = None,
+    slab_thickness_mm: int | None = None,
+    levels_source: str = "none",
+    section_level_ids: list[str] | None = None,
 ) -> Job:
     """Задание `cad_mep_route` по одобренному виду.
 
@@ -438,9 +453,17 @@ async def schedule_routes(
 
     Нет действующего одобрения - 409 CAD_VIEW_NOT_APPROVED (если его отозвали -
     CAD_VIEW_APPROVAL_REVOKED). Отметки не заданы - генератор определит их по документации.
+
+    Высота в свету (принятые разрезы) и толщина плиты проекта - необязательные уровни для
+    генератора; оба сразу не передаются никогда (в движке это `levels_conflict`). Они входят в
+    ключ идемпотентности: другие уровни - новое задание.
     """
     if job.job_type is not JobType.CAD_PDF_CONVERT:
         raise not_found("Задание")
+    if clear_height_mm is not None and slab_thickness_mm is not None:
+        raise DomainError(
+            ErrorCode.CAD_PARAMS_INVALID, "Высота в свету и толщина плиты не задаются вместе"
+        )
     result = _succeeded_current(job, attempt)
     _view_row(result, page_index, view)
     folder = _folder(page_index, view)
@@ -494,6 +517,8 @@ async def schedule_routes(
             params_sha256=params.sha256,
             generator_version=params.generator_version,
             risers_sha256=risers_sha256,
+            clear_height_mm=clear_height_mm,
+            slab_thickness_mm=slab_thickness_mm,
         ),
         payload={
             "revision_id": job.payload["revision_id"],
@@ -506,6 +531,11 @@ async def schedule_routes(
             # None - определить по документации; число - переопределение человека
             "floor_elevation_mm": floor_elevation_mm,
             "floor_height_mm": floor_height_mm,
+            # Уровни для генератора: `section` - принятые разрезы, `project_slab` - плита проекта.
+            "clear_height_mm": clear_height_mm,
+            "slab_thickness_mm": slab_thickness_mm,
+            "levels_source": levels_source,
+            **({"section_level_ids": section_level_ids} if section_level_ids else {}),
             "params_sha256": params.sha256,
             "generator_version": params.generator_version,
             "engine_version": params.generator_version,

@@ -81,6 +81,7 @@ class TestStageBoundaries:
             "cad_walls",
             "cad_floor3d_dxf",
             "cad_zones",
+            "cad_sections",
         ]
 
     def test_no_job_type_invokes_a_model(self) -> None:

@@ -43,7 +43,7 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
 from app.services import cad_construction_store as construction_store
-from app.services import cad_constructions
+from app.services import cad_constructions, cad_sections
 from app.services import cad_mep as cad_mep_service
 
 router = APIRouter(
@@ -139,6 +139,15 @@ async def create_cad_mep_routes(
         level_elevation_mm=level_elevation,
         level_height_mm=level_height,
     )
+    # Высота в свету: принятые разрезы проекта по отметке этажа, иначе плита проекта, иначе движок
+    # сам предупредит о допущении толщины плиты. Оба значения генератору не уходят никогда.
+    levels = await cad_sections.resolve_route_levels(
+        session,
+        project_id=project_id,
+        floor_elevation_mm=floor_elevation,
+        plan_revision_id=revision_id,
+        plan_page_index=page_index,
+    )
     route = await cad_mep_service.schedule_routes(
         session,
         project=project,
@@ -150,9 +159,14 @@ async def create_cad_mep_routes(
         floor_height_mm=floor_height,
         user_id=context.principal.user_id,
         settings=settings,
+        clear_height_mm=levels.clear_height_mm,
+        slab_thickness_mm=levels.slab_thickness_mm,
+        levels_source=levels.source,
+        section_level_ids=[str(level_id) for level_id in levels.section_level_ids],
     )
     await session.commit()
-    return CadJobRead.of(route, await cad_mep_service.load_state(session, [route]))
+    read = CadJobRead.of(route, await cad_mep_service.load_state(session, [route]))
+    return read.model_copy(update={"warnings": list(levels.warnings)})
 
 
 @router.post(

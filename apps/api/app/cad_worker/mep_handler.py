@@ -4,10 +4,13 @@
 окружение, новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
     <python> -I run_mep.py --pdf --page-index --view-dxf --scale --preview --params --out
-        --view-folder [--floor-elevation-mm] [--floor-height-mm] [--risers]
+        --view-folder [--floor-elevation-mm] [--floor-height-mm] [--clear-height-mm]
+        [--slab-thickness-mm] [--risers]
 
 Отметка пола и высота этажа в аргументы попадают только если их задал человек (запрос или
-пересчёт); иначе генератор определяет их по тексту документации.
+пересчёт); иначе генератор определяет их по тексту документации. Так же необязательны
+`--clear-height-mm` (принятые разрезы) и `--slab-thickness-mm` (плита проекта): оба сразу не
+передаются никогда.
 
 Реестр стояков листа (ADR-0041) лежит в задании списком `risers` с `risers_sha256`; обработчик
 пишет его файлом `in/risers.json` (канонический JSON контракта `cad_risers.v1`), сверяет sha256 и
@@ -90,6 +93,8 @@ def _generator_argv(
     for flag, key in (
         ("--floor-elevation-mm", "floor_elevation_mm"),
         ("--floor-height-mm", "floor_height_mm"),
+        ("--clear-height-mm", "clear_height_mm"),
+        ("--slab-thickness-mm", "slab_thickness_mm"),
     ):
         value = cad_mep_service.payload_int(job, key)
         if value is not None:
@@ -146,6 +151,26 @@ def _write_risers(job: Job, target: Path) -> Path | None:
     return target
 
 
+def _check_levels(payload: dict[str, Any]) -> None:
+    """Высота в свету и толщина плиты: необязательные целые в пределах CLI, оба сразу - отказ."""
+    limits = {
+        "clear_height_mm": (
+            cad_mep_service.CLEAR_HEIGHT_MIN_MM,
+            cad_mep_service.CLEAR_HEIGHT_MAX_MM,
+        ),
+        "slab_thickness_mm": (
+            cad_mep_service.SLAB_THICKNESS_MIN_MM,
+            cad_mep_service.SLAB_THICKNESS_MAX_MM,
+        ),
+    }
+    for key, (low, high) in limits.items():
+        value = payload.get(key)
+        if value is not None and (type(value) is not int or not low <= value <= high):
+            raise CadError(ErrorCode.CAD_PARAMS_INVALID, "уровни для трасс заданы неверно")
+    if payload.get("clear_height_mm") is not None and payload.get("slab_thickness_mm") is not None:
+        raise CadError(ErrorCode.CAD_PARAMS_INVALID, "высота в свету и толщина плиты заданы вместе")
+
+
 async def _checked_input(session: AsyncSession, job: Job) -> _Input:
     payload = job.payload
     parent_id = cad_mep_service.parent_job_id_of(job)
@@ -157,6 +182,7 @@ async def _checked_input(session: AsyncSession, job: Job) -> _Input:
     for key in ("floor_elevation_mm", "floor_height_mm"):
         if key not in payload or (payload[key] is not None and type(payload[key]) is not int):
             raise CadError(ErrorCode.CAD_PARAMS_INVALID, "отметки этажа заданы неверно")
+    _check_levels(payload)
     parent = await session.get(Job, parent_id)
     if (
         parent is None

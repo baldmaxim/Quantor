@@ -317,6 +317,9 @@ class CadJobRead(BaseModel):
     attempts: list[CadAttemptRead]
     retryable: bool
     retry_blocked_reason: str | None
+    # Предупреждения постановки (не хранятся в задании): `section_level_ambiguous` - принятые
+    # разрезы с отметкой этажа дают разную высоту в свету, высота в трассы не передана.
+    warnings: list[str] = Field(default_factory=list)
 
     @classmethod
     def of(cls, job: Job, state: cad_mep_service.MepState | None = None) -> CadJobRead:

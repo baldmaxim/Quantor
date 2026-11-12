@@ -25,6 +25,7 @@ from app.api.v1.cad_floor3d import qa_router as cad_floor3d_qa_router
 from app.api.v1.cad_mep import qa_router as cad_mep_qa_router
 from app.api.v1.cad_pipeline import qa_router as cad_pipeline_qa_router
 from app.api.v1.cad_risers import qa_router as cad_risers_qa_router
+from app.api.v1.cad_sections import qa_router as cad_sections_qa_router
 from app.api.v1.cad_vor import qa_router as cad_vor_qa_router
 from app.api.v1.cad_zones import qa_router as cad_zones_qa_router
 from app.api.v1.router import api_v1_router
@@ -110,6 +111,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cad_zones_qa_router)
     # Реестр стояков листа по проекту ИОС (ADR-0041).
     app.include_router(cad_risers_qa_router)
+    # Разрезы АР: кандидаты уровней и принятая высота для трасс.
+    app.include_router(cad_sections_qa_router)
     app.include_router(cad_constructions_qa_router)
     # ВОР Заказчика как объект сверки конструкций CAD (ADR-0038 п. 5).
     app.include_router(cad_vor_qa_router)

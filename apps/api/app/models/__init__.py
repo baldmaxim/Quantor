@@ -8,6 +8,7 @@ from app.models.cad_finish_template import CadFinishTemplate
 from app.models.cad_project_levels import CadProjectLevels, CadSlabHoleDecision
 from app.models.cad_remark import CadRemark
 from app.models.cad_riser import CadSheetRisers
+from app.models.cad_section_level import CadSectionLevel
 from app.models.cad_vor import CadVorDocument, CadVorItem, CadVorLink
 from app.models.cad_zone import CadZone
 from app.models.calc import (
@@ -49,6 +50,7 @@ __all__ = [
     "CadFinishTemplate",
     "CadProjectLevels",
     "CadRemark",
+    "CadSectionLevel",
     "CadSheetLevels",
     "CadSheetRisers",
     "CadSlabHoleDecision",
