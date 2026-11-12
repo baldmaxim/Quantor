@@ -301,6 +301,28 @@ describe('вкладка «Трассы»: выбранные трассы', () 
     expect(screen.getByTestId('mep-route-warning')).toHaveTextContent(/уточните уровни на листе разреза/);
   });
 
+  it('ответ к документации и его предупреждение показываются в задании трасс', async () => {
+    const base = routeState();
+    const job = {
+      ...base.job,
+      levels_source: 'doc_answer',
+      slab_thickness_mm: 220,
+      levels_doc_answer: {
+        answer_id: 'a1',
+        question_code: 'slab_thickness',
+        answer_source: 'document',
+        file_name: 'КР.pdf',
+        page_index: 2,
+      },
+      warnings: ['doc_answer_ambiguous'],
+    } as unknown as NonNullable<IWorkspaceCadMep['route']>['job'];
+    mount(withRoute({}, routeState({ job })));
+    expect(await screen.findByTestId('mep-route-levels')).toHaveTextContent(
+      'Плита 220 мм — по ответу к документации (КР.pdf, стр. 3)',
+    );
+    expect(screen.getByTestId('mep-route-warning')).toHaveTextContent(/ответы к документации/);
+  });
+
   it('без источника высоты - допущение движка', async () => {
     mount(withRoute());
     expect(await screen.findByTestId('mep-route-levels')).toHaveTextContent(

@@ -1,4 +1,9 @@
-import type { SectionIssueRead, SectionLevelRead, SectionPageRead } from '@quantor/api-client';
+import type {
+  CadLevelsDocAnswerRead,
+  SectionIssueRead,
+  SectionLevelRead,
+  SectionPageRead,
+} from '@quantor/api-client';
 
 import { extractCode, extractMessage } from '@/lib/errors';
 
@@ -10,6 +15,8 @@ import { cadErrorText } from './errors';
  * и не определяет сам - только показывает и отправляет решение человека (принять/отклонить).
  */
 
+type DocAnswerOrigin = Pick<CadLevelsDocAnswerRead, 'answer_source' | 'file_name' | 'page_index'>;
+
 export type SectionLevelStatus = SectionLevelRead['status'];
 
 /** Границы высоты в свету, которые принимает сервер (как в генераторе трасс). */
@@ -19,9 +26,17 @@ export const CLEAR_HEIGHT_MAX_MM = 6000;
 /** Предупреждение запуска трасс: принятые разрезы дают разные высоты для отметки этажа листа. */
 export const SECTION_AMBIGUOUS_WARNING = 'section_level_ambiguous';
 
+/** Предупреждения источника «ответ к документации» (сервер: WARNING_DOC_*). */
+export const DOC_ANSWER_AMBIGUOUS_WARNING = 'doc_answer_ambiguous';
+export const DOC_ANSWER_OUT_OF_RANGE_WARNING = 'doc_answer_out_of_range';
+
 const WARNING_TEXTS: Readonly<Record<string, string>> = {
   [SECTION_AMBIGUOUS_WARNING]:
     'Для отметки листа найдено несколько принятых уровней с разной высотой — уточните уровни на листе разреза.',
+  [DOC_ANSWER_AMBIGUOUS_WARNING]:
+    'Подтверждённые ответы к документации для этого листа расходятся — взята плита проекта / допущение.',
+  [DOC_ANSWER_OUT_OF_RANGE_WARNING]:
+    'Подтверждённый ответ к документации вне пределов трасс (высота в свету 1500–6000 мм, плита 100–600 мм) — не применён, взята плита проекта / допущение.',
 };
 
 /** Текст предупреждения запуска трасс; незнакомый код показывается как есть. */
@@ -29,16 +44,36 @@ export const sectionWarningText = (code: string): string => WARNING_TEXTS[code] 
 
 /** Значения `levels_source` у задания трасс (сервер: RouteLevels.source). */
 export const LEVELS_SOURCE_SECTION = 'section';
+export const LEVELS_SOURCE_DOC_ANSWER = 'doc_answer';
 export const LEVELS_SOURCE_PROJECT_SLAB = 'project_slab';
 
-/** Строка «откуда высота» у задания трасс: разрезы, плита проекта или допущение движка. */
+/** Происхождение ответа к документации: файл и страница либо «введено вручную». */
+const docAnswerOrigin = (answer: DocAnswerOrigin | null | undefined): string => {
+  if (answer == null) return '';
+  if (answer.answer_source === 'manual') return ' (введено вручную)';
+  if (!answer.file_name) return '';
+  const page = answer.page_index == null ? '' : `, стр. ${answer.page_index + 1}`;
+  return ` (${answer.file_name}${page})`;
+};
+
+/** Строка «откуда высота» у задания трасс: разрезы, документация, плита проекта или допущение. */
 export const routeLevelsText = (job: {
   readonly levels_source?: string | null;
   readonly clear_height_mm?: number | null;
   readonly slab_thickness_mm?: number | null;
+  readonly levels_doc_answer?: DocAnswerOrigin | null;
 }): string => {
   if (job.levels_source === LEVELS_SOURCE_SECTION && job.clear_height_mm != null) {
     return `Высота в свету: ${job.clear_height_mm} мм — по разрезам`;
+  }
+  if (job.levels_source === LEVELS_SOURCE_DOC_ANSWER) {
+    const origin = docAnswerOrigin(job.levels_doc_answer);
+    if (job.clear_height_mm != null) {
+      return `Высота в свету: ${job.clear_height_mm} мм — по ответу к документации${origin}`;
+    }
+    if (job.slab_thickness_mm != null) {
+      return `Плита ${job.slab_thickness_mm} мм — по ответу к документации${origin}`;
+    }
   }
   if (job.levels_source === LEVELS_SOURCE_PROJECT_SLAB && job.slab_thickness_mm != null) {
     return `Плита ${job.slab_thickness_mm} мм — из уровней проекта`;

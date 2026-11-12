@@ -29,11 +29,20 @@ from app.contracts.cad_sections import (
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, not_found
-from app.models import CadSectionLevel, DocumentRevision, Job, Project, SheetPassport
+from app.models import (
+    CadSectionLevel,
+    DocQuestionAnswer,
+    DocumentRevision,
+    Job,
+    Project,
+    SheetPassport,
+)
 from app.services import cad as cad_service
 from app.services import cad_construction_store
 from app.services import cad_mep as cad_mep_service
+from app.services import feature_flags as flags_service
 from app.services import jobs as jobs_service
+from app.services.consistency.doc_questions import DocQuestionCode
 
 SECTIONS_JSON: Final = "sections.json"
 SECTIONS_SCHEMA: Final = "cad_sections.v2"
@@ -47,9 +56,13 @@ SLAB_THICKNESS_MIN_MM: Final = cad_mep_service.SLAB_THICKNESS_MIN_MM
 SLAB_THICKNESS_MAX_MM: Final = cad_mep_service.SLAB_THICKNESS_MAX_MM
 
 LEVELS_SOURCE_SECTION: Final = "section"
+LEVELS_SOURCE_DOC_ANSWER: Final = "doc_answer"
 LEVELS_SOURCE_PROJECT_SLAB: Final = "project_slab"
 LEVELS_SOURCE_NONE: Final = "none"
 WARNING_AMBIGUOUS: Final = "section_level_ambiguous"
+WARNING_DOC_AMBIGUOUS: Final = "doc_answer_ambiguous"
+WARNING_DOC_OUT_OF_RANGE: Final = "doc_answer_out_of_range"
+CONSISTENCY_FLAG: Final = "project.consistency"
 
 
 def runner_path(settings: Settings) -> Path | None:
@@ -323,6 +336,26 @@ async def decide(
 
 
 @dataclass(frozen=True, slots=True)
+class DocAnswerOrigin:
+    """Происхождение высоты из ответа к документации (для manual файл и страница пусты)."""
+
+    answer_id: uuid.UUID
+    question_code: str
+    answer_source: str
+    file_name: str | None
+    page_index: int | None
+
+    def to_payload(self) -> dict[str, str | int | None]:
+        return {
+            "answer_id": str(self.answer_id),
+            "question_code": self.question_code,
+            "answer_source": self.answer_source,
+            "file_name": self.file_name,
+            "page_index": self.page_index,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class RouteLevels:
     """Что уходит в запуск трасс: высота в свету, толщина плиты либо ничего; оба сразу - никогда."""
 
@@ -331,6 +364,7 @@ class RouteLevels:
     source: str = LEVELS_SOURCE_NONE
     section_level_ids: tuple[uuid.UUID, ...] = ()
     warnings: tuple[str, ...] = ()
+    doc_answer: DocAnswerOrigin | None = None
 
 
 _RANGE: Final = re.compile(r"(\d+)\s*[-\u2013\u2014]\s*(\d+)")
@@ -387,22 +421,144 @@ async def _plan_passport_marks(
     return marks(row.building), marks(row.section)
 
 
+# Вопросы каталога, которые принимает движок трасс, по приоритету: высота в свету главнее плиты.
+_DOC_QUESTIONS: Final = (
+    (DocQuestionCode.CLEAR_HEIGHT.value, CLEAR_HEIGHT_MIN_MM, CLEAR_HEIGHT_MAX_MM),
+    (DocQuestionCode.SLAB_THICKNESS.value, SLAB_THICKNESS_MIN_MM, SLAB_THICKNESS_MAX_MM),
+)
+_DOC_SOURCES: Final = ("document", "manual")
+
+
+def _first_number(row: DocQuestionAnswer) -> int | None:
+    value = row.value
+    numbers = value.get("numbers") if isinstance(value, dict) else None
+    if not isinstance(numbers, list) or not numbers:
+        return None
+    first = numbers[0]
+    return first if isinstance(first, int) and not isinstance(first, bool) else None
+
+
+def _scope_rank(
+    row: DocQuestionAnswer, building: frozenset[str], section: frozenset[str]
+) -> int | None:
+    """Точность области ответа для листа: 3 корпус+секция, 2 корпус, 1 секция, 0 проект.
+
+    Не подошёл листу - `None`; в том числе область задана, а метки листа неизвестны (нет
+    подтверждённого паспорта).
+    """
+    row_building, row_section = marks(row.scope_building), marks(row.scope_section)
+    if row.scope_building is None and row.scope_section is None:
+        return 0
+    if row.scope_building is not None and not (row_building & building):
+        return None
+    if row.scope_section is not None and not (row_section & section):
+        return None
+    return (2 if row.scope_building is not None else 0) + (
+        1 if row.scope_section is not None else 0
+    )
+
+
+async def _doc_answer_levels(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    plan_revision_id: uuid.UUID,
+    plan_page_index: int,
+) -> tuple[RouteLevels | None, tuple[str, ...]]:
+    """Высота из подтверждённых ответов к документации: `(уровни | None, предупреждения)`.
+
+    Берутся только `document` и `manual` с числом; `not_in_project` и `norm_assumption` - никогда.
+    Сначала `clear_height`, иначе `slab_thickness`: решает первый вопрос, у которого есть
+    подходящие листу ответы. Из них берётся самая точная область; разные значения на ней или
+    значение вне пределов генератора - источник не применяется, предупреждение.
+    """
+    rows = list(
+        (
+            await session.scalars(
+                select(DocQuestionAnswer)
+                .where(
+                    DocQuestionAnswer.project_id == project_id,
+                    DocQuestionAnswer.question_code.in_([code for code, _, _ in _DOC_QUESTIONS]),
+                    DocQuestionAnswer.source.in_(_DOC_SOURCES),
+                    DocQuestionAnswer.value.is_not(None),
+                )
+                .order_by(DocQuestionAnswer.confirmed_at.desc(), DocQuestionAnswer.id)
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+    )
+    if not rows:
+        return None, ()
+    building, section = await _plan_passport_marks(
+        session, revision_id=plan_revision_id, page_index=plan_page_index
+    )
+    for code, low, high in _DOC_QUESTIONS:
+        ranked = [
+            (rank, row)
+            for row in rows
+            if row.question_code == code
+            and _first_number(row) is not None
+            and (rank := _scope_rank(row, building, section)) is not None
+        ]
+        if not ranked:
+            continue
+        best = max(rank for rank, _ in ranked)
+        top = [row for rank, row in ranked if rank == best]
+        if len({_first_number(row) for row in top}) > 1:
+            return None, (WARNING_DOC_AMBIGUOUS,)
+        chosen = top[0]
+        number = _first_number(chosen)
+        if number is None or not low <= number <= high:
+            return None, (WARNING_DOC_OUT_OF_RANGE,)
+        origin = DocAnswerOrigin(
+            answer_id=chosen.id,
+            question_code=chosen.question_code,
+            answer_source=chosen.source,
+            file_name=chosen.file_name,
+            page_index=chosen.page_index,
+        )
+        is_clear = code == DocQuestionCode.CLEAR_HEIGHT.value
+        return (
+            RouteLevels(
+                clear_height_mm=number if is_clear else None,
+                slab_thickness_mm=None if is_clear else number,
+                source=LEVELS_SOURCE_DOC_ANSWER,
+                doc_answer=origin,
+            ),
+            (),
+        )
+    return None, ()
+
+
+async def _doc_answers_enabled(
+    session: AsyncSession, settings: Settings, workspace_id: uuid.UUID
+) -> bool:
+    """Флаг `project.consistency` пространства - тем же провайдером, что и `require_feature`."""
+    evaluated = await flags_service.evaluate_all(
+        session, settings, flags_service.EvaluationContext(workspace_id=workspace_id)
+    )
+    return evaluated[CONSISTENCY_FLAG].value
+
+
 async def resolve_route_levels(
     session: AsyncSession,
     *,
+    settings: Settings,
+    workspace_id: uuid.UUID,
     project_id: uuid.UUID,
     floor_elevation_mm: int | None,
     plan_revision_id: uuid.UUID,
     plan_page_index: int,
 ) -> RouteLevels:
-    """Источник уровней для запуска трасс: принятые разрезы, плита проекта или ничего.
+    """Источник уровней для запуска трасс: разрезы, ответы к документации, плита проекта, ничего.
 
     Известна отметка этажа листа - берутся принятые уровни проекта с этой отметкой. Одно значение
     высоты в свету -> `section`. Разные -> сужение по корпусу и секции листа плана (подтверждённый
     паспорт листа; нет паспорта или метка не совпала ни с одним уровнем - не сужаем); всё ещё
-    разные -> ничего и предупреждение `section_level_ambiguous`. Принятых уровней нет (или
-    отметка этажа не известна) -> толщина плиты проекта, если задана, иначе ничего. Оба значения
-    не уходят никогда.
+    разные -> ничего и предупреждение `section_level_ambiguous` (документация и плита не берутся).
+    Принятых уровней нет (или отметка этажа не известна) -> подтверждённые ответы к документации
+    (`doc_answer`, только при включённом флаге `project.consistency`), затем толщина плиты проекта,
+    если задана, иначе ничего. Оба значения не уходят никогда.
     """
     if floor_elevation_mm is not None:
         rows = list(
@@ -439,7 +595,21 @@ async def resolve_route_levels(
                     section_level_ids=tuple(row.id for row in rows),
                 )
             return RouteLevels(warnings=(WARNING_AMBIGUOUS,))
+    doc_warnings: tuple[str, ...] = ()
+    if await _doc_answers_enabled(session, settings, workspace_id):
+        doc_levels, doc_warnings = await _doc_answer_levels(
+            session,
+            project_id=project_id,
+            plan_revision_id=plan_revision_id,
+            plan_page_index=plan_page_index,
+        )
+        if doc_levels is not None:
+            return doc_levels
     slab = await cad_construction_store.load_project_slab(session, project_id=project_id)
     if slab is not None and SLAB_THICKNESS_MIN_MM <= slab.thickness_mm <= SLAB_THICKNESS_MAX_MM:
-        return RouteLevels(slab_thickness_mm=slab.thickness_mm, source=LEVELS_SOURCE_PROJECT_SLAB)
-    return RouteLevels()
+        return RouteLevels(
+            slab_thickness_mm=slab.thickness_mm,
+            source=LEVELS_SOURCE_PROJECT_SLAB,
+            warnings=doc_warnings,
+        )
+    return RouteLevels(warnings=doc_warnings)

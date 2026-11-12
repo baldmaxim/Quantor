@@ -272,6 +272,27 @@ class CadJobListRead(BaseModel):
     server_time: datetime
 
 
+class CadLevelsDocAnswerRead(BaseModel):
+    """Ответ к документации, по которому взята высота трасс (для manual файл и страница null)."""
+
+    answer_id: UUID
+    question_code: str
+    answer_source: str
+    file_name: str | None
+    page_index: int | None
+
+
+def _levels_doc_answer(job: Job) -> CadLevelsDocAnswerRead | None:
+    """Происхождение из payload задания; нет ключа или он битый - `None` (старые задания)."""
+    raw = job.payload.get("levels_doc_answer")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return CadLevelsDocAnswerRead.model_validate(raw)
+    except ValueError:
+        return None
+
+
 class CadJobRead(BaseModel):
     job_id: UUID
     job_type: CadJobType
@@ -317,11 +338,14 @@ class CadJobRead(BaseModel):
     attempts: list[CadAttemptRead]
     retryable: bool
     retry_blocked_reason: str | None
-    # Только у `cad_mep_route`: откуда высота в свету (`section` - разрезы, `project_slab` -
-    # плита проекта, `none` - допущение движка) и переданные значения, мм.
+    # Только у `cad_mep_route`: откуда высота в свету (`section` - разрезы, `doc_answer` - ответ
+    # к документации, `project_slab` - плита проекта, `none` - допущение движка) и переданные
+    # значения, мм.
     levels_source: str | None = None
     clear_height_mm: int | None = None
     slab_thickness_mm: int | None = None
+    # Происхождение при `levels_source = doc_answer`; у прочих источников и старых заданий - null.
+    levels_doc_answer: CadLevelsDocAnswerRead | None = None
     # Предупреждения постановки (хранятся в задании): `section_level_ambiguous` - принятые
     # разрезы с отметкой этажа дают разную высоту в свету, высота в трассы не передана.
     warnings: list[str] = Field(default_factory=list)
@@ -376,6 +400,7 @@ class CadJobRead(BaseModel):
             approval_id=approval_id,
             approval_revoked=approval is not None and approval.revoked_at is not None,
             levels_source=levels_source if isinstance(levels_source, str) else None,
+            levels_doc_answer=_levels_doc_answer(job) if parent else None,
             clear_height_mm=cad_mep_service.payload_int(job, "clear_height_mm") if parent else None,
             slab_thickness_mm=(
                 cad_mep_service.payload_int(job, "slab_thickness_mm") if parent else None

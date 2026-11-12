@@ -99,6 +99,7 @@ def route_idempotency_key(
     risers_sha256: str = "",
     clear_height_mm: int | None = None,
     slab_thickness_mm: int | None = None,
+    doc_answer_id: uuid.UUID | None = None,
 ) -> str:
     """То же одобрение, параметры, версия генератора, реестр стояков и уровни - то же задание.
 
@@ -119,10 +120,16 @@ def route_idempotency_key(
                 risers_sha256,
                 *((f"clear={clear_height_mm}",) if clear_height_mm is not None else ()),
                 *((f"slab={slab_thickness_mm}",) if slab_thickness_mm is not None else ()),
+                *((f"doc={doc_answer_id}",) if doc_answer_id is not None else ()),
             )
         ).encode()
     ).hexdigest()
     return f"cadmep:{digest[:48]}"
+
+
+def _doc_answer_uuid(origin: dict[str, str | int | None] | None) -> uuid.UUID | None:
+    answer_id = None if origin is None else origin.get("answer_id")
+    return uuid.UUID(answer_id) if isinstance(answer_id, str) else None
 
 
 # ------------------------------------------------------------------ чтение состояния
@@ -446,6 +453,7 @@ async def schedule_routes(
     levels_source: str = "none",
     section_level_ids: list[str] | None = None,
     levels_warnings: list[str] | None = None,
+    levels_doc_answer: dict[str, str | int | None] | None = None,
 ) -> Job:
     """Задание `cad_mep_route` по одобренному виду.
 
@@ -455,9 +463,10 @@ async def schedule_routes(
     Нет действующего одобрения - 409 CAD_VIEW_NOT_APPROVED (если его отозвали -
     CAD_VIEW_APPROVAL_REVOKED). Отметки не заданы - генератор определит их по документации.
 
-    Высота в свету (принятые разрезы) и толщина плиты проекта - необязательные уровни для
-    генератора; оба сразу не передаются никогда (в движке это `levels_conflict`). Они входят в
-    ключ идемпотентности: другие уровни - новое задание.
+    Высота в свету (принятые разрезы, ответ к документации) и толщина плиты - необязательные
+    уровни для генератора; оба сразу не передаются никогда (в движке это `levels_conflict`).
+    Они входят в ключ идемпотентности вместе с id ответа к документации: другие уровни или другой
+    ответ - новое задание.
     """
     if job.job_type is not JobType.CAD_PDF_CONVERT:
         raise not_found("Задание")
@@ -520,6 +529,7 @@ async def schedule_routes(
             risers_sha256=risers_sha256,
             clear_height_mm=clear_height_mm,
             slab_thickness_mm=slab_thickness_mm,
+            doc_answer_id=_doc_answer_uuid(levels_doc_answer),
         ),
         payload={
             "revision_id": job.payload["revision_id"],
@@ -537,6 +547,8 @@ async def schedule_routes(
             "slab_thickness_mm": slab_thickness_mm,
             "levels_source": levels_source,
             **({"section_level_ids": section_level_ids} if section_level_ids else {}),
+            # Ответ к документации (`doc_answer`): откуда взята высота; для manual файла нет.
+            **({"levels_doc_answer": levels_doc_answer} if levels_doc_answer else {}),
             # Предупреждения резолва уровней (`section_level_ambiguous`) - для показа в задании.
             **({"levels_warnings": list(levels_warnings)} if levels_warnings else {}),
             "params_sha256": params.sha256,

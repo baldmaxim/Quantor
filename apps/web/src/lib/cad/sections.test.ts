@@ -144,6 +144,13 @@ describe('предупреждение трасс', () => {
     expect(sectionWarningText('section_level_ambiguous')).toContain('уточните уровни на листе разреза');
     expect(sectionWarningText('other')).toBe('other');
   });
+
+  it('предупреждения ответов к документации', () => {
+    expect(sectionWarningText('doc_answer_ambiguous')).toBe(
+      'Подтверждённые ответы к документации для этого листа расходятся — взята плита проекта / допущение.',
+    );
+    expect(sectionWarningText('doc_answer_out_of_range')).toContain('вне пределов трасс');
+  });
 });
 
 describe('источник высоты у задания трасс', () => {
@@ -156,5 +163,28 @@ describe('источник высоты у задания трасс', () => {
     );
     expect(routeLevelsText({ levels_source: 'none' })).toBe('Высота: допущение движка');
     expect(routeLevelsText({})).toBe('Высота: допущение движка');
+  });
+
+  it('ответ к документации: файл и страница, для ручного - «введено вручную»', () => {
+    const document = { answer_source: 'document', file_name: 'АР ПЗ.pdf', page_index: 4 };
+    const manual = { answer_source: 'manual', file_name: null, page_index: null };
+    expect(
+      routeLevelsText({
+        levels_source: 'doc_answer',
+        clear_height_mm: 2900,
+        levels_doc_answer: document,
+      }),
+    ).toBe('Высота в свету: 2900 мм — по ответу к документации (АР ПЗ.pdf, стр. 5)');
+    expect(
+      routeLevelsText({
+        levels_source: 'doc_answer',
+        slab_thickness_mm: 220,
+        levels_doc_answer: manual,
+      }),
+    ).toBe('Плита 220 мм — по ответу к документации (введено вручную)');
+    expect(routeLevelsText({ levels_source: 'doc_answer', clear_height_mm: 2900 })).toBe(
+      'Высота в свету: 2900 мм — по ответу к документации',
+    );
+    expect(routeLevelsText({ levels_source: 'doc_answer' })).toBe('Высота: допущение движка');
   });
 });

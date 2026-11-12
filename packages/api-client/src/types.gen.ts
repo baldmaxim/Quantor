@@ -2377,6 +2377,7 @@ export type CadJobRead = {
      * Known Limitation
      */
     known_limitation: string | null;
+    levels_doc_answer?: CadLevelsDocAnswerRead | null;
     /**
      * Levels Source
      */
@@ -2550,6 +2551,34 @@ export type CadLevelValueRead = {
      * Value Mm
      */
     value_mm: number | null;
+};
+
+/**
+ * CadLevelsDocAnswerRead
+ *
+ * Ответ к документации, по которому взята высота трасс (для manual файл и страница null).
+ */
+export type CadLevelsDocAnswerRead = {
+    /**
+     * Answer Id
+     */
+    answer_id: string;
+    /**
+     * Answer Source
+     */
+    answer_source: string;
+    /**
+     * File Name
+     */
+    file_name: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+    /**
+     * Question Code
+     */
+    question_code: string;
 };
 
 /**

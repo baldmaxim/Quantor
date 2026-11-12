@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dev import DEV_USER_ID
@@ -37,6 +37,7 @@ from app.models import (
     CadProjectLevels,
     CadRemark,
     CadSectionLevel,
+    DocQuestionAnswer,
     Job,
     SheetPassport,
     Workspace,
@@ -130,10 +131,15 @@ def tools(tmp_path: Path) -> Path:
     return root
 
 
-def mep_settings(tools: Path, tmp_path: Path, *, flag: bool = True) -> Settings:
+def mep_settings(
+    tools: Path, tmp_path: Path, *, flag: bool = True, consistency: bool = False
+) -> Settings:
+    flags = ["cad.export=true"] if flag else []
+    if consistency:
+        flags.append("project.consistency=true")
     return clean_settings(
         environment="test",
-        feature_flags="cad.export=true" if flag else "",
+        feature_flags=",".join(flags),
         cad_engine_python=sys.executable,
         cad_mep_runner=str(tools / "run_mep.py"),
         cad_mep_params=str(tools / "params" / "v1.json"),
@@ -1490,13 +1496,14 @@ async def test_old_route_job_without_levels_keys_reads_as_empty(
                 "clear_height_mm",
                 "slab_thickness_mm",
                 "section_level_ids",
+                "levels_doc_answer",
             }
         }
         await db_session.execute(update(Job).where(Job.id == job.id).values(payload=payload))
         await db_session.commit()
         db_session.expire_all()
         read = (await api.get(f"{base}/{queued['job_id']}")).json()
-        assert read["levels_source"] is None
+        assert read["levels_source"] is None and read["levels_doc_answer"] is None
         assert read["clear_height_mm"] is None and read["slab_thickness_mm"] is None
         assert read["warnings"] == []
 
@@ -1525,3 +1532,373 @@ async def test_worker_refuses_both_levels_in_one_job(
         job = await _run_route_worker(db_session, fake_storage, settings, route_id)
         assert job.status is JobStatus.FAILED and job.error_code == "CAD_PARAMS_INVALID"
         assert not (tools / "levels_seen.json").exists(), "генератор не запускался"
+
+
+# ------------------------------------------------------------------ ответы к документации (В5)
+
+
+async def _answer(
+    session: AsyncSession,
+    *,
+    project_id: str,
+    code: str = "clear_height",
+    number: int | None = 2900,
+    source: str = "document",
+    building: str | None = None,
+    section: str | None = None,
+    file_name: str | None = "АР ПЗ.pdf",
+    page_index: int | None = 4,
+) -> uuid.UUID:
+    """Подтверждённый ответ как его оставил бы экран «Вопросы к документации»."""
+    row = DocQuestionAnswer(
+        project_id=uuid.UUID(project_id),
+        question_code=code,
+        scope_building=building,
+        scope_section=section,
+        source=source,
+        value=None
+        if number is None
+        else {"kind": "length_mm", "display": str(number), "numbers": [number]},
+        value_text=None if number is None else str(number),
+        file_name=file_name if source == "document" else None,
+        page_index=page_index if source == "document" else None,
+        catalog_version="test",
+        confirmed_by=DEV_USER_ID,
+    )
+    session.add(row)
+    await session.commit()
+    return row.id
+
+
+async def _confirm_passport(
+    session: AsyncSession, *, project_id: str, revision_id: str, building: str, section: str
+) -> None:
+    session.add(
+        SheetPassport(
+            project_id=uuid.UUID(project_id),
+            revision_id=uuid.UUID(revision_id),
+            page_index=0,
+            file_name="План.pdf",
+            status="confirmed",
+            building=building,
+            section=section,
+        )
+    )
+    await session.commit()
+
+
+async def _slab(session: AsyncSession, project_id: str, thickness: int = 250) -> None:
+    session.add(
+        CadProjectLevels(
+            project_id=uuid.UUID(project_id),
+            workspace_id=DEV_WORKSPACE_ID,
+            slab_thickness_mm=thickness,
+            slab_source_ref="АР л. 45",
+        )
+    )
+    await session.commit()
+
+
+async def _queued_levels(
+    api: AsyncClient, session: AsyncSession, base: str, job_id: str
+) -> tuple[dict[str, Any], Job]:
+    queued = await _queue_routes(api, base, job_id)
+    stored = await session.get(Job, uuid.UUID(queued["job_id"]))
+    assert stored is not None
+    return queued, stored
+
+
+async def test_doc_answer_is_used_without_sections_and_goes_to_the_generator(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=True)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        answer = await _answer(db_session, project_id=project_id, number=2900)
+        await _slab(db_session, project_id)  # плита проекта документации уступает
+
+        queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert queued["warnings"] == []
+        assert stored.payload["levels_source"] == "doc_answer"
+        assert stored.payload["clear_height_mm"] == 2900
+        assert stored.payload["slab_thickness_mm"] is None
+        assert stored.payload["levels_doc_answer"] == {
+            "answer_id": str(answer),
+            "question_code": "clear_height",
+            "answer_source": "document",
+            "file_name": "АР ПЗ.pdf",
+            "page_index": 4,
+        }
+        read = (await api.get(f"{base}/{queued['job_id']}")).json()
+        assert (read["levels_source"], read["clear_height_mm"], read["slab_thickness_mm"]) == (
+            "doc_answer",
+            2900,
+            None,
+        )
+        assert read["levels_doc_answer"]["answer_id"] == str(answer)
+        assert read["levels_doc_answer"]["file_name"] == "АР ПЗ.pdf"
+        assert read["levels_doc_answer"]["page_index"] == 4
+
+        job = await _run_route_worker(db_session, fake_storage, settings, queued["job_id"])
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        assert _levels_seen(tools) == {"clear_height_mm": "2900", "slab_thickness_mm": None}
+
+
+async def test_doc_slab_answer_goes_as_slab_and_manual_has_no_file(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=True)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        await _answer(
+            db_session, project_id=project_id, code="slab_thickness", number=220, source="manual"
+        )
+        queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert stored.payload["levels_source"] == "doc_answer"
+        assert stored.payload["clear_height_mm"] is None
+        assert stored.payload["slab_thickness_mm"] == 220
+        read = (await api.get(f"{base}/{queued['job_id']}")).json()
+        assert read["levels_doc_answer"]["answer_source"] == "manual"
+        assert read["levels_doc_answer"]["question_code"] == "slab_thickness"
+        assert read["levels_doc_answer"]["file_name"] is None
+        assert read["levels_doc_answer"]["page_index"] is None
+
+
+async def test_clear_height_answer_beats_slab_answer(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=True)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        await _answer(db_session, project_id=project_id, code="slab_thickness", number=220)
+        await _answer(db_session, project_id=project_id, code="clear_height", number=2900)
+        _queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert stored.payload["clear_height_mm"] == 2900
+        assert stored.payload["slab_thickness_mm"] is None
+
+
+async def test_accepted_sections_beat_doc_answers_even_when_ambiguous(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=True)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        common = {"project_id": project_id, "revision_id": revision_id, "job_id": job_id}
+        await _answer(db_session, project_id=project_id, number=2900)
+        await _level(db_session, seq=0, clear=3000, **common)
+        _queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert stored.payload["levels_source"] == "section"
+        assert stored.payload["clear_height_mm"] == 3000
+        assert "levels_doc_answer" not in stored.payload
+
+        # Разрезы расходятся - документация не подставляется: без высоты и без плиты.
+        await _level(db_session, seq=1, clear=3200, corps="10", **common)
+        queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert queued["warnings"] == ["section_level_ambiguous"]
+        assert stored.payload["levels_source"] == "none"
+        assert stored.payload["clear_height_mm"] is None
+        assert stored.payload["slab_thickness_mm"] is None
+
+
+@pytest.mark.parametrize(
+    ("answers", "passport", "expected", "warnings"),
+    [
+        # Точная секция главнее ответа на весь проект.
+        (
+            [(None, None, 2800), ("9", "3", 2900), ("9", None, 3000)],
+            ("9", "3"),
+            2900,
+            [],
+        ),
+        # Секции листа нет в ответах - корпус, затем проект.
+        ([(None, None, 2800), ("9", None, 3000)], ("9", "5"), 3000, []),
+        ([(None, None, 2800), ("10", None, 3000)], ("9", "3"), 2800, []),
+        # Область задана, паспорта листа нет - ответ не подходит, проектный подходит.
+        ([("9", "3", 2900)], None, None, []),
+        ([("9", "3", 2900), (None, None, 2800)], None, 2800, []),
+        # Корпус точнее одной секции без корпуса.
+        ([(None, "3", 2900), ("9", None, 3000)], ("9", "3"), 3000, []),
+        # Расхождение на самом точном уровне - источник не применяется, дальше плита проекта.
+        ([("9", "3", 3000), ("9", "2-4", 3100)], ("9", "3"), None, ["doc_answer_ambiguous"]),
+    ],
+)
+async def test_doc_answer_scope_picks_the_most_exact_level_or_refuses_on_conflict(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+    answers: list[tuple[str | None, str | None, int]],
+    passport: tuple[str, str] | None,
+    expected: int | None,
+    warnings: list[str],
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=True)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        await _slab(db_session, project_id)
+        for building, section, number in answers:
+            await _answer(
+                db_session,
+                project_id=project_id,
+                number=number,
+                building=building,
+                section=section,
+            )
+        if passport is not None:
+            await _confirm_passport(
+                db_session,
+                project_id=project_id,
+                revision_id=revision_id,
+                building=passport[0],
+                section=passport[1],
+            )
+        queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert queued["warnings"] == warnings
+        if expected is None:
+            # Без документации - плита проекта.
+            assert stored.payload["levels_source"] == "project_slab"
+            assert stored.payload["slab_thickness_mm"] == 250
+            assert stored.payload["clear_height_mm"] is None
+        else:
+            assert stored.payload["levels_source"] == "doc_answer"
+            assert stored.payload["clear_height_mm"] == expected
+
+
+@pytest.mark.parametrize(
+    "ignored",
+    [
+        {"source": "not_in_project", "number": None},
+        {"source": "norm_assumption", "number": 2900},
+    ],
+)
+async def test_not_in_project_and_norm_assumption_are_never_used(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+    ignored: dict[str, Any],
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=True)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        await _answer(db_session, project_id=project_id, **ignored)
+        await _slab(db_session, project_id)
+        queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert queued["warnings"] == []
+        assert stored.payload["levels_source"] == "project_slab"
+        assert stored.payload["clear_height_mm"] is None
+
+
+async def test_doc_answers_are_ignored_while_the_consistency_flag_is_off(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=False)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        await _answer(db_session, project_id=project_id, number=2900)
+        await _answer(db_session, project_id=project_id, number=2800, building="9")
+        queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert queued["warnings"] == []
+        assert stored.payload["levels_source"] == "none"
+        assert stored.payload["clear_height_mm"] is None
+        assert "levels_doc_answer" not in stored.payload
+
+
+@pytest.mark.parametrize(
+    ("code", "number"),
+    [
+        ("clear_height", 1400),
+        ("clear_height", 6100),
+        ("slab_thickness", 99),
+        ("slab_thickness", 700),
+    ],
+)
+async def test_doc_answer_out_of_generator_limits_warns_and_falls_back_to_the_project_slab(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+    code: str,
+    number: int,
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=True)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        await _answer(db_session, project_id=project_id, code=code, number=number)
+        await _slab(db_session, project_id)
+        queued, stored = await _queued_levels(api, db_session, base, job_id)
+        assert queued["warnings"] == ["doc_answer_out_of_range"]
+        read = (await api.get(f"{base}/{queued['job_id']}")).json()
+        assert read["warnings"] == ["doc_answer_out_of_range"]
+        assert stored.payload["levels_source"] == "project_slab"
+        assert stored.payload["clear_height_mm"] is None
+        assert "levels_doc_answer" not in stored.payload
+
+
+def test_idempotency_key_includes_the_doc_answer_id() -> None:
+    approval = uuid.uuid4()
+    sha, version = "p" * 64, "cad_mep.v1"
+
+    def key(doc_answer_id: uuid.UUID | None) -> str:
+        return cad_mep_service.route_idempotency_key(
+            approval,
+            params_sha256=sha,
+            generator_version=version,
+            clear_height_mm=2900,
+            doc_answer_id=doc_answer_id,
+        )
+
+    plain = cad_mep_service.route_idempotency_key(
+        approval, params_sha256=sha, generator_version=version, clear_height_mm=2900
+    )
+    first, second = key(uuid.uuid4()), key(uuid.uuid4())
+    assert len({plain, first, second}) == 3
+    assert plain == key(None)
+
+
+async def test_replaced_doc_answer_with_the_same_value_queues_a_new_job(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path, consistency=True)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        first = await _answer(db_session, project_id=project_id, number=2900)
+        queued = await _queue_routes(api, base, job_id)
+        assert (await _queue_routes(api, base, job_id))["job_id"] == queued["job_id"]
+
+        # Повторное подтверждение заменяет ответ: новая строка с тем же значением и новым id.
+        await db_session.execute(delete(DocQuestionAnswer).where(DocQuestionAnswer.id == first))
+        await db_session.commit()
+        second = await _answer(db_session, project_id=project_id, number=2900)
+        again = await _queue_routes(api, base, job_id)
+        assert again["job_id"] != queued["job_id"]
+        stored = await db_session.get(Job, uuid.UUID(again["job_id"]))
+        assert stored is not None
+        assert stored.payload["levels_doc_answer"]["answer_id"] == str(second)

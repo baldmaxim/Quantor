@@ -139,10 +139,13 @@ async def create_cad_mep_routes(
         level_elevation_mm=level_elevation,
         level_height_mm=level_height,
     )
-    # Высота в свету: принятые разрезы проекта по отметке этажа, иначе плита проекта, иначе движок
+    # Высота в свету: принятые разрезы проекта по отметке этажа, иначе ответы к документации, иначе
+    # плита проекта, иначе движок
     # сам предупредит о допущении толщины плиты. Оба значения генератору не уходят никогда.
     levels = await cad_sections.resolve_route_levels(
         session,
+        settings=settings,
+        workspace_id=project.workspace_id,
         project_id=project_id,
         floor_elevation_mm=floor_elevation,
         plan_revision_id=revision_id,
@@ -164,6 +167,7 @@ async def create_cad_mep_routes(
         levels_source=levels.source,
         section_level_ids=[str(level_id) for level_id in levels.section_level_ids],
         levels_warnings=list(levels.warnings),
+        levels_doc_answer=levels.doc_answer.to_payload() if levels.doc_answer else None,
     )
     await session.commit()
     return CadJobRead.of(route, await cad_mep_service.load_state(session, [route]))

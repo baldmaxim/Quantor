@@ -4992,6 +4992,16 @@
             ],
             "title": "Known Limitation"
           },
+          "levels_doc_answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadLevelsDocAnswerRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "levels_source": {
             "anyOf": [
               {
@@ -5432,6 +5442,55 @@
           "default_mm"
         ],
         "title": "CadLevelValueRead",
+        "type": "object"
+      },
+      "CadLevelsDocAnswerRead": {
+        "description": "Ответ к документации, по которому взята высота трасс (для manual файл и страница null).",
+        "properties": {
+          "answer_id": {
+            "format": "uuid",
+            "title": "Answer Id",
+            "type": "string"
+          },
+          "answer_source": {
+            "title": "Answer Source",
+            "type": "string"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          },
+          "question_code": {
+            "title": "Question Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer_id",
+          "question_code",
+          "answer_source",
+          "file_name",
+          "page_index"
+        ],
+        "title": "CadLevelsDocAnswerRead",
         "type": "object"
       },
       "CadMepAttemptRead": {
