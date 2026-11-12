@@ -122,6 +122,8 @@ class Settings(BaseSettings):
     # пространства (RLIMIT_AS) и время. Превышение - ошибка файла, а не гибель исполнителя.
     sheet_passport_parse_memory_mb: int = Field(default=1024, ge=64, le=16384)
     sheet_passport_parse_timeout_seconds: float = Field(default=600.0, gt=0)
+    # Предел распакованного текста страниц одной ревизии (В1): защита от gzip-бомбы.
+    sheet_passport_page_text_max_mb: int = Field(default=256, ge=1, le=4096)
 
     # --- PDF -> CAD (app/cad_worker, ADR-0036) ---
     #

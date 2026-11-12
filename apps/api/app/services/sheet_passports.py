@@ -1,8 +1,9 @@
 """Паспорт листа (ADR-0043, С1): задание разбора комплекта, хранение и правка кандидатов.
 
 Кандидата собирает исполнитель по текстовому слою PDF (pypdf, без OCR и растра); подтверждает
-человек. Поле, которое правил человек (`evidence.source == "manual"`), повторный разбор не
-трогает; подтверждённый и отклонённый паспорт не перезаписывается вовсе. Доступ к проекту
+человек. Тот же проход сохраняет текст страниц ревизии в хранилище (В1, `page_texts`). Поле,
+которое правил человек (`evidence.source == "manual"`), повторный разбор не трогает;
+подтверждённый и отклонённый паспорт не перезаписывается вовсе. Доступ к проекту
 проверяет вызывающий.
 """
 
@@ -10,11 +11,13 @@ from __future__ import annotations
 
 import tempfile
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
 from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,8 +34,21 @@ from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain import DocumentKind, JobStatus, JobType
 from app.errors import ErrorCode, not_found
-from app.models import Document, DocumentRevision, Job, Project, SheetPassport
+from app.models import (
+    Document,
+    DocumentRevision,
+    Job,
+    Project,
+    RevisionPageText,
+    SheetPassport,
+)
 from app.services import jobs as jobs_service
+from app.services.consistency.page_texts import (
+    PAGE_TEXT_FORMAT,
+    REASON_STORE_FAILED,
+    StoredPageText,
+    store_page_text_file,
+)
 from app.services.consistency.passport_process import (
     PassportParseError,
     parse_pdf_in_subprocess,
@@ -162,30 +178,97 @@ async def _upsert_candidates(
     return created, updated, skipped
 
 
+@dataclass(frozen=True, slots=True)
+class _ParsedFile:
+    """Разобранный файл: кандидаты и выгруженный текст (None - выгрузка не удалась)."""
+
+    candidates: list[PassportCandidate]
+    text: StoredPageText | None
+
+
+async def _upsert_page_text(
+    session: AsyncSession, *, project_id: uuid.UUID, revision_id: uuid.UUID, stored: StoredPageText
+) -> None:
+    """Строка указателя на текст ревизии; повторный разбор перезаписывает её."""
+    values = {
+        "project_id": project_id,
+        "storage_key": stored.storage_key,
+        "format": stored.format,
+        "parser_version": stored.parser_version,
+        "pages": stored.pages,
+        "empty_pages": stored.empty_pages,
+        "size_bytes": stored.size_bytes,
+        "sha256": stored.sha256,
+    }
+    statement = pg_insert(RevisionPageText).values(revision_id=revision_id, **values)
+    await session.execute(
+        statement.on_conflict_do_update(
+            index_elements=[RevisionPageText.revision_id],
+            set_={**values, "created_at": func.now()},
+        )
+    )
+
+
 async def _download_and_parse(
-    storage: ObjectStorage, *, storage_key: str, file_name: str, settings: Settings
-) -> list[PassportCandidate]:
-    """Файл потоково во временный файл на диске (ADR-0002), разбор - в подпроцессе с пределами."""
+    storage: ObjectStorage,
+    *,
+    storage_key: str,
+    file_name: str,
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    settings: Settings,
+) -> _ParsedFile:
+    """Файл потоково во временный файл на диске (ADR-0002), разбор - в подпроцессе с пределами.
+
+    Текст страниц выгружается в хранилище, пока жив временный каталог. Сбой выгрузки не
+    отнимает кандидатов: `text` остаётся None, и повторный запуск доделает текст.
+    """
     with tempfile.TemporaryDirectory(prefix="quantor-passport-") as workdir:
         path = Path(workdir) / "source.pdf"
         with path.open("wb") as output:
             async for chunk in storage.iter_stream(storage_key, chunk_size=CHUNK_SIZE):
                 output.write(chunk)
-        return await parse_pdf_in_subprocess(
+        parsed = await parse_pdf_in_subprocess(
             path,
             file_name,
             memory_limit_mb=settings.sheet_passport_parse_memory_mb,
             timeout_seconds=settings.sheet_passport_parse_timeout_seconds,
         )
+        try:
+            stored: StoredPageText | None = await store_page_text_file(
+                storage,
+                project_id=project_id,
+                revision_id=revision_id,
+                path=parsed.text_path,
+                parser_version=PARSER_VERSION,
+                max_bytes=settings.sheet_passport_page_text_max_mb * 1024 * 1024,
+            )
+        except Exception as error:
+            stored = None
+            log.warning(
+                "sheet_passport_page_text_failed",
+                revision_id=str(revision_id),
+                reason=type(error).__name__,
+            )
+        return _ParsedFile(candidates=parsed.candidates, text=stored)
 
 
 async def _already_parsed(session: AsyncSession, revision_id: uuid.UUID) -> bool:
-    """У ревизии есть паспорта и все разобраны текущей версией разборщика: файл не качаем."""
+    """Паспорта разобраны текущей версией разборщика и текст страниц сохранён: файл не качаем."""
     versions = await session.scalars(
         select(SheetPassport.versions).where(SheetPassport.revision_id == revision_id)
     )
     parsers = [item.get("parser") for item in versions]
-    return bool(parsers) and all(parser == PARSER_VERSION for parser in parsers)
+    if not parsers or any(parser != PARSER_VERSION for parser in parsers):
+        return False
+    stored = await session.scalar(
+        select(RevisionPageText.revision_id).where(
+            RevisionPageText.revision_id == revision_id,
+            RevisionPageText.format == PAGE_TEXT_FORMAT,
+            RevisionPageText.parser_version == PARSER_VERSION,
+        )
+    )
+    return stored is not None
 
 
 async def latest_pdf_revisions(
@@ -214,7 +297,9 @@ async def execute_sheet_passport_extract(
     Файлы идут по одному, после каждого - коммит. Каждый разбирается подпроцессом с пределом
     памяти и времени. Файл, который не открылся или не уложился в пределы, задание не валит:
     он попадает в итог с именем и классом ошибки (содержимое чужих документов в итог и журнал
-    не попадает). Ревизия, уже разобранная текущей версией разборщика, при повторе пропускается.
+    не попадает). Ревизия, уже разобранная текущей версией разборщика и с сохранённым текстом
+    страниц, при повторе пропускается. Сбой выгрузки текста (`PageTextStoreFailed`) кандидатов
+    не отменяет, но попадает в итог; ревизия без строки текста при повторе разбирается снова.
     """
     raw_project_id = job.payload.get("project_id")
     try:
@@ -231,7 +316,7 @@ async def execute_sheet_passport_extract(
     revisions = await latest_pdf_revisions(session, project_id=project_id)
     await session.commit()
 
-    files = pages = created = updated = skipped = already = 0
+    files = pages = created = updated = skipped = already = texts = 0
     errors: list[dict[str, str]] = []
     error_count = 0
     total = len(revisions)
@@ -244,8 +329,13 @@ async def execute_sheet_passport_extract(
             await session.commit()
             continue
         try:
-            candidates = await _download_and_parse(
-                storage, storage_key=revision.storage_key, file_name=file_name, settings=settings
+            parsed = await _download_and_parse(
+                storage,
+                storage_key=revision.storage_key,
+                file_name=file_name,
+                project_id=project_id,
+                revision_id=revision_id,
+                settings=settings,
             )
         except ObjectNotFoundError:
             reason = "ObjectNotFoundError"
@@ -265,8 +355,15 @@ async def execute_sheet_passport_extract(
                         project_id=project_id,
                         revision_id=revision_id,
                         file_name=file_name,
-                        candidates=candidates,
+                        candidates=parsed.candidates,
                     )
+                    if parsed.text is not None:
+                        await _upsert_page_text(
+                            session,
+                            project_id=project_id,
+                            revision_id=revision_id,
+                            stored=parsed.text,
+                        )
             except DBAPIError as error:
                 reason = "ParseStoreFailed"
                 log.warning(
@@ -276,13 +373,18 @@ async def execute_sheet_passport_extract(
                     db_error=type(error.orig).__name__,
                 )
                 made = changed = left = 0
-                candidates = []
+                parsed = _ParsedFile(candidates=[], text=None)
         if not reason:
             files += 1
-            pages += len(candidates)
+            pages += len(parsed.candidates)
             created += made
             updated += changed
             skipped += left
+            if parsed.text is not None:
+                texts += 1
+            else:
+                # Кандидаты сохранены, текста нет: файл попадает в итог, повтор доделает текст.
+                reason = REASON_STORE_FAILED
         if reason:
             error_count += 1
             if len(errors) < MAX_REPORTED_ERRORS:
@@ -296,6 +398,7 @@ async def execute_sheet_passport_extract(
         files=files,
         already_parsed=already,
         pages=pages,
+        page_texts_stored=texts,
         errors=error_count,
     )
     result = await jobs_service.succeed(
@@ -306,6 +409,7 @@ async def execute_sheet_passport_extract(
             "files_parsed": files,
             "files_already_parsed": already,
             "pages": pages,
+            "page_texts_stored": texts,
             "created": created,
             "updated": updated,
             "skipped_reviewed": skipped,

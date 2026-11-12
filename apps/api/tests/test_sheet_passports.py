@@ -23,11 +23,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.domain import DocumentKind, JobStatus, JobType, Role
 from app.main import create_app
-from app.models import Document, DocumentRevision, Job, SheetPassport, Workspace
+from app.models import (
+    Document,
+    DocumentRevision,
+    Job,
+    RevisionPageText,
+    SheetPassport,
+    Workspace,
+)
 from app.services import jobs as jobs_service
 from app.services import sheet_passports as passports_service
-from app.services.consistency.passport_process import REASON_FAILED, PassportParseError
+from app.services.consistency import page_texts as page_texts_module
+from app.services.consistency.page_texts import (
+    PageTextWriter,
+    iter_page_texts,
+    page_text_key,
+)
+from app.services.consistency.passport_process import (
+    REASON_FAILED,
+    ParsedPassportFile,
+    PassportParseError,
+)
 from app.services.consistency.sheet_passport import (
+    PARSER_VERSION,
     EvidenceSource,
     FieldEvidence,
     PageInput,
@@ -83,12 +101,17 @@ def texts(monkeypatch: pytest.MonkeyPatch) -> _Texts:
 
     async def fake(
         path: Path, file_name: str, *, memory_limit_mb: int, timeout_seconds: float
-    ) -> list[PassportCandidate]:
+    ) -> ParsedPassportFile:
+        text_path = path.parent / "page_text.jsonl.gz"
         try:
-            with path.open("rb") as stream:
-                return [parse_page(page) for page in pages_of(stream, file_name)]
+            with path.open("rb") as stream, PageTextWriter(text_path, PARSER_VERSION) as writer:
+                candidates: list[PassportCandidate] = []
+                for page in pages_of(stream, file_name):
+                    candidates.append(parse_page(page))
+                    writer.add(page.page_index, page.page_label, page.text)
         except Exception:
             raise PassportParseError(REASON_FAILED) from None
+        return ParsedPassportFile(candidates=candidates, text_path=text_path)
 
     monkeypatch.setattr(passports_service, "parse_pdf_in_subprocess", fake)
     state.pages[PLAN_PDF] = [PLAN_STAMP, PLAN_STAMP.replace("7 40", "8 40")]
@@ -719,3 +742,113 @@ async def test_db_failure_on_one_file_goes_to_errors_and_job_continues(
         assert job.payload["errors"] == [{"file_name": PLAN_PDF, "reason": "ParseStoreFailed"}]
         listing = (await api.get(_url(project_id))).json()
         assert [item["file_name"] for item in listing["items"]] == [SCHEME_PDF]
+
+
+async def test_page_text_is_stored_and_rerun_skips_only_with_text_row(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        revision = await _add_pdf(db_session, fake_storage, project_id, PLAN_PDF)
+        await _add_pdf(db_session, fake_storage, project_id, SCHEME_PDF)
+        revision_id = revision.id
+        first = await _extract(api, db_session, fake_storage, project_id)
+        assert first.payload["page_texts_stored"] == 2 and first.payload["error_count"] == 0
+
+        row = await db_session.get(RevisionPageText, revision_id)
+        assert row is not None
+        assert row.storage_key == page_text_key(uuid.UUID(project_id), revision_id)
+        assert (row.pages, row.empty_pages) == (2, 0)
+        assert row.parser_version == PARSER_VERSION and row.project_id == uuid.UUID(project_id)
+        assert row.size_bytes == len(fake_storage.objects[row.storage_key])
+        assert row.sha256 == hashlib.sha256(fake_storage.objects[row.storage_key]).hexdigest()
+        pages = [
+            page
+            async for page in iter_page_texts(fake_storage, row.storage_key, max_bytes=1024 * 1024)
+        ]
+        assert [page.text for page in pages] == texts.pages[PLAN_PDF]
+
+        # Есть паспорта и строка текста: повтор ничего не качает.
+        again = await _extract(api, db_session, fake_storage, project_id)
+        assert again.payload["files_already_parsed"] == 2 and again.payload["files_parsed"] == 0
+        assert again.payload["page_texts_stored"] == 0
+
+        # Строки текста нет (паспорта разобраны до В1): ревизия разбирается заново, текст
+        # сохраняется, подтверждённый паспорт не перезаписывается.
+        text_key = row.storage_key
+        await db_session.delete(row)
+        await db_session.execute(
+            update(SheetPassport)
+            .where(SheetPassport.revision_id == revision_id, SheetPassport.page_index == 0)
+            .values(status="confirmed", title="Правка человека")
+        )
+        await db_session.commit()
+        fake_storage.objects.pop(text_key)
+        third = await _extract(api, db_session, fake_storage, project_id)
+        assert third.payload["files_already_parsed"] == 1
+        assert third.payload["files_parsed"] == 1 and third.payload["page_texts_stored"] == 1
+        assert third.payload["skipped_reviewed"] == 1
+        assert await db_session.get(RevisionPageText, revision_id) is not None
+        assert text_key in fake_storage.objects
+        title = await db_session.scalar(
+            select(SheetPassport.title).where(
+                SheetPassport.revision_id == revision_id, SheetPassport.page_index == 0
+            )
+        )
+        assert title == "Правка человека"
+
+
+async def test_old_text_version_is_not_skipped(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        revision = await _add_pdf(db_session, fake_storage, project_id, SCHEME_PDF)
+        await _extract(api, db_session, fake_storage, project_id)
+        await db_session.execute(update(RevisionPageText).values(parser_version="old"))
+        await db_session.commit()
+        job = await _extract(api, db_session, fake_storage, project_id)
+        assert job.payload["files_parsed"] == 1 and job.payload["files_already_parsed"] == 0
+        stored = await db_session.scalar(
+            select(RevisionPageText.parser_version).where(
+                RevisionPageText.revision_id == revision.id
+            )
+        )
+        assert stored == PARSER_VERSION
+
+
+async def test_page_text_store_failure_keeps_candidates_and_next_run_completes_text(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def broken(*args: object, **kwargs: object) -> None:
+        raise OSError("хранилище недоступно")
+
+    original = passports_service.store_page_text_file
+    monkeypatch.setattr(passports_service, "store_page_text_file", broken)
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        revision = await _add_pdf(db_session, fake_storage, project_id, SCHEME_PDF)
+        failed = await _extract(api, db_session, fake_storage, project_id)
+        assert failed.status is JobStatus.SUCCEEDED
+        assert failed.payload["files_parsed"] == 1 and failed.payload["created"] == 1
+        assert failed.payload["page_texts_stored"] == 0
+        assert failed.payload["errors"] == [
+            {"file_name": SCHEME_PDF, "reason": page_texts_module.REASON_STORE_FAILED}
+        ]
+        assert await db_session.get(RevisionPageText, revision.id) is None
+
+        monkeypatch.setattr(passports_service, "store_page_text_file", original)
+        retry = await _extract(api, db_session, fake_storage, project_id)
+        assert retry.payload["files_already_parsed"] == 0 and retry.payload["files_parsed"] == 1
+        assert retry.payload["page_texts_stored"] == 1 and retry.payload["error_count"] == 0
+        assert retry.payload["created"] == 0 and retry.payload["updated"] == 1

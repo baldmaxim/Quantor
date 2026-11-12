@@ -2,7 +2,8 @@
 
 Тяжёлый или битый файл не должен убивать исполнителя (в бою он ограничен по памяти): разбор
 идёт отдельным процессом в своей группе с RLIMIT_AS; по таймауту убивается вся группа.
-Результат - файл JSON в каталоге рядом с PDF, а не stdout (родитель не держит его в памяти).
+Результат - файлы в каталоге рядом с PDF, а не stdout (родитель не держит их в памяти):
+JSON кандидатов и gzip с текстом страниц (`page_texts`, В1).
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import resource
 import signal
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
@@ -25,10 +27,21 @@ from app.services.consistency.sheet_passport import PassportCandidate
 REASON_MEMORY: Final = "ParseMemoryLimit"
 REASON_TIMEOUT: Final = "ParseTimeout"
 REASON_FAILED: Final = "ParseFailed"
+# Файл обрезан или не PDF: pypdf не открывает (нужен целый файл от Заказчика).
+REASON_UNREADABLE: Final = "PdfUnreadable"
 
 # apps/api/app/services/consistency/passport_process.py -> apps/api: корень для `import app`.
 _API_ROOT: Final = Path(__file__).resolve().parents[3]
 _OUT_NAME: Final = "candidates.json"
+_TEXT_NAME: Final = "page_text.jsonl.gz"
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedPassportFile:
+    """Итог разбора файла: кандидаты и готовый gzip с текстом страниц (рядом с PDF)."""
+
+    candidates: list[PassportCandidate]
+    text_path: Path
 
 
 class PassportParseError(Exception):
@@ -47,7 +60,7 @@ def _memory_limiter(limit_mb: int) -> Callable[[], None]:
     return apply
 
 
-def _command(pdf_path: Path, file_name: str, out_path: Path) -> list[str]:
+def _command(pdf_path: Path, file_name: str, out_path: Path, text_path: Path) -> list[str]:
     return [
         sys.executable,
         "-m",
@@ -55,6 +68,7 @@ def _command(pdf_path: Path, file_name: str, out_path: Path) -> list[str]:
         str(pdf_path),
         file_name,
         str(out_path),
+        str(text_path),
     ]
 
 
@@ -65,15 +79,16 @@ def _kill_group(pid: int) -> None:
 
 async def parse_pdf_in_subprocess(
     path: Path, file_name: str, *, memory_limit_mb: int, timeout_seconds: float
-) -> list[PassportCandidate]:
-    """Кандидаты по страницам PDF; отказ - `PassportParseError` с классом причины.
+) -> ParsedPassportFile:
+    """Кандидаты и файл текста по страницам PDF; отказ - `PassportParseError` с классом причины.
 
     Окружение пустое, кроме PATH, LANG и PYTHONPATH на корень API (пакет читается из
     исходников, как в образе); рабочий каталог - каталог файла.
     """
     out_path = path.parent / _OUT_NAME
+    text_path = path.parent / _TEXT_NAME
     process = await asyncio.create_subprocess_exec(
-        *_command(path, file_name, out_path),
+        *_command(path, file_name, out_path, text_path),
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
@@ -101,12 +116,18 @@ async def parse_pdf_in_subprocess(
     if code < 0 or code == passport_cli.EXIT_MEMORY:
         # Убит сигналом (в том числе SIGKILL/SIGSEGV при исчерпании предела) или MemoryError.
         raise PassportParseError(REASON_MEMORY)
+    if code == passport_cli.EXIT_UNREADABLE:
+        raise PassportParseError(REASON_UNREADABLE)
     if code != 0:
+        raise PassportParseError(REASON_FAILED)
+    if not text_path.is_file():
         raise PassportParseError(REASON_FAILED)
     try:
         raw = json.loads(out_path.read_text(encoding="utf-8"))
         if not isinstance(raw, list):
             raise ValueError("ожидался список")
-        return [candidate_from_json(item) for item in raw]
+        return ParsedPassportFile(
+            candidates=[candidate_from_json(item) for item in raw], text_path=text_path
+        )
     except (OSError, ValueError):
         raise PassportParseError(REASON_FAILED) from None

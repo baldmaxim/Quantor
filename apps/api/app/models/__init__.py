@@ -35,6 +35,7 @@ from app.models.identity import (
 from app.models.job import Job
 from app.models.page_geometry import PageGeometry
 from app.models.project import Project
+from app.models.revision_page_text import RevisionPageText
 from app.models.scale import ScaleCalibration
 from app.models.sheet import Region, Sheet
 from app.models.sheet_passport import SheetPassport
@@ -84,6 +85,7 @@ __all__ = [
     "Project",
     "RecognitionArtifact",
     "Region",
+    "RevisionPageText",
     "ScaleCalibration",
     "SettingOverride",
     "Sheet",
