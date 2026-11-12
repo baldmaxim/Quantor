@@ -138,7 +138,7 @@ class Settings(BaseSettings):
     cad_engine_archive: str = ""
     # Пусто — системный каталог временных файлов + quantor-cad.
     cad_work_root: str = ""
-    cad_total_timeout_seconds: int = Field(default=900, ge=10, le=7200)
+    cad_total_timeout_seconds: int = Field(default=2700, ge=10, le=7200)
     cad_max_memory_mb: int = Field(default=3072, ge=256, le=16384)
     # Генераторы CAD (трассы и зоны `cad_mep`, конструкции `cad_walls`) живут в репозитории движка
     # и закреплены в `tools/cad_engine/pins.json` (раздел `generators`, ADR-0036 п. 8, ADR-0038).
