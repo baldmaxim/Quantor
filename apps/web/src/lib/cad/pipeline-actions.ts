@@ -231,7 +231,7 @@ const zonesActions = (
   view: CadPipelineViewRead,
   context: IContext,
 ): IPipelineAction[] => {
-  if (step.state === 'running') return [];
+  if (step.state === 'running' || step.state === 'queued') return [];
   // Автоматическая разметка по уже размеченному листу отвечает 409: там только переход к зонам.
   if (view.zones_count > 0) {
     return [linkTo(context, `zones:${view.view}:link`, 'Открыть зоны', view.view, true)];

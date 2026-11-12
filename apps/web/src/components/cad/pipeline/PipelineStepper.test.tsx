@@ -25,6 +25,7 @@ const stepsOf = (
     label: PIPELINE_STEP_LABELS[key],
     state: states[index] ?? 'blocked',
     detail: details[key] ?? null,
+    jobId: null,
   }));
 
 const items = () => within(screen.getByRole('list', { name: 'Шаги конвейера' })).getAllByRole('listitem');

@@ -36,6 +36,7 @@ export interface ICadPipelineSheetRowProps {
 }
 
 const FLOOR3D_BADGES: Partial<Record<PipelineStepState, { tone: BadgeTone; label: string }>> = {
+  queued: { tone: 'accent', label: '3D DXF: в очереди' },
   running: { tone: 'accent', label: '3D DXF…' },
   done: { tone: 'success', label: '3D DXF готов' },
   failed: { tone: 'danger', label: '3D DXF: ошибка' },

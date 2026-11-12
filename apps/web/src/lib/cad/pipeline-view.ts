@@ -6,6 +6,7 @@ import type { PipelineStepState } from './pipeline';
 
 export const PIPELINE_STATE_TONES: Readonly<Record<PipelineStepState, BadgeTone>> = {
   todo: 'neutral',
+  queued: 'accent',
   running: 'accent',
   done: 'success',
   review: 'warning',
@@ -16,6 +17,7 @@ export const PIPELINE_STATE_TONES: Readonly<Record<PipelineStepState, BadgeTone>
 
 export const PIPELINE_STATE_GLYPHS: Readonly<Record<PipelineStepState, string>> = {
   todo: '○',
+  queued: '◷',
   running: '…',
   done: '✓',
   review: '!',
@@ -26,6 +28,7 @@ export const PIPELINE_STATE_GLYPHS: Readonly<Record<PipelineStepState, string>> 
 
 export const PIPELINE_STATE_WORDS: Readonly<Record<PipelineStepState, string>> = {
   todo: 'не начато',
+  queued: 'в очереди',
   running: 'идёт',
   done: 'готово',
   review: 'нужно решение',

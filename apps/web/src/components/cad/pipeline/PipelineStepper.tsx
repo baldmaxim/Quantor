@@ -28,6 +28,7 @@ const NODE_BASE = 'relative z-10 flex flex-none items-center justify-center roun
 
 const NODE_STYLES: Readonly<Record<PipelineStepState, string>> = {
   done: 'bg-success text-surface',
+  queued: 'border-2 border-dashed border-accent-soft bg-surface text-accent',
   running: 'border-2 border-accent-soft bg-surface text-accent',
   review: 'bg-warning text-surface',
   failed: 'bg-danger text-surface',
@@ -71,6 +72,12 @@ const NodeIcon: FC<{ readonly state: PipelineStepState }> = ({ state }) => {
       return (
         <svg {...ICON_PROPS}>
           <path d="M4.5 8h7" />
+        </svg>
+      );
+    case 'queued':
+      return (
+        <svg {...ICON_PROPS}>
+          <path d="M8 4v4.5l2.5 1.5" />
         </svg>
       );
     case 'running':

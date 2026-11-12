@@ -3103,6 +3103,80 @@ export type CadProjectLevelsWrite = {
 };
 
 /**
+ * CadQueueItemRead
+ */
+export type CadQueueItemRead = {
+    /**
+     * Ahead
+     */
+    ahead: number | null;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Document Name
+     */
+    document_name: string | null;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    job_type: JobType;
+    /**
+     * Max Attempts
+     */
+    max_attempts: number;
+    /**
+     * Pages
+     */
+    pages: Array<number>;
+    /**
+     * Revision Id
+     */
+    revision_id: string | null;
+    /**
+     * Started At
+     */
+    started_at: string | null;
+    status: JobStatus;
+};
+
+/**
+ * CadQueueRead
+ */
+export type CadQueueRead = {
+    /**
+     * Items
+     */
+    items: Array<CadQueueItemRead>;
+    /**
+     * Queued Total
+     */
+    queued_total: number;
+    /**
+     * Running Total
+     */
+    running_total: number;
+};
+
+/**
  * CadRemarkFileItem
  *
  * Замечание в файле обмена; лишние поля игнорируются, как у разбора файла в интерфейсе.
@@ -19064,6 +19138,36 @@ export type ReadCadMepRoutes3dResponses = {
 };
 
 export type ReadCadMepRoutes3dResponse = ReadCadMepRoutes3dResponses[keyof ReadCadMepRoutes3dResponses];
+
+export type ReadCadQueueData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/queue';
+};
+
+export type ReadCadQueueErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadQueueError = ReadCadQueueErrors[keyof ReadCadQueueErrors];
+
+export type ReadCadQueueResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadQueueRead;
+};
+
+export type ReadCadQueueResponse = ReadCadQueueResponses[keyof ReadCadQueueResponses];
 
 export type ReadCadSheetRisersData = {
     body?: never;

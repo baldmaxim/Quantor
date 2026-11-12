@@ -17,6 +17,7 @@ import {
   type IPipelineSummary,
 } from '@/lib/cad/pipeline';
 import { cadPipelineKey, useCadPipeline } from '@/lib/cad/pipeline-queries';
+import { useCadQueue } from '@/lib/cad/queue-queries';
 import { cadKeys } from '@/lib/cad/queries';
 import { zoneKeys } from '@/lib/cad/zones-queries';
 import { unwrap } from '@/lib/queries';
@@ -48,6 +49,8 @@ export interface IWorkspaceCadPipeline {
   readonly startAutoZones: () => Promise<void>;
   readonly startingZones: boolean;
   readonly zonesError: string | null;
+  /** Сколько заданий CAD исполнится раньше задания в очереди (по `job_id`); неизвестно - нет записи. */
+  readonly queueAhead: ReadonlyMap<string, number>;
 }
 
 type StageName = 'convert' | 'walls' | 'zones' | 'routes' | 'floor3d';
@@ -203,6 +206,17 @@ export const useWorkspaceCadPipeline = ({
     }
   }, [client, projectId, revisionId, sheet]);
 
+  // Очередь исполнителя нужна только пока на листе есть шаг в очереди.
+  const hasQueuedStep = steps.some((step) => step.state === 'queued');
+  const queue = useCadQueue(projectId, enabled && hasQueuedStep);
+  const queueAhead = useMemo(() => {
+    const result = new Map<string, number>();
+    for (const item of queue.data?.items ?? []) {
+      if (item.status === 'queued' && item.ahead !== null) result.set(item.job_id, item.ahead);
+    }
+    return result;
+  }, [queue.data]);
+
   const { refetch } = query;
   const reload = useCallback(() => void refetch(), [refetch]);
 
@@ -217,5 +231,6 @@ export const useWorkspaceCadPipeline = ({
     startAutoZones,
     startingZones,
     zonesError,
+    queueAhead,
   };
 };

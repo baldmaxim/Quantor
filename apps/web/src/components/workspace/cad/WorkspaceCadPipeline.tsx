@@ -11,6 +11,7 @@ import {
   PIPELINE_STATE_TONES,
   PIPELINE_STATE_WORDS,
 } from '@/lib/cad/pipeline-view';
+import { queuePositionText } from '@/lib/cad/queue-view';
 
 import type { IWorkspaceCadConvert } from './types';
 import type { IWorkspaceCadPipeline } from './useWorkspaceCadPipeline';
@@ -80,8 +81,17 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
   openablePanels,
   onOpenPanel,
 }) => {
-  const { steps, sheet, isPending, isError, refetch, startAutoZones, startingZones, zonesError } =
-    pipeline;
+  const {
+    steps,
+    sheet,
+    isPending,
+    isError,
+    refetch,
+    startAutoZones,
+    startingZones,
+    zonesError,
+    queueAhead,
+  } = pipeline;
   const convertNode = convert ? <WorkspaceCadConvert key={convert.pageIndex} {...convert} /> : null;
 
   if (isPending) {
@@ -208,6 +218,10 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
         {steps.map((step) => {
           const tone = TONE_TEXT[PIPELINE_STATE_TONES[step.state]] ?? 'text-muted';
           const extra = action(step.key, step.state);
+          const position =
+            step.state === 'queued' && step.jobId !== null
+              ? queuePositionText(queueAhead.get(step.jobId))
+              : null;
           return (
             <li key={step.key} className="flex min-w-0 flex-col gap-[var(--s-2)]">
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-[var(--s-3)]">
@@ -217,6 +231,14 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
                 <span className="text-sm font-medium">{step.label}</span>
                 <span className={`text-xs ${tone}`}>{PIPELINE_STATE_WORDS[step.state]}</span>
               </div>
+              {position && (
+                <p
+                  data-testid="pipeline-queue-position"
+                  className="m-0 pl-[calc(1.25em+var(--s-3))] text-xs text-muted"
+                >
+                  {position}
+                </p>
+              )}
               {step.detail && (
                 <p className={`m-0 pl-[calc(1.25em+var(--s-3))] text-xs [overflow-wrap:anywhere] ${
                   step.state === 'failed' ? 'text-danger' : 'text-muted'

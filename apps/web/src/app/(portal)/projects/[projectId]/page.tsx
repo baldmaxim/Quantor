@@ -4,6 +4,7 @@ import type { DocumentRevisionRead } from '@quantor/api-client';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useRef, useState, ViewTransition } from 'react';
 
+import { CadQueueCard } from '@/components/projects/CadQueueCard';
 import { DocumentPipelinePanel } from '@/components/projects/DocumentPipelinePanel';
 import { DocumentSections } from '@/components/projects/DocumentSections';
 import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
@@ -192,30 +193,33 @@ const ProjectPage = ({ params }: IPageProps) => {
             </div>
           </section>
 
-          <div ref={panelRef} className="scroll-mt-[var(--s-6)]">
-            {selected ? (
-              <DocumentPipelinePanel
-                key={selected.id}
-                projectId={projectId}
-                document={selected}
-                revisions={revisions.byDocument.get(selected.id)?.items ?? null}
-                cadEnabled={features[CAD_FEATURE] === true}
-                importJob={project.data?.last_job ?? null}
-              />
-            ) : (
-              <section className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
-                <h2 className="border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
-                  Обработка
-                </h2>
-                <div className="px-[var(--s-6)] py-[var(--s-5)]">
-                  {documents.isPending ? (
-                    <Skeleton className="h-[96px] w-full" />
-                  ) : (
-                    <p className="text-sm text-muted">Выберите документ, чтобы увидеть обработку.</p>
-                  )}
-                </div>
-              </section>
-            )}
+          <div className="flex min-w-0 flex-col gap-[var(--s-6)]">
+            {features[CAD_FEATURE] === true && <CadQueueCard projectId={projectId} />}
+            <div ref={panelRef} className="scroll-mt-[var(--s-6)]">
+              {selected ? (
+                <DocumentPipelinePanel
+                  key={selected.id}
+                  projectId={projectId}
+                  document={selected}
+                  revisions={revisions.byDocument.get(selected.id)?.items ?? null}
+                  cadEnabled={features[CAD_FEATURE] === true}
+                  importJob={project.data?.last_job ?? null}
+                />
+              ) : (
+                <section className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
+                  <h2 className="border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
+                    Обработка
+                  </h2>
+                  <div className="px-[var(--s-6)] py-[var(--s-5)]">
+                    {documents.isPending ? (
+                      <Skeleton className="h-[96px] w-full" />
+                    ) : (
+                      <p className="text-sm text-muted">Выберите документ, чтобы увидеть обработку.</p>
+                    )}
+                  </div>
+                </section>
+              )}
+            </div>
           </div>
         </div>
       </main>

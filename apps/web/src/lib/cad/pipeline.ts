@@ -26,10 +26,12 @@ export type PipelineStepKey =
 
 /**
  * `blocked` - предыдущий шаг не выполнен; `skipped` - шаг не нужен (преобразование не выпустило
- * DXF, видов для проверки нет); `review` - ждёт человека (одобрение вида, принятие трасс).
+ * DXF, видов для проверки нет); `review` - ждёт человека (одобрение вида, принятие трасс);
+ * `queued` - задание поставлено, но исполнитель CAD ещё занят другим.
  */
 export type PipelineStepState =
   | 'todo'
+  | 'queued'
   | 'running'
   | 'done'
   | 'review'
@@ -42,6 +44,8 @@ export interface IPipelineStep {
   readonly label: string;
   readonly state: PipelineStepState;
   readonly detail: string | null;
+  /** Последнее задание шага (у шага из нескольких видов - худшего вида); `null` - задания нет. */
+  readonly jobId: string | null;
 }
 
 export type PipelineTone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
@@ -74,6 +78,7 @@ const isActive = (stage: CadPipelineStageRead | null): boolean =>
 const SEVERITY: readonly PipelineStepState[] = [
   'failed',
   'running',
+  'queued',
   'review',
   'todo',
   'blocked',
@@ -87,7 +92,8 @@ const make = (
   key: PipelineStepKey,
   state: PipelineStepState,
   detail: string | null = null,
-): IPipelineStep => ({ key, label: PIPELINE_STEP_LABELS[key], state, detail });
+  jobId: string | null = null,
+): IPipelineStep => ({ key, label: PIPELINE_STEP_LABELS[key], state, detail, jobId });
 
 const percentText = (stage: CadPipelineStageRead): string | null =>
   stage.progress === null
@@ -97,7 +103,8 @@ const percentText = (stage: CadPipelineStageRead): string | null =>
 /** Состояние этапа по последнему заданию: нет задания - `todo`. */
 const stageState = (stage: CadPipelineStageRead | null): PipelineStepState => {
   if (stage === null) return 'todo';
-  if (stage.status === 'queued' || stage.status === 'running') return 'running';
+  if (stage.status === 'queued') return 'queued';
+  if (stage.status === 'running') return 'running';
   if (stage.status !== 'succeeded' || stage.result_status === 'failed') return 'failed';
   return 'done';
 };
@@ -117,7 +124,7 @@ const stageDetail = (stage: CadPipelineStageRead | null): string | null => {
 };
 
 const stageStep = (key: PipelineStepKey, stage: CadPipelineStageRead | null): IPipelineStep =>
-  make(key, stageState(stage), stageDetail(stage));
+  make(key, stageState(stage), stageDetail(stage), stage?.job_id ?? null);
 
 const zonesWord = (count: number): string => {
   const tail = count % 100;
@@ -137,7 +144,7 @@ const zonesStep = (view: CadPipelineViewRead): IPipelineStep => {
       ? make('zones', 'done', `${view.zones_count} ${zonesWord(view.zones_count)}`)
       : make('zones', 'todo');
   }
-  if (state !== 'done') return make('zones', state, stageDetail(stage));
+  if (state !== 'done') return make('zones', state, stageDetail(stage), stage.job_id);
   if (stage.result_status === RESULT_ZONES_SKIPPED) {
     return make('zones', 'done', 'на листе уже были зоны');
   }
@@ -154,7 +161,7 @@ const routesStep = (view: CadPipelineViewRead): IPipelineStep => {
   const stage = view.routes;
   if (stage === null) return make('routes', view.approved ? 'todo' : 'blocked');
   const state = stageState(stage);
-  if (state !== 'done') return make('routes', state, stageDetail(stage));
+  if (state !== 'done') return make('routes', state, stageDetail(stage), stage.job_id);
   return view.routes_accepted
     ? make('routes', 'done', 'приняты')
     : make('routes', 'review', 'ждут принятия');
@@ -294,6 +301,8 @@ export const sheetSummary = (sheet: CadPipelineSheetRead): IPipelineSummary => {
     const percent = running.detail !== null && running.detail.endsWith('%') ? ` · ${running.detail}` : '';
     return { tone: 'accent', label: `Идёт: ${running.label}${percent}` };
   }
+
+  if (steps.some((step) => step.state === 'queued')) return { tone: 'accent', label: 'В очереди' };
 
   const human = steps.find(needsHuman);
   if (human) {

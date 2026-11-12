@@ -224,4 +224,40 @@ describe('WorkspaceCadPipeline', () => {
     mount(pipelineOfSheet(pipelineSheet()));
     expect(screen.queryByTestId('pipeline-floor-title')).toBeNull();
   });
+
+  describe('шаг в очереди', () => {
+    const queuedSheet = () =>
+      pipelineSheet({
+        convert: stage({ job_id: 'job-q', status: 'queued', progress: null, result_status: null }),
+        views: [],
+      });
+
+    it('слово «в очереди» и строка «Перед ним N заданий»', () => {
+      mount(pipelineOfSheet(queuedSheet(), { queueAhead: new Map([['job-q', 5]]) }));
+      const convert = screen.getAllByRole('listitem')[1];
+      expect(convert).toHaveTextContent('CADв очереди');
+      expect(screen.getByTestId('pipeline-queue-position')).toHaveTextContent('Перед ним 5 заданий');
+    });
+
+    it('склонение: 1 задание, 3 задания', () => {
+      const { unmount } = mount(pipelineOfSheet(queuedSheet(), { queueAhead: new Map([['job-q', 1]]) }));
+      expect(screen.getByTestId('pipeline-queue-position')).toHaveTextContent('Перед ним 1 задание');
+      unmount();
+      mount(pipelineOfSheet(queuedSheet(), { queueAhead: new Map([['job-q', 3]]) }));
+      expect(screen.getByTestId('pipeline-queue-position')).toHaveTextContent('Перед ним 3 задания');
+    });
+
+    it('впереди никого: «Следующее на исполнение»', () => {
+      mount(pipelineOfSheet(queuedSheet(), { queueAhead: new Map([['job-q', 0]]) }));
+      expect(screen.getByTestId('pipeline-queue-position')).toHaveTextContent(
+        'Следующее на исполнение',
+      );
+    });
+
+    it('очередь ещё не загружена: только «в очереди», без строки', () => {
+      mount(pipelineOfSheet(queuedSheet()));
+      expect(screen.getAllByRole('listitem')[1]).toHaveTextContent('CADв очереди');
+      expect(screen.queryByTestId('pipeline-queue-position')).toBeNull();
+    });
+  });
 });

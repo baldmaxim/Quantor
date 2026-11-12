@@ -70,5 +70,6 @@ export const pipelineOfSheet = (
   startAutoZones: () => Promise.resolve(),
   startingZones: false,
   zonesError: null,
+  queueAhead: new Map<string, number>(),
   ...overrides,
 });

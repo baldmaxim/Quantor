@@ -6553,6 +6553,166 @@
         "title": "CadProjectLevelsWrite",
         "type": "object"
       },
+      "CadQueueItemRead": {
+        "properties": {
+          "ahead": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ahead"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "document_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Name"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_type": {
+            "$ref": "#/components/schemas/JobType"
+          },
+          "max_attempts": {
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "pages": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_type",
+          "status",
+          "revision_id",
+          "document_id",
+          "document_name",
+          "pages",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "attempt",
+          "max_attempts",
+          "ahead",
+          "error_code"
+        ],
+        "title": "CadQueueItemRead",
+        "type": "object"
+      },
+      "CadQueueRead": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CadQueueItemRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "queued_total": {
+            "title": "Queued Total",
+            "type": "integer"
+          },
+          "running_total": {
+            "title": "Running Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "running_total",
+          "queued_total"
+        ],
+        "title": "CadQueueRead",
+        "type": "object"
+      },
       "CadRemarkFileItem": {
         "description": "Замечание в файле обмена; лишние поля игнорируются, как у разбора файла в интерфейсе.",
         "properties": {
@@ -36254,6 +36414,49 @@
         "summary": "Трассы механики листа в 3D: вершины в мм DXF вида, Z от отметки этажа",
         "tags": [
           "cad-mep"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/queue": {
+      "get": {
+        "operationId": "read_cad_queue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadQueueRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Очередь CAD проекта: выполняется, ждёт, недавно завершено",
+        "tags": [
+          "cad-queue"
         ]
       }
     },

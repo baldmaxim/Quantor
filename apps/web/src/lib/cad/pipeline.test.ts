@@ -131,9 +131,33 @@ describe('шаги листа', () => {
     expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'Идёт: CAD · 40 %' });
   });
 
-  it('преобразование без хода: просто «CAD»', () => {
-    const s = sheet({ convert: stage({ status: 'queued', progress: null }), views: [] });
+  it('преобразование без хода: идёт, но без процента', () => {
+    const s = sheet({ convert: stage({ status: 'running', progress: null }), views: [] });
     expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'Идёт: CAD' });
+  });
+
+  it('задание в очереди: состояние «в очереди» с номером задания, итог «В очереди»', () => {
+    const s = sheet({ convert: stage({ job_id: 'job-q', status: 'queued', progress: null }), views: [] });
+    expect(state(s, 'convert')).toMatchObject({ state: 'queued', detail: null, jobId: 'job-q' });
+    expect(state(s, 'walls')?.state).toBe('blocked');
+    expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'В очереди' });
+  });
+
+  it('этап вида в очереди: шаг «в очереди», идущий этап важнее в итоге', () => {
+    const queued = sheet({
+      views: [view({ walls: stage({ job_type: 'cad_walls', job_id: 'w-q', status: 'queued' }) })],
+    });
+    expect(state(queued, 'walls')).toMatchObject({ state: 'queued', jobId: 'w-q' });
+    expect(sheetSummary(queued)).toEqual({ tone: 'accent', label: 'В очереди' });
+    const mixed = sheet({
+      views: [
+        view({
+          walls: stage({ job_type: 'cad_walls', status: 'queued' }),
+          zones: stage({ job_type: 'cad_zones', status: 'running', progress: null }),
+        }),
+      ],
+    });
+    expect(sheetSummary(mixed)).toEqual({ tone: 'accent', label: 'Идёт: Зоны' });
   });
 
   it('отказ преобразования: код ошибки в подписи, итог - ошибка CAD', () => {
