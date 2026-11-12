@@ -28,8 +28,11 @@
   толщины или хозяина — в итог не идёт, считается в `lintels_without_volume`;
 - каркасная перегородка ГКЛ (`frame_partition`) меряется площадью: длина и площадь стены как у
   кладки, объём не определён (`None`);
-- разрыв без данных о проёме (`gap`) в объём и площадь не входит и даёт предупреждение
-  `opening_no_data` у несущей конструкции;
+- разрыв (`gap`) с высотой проёма из walls.json v1.9 (`opening_height_mm`) даёт надпроёмную
+  часть как дверь: ширина x `t` x max(0, `H` - высота проёма); перемычка на не-монолитном
+  хозяине в объём не идёт; происхождение высоты - `sources.gap_opening_height`. Разрыв без высоты
+  (старый файл) в объём и площадь не входит и даёт предупреждение `opening_no_data` у несущей
+  конструкции и счёт в `unaccounted_gap_openings`;
 - плита перекрытия (`floor_slab`, одна на лист): площадь нетто = контур минус включённые
   отверстия; толщина = переопределение человека, иначе толщина плиты листа; объём = нетто x
   толщина; нет толщины — `thickness_check`, в итоги не входит.
@@ -127,6 +130,33 @@ class EffectiveLevels:
     elevation_source: CadValueSource | None = None
     # Лист разреза, если толщина плиты взята из уровня проекта.
     slab_sheet_ref: str | None = None
+    # Верх плиты из walls.json v1.9 (отметка листа - пирог пола); при ручной отметке - `None`.
+    slab_top_mm: int | None = None
+    # Пирог пола (чистый пол - верх плиты) из walls.json; нужен, пока база взята из `slab_top_mm`.
+    floor_finish_mm: int | None = None
+
+    @property
+    def base_z_mm(self) -> int:
+        """База z этажа (верх плиты): верх плиты из walls.json, иначе отметка листа, иначе 0.
+
+        Ручная отметка этажа - без вычета пирога (как отметка верха плиты, что и было прежде).
+        """
+        if self.slab_top_mm is not None:
+            return self.slab_top_mm
+        return self.elevation_mm if self.elevation_mm is not None else 0
+
+    @property
+    def opening_floor_z_mm(self) -> int:
+        """Чистый пол этажа - отсчёт низа проёмов и высоты проёма.
+
+        База взята из верха плиты - прибавляем пирог пола (по умолчанию возвращаемся к отметке
+        листа); иначе база и есть отметка.
+        """
+        if self.slab_top_mm is None:
+            return self.base_z_mm
+        if self.floor_finish_mm is not None:
+            return self.slab_top_mm + self.floor_finish_mm
+        return self.elevation_mm if self.elevation_mm is not None else self.slab_top_mm
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,7 +181,8 @@ def effective_levels(
     """Действующие высоты листа.
 
     Толщина плиты: переопределение листа, затем уровень проекта (ввод человека), затем walls.json.
-    Отметка этажа: переопределение листа, затем walls.json.
+    Отметка этажа: переопределение листа, затем walls.json. Верх плиты (`slab_top_mm`) берётся из
+    walls.json v1.9 только без ручной отметки: отметку человека не поправляем на пирог пола.
     """
     floor = _level(heights.floor_height_mm, heights.height_status, overrides.floor_height_mm)
     slab_ref: str | None = None
@@ -162,10 +193,12 @@ def effective_levels(
         slab = _level(heights.slab_thickness_mm, heights.slab_status, overrides.slab_thickness_mm)
     elevation: int | None
     elevation_source: CadValueSource | None
+    slab_top: int | None = None
     if overrides.floor_elevation_mm is not None:
         elevation, elevation_source = overrides.floor_elevation_mm, "manual"
     else:
         elevation = heights.floor_elevation_mm
+        slab_top = heights.slab_top_elevation_mm if elevation is not None else None
         elevation_source = source_of(heights.elevation_status) if elevation is not None else None
     door = _level(heights.door_height_mm, heights.door_height_status, overrides.door_height_mm)
     wall: int | None = None
@@ -176,7 +209,16 @@ def effective_levels(
             wall = candidate
             wall_source = "manual" if floor.source == "manual" else "derived"
     return EffectiveLevels(
-        floor, slab, door, wall, wall_source, elevation, elevation_source, slab_ref
+        floor,
+        slab,
+        door,
+        wall,
+        wall_source,
+        elevation,
+        elevation_source,
+        slab_ref,
+        slab_top_mm=slab_top,
+        floor_finish_mm=heights.floor_finish_mm,
     )
 
 
@@ -269,6 +311,20 @@ def _round(value: float | None, digits: int) -> float | None:
     return None if value is None else round(value, digits)
 
 
+def _gap_above_mm(opening: WallsOpening, wall_height_mm: int) -> float:
+    """Надпроёмная часть разрыва: высота стены минус высота проёма (у разрыва она задана)."""
+    return max(0.0, float(wall_height_mm) - float(opening.opening_height_mm or 0))
+
+
+# Надёжность происхождения: у разрывов с разным статусом в ответ идёт наименее надёжный.
+_SOURCE_RANK: Final[tuple[CadValueSource, ...]] = ("assumption", "derived", "observed", "manual")
+
+
+def _gap_height_source(gaps: Sequence[WallsOpening]) -> CadValueSource:
+    sources = [source_of(o.opening_height_status or "assumption") or "assumption" for o in gaps]
+    return min(sources, key=_SOURCE_RANK.index)
+
+
 def compute_construction(
     construction: WallsConstruction,
     host_openings: list[WallsOpening],
@@ -307,6 +363,13 @@ def compute_construction(
     # В объём хозяина не идут монолитные перемычки в кладке и перегородках: у них своя группа.
     host_is_monolith = _is_monolith_kind(construction.kind)
     volume_doors = [o for o in doors if host_is_monolith or not is_monolith_lintel(o)]
+    # Разрыв с заданной высотой (v1.9): надпроёмная часть считается как у двери; без высоты — нет.
+    gaps = (
+        [o for o in host_openings if o.kind == "gap" and o.opening_height_mm is not None]
+        if props.count_openings
+        else []
+    )
+    volume_gaps = [o for o in gaps if host_is_monolith or not is_monolith_lintel(o)]
     door_height = levels.door_height.value_mm
     warnings: list[CadConstructionWarning] = []
     if thickness is None:
@@ -314,7 +377,10 @@ def compute_construction(
     door_height_missing = bool(doors) and door_height is None
     if height is None or door_height_missing:
         warnings.append("height_missing")
-    if any(o.kind == "gap" or o.status == "no_data" for o in host_openings):
+    if any(
+        o.opening_height_mm is None if o.kind == "gap" else o.status == "no_data"
+        for o in host_openings
+    ):
         warnings.append("opening_no_data")
     if any(o.kind == "door" and o.status == "estimate" for o in host_openings):
         warnings.append("opening_estimate")
@@ -340,6 +406,10 @@ def compute_construction(
             above_h = max(0.0, float(height) - float(door_height or 0))
             volume_above = math.fsum(o.width_mm * thickness * above_h for o in volume_doors)
             area_above = math.fsum(o.width_mm * above_h for o in doors)
+            volume_above += math.fsum(
+                o.width_mm * thickness * _gap_above_mm(o, height) for o in volume_gaps
+            )
+            area_above += math.fsum(o.width_mm * _gap_above_mm(o, height) for o in gaps)
             if construction.kind != "frame_partition":
                 volume_m3 = (base_mm3_per_h * height + volume_above) / _MM3_IN_M3
             wall_area_m2 = length_m * height / 1000 + area_above / _MM2_IN_M2
@@ -354,6 +424,7 @@ def compute_construction(
             thickness=thickness_source,
             height=height_source,
             door_height=levels.door_height.source if doors else None,
+            gap_opening_height=_gap_height_source(gaps) if gaps else None,
         ),
         warnings=warnings,
     )
@@ -522,10 +593,15 @@ def compute_lintels(
             if props.height_override_mm is not None
             else levels.wall_height_mm
         )
-        if thickness is None or height is None or door_height is None:
+        opening_height = (
+            opening.opening_height_mm
+            if opening.kind == "gap" and opening.opening_height_mm is not None
+            else door_height
+        )
+        if thickness is None or height is None or opening_height is None:
             without_volume += 1
             continue
-        above = float(height) - float(door_height)
+        above = float(height) - float(opening_height)
         if above <= 0:
             continue
         group = groups[thickness]
@@ -659,7 +735,9 @@ def compute_sheet(
         total_count=len(items_all) + (0 if slab is None else 1),
         thickness_check_count=check_count,
         height_missing_count=height_missing_count,
-        unaccounted_gap_openings=sum(1 for o in document.openings if o.kind == "gap"),
+        unaccounted_gap_openings=sum(
+            1 for o in document.openings if o.kind == "gap" and o.opening_height_mm is None
+        ),
         door_openings_without_host=sum(
             1
             for o in document.openings

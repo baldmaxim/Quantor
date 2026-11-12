@@ -139,6 +139,49 @@ def test_overrides_and_project_slab_follow_effective_levels() -> None:
     assert (floor.floor_height_mm, floor.slab_thickness_mm, floor.base_z_mm) == (3300, 300, 9000)
 
 
+def test_floor_base_is_the_slab_top_of_walls_json_v19_and_old_files_keep_the_sheet_elevation() -> (
+    None
+):
+    new = floor_of(
+        raw_document(floor_elevation_mm=50900, slab_top_elevation_mm=50800, floor_finish_mm=100),
+        raw_extras(),
+    )
+    assert (new.elevation_known, new.base_z_mm) == (True, 50800)
+    assert floor_of(raw_document(), raw_extras()).base_z_mm == BASE
+    # Ручная отметка этажа не уменьшается на пирог пола.
+    document = WallsDocument.model_validate(
+        raw_document(floor_elevation_mm=50900, slab_top_elevation_mm=50800)
+    )
+    levels = CadSheetLevelsRead(
+        floor_height_mm=None, slab_thickness_mm=None, door_height_mm=None, floor_elevation_mm=9000
+    )
+    floor, _ = b3d.build_floor(
+        sheet(overrides=levels), document, WallsFloorExtras.model_validate(raw_extras()), None
+    )
+    assert floor.base_z_mm == 9000
+
+
+def test_floors_stack_on_the_slab_top_base() -> None:
+    def make(elevation: int, slab_top: int, order: int) -> CadBuilding3dFloorRead:
+        raw = raw_document(
+            floor_elevation_mm=elevation, slab_top_elevation_mm=slab_top, floor_height_mm=3300
+        )
+        floor, _ = b3d.build_floor(
+            sheet(order=(0.0, 0.0, order, 1)),
+            WallsDocument.model_validate(raw),
+            WallsFloorExtras.model_validate(raw_extras()),
+            None,
+        )
+        return floor
+
+    upper, lower = make(54200, 54100, 1), make(50900, 50800, 0)
+    ordered = b3d.sort_floors([(upper, (0.0, 0.0, 1, 1)), (lower, (0.0, 0.0, 0, 1))])
+    assert [f.base_z_mm for f in ordered] == [50800, 54100]
+    # Верх стен нижнего этажа (база + высота этажа - плита) = низ плиты верхнего (база - 200 + ...).
+    assert lower.base_z_mm + lower.floor_height_mm - lower.slab_thickness_mm == 53900
+    assert upper.base_z_mm - upper.slab_thickness_mm == 53900
+
+
 def test_floors_are_sorted_known_by_elevation_then_unknown_by_order() -> None:
     def make(elevation: int | None, order: tuple[float, float, int, int]) -> Any:
         raw = raw_document(**({} if elevation is not None else {"floor_elevation_mm": None}))

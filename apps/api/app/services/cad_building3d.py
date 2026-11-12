@@ -249,7 +249,7 @@ def build_floor(
         document_id=sheet.document_id,
         label=format_floor_title(document.heights.title, sheet.label),
         elevation_known=levels.elevation_mm is not None,
-        base_z_mm=levels.elevation_mm if levels.elevation_mm is not None else 0,
+        base_z_mm=levels.base_z_mm,
         floor_height_mm=DEFAULT_FLOOR_HEIGHT_MM if floor_height is None else floor_height,
         floor_height_known=floor_height is not None,
         slab_thickness_mm=DEFAULT_SLAB_THICKNESS_MM if thickness is None else thickness,

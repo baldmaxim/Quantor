@@ -71,6 +71,7 @@ def document(
     openings: list[dict[str, Any]] | None = None,
     *,
     floor_height: int | None = 3000,
+    heights_patch: dict[str, Any] | None = None,
 ) -> WallsDocument:
     return WallsDocument.model_validate(
         {
@@ -91,6 +92,7 @@ def document(
                 "slab_status": "assumption",
                 "door_height_mm": 2100,
                 "door_height_status": "assumption",
+                **(heights_patch or {}),
             },
             "constructions": constructions,
             "openings": openings or [],
@@ -426,3 +428,158 @@ def test_lintel_group_key_and_coverage_do_not_merge_with_monolith_walls() -> Non
     assert by_key[key].element == "lintel"
     assert by_key["monolith_wall|200|"].element == "construction"
     assert set(by_key) == {"masonry|200|", "monolith_wall|200|", key}
+
+
+# ------------------------------------------------------------------ разрывы с высотой (v1.9)
+
+
+def gap(
+    key: str,
+    host: str | None,
+    *,
+    width: float = 1000.0,
+    height: int | None = 2100,
+    status: str | None = "assumption",
+) -> dict[str, Any]:
+    item = opening(key, host, kind="gap", status="no_data", width=width)
+    if height is not None:
+        item["opening_height_mm"] = height
+        item["opening_height_status"] = status
+    return item
+
+
+def test_gap_with_height_adds_the_part_above_like_a_door() -> None:
+    doc = document([construction()], [gap("g1", "c1", width=1200.0)])
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    computed = result.constructions[0].computed
+    above = 2800 - 2100
+    assert computed.volume_m3 == pytest.approx((1_000_000 * 2800 + 1200 * 200 * above) / 1e9)
+    assert computed.wall_area_m2 == pytest.approx(5.0 * 2.8 + 1200 * above / 1e6)
+    assert computed.sources.gap_opening_height == "assumption"
+    assert computed.sources.door_height is None
+    # Высота известна: предупреждения и счётчика неучтённых разрывов нет.
+    assert "opening_no_data" not in computed.warnings
+    assert result.summary.unaccounted_gap_openings == 0
+
+
+def test_gap_uses_its_own_height_not_the_door_height() -> None:
+    doc = document([construction()], [gap("g1", "c1", height=2400)])
+    computed = calc.compute_sheet(doc, {}, NO_LEVELS).constructions[0].computed
+    assert computed.volume_m3 == pytest.approx((1_000_000 * 2800 + 1000 * 200 * 400) / 1e9)
+
+
+def test_gap_height_equal_or_above_wall_adds_nothing() -> None:
+    doc = document([construction()], [gap("g1", "c1", height=2800)])
+    computed = calc.compute_sheet(doc, {}, NO_LEVELS).constructions[0].computed
+    assert computed.volume_m3 == pytest.approx(2.8)
+
+
+def test_gap_without_height_is_as_before() -> None:
+    doc = document([construction()], [gap("g1", "c1", height=None)])
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    computed = result.constructions[0].computed
+    assert computed.volume_m3 == pytest.approx(2.8)
+    assert computed.warnings == ["opening_no_data"]
+    assert computed.sources.gap_opening_height is None
+    assert result.summary.unaccounted_gap_openings == 1
+
+
+def test_only_gaps_without_height_stay_unaccounted_and_warn() -> None:
+    doc = document([construction()], [gap("g1", "c1"), gap("g2", "c1", height=None)])
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    assert result.summary.unaccounted_gap_openings == 1
+    assert result.constructions[0].computed.warnings == ["opening_no_data"]
+
+
+def test_count_openings_false_ignores_gap_height() -> None:
+    doc = document([construction()], [gap("g1", "c1")])
+    computed = (
+        calc.compute_sheet(
+            doc, {"c1": (CadConstructionProps(count_openings=False), False)}, NO_LEVELS
+        )
+        .constructions[0]
+        .computed
+    )
+    assert computed.volume_m3 == pytest.approx(2.8)
+    assert computed.sources.gap_opening_height is None
+
+
+def test_gap_height_source_is_the_least_reliable_of_the_gaps() -> None:
+    doc = document(
+        [construction()],
+        [gap("g1", "c1", status="observed"), gap("g2", "c1", status="assumption")],
+    )
+    computed = calc.compute_sheet(doc, {}, NO_LEVELS).constructions[0].computed
+    assert computed.sources.gap_opening_height == "assumption"
+
+
+def test_monolith_lintel_over_a_gap_with_height_leaves_the_host_volume_and_uses_gap_height() -> (
+    None
+):
+    item = with_lintel(gap("g1", "c1", height=2000))
+    result = calc.compute_sheet(document([construction()], [item]), {}, NO_LEVELS)
+    host = result.constructions[0].computed
+    # Объём кладки без надпроёмной части; поверхность под отделку - с ней (2800 - 2000 = 800).
+    assert host.volume_m3 == pytest.approx(2.8)
+    assert host.wall_area_m2 == pytest.approx(5.0 * 2.8 + 1000 * 800 / 1e6)
+    group = lintel_group(result)
+    # 200 000 мм2 x 800 мм = 0,16 м3.
+    assert group.count == 1 and group.volume_m3 == pytest.approx(0.16)
+    assert result.summary.lintels_without_volume == 0
+
+
+def test_monolith_lintel_over_a_gap_with_height_stays_in_a_monolith_host() -> None:
+    item = with_lintel(gap("g1", "c1", height=2000), "monolith")
+    result = calc.compute_sheet(
+        document([construction(kind="monolith_wall")], [item]), {}, NO_LEVELS
+    )
+    assert lintel_group(result) is None
+    assert result.constructions[0].computed.volume_m3 == pytest.approx(
+        (1_000_000 * 2800 + 1000 * 200 * 800) / 1e9
+    )
+
+
+def test_gap_lintel_without_door_height_uses_gap_height() -> None:
+    doc = document(
+        [construction()],
+        [with_lintel(gap("g1", "c1", height=2000))],
+        heights_patch={"door_height_mm": None, "door_height_status": "missing"},
+    )
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    assert lintel_group(result).volume_m3 == pytest.approx(0.16)
+    assert result.summary.lintels_without_volume == 0
+
+
+# ------------------------------------------------------------------ верх плиты (cad_walls v1.9)
+
+
+def test_effective_levels_base_from_slab_top_then_sheet_elevation_then_zero() -> None:
+    new = document(
+        [construction()],
+        heights_patch={
+            "floor_elevation_mm": 50900,
+            "elevation_status": "observed",
+            "slab_top_elevation_mm": 50800,
+            "floor_finish_mm": 100,
+        },
+    ).heights
+    levels = calc.effective_levels(new, NO_LEVELS)
+    assert (levels.base_z_mm, levels.opening_floor_z_mm, levels.elevation_mm) == (
+        50800,
+        50900,
+        50900,
+    )
+    # Ручная отметка этажа - без вычета пирога, проёмы от неё же.
+    manual = CadSheetLevelsRead(
+        floor_height_mm=None, slab_thickness_mm=None, door_height_mm=None, floor_elevation_mm=9000
+    )
+    levels = calc.effective_levels(new, manual)
+    assert (levels.base_z_mm, levels.opening_floor_z_mm, levels.slab_top_mm) == (9000, 9000, None)
+    # Старый файл: отметка листа = база.
+    old = document(
+        [construction()],
+        heights_patch={"floor_elevation_mm": 47600, "elevation_status": "observed"},
+    ).heights
+    levels = calc.effective_levels(old, NO_LEVELS)
+    assert (levels.base_z_mm, levels.opening_floor_z_mm) == (47600, 47600)
+    assert calc.effective_levels(document([construction()]).heights, NO_LEVELS).base_z_mm == 0

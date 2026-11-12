@@ -1541,6 +1541,23 @@
             ],
             "title": "Door Height"
           },
+          "gap_opening_height": {
+            "anyOf": [
+              {
+                "enum": [
+                  "observed",
+                  "derived",
+                  "assumption",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap Opening Height"
+          },
           "height": {
             "anyOf": [
               {

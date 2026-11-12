@@ -783,6 +783,10 @@ export type CadComputedSourcesRead = {
      */
     door_height: 'observed' | 'derived' | 'assumption' | 'manual' | null;
     /**
+     * Gap Opening Height
+     */
+    gap_opening_height?: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    /**
      * Height
      */
     height: 'observed' | 'derived' | 'assumption' | 'manual' | null;

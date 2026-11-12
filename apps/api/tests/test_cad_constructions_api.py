@@ -111,6 +111,9 @@ doc = {
     "checks": {"area_union_mm2": 1.0, "area_constructions_mm2": 1.0, "residue_ratio": 0.0,
                "warnings": [{"code": "area_residue", "message": "тест"}]},
 }
+if mode == "slabwarn":
+    doc["checks"]["warnings"].append(
+        {"code": "slab_without_zones", "message": "плита по стенам"})
 if mode == "gone":
     doc["constructions"] = [c for c in doc["constructions"] if c["id"] != "aaaaaaaaaaaa"]
 out = pathlib.Path(args.out)
@@ -529,6 +532,7 @@ async def test_read_constructions_computes_values_and_sources(
             "thickness": "derived",
             "height": "derived",
             "door_height": "assumption",
+            "gap_opening_height": None,
         }
         gap_host = _construction(body, "bbbbbbbbbbbb")["computed"]
         assert gap_host["warnings"] == ["opening_no_data"]
@@ -546,6 +550,8 @@ async def test_read_constructions_computes_values_and_sources(
             "unaccounted_gap_openings": 1,
             "door_openings_without_host": 0,
             "lintels_without_volume": 0,
+            "orphaned_props": 0,
+            "props_carried_over": 0,
         }
         assert [(g["kind"], g["thickness_mm"], g["count"]) for g in body["totals"]] == [
             ("masonry", 100.0, 1),
@@ -1046,3 +1052,23 @@ async def test_constructions_are_not_ready_when_the_dxf_changed_after_the_walls_
             _url(project_id, job_id, "constructions/aaaaaaaaaaaa/props"), json={"props": {}}
         )
         assert put.status_code == 404 and put.json()["detail"]["code"] == "CAD_WALLS_NOT_READY"
+
+
+async def test_generator_warning_slab_without_zones_reaches_the_response(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    walls_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(walls_tools, tmp_path)
+    (walls_tools / "mode").write_text("slabwarn")
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _rev, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        body = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert body["warnings"] == [
+            {"code": "area_residue", "message": "тест"},
+            {"code": "slab_without_zones", "message": "плита по стенам"},
+        ]

@@ -41,6 +41,9 @@ class WallsSlab(BaseModel):
     shell: list[list[float]]
     area_mm2: float
     close_radius_mm: float | None = None
+    # cad_walls v1.9: `zones` - контур по зонам помещений, `walls_only` - только по стенам.
+    basis: str | None = None
+    needs_review: bool | None = None
 
 
 class WallsSlabHole(BaseModel):

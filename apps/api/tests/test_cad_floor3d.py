@@ -579,3 +579,146 @@ def test_document_without_frame_partitions_builds_as_before() -> None:
     model = build()
     assert [w.family for w in model.walls] == ["masonry", "monolith"]
     assert all(w.kind != "frame_partition" for w in model.walls)
+
+
+# ------------------------------------------------------------------ верх плиты, разрывы (v1.9)
+
+SLAB_TOP = 50800
+CLEAN_FLOOR = 50900
+V19 = {
+    "floor_elevation_mm": CLEAN_FLOOR,
+    "floor_height_mm": 3300,
+    "floor_elevation_basis": "clean_floor",
+    "floor_finish_mm": 100,
+    "floor_finish_status": "assumption",
+    "slab_top_elevation_mm": SLAB_TOP,
+    "gap_opening_height_mm": 2100,
+    "gap_opening_height_status": "assumption",
+}
+
+
+def test_base_is_the_slab_top_and_walls_slab_and_openings_follow_it() -> None:
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = LEAF
+    model = build(heights_patch=V19, extras=extras)
+    # Отметка листа 50900 - чистый пол; верх плиты 50800; этаж 3300, плита 200.
+    assert model.base_z_mm == SLAB_TOP and model.elevation_known is True
+    assert model.heights.floor_elevation_mm == CLEAN_FLOOR
+    assert model.slab is not None
+    assert (model.slab.z_top_mm, model.slab.z_bottom_mm) == (50800, 50600)
+    assert all((w.z_bottom_mm, w.z_top_mm) == (50800, 53900) for w in model.walls)
+    # Низ плиты перекрытия над этажом = верх стен.
+    assert model.walls[0].z_top_mm == 53900
+    (door,) = model.doors
+    assert (door.z_bottom_mm, door.z_top_mm) == (50900, 53000)
+    assert (model.lintels[0].z_bottom_mm, model.lintels[0].z_top_mm) == (53000, 53900)
+
+
+def test_manual_floor_elevation_is_not_reduced_by_the_floor_finish() -> None:
+    levels = CadSheetLevelsRead(
+        floor_height_mm=None, slab_thickness_mm=None, door_height_mm=None, floor_elevation_mm=60000
+    )
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = LEAF
+    model = build(heights_patch=V19, extras=extras, overrides=levels)
+    assert model.base_z_mm == 60000
+    assert model.slab is not None and model.slab.z_top_mm == 60000
+    assert model.doors[0].z_bottom_mm == 60000
+    assert model.lintels[0].z_bottom_mm == 60000 + 2100
+
+
+def test_slab_top_null_in_new_file_falls_back_to_the_sheet_elevation() -> None:
+    model = build(heights_patch={**V19, "slab_top_elevation_mm": None, "floor_elevation_mm": BASE})
+    assert model.base_z_mm == BASE
+
+
+def test_old_walls_json_without_new_fields_builds_as_before() -> None:
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = LEAF
+    model = build(extras=extras)
+    assert model.base_z_mm == BASE
+    assert (model.doors[0].z_bottom_mm, model.doors[0].z_top_mm) == (BASE, BASE + 2100)
+    assert (model.lintels[0].z_bottom_mm, model.lintels[0].z_top_mm) == (BASE + 2100, BASE + 2800)
+
+
+def gap_document(*, height: int | None = 2000, status: str | None = "assumption") -> dict[str, Any]:
+    raw = raw_document(**V19)
+    raw["openings"][0]["kind"] = "gap"
+    raw["openings"][0]["status"] = "no_data"
+    if height is not None:
+        raw["openings"][0]["opening_height_mm"] = height
+        raw["openings"][0]["opening_height_status"] = status
+    return raw
+
+
+def build_gap(raw: dict[str, Any], zones: list[f3d.DoorZoneMm] | None = None) -> Any:
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = LEAF
+    return f3d.build_floor3d(
+        WallsDocument.model_validate(raw),
+        WallsFloorExtras.model_validate(extras),
+        props_by_key={},
+        overrides=NO_LEVELS,
+        project_slab=None,
+        hole_decisions={},
+        door_zones=zones or [],
+    )
+
+
+def test_gap_height_is_taken_from_the_opening_and_counted_from_the_clean_floor() -> None:
+    model = build_gap(gap_document(height=2000, status="assumption"))
+    (lintel,) = model.lintels
+    assert lintel.kind == "gap"
+    assert (lintel.z_bottom_mm, lintel.z_top_mm) == (CLEAN_FLOOR + 2000, 53900)
+    assert (lintel.door_height_mm, lintel.door_height_source) == (2000, "assumption")
+    assert model.doors[0].door_height_mm == 2000
+    assert (model.doors[0].z_bottom_mm, model.doors[0].z_top_mm) == (
+        CLEAN_FLOOR,
+        CLEAN_FLOOR + 2000,
+    )
+
+
+def test_gap_zone_height_of_a_human_beats_the_opening_height() -> None:
+    near = f3d.DoorZoneMm((500.0, 100.0), (1500.0, 100.0), 2300)
+    model = build_gap(gap_document(height=2000), [near])
+    assert (model.lintels[0].door_height_mm, model.lintels[0].door_height_source) == (
+        2300,
+        "manual",
+    )
+
+
+def test_gap_without_height_uses_the_door_height_as_before() -> None:
+    model = build_gap(gap_document(height=None))
+    assert (model.lintels[0].door_height_mm, model.lintels[0].door_height_source) == (
+        2100,
+        "assumption",
+    )
+
+
+def test_slab_without_zones_warning_is_passed_to_the_3d_response() -> None:
+    raw = raw_document(**V19)
+    raw["checks"]["warnings"] = [
+        {"code": "slab_without_zones", "message": "плита по стенам, зон помещений нет"},
+        {"code": "area_residue", "message": "посторонний код не переносится"},
+    ]
+    model = f3d.build_floor3d(
+        WallsDocument.model_validate(raw),
+        WallsFloorExtras.model_validate(raw_extras()),
+        props_by_key={},
+        overrides=NO_LEVELS,
+        project_slab=None,
+        hole_decisions={},
+        door_zones=[],
+    )
+    assert codes(model) == ["slab_without_zones"]
+
+
+def test_new_slab_fields_are_parsed_and_old_extras_keep_none() -> None:
+    extras = raw_extras()
+    extras["slab"]["basis"] = "walls_only"
+    extras["slab"]["needs_review"] = True
+    parsed = WallsFloorExtras.model_validate(extras)
+    assert parsed.slab is not None
+    assert (parsed.slab.basis, parsed.slab.needs_review) == ("walls_only", True)
+    old = WallsFloorExtras.model_validate(raw_extras())
+    assert old.slab is not None and (old.slab.basis, old.slab.needs_review) == (None, None)

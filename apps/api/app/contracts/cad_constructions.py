@@ -138,6 +138,9 @@ class WallsOpening(BaseModel):
     # нет у дверей без разрыва и в старых walls.json.
     lintel: list[list[float]] | None = None
     lintel_material: str | None = None
+    # Высота разрыва (`gap`) и её статус (cad_walls v1.9); у дверей и в старых файлах — `None`.
+    opening_height_mm: int | None = None
+    opening_height_status: str | None = None
 
 
 class CadSheetFloorTitle(BaseModel):
@@ -178,6 +181,16 @@ class WallsHeights(BaseModel):
     door_height_status: str
     # Заголовок плана (cad_walls v1.5); у старого файла и без заголовка — `None`.
     title: CadSheetFloorTitle | None = None
+    # cad_walls v1.9: отметка листа АР — чистый пол (`clean_floor`), верх плиты ниже на пирог пола.
+    # Всех полей нет в старых файлах (v1.8 и раньше) — тогда отметка листа = верх плиты.
+    floor_elevation_basis: str | None = None
+    floor_finish_mm: int | None = None
+    floor_finish_status: str | None = None
+    # Отметка верха плиты (чистый пол минус пирог); `None` — отметки листа нет или файл старый.
+    slab_top_elevation_mm: int | None = None
+    # Высота проёмов-разрывов (`gap`): двери лифтов и шахт без дверного блока.
+    gap_opening_height_mm: int | None = None
+    gap_opening_height_status: str | None = None
 
 
 class WallsWarning(BaseModel):
@@ -377,6 +390,8 @@ class CadComputedSourcesRead(BaseModel):
     thickness: CadValueSource | None
     height: CadValueSource | None
     door_height: CadValueSource | None
+    # Происхождение высоты разрывов, чья надпроёмная часть вошла в объём (v1.9): обычно допущение.
+    gap_opening_height: CadValueSource | None = None
 
 
 class CadConstructionComputedRead(BaseModel):

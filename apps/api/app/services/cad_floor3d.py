@@ -6,12 +6,16 @@
 источником. Фронт геометрию не выводит. Величин, кроме справочной площади плиты и отверстий,
 нет: вид в итоги обмера, calc и MEP не входит. Не определено — `None` и предупреждение, не 0.
 
-Высоты (мм): отметка этажа — верх плиты; плита — от `отметка - t` до `отметка`; стена — от
-`отметка` до `отметка + (высота этажа - t)` (или своя высота конструкции от человека); перемычка
-над проёмом — от `отметка + высота двери` до верха стены; полотно двери — от `отметка` до
-`отметка + высота двери`. Высота двери — зона двери человека, содержащая середину перемычки
-(полотна), иначе действующая высота двери листа. У двери без разрыва (`no_data`) перемычки и
-полотна нет: предупреждение `door_without_gap` берётся из walls.json.
+Высоты (мм): база `b` — верх плиты: `heights.slab_top_elevation_mm` из walls.json v1.9 (отметка
+листа АР — чистый пол минус пирог пола), иначе отметка листа (старый файл и ручная отметка этажа
+человека — без вычета пирога), иначе 0. Плита — от `b - t` до `b`; стена — от `b` до
+`b + (высота этажа - t)` (или своя высота конструкции от человека). Проёмы отсчитываются от
+чистого пола `f` (= `b` + пирог пола, если база взята из верха плиты, иначе `f = b`): перемычка
+над проёмом — от `f + высота проёма` до верха стены; полотно двери — от `f` до
+`f + высота проёма`. Высота проёма — зона двери человека, содержащая середину перемычки
+(полотна), у разрыва `gap` затем `opening_height_mm` из walls.json, иначе действующая высота
+двери листа. У двери без разрыва (`no_data`) перемычки и полотна нет: предупреждение
+`door_without_gap` берётся из walls.json.
 """
 
 from __future__ import annotations
@@ -53,6 +57,9 @@ _KEY_LENGTH: Final = 12
 DOOR_ZONE_TOLERANCE_MM: Final = 300.0
 # Код предупреждения cad_walls: дверь без разрыва стены (перемычки и полотна нет).
 DOOR_WITHOUT_GAP: Final = "door_without_gap"
+# Код предупреждения cad_walls v1.9: плита по стенам, без зон помещений (контур требует проверки).
+SLAB_WITHOUT_ZONES: Final = "slab_without_zones"
+_PASSED_WARNING_CODES: Final = frozenset({DOOR_WITHOUT_GAP, SLAB_WITHOUT_ZONES})
 
 Point = tuple[float, float]
 Ring = list[list[float]]
@@ -292,7 +299,7 @@ def build_floor3d(
     warnings.extend(
         CadFloor3dWarningRead(code=w.code, message=w.message)
         for w in document.checks.warnings
-        if w.code == DOOR_WITHOUT_GAP
+        if w.code in _PASSED_WARNING_CODES
     )
     outdated = walls_outdated(document.generator, extras.has_slab_key, current_generator)
     if outdated:
@@ -306,7 +313,8 @@ def build_floor3d(
             )
         )
 
-    base = levels.elevation_mm if levels.elevation_mm is not None else 0
+    base = levels.base_z_mm
+    opening_floor = levels.opening_floor_z_mm
     thickness = levels.slab_thickness.value_mm
     wall_height = levels.wall_height_mm
 
@@ -382,12 +390,15 @@ def build_floor3d(
         source: CadValueSource | None
         if zone_height is not None:
             height_mm, source = zone_height, "manual"
+        elif opening.kind == "gap" and opening.opening_height_mm is not None:
+            height_mm = opening.opening_height_mm
+            source = cad_constructions.source_of(opening.opening_height_status or "assumption")
         else:
             height_mm, source = levels.door_height.value_mm, levels.door_height.source
         if height_mm is None:
             door_height_missing = True
             continue
-        z_bottom = base + height_mm
+        z_bottom = opening_floor + height_mm
         if z_bottom >= top:
             continue
         leaf = leaf_by_id.get(opening.id)
@@ -397,7 +408,7 @@ def build_floor3d(
                     opening_id=opening.id,
                     host_id=opening.host_id,
                     shell=leaf,
-                    z_bottom_mm=base,
+                    z_bottom_mm=opening_floor,
                     z_top_mm=z_bottom,
                     door_height_mm=height_mm,
                     door_height_source=source,
