@@ -229,6 +229,69 @@ class TestImportStatusInList:
 
         assert body["items"][0]["last_job"]["id"] == str(second.id)
 
+    async def test_later_failed_cad_job_does_not_replace_import_job(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        from app.domain import JobType
+        from app.services import jobs as jobs_service
+
+        created = (await api.post("/api/v1/projects", json={"name": "Импорт и CAD"})).json()
+        project = await projects_service.get_project(
+            db_session, workspace_id=workspace_id, project_id=uuid.UUID(created["id"])
+        )
+        assert project is not None
+        imported = await jobs_service.enqueue(
+            db_session,
+            job_type=JobType.LEGACY_IMPORT,
+            workspace_id=workspace_id,
+            project_id=project.id,
+            idempotency_key="import",
+        )
+        await jobs_service.start(db_session, job=imported)
+        await jobs_service.succeed(db_session, job=imported)
+        cad = await jobs_service.enqueue(
+            db_session,
+            job_type=JobType.CAD_ZONES,
+            workspace_id=workspace_id,
+            project_id=project.id,
+            idempotency_key="cad",
+        )
+        await jobs_service.start(db_session, job=cad)
+        await jobs_service.fail(db_session, job=cad, error_code="CAD_FAILED")
+        await db_session.commit()
+
+        listed = (await api.get("/api/v1/projects")).json()
+        card = (await api.get(f"/api/v1/projects/{created['id']}")).json()
+
+        for last_job in (listed["items"][0]["last_job"], card["last_job"]):
+            assert last_job["id"] == str(imported.id)
+            assert last_job["status"] == "succeeded"
+
+    async def test_only_cad_jobs_give_no_last_job(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        from app.domain import JobType
+        from app.services import jobs as jobs_service
+
+        created = (await api.post("/api/v1/projects", json={"name": "Только CAD"})).json()
+        project = await projects_service.get_project(
+            db_session, workspace_id=workspace_id, project_id=uuid.UUID(created["id"])
+        )
+        assert project is not None
+        await jobs_service.enqueue(
+            db_session,
+            job_type=JobType.CAD_ZONES,
+            workspace_id=workspace_id,
+            project_id=project.id,
+        )
+        await db_session.commit()
+
+        listed = (await api.get("/api/v1/projects")).json()
+        card = (await api.get(f"/api/v1/projects/{created['id']}")).json()
+
+        assert listed["items"][0]["last_job"] is None
+        assert card["last_job"] is None
+
     async def test_list_of_many_projects_stays_one_query_shaped(self, api: AsyncClient) -> None:
         """Список со счётчиками и заданиями собирается без обхода по проектам."""
         for index in range(10):

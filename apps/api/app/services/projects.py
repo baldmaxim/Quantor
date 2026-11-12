@@ -16,8 +16,19 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.domain import ProjectSource, ProjectStatus
+from app.domain import JobType, ProjectSource, ProjectStatus
 from app.models import Document, DocumentRevision, Job, Project, Sheet
+
+# Задания конвейера загрузки и импорта документов. Только они задают статус проекта
+# («Готов» / «Ошибка импорта» / «Импорт N %»): сбой CAD, calc, поиска ответов и прочих
+# необязательных контуров не означает, что импорт не прошёл.
+IMPORT_JOB_TYPES: frozenset[JobType] = frozenset(
+    {
+        JobType.LEGACY_IMPORT,
+        JobType.PDF_GEOMETRY_EXTRACT,
+        JobType.SHEET_PASSPORT_EXTRACT,
+    }
+)
 
 
 class ProjectSort(StrEnum):
@@ -188,13 +199,17 @@ def _document_count_subquery() -> Any:
 
 
 def _latest_job() -> Any:
-    """Последнее задание каждого проекта.
+    """Последнее задание импорта каждого проекта (типы — `IMPORT_JOB_TYPES`).
+
+    Задания CAD, calc и прочих контуров не учитываются: иначе их сбой показывался бы как
+    «Ошибка импорта».
 
     DISTINCT ON вместо подзапроса на строку: иначе список из тридцати проектов делает
     тридцать лишних обращений к базе.
     """
     subquery = (
         select(Job)
+        .where(Job.job_type.in_(IMPORT_JOB_TYPES))
         .distinct(Job.project_id)
         # id как тай-брейкер: два задания, созданные в одной транзакции, могут
         # получить одинаковый created_at с точностью до микросекунд.
