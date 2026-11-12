@@ -8,6 +8,7 @@ import { useViewportInput } from '@/components/viewer/useViewportInput';
 import { useViewportLayers } from '@/components/viewer/useViewportLayers';
 import type { RenderBackend } from '@/lib/viewer/backend';
 import type { Camera, CameraState } from '@/lib/viewer/camera';
+import { decideFit, type IHostSize } from '@/lib/viewer/fit-gate';
 import { GestureSettle } from '@/lib/viewer/gesture-settle';
 import type { OverlayRegion } from '@/lib/viewer/overlay';
 import type { ScaleDraft } from '@/lib/viewer/scale-draft';
@@ -262,14 +263,32 @@ export const DrawingViewport = ({
     const element = host.current;
     if (!element || !page) return;
 
-    camera.fitPage(
-      { width: page.width, height: page.height },
-      { width: element.clientWidth, height: element.clientHeight },
-    );
+    const content = { width: page.width, height: page.height };
+    const hostSize = (): IHostSize => ({ width: element.clientWidth, height: element.clientHeight });
 
-    let left = element.getBoundingClientRect().left;
-    let top = element.getBoundingClientRect().top;
+    // Скрытая область (`hidden lg:flex` на узком окне) даёт размер 0x0: вписка при нём дала бы
+    // минимальный масштаб. Откладываем её до первого ненулевого размера.
+    let fitPending = true;
+    let left = 0;
+    let top = 0;
+    const fitIfReady = (): boolean => {
+      const size = hostSize();
+      if (decideFit(size, fitPending) !== 'fit') return false;
+      camera.fitPage(content, size);
+      fitPending = false;
+      const rect = element.getBoundingClientRect();
+      left = rect.left;
+      top = rect.top;
+      return true;
+    };
+    fitIfReady();
+
     const keepPlace = () => {
+      if (fitPending) {
+        if (!fitIfReady()) return;
+        applyCameraRef.current(camera.getState());
+        return;
+      }
       const rect = element.getBoundingClientRect();
       const deltaX = left - rect.left;
       const deltaY = top - rect.top;

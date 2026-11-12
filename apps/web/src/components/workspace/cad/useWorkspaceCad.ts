@@ -47,7 +47,11 @@ import type {
   IWorkspaceCadSideProps,
   WorkspaceCadState,
 } from './types';
-import { layerVisibilityKey, useCadLayerVisibility } from './useCadLayerVisibility';
+import {
+  layerVisibilityKey,
+  legacyLayerVisibilityKey,
+  useCadLayerVisibility,
+} from './useCadLayerVisibility';
 import { useWorkspaceCadConstructions } from './useWorkspaceCadConstructions';
 import { useWorkspaceCadJob } from './useWorkspaceCadJob';
 import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
@@ -207,8 +211,9 @@ export const useWorkspaceCad = ({
   // Слои - один источник правды для плана и 3D: по именам, не сбрасываются при смене режима и вида.
   const layerNames = useMemo(() => preview?.layers ?? [], [preview]);
   const visibility = useCadLayerVisibility(
-    params ? layerVisibilityKey(params.jobId, params.pageIndex) : null,
+    params && revisionId !== null ? layerVisibilityKey(revisionId, params.pageIndex) : null,
     layerNames,
+    params ? legacyLayerVisibilityKey(params.jobId, params.pageIndex) : null,
   );
   const { hiddenLayers } = visibility;
   const visibleLayers = useMemo<ReadonlySet<number>>(

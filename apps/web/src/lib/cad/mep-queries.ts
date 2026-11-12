@@ -24,6 +24,7 @@ import { unwrap } from '@/lib/queries';
 
 import { cadArtifactUrl } from './artifacts';
 import { parseCandidate, viewFolder, type MepCandidate } from './mep-candidate';
+import { cadPipelineKey } from './pipeline-queries';
 import { cadKeys } from './queries';
 import { cadViewKeys, type ICadViewParams } from './view-queries';
 
@@ -51,6 +52,8 @@ const refresh = (client: QueryClient, params: ICadViewParams): void => {
     queryKey: cadKeys.job(params.projectId, params.revisionId, params.jobId),
   });
   void client.invalidateQueries({ queryKey: cadViewKeys.diagnostics(params) });
+  // Конвейер листа (одобрение, трассы) берёт этапы из своего ответа: без сброса бейдж устаревает.
+  void client.invalidateQueries({ queryKey: cadPipelineKey(params.projectId, params.revisionId) });
 };
 
 interface IDecisionInput {

@@ -1,10 +1,14 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { layerVisibilityKey, useCadLayerVisibility } from './useCadLayerVisibility';
+import {
+  layerVisibilityKey,
+  legacyLayerVisibilityKey,
+  useCadLayerVisibility,
+} from './useCadLayerVisibility';
 
 const NAMES = ['01_КЛАДКА', '02_МОНОЛИТ', '04_ОСИ'] as const;
-const KEY = layerVisibilityKey('job-1', 3);
+const KEY = layerVisibilityKey('rev-1', 3);
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -54,7 +58,7 @@ describe('видимость слоёв листа', () => {
   });
 
   it('смена листа читает его собственный выбор', () => {
-    const other = layerVisibilityKey('job-1', 4);
+    const other = layerVisibilityKey('rev-1', 4);
     window.localStorage.setItem(other, JSON.stringify({ layers: ['01_КЛАДКА'], extra: [] }));
     const { result, rerender } = renderHook(({ key }) => useCadLayerVisibility(key, NAMES), {
       initialProps: { key: KEY },
@@ -95,5 +99,50 @@ describe('видимость слоёв листа', () => {
     const { result } = renderHook(() => useCadLayerVisibility(null, NAMES));
     act(() => result.current.toggleLayer(0));
     expect(window.localStorage.length).toBe(0);
+  });
+
+  it('миграция v1 -> v2: старая запись по заданию читается один раз и переписывается в v2', () => {
+    const legacy = legacyLayerVisibilityKey('job-1', 3);
+    window.localStorage.setItem(legacy, JSON.stringify({ layers: ['01_КЛАДКА'], extra: ['slab'] }));
+    const { result } = renderHook(() => useCadLayerVisibility(KEY, NAMES, legacy));
+    expect([...result.current.hiddenLayers]).toEqual([0]);
+    expect([...result.current.hiddenCategories].sort()).toEqual(['masonry', 'slab']);
+    expect(JSON.parse(window.localStorage.getItem(KEY) ?? '{}')).toEqual({
+      layers: ['01_КЛАДКА'],
+      extra: ['slab'],
+    });
+    // Запись только в v2: v1 не меняется.
+    act(() => result.current.toggleLayer(0));
+    expect(JSON.parse(window.localStorage.getItem(legacy) ?? '{}')).toEqual({
+      layers: ['01_КЛАДКА'],
+      extra: ['slab'],
+    });
+    expect(JSON.parse(window.localStorage.getItem(KEY) ?? '{}')).toEqual({ layers: [], extra: ['slab'] });
+  });
+
+  it('запись v2 приоритетнее v1', () => {
+    const legacy = legacyLayerVisibilityKey('job-1', 3);
+    window.localStorage.setItem(legacy, JSON.stringify({ layers: ['01_КЛАДКА'], extra: [] }));
+    window.localStorage.setItem(KEY, JSON.stringify({ layers: ['02_МОНОЛИТ'], extra: [] }));
+    const { result } = renderHook(() => useCadLayerVisibility(KEY, NAMES, legacy));
+    expect([...result.current.hiddenLayers]).toEqual([1]);
+  });
+
+  it('новое задание того же листа сохраняет выбор: ключ не зависит от job', () => {
+    const first = renderHook(() =>
+      useCadLayerVisibility(KEY, NAMES, legacyLayerVisibilityKey('job-1', 3)),
+    );
+    act(() => first.result.current.toggleLayer(1));
+    first.unmount();
+    const second = renderHook(() =>
+      useCadLayerVisibility(KEY, NAMES, legacyLayerVisibilityKey('job-2', 3)),
+    );
+    expect([...second.result.current.hiddenLayers]).toEqual([1]);
+  });
+
+  it('слоя нет в новом DXF - он просто не попадает в скрытые', () => {
+    window.localStorage.setItem(KEY, JSON.stringify({ layers: ['99_СТАРЫЙ'], extra: [] }));
+    const { result } = renderHook(() => useCadLayerVisibility(KEY, NAMES));
+    expect(result.current.hiddenLayers.size).toBe(0);
   });
 });

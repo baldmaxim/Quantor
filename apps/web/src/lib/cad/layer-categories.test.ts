@@ -112,3 +112,35 @@ describe('скрытие конструкций слоями-источника�
     expect(layerGroupKeyOf([])).toBeUndefined();
   });
 });
+
+describe('плита скрывается своей строкой «Плита»', () => {
+  const items = [
+    { id: 'slab', kind: 'floor_slab' as const, source_layers: [] },
+    { id: 'a', kind: 'masonry' as const, source_layers: ['01_КЛАДКА'] },
+  ];
+
+  it('строка «Плита» -> категория slab (3D: плита и отверстия) без слоёв DXF', () => {
+    const hidden = hiddenCategoriesOf(['01_КЛАДКА'], new Set(), new Set(['slab']));
+    expect([...hidden]).toEqual(['slab']);
+  });
+
+  it('скрытые конструкции: плита по категории, кладка остаётся', () => {
+    const hidden = hiddenCategoriesOf([], new Set(), new Set(['slab']));
+    expect([...hiddenConstructionIdsOf(items, hidden, new Set())]).toEqual(['slab']);
+  });
+
+  it('2D-фигуры: floor_slab пропадает при скрытой плите, без неё остаётся', () => {
+    const shapes = [
+      { id: 'slab', kind: 'floor_slab' as const },
+      { id: 'a', kind: 'masonry' as const },
+    ];
+    const hidden = hiddenCategoriesOf([], new Set(), new Set(['slab']));
+    expect(withoutHiddenCategories(shapes, hidden).map((s) => s.id)).toEqual(['a']);
+    expect(withoutHiddenCategories(shapes, hiddenCategoriesOf([], new Set(), new Set())).length).toBe(2);
+  });
+
+  it('скрытая строка «Перемычки» плиту не трогает', () => {
+    const hidden = hiddenCategoriesOf([], new Set(), new Set(['lintel']));
+    expect(hiddenConstructionIdsOf(items, hidden, new Set()).size).toBe(0);
+  });
+});

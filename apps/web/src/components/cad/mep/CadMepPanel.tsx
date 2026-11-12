@@ -42,6 +42,7 @@ export const CadMepPanel: FC<IWorkspaceCadMep> = ({
           parent={parent}
           onCreated={onSelectRoute}
           hasRoutes={routeJobs.some((item) => item.approval_id === approval.id)}
+          knownRouteJobIds={routeJobs.map((item) => item.job_id)}
           sections={sections}
         />
       ) : (

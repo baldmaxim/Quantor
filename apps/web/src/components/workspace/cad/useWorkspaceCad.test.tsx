@@ -540,7 +540,7 @@ describe('useWorkspaceCad: слои и область проверки масш�
     const first = mount({ jobParam: JOB_ID, viewParam: 1 });
     act(() => first.result.current.side.view?.layers.onToggleLayer(0));
     const stored = Object.entries(window.localStorage).filter(([key]) =>
-      key.startsWith('quantor.cad.layers-hidden.v1:'),
+      key.startsWith('quantor.cad.layers-hidden.v2:'),
     );
     expect(stored).toHaveLength(1);
     first.unmount();

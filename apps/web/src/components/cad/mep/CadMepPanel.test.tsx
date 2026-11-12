@@ -172,7 +172,7 @@ describe('вкладка «Трассы»: построение', () => {
   });
 
   it('по умолчанию полей нет: отметка и высота определяются по документации', async () => {
-    api.createCadMepRoutes.mockResolvedValue({ data: { job_id: 'job-route' } });
+    api.createCadMepRoutes.mockResolvedValue({ data: { job_id: 'job-route', status: 'queued', attempt: 0 } });
     const value = mep({ approval: decision('view_approval') });
     mount(value);
     expect(
@@ -184,6 +184,30 @@ describe('вкладка «Трассы»: построение', () => {
     expect(api.createCadMepRoutes.mock.calls[0]?.[0]).toMatchObject({
       body: { attempt: 2, floor_elevation_mm: null, floor_height_mm: null },
     });
+  });
+
+  it('новое задание - без сообщения о прежнем', async () => {
+    api.createCadMepRoutes.mockResolvedValue({
+      data: { job_id: 'job-route', status: 'queued', attempt: 0 },
+    });
+    const value = mep({ approval: decision('view_approval') });
+    mount(value);
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    await waitFor(() => expect(value.onSelectRoute).toHaveBeenCalledWith('job-route'));
+    expect(screen.queryByText(/с этими параметрами/)).toBeNull();
+  });
+
+  it('прежнее готовое задание: открыто и сказано, что трассы уже построены', async () => {
+    api.createCadMepRoutes.mockResolvedValue({
+      data: { job_id: 'job-route', status: 'succeeded', attempt: 1 },
+    });
+    const value = mep({ approval: decision('view_approval') });
+    mount(value);
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    await waitFor(() => expect(value.onSelectRoute).toHaveBeenCalledWith('job-route'));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Трассы с этими параметрами уже построены — открыт готовый результат.',
+    );
   });
 
   it('предупреждение постановки о неоднозначной высоте по разрезам показывается текстом', async () => {
@@ -219,7 +243,7 @@ describe('вкладка «Трассы»: построение', () => {
   });
 
   it('вводы уходят целыми мм, созданное задание открывается', async () => {
-    api.createCadMepRoutes.mockResolvedValue({ data: { job_id: 'job-route' } });
+    api.createCadMepRoutes.mockResolvedValue({ data: { job_id: 'job-route', status: 'queued', attempt: 0 } });
     const value = mep({ approval: decision('view_approval') });
     mount(value);
     fireEvent.click(screen.getByRole('button', { name: 'Задать вручную' }));

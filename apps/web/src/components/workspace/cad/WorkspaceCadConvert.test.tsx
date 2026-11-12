@@ -53,10 +53,26 @@ describe('WorkspaceCadConvert', () => {
     const onJobCreated = mount();
     fireEvent.click(button());
     expect(mocks.mutate).toHaveBeenCalledTimes(1);
-    expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ pages: [3] });
+    expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ pages: [3], autoScale: true });
     const options = mocks.mutate.mock.calls[0]?.[1] as { onSuccess: (job: unknown) => void };
     act(() => options.onSuccess({ job_id: 'new', requested_pages: [3] }));
     expect(onJobCreated).toHaveBeenCalledWith('new', [3]);
+  });
+
+  it('неповторяемый отказ: показана причина, задание не открывается', () => {
+    const onJobCreated = mount();
+    fireEvent.click(button());
+    const options = mocks.mutate.mock.calls[0]?.[1] as { onSuccess: (job: unknown) => void };
+    act(() =>
+      options.onSuccess({
+        job_id: 'old',
+        status: 'failed',
+        retryable: false,
+        retry_blocked_reason: 'Движок детерминирован.',
+      }),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Движок детерминирован.');
+    expect(onJobCreated).not.toHaveBeenCalled();
   });
 
   it('калибровка читается только у этого листа', () => {
@@ -66,15 +82,21 @@ describe('WorkspaceCadConvert', () => {
     expect(enabled).toBe(true);
   });
 
-  it('нет калибровки: метка и кнопка «Откалибровать», запуск закрыт', () => {
+  it('нет калибровки: метка, подсказка про движок и «Откалибровать»; запуск открыт с автомасштабом', () => {
     mocks.calibration.current = 'missing';
     mount();
     expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Масштаб определит движок по размерам чертежа; если не подтвердится — откалибруйте вручную.',
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Откалибровать' }));
     expect(onCalibrate).toHaveBeenCalledTimes(1);
-    expect(button()).toBeDisabled();
+    expect(button()).toBeEnabled();
     fireEvent.click(button());
-    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(mocks.mutate).toHaveBeenCalledTimes(1);
+    expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ pages: [3], autoScale: true });
   });
 
   it('инструмент «Масштаб» включён: вместо кнопки подсказка', () => {
@@ -106,7 +128,7 @@ describe('WorkspaceCadConvert', () => {
     expect(button()).toBeEnabled();
   });
 
-  it('ответ 409 по этой странице: метка, кнопка и закрытый запуск', () => {
+  it('ответ 409 по этой странице: метка, кнопка «Откалибровать», запуск не закрыт', () => {
     mocks.calibration.current = 'unknown';
     mount();
     fireEvent.click(button());
@@ -117,7 +139,7 @@ describe('WorkspaceCadConvert', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('стр. 4');
     expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Откалибровать' })).toBeInTheDocument();
-    expect(button()).toBeDisabled();
+    expect(button()).toBeEnabled();
   });
 
   it('иной отказ: текст ошибки, запуск остаётся доступным', () => {
@@ -170,7 +192,7 @@ describe('WorkspaceCadConvert', () => {
       const onJobCreated = mountAgain();
       confirm();
       expect(mocks.mutate).toHaveBeenCalledTimes(1);
-      expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ pages: [3] });
+      expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ pages: [3], autoScale: true });
       succeed({ job_id: 'new', requested_pages: [3] });
       expect(onJobCreated).toHaveBeenCalledWith('new', [3]);
       expect(screen.queryByText(/Уже актуально/)).toBeNull();
@@ -194,10 +216,10 @@ describe('WorkspaceCadConvert', () => {
       expect(mocks.mutate).not.toHaveBeenCalled();
     });
 
-    it('нет калибровки: кнопка закрыта', () => {
+    it('нет калибровки: кнопка открыта (автомасштаб), метка видна', () => {
       mocks.calibration.current = 'missing';
       mountAgain();
-      expect(againButton()).toBeDisabled();
+      expect(againButton()).toBeEnabled();
       expect(screen.getByText('Нет калибровки')).toBeInTheDocument();
     });
   });

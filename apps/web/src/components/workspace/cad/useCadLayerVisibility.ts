@@ -9,8 +9,15 @@ import {
   type CadLayerCategory,
 } from '@/lib/cad/layer-categories';
 
-/** Ключ браузерного хранилища скрытых слоёв листа задания. */
-export const layerVisibilityKey = (jobId: string, pageIndex: number): string =>
+/**
+ * Ключ браузерного хранилища скрытых слоёв листа: ревизия документа и страница, не задание, -
+ * новое преобразование того же листа не сбрасывает выбор (хранятся имена слоёв).
+ */
+export const layerVisibilityKey = (revisionId: string, pageIndex: number): string =>
+  `quantor.cad.layers-hidden.v2:${revisionId}:${pageIndex}`;
+
+/** Прежний ключ v1 (по заданию): читается один раз для переноса в v2, не пишется. */
+export const legacyLayerVisibilityKey = (jobId: string, pageIndex: number): string =>
   `quantor.cad.layers-hidden.v1:${jobId}:${pageIndex}`;
 
 interface IStored {
@@ -22,12 +29,10 @@ interface IStored {
 
 const EMPTY: IStored = { layers: [], extra: [] };
 
-/** Чтение с защитой: хранилища нет, JSON битый или формат чужой - ничего не скрыто. */
-export const readLayerVisibility = (key: string | null): IStored => {
-  if (key === null) return EMPTY;
+/** Разбор записи; `null` - записи нет. Битый JSON и чужой формат - ничего не скрыто. */
+const parseStored = (raw: string | null): IStored | null => {
+  if (raw === null) return null;
   try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === null) return EMPTY;
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null) return EMPTY;
     const { layers, extra } = parsed as { layers?: unknown; extra?: unknown };
@@ -39,6 +44,25 @@ export const readLayerVisibility = (key: string | null): IStored => {
         ? EXTRA_CATEGORIES.filter((category) => extra.includes(category))
         : [],
     };
+  } catch {
+    return EMPTY;
+  }
+};
+
+/**
+ * Чтение с защитой: хранилища нет, JSON битый или формат чужой - ничего не скрыто. Записи v2 нет,
+ * а есть `legacyKey` (v1 по заданию) - берётся она и разово переписывается в v2.
+ */
+export const readLayerVisibility = (key: string | null, legacyKey: string | null = null): IStored => {
+  if (key === null) return EMPTY;
+  try {
+    const current = parseStored(window.localStorage.getItem(key));
+    if (current !== null) return current;
+    if (legacyKey === null) return EMPTY;
+    const legacy = parseStored(window.localStorage.getItem(legacyKey));
+    if (legacy === null) return EMPTY;
+    writeLayerVisibility(key, legacy);
+    return legacy;
   } catch {
     return EMPTY;
   }
@@ -75,20 +99,21 @@ export interface ICadLayerVisibility {
 /**
  * Видимость слоёв листа - один источник правды для плана и 3D. Скрытые слои хранятся по именам,
  * не сбрасываются при смене вида и режима «план/3D» и переживают перезагрузку (localStorage по
- * заданию и странице). `storageKey = null` - вида нет, ничего не скрыто и не пишется.
+ * листу и странице). `legacyKey` - ключ v1 по заданию для разового переноса. `storageKey = null` - вида нет, ничего не скрыто и не пишется.
  */
 export const useCadLayerVisibility = (
   storageKey: string | null,
   layerNames: readonly string[],
+  legacyKey: string | null = null,
 ): ICadLayerVisibility => {
   const [state, setState] = useState<{ key: string | null; value: IStored }>(() => ({
     key: storageKey,
-    value: readLayerVisibility(storageKey),
+    value: readLayerVisibility(storageKey, legacyKey),
   }));
   // Лист другой - читаем его выбор из хранилища.
   let current = state.value;
   if (state.key !== storageKey) {
-    current = readLayerVisibility(storageKey);
+    current = readLayerVisibility(storageKey, legacyKey);
     setState({ key: storageKey, value: current });
   }
 

@@ -247,6 +247,7 @@ export const useRetryCadJob = (
       client.setQueryData(cadKeys.job(projectId, revisionId, jobId), job);
       void client.invalidateQueries({ queryKey: cadKeys.job(projectId, revisionId, jobId) });
       void client.invalidateQueries({ queryKey: cadKeys.jobs(projectId, revisionId) });
+      void client.invalidateQueries({ queryKey: cadPipelineKey(projectId, revisionId) });
     },
   });
 };

@@ -10,7 +10,6 @@ import { useSheetCalibrationStates } from '@/lib/cad/sheet-queries';
 import {
   CALIBRATION_UNAVAILABLE_TEXT,
   calibrationPagesOf,
-  canLaunchCad,
   type SheetCalibrationState,
 } from '@/lib/cad/sheets';
 import { useFeatures } from '@/lib/queries';
@@ -19,10 +18,12 @@ import { useWorkspaceStore } from '@/store/workspace';
 import type { IWorkspaceCadConvert } from './types';
 
 /**
- * Кнопка «Преобразовать лист в CAD»: задание на одну страницу открытого листа. Масштаб сервер
- * берёт из калибровки листа (ADR-0018), клиент его не передаёт. Лист без калибровки запустить
- * нельзя: рядом кнопка «Откалибровать» включает инструмент «Масштаб» на открытом листе в текущем
- * окне; пока инструмент включён, вместо кнопки показана подсказка.
+ * Кнопка «Преобразовать лист в CAD»: задание на одну страницу открытого листа. Масштаб клиент не
+ * передаёт, только `auto_scale: true`: сервер берёт калибровку листа (ADR-0018), если она есть,
+ * а для некалиброванного листа масштаб определит движок по размерным цепочкам (ADR-0045). Если
+ * не подтвердит — задание упадёт с `CAD_AUTO_SCALE_UNCONFIRMED`, лист калибруют вручную: рядом
+ * кнопка «Откалибровать» включает инструмент «Масштаб» на открытом листе в текущем окне; пока
+ * инструмент включён, показана подсказка.
  *
  * Режим `again` — для листа, уже преобразованного в CAD: вторичная кнопка «Преобразовать заново»
  * с подтверждением. Сервер идемпотентен (ревизия + версия движка + параметры): если он вернул
@@ -45,7 +46,7 @@ export const WorkspaceCadConvert: FC<IWorkspaceCadConvert> = ({
   const create = useCreateCadJob(projectId, revisionId);
   const sheets = useMemo(() => [{ id: sheetId, page_index: pageIndex }], [sheetId, pageIndex]);
   const loaded = useSheetCalibrationStates(sheets, manualEnabled);
-  // Сервер ответил 409: калибровки нет, даже если клиент её не видел.
+  // Сервер ответил 409: калибровки нет, даже если клиент её не видел (при auto_scale не бывает).
   const [serverMissing, setServerMissing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   // Режим «заново»: подтверждение и ответ «задание уже есть».
@@ -57,7 +58,8 @@ export const WorkspaceCadConvert: FC<IWorkspaceCadConvert> = ({
   const read: SheetCalibrationState = loaded.get(pageIndex) ?? 'unknown';
   // Калибровка, появившаяся после отказа (созданная в просмотрщике), снимает блокировку.
   const state: SheetCalibrationState = serverMissing && read !== 'calibrated' ? 'missing' : read;
-  const canLaunch = canLaunchCad([pageIndex], new Map([[pageIndex, state]]));
+  // Лист без калибровки не блокирует запуск: масштаб определит движок. Ждём лишь проверку.
+  const canLaunch = state !== 'loading';
 
   const launch = () => {
     if (launching.current || create.isPending || !canLaunch) return;
@@ -65,10 +67,16 @@ export const WorkspaceCadConvert: FC<IWorkspaceCadConvert> = ({
     setProblem(null);
     setUpToDate(false);
     create.mutate(
-      { pages: [pageIndex] },
+      { pages: [pageIndex], autoScale: true },
       {
         onSuccess: (job) => {
           setConfirming(false);
+          // Сервер сам ставит новую попытку упавшего по сбою инфраструктуры; неповторяемый отказ
+          // (движок детерминирован) возвращается как есть: показываем причину, а не открываем задание.
+          if (job.status === 'failed' && !job.retryable) {
+            setProblem(job.retry_blocked_reason ?? 'Преобразование завершилось отказом, повтор недоступен.');
+            return;
+          }
           // Тот же ключ идемпотентности: сервер вернул текущее задание, повтор ничего не меняет.
           if (again && job.job_id === currentJobId) {
             setUpToDate(true);
@@ -121,10 +129,13 @@ export const WorkspaceCadConvert: FC<IWorkspaceCadConvert> = ({
         </div>
       )}
       {state === 'missing' && (
-        <div className="flex flex-wrap items-center gap-x-[var(--s-4)]">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-[var(--s-4)]">
           <StatusBadge tone="warning" dot={false}>
             Нет калибровки
           </StatusBadge>
+          <p className="m-0 min-w-0 text-xs text-muted [overflow-wrap:anywhere]">
+            Масштаб определит движок по размерам чертежа; если не подтвердится — откалибруйте вручную.
+          </p>
           {manualEnabled ? (
             scaleToolActive ? (
               <span role="status" className="text-xs text-muted">

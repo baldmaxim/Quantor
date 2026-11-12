@@ -9,6 +9,7 @@ import {
   mepErrorText,
   optionalMm,
 } from '@/lib/cad/mep-gates';
+import { reusedRouteNotice } from '@/lib/cad/mep-reuse';
 import { useBuildMepRoutes } from '@/lib/cad/mep-queries';
 import { sectionWarningText } from '@/lib/cad/sections';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
@@ -24,6 +25,8 @@ interface ICadMepBuildProps {
   onCreated: (routeJobId: string) => void;
   /** По действующему одобрению трассы уже строились: правят их пересчётом. */
   hasRoutes?: boolean;
+  /** Id заданий трасс вида, известных панели до нажатия: по ним узнаём прежнее задание. */
+  knownRouteJobIds?: readonly string[];
   /** Разрезы ревизии: блок «Высота из разрезов»; `null` - блока нет. */
   sections?: IWorkspaceCadSectionsLink | null;
 }
@@ -36,6 +39,7 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({
   parent,
   onCreated,
   hasRoutes = false,
+  knownRouteJobIds = [],
   sections = null,
 }) => {
   const build = useBuildMepRoutes(parent);
@@ -46,6 +50,8 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({
   const [problem, setProblem] = useState<string | null>(null);
   // Предупреждения постановки (например, неоднозначная высота по разрезам); в задании тоже хранятся.
   const [warnings, setWarnings] = useState<readonly string[]>([]);
+  // Сервер идемпотентен: при тех же параметрах вернул прежнее задание - скажем об этом.
+  const [reusedNotice, setReusedNotice] = useState<string | null>(null);
 
   const elevationProblem = manual ? elevationError(elevation) : null;
   const heightProblem = manual ? floorHeightError(height) : null;
@@ -56,6 +62,8 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({
     if (!valid || build.isPending) return;
     setProblem(null);
     setWarnings([]);
+    setReusedNotice(null);
+    const known = new Set(knownRouteJobIds);
     build.mutate(
       {
         floorElevationMm: manual ? optionalMm(elevation) : null,
@@ -64,6 +72,7 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({
       {
         onSuccess: (job) => {
           setWarnings(job.warnings ?? []);
+          setReusedNotice(reusedRouteNotice(job, known));
           onCreated(job.job_id);
         },
         onError: (error) => setProblem(mepErrorText(error)),
@@ -124,6 +133,11 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({
         {problem && (
           <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
             {problem}
+          </p>
+        )}
+        {reusedNotice && (
+          <p role="status" className="text-xs text-muted [overflow-wrap:anywhere]">
+            {reusedNotice}
           </p>
         )}
         {warnings.map((code) => (

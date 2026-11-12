@@ -18,6 +18,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
@@ -26,6 +27,8 @@ import { cadCodeText } from './errors';
 import { extractCode } from '@/lib/errors';
 import { unwrap } from '@/lib/queries';
 
+import { building3dKeys } from './building3d-queries';
+import { cadPipelineKey } from './pipeline-queries';
 import type { ICadViewParams } from './view-queries';
 
 /**
@@ -43,6 +46,18 @@ export const WALLS_POLL_MS = 5000;
 export const constructionKeys = {
   view: (params: ICadViewParams) =>
     ['cad-constructions', params.projectId, params.revisionId, params.jobId, params.pageIndex, params.view] as const,
+};
+
+/**
+ * После правки конструкций листа его 3D-модель этажа и здание проекта строятся по другим данным:
+ * ключи инвалидируются, открытый 3D перечитывается. Ключ модели этажа повторяет `floor3dKeys.view`
+ * (импорт из `floor3d-queries` дал бы цикл: тот уже берёт отсюда опрос расчёта).
+ */
+export const invalidateSheet3d = (client: QueryClient, params: ICadViewParams): void => {
+  void client.invalidateQueries({
+    queryKey: ['cad-floor3d', params.projectId, params.revisionId, params.jobId, params.pageIndex, params.view],
+  });
+  void client.invalidateQueries({ queryKey: building3dKeys.project(params.projectId) });
 };
 
 const need = (params: ICadViewParams | null): ICadViewParams => {
@@ -110,7 +125,11 @@ export const useRecomputeCadWalls = (
     mutationFn: async () =>
       unwrap(await recomputeCadWalls({ throwOnError: true, path: pathOf(need(params)) })),
     onSettled: () => {
-      if (params) void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
+      if (!params) return;
+      void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
+      invalidateSheet3d(client, params);
+      // Пересчёт ставит задание cad_walls: этапы конвейера листа меняются.
+      void client.invalidateQueries({ queryKey: cadPipelineKey(params.projectId, params.revisionId) });
     },
   });
 };
@@ -149,6 +168,7 @@ export const useSaveConstructionProps = (
           : current,
       );
       void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
+      invalidateSheet3d(client, params);
     },
   });
 };
@@ -172,7 +192,9 @@ export const useBulkConstructionProps = (
         }),
       ),
     onSuccess: () => {
-      if (params) void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
+      if (!params) return;
+      void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
+      invalidateSheet3d(client, params);
     },
   });
 };
@@ -191,7 +213,9 @@ export const useSaveSheetLevels = (
         }),
       ),
     onSuccess: () => {
-      if (params) void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
+      if (!params) return;
+      void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
+      invalidateSheet3d(client, params);
     },
   });
 };
