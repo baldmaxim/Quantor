@@ -295,6 +295,15 @@ def _length_found(
         )
         found = _Found(value, match.start(), match.end(), 30)
         items.append((_distance(anchor, found.start, found.end), found.start, found))
+    if question.code == DocQuestionCode.LIFT_DOOR_HEIGHT:
+        # «1200*2400» после «Дверь (ширина х высота), мм»: ответ - вторая величина, высота.
+        for rect in _RECT_RE.finditer(text, lo, hi):
+            width, height = int(rect.group("w")), int(rect.group("h"))
+            if height <= width or not _within(question, height):
+                continue
+            value = DocValue(DocValueKind.LENGTH_MM, str(height), (height,), None, None)
+            found = _Found(value, rect.start(), rect.end(), 30)
+            items.append((_distance(anchor, found.start, found.end), found.start, found))
     if bare:
         bare_match = _BARE_RE.match(text, anchor[1])
         if (

@@ -21283,7 +21283,8 @@
           "hot_over_cold_gap",
           "duct_section",
           "cable_tray_section",
-          "apartment_partition_height"
+          "apartment_partition_height",
+          "lift_door_height"
         ],
         "title": "DocQuestionCode",
         "type": "string"

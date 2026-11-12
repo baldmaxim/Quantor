@@ -38,7 +38,14 @@ from app.contracts.cad_floor3d import (
 from app.errors import DomainError, ErrorCode, not_found
 from app.services import cad as cad_service
 from app.services import cad_construction_store as construction_store
-from app.services import cad_floor3d, cad_floor3d_dxf, cad_partitions, cad_views, cad_zones
+from app.services import (
+    cad_floor3d,
+    cad_floor3d_dxf,
+    cad_lift_openings,
+    cad_partitions,
+    cad_views,
+    cad_zones,
+)
 from app.services import cad_floor3d_store as store
 from app.services import projects as projects_service
 from app.services.cad_walls_version import current_walls_generator
@@ -152,9 +159,16 @@ async def _floor3d(
         page_index=sheet.page_index,
         view=sheet.view,
     )
+    extras = _extras(walls)
+    # Разрывы у лифтового холла получают высоту проёма из принятого ответа (как в объёме).
+    lift = cad_lift_openings.apply_lift_door_heights(walls.document, extras, partition)
+    zone_warnings = [
+        *zone_warnings,
+        *(CadFloor3dWarningRead(code=code, message=message) for code, message in lift.warnings),
+    ]
     return cad_floor3d.build_floor3d(
-        walls.document,
-        _extras(walls),
+        lift.document,
+        extras,
         props_by_key=props,
         overrides=overrides,
         project_slab=project_slab,

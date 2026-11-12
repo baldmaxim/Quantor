@@ -37,12 +37,13 @@ def _first_number(value: Any) -> int | None:
     return first if isinstance(first, int) and not isinstance(first, bool) else None
 
 
-async def apartment_partition_height(
-    session: AsyncSession, *, project_id: uuid.UUID
+async def accepted_answer_height(
+    session: AsyncSession, *, project_id: uuid.UUID, code: DocQuestionCode
 ) -> PartitionHeight | None:
-    """Последний принятый ответ проекта «высота маячного ряда»; нет ответа или число вне пределов -
-    `None`. Происхождение: из документа - `observed`, введено человеком - `manual`."""
-    question = question_by_code(DocQuestionCode.APARTMENT_PARTITION_HEIGHT)
+    """Последний принятый ответ проекта на вопрос с одной величиной в мм; нет ответа или число вне
+    пределов вопроса - `None`. Происхождение: из документа - `observed`, введено человеком -
+    `manual`."""
+    question = question_by_code(code)
     rows = await session.scalars(
         select(DocQuestionAnswer)
         .where(
@@ -67,6 +68,24 @@ async def apartment_partition_height(
             quote=row.quote,
         )
     return None
+
+
+async def apartment_partition_height(
+    session: AsyncSession, *, project_id: uuid.UUID
+) -> PartitionHeight | None:
+    """Принятая высота маячного ряда внутриквартирных перегородок."""
+    return await accepted_answer_height(
+        session, project_id=project_id, code=DocQuestionCode.APARTMENT_PARTITION_HEIGHT
+    )
+
+
+async def lift_door_height(
+    session: AsyncSession, *, project_id: uuid.UUID
+) -> PartitionHeight | None:
+    """Принятая высота проёма двери шахты лифта."""
+    return await accepted_answer_height(
+        session, project_id=project_id, code=DocQuestionCode.LIFT_DOOR_HEIGHT
+    )
 
 
 async def _artifact_json(
@@ -141,6 +160,9 @@ async def sheet_partition_zones(
                     kind=zone.kind,
                     apartment_no=zone.apartment_no,
                     shell=[[x, y] for x, y in mapped[0].shell],
+                    room_type=cad_zones.effective_room_type(zone.kind, zone.room_type, zone.name)[
+                        0
+                    ],
                 )
             )
     return result
@@ -156,8 +178,9 @@ async def load_partition_context(
     page_index: int,
     view: int,
 ) -> PartitionContext:
-    """Высота маячного ряда проекта и зоны помещений листа: вход расчёта и 3D этажа."""
+    """Высота маячного ряда, высота двери лифта и зоны помещений листа: вход расчёта и 3D этажа."""
     height = await apartment_partition_height(session, project_id=project_id)
+    lift_height = await lift_door_height(session, project_id=project_id)
     zones = await sheet_partition_zones(
         session,
         storage,
@@ -166,4 +189,4 @@ async def load_partition_context(
         page_index=page_index,
         view=view,
     )
-    return PartitionContext(zones=zones, height=height)
+    return PartitionContext(zones=zones, height=height, lift_door_height=lift_height)

@@ -35,6 +35,8 @@ from tests.test_cad_constructions_api import (
     STUB,
     _ready_sheet,
     _url,
+    lift_answer,
+    lift_hall_zone,
     walls_settings,
 )
 from tests.test_cad_mep import _parent
@@ -661,3 +663,42 @@ async def test_beacon_row_height_applies_to_constructions_and_3d_by_the_accepted
         assert walls["bbbbbbbbbbbb"]["height_basis"] == "apartment_partition"
         assert walls["aaaaaaaaaaaa"]["z_top_mm"] == BASE + 2800
         assert "apartment_partition_height_unknown" not in _codes(floor)
+
+
+# ------------------------------------------------------------------ двери шахт лифтов
+
+
+async def test_lift_door_gap_gets_its_height_in_3d_by_the_accepted_answer(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        await lift_hall_zone(api, project_id, revision_id)
+
+        # Ответа нет: предупреждение, разрыв на высоте двери листа (допущение 2100).
+        before = (await api.get(_floor(project_id, job_id))).json()
+        assert "lift_door_height_unknown" in _codes(before)
+        lift_before = next(i for i in before["lintels"] if i["opening_id"] == "gap000000001")
+        assert (lift_before["door_height_mm"], lift_before["door_height_source"]) == (
+            2100,
+            "assumption",
+        )
+
+        db_session.add(lift_answer(project_id, 2400))
+        await db_session.commit()
+
+        after = (await api.get(_floor(project_id, job_id))).json()
+        assert "lift_door_height_unknown" not in _codes(after)
+        lintels = {item["opening_id"]: item for item in after["lintels"]}
+        lift = lintels["gap000000001"]
+        assert (lift["z_bottom_mm"], lift["z_top_mm"]) == (BASE + 2400, BASE + 2800)
+        assert (lift["door_height_mm"], lift["door_height_source"]) == (2400, "observed")
+        # Дверь с блоком остаётся на высоте двери листа.
+        assert lintels["door00000001"]["door_height_mm"] == 2100

@@ -23,6 +23,7 @@ from httpx import AsyncClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dev import DEV_USER_ID
 from app.cad_worker import HANDLERS
 from app.cad_worker import handler as convert_handler
 from app.cad_worker.handler import execute_cad_pdf_convert
@@ -30,7 +31,7 @@ from app.cad_worker.walls_handler import execute_cad_walls
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.main import create_app
-from app.models import CadConstructionProps, CadSheetLevels, Job, Workspace
+from app.models import CadConstructionProps, CadSheetLevels, DocQuestionAnswer, Job, Workspace
 from app.services import cad as cad_service
 from app.services import cad_walls as cad_walls_service
 from app.services import cad_walls_zones
@@ -38,7 +39,7 @@ from app.services import jobs as jobs_service
 from tests.cad_pins_helper import write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_mep import FOLDER, PARENT_DXF, _parent
-from tests.test_cad_qa import BROKEN_PDF, _upload_calibrated
+from tests.test_cad_qa import A3_HEIGHT, A3_WIDTH, BROKEN_PDF, _upload_calibrated
 
 PARAMS = {"slab_thickness_mm": {"value": 200, "unit": "мм", "source": "assumed", "note": "тест"}}
 
@@ -1073,3 +1074,86 @@ async def test_generator_warning_slab_without_zones_reaches_the_response(
             {"code": "area_residue", "message": "тест"},
             {"code": "slab_without_zones", "message": "плита по стенам"},
         ]
+
+
+# ------------------------------------------------------------------ двери шахт лифтов
+
+# Заглушка с направлением разрыва: у `gap000000001` (центр 1000, 100; стена 200) направление (1, 0).
+LIFT_STUB = STUB.replace(
+    "out = pathlib.Path(args.out)\n",
+    'doc["openings"][1]["direction"] = [1.0, 0.0]\nout = pathlib.Path(args.out)\n',
+)
+assert LIFT_STUB != STUB
+
+
+async def lift_hall_zone(api: AsyncClient, project_id: str, revision_id: str) -> None:
+    """Лифтовый холл с одной стороны разрыва `gap000000001` (y 200-700 мм); с другой зон нет."""
+    factor, origin = 35.2778, (10.0, 20.0)
+    corners = [(0.0, 200.0), (5000.0, 200.0), (5000.0, 700.0), (0.0, 700.0)]
+    created = await api.post(
+        f"/api/v1/projects/{project_id}/cad/zones",
+        json={
+            "revision_id": revision_id,
+            "page_index": 0,
+            "kind": "room_mop",
+            "room_type": "lift_hall",
+            "points": [
+                [
+                    (origin[0] + x / factor) / float(A3_WIDTH),
+                    (origin[1] - y / factor) / float(A3_HEIGHT),
+                ]
+                for x, y in corners
+            ],
+        },
+    )
+    assert created.status_code == 201, created.text
+
+
+def lift_answer(project_id: str, number: int) -> DocQuestionAnswer:
+    return DocQuestionAnswer(
+        project_id=uuid.UUID(project_id),
+        question_code="lift_door_height",
+        source="document",
+        value={"kind": "length_mm", "display": str(number), "numbers": [number]},
+        file_name="ТЗ.pdf",
+        page_index=7,
+        quote="Дверь (ширина х высота), мм 1200*2400",
+        catalog_version="test",
+        confirmed_by=DEV_USER_ID,
+    )
+
+
+async def test_lift_door_gap_with_the_accepted_answer_enters_the_volume(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    walls_tools: Path,
+    tmp_path: Path,
+) -> None:
+    (walls_tools / "run_walls.py").write_text(LIFT_STUB, encoding="utf-8")
+    settings = walls_settings(walls_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        await lift_hall_zone(api, project_id, revision_id)
+
+        # Ответа нет: разрыв не учтён, предупреждение в ответе.
+        before = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert "lift_door_height_unknown" in [w["code"] for w in before["warnings"]]
+        assert before["summary"]["unaccounted_gap_openings"] == 1
+        host = _construction(before, "bbbbbbbbbbbb")["computed"]
+        assert host["warnings"] == ["opening_no_data"]
+        assert host["sources"]["gap_opening_height"] is None
+
+        db_session.add(lift_answer(project_id, 2400))
+        await db_session.commit()
+
+        after = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert "lift_door_height_unknown" not in [w["code"] for w in after["warnings"]]
+        assert after["summary"]["unaccounted_gap_openings"] == 0
+        host = _construction(after, "bbbbbbbbbbbb")["computed"]
+        # 5000 x 100 x 2800 и надпроёмная часть разрыва 1000 x 100 x (2800 - 2400).
+        assert host["volume_m3"] == pytest.approx((500_000 * 2800 + 1000 * 100 * 400) / 1e9)
+        assert host["warnings"] == []
+        assert host["sources"]["gap_opening_height"] == "observed"

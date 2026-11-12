@@ -10692,7 +10692,7 @@ export type DocCandidateStatus = 'candidate' | 'rejected';
 /**
  * DocQuestionCode
  */
-export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section' | 'apartment_partition_height';
+export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section' | 'apartment_partition_height' | 'lift_door_height';
 
 /**
  * DocQuestionOut

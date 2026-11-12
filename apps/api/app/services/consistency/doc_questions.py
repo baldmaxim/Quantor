@@ -34,6 +34,7 @@ class DocQuestionCode(StrEnum):
     DUCT_SECTION = "duct_section"
     CABLE_TRAY_SECTION = "cable_tray_section"
     APARTMENT_PARTITION_HEIGHT = "apartment_partition_height"
+    LIFT_DOOR_HEIGHT = "lift_door_height"
 
 
 class DocValueKind(StrEnum):
@@ -173,6 +174,8 @@ _AR = ("АР",)
 _CUSTOMER = DocSource("Договор / ТЗ Заказчика", customer=True)
 _WATER_FIRE = ("ИОС2", "ВК", "АПТ", "АУПТ")
 _HVAC = ("ИОС4", "ОВ")
+_LIFT_TECH = ("ИОС7", "ТХ")
+_STRUCTURE = ("КР", "КЖ")
 _ELECTRIC = ("ИОС1", "ЭОМ", "ЭМ", "ЭО", "ЭС", "ИОС5", "СС")
 
 # Контекст «коридор / МОП»: без него высота потолка квартиры или номер пола не наш ответ.
@@ -207,6 +210,8 @@ _FLOOR_TO_FLOOR: Final = (
 _SMOKE_CALC_LABEL: Final = "ИОС4 / ОВ: расчёты дымоудаления"
 # Кладка внутриквартирных перегородок: «маячный ряд», камень «ПОЛИГРАН 80», сами перегородки.
 _PARTITION_CTX: Final = (_rx(r"маячн\w+\s+ряд|полигран\s*80|внутриквартирн\w+\s+перегородк"),)
+# Лифты: двери шахт, лифтовые двери, проёмы шахты. Без слова «лифт» рядом высота - не наш ответ.
+_LIFT_CTX: Final = (_rx(r"лифт"),)
 
 
 # --------------------------------------------------------------------------- каталог v1
@@ -507,6 +512,35 @@ DOC_QUESTIONS: Final[tuple[DocQuestion, ...]] = (
         context=_PARTITION_CTX,
         context_required=True,
         min_mm=100,
+        max_mm=3000,
+    ),
+    DocQuestion(
+        code=DocQuestionCode.LIFT_DOOR_HEIGHT,
+        title="Высота проёма двери шахты лифта (проём в стене от чистого пола), мм",
+        receiver_param="lift_door_opening_height_mm",
+        value_kind=DocValueKind.LENGTH_MM,
+        extractor=ExtractorKind.LENGTH,
+        sources=(
+            DocSource("ПЗ АР", _AR, (_K.TEXT,)),
+            DocSource("Таблицы АР", _AR, (_K.TABLE,)),
+            _CUSTOMER,
+            DocSource("ТХ / ИОС7: технологические решения (лифты)", _LIFT_TECH),
+            DocSource("ДЛ: диспетчеризация лифтов", ("ДЛ",)),
+            DocSource("ПЗ / СП: общая записка", ("ПЗ", "СП")),
+            DocSource("Прочие листы АР", _AR),
+            DocSource("КР / КЖ: конструктивные решения", _STRUCTURE),
+        ),
+        anchors=(
+            _anchor(r"двер\w*\s+шахт\w*\s+лифт\w*", 20),
+            _anchor(r"лифтов\w+\s+двер\w*", 15),
+            # «Дверь (ширина х высота), мм ... 1200*2400» - высота из пары «ширина×высота».
+            _anchor(r"дверь\s*\(ширина\s*[хx×]\s*высота\)", 15),
+            _anchor(r"проем\w*\s+(?:в\s+стене\s+)?[^.;]{0,60}?лифт\w*", 10),
+            _anchor(r"высот\w*[^.;]{0,40}?\d{4}\s*мм", 8),
+        ),
+        context=_LIFT_CTX,
+        context_required=True,
+        min_mm=1900,
         max_mm=3000,
     ),
 )

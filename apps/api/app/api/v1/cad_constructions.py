@@ -52,7 +52,7 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
 from app.services import cad_construction_store as store
-from app.services import cad_constructions, cad_partitions, cad_slab, cad_walls
+from app.services import cad_constructions, cad_lift_openings, cad_partitions, cad_slab, cad_walls
 from app.services import cad_floor3d_store as floor3d_store
 from app.services import jobs as jobs_service
 from app.services.cad_walls_cache import CachedWalls, walls_cache
@@ -271,11 +271,18 @@ async def _totals(
         page_index=sheet.page_index,
         view=sheet.view,
     )
-    return await _compute(walls, loaded, levels, project_slab, slab, partition), levels
+    # Разрывы у лифтового холла получают высоту проёма из принятого ответа (один раз до расчёта).
+    lift = cad_lift_openings.apply_lift_door_heights(walls.document, walls.extras, partition)
+    result = await _compute(lift.document, loaded, levels, project_slab, slab, partition)
+    if lift.warnings:
+        result = dataclasses.replace(
+            result, partition_warnings=[*result.partition_warnings, *lift.warnings]
+        )
+    return result, levels
 
 
 async def _compute(
-    walls: _Walls,
+    document: WallsDocument,
     loaded: store.PropsLoad,
     levels: CadSheetLevelsRead,
     project_slab: cad_constructions.ProjectSlab | None,
@@ -285,7 +292,7 @@ async def _compute(
     # Аргументы — pydantic-модели и dataclass, не ORM: расчёт идёт в потоке, не на event loop.
     result = await asyncio.to_thread(
         cad_constructions.compute_sheet,
-        walls.document,
+        document,
         loaded.props,
         levels,
         project_slab,

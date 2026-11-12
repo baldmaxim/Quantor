@@ -318,6 +318,8 @@ class PartitionZone:
     kind: str
     apartment_no: str | None
     shell: list[list[float]]
+    # Действующий тип помещения (`lift_hall`, `corridor`, ...); нужен распознаванию лифтовых дверей.
+    room_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -349,6 +351,8 @@ class PartitionContext:
 
     zones: Sequence[PartitionZone] = ()
     height: PartitionHeight | None = None
+    # Принятая высота проёма двери шахты лифта (LIFT_DOOR_HEIGHT); применяет `cad_lift_openings`.
+    lift_door_height: PartitionHeight | None = None
 
 
 @dataclass(frozen=True, slots=True)
