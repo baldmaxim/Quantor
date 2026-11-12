@@ -120,7 +120,7 @@ class Settings(BaseSettings):
 
     # Разбор паспорта листа (ADR-0043) идёт подпроцессом на каждый PDF: предел адресного
     # пространства (RLIMIT_AS) и время. Превышение - ошибка файла, а не гибель исполнителя.
-    sheet_passport_parse_memory_mb: int = Field(default=448, ge=64, le=16384)
+    sheet_passport_parse_memory_mb: int = Field(default=1024, ge=64, le=16384)
     sheet_passport_parse_timeout_seconds: float = Field(default=600.0, gt=0)
 
     # --- PDF -> CAD (app/cad_worker, ADR-0036) ---
