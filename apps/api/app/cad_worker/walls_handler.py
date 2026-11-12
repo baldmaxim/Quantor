@@ -3,7 +3,7 @@
 Скрипт не импортируется: он работает подпроцессом интерпретатора движка (`-I`, пустое окружение,
 новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
-    <python> -I run_walls.py --dxf --params --out --pdf --page [--zones]
+    <python> -I run_walls.py --dxf --params --out --pdf --page [--zones] [--view-zone=X0,Y0,X1,Y1]
 
 PDF ревизии и номер страницы нужны только разбору отметок этажа (как у генератора трасс); не
 определились — скрипт пишет в `heights` статус `missing`, и это не отказ. Зоны помещений листа
@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import shutil
 import tempfile
 import uuid
@@ -77,6 +78,7 @@ def _argv(
     pdf: Path,
     page_index: int,
     zones: Path | None = None,
+    view_zone: tuple[float, float, float, float] | None = None,
 ) -> list[str]:
     python, runner = settings.cad_engine_python.strip(), cad_walls_service.runner_path(settings)
     if not python or runner is None or not (Path(python).is_file() and runner.is_file()):
@@ -98,7 +100,23 @@ def _argv(
     ]
     if zones is not None:
         argv += ["--zones", str(zones)]
+    if view_zone is not None:
+        x0, y0, x1, y1 = (round(v, 2) for v in view_zone)
+        argv += [f"--view-zone={x0},{y0},{x1},{y1}"]
     return argv
+
+
+def _view_zone_of(payload: dict[str, Any]) -> tuple[float, float, float, float] | None:
+    """Зона вида из задания: четыре конечных числа и x1 > x0, y1 > y0; иначе — без аргумента."""
+    raw = payload.get("view_zone")
+    if not isinstance(raw, list) or len(raw) != 4:
+        return None
+    if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in raw):
+        return None
+    x0, y0, x1, y1 = (float(v) for v in raw)
+    if not all(math.isfinite(v) for v in (x0, y0, x1, y1)) or x1 <= x0 or y1 <= y0:
+        return None
+    return (x0, y0, x1, y1)
 
 
 async def _download_zones(
@@ -281,6 +299,7 @@ async def execute_cad_walls(
                 pdf=pdf,
                 page_index=source.page_index,
                 zones=zones_file,
+                view_zone=_view_zone_of(job.payload),
             ),
             limit_seconds=float(settings.cad_total_timeout_seconds),
             poll_interval=settings.worker_heartbeat_interval_seconds,

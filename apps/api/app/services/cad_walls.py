@@ -160,6 +160,9 @@ def _walls_payload(
     }
     if zones.warning is not None:
         payload["zones_warning"] = zones.warning
+    if zones.view_zone is not None:
+        # прямоугольник вида в pt PDF: скрипт по центру выбирает заголовок плана (`--view-zone`)
+        payload["view_zone"] = list(zones.view_zone)
     return payload
 
 

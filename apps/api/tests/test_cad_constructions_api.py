@@ -47,7 +47,7 @@ STUB = """
 import argparse, hashlib, json, pathlib, sys
 
 parser = argparse.ArgumentParser()
-for name in ("dxf", "params", "out", "pdf", "page", "zones"):
+for name in ("dxf", "params", "out", "pdf", "page", "zones", "view-zone"):
     parser.add_argument("--" + name)
 args = parser.parse_args()
 here = pathlib.Path(__file__).parent
@@ -59,7 +59,8 @@ for name in ("dxf", "params", "pdf"):
 (here / "args.json").write_text(json.dumps({
     "page": args.page, "params_name": pathlib.Path(args.params).name,
     "pdf_head": pathlib.Path(args.pdf).read_bytes()[:5].decode("latin-1"),
-    "zones": pathlib.Path(args.zones).read_text() if args.zones else None}))
+    "zones": pathlib.Path(args.zones).read_text() if args.zones else None,
+    "view_zone": args.view_zone}))
 if mode == "fail":
     print(json.dumps({"code": "pdf_unreadable", "message": "PDF не открывается"}), file=sys.stderr)
     sys.exit(2)
@@ -357,7 +358,13 @@ async def test_worker_publishes_walls_json_and_result_carries_hashes(
     assert [a["name"] for a in result["artifacts"]] == [f"{FOLDER}/walls.json"]
     # Скрипт получил PDF ревизии и страницу с нуля; копия параметров названа как исходный файл.
     seen = json.loads((walls_tools / "args.json").read_text())
-    assert seen == {"page": "0", "params_name": "v1.json", "pdf_head": "%PDF-", "zones": None}
+    assert seen == {
+        "page": "0",
+        "params_name": "v1.json",
+        "pdf_head": "%PDF-",
+        "zones": None,
+        "view_zone": None,
+    }
 
 
 async def test_worker_passes_stored_zones_to_the_script(

@@ -9,8 +9,10 @@ ezdxf сюда не импортируются.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
+import math
 import uuid
 from dataclasses import dataclass
 from typing import Any, Final
@@ -29,10 +31,13 @@ from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavaila
 
 log = get_logger(__name__)
 
+ViewZonePt = tuple[float, float, float, float]
+
 ROOM_KINDS: Final = ("room_apartment", "room_mop")
 # Предел входа: контуры зон одного листа, с большим запасом.
 MAX_ZONES_BYTES: Final = 8 * 1024 * 1024
 _ROUND_MM: Final = 1
+_ROUND_PT: Final = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +48,9 @@ class ZonesInput:
     sha256: str
     count: int
     warning: str | None
+    # Прямоугольник вида в пунктах PDF (x0, y0, x1, y1; левый верхний угол) для `--view-zone`:
+    # скрипт по его центру выбирает заголовок плана. `None` — кадр не подтверждён или bbox нет.
+    view_zone: ViewZonePt | None = None
 
     @property
     def present(self) -> bool:
@@ -91,6 +99,43 @@ async def _artifact_json(
         return None
 
 
+def view_zone_pt(
+    bbox_mm: object,
+    *,
+    origin_pt: tuple[float, float] | None,
+    mm_per_pdf_point: float | None,
+) -> ViewZonePt | None:
+    """bbox вида из preview.json (мм DXF: x0, y0, x1, y1) -> прямоугольник в пунктах PDF.
+
+    Обратное к кадру вида (`pt = origin_pt + (x_mm, -y_mm) / mm_per_pdf_point`, ось Y вниз):
+    x_pt = ox + x_mm / k; y_pt = oy - y_mm / k, поэтому верхний край — по наибольшему y_mm.
+    Нет bbox, начала координат или коэффициента — `None` (аргумент скрипту не передаётся).
+    """
+    if (
+        origin_pt is None
+        or mm_per_pdf_point is None
+        or mm_per_pdf_point <= 0
+        or not isinstance(bbox_mm, list)
+        or len(bbox_mm) != 4
+    ):
+        return None
+    values: list[float] = []
+    for item in bbox_mm:
+        if isinstance(item, bool) or not isinstance(item, int | float) or not math.isfinite(item):
+            return None
+        values.append(float(item))
+    x0, y0, x1, y1 = values
+    if x1 <= x0 or y1 <= y0:
+        return None
+    ox, oy = origin_pt
+    return (
+        round(ox + x0 / mm_per_pdf_point, _ROUND_PT),
+        round(oy - y1 / mm_per_pdf_point, _ROUND_PT),
+        round(ox + x1 / mm_per_pdf_point, _ROUND_PT),
+        round(oy - y0 / mm_per_pdf_point, _ROUND_PT),
+    )
+
+
 async def sheet_room_zones(
     session: AsyncSession,
     storage: ObjectStorage,
@@ -104,17 +149,11 @@ async def sheet_room_zones(
     if parent.job_type is not JobType.CAD_PDF_CONVERT or not isinstance(revision_id, str):
         return NO_ZONES
     revision = uuid.UUID(revision_id)
-    rows = [
-        zone
-        for zone in await cad_zones.list_zones(session, revision_id=revision, page_index=page_index)
-        if zone.kind in ROOM_KINDS and len(zone.points) >= 3
-    ]
-    if not rows:
-        return NO_ZONES
     attempt = cad_service.current_result(parent).get("attempt")
-    folder = cad_service.view_folder(page_index, view)
     frame = None
+    view_zone: ViewZonePt | None = None
     if type(attempt) is int:
+        folder = cad_service.view_folder(page_index, view)
         scale = cad_views.scale_from(
             await _artifact_json(storage, parent, revision, attempt, f"{folder}/scale.json")
         )
@@ -122,6 +161,22 @@ async def sheet_room_zones(
             storage, parent, revision, attempt, f"{folder}/cad_checks.json"
         )
         frame = cad_views.frame_from(scale, checks)
+        if frame.confirmed:
+            preview = await _artifact_json(
+                storage, parent, revision, attempt, f"{folder}/preview.json"
+            )
+            view_zone = view_zone_pt(
+                preview.get("bbox") if isinstance(preview, dict) else None,
+                origin_pt=frame.origin_pt,
+                mm_per_pdf_point=frame.mm_per_pdf_point,
+            )
+    rows = [
+        zone
+        for zone in await cad_zones.list_zones(session, revision_id=revision, page_index=page_index)
+        if zone.kind in ROOM_KINDS and len(zone.points) >= 3
+    ]
+    if not rows:
+        return dataclasses.replace(NO_ZONES, view_zone=view_zone)
     page = (
         await cad_zones.page_scales(session, revision_id=revision, page_indexes={page_index})
     ).get(page_index)
@@ -136,7 +191,11 @@ async def sheet_room_zones(
         reason = None
     if reason is not None or geometry is None or origin is None or factor is None:
         return ZonesInput(
-            b"", "", 0, f"Контур плиты построен без зон помещений: {reason or 'кадр неполон'}."
+            b"",
+            "",
+            0,
+            f"Контур плиты построен без зон помещений: {reason or 'кадр неполон'}.",
+            view_zone,
         )
     mapped = cad_floor3d.room_zones_to_mm(
         [
@@ -149,11 +208,11 @@ async def sheet_room_zones(
         mm_per_pdf_point=factor,
     )
     if not mapped:
-        return NO_ZONES
+        return dataclasses.replace(NO_ZONES, view_zone=view_zone)
     raw = canonical_bytes(mapped)
     if len(raw) > MAX_ZONES_BYTES:
         raise DomainError(ErrorCode.CAD_INPUT_LIMIT_EXCEEDED, "зоны листа больше допустимого")
-    return ZonesInput(raw, hashlib.sha256(raw).hexdigest(), len(mapped), None)
+    return ZonesInput(raw, hashlib.sha256(raw).hexdigest(), len(mapped), None, view_zone)
 
 
 async def store(

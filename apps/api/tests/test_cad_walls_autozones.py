@@ -17,6 +17,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cad_worker import walls_handler
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.models import Job
@@ -295,3 +296,98 @@ async def test_recompute_after_auto_zones_is_skipped_when_active_job_has_same_zo
         )
         assert queued is None
         assert len(await _walls_jobs(db_session)) == 1
+
+
+# ------------------------------------------------------------------ зона вида (--view-zone)
+
+VIEW_BBOX_MM = [0, 0, 3527.78, 7055.56]
+# Кадр родителя: начало (10, 20) pt, 35.2778 мм/pt; y_pt = 20 - y_mm / k, поэтому верх — по y1.
+VIEW_ZONE_PT = (10.0, -180.0, 110.0, 20.0)
+
+
+def _set_preview_bbox(storage: FakeObjectStorage, bbox: list[float] | None) -> None:
+    key = next(k for k in storage.objects if k.endswith(f"{FOLDER}/preview.json"))
+    storage.objects[key] = json.dumps({} if bbox is None else {"bbox": bbox}).encode()
+
+
+def _argv_of(settings: Settings, tmp_path: Path, view_zone: tuple[float, ...] | None) -> list[str]:
+    return walls_handler._argv(
+        settings,
+        dxf=tmp_path / "a.dxf",
+        params=tmp_path / "v1.json",
+        out=tmp_path / "walls.json",
+        pdf=tmp_path / "source.pdf",
+        page_index=0,
+        view_zone=None
+        if view_zone is None
+        else (view_zone[0], view_zone[1], view_zone[2], view_zone[3]),
+    )
+
+
+def test_view_zone_formula_is_inverse_of_frame() -> None:
+    zone = cad_walls_zones.view_zone_pt(
+        [100.0, 200.0, 400.0, 500.0], origin_pt=(10.0, 20.0), mm_per_pdf_point=10.0
+    )
+    assert zone == (20.0, -30.0, 50.0, 0.0)
+    for bad in (None, [1, 2, 3], [0, 0, 0, 5], ["a", 0, 1, 1], [0, 0, float("inf"), 1]):
+        assert cad_walls_zones.view_zone_pt(bad, origin_pt=(0.0, 0.0), mm_per_pdf_point=1.0) is None
+    assert cad_walls_zones.view_zone_pt([0, 0, 1, 1], origin_pt=None, mm_per_pdf_point=1.0) is None
+    assert (
+        cad_walls_zones.view_zone_pt([0, 0, 1, 1], origin_pt=(0.0, 0.0), mm_per_pdf_point=None)
+        is None
+    )
+
+
+def test_argv_passes_view_zone_with_equals_form(settings: Settings, tmp_path: Path) -> None:
+    argv = _argv_of(settings, tmp_path, (10.0, -180.004, 110.0, 20.0))
+    assert argv[-1] == "--view-zone=10.0,-180.0,110.0,20.0"
+    assert not any(a.startswith("--view-zone") for a in _argv_of(settings, tmp_path, None))
+
+
+def test_view_zone_of_payload_is_validated() -> None:
+    assert walls_handler._view_zone_of({"view_zone": [1, 2, 3, 4]}) == (1.0, 2.0, 3.0, 4.0)
+    for bad in (None, [1, 2, 3], [3, 2, 1, 4], ["a", 2, 3, 4], "1,2,3,4"):
+        assert walls_handler._view_zone_of({"view_zone": bad}) is None
+    assert walls_handler._view_zone_of({}) is None
+
+
+async def test_auto_enqueue_puts_view_zone_into_payload(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    settings: Settings,
+) -> None:
+    async with build_api(make_context(), settings=settings) as api:
+        _project, _revision, job_id, _base = await _parent(api, db_session, fake_storage)
+        _set_preview_bbox(fake_storage, VIEW_BBOX_MM)
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        (job,) = await cad_walls_service.enqueue_after_convert(
+            db_session, fake_storage, parent, settings
+        )
+        assert job.payload["view_zone"] == pytest.approx(list(VIEW_ZONE_PT), abs=0.01)
+        assert job.payload["zones_count"] == 0 and "zones_warning" not in job.payload
+        view_zone = walls_handler._view_zone_of(job.payload)
+        assert view_zone is not None
+        argv = _argv_of(settings, Path("/x"), view_zone)
+        assert argv[-1] == "--view-zone=10.0,-180.0,110.0,20.0"
+
+
+async def test_auto_enqueue_without_confirmed_frame_has_no_view_zone(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    settings: Settings,
+) -> None:
+    async with build_api(make_context(), settings=settings) as api:
+        _project, _revision, job_id, _base = await _parent(api, db_session, fake_storage)
+        _set_preview_bbox(fake_storage, VIEW_BBOX_MM)
+        scale = next(key for key in fake_storage.objects if key.endswith(f"{FOLDER}/scale.json"))
+        del fake_storage.objects[scale]
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        (job,) = await cad_walls_service.enqueue_after_convert(
+            db_session, fake_storage, parent, settings
+        )
+        assert "view_zone" not in job.payload
+        assert walls_handler._view_zone_of(job.payload) is None

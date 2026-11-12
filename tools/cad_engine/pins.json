@@ -3,14 +3,14 @@
   "runner_version": "0.1.0",
   "engine": {
     "name": "quantor-cad-legacy-ar",
-    "version": "2026.11.13+ac1dd789d113",
-    "archive_name": "Quantor_CAD_source_2026.11.13_ac1dd789d113.zip",
+    "version": "2026.11.13+1afeca5f32b7",
+    "archive_name": "Quantor_CAD_source_2026.11.13_1afeca5f32b7.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "0e90ea9ec5d12f51dcb6020ad6e68d1379d9b861",
-    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.13_ac1dd789d113.zip",
-    "archive_sha256": "11a0b8bd6bede226f520609b0b74992a67bd5b8af4e3033292790a107477c405",
-    "manifest_sha256": "7dbcda7ca620aa08b0f89ea93c533066601b13fc8cf73f1402586373e9b055cf",
-    "source_snapshot_sha256": "ac1dd789d11372699ff16968e900596adc75dfd25486f8b52ebf24c0339886fd",
+    "repo_ref": "28c94f0cbda1fe4d1c8b2af8e54630c9c5f03823",
+    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.13_1afeca5f32b7.zip",
+    "archive_sha256": "619c3910d0d07b7dfbf531ffa093484a95a0b9fb5acac8abff000b802d963888",
+    "manifest_sha256": "eddb9a3d44bf23e18fec9d3b58b875626a0acd540f792428e6059b8e29945754",
+    "source_snapshot_sha256": "1afeca5f32b7262c2f9a5f177fee0f6eeef7d24b47c598ec972a4f6e7288ee72",
     "archive_entries": 246,
     "max_unpacked_bytes": 4194304,
     "worker": "АР_Обработка/90_Пайплайн/pdf_job_monitor/worker.py",
@@ -30,13 +30,13 @@
   "generators": {
     "path": "generators",
     "cad_mep": {
-      "generator_version": "cad_mep.v13",
+      "generator_version": "cad_mep.v13.1",
       "params_path": "generators/cad_mep/params/v1.json",
-      "params_sha256": "72f26855ee39dbd60bcb820990983be4ce20a1499a8e00dc196df91f863878bd",
-      "params_canonical_sha256": "c7a1d21bfbb858e5eabbbd0c87117a3b48483b07b196c51627ab3c42af520f83"
+      "params_sha256": "b307ec1333733a740f6f83888f907ca9b5abdb6896fa58892539eb3b76ee3f46",
+      "params_canonical_sha256": "fe6728d07784c3a5e83ab910bb1fd8dfbd1ee86eaa04bbb1bdfd96fa4fcfb861"
     },
     "cad_walls": {
-      "generator_version": "cad_walls.v1.11",
+      "generator_version": "cad_walls.v1.13",
       "params_path": "generators/cad_walls/params/v1.json",
       "params_sha256": "8e953206e31da7d2509ee8bb9ffc56923b2959d58155bf435a8c93241238cbc2",
       "params_canonical_sha256": "6b39e4dabc2b42f3a352c6be4b0b65e11e312ac1c65674fae04883f1e9bc8dd1",
