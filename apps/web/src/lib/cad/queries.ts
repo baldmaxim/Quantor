@@ -28,6 +28,8 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import { unwrap } from '@/lib/queries';
 
+import { cadPipelineKey } from './pipeline-queries';
+
 import { emptyEventLog, isEventLogComplete, mergeEvents, type ICadEventLog } from './events';
 import { sortRemarks, type IRemarkBinding } from './remarks';
 
@@ -219,6 +221,9 @@ export const useCreateCadJob = (
     onSuccess: (job) => {
       client.setQueryData(cadKeys.job(projectId, revisionId, job.job_id), job);
       void client.invalidateQueries({ queryKey: cadKeys.jobs(projectId, revisionId) });
+      // Бейдж «Обработка листа» берёт статус из конвейера: без сброса он держит старый итог,
+      // а опрос конвейера включается только при идущем этапе.
+      void client.invalidateQueries({ queryKey: cadPipelineKey(projectId, revisionId) });
     },
   });
 };
