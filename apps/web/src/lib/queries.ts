@@ -9,8 +9,8 @@ import {
   listSheetMeasurements,
   readSheetQuantities,
   listTakeoffItems,
-  listDocumentRevisions,
   listProjectDocuments,
+  listProjectRevisions,
   readDocument,
   readRevision,
   listProjects,
@@ -33,12 +33,11 @@ import {
 } from '@quantor/api-client';
 import {
   useMutation,
-  useQueries,
   useQuery,
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 
 /**
  * Обращения к API.
@@ -54,6 +53,7 @@ export const queryKeys = {
   project: (projectId: string) => ['project', projectId] as const,
   documents: (projectId: string) => ['project', projectId, 'documents'] as const,
   revisions: (documentId: string) => ['document', documentId, 'revisions'] as const,
+  projectRevisions: (projectId: string) => ['project', projectId, 'revisions'] as const,
   sheets: (revisionId: string) => ['revision', revisionId, 'sheets'] as const,
   regions: (sheetId: string, blockType: string | null) =>
     ['sheet', sheetId, 'regions', blockType] as const,
@@ -165,44 +165,61 @@ export const useProjectDocuments = (projectId: string, enabled = true) =>
       ),
   });
 
-const revisionsQuery = (documentId: string) => ({
-  queryKey: queryKeys.revisions(documentId),
-  queryFn: async () =>
-    unwrap(
-      await listDocumentRevisions({
-        throwOnError: true,
-        path: { document_id: documentId },
-        query: { limit: 50 },
-      }),
-    ),
-  // Пока листы готовятся, страница должна сама дойти до готовности: иначе «Подготавливаем
-  // листы» висит до ручной перезагрузки, хотя задание давно завершилось.
-  refetchInterval: (query: { state: { data?: PageDocumentRevisionRead } }) =>
-    query.state.data?.items.some(isPreparing) ? JOB_POLL_INTERVAL : (false as const),
-});
-
 const isPreparing = (revision: DocumentRevisionRead): boolean =>
   revision.geometry_status === 'pending' || revision.geometry_status === 'extracting';
 
 /**
- * Ревизии сразу всех документов проекта.
+ * Ревизии сразу всех документов проекта — одним запросом.
  *
  * Карточка проекта спрашивала ревизии только у первого PDF и по нему решала, открывать ли
  * рабочую область: второй, уже готовый документ при этом терялся. Теперь состояние
- * известно по каждому документу, а ключи запросов те же — строка документа и заголовок
- * страницы читают один и тот же кеш.
+ * известно по каждому документу. Раньше это был запрос на каждый документ (сотни запросов
+ * на экран и очередь за ними), к тому же после загрузки списка документов; теперь запрос
+ * один и от списка документов не зависит.
+ *
+ * Форма результата — страница ревизий по документу, как у одиночного запроса: потребители
+ * читают `byDocument.get(id)?.items`. Пока данных нет — `null`.
  */
-export const useDocumentsRevisions = (documentIds: readonly string[]) =>
-  useQueries({
-    queries: documentIds.map(revisionsQuery),
-    combine: (results) => ({
-      byDocument: new Map(
-        documentIds.map((documentId, index) => [documentId, results[index]?.data ?? null]),
-      ),
-      isPending: results.some((result) => result.isPending),
-      isError: results.some((result) => result.isError),
-    }),
+export const useProjectRevisions = (
+  projectId: string,
+  documentIds: readonly string[],
+  enabled = true,
+) => {
+  const query = useQuery({
+    enabled,
+    queryKey: queryKeys.projectRevisions(projectId),
+    queryFn: async () =>
+      unwrap(await listProjectRevisions({ throwOnError: true, path: { project_id: projectId } })),
+    // Пока листы готовятся, страница должна сама дойти до готовности: иначе «Подготавливаем
+    // листы» висит до ручной перезагрузки, хотя задание давно завершилось.
+    refetchInterval: (state) =>
+      state.state.data?.some(isPreparing) ? JOB_POLL_INTERVAL : false,
   });
+  const revisions = query.data;
+  // Потребители передают новый массив на каждом рендере: ключ из идентификаторов держит
+  // ссылку на карту стабильной, пока не изменились ни ревизии, ни состав документов.
+  const idsKey = documentIds.join(',');
+  const byDocument = useMemo(() => {
+    const ids = idsKey === '' ? [] : idsKey.split(',');
+    const map = new Map<string, PageDocumentRevisionRead | null>();
+    if (revisions === undefined) {
+      for (const documentId of ids) map.set(documentId, null);
+      return map;
+    }
+    const grouped = new Map<string, DocumentRevisionRead[]>();
+    for (const revision of revisions) {
+      const items = grouped.get(revision.document_id);
+      if (items === undefined) grouped.set(revision.document_id, [revision]);
+      else items.push(revision);
+    }
+    for (const documentId of ids) {
+      const items = grouped.get(documentId) ?? [];
+      map.set(documentId, { items, total: items.length, limit: items.length, offset: 0 });
+    }
+    return map;
+  }, [revisions, idsKey]);
+  return { byDocument, isPending: query.isPending, isError: query.isError };
+};
 
 /**
  * Открытая ревизия и её документ.
@@ -279,10 +296,22 @@ export const useContentUrl = (revisionId: string | null) =>
           path: { revision_id: revisionId ?? '' },
         }),
       ),
-    staleTime: 0,
+    // Ссылка свежая, пока до её истечения больше 5 минут: повторный заход в тот же лист
+    // получает тот же URL, и документ из кеша браузера/отрисовщика не открывается заново.
+    // expires_in относителен моменту ответа, staleTime считается от dataUpdatedAt.
+    staleTime: (query) => {
+      const expires = query.state.data?.expires_in;
+      return expires ? Math.max(expires - 300, 60) * 1000 : 0;
+    },
+    gcTime: 60 * 60 * 1000,
+    // Таймер отсчитывается от монтирования, а ссылка могла быть получена раньше (возврат в
+    // лист из кеша): срок считаем от dataUpdatedAt. С Range-подкачкой протухшая ссылка
+    // ломает догрузку страниц, поэтому обновляем заранее.
     refetchInterval: (query) => {
       const expires = query.state.data?.expires_in;
-      return expires ? Math.max(expires - 300, 60) * 1000 : false;
+      if (!expires) return false;
+      const age = Date.now() - query.state.dataUpdatedAt;
+      return Math.max((expires - 300) * 1000 - age, 60_000);
     },
   });
 

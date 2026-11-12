@@ -20461,6 +20461,38 @@ export type ListProjectJobsResponses = {
 
 export type ListProjectJobsResponse = ListProjectJobsResponses[keyof ListProjectJobsResponses];
 
+export type ListProjectRevisionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions';
+};
+
+export type ListProjectRevisionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListProjectRevisionsError = ListProjectRevisionsErrors[keyof ListProjectRevisionsErrors];
+
+export type ListProjectRevisionsResponses = {
+    /**
+     * Response List Project Revisions
+     *
+     * Successful Response
+     */
+    200: Array<DocumentRevisionRead>;
+};
+
+export type ListProjectRevisionsResponse = ListProjectRevisionsResponses[keyof ListProjectRevisionsResponses];
+
 export type ListCadJobsData = {
     body?: never;
     path: {

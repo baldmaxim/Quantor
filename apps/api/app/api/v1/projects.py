@@ -18,6 +18,7 @@ from app.auth.permissions import Permission
 from app.errors import not_found
 from app.schemas import (
     DocumentRead,
+    DocumentRevisionRead,
     JobRead,
     Page,
     ProjectCreate,
@@ -160,6 +161,25 @@ async def list_project_documents(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get(
+    "/{project_id}/revisions",
+    response_model=list[DocumentRevisionRead],
+    summary="Ревизии всех документов проекта",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def list_project_revisions(
+    project_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
+) -> list[DocumentRevisionRead]:
+    project = await projects_service.get_project(
+        session, workspace_id=workspace.tenant, project_id=project_id
+    )
+    if project is None:
+        raise not_found("Проект")
+
+    rows = await documents_service.list_project_revisions(session, project_id=project.id)
+    return [DocumentRevisionRead.of(row.revision, row.sheet_count) for row in rows]
 
 
 @router.get(

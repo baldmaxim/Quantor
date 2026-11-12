@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   coverage: vi.fn(),
   importRevision: vi.fn(),
   projectDocs: vi.fn(),
-  revisions: vi.fn(),
+  projectRevisions: vi.fn(),
   remove: vi.fn(),
   put: vi.fn(),
 }));
@@ -22,7 +22,7 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
   readCadVorCoverage: mocks.coverage,
   importCadVorFromRevision: mocks.importRevision,
   listProjectDocuments: mocks.projectDocs,
-  listDocumentRevisions: mocks.revisions,
+  listProjectRevisions: mocks.projectRevisions,
   deleteCadVorDocument: mocks.remove,
   putCadVorLinks: mocks.put,
 }));
@@ -75,17 +75,13 @@ describe('запросы ВОР', () => {
         ],
       },
     });
-    mocks.revisions.mockImplementation(async ({ path }: { path: { document_id: string } }) => ({
-      data: {
-        items:
-          path.document_id === 'doc1'
-            ? [
-                { id: 'rev-old', source_filename: 'ВОР.xlsx', source_sha256: 'old' },
-                { id: 'rev-new', source_filename: 'ВОР.xlsx', source_sha256: 'new' },
-              ]
-            : [{ id: 'rev3', source_filename: 'Книга.pdf', source_sha256: 'pdf' }],
-      },
-    }));
+    mocks.projectRevisions.mockResolvedValue({
+      data: [
+        { id: 'rev-old', document_id: 'doc1', source_filename: 'ВОР.xlsx', source_sha256: 'old' },
+        { id: 'rev-new', document_id: 'doc1', source_filename: 'ВОР.xlsx', source_sha256: 'new' },
+        { id: 'rev3', document_id: 'doc3', source_filename: 'Книга.pdf', source_sha256: 'pdf' },
+      ],
+    });
     mocks.remove.mockResolvedValue({ data: undefined });
     mocks.put.mockResolvedValue({ data: [] });
   });
@@ -135,7 +131,11 @@ describe('запросы ВОР', () => {
     expect(result.current.sources.sources).toEqual([
       { documentId: 'doc1', revisionId: 'rev-new', fileName: 'ВОР.xlsx', sha256: 'new' },
     ]);
-    expect(mocks.revisions).toHaveBeenCalledTimes(2);
+    expect(mocks.projectRevisions).toHaveBeenCalledTimes(1);
+    expect(mocks.projectRevisions).toHaveBeenCalledWith({
+      throwOnError: true,
+      path: { project_id: 'p1' },
+    });
   });
 
   it('удаление ВОР перечитывает список, связи и сверку', async () => {

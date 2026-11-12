@@ -8,7 +8,7 @@ import { VersionList } from '@/components/versions/VersionList';
 import { ErrorState, SkeletonRows } from '@/components/ui';
 import { errorMessage, extractCode } from '@/lib/errors';
 import { defaultVersionId, useTenderVersion, useTenderVersions } from '@/lib/tender-versions';
-import { useDocumentsRevisions, useProject, useProjectDocuments } from '@/lib/queries';
+import { useProject, useProjectDocuments, useProjectRevisions } from '@/lib/queries';
 
 /**
  * Экран «Версии тендера»: список слева, карточка выбранной версии справа; на телефоне друг под
@@ -23,7 +23,7 @@ export const TenderVersionsScreen = ({ projectId }: { projectId: string }) => {
   const versions = useTenderVersions(projectId, true);
   const documents = useProjectDocuments(projectId);
   const projectDocuments = documents.data?.items ?? [];
-  const revisions = useDocumentsRevisions(projectDocuments.map((document) => document.id));
+  const revisions = useProjectRevisions(projectId, projectDocuments.map((document) => document.id));
 
   const list = versions.data ?? [];
   // Выбранная версия могла исчезнуть (черновик удалён): тогда открывается версия по умолчанию.

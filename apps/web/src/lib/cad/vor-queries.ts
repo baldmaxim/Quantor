@@ -27,7 +27,7 @@ import {
 
 import { fileExtension } from '@/lib/documentSections';
 import { extractCode } from '@/lib/errors';
-import { unwrap, useDocumentsRevisions, useProjectDocuments } from '@/lib/queries';
+import { unwrap, useProjectDocuments, useProjectRevisions } from '@/lib/queries';
 
 import { cadErrorText } from './errors';
 import type { ICadViewParams } from './view-queries';
@@ -187,7 +187,11 @@ export const useCadVorSources = (projectId: string | null, enabled: boolean): IV
   const books = (documents.data?.items ?? []).filter(
     (document) => fileExtension(document.display_name) === 'xlsx',
   );
-  const revisions = useDocumentsRevisions(books.map((document) => document.id));
+  const revisions = useProjectRevisions(
+    projectId ?? '',
+    books.map((document) => document.id),
+    enabled && projectId !== null,
+  );
 
   const sources: IVorSource[] = [];
   for (const document of books) {

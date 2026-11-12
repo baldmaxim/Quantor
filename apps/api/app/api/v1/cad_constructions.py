@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from typing import Annotated, Any
@@ -51,6 +52,7 @@ from app.services import cad_construction_store as store
 from app.services import cad_constructions, cad_slab, cad_walls
 from app.services import cad_floor3d_store as floor3d_store
 from app.services import jobs as jobs_service
+from app.services.cad_walls_cache import CachedWalls, walls_cache
 
 router = APIRouter(
     prefix="/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}",
@@ -126,18 +128,26 @@ async def _load_walls(session: SessionDep, storage: StorageDep, sheet: _Sheet) -
     folder = cad_service.view_folder(sheet.page_index, sheet.view)
     name = f"{folder}/{cad_walls.WALLS_JSON}"
     artifact = cad_service.find_artifact(ready, name)
-    raw = (
-        await _read_artifact_json(storage, ready, sheet.revision_id, attempt, name)
-        if type(attempt) is int and artifact is not None
-        else None
-    )
-    if raw is None or artifact is None:
+    if type(attempt) is not int or artifact is None:
         raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "walls.json задания не найден")
-    try:
-        document = WallsDocument.model_validate(raw)
-    except ValidationError as error:
-        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "walls.json вне контракта") from error
-    return _Walls(ready, str(artifact["sha256"]), document, raw, jobs[0])
+    sha256 = str(artifact["sha256"])
+    # Кеш — только для файла по каноническому ключу попытки; ключ + sha256 неизменяемы.
+    storage_key = cad_service.artifact_storage_key(sheet.revision_id, ready.id, attempt, name)
+    cache_key = (storage_key, sha256) if artifact.get("key") == storage_key else None
+    cached = walls_cache.get(cache_key) if cache_key is not None else None
+    if cached is None:
+        raw = await _read_artifact_json(storage, ready, sheet.revision_id, attempt, name)
+        if raw is None:
+            raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "walls.json задания не найден")
+        try:
+            # Валидация большого файла — в потоке, не на event loop.
+            document = await asyncio.to_thread(WallsDocument.model_validate, raw)
+        except ValidationError as error:
+            raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "walls.json вне контракта") from error
+        cached = CachedWalls(document, raw, int(artifact.get("size") or 0))
+        if cache_key is not None:
+            walls_cache.put(cache_key, cached)
+    return _Walls(ready, sha256, cached.document, cached.raw, jobs[0])
 
 
 def _floor_extras(walls: _Walls) -> WallsFloorExtras:
@@ -177,7 +187,10 @@ async def _totals(
     # Толщина плиты проекта из разреза (ADR-0039) сильнее walls.json, слабее переопределения листа.
     project_slab = await store.load_project_slab(session, project_id=sheet.project_id)
     slab = await _slab(session, sheet, walls)
-    result = cad_constructions.compute_sheet(walls.document, props, levels, project_slab, slab)
+    # Аргументы — pydantic-модели и dataclass, не ORM: расчёт идёт в потоке, не на event loop.
+    result = await asyncio.to_thread(
+        cad_constructions.compute_sheet, walls.document, props, levels, project_slab, slab
+    )
     return result, levels
 
 
@@ -362,7 +375,10 @@ async def put_cad_sheet_levels(
     )
     project_slab = await store.load_project_slab(session, project_id=sheet.project_id)
     slab = await _slab(session, sheet, walls)
-    result = cad_constructions.compute_sheet(walls.document, props, levels, project_slab, slab)
+    # Аргументы — pydantic-модели и dataclass, не ORM: расчёт идёт в потоке, не на event loop.
+    result = await asyncio.to_thread(
+        cad_constructions.compute_sheet, walls.document, props, levels, project_slab, slab
+    )
     response = _totals_read(result, levels)
     await session.commit()
     return response

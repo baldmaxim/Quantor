@@ -29,7 +29,7 @@ import { CAD_FEATURE } from '@/lib/cad/access';
 import { CALC_FEATURE } from '@/lib/calc/access';
 import { CONSISTENCY_FEATURE } from '@/lib/consistency/access';
 import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
-import { useDocumentsRevisions, useFeatures, useProject, useProjectDocuments } from '@/lib/queries';
+import { useFeatures, useProject, useProjectDocuments, useProjectRevisions } from '@/lib/queries';
 
 /**
  * Карточка проекта.
@@ -60,7 +60,7 @@ const ProjectPage = ({ params }: IPageProps) => {
   const features = useFeatures();
 
   const items = documents.data?.items ?? [];
-  const revisions = useDocumentsRevisions(items.map((document) => document.id));
+  const revisions = useProjectRevisions(projectId, items.map((document) => document.id));
   const revisionsOf = (documentId: string): readonly DocumentRevisionRead[] =>
     revisions.byDocument.get(documentId)?.items ?? [];
 

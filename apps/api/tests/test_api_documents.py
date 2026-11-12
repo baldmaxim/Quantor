@@ -296,6 +296,60 @@ class TestOpenability:
         assert items[-1]["id"] == str(second.id)
 
 
+class TestProjectRevisions:
+    """Ревизии всех документов проекта одним запросом (вместо запроса на каждый документ)."""
+
+    async def test_revisions_of_all_documents_are_listed_in_order(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Два документа"
+        )
+        first_doc, first_rev = await _raw_pdf(db_session, project=project, sheets=1)
+        second_doc, second_rev = await _raw_pdf(db_session, project=project, sheets=3)
+        newer = await _revision(db_session, document=first_doc, index=7, sheets=2)
+        first_rev.created_at = datetime(2026, 9, 1, 10, 0, tzinfo=UTC)
+        newer.created_at = datetime(2026, 9, 2, 10, 0, tzinfo=UTC)
+        await db_session.commit()
+
+        response = await api.get(f"/api/v1/projects/{project.id}/revisions")
+
+        assert response.status_code == 200
+        items = response.json()
+        counts = {item["id"]: item["sheet_count"] for item in items}
+        assert counts == {str(first_rev.id): 1, str(newer.id): 2, str(second_rev.id): 3}
+        assert {item["document_id"] for item in items} == {str(first_doc.id), str(second_doc.id)}
+        by_document: dict[str, list[str]] = {}
+        for item in items:
+            by_document.setdefault(item["document_id"], []).append(item["id"])
+        assert by_document[str(first_doc.id)] == [str(first_rev.id), str(newer.id)]
+        assert [item["document_id"] for item in items] == sorted(
+            item["document_id"] for item in items
+        )
+
+    async def test_project_without_documents_gives_empty_list(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        project = await projects_service.create_project(
+            db_session, workspace_id=workspace_id, name="Пустой"
+        )
+        await db_session.commit()
+
+        response = await api.get(f"/api/v1/projects/{project.id}/revisions")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    async def test_project_of_foreign_workspace_is_hidden(
+        self, api: AsyncClient, db_session: AsyncSession, second_workspace: Workspace
+    ) -> None:
+        data = await _build(db_session, second_workspace.id)
+
+        response = await api.get(f"/api/v1/projects/{data.project.id}/revisions")
+
+        assert response.status_code == 404
+
+
 class TestContentUrl:
     async def test_returns_presigned_url_with_original_filename(
         self,

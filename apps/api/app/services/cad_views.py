@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 from typing import Any, Final
@@ -60,7 +61,8 @@ async def read_json(storage: ObjectStorage, key: str) -> Any:
         if size > cad_service.MAX_JSON_ARTIFACT_BYTES:
             raise ArtifactTooLargeError(key)
         chunks.append(chunk)
-    return json.loads(b"".join(chunks))
+    # Разбор до 32 МБ — в потоке: на event loop он останавливал бы все запросы процесса.
+    return await asyncio.to_thread(json.loads, b"".join(chunks))
 
 
 def _num(value: Any) -> float | None:

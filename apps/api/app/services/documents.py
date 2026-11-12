@@ -211,6 +211,38 @@ async def list_revisions(
     ]
 
 
+async def list_project_revisions(
+    session: AsyncSession, *, project_id: uuid.UUID
+) -> list[RevisionWithCount]:
+    """Ревизии всех документов проекта одним запросом, со счётчиком листов.
+
+    Заменяет N запросов `list_revisions` по одному на документ. Порядок — по документу,
+    внутри документа от старой ревизии к новой, как и в `list_revisions`. Предохранитель
+    ограничивает выдачу на случай аномально большого проекта.
+    """
+    sheet_count = (
+        select(func.count(Sheet.id))
+        .where(Sheet.revision_id == DocumentRevision.id)
+        .correlate(DocumentRevision)
+        .scalar_subquery()
+    )
+    query = (
+        select(DocumentRevision, sheet_count)
+        .join(Document, DocumentRevision.document_id == Document.id)
+        .where(Document.project_id == project_id)
+        .order_by(
+            DocumentRevision.document_id.asc(),
+            DocumentRevision.created_at.asc(),
+            DocumentRevision.id.asc(),
+        )
+        .limit(5000)
+    )
+    result = await session.execute(query)
+    return [
+        RevisionWithCount(revision=revision, sheet_count=count) for revision, count in result.all()
+    ]
+
+
 async def count_revisions(session: AsyncSession, *, document_id: uuid.UUID) -> int:
     result = await session.execute(
         select(func.count())

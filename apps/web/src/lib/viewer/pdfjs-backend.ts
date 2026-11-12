@@ -47,7 +47,16 @@ export class PdfJsRenderBackend implements RenderBackend {
       import.meta.url,
     ).toString();
 
-    const task = pdfjs.getDocument({ url, withCredentials: false });
+    // Чертежи весят десятки–сотни МБ, а нужна одна страница. Без этих опций pdf.js стримит
+    // и дозагружает весь файл в фоне. Так берём только нужные куски по Range (по 1 МБ);
+    // если сервер Range не поддержит, pdf.js сам откатится на полную загрузку.
+    const task = pdfjs.getDocument({
+      url,
+      withCredentials: false,
+      disableAutoFetch: true,
+      disableStream: true,
+      rangeChunkSize: 1 << 20,
+    });
     signal?.addEventListener('abort', () => void task.destroy(), { once: true });
 
     try {
