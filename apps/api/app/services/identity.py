@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth.cache import invalidate_auth_cache
 from app.domain import ApprovalStatus, Role, UserKind, WorkspaceStatus
 from app.models import UserIdentity, Workspace, WorkspaceMembership
 
@@ -92,6 +93,8 @@ async def upsert_identity(
     if user.platform_role is None and _matches_hint(user, platform_admin_hints):
         user.platform_role = Role.PLATFORM_ADMIN
     await session.flush()
+    # Почта, имя и права личности лежат в кэше разбора сеанса.
+    invalidate_auth_cache()
     return user
 
 

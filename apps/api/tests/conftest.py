@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from app.auth.cache import invalidate_auth_cache
 from app.auth.context import AuthContext, CredentialKind, Principal
 from app.auth.dev import DEV_USER_ID
 from app.auth.permissions import permissions_for
@@ -36,6 +37,7 @@ from app.db.session import get_session
 from app.domain import OverrideScope, Role, UserKind
 from app.main import create_app
 from app.models import FeatureFlagOverride, UserIdentity, Workspace
+from app.services.feature_flags import clear_flag_cache
 from app.services.job_runner import get_job_scheduler
 from app.storage import get_object_storage
 from app.storage.base import ObjectNotFoundError, ObjectStat, StoredObject
@@ -82,6 +84,20 @@ async def _ensure_database() -> bool:
     finally:
         await engine.dispose()
     return True
+
+
+@pytest.fixture(autouse=True)
+def _reset_process_caches() -> Iterator[None]:
+    """Кэши процесса (флаги, разбор сеанса) не переживают тест.
+
+    Тесты правят базу напрямую, минуя сервисы с инвалидацией, а `truncate` между тестами
+    тоже о кэше не знает: без сброса запись одного теста попала бы в другой.
+    """
+    clear_flag_cache()
+    invalidate_auth_cache()
+    yield
+    clear_flag_cache()
+    invalidate_auth_cache()
 
 
 @pytest.fixture

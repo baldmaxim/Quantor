@@ -123,7 +123,10 @@ services:
     image: ghcr.io/baldmaxim/quantor-api:${IMAGE_TAG:?запускайте через update.sh или compose.sh}
     container_name: quantor-api
     restart: unless-stopped
-    environment: *api-env
+    environment:
+      <<: *api-env
+      # Процессов uvicorn; один занимает ~175 МиБ. Два — с запасом в mem_limit 768m; пул БД 3+4 на процесс.
+      API_WORKERS: ${API_WORKERS:-2}
     volumes:
       # Загрузки до гигабайта идут через временный файл: на диск, а не в память.
       - api_tmp:/tmp
@@ -144,7 +147,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    mem_limit: 512m
+    mem_limit: 768m
     networks: [internal, infra_web]
 
   worker:

@@ -45,5 +45,6 @@ EXPOSE 8000
 
 # Заголовки прокси принимаются от любого адреса: API опубликован только во внутренних
 # сетях Docker, и перед ним всегда стоит nginx, который сам выставляет X-Forwarded-*.
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--proxy-headers", "--forwarded-allow-ips", "*", "--no-server-header"]
+# Число процессов — API_WORKERS (по умолчанию 2). Оболочка нужна, чтобы прочитать переменную;
+# `exec` оставляет uvicorn первым процессом контейнера, и SIGTERM доходит до него напрямую.
+CMD ["sh", "-c", "exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers \"${API_WORKERS:-2}\" --proxy-headers --forwarded-allow-ips '*' --no-server-header"]

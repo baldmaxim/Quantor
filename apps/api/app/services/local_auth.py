@@ -23,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import sessions
+from app.auth.cache import invalidate_auth_cache
 from app.core.workspace import DEV_WORKSPACE_ID
 from app.domain import ApprovalStatus, Role, UserKind
 from app.errors import DomainError, ErrorCode
@@ -276,6 +277,7 @@ async def create_platform_admin(
     user.approval_status = ApprovalStatus.APPROVED
     user.is_active = True
     await session.flush()
+    invalidate_auth_cache()
 
     credential = await session.get(LocalCredential, user.id)
     if credential is None:

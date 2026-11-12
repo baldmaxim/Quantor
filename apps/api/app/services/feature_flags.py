@@ -5,14 +5,17 @@
 Внешнего сервиса флагов не заводится — на текущих объёмах это была бы инфраструктура
 без отдачи, — но замена провайдера потом не потребует править места использования.
 
-Межпроцессного кэша нет намеренно. Флаги разрешаются один раз за запрос, источник правды
-один — база, поэтому переопределение действует со следующего запроса в любом процессе.
-Это и есть детерминированная инвалидация: нечего инвалидировать. Кэш появится, когда
-измерения покажут, что он нужен, и тогда ключом станет счётчик изменений контура.
+Межпроцессного кэша нет. Есть короткий внутрипроцессный кэш загруженных переопределений
+(`FLAG_CACHE_TTL_SECONDS`): он снимает SELECT с каждого запроса к закрытому флагом маршруту.
+Запись переопределения сбрасывает кэш своего процесса сразу; при нескольких воркерах uvicorn
+инвалидация действует только в процессе-авторе, поэтому в остальных устаревание ограничено
+TTL (15 с). Результат вычисления не кэшируется — только сырые переопределения: итог зависит
+ещё и от окружения, настроек и контекста запроса.
 """
 
 from __future__ import annotations
 
+import time
 import uuid
 from dataclasses import dataclass
 from typing import Protocol
@@ -32,6 +35,29 @@ from app.models import FeatureFlagOverride
 from app.services import audit as audit_service
 
 log = get_logger(__name__)
+
+# Срок жизни кэша переопределений в процессе. Константа модуля: тесты подменяют `time.monotonic`.
+FLAG_CACHE_TTL_SECONDS = 15.0
+
+
+@dataclass(frozen=True, slots=True)
+class OverrideSnapshot:
+    """Неизменяемый снимок строки переопределения: ORM-объект в кэше жить не может."""
+
+    workspace_id: uuid.UUID | None
+    enabled: bool
+    reason: str | None
+
+
+OverrideMap = dict[tuple[str, OverrideScope], OverrideSnapshot]
+
+# workspace_id (None — системный контекст) -> (монотонное время истечения, переопределения).
+_override_cache: dict[uuid.UUID | None, tuple[float, OverrideMap]] = {}
+
+
+def clear_flag_cache() -> None:
+    """Сбрасывает кэш переопределений этого процесса."""
+    _override_cache.clear()
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,15 +173,29 @@ def _configuration_state(key: str, settings: Settings) -> bool:
     return True
 
 
-async def _load_overrides(
-    session: AsyncSession, workspace_id: uuid.UUID | None
-) -> dict[tuple[str, OverrideScope], FeatureFlagOverride]:
+async def _load_overrides(session: AsyncSession, workspace_id: uuid.UUID | None) -> OverrideMap:
+    """Переопределения системы и пространства; из кэша, пока он не истёк.
+
+    Ошибка базы пробрасывается до записи в кэш: сбой не должен закрепляться на TTL.
+    """
+    now = time.monotonic()
+    cached = _override_cache.get(workspace_id)
+    if cached is not None and cached[0] > now:
+        return cached[1]
+
     query = select(FeatureFlagOverride).where(
         (FeatureFlagOverride.workspace_id.is_(None))
         | (FeatureFlagOverride.workspace_id == workspace_id)
     )
     rows = (await session.execute(query)).scalars().all()
-    return {(row.flag_key, row.scope): row for row in rows}
+    loaded: OverrideMap = {
+        (row.flag_key, row.scope): OverrideSnapshot(
+            workspace_id=row.workspace_id, enabled=row.enabled, reason=row.reason
+        )
+        for row in rows
+    }
+    _override_cache[workspace_id] = (time.monotonic() + FLAG_CACHE_TTL_SECONDS, loaded)
+    return loaded
 
 
 async def evaluate_all(
@@ -270,6 +310,8 @@ async def set_override(
         after={"enabled": enabled, "reason": reason, "scope": scope.value},
     )
     await session.commit()
+    # После фиксации: кэш, наполненный до коммита, не должен пережить запись.
+    clear_flag_cache()
 
     evaluated = await evaluate_all(
         session, settings, EvaluationContext(workspace_id=context.workspace_id)
@@ -305,6 +347,7 @@ async def delete_override(
             before={"enabled": existing.enabled, "scope": scope.value},
         )
         await session.commit()
+        clear_flag_cache()
 
     evaluated = await evaluate_all(
         session, settings, EvaluationContext(workspace_id=context.workspace_id)

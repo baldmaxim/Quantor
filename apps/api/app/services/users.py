@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import sessions
+from app.auth.cache import invalidate_auth_cache
 from app.domain import WORKSPACE_ROLES, ApprovalStatus, Role, WorkspaceStatus
 from app.errors import DomainError, ErrorCode
 from app.models import LocalCredential, UserIdentity, Workspace, WorkspaceMembership
@@ -139,6 +140,7 @@ async def upsert_membership(
     else:
         membership.role = role
     await session.flush()
+    invalidate_auth_cache()
     return membership
 
 
@@ -161,6 +163,7 @@ async def approve(
     _check_workspace_role(role)
     await _active_workspace(session, workspace_id)
     user.approval_status = ApprovalStatus.APPROVED
+    invalidate_auth_cache()
     await upsert_membership(session, user_id=user.id, workspace_id=workspace_id, role=role)
 
 
@@ -170,6 +173,7 @@ async def reject(session: AsyncSession, *, user: UserIdentity) -> None:
         raise DomainError(ErrorCode.USER_STATE_INVALID, "Отклонить можно только новую заявку")
     user.approval_status = ApprovalStatus.REJECTED
     await session.flush()
+    invalidate_auth_cache()
 
 
 async def set_active(
@@ -182,6 +186,7 @@ async def set_active(
     if not active:
         await sessions.revoke_all_for_user(session, user.id)
     await session.flush()
+    invalidate_auth_cache()
 
 
 async def set_membership(

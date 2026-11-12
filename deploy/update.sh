@@ -8,7 +8,7 @@
 # Тег выпуска хранится в RELEASE, а не в .env: .env заполняет владелец, скрипт его не
 # меняет. Ручные команды compose — через ./compose.sh, он берёт тег оттуда же.
 #
-# Порядок: скачать образы → сверить описание развёртывания с образом → бакет → миграции →
+# Порядок: образ API → сверить описание развёртывания с образом → остальные образы → бакет → миграции →
 # перезапуск → проверка, что все контейнеры из одной сборки и API готов.
 #
 # docker-compose.yml руками здесь не правится: скрипт берёт его из образа API того же
@@ -24,12 +24,12 @@ export IMAGE_TAG="$TAG"
 COMPOSE=(docker compose -p quantor)
 
 echo "→ выкатывается ${TAG}"
-# Именно pull: `up -d` не перекачивает образ, если тег уже есть на диске.
+# Сначала только образ API: из него берётся docker-compose.yml этого выпуска. Остальные
+# образы качаются ниже по уже синхронизированному описанию — иначе pull идёт по прежнему
+# compose (старые имена и состав сервисов).
 # SKIP_PULL=1 — образы уже загружены по ssh (deploy/ship-local.sh), реестр не нужен.
-if [ "${SKIP_PULL:-0}" = 1 ]; then
-  echo "   pull пропущен (SKIP_PULL=1): образы загружены на сервер"
-else
-  "${COMPOSE[@]}" pull minio api worker cad-worker web admin
+if [ "${SKIP_PULL:-0}" != 1 ]; then
+  docker pull "ghcr.io/baldmaxim/quantor-api:${TAG}"
 fi
 
 echo -n "→ описание развёртывания: "
@@ -56,6 +56,13 @@ if docker cp "$helper:/app/deploy/update.sh" "$tmp_self" 2>/dev/null && ! cmp -s
 fi
 docker rm -f "$helper" >/dev/null 2>&1 || true
 rm -f "$tmp_compose" "$tmp_self"
+
+# Именно pull: `up -d` не перекачивает образ, если тег уже есть на диске.
+if [ "${SKIP_PULL:-0}" = 1 ]; then
+  echo "   pull пропущен (SKIP_PULL=1): образы загружены на сервер"
+else
+  "${COMPOSE[@]}" pull minio api worker cad-worker web admin
+fi
 
 # Хранилище и база должны быть подняты до миграций и бакета.
 "${COMPOSE[@]}" up -d db minio

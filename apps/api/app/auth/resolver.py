@@ -12,12 +12,15 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, params
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import cache as auth_cache
 from app.auth import csrf, oidc, sessions
 from app.auth.context import AuthContext, CredentialKind, Principal
 from app.auth.dev import DEV_ROLE_HEADER, dev_context
@@ -40,6 +43,18 @@ WORKSPACE_HEADER = "X-Workspace-Id"
 _BEARER_PREFIX = "bearer "
 
 
+@dataclass(frozen=True, slots=True)
+class _Identity:
+    """Результат опознания: кто, чем подтверждён и что уже известно о членствах."""
+
+    principal: Principal
+    credential: CredentialKind
+    session_id: uuid.UUID | None
+    # Хеш токена сеанса — ключ кэша (`auth/cache.py`); у bearer-токена кэша нет.
+    token_hash: str | None = None
+    memberships: tuple[identity_service.MembershipView, ...] | None = None
+
+
 def _unauthenticated(code: ErrorCode = ErrorCode.UNAUTHENTICATED) -> Exception:
     """401 с заголовком, без которого ответ формально неполон."""
     return http_error(code, headers={"WWW-Authenticate": "Bearer"})
@@ -54,7 +69,8 @@ async def get_auth_context(
     if settings.auth_mode == "dev":
         return dev_context(request.headers.get(DEV_ROLE_HEADER))
 
-    principal, credential, session_id = await _authenticate(request, settings, session)
+    identity = await _authenticate(request, settings, session)
+    principal, credential = identity.principal, identity.credential
 
     # Подтверждение — после опознания и только для cookie: у запроса с заголовком
     # Authorization подделывать нечего, браузер его сам не добавляет.
@@ -65,7 +81,7 @@ async def get_auth_context(
             request.headers.get(csrf.CSRF_HEADER),
         )
 
-    workspace_id, role = await _resolve_workspace(request, session, principal)
+    workspace_id, role = await _resolve_workspace(request, session, identity)
 
     return AuthContext(
         principal=principal,
@@ -74,13 +90,11 @@ async def get_auth_context(
         permissions=permissions_for(role),
         credential=credential,
         is_dev_mode=False,
-        session_id=session_id,
+        session_id=identity.session_id,
     )
 
 
-async def _authenticate(
-    request: Request, settings: Settings, session: AsyncSession
-) -> tuple[Principal, CredentialKind, uuid.UUID | None]:
+async def _authenticate(request: Request, settings: Settings, session: AsyncSession) -> _Identity:
     """Опознаёт личность по cookie или заголовку."""
     header = request.headers.get("Authorization", "")
     if header.lower().startswith(_BEARER_PREFIX):
@@ -96,11 +110,24 @@ async def _authenticate(
             # Токен настоящий, но такой личности портал не знает. Это не «неверный токен»,
             # а «доступ не выдан», и 401 здесь честнее 403: сеанса нет вовсе.
             raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
-        return _principal(user), CredentialKind.BEARER, None
+        return _Identity(_principal(user), CredentialKind.BEARER, None)
 
     token = request.cookies.get(settings.auth_cookie_name)
     if not token:
         raise _unauthenticated()
+
+    token_hash = sessions.hash_token(token)
+    cached = auth_cache.get_auth_entry(token_hash)
+    if cached is not None:
+        # Без базы: сеанс, пользователь и членства свежи не старше TTL кэша, срок сеанса
+        # проверен при выдаче. Продление (`touch`) случится на ближайшем промахе.
+        return _Identity(
+            cached.principal,
+            CredentialKind.SESSION,
+            cached.session_id,
+            token_hash,
+            cached.memberships,
+        )
 
     row = await sessions.resolve(session, token)
     if row is None:
@@ -124,7 +151,14 @@ async def _authenticate(
         request.scope.setdefault("state", {})[STATE_KEY] = SessionCookieRefresh(
             token=token, max_age=max(remaining, 0)
         )
-    return _principal(user), CredentialKind.SESSION, row.id
+    principal = _principal(user)
+    auth_cache.put_auth_entry(
+        token_hash,
+        principal=principal,
+        session_id=row.id,
+        session_expires_at=row.expires_at,
+    )
+    return _Identity(principal, CredentialKind.SESSION, row.id, token_hash)
 
 
 def _principal(user: UserIdentity) -> Principal:
@@ -140,7 +174,7 @@ def _principal(user: UserIdentity) -> Principal:
 
 
 async def _resolve_workspace(
-    request: Request, session: AsyncSession, principal: Principal
+    request: Request, session: AsyncSession, identity: _Identity
 ) -> tuple[uuid.UUID | None, Role]:
     """Выбирает пространство запроса и роль в нём.
 
@@ -152,8 +186,15 @@ async def _resolve_workspace(
     закрыть администрирование установки ровно в тот момент, когда оно нужнее всего —
     при её первичной настройке.
     """
+    principal = identity.principal
     requested = _requested_workspace(request)
-    memberships = await identity_service.list_memberships(session, principal.user_id)
+    if identity.memberships is not None:
+        memberships: Sequence[identity_service.MembershipView] = identity.memberships
+    else:
+        loaded = await identity_service.list_memberships(session, principal.user_id)
+        memberships = loaded
+        if identity.token_hash is not None:
+            auth_cache.set_cached_memberships(identity.token_hash, tuple(loaded))
 
     def role_in(membership: identity_service.MembershipView) -> Role:
         # Администратор платформы остаётся им и в пространстве, где он участник: так же

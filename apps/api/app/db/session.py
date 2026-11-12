@@ -26,8 +26,9 @@ def get_engine() -> AsyncEngine:
     return create_async_engine(
         settings.database_url,
         pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=5,
+        # Несколько процессов uvicorn плюс исполнители делят max_connections базы.
+        pool_size=3,
+        max_overflow=4,
         echo=False,
         # Зависший запрос иначе держит соединение и рабочий поток приложения бесконечно.
         connect_args={"command_timeout": settings.database_statement_timeout_seconds},

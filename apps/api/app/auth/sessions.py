@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.cache import invalidate_auth_cache
 from app.models import AuthSession
 
 # 32 байта энтропии: перебор по сети бессмыслен, а длина cookie остаётся разумной.
@@ -110,6 +111,8 @@ async def revoke(session: AsyncSession, row: AuthSession) -> None:
     """Гасит сеанс. Повторный вызов безобиден."""
     if row.revoked_at is None:
         row.revoked_at = datetime.now(UTC)
+    # Кэш разбора сеанса: отозванный токен не должен жить в нём до истечения TTL.
+    invalidate_auth_cache(row.token_hash)
 
 
 async def revoke_all_for_user(
@@ -129,4 +132,6 @@ async def revoke_all_for_user(
     now = datetime.now(UTC)
     for row in rows:
         row.revoked_at = now
+    # Какие именно токены в кэше, по user_id не узнать: сбрасываем всё.
+    invalidate_auth_cache()
     return len(rows)
