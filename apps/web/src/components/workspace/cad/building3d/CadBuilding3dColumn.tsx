@@ -37,7 +37,8 @@ const ROW =
 
 /**
  * Колонка «Здание» вида «3D»: аксонометрия стопки этажей и список этажей одного здания (корпус +
- * секция; при нескольких - переключатель, по умолчанию первое). Этажи уже совмещены сервером по
+ * секция; при нескольких - переключатель). Действующее здание: ручной выбор (только пока открыт тот же
+ * лист, при котором он сделан), иначе здание открытого листа, иначе первое. Этажи уже совмещены сервером по
  * осям; несовмещённые помечены в списке и в подсказке. Щелчок по этажу на
  * холсте или в списке открывает его лист в основном 3D-виде. Этаж без отметки в 3D не строится
  * и стоит в списке внизу. Ширина от `lg` - колонка слева; уже - сворачиваемая полоса сверху.
@@ -47,17 +48,25 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
   const [open, setOpen] = useState(true);
   const [hover, setHover] = useState<IHover | null>(null);
   const [canvasError, setCanvasError] = useState<string | null>(null);
-  const [chosenGroup, setChosenGroup] = useState<string | null>(null);
+  // Ручной выбор помнит лист, при котором он сделан: смена листа его отменяет (без эффекта, при рендере).
+  const [chosen, setChosen] = useState<{ readonly group: string; readonly sheetKey: string | null } | null>(null);
 
+  const currentKey = current ? floorKey({ job_id: current.jobId, page_index: current.pageIndex, view: current.view }) : null;
   const groups = useMemo(() => query.data?.groups ?? [], [query.data]);
-  const groupKey = resolveGroupKey(groups, chosenGroup);
+  const sheetGroup = useMemo(
+    () => (query.data?.floors ?? []).find((item) => floorKey(item) === currentKey)?.group_key ?? null,
+    [query.data, currentKey],
+  );
+  // Выбор для другого листа забывается совсем: возврат на прежний лист не вернёт старый выбор.
+  if (chosen !== null && chosen.sheetKey !== currentKey) setChosen(null);
+  const chosenGroup = chosen !== null && chosen.sheetKey === currentKey ? chosen.group : null;
+  const groupKey = resolveGroupKey(groups, chosenGroup, sheetGroup);
   const floors = useMemo(
     () => filterFloorsByGroup(query.data?.floors ?? [], groupKey),
     [query.data, groupKey],
   );
   const list = useMemo(() => splitFloors(floors), [floors]);
   const byKey = useMemo(() => new Map(floors.map((floor) => [floorKey(floor), floor])), [floors]);
-  const currentKey = current ? floorKey({ job_id: current.jobId, page_index: current.pageIndex, view: current.view }) : null;
   const hovered = hover ? (byKey.get(hover.key) ?? null) : null;
   const hoveredNote = hovered ? alignmentNote(hovered, floors.length) : null;
   const hasFloors = list.known.length + list.unknown.length > 0;
@@ -192,7 +201,7 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
           groups={groups}
           value={groupKey ?? ''}
           onChange={(key) => {
-            setChosenGroup(key);
+            setChosen({ group: key, sheetKey: currentKey });
             setHover(null);
           }}
         />

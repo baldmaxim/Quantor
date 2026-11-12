@@ -158,6 +158,17 @@ describe('здания и совмещение', () => {
     expect(resolveGroupKey([], 'k2')).toBeNull();
   });
 
+  it('действующее здание: группа открытого листа вместо первой, ручной выбор главнее', () => {
+    const groups = [
+      { key: 'k2', label: 'Корп. 2', floor_count: 2, aligned_count: 2 },
+      { key: 'k10', label: 'Корп. 10', floor_count: 1, aligned_count: 0 },
+    ];
+    expect(resolveGroupKey(groups, null, 'k10')).toBe('k10');
+    expect(resolveGroupKey(groups, 'k2', 'k10')).toBe('k2');
+    expect(resolveGroupKey(groups, 'исчезло', 'k10')).toBe('k10');
+    expect(resolveGroupKey(groups, null, 'нет')).toBe('k2');
+  });
+
   it('пометка совмещения: «не совмещён» только в здании из нескольких этажей', () => {
     const none = floor({ alignment: 'none', alignment_message: 'оси не распознаны' });
     expect(alignmentNote(none, 2)).toEqual({

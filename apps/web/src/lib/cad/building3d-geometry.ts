@@ -69,14 +69,21 @@ export const filterFloorsByGroup = (
 ): CadBuilding3dFloorRead[] =>
   groupKey === null ? [...floors] : floors.filter((floor) => floor.group_key === groupKey);
 
-/** Действующее здание: выбранное, если оно есть в ответе, иначе первое; групп нет - `null`. */
+/**
+ * Действующее здание по убыванию приоритета: ручной выбор, группа открытого листа, первое в списке.
+ * Ключ, которого нет в ответе, пропускается; групп нет - `null`.
+ */
 export const resolveGroupKey = (
   groups: readonly CadBuilding3dGroupRead[],
   chosen: string | null,
+  sheetGroup: string | null = null,
 ): string | null => {
   const first = groups[0];
   if (first === undefined) return null;
-  return groups.some((group) => group.key === chosen) && chosen !== null ? chosen : first.key;
+  const exists = (key: string | null): key is string => key !== null && groups.some((group) => group.key === key);
+  if (exists(chosen)) return chosen;
+  if (exists(sheetGroup)) return sheetGroup;
+  return first.key;
 };
 
 export interface IAlignmentNote {

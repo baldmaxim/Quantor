@@ -72,18 +72,17 @@ const group = (key: string, label: string, floorCount: number): CadBuilding3dGro
   aligned_count: floorCount,
 });
 
-const mount = (onSelectFloor = vi.fn()) => {
+type Current = { jobId: string; pageIndex: number; view: number } | null;
+
+const mount = (onSelectFloor = vi.fn(), current: Current = { jobId: 'j1', pageIndex: 0, view: 0 }) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  const ui = (value: Current) => (
     <QueryClientProvider client={queryClient}>
-      <CadBuilding3dColumn
-        projectId="p1"
-        current={{ jobId: 'j1', pageIndex: 0, view: 0 }}
-        onSelectFloor={onSelectFloor}
-      />
-    </QueryClientProvider>,
+      <CadBuilding3dColumn projectId="p1" current={value} onSelectFloor={onSelectFloor} />
+    </QueryClientProvider>
   );
-  return onSelectFloor;
+  const { rerender } = render(ui(current));
+  return { onSelectFloor, setCurrent: (value: Current) => rerender(ui(value)) };
 };
 
 beforeEach(() => {
@@ -113,7 +112,7 @@ describe('колонка «Здание»', () => {
 
   it('выбор этажа в списке и на холсте отдаёт этаж', async () => {
     respond([floor({ job_id: 'j1' }), floor({ job_id: 'j2', label: '2 этаж', base_z_mm: 3000 })]);
-    const onSelectFloor = mount();
+    const { onSelectFloor } = mount();
     fireEvent.click(await screen.findByRole('button', { name: /2 этаж/ }));
     expect(onSelectFloor).toHaveBeenLastCalledWith(expect.objectContaining({ job_id: 'j2' }));
     fireEvent.click(screen.getByRole('button', { name: 'щелчок по холсту' }));
@@ -159,9 +158,9 @@ describe('колонка «Здание»', () => {
         [group('k2', 'Корп. 2', 2), group('k10', 'Корп. 10', 1)],
       );
 
-    it('по умолчанию показывает первое здание, переключатель меняет список', async () => {
+    it('лист не найден среди этажей или не открыт - первое здание, переключатель меняет список', async () => {
       two();
-      mount();
+      mount(vi.fn(), null);
       const select = await screen.findByRole('combobox', { name: /Корпус и секция/ });
       expect(select).toHaveValue('k2');
       expect(
@@ -171,6 +170,29 @@ describe('колонка «Здание»', () => {
       expect(
         within(screen.getByRole('list')).getAllByRole('button').map((row) => row.textContent),
       ).toEqual(['К10 этаж 10.000']);
+    });
+
+    it('показывает здание открытого листа, а не первое', async () => {
+      two();
+      mount(vi.fn(), { jobId: 'b1', pageIndex: 0, view: 0 });
+      const select = await screen.findByRole('combobox', { name: /Корпус и секция/ });
+      expect(select).toHaveValue('k10');
+      expect(
+        within(screen.getByRole('list')).getAllByRole('button').map((row) => row.textContent),
+      ).toEqual(['К10 этаж 10.000']);
+    });
+
+    it('ручной выбор действует до смены листа, затем - здание нового листа', async () => {
+      two();
+      const { setCurrent } = mount(vi.fn(), { jobId: 'a1', pageIndex: 0, view: 0 });
+      const select = await screen.findByRole('combobox', { name: /Корпус и секция/ });
+      expect(select).toHaveValue('k2');
+      fireEvent.change(select, { target: { value: 'k10' } });
+      expect(select).toHaveValue('k10');
+      setCurrent({ jobId: 'a2', pageIndex: 0, view: 0 });
+      expect(select).toHaveValue('k2');
+      setCurrent({ jobId: 'b1', pageIndex: 0, view: 0 });
+      expect(select).toHaveValue('k10');
     });
 
     it('одно здание - переключателя нет', async () => {
