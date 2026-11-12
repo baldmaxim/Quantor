@@ -576,17 +576,17 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 )}
               </div>
 
-              <div className="flex min-w-0 flex-1 items-stretch">
-                <span className="flex items-center gap-[var(--s-3)] border-r border-border bg-surface-muted px-[var(--s-5)] text-xs shadow-[inset_0_-2px_0_var(--accent)]">
+              <div className="flex min-w-0 flex-1 items-stretch overflow-hidden">
+                <span className="flex min-w-0 items-center gap-[var(--s-3)] whitespace-nowrap border-r border-border bg-surface-muted px-[var(--s-5)] text-xs shadow-[inset_0_-2px_0_var(--accent)]">
                   {sheet && floorTitle !== '' ? (
                     <>
                       <span
-                        className="font-medium"
+                        className="min-w-0 truncate font-medium"
                         title={formatFloorTitleFull(pipeline.sheet?.floor_title) ?? undefined}
                       >
                         {floorTitle}
                       </span>
-                      <span className="text-muted">Лист {sheet.page_label ?? sheet.page_index + 1}</span>
+                      <span className="flex-none text-muted">Лист {sheet.page_label ?? sheet.page_index + 1}</span>
                     </>
                   ) : sheet ? (
                     `Лист ${sheet.page_label ?? sheet.page_index + 1}`
