@@ -20,7 +20,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import JobStatus
+from app.domain import JobStatus, JobType
 from app.main import create_app
 from app.models import Job, Workspace
 from app.openapi_export import export
@@ -201,6 +201,153 @@ def test_retry_state_explains_every_refusal() -> None:
     ):
         allowed, reason = cad_service.retry_state(job(status, code))
         assert allowed is False and reason, (status, code)
+
+
+def test_refresh_limits_updates_limits_and_sha_only() -> None:
+    old_params = cad_service.build_params(
+        [0, 2], {0: cad_service.AutoScale(), 2: cad_service.AutoScale()}, clean_settings()
+    )
+    old_params["limits"]["total_timeout_s"] = 900
+    payload: dict[str, Any] = {
+        "revision_id": "r",
+        "params": old_params,
+        "params_sha256": cad_service.params_sha256(old_params),
+        "engine_version": "v",
+    }
+    job = Job(status=JobStatus.FAILED, error_code="JOB_TIMEOUT", attempt=1, payload=payload)
+    settings = clean_settings(cad_total_timeout_seconds=2700, cad_max_memory_mb=3000)
+    cad_service.refresh_limits(job, settings)
+    params = job.payload["params"]
+    assert isinstance(params, dict)
+    assert job.payload is not payload and payload["params"]["limits"]["total_timeout_s"] == 900
+    assert params["limits"] == cad_service.build_limits(settings)
+    assert params["limits"]["total_timeout_s"] == settings.cad_total_timeout_seconds != 900
+    assert {k: v for k, v in params.items() if k != "limits"} == {
+        k: v for k, v in old_params.items() if k != "limits"
+    }
+    sha = hashlib.sha256(cad_service.params_bytes(params)).hexdigest()
+    assert job.payload["params_sha256"] == sha
+    assert job.payload["revision_id"] == "r" and job.payload["engine_version"] == "v"
+    broken = Job(status=JobStatus.FAILED, attempt=1, payload={"params": "x"})
+    cad_service.refresh_limits(broken, settings)
+    assert broken.payload == {"params": "x"}
+
+
+async def test_retry_endpoint_refreshes_stale_limits(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    tmp_path: Path,
+) -> None:
+    settings = cad_settings(tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id = await _upload_calibrated(api, db_session, BROKEN_PDF)
+        base = f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad"
+        job_id = (await api.post(base, json={"pages": [0]})).json()["job_id"]
+        job = await db_session.get(Job, uuid.UUID(job_id))
+        assert job is not None
+        old = dict(job.payload["params"])
+        old["limits"] = {**old["limits"], "total_timeout_s": 900}
+        job.payload = {
+            **job.payload,
+            "params": old,
+            "params_sha256": cad_service.params_sha256(old),
+        }
+        key = job.idempotency_key
+        job.status = JobStatus.FAILED
+        job.error_code = "JOB_TIMEOUT"
+        job.attempt = 1
+        await db_session.commit()
+        retried = await api.post(f"{base}/{job_id}/retry")
+        assert retried.status_code == 200, retried.text
+        await db_session.refresh(job)
+        params = job.payload["params"]
+        assert params["limits"]["total_timeout_s"] == settings.cad_total_timeout_seconds != 900
+        assert job.payload["params_sha256"] == cad_service.params_sha256(params)
+        assert params["pages"] == old["pages"] and params["scales"] == old["scales"]
+        assert job.idempotency_key == key and job.status is JobStatus.QUEUED
+
+
+async def test_reschedule_convert_requeues_retryable_failure_only(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    tmp_path: Path,
+) -> None:
+    """«Преобразовать заново»: повторяемый отказ - новая попытка того же задания, иначе как есть."""
+    settings = cad_settings(tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id = await _upload_calibrated(api, db_session, BROKEN_PDF)
+        base = f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad"
+        job_id = (await api.post(base, json={"pages": [0]})).json()["job_id"]
+        job = await db_session.get(Job, uuid.UUID(job_id))
+        assert job is not None
+        old = dict(job.payload["params"])
+        old["limits"] = {**old["limits"], "total_timeout_s": 900}
+        job.payload = {
+            **job.payload,
+            "params": old,
+            "params_sha256": cad_service.params_sha256(old),
+        }
+        job.status = JobStatus.FAILED
+        job.error_code = "JOB_TIMEOUT"
+        job.attempt = 1
+        await db_session.commit()
+
+        again = await api.post(base, json={"pages": [0]})
+        assert again.status_code == 202, again.text
+        assert again.json()["job_id"] == job_id and again.json()["status"] == "queued"
+        await db_session.refresh(job)
+        assert job.status is JobStatus.QUEUED and job.error_code is None
+        assert job.max_attempts == job.attempt + 1
+        limits = job.payload["params"]["limits"]
+        assert limits["total_timeout_s"] == settings.cad_total_timeout_seconds != 900
+        assert job.payload["params_sha256"] == cad_service.params_sha256(job.payload["params"])
+
+        # Детерминированный отказ движка: возвращается то же упавшее задание без изменений.
+        job.status = JobStatus.FAILED
+        job.error_code = "CAD_ENGINE_FAILED"
+        job.max_attempts = 1
+        await db_session.commit()
+        same = await api.post(base, json={"pages": [0]})
+        assert same.json()["job_id"] == job_id and same.json()["status"] == "failed"
+        assert same.json()["retryable"] is False
+        await db_session.refresh(job)
+        assert job.status is JobStatus.FAILED and job.error_code == "CAD_ENGINE_FAILED"
+        assert job.max_attempts == 1
+
+
+async def test_requeue_helper_for_route_jobs_keeps_limits(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    """Трассы (`refresh=False`): повторяемый отказ - в очередь, лимиты и параметры не трогаются."""
+    settings = cad_settings(tmp_path)
+    payload: dict[str, Any] = {"params": {"limits": {"total_timeout_s": 900}}, "params_sha256": "x"}
+    job = Job(
+        workspace_id=None,
+        job_type=JobType.CAD_MEP_ROUTE,
+        status=JobStatus.FAILED,
+        error_code="STORAGE_UNAVAILABLE",
+        attempt=1,
+        payload=payload,
+    )
+    db_session.add(job)
+    await db_session.flush()
+    same = await cad_service.requeue_if_retryable_failure(
+        db_session, job, settings=settings, refresh=False
+    )
+    assert same is job and job.status is JobStatus.QUEUED and job.error_code is None
+    assert job.payload == payload
+    # Не упавшее и неповторяемое возвращаются как есть.
+    again = await cad_service.requeue_if_retryable_failure(
+        db_session, job, settings=settings, refresh=False
+    )
+    assert again is job and job.status is JobStatus.QUEUED
+    job.status = JobStatus.FAILED
+    job.error_code = "CAD_MEP_NOT_BUILT"
+    await db_session.flush()
+    kept = await cad_service.requeue_if_retryable_failure(
+        db_session, job, settings=settings, refresh=False
+    )
+    assert kept.status is JobStatus.FAILED and kept.error_code == "CAD_MEP_NOT_BUILT"
 
 
 def test_hold_reasons_and_frame() -> None:

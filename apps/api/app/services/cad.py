@@ -109,6 +109,14 @@ def _scale_entry(scale: ScaleChoice) -> dict[str, Any]:
     return {"mm_per_pt": scale.mm_per_pt, "calibration_id": scale.calibration_id}
 
 
+def build_limits(settings: Settings) -> dict[str, int]:
+    return {
+        "max_pages": MAX_PAGES,
+        "total_timeout_s": settings.cad_total_timeout_seconds,
+        "max_memory_mb": settings.cad_max_memory_mb,
+    }
+
+
 def build_params(
     pages: list[int], scales: Mapping[int, ScaleChoice], settings: Settings
 ) -> dict[str, Any]:
@@ -130,11 +138,7 @@ def build_params(
         "scales": {str(index): _scale_entry(scales[index]) for index in ordered},
         "finishes": False,
         "schedules": False,
-        "limits": {
-            "max_pages": MAX_PAGES,
-            "total_timeout_s": settings.cad_total_timeout_seconds,
-            "max_memory_mb": settings.cad_max_memory_mb,
-        },
+        "limits": build_limits(settings),
     }
 
 
@@ -144,6 +148,21 @@ def params_bytes(params: dict[str, Any]) -> bytes:
 
 def params_sha256(params: dict[str, Any]) -> str:
     return hashlib.sha256(params_bytes(params)).hexdigest()
+
+
+def refresh_limits(job: Job, settings: Settings) -> None:
+    """Повтор: лимиты задания берутся из текущих настроек, остальные параметры не меняются.
+
+    Контрольная сумма параметров пересчитывается: исполнитель сверяет её с параметрами.
+    Ключ идемпотентности не трогаем. Нет `params` или это не словарь — не трогаем (исполнитель
+    сам отклонит задание).
+    """
+    payload = job.payload
+    params = payload.get("params") if isinstance(payload, dict) else None
+    if not isinstance(params, dict):
+        return
+    new_params = {**params, "limits": build_limits(settings)}
+    job.payload = {**payload, "params": new_params, "params_sha256": params_sha256(new_params)}
 
 
 def idempotency_key(revision_id: uuid.UUID, params: dict[str, Any]) -> str:
@@ -251,7 +270,7 @@ async def schedule_convert(
         raise DomainError(ErrorCode.CAD_INPUT_INVALID, "Источник ревизии не PDF")
     scales = await resolve_scales(session, revision=revision, pages=pages, auto_scale=auto_scale)
     params = build_params(pages, scales, settings)
-    return await jobs_service.enqueue(
+    job = await jobs_service.enqueue(
         session,
         job_type=JobType.CAD_PDF_CONVERT,
         workspace_id=project.workspace_id,
@@ -265,6 +284,29 @@ async def schedule_convert(
             "engine_archive_sha256": ENGINE_ARCHIVE_SHA256,
         },
     )
+    return await requeue_if_retryable_failure(session, job, settings=settings, refresh=True)
+
+
+async def requeue_if_retryable_failure(
+    session: AsyncSession, job: Job, *, settings: Settings, refresh: bool
+) -> Job:
+    """Повторная постановка по тому же ключу: упавшее повторяемо — новая попытка того же задания.
+
+    `jobs.enqueue` идемпотентен при любом статусе и возвращает существующее задание; без этого
+    «Преобразовать заново» после сбоя инфраструктуры возвращало бы то же упавшее задание.
+    Неповторяемый отказ (детерминированный движок) возвращается как есть. Строка берётся под
+    блокировкой: два одновременных запроса не ставят задание дважды. `refresh` — подтянуть
+    лимиты из текущих настроек (преобразование; у трасс лимиты берутся при выполнении).
+    """
+    if job.status is not JobStatus.FAILED:
+        return job
+    await session.refresh(job, with_for_update=True)
+    retryable, _reason = retry_state(job)
+    if not retryable:
+        return job
+    if refresh:
+        refresh_limits(job, settings)
+    return await jobs_service.retry(session, job=job)
 
 
 async def get_cad_job(

@@ -517,7 +517,7 @@ async def schedule_routes(
         )
     )
     risers_sha256 = cad_risers.registry_sha256(risers) if risers else ""
-    return await jobs_service.enqueue(
+    route = await jobs_service.enqueue(
         session,
         job_type=JobType.CAD_MEP_ROUTE,
         workspace_id=project.workspace_id,
@@ -557,6 +557,10 @@ async def schedule_routes(
             "mep_attempts": [_attempt_entry(1, floor_elevation_mm, floor_height_mm, user_id)],
             **({"risers": risers, "risers_sha256": risers_sha256} if risers else {}),
         },
+    )
+    # Тот же ключ и упавшее повторяемо (сбой инфраструктуры) - новая попытка того же задания.
+    return await cad_service.requeue_if_retryable_failure(
+        session, route, settings=settings, refresh=False
     )
 
 

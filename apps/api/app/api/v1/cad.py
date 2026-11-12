@@ -280,6 +280,7 @@ async def retry_cad_job(
     job_id: uuid.UUID,
     session: SessionDep,
     context: AuthDep,
+    settings: SettingsDep,
 ) -> CadJobRead:
     job = await _job(session, context, project_id, revision_id, job_id)
     # Строка под блокировкой: два одновременных нажатия не ставят задание дважды.
@@ -287,6 +288,8 @@ async def retry_cad_job(
     retryable, reason = cad_service.retry_state(job)
     if not retryable:
         raise DomainError(ErrorCode.JOB_NOT_RETRYABLE, reason or "Повтор недоступен")
+    if job.job_type is JobType.CAD_PDF_CONVERT:
+        cad_service.refresh_limits(job, settings)
     await jobs_service.retry(session, job=job)
     await session.commit()
     return await job_read(session, job)
