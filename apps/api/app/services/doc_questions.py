@@ -34,6 +34,7 @@ from app.contracts.doc_questions import DocSearchSummary
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
+from app.errors import ErrorCode
 from app.models import (
     DocQuestionCandidate,
     Job,
@@ -65,8 +66,7 @@ from app.storage.base import ObjectStorage
 
 log = get_logger(__name__)
 
-# Код ошибки задания; в `ErrorCode` не заводится, пока файл ошибок общий с параллельными сессиями.
-SEARCH_FAILED_CODE: Final = "DOC_QUESTIONS_SEARCH_FAILED"
+SEARCH_FAILED_CODE: Final = ErrorCode.DOC_QUESTIONS_SEARCH_FAILED.value
 MAX_REPORTED_FILES: Final = 50
 _ACTIVE: Final = (JobStatus.QUEUED, JobStatus.RUNNING)
 # Потоковое слияние находок вопроса: как `_COMPACT_AT` / `_COMPACT_KEEP` в doc_search.

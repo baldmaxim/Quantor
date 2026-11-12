@@ -76,6 +76,8 @@ class ErrorCode(StrEnum):
     GEOMETRY_EXTRACT_FAILED = "GEOMETRY_EXTRACT_FAILED"
     # Паспорт листа (ADR-0043): задание разбора комплекта не удалось выполнить.
     SHEET_PASSPORT_EXTRACT_FAILED = "SHEET_PASSPORT_EXTRACT_FAILED"
+    # Вопросы к документации: задание поиска ответов не удалось выполнить.
+    DOC_QUESTIONS_SEARCH_FAILED = "DOC_QUESTIONS_SEARCH_FAILED"
 
     # --- калибровка масштаба (ADR-0018) ---
     SCALE_GEOMETRY_REQUIRED = "SCALE_GEOMETRY_REQUIRED"
@@ -257,6 +259,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.PDF_PAGE_COUNT_MISMATCH: "Число страниц PDF не совпадает с числом листов",
     ErrorCode.PDF_PAGE_GEOMETRY_INVALID: "Геометрия страницы некорректна",
     ErrorCode.GEOMETRY_EXTRACT_FAILED: "Извлечь геометрию страниц не удалось",
+    ErrorCode.DOC_QUESTIONS_SEARCH_FAILED: "Найти ответы на вопросы к документации не удалось",
     ErrorCode.SCALE_GEOMETRY_REQUIRED: "Масштаб нельзя задать до извлечения геометрии страницы",
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: "Отрезок калибровки слишком короткий",
     ErrorCode.SHEET_PASSPORT_EXTRACT_FAILED: "Разобрать паспорта листов не удалось",
@@ -438,6 +441,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.PDF_PAGE_GEOMETRY_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.IMPORT_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.GEOMETRY_EXTRACT_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.DOC_QUESTIONS_SEARCH_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.SCALE_GEOMETRY_REQUIRED: status.HTTP_409_CONFLICT,
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: status.HTTP_409_CONFLICT,
