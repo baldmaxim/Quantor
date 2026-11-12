@@ -286,6 +286,29 @@ describe('вкладка «Трассы»: выбранные трассы', () 
     expect(value.onSelectRoute).toHaveBeenCalledWith('job-route');
   });
 
+  it('источник высоты и предупреждение берутся из выбранного задания', async () => {
+    const base = routeState();
+    const job = {
+      ...base.job,
+      levels_source: 'section',
+      clear_height_mm: 3000,
+      warnings: ['section_level_ambiguous'],
+    } as unknown as NonNullable<IWorkspaceCadMep['route']>['job'];
+    mount(withRoute({}, routeState({ job })));
+    expect(await screen.findByTestId('mep-route-levels')).toHaveTextContent(
+      'Высота в свету: 3000 мм — по разрезам',
+    );
+    expect(screen.getByTestId('mep-route-warning')).toHaveTextContent(/уточните в «Разрезах»/);
+  });
+
+  it('без источника высоты - допущение движка', async () => {
+    mount(withRoute());
+    expect(await screen.findByTestId('mep-route-levels')).toHaveTextContent(
+      'Высота: допущение движка',
+    );
+    expect(screen.queryByTestId('mep-route-warning')).toBeNull();
+  });
+
   it('показывает длины по системам и квартирам, проблемы и допущения', async () => {
     mount(withRoute());
     expect(await screen.findByTestId('mep-candidate')).toBeInTheDocument();

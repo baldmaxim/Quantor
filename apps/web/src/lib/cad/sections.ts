@@ -27,6 +27,25 @@ const WARNING_TEXTS: Readonly<Record<string, string>> = {
 /** Текст предупреждения запуска трасс; незнакомый код показывается как есть. */
 export const sectionWarningText = (code: string): string => WARNING_TEXTS[code] ?? code;
 
+/** Значения `levels_source` у задания трасс (сервер: RouteLevels.source). */
+export const LEVELS_SOURCE_SECTION = 'section';
+export const LEVELS_SOURCE_PROJECT_SLAB = 'project_slab';
+
+/** Строка «откуда высота» у задания трасс: разрезы, плита проекта или допущение движка. */
+export const routeLevelsText = (job: {
+  readonly levels_source?: string | null;
+  readonly clear_height_mm?: number | null;
+  readonly slab_thickness_mm?: number | null;
+}): string => {
+  if (job.levels_source === LEVELS_SOURCE_SECTION && job.clear_height_mm != null) {
+    return `Высота в свету: ${job.clear_height_mm} мм — по разрезам`;
+  }
+  if (job.levels_source === LEVELS_SOURCE_PROJECT_SLAB && job.slab_thickness_mm != null) {
+    return `Плита ${job.slab_thickness_mm} мм — из уровней проекта`;
+  }
+  return 'Высота: допущение движка';
+};
+
 const STATUS_LABELS: Readonly<Record<SectionLevelStatus, string>> = {
   candidate: 'Кандидат',
   accepted: 'Принят',

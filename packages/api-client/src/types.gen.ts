@@ -2314,6 +2314,10 @@ export type CadJobRead = {
      */
     attempts: Array<CadAttemptRead>;
     /**
+     * Clear Height Mm
+     */
+    clear_height_mm?: number | null;
+    /**
      * Created At
      */
     created_at: string;
@@ -2374,6 +2378,10 @@ export type CadJobRead = {
      */
     known_limitation: string | null;
     /**
+     * Levels Source
+     */
+    levels_source?: string | null;
+    /**
      * Page Index
      */
     page_index: number | null;
@@ -2425,6 +2433,10 @@ export type CadJobRead = {
      * Server Time
      */
     server_time: string;
+    /**
+     * Slab Thickness Mm
+     */
+    slab_thickness_mm?: number | null;
     /**
      * Stage
      */

@@ -34,7 +34,7 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated, hasRoute
   const [height, setHeight] = useState('');
   const [touched, setTouched] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  // Предупреждения постановки (например, неоднозначная высота по разрезам) в задании не хранятся.
+  // Предупреждения постановки (например, неоднозначная высота по разрезам); в задании тоже хранятся.
   const [warnings, setWarnings] = useState<readonly string[]>([]);
 
   const elevationProblem = manual ? elevationError(elevation) : null;

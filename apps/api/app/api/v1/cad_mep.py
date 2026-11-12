@@ -163,10 +163,10 @@ async def create_cad_mep_routes(
         slab_thickness_mm=levels.slab_thickness_mm,
         levels_source=levels.source,
         section_level_ids=[str(level_id) for level_id in levels.section_level_ids],
+        levels_warnings=list(levels.warnings),
     )
     await session.commit()
-    read = CadJobRead.of(route, await cad_mep_service.load_state(session, [route]))
-    return read.model_copy(update={"warnings": list(levels.warnings)})
+    return CadJobRead.of(route, await cad_mep_service.load_state(session, [route]))
 
 
 @router.post(

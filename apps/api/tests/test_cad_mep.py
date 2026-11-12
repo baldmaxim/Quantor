@@ -1294,6 +1294,14 @@ async def test_accepted_section_level_goes_to_the_generator_as_clear_height(
         assert stored.payload["slab_thickness_mm"] is None
         assert stored.payload["levels_source"] == "section"
         assert stored.payload["section_level_ids"] == [str(accepted)]
+        # Источник высоты виден и при чтении задания (после перезагрузки страницы).
+        read = (await api.get(f"{base}/{queued['job_id']}")).json()
+        assert (read["levels_source"], read["clear_height_mm"], read["slab_thickness_mm"]) == (
+            "section",
+            3000,
+            None,
+        )
+        assert read["warnings"] == []
 
         # Тот же запрос - то же задание; другая принятая высота - новое задание.
         assert (await _queue_routes(api, base, job_id))["job_id"] == queued["job_id"]
@@ -1396,6 +1404,9 @@ async def test_ambiguous_heights_do_not_fall_back_to_the_project_slab(
 
         queued = await _queue_routes(api, base, job_id)
         assert queued["warnings"] == ["section_level_ambiguous"]
+        read = (await api.get(f"{base}/{queued['job_id']}")).json()
+        assert read["warnings"] == ["section_level_ambiguous"]
+        assert read["levels_source"] == "none" and read["clear_height_mm"] is None
         job = await _run_route_worker(db_session, fake_storage, settings, queued["job_id"])
         assert job.status is JobStatus.SUCCEEDED
         assert job.payload["levels_source"] == "none"
@@ -1441,6 +1452,9 @@ async def test_project_slab_is_used_without_accepted_sections_and_never_with_the
 
         queued = await _queue_routes(api, base, job_id)
         assert queued["warnings"] == []
+        read = (await api.get(f"{base}/{queued['job_id']}")).json()
+        assert (read["levels_source"], read["slab_thickness_mm"]) == (source, expected_slab)
+        assert read["clear_height_mm"] is None and read["warnings"] == []
         job = await _run_route_worker(db_session, fake_storage, settings, queued["job_id"])
         assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
         assert job.payload["levels_source"] == source
@@ -1450,6 +1464,41 @@ async def test_project_slab_is_used_without_accepted_sections_and_never_with_the
             "clear_height_mm": None,
             "slab_thickness_mm": None if expected_slab is None else str(expected_slab),
         }
+
+
+async def test_old_route_job_without_levels_keys_reads_as_empty(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        _project_id, _revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        queued = await _queue_routes(api, base, job_id)
+        job = await db_session.get(Job, uuid.UUID(queued["job_id"]))
+        assert job is not None
+        # Задание, поставленное до появления уровней: ключей в payload нет.
+        payload = {
+            key: value
+            for key, value in job.payload.items()
+            if key
+            not in {
+                "levels_source",
+                "levels_warnings",
+                "clear_height_mm",
+                "slab_thickness_mm",
+                "section_level_ids",
+            }
+        }
+        await db_session.execute(update(Job).where(Job.id == job.id).values(payload=payload))
+        await db_session.commit()
+        db_session.expire_all()
+        read = (await api.get(f"{base}/{queued['job_id']}")).json()
+        assert read["levels_source"] is None
+        assert read["clear_height_mm"] is None and read["slab_thickness_mm"] is None
+        assert read["warnings"] == []
 
 
 async def test_worker_refuses_both_levels_in_one_job(

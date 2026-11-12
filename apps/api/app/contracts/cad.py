@@ -317,7 +317,12 @@ class CadJobRead(BaseModel):
     attempts: list[CadAttemptRead]
     retryable: bool
     retry_blocked_reason: str | None
-    # Предупреждения постановки (не хранятся в задании): `section_level_ambiguous` - принятые
+    # Только у `cad_mep_route`: откуда высота в свету (`section` - разрезы, `project_slab` -
+    # плита проекта, `none` - допущение движка) и переданные значения, мм.
+    levels_source: str | None = None
+    clear_height_mm: int | None = None
+    slab_thickness_mm: int | None = None
+    # Предупреждения постановки (хранятся в задании): `section_level_ambiguous` - принятые
     # разрезы с отметкой этажа дают разную высоту в свету, высота в трассы не передана.
     warnings: list[str] = Field(default_factory=list)
 
@@ -352,6 +357,8 @@ class CadJobRead(BaseModel):
         approval = (
             None if state is None or approval_id is None else state.approval_by_id.get(approval_id)
         )
+        levels_source = job.payload.get("levels_source") if parent else None
+        raw_warnings = job.payload.get("levels_warnings") if parent else None
         return cls(
             job_id=job.id,
             job_type=_job_type_of(job),
@@ -368,6 +375,16 @@ class CadJobRead(BaseModel):
             floor_height_evidence=height[2],
             approval_id=approval_id,
             approval_revoked=approval is not None and approval.revoked_at is not None,
+            levels_source=levels_source if isinstance(levels_source, str) else None,
+            clear_height_mm=cad_mep_service.payload_int(job, "clear_height_mm") if parent else None,
+            slab_thickness_mm=(
+                cad_mep_service.payload_int(job, "slab_thickness_mm") if parent else None
+            ),
+            warnings=(
+                [item for item in raw_warnings if isinstance(item, str)]
+                if isinstance(raw_warnings, list)
+                else []
+            ),
             route_attempts=attempts_read(job) if parent else [],
             generator_version=version if isinstance(version, str) else None,
             status=job.status,

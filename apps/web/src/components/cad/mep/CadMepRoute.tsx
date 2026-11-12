@@ -5,6 +5,7 @@ import type { FC } from 'react';
 import type { IWorkspaceCadMepRoute } from '@/components/workspace/cad/types';
 import { StatusBadge } from '@/components/ui';
 import { cadCodeText } from '@/lib/cad/errors';
+import { routeLevelsText, sectionWarningText } from '@/lib/cad/sections';
 import { jobLabel, jobTone } from '@/lib/cad/stages';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 
@@ -58,6 +59,19 @@ export const CadMepRoute: FC<ICadMepRouteProps> = ({ route, parent, openRemarks 
           {job.generator_version && (
             <p className="mono text-xs text-muted">{job.generator_version}</p>
           )}
+          <p className="text-xs text-muted" data-testid="mep-route-levels">
+            {routeLevelsText(job)}
+          </p>
+          {(job.warnings ?? []).map((code) => (
+            <p
+              key={code}
+              role="note"
+              className="text-xs text-warning [overflow-wrap:anywhere]"
+              data-testid="mep-route-warning"
+            >
+              {sectionWarningText(code)}
+            </p>
+          ))}
           {job.approval_revoked && (
             <p role="note" className="text-xs text-danger" data-testid="mep-approval-revoked">
               Одобрение вида отозвано: принять эти трассы нельзя, просмотр доступен.

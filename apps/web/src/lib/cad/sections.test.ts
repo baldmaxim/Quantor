@@ -13,6 +13,7 @@ import {
   levelsOfPage,
   sectionPageLabel,
   sectionPageRows,
+  routeLevelsText,
   sectionWarningText,
 } from './sections';
 
@@ -142,5 +143,18 @@ describe('предупреждение трасс', () => {
   it('известный код - текст, неизвестный - как есть', () => {
     expect(sectionWarningText('section_level_ambiguous')).toContain('уточните в «Разрезах»');
     expect(sectionWarningText('other')).toBe('other');
+  });
+});
+
+describe('источник высоты у задания трасс', () => {
+  it('разрезы, плита проекта и допущение движка', () => {
+    expect(routeLevelsText({ levels_source: 'section', clear_height_mm: 3000 })).toBe(
+      'Высота в свету: 3000 мм — по разрезам',
+    );
+    expect(routeLevelsText({ levels_source: 'project_slab', slab_thickness_mm: 250 })).toBe(
+      'Плита 250 мм — из уровней проекта',
+    );
+    expect(routeLevelsText({ levels_source: 'none' })).toBe('Высота: допущение движка');
+    expect(routeLevelsText({})).toBe('Высота: допущение движка');
   });
 });

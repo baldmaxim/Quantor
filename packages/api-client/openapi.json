@@ -4837,6 +4837,17 @@
             "title": "Attempts",
             "type": "array"
           },
+          "clear_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clear Height Mm"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -4981,6 +4992,17 @@
             ],
             "title": "Known Limitation"
           },
+          "levels_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels Source"
+          },
           "page_index": {
             "anyOf": [
               {
@@ -5093,6 +5115,17 @@
             "format": "date-time",
             "title": "Server Time",
             "type": "string"
+          },
+          "slab_thickness_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slab Thickness Mm"
           },
           "stage": {
             "anyOf": [

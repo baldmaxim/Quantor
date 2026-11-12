@@ -445,6 +445,7 @@ async def schedule_routes(
     slab_thickness_mm: int | None = None,
     levels_source: str = "none",
     section_level_ids: list[str] | None = None,
+    levels_warnings: list[str] | None = None,
 ) -> Job:
     """Задание `cad_mep_route` по одобренному виду.
 
@@ -536,6 +537,8 @@ async def schedule_routes(
             "slab_thickness_mm": slab_thickness_mm,
             "levels_source": levels_source,
             **({"section_level_ids": section_level_ids} if section_level_ids else {}),
+            # Предупреждения резолва уровней (`section_level_ambiguous`) - для показа в задании.
+            **({"levels_warnings": list(levels_warnings)} if levels_warnings else {}),
             "params_sha256": params.sha256,
             "generator_version": params.generator_version,
             "engine_version": params.generator_version,
