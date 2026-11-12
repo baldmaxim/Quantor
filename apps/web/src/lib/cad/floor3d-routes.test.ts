@@ -1,9 +1,14 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { floor3dFixture } from './floor3d-fixtures';
+import { floor3dFixture, heightsFixture } from './floor3d-fixtures';
 import { buildFloor3dPlan } from './floor3d-geometry';
-import { ROUTES_RENDER_ORDER, buildFloor3dRoutes, type IFloor3dRouteColors } from './floor3d-routes';
+import {
+  ROUTES_RENDER_ORDER,
+  buildFloor3dRoutes,
+  routesBaseZMm,
+  type IFloor3dRouteColors,
+} from './floor3d-routes';
 import { buildFloor3dScene, readFloor3dColors, type IFloor3dPickData } from './floor3d-scene';
 
 const COLORS: IFloor3dRouteColors = {
@@ -116,5 +121,17 @@ describe('трассы в 3D-виде (без WebGL)', () => {
     expect(disposed.filter((kind) => kind === 'geometry')).toHaveLength(2);
     expect(disposed.filter((kind) => kind === 'material')).toHaveLength(2);
     expect(routes.group.children).toHaveLength(0);
+  });
+});
+
+describe('чистый пол модели для трасс', () => {
+  it('берёт отметку листа, а не верх плиты', () => {
+    const model = floor3dFixture({ base_z_mm: 50800, heights: heightsFixture({ floor_elevation_mm: 50900 }) });
+    expect(routesBaseZMm(model)).toBe(50900);
+  });
+
+  it('без отметки листа берёт базу модели', () => {
+    const model = floor3dFixture({ base_z_mm: 0, heights: heightsFixture({ floor_elevation_mm: null }) });
+    expect(routesBaseZMm(model)).toBe(0);
   });
 });

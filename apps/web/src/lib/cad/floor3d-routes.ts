@@ -1,3 +1,4 @@
+import type { CadFloor3dRead } from '@quantor/api-client';
 import * as THREE from 'three';
 
 import { toScenePoint, type IFloor3dCenter } from './floor3d-geometry';
@@ -5,15 +6,20 @@ import { readMepColors } from './mep-layers';
 
 /**
  * Трассы механики в 3D-виде этажа (ADR-0036, ADR-0039). Вершины приходят в мм DXF вида, Z - от
- * отметки этажа (верх плиты = чистый пол). Перевод в сцену тот же, что у призм: `toScenePoint`
- * (метры, центр модели в нуле, `Z = -y`), по высоте к Z трассы прибавляется отметка этажа модели
- * (`base_z_mm`: от неё строятся низ стен и верх плиты). В клик трассы не входят.
+ * чистого пола этажа (отметка листа; отопление в стяжке имеет отрицательный Z). Перевод в сцену тот
+ * же, что у призм: `toScenePoint` (метры, центр модели в нуле, `Z = -y`), по высоте к Z трассы
+ * прибавляется чистый пол модели (`routesBaseZMm`; верх плиты, от которого строятся низ стен и плита,
+ * ниже на пирог пола). В клик трассы не входят.
  */
+
+/** Чистый пол модели этажа, мм: отметка листа, а без неё - база модели (`base_z_mm`). */
+export const routesBaseZMm = (model: Pick<CadFloor3dRead, 'base_z_mm' | 'heights'>): number =>
+  model.heights.floor_elevation_mm ?? model.base_z_mm;
 
 export interface IFloor3dRoutesFrame {
   /** Центр модели этажа: тот же, что у призм плана. */
   readonly center: IFloor3dCenter;
-  /** Отметка этажа модели (`base_z_mm`), мм: от неё отсчитан `z_rel` трасс. */
+  /** Чистый пол модели (`routesBaseZMm`), мм: от него отсчитан `z_rel` трасс. */
   readonly baseZMm: number;
 }
 

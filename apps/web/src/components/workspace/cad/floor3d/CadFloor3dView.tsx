@@ -16,6 +16,7 @@ import {
   useSaveFloor3dSheetLevels,
   useSetFloor3dHole,
 } from '@/lib/cad/floor3d-queries';
+import { routesBaseZMm } from '@/lib/cad/floor3d-routes';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
 import { layerGroupKeys, type CadLayerCategory } from '@/lib/cad/layer-categories';
 import { useMepLayerVisibility } from '@/lib/cad/mep-layers';
@@ -122,7 +123,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const routesMask = useMepLayerVisibility().mask;
   const routesData = routesState.status === 'ready' ? routesState.data : null;
   const routes = useMemo<ICadFloor3dRoutes | null>(
-    () => (routesData && model ? { polylines: routesData.polylines, baseZMm: model.base_z_mm } : null),
+    () => (routesData && model ? { polylines: routesData.polylines, baseZMm: routesBaseZMm(model) } : null),
     [routesData, model],
   );
 

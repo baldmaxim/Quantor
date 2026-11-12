@@ -29,10 +29,10 @@ export interface IFloor3dViewRequest {
   readonly seq: number;
 }
 
-/** Трассы механики листа: полилинии в мм DXF, Z от отметки этажа модели. */
+/** Трассы механики листа: полилинии в мм DXF, Z от чистого пола этажа модели. */
 export interface ICadFloor3dRoutes {
   readonly polylines: readonly IFloor3dRoutePolyline[];
-  /** Отметка этажа модели (`base_z_mm`), мм. */
+  /** Чистый пол модели (`routesBaseZMm`), мм: верх плиты ниже на пирог пола. */
   readonly baseZMm: number;
 }
 
