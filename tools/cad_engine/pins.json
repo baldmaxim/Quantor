@@ -3,14 +3,14 @@
   "runner_version": "0.1.0",
   "engine": {
     "name": "quantor-cad-legacy-ar",
-    "version": "2026.11.12+a712a359fe93",
-    "archive_name": "Quantor_CAD_source_2026.11.12_a712a359fe93.zip",
+    "version": "2026.11.12+bd4d3f554808",
+    "archive_name": "Quantor_CAD_source_2026.11.12_bd4d3f554808.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "c47e03866a52cc5c45014e6d6c7230683a5f8dc6",
-    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.12_a712a359fe93.zip",
-    "archive_sha256": "67c566cab567a975c0ab4f0a7740da91349851d5ee53adeb6738fbef2ba04bc9",
-    "manifest_sha256": "68a4d096a44d14735bd7e2f6e9684c394bfd410cd87eab4173ee011762d9dc5e",
-    "source_snapshot_sha256": "a712a359fe93214e2bebc633c0d73215f2adb9efb26e6630ba8c09d35c20e90b",
+    "repo_ref": "1aeeea78e08d334fea3a31b5953b344bc4e816a9",
+    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.12_bd4d3f554808.zip",
+    "archive_sha256": "d153beceb24bf1aac28c3e92e667a5b45f2dba5051cc477e1a45e1d2ec574726",
+    "manifest_sha256": "db74e3421d0363deb4a5b6f42d4990990e0999833d3b7fd90c761d23245e8f6a",
+    "source_snapshot_sha256": "bd4d3f55480859d91a603513e25a752cdb03084523ead6cc53ca9d0d9dc2dc25",
     "archive_entries": 240,
     "max_unpacked_bytes": 4194304,
     "worker": "АР_Обработка/90_Пайплайн/pdf_job_monitor/worker.py",
@@ -36,10 +36,10 @@
       "params_canonical_sha256": "93b98f9124c6078fc26e7fb089a7b350641ef332ad6c64aa775a59f50c09c1ed"
     },
     "cad_walls": {
-      "generator_version": "cad_walls.v1.7",
+      "generator_version": "cad_walls.v1.8",
       "params_path": "generators/cad_walls/params/v1.json",
-      "params_sha256": "7fd0ec162c0ea02199efc13f1800d4d77f95950e080b048a5d68c84a1a48d016",
-      "params_canonical_sha256": "dbcae6ccf5bc924aa7439aa2d88ab4542db374b9e77b67d661a7d7a391e1ec53",
+      "params_sha256": "851afc712d45a61d7dd868045c0dee3e8037b18cec4333f20a26360c5fbcf04b",
+      "params_canonical_sha256": "f951aa994d7752b06cbdc9a6a15b94b4fe0192a4c66f6834136fc697cffb4cfe",
       "floor3d_dxf_version": "cad_floor3d_dxf.v2"
     }
   }
