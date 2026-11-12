@@ -96,6 +96,8 @@ describe('ведомость отделки листа', () => {
             area_m2: null,
             material_qty: null,
             zone_count: 1,
+            unknown_zone_count: 0,
+            incomplete: false,
           },
         ],
       }),

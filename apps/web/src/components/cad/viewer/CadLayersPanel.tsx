@@ -171,7 +171,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
               aria-valuetext={`${Math.round(pdfOpacity * 100)} %`}
               className="h-[44px] min-w-[120px] flex-1"
             />
-            <span className="tabular w-[4ch] text-xs text-muted">
+            <span className="tabular w-[6ch] shrink-0 whitespace-nowrap text-right text-xs text-muted">
               {Math.round(pdfOpacity * 100)} %
             </span>
           </label>

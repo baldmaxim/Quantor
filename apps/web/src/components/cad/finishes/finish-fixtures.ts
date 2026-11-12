@@ -88,6 +88,8 @@ export const sheetFixture = (patch: Partial<CadFinishSheetRead> = {}): CadFinish
       area_m2: 12.5,
       material_qty: 1125,
       zone_count: 1,
+      unknown_zone_count: 0,
+      incomplete: false,
     },
   ],
   by_room_type: [
@@ -97,6 +99,8 @@ export const sheetFixture = (patch: Partial<CadFinishSheetRead> = {}): CadFinish
       floor_area_m2: 12.5,
       wall_area_m2: 37.8,
       ceiling_area_m2: 12.5,
+      unknown_zone_count: 0,
+      incomplete: false,
     },
   ],
   warnings: [],

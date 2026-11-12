@@ -29,6 +29,7 @@ export const SECTION_AMBIGUOUS_WARNING = 'section_level_ambiguous';
 /** Предупреждения источника «ответ к документации» (сервер: WARNING_DOC_*). */
 export const DOC_ANSWER_AMBIGUOUS_WARNING = 'doc_answer_ambiguous';
 export const DOC_ANSWER_OUT_OF_RANGE_WARNING = 'doc_answer_out_of_range';
+export const SECTION_FLOOR_ELEVATION_UNKNOWN_WARNING = 'section_floor_elevation_unknown';
 
 const WARNING_TEXTS: Readonly<Record<string, string>> = {
   [SECTION_AMBIGUOUS_WARNING]:
@@ -37,6 +38,8 @@ const WARNING_TEXTS: Readonly<Record<string, string>> = {
     'Подтверждённые ответы к документации для этого листа расходятся — взята плита проекта / допущение.',
   [DOC_ANSWER_OUT_OF_RANGE_WARNING]:
     'Подтверждённый ответ к документации вне пределов трасс (высота в свету 1500–6000 мм, плита 100–600 мм) — не применён, взята плита проекта / допущение.',
+  [SECTION_FLOOR_ELEVATION_UNKNOWN_WARNING]:
+    'Отметка этажа листа неизвестна — принятые уровни разрезов не применены; укажите отметку вручную.',
 };
 
 /** Текст предупреждения запуска трасс; незнакомый код показывается как есть. */
