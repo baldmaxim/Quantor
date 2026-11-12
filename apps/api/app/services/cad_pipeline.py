@@ -25,13 +25,13 @@ from app.contracts.cad_pipeline import (
     CadPipelineViewRead,
 )
 from app.domain import JobStatus, JobType
-from app.models import CadDecision, CadZone, Job, ScaleCalibration, Sheet
+from app.models import CadDecision, CadZone, Job, ScaleCalibration, Sheet, SheetPassport
 from app.models.cad_decision import DECISION_MEP_ACCEPTANCE, DECISION_VIEW_APPROVAL
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
 from app.services import cad_walls
 from app.services import documents as documents_service
-from app.services.cad_plan_sheets import is_plan_title
+from app.services.cad_plan_sheets import is_plan_sheet
 
 _PIPELINE_TYPES: Final = (
     JobType.CAD_PDF_CONVERT,
@@ -157,7 +157,8 @@ async def build_pipeline(
             .where(Sheet.revision_id == revision_id)
         )
     )
-    # Все листы ревизии: листы-планы входят в конвейер и без работы (массовый запуск, ADR-0045).
+    # Все листы ревизии: листы-планы (штамп или паспорт листа) входят в конвейер и без работы
+    # (массовый запуск, ADR-0045). Название: штамп -> паспорт -> подпись страницы.
     sheet_rows = (
         await session.execute(
             select(Sheet.id, Sheet.page_index, Sheet.page_label).where(
@@ -168,11 +169,34 @@ async def build_pipeline(
     stamp_titles = await documents_service.sheet_titles(
         session, sheet_ids=[row.id for row in sheet_rows]
     )
-    labels: dict[int, str | None] = {row.page_index: row.page_label for row in sheet_rows}
-    titles_by_page: dict[int, str | None] = {
-        row.page_index: stamp_titles.get(row.id) or row.page_label for row in sheet_rows
+    passports = {
+        row.page_index: row
+        for row in (
+            await session.execute(
+                select(
+                    SheetPassport.page_index, SheetPassport.sheet_kind, SheetPassport.title
+                ).where(
+                    SheetPassport.revision_id == revision_id,
+                    SheetPassport.status != "rejected",
+                )
+            )
+        ).all()
     }
-    plan_pages = {index for index, title in titles_by_page.items() if is_plan_title(title)}
+    labels: dict[int, str | None] = {row.page_index: row.page_label for row in sheet_rows}
+    titles_by_page: dict[int, str | None] = {}
+    plan_pages: set[int] = set()
+    for sheet_row in sheet_rows:
+        passport = passports.get(sheet_row.page_index)
+        passport_title = (passport.title or "").strip() or None if passport else None
+        stamp_title = stamp_titles.get(sheet_row.id)
+        titles_by_page[sheet_row.page_index] = stamp_title or passport_title or sheet_row.page_label
+        if is_plan_sheet(
+            stamp_title=stamp_title,
+            passport_kind=passport.sheet_kind if passport else None,
+            passport_title=passport_title,
+            page_label=sheet_row.page_label,
+        ):
+            plan_pages.add(sheet_row.page_index)
     zone_counts: dict[int, int] = dict(
         (
             await session.execute(

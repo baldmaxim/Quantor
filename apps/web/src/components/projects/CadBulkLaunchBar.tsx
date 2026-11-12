@@ -5,8 +5,8 @@ import { useEffect, useId, useRef, type FC } from 'react';
 import { Button } from '@/components/ui';
 
 /**
- * Панель массового запуска преобразования в CAD над списком листов: сводка, «выбрать все
- * доступные», кнопка запуска и ход очереди. Только рисует; выбор и очередь - у родителя.
+ * Панель массового запуска конвейера CAD над списком листов: сводка, «выбрать все доступные»,
+ * кнопка запуска, ход партии и «Остановить». Только рисует; выбор и партия - у родителя.
  * Узкий экран - колонкой, без горизонтальной прокрутки.
  */
 
@@ -22,16 +22,17 @@ export interface ICadBulkLaunchBarProps {
   readonly plansCount: number;
   /** Из них без преобразования в CAD. */
   readonly withoutCadCount: number;
-  /** Листов, доступных к запуску (чекбокс активен). */
+  /** Листов, доступных к запуску конвейера (чекбокс активен). */
   readonly launchableCount: number;
   readonly selectedCount: number;
   readonly running: boolean;
-  /** Размер текущей очереди и сколько принято сервером; показываются, пока очередь идёт. */
+  /** Размер текущей (или последней) партии и сколько листов в ней закончено. */
   readonly total: number;
-  readonly placed: number;
+  readonly finished: number;
   readonly failures: readonly IBulkLaunchFailureView[];
   readonly onToggleAll: (checked: boolean) => void;
   readonly onLaunch: () => void;
+  readonly onStop: () => void;
 }
 
 export const CadBulkLaunchBar: FC<ICadBulkLaunchBarProps> = ({
@@ -41,10 +42,11 @@ export const CadBulkLaunchBar: FC<ICadBulkLaunchBarProps> = ({
   selectedCount,
   running,
   total,
-  placed,
+  finished,
   failures,
   onToggleAll,
   onLaunch,
+  onStop,
 }) => {
   const checkId = useId();
   const checkRef = useRef<HTMLInputElement>(null);
@@ -75,34 +77,40 @@ export const CadBulkLaunchBar: FC<ICadBulkLaunchBarProps> = ({
           />
           Выбрать все доступные
         </label>
-        <Button
-          variant="primary"
-          compact
-          loading={running}
-          loadingLabel="Запуск…"
-          disabled={selectedCount === 0 || running}
-          onClick={onLaunch}
-          className="max-md:h-[44px] max-md:w-full"
-        >
-          {`Преобразовать выбранные (${selectedCount})`}
-        </Button>
+        {running ? (
+          <Button
+            variant="default"
+            compact
+            onClick={onStop}
+            className="max-md:h-[44px] max-md:w-full"
+          >
+            Остановить
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            compact
+            disabled={selectedCount === 0}
+            onClick={onLaunch}
+            className="max-md:h-[44px] max-md:w-full"
+          >
+            {`Запустить конвейер (${selectedCount})`}
+          </Button>
+        )}
       </div>
-      {running && (
+      {total > 0 && (
         <p role="status" className="m-0 text-xs text-muted">
-          {`Поставлено ${placed} из ${total}`}
+          {running
+            ? `Листов: готово ${finished} из ${total}, идёт ${total - finished}`
+            : `Листов: готово ${finished} из ${total}`}
         </p>
       )}
-      {!running && failures.length > 0 && (
+      {failures.length > 0 && (
         <div role="alert" className="flex min-w-0 flex-col gap-[var(--s-2)]">
-          <p className="m-0 text-xs text-danger">
-            {`Поставлено ${placed} из ${total}; не поставлено: ${failures.length}`}
-          </p>
+          <p className="m-0 text-xs text-danger">{`Листов с ошибкой: ${failures.length}`}</p>
           <ul className="m-0 list-none p-0">
             {failures.map((failure) => (
-              <li
-                key={failure.pageIndex}
-                className="text-xs text-danger [overflow-wrap:anywhere]"
-              >
+              <li key={failure.pageIndex} className="text-xs text-danger [overflow-wrap:anywhere]">
                 {`${failure.label}: ${failure.message}`}
               </li>
             ))}

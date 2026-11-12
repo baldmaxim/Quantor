@@ -1,5 +1,9 @@
 import type * as ApiClient from '@quantor/api-client';
-import type { CadPipelineSheetRead, CadPipelineStageRead } from '@quantor/api-client';
+import type {
+  CadPipelineSheetRead,
+  CadPipelineStageRead,
+  CadPipelineViewRead,
+} from '@quantor/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -29,7 +33,10 @@ const stage = (overrides: Partial<CadPipelineStageRead> = {}): CadPipelineStageR
   ...overrides,
 });
 
-const sheet = (pageIndex: number, overrides: Partial<CadPipelineSheetRead> = {}): CadPipelineSheetRead => ({
+const sheet = (
+  pageIndex: number,
+  overrides: Partial<CadPipelineSheetRead> = {},
+): CadPipelineSheetRead => ({
   page_index: pageIndex,
   page_label: String(pageIndex + 1),
   title: null,
@@ -47,6 +54,19 @@ const unconfirmed = stage({
   result_status: null,
   error_code: 'CAD_AUTO_SCALE_UNCONFIRMED',
 });
+
+const doneView: CadPipelineViewRead = {
+  page: 0,
+  view: 1,
+  has_dxf: true,
+  walls: null,
+  zones: null,
+  zones_count: 0,
+  approved: false,
+  routes: null,
+  routes_accepted: false,
+  floor3d: null,
+};
 
 const respond = (sheets: CadPipelineSheetRead[]) =>
   mocks.pipeline.mockResolvedValue({
@@ -114,31 +134,40 @@ describe('конвейер CAD документа: массовый запуск
     renderList();
 
     await screen.findByText('Планов: 3 · без CAD: 2');
-    const launch = screen.getByRole('button', { name: /Преобразовать выбранные/ });
+    const launch = screen.getByRole('button', { name: /Запустить конвейер/ });
     expect(launch).toBeDisabled();
 
     await user.click(checkbox('1'));
-    expect(screen.getByRole('button', { name: 'Преобразовать выбранные (1)' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Запустить конвейер (1)' })).toBeEnabled();
     expect(
-      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Выбрать все доступные' }).indeterminate,
+      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Выбрать все доступные' })
+        .indeterminate,
     ).toBe(true);
     // Щелчок по чекбоксу не раскрывает строку.
     expect(screen.queryByRole('list', { name: 'Шаги листа' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: 'Выбрать все доступные' }));
-    expect(screen.getByRole('button', { name: 'Преобразовать выбранные (2)' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Запустить конвейер (2)' })).toBeEnabled();
     expect(checkbox('2').checked).toBe(false);
   });
 
-  it('запуск: по заданию на лист с auto_scale, затем выбор сбрасывается', async () => {
+  it('запуск: по заданию на лист с auto_scale, выбор сбрасывается, идёт партия', async () => {
     const user = userEvent.setup();
     respond([sheet(0), sheet(1), sheet(2, { convert: stage() })]);
-    mocks.createJob.mockResolvedValue({ data: { job_id: 'job-new' } });
+    // После постановки конвейер показывает идущее преобразование.
+    mocks.createJob.mockImplementation(() => {
+      respond([
+        sheet(0, { convert: stage({ status: 'running', progress: 0.1 }) }),
+        sheet(1, { convert: stage({ status: 'running', progress: 0.1 }) }),
+        sheet(2, { convert: stage() }),
+      ]);
+      return Promise.resolve({ data: { job_id: 'job-new' } });
+    });
     renderList();
 
     await screen.findByText('Планов: 3 · без CAD: 2');
     await user.click(screen.getByRole('checkbox', { name: 'Выбрать все доступные' }));
-    await user.click(screen.getByRole('button', { name: 'Преобразовать выбранные (2)' }));
+    await user.click(screen.getByRole('button', { name: 'Запустить конвейер (2)' }));
 
     await waitFor(() => expect(mocks.createJob).toHaveBeenCalledTimes(2));
     const bodies = mocks.createJob.mock.calls.map((call) => (call[0] as { body: unknown }).body);
@@ -146,28 +175,40 @@ describe('конвейер CAD документа: массовый запуск
       { pages: [0], finishes: false, schedules: false, auto_scale: true },
       { pages: [1], finishes: false, schedules: false, auto_scale: true },
     ]);
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Преобразовать выбранные (0)' })).toBeDisabled(),
-    );
+    expect(await screen.findByText('Листов: готово 0 из 2, идёт 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Остановить' })).toBeEnabled();
     expect(checkbox('1').checked).toBe(false);
+    expect(checkbox('1')).toBeDisabled();
+    expect(mocks.createJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('лист с готовым преобразованием и не начатыми конструкциями выбираем', async () => {
+    respond([sheet(0, { convert: stage(), views: [{ ...doneView }] })]);
+    renderList();
+
+    await screen.findByText('Планов: 1 · без CAD: 0');
+    expect(checkbox('1')).toBeEnabled();
   });
 
   it('отказ постановки: сводка по листу', async () => {
     const user = userEvent.setup();
     respond([sheet(0), sheet(1)]);
-    mocks.createJob.mockImplementation(({ body }: { body: { pages: number[] } }) =>
-      body.pages[0] === 1
-        ? Promise.reject({ status: 409, code: 'CAD_CALIBRATION_REQUIRED', message: 'x' })
-        : Promise.resolve({ data: { job_id: 'job-new' } }),
-    );
+    mocks.createJob.mockImplementation(({ body }: { body: { pages: number[] } }) => {
+      if (body.pages[0] === 1) {
+        return Promise.reject({ status: 409, code: 'CAD_CALIBRATION_REQUIRED', message: 'x' });
+      }
+      // Принятый лист в конвейере уже идёт: защита от повтора его не трогает.
+      respond([sheet(0, { convert: stage({ status: 'running', progress: 0.1 }) }), sheet(1)]);
+      return Promise.resolve({ data: { job_id: 'job-new' } });
+    });
     renderList();
 
     await screen.findByText('Планов: 2 · без CAD: 2');
     await user.click(screen.getByRole('checkbox', { name: 'Выбрать все доступные' }));
-    await user.click(screen.getByRole('button', { name: 'Преобразовать выбранные (2)' }));
+    await user.click(screen.getByRole('button', { name: 'Запустить конвейер (2)' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Поставлено 1 из 2; не поставлено: 1');
+    expect(alert).toHaveTextContent('Листов с ошибкой: 1');
     expect(alert).toHaveTextContent('Лист 2:');
   });
 });

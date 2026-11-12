@@ -1,38 +1,58 @@
 'use client';
 
-import { useMemo, useState, type FC } from 'react';
+import { useCallback, useMemo, useState, type FC } from 'react';
 
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui';
-import { isBulkLaunchable } from '@/lib/cad/pipeline-actions';
+import { sheetRows } from '@/lib/cad/pipeline-actions';
+import { isPipelineSelectable } from '@/lib/cad/pipeline-batch';
 import { useCadPipeline } from '@/lib/cad/pipeline-queries';
 import { sheetPosition } from '@/lib/cad/workspace-url';
 import { useSheets } from '@/lib/queries';
 
 import { CadBulkLaunchBar, type IBulkLaunchFailureView } from './CadBulkLaunchBar';
 import { CadPipelineSheetRow } from './CadPipelineSheetRow';
-import { useBulkCadLaunch } from './useBulkCadLaunch';
+import { useBulkPipelineRun } from './useBulkPipelineRun';
 
 /**
  * Конвейер CAD по листам одной ревизии (планы и листы с работой, по порядку страниц);
- * опрашивается, пока что-то идёт. Над списком - массовый запуск преобразования.
+ * опрашивается, пока что-то идёт. Над списком - массовый запуск конвейера по шагам, которые не отработаны.
  */
-export const DocumentCadPipeline: FC<{ readonly projectId: string; readonly revisionId: string }> = ({
-  projectId,
-  revisionId,
-}) => {
+export const DocumentCadPipeline: FC<{
+  readonly projectId: string;
+  readonly revisionId: string;
+}> = ({ projectId, revisionId }) => {
   const pipeline = useCadPipeline(projectId, revisionId, true);
   const sheets = useSheets(revisionId);
-  const known = sheets.data?.items ?? [];
-  const bulk = useBulkCadLaunch(projectId, revisionId);
+  const known = useMemo(() => sheets.data?.items ?? [], [sheets.data]);
   const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
 
   const ordered = useMemo(
     () => [...(pipeline.data?.sheets ?? [])].sort((a, b) => a.page_index - b.page_index),
     [pipeline.data],
   );
+  const positionOf = useCallback(
+    (pageIndex: number) => sheetPosition(known, pageIndex) ?? pageIndex + 1,
+    [known],
+  );
+  const bulk = useBulkPipelineRun(
+    projectId,
+    revisionId,
+    ordered,
+    pipeline.dataUpdatedAt,
+    positionOf,
+  );
+  // Выбираемы листы, где можно запустить преобразование или есть следующий машинный шаг.
   const launchable = useMemo(
-    () => ordered.filter(isBulkLaunchable).map((sheet) => sheet.page_index),
-    [ordered],
+    () =>
+      ordered
+        .filter((sheet) =>
+          isPipelineSelectable(
+            sheet,
+            sheetRows(projectId, revisionId, positionOf(sheet.page_index), sheet),
+          ),
+        )
+        .map((sheet) => sheet.page_index),
+    [ordered, projectId, revisionId, positionOf],
   );
   const launchableSet = useMemo(() => new Set(launchable), [launchable]);
   // Выбор переживает обновления конвейера, но лист, ставший недоступным, из него выпадает.
@@ -82,8 +102,8 @@ export const DocumentCadPipeline: FC<{ readonly projectId: string; readonly revi
 
   const toggleAll = (checked: boolean) => setSelected(new Set(checked ? launchable : []));
 
-  const launch = async () => {
-    await bulk.launch(effective);
+  const launch = () => {
+    bulk.start(effective);
     setSelected(new Set());
   };
 
@@ -96,10 +116,11 @@ export const DocumentCadPipeline: FC<{ readonly projectId: string; readonly revi
         selectedCount={effective.length}
         running={bulk.running}
         total={bulk.total}
-        placed={bulk.placed}
+        finished={bulk.finished}
         failures={failures}
         onToggleAll={toggleAll}
-        onLaunch={() => void launch()}
+        onLaunch={launch}
+        onStop={bulk.stop}
       />
       <ul className="m-0 list-none p-0" aria-label="Листы CAD">
         {ordered.map((sheet) => (
@@ -108,7 +129,7 @@ export const DocumentCadPipeline: FC<{ readonly projectId: string; readonly revi
             projectId={projectId}
             revisionId={revisionId}
             sheet={sheet}
-            position={sheetPosition(known, sheet.page_index) ?? sheet.page_index + 1}
+            position={positionOf(sheet.page_index)}
             selected={selected.has(sheet.page_index) && launchableSet.has(sheet.page_index)}
             selectable={launchableSet.has(sheet.page_index) && !bulk.running}
             onSelectedChange={(checked) => toggleOne(sheet.page_index, checked)}
