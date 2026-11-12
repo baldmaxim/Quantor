@@ -457,8 +457,8 @@ async def read_cad_view(
     )
 
 
-# Неизменяемый ответ: клиент не ходит за ним повторно пять минут, затем сверяет по ETag.
-PREVIEW_CACHE_CONTROL = "private, max-age=300"
+# Неизменяемый ответ: браузер каждый раз сверяет по ETag (дешёвый 304), без устаревших копий.
+PREVIEW_CACHE_CONTROL = "private, no-cache"
 
 
 @router.get(

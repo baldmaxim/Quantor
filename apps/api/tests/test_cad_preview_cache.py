@@ -76,7 +76,7 @@ async def test_preview_is_cached_and_served_with_etag(
         first = await api.get(url)
         assert first.status_code == 200, first.text
         assert first.headers["content-type"] == "application/json"
-        assert first.headers["cache-control"] == "private, max-age=300"
+        assert first.headers["cache-control"] == "private, no-cache"
         etag = first.headers["etag"]
         assert etag.startswith('"') and etag.endswith('"')
         assert len(reads) == 1
