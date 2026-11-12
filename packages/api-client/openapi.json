@@ -6894,6 +6894,19 @@
             "title": "Count",
             "type": "integer"
           },
+          "d_mm": {
+            "anyOf": [
+              {
+                "maximum": 2000.0,
+                "minimum": 50.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D Mm"
+          },
           "dn_mm": {
             "anyOf": [
               {
@@ -6906,6 +6919,43 @@
               }
             ],
             "title": "Dn Mm"
+          },
+          "ei": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ei"
+          },
+          "floors": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "maximum": 200.0,
+                    "minimum": -10.0,
+                    "type": "integer"
+                  },
+                  {
+                    "maximum": 200.0,
+                    "minimum": -10.0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floors"
           },
           "mark": {
             "maxLength": 32,
@@ -6927,6 +6977,41 @@
           },
           "role": {
             "$ref": "#/components/schemas/RiserRole"
+          },
+          "section_mm": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "maximum": 3000.0,
+                    "minimum": 50.0,
+                    "type": "integer"
+                  },
+                  {
+                    "maximum": 3000.0,
+                    "minimum": 50.0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Mm"
+          },
+          "serves": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiserServes"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "shaft_id": {
             "anyOf": [
@@ -6954,6 +7039,16 @@
           },
           "system": {
             "$ref": "#/components/schemas/RiserSystem"
+          },
+          "valve": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiserValve"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -7665,7 +7760,7 @@
             "items": {
               "$ref": "#/components/schemas/CadRiserEntry"
             },
-            "maxItems": 40,
+            "maxItems": 120,
             "title": "Risers",
             "type": "array"
           }
@@ -24732,17 +24827,53 @@
         "title": "RiserRole",
         "type": "string"
       },
+      "RiserServes": {
+        "description": "Что обслуживает стояк (необязательная подсказка генератору).",
+        "enum": [
+          "apartments",
+          "corridor",
+          "lobby_pbz",
+          "tambour",
+          "stair",
+          "lift",
+          "parking"
+        ],
+        "title": "RiserServes",
+        "type": "string"
+      },
       "RiserSystem": {
-        "description": "Система стояка. Отопление и К1 в реестр v1 не входят: генерируются как в cad_mep.v5.",
+        "description": "Система стояка. Отопление в реестр не входит: генерируется как в cad_mep.v5.",
         "enum": [
           "V1",
           "T3",
           "T4",
           "VPV",
           "AUP",
-          "FS"
+          "FS",
+          "K1",
+          "K2",
+          "K4",
+          "DRK",
+          "VZH",
+          "MO",
+          "VMOP",
+          "PMOP",
+          "DU",
+          "KDU",
+          "DP",
+          "TRV"
         ],
         "title": "RiserSystem",
+        "type": "string"
+      },
+      "RiserValve": {
+        "description": "Клапан на стояке: нет, нормально открытый, нормально закрытый.",
+        "enum": [
+          "none",
+          "NO",
+          "NZ"
+        ],
+        "title": "RiserValve",
         "type": "string"
       },
       "Role": {

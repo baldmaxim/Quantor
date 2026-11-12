@@ -3301,9 +3301,24 @@ export type CadRiserEntry = {
      */
     count?: number;
     /**
+     * D Mm
+     */
+    d_mm?: number | null;
+    /**
      * Dn Mm
      */
     dn_mm?: number | null;
+    /**
+     * Ei
+     */
+    ei?: string | null;
+    /**
+     * Floors
+     */
+    floors?: [
+        number,
+        number
+    ] | null;
     /**
      * Mark
      */
@@ -3314,6 +3329,14 @@ export type CadRiserEntry = {
     note?: string | null;
     role: RiserRole;
     /**
+     * Section Mm
+     */
+    section_mm?: [
+        number,
+        number
+    ] | null;
+    serves?: RiserServes | null;
+    /**
      * Shaft Id
      */
     shaft_id?: string | null;
@@ -3322,6 +3345,7 @@ export type CadRiserEntry = {
      */
     source?: string | null;
     system: RiserSystem;
+    valve?: RiserValve | null;
 };
 
 /**
@@ -12649,11 +12673,25 @@ export type ReviewStatus = 'unreviewed' | 'confirmed' | 'ambiguous' | 'rejected'
 export type RiserRole = 'own' | 'transit';
 
 /**
+ * RiserServes
+ *
+ * Что обслуживает стояк (необязательная подсказка генератору).
+ */
+export type RiserServes = 'apartments' | 'corridor' | 'lobby_pbz' | 'tambour' | 'stair' | 'lift' | 'parking';
+
+/**
  * RiserSystem
  *
- * Система стояка. Отопление и К1 в реестр v1 не входят: генерируются как в cad_mep.v5.
+ * Система стояка. Отопление в реестр не входит: генерируется как в cad_mep.v5.
  */
-export type RiserSystem = 'V1' | 'T3' | 'T4' | 'VPV' | 'AUP' | 'FS';
+export type RiserSystem = 'V1' | 'T3' | 'T4' | 'VPV' | 'AUP' | 'FS' | 'K1' | 'K2' | 'K4' | 'DRK' | 'VZH' | 'MO' | 'VMOP' | 'PMOP' | 'DU' | 'KDU' | 'DP' | 'TRV';
+
+/**
+ * RiserValve
+ *
+ * Клапан на стояке: нет, нормально открытый, нормально закрытый.
+ */
+export type RiserValve = 'none' | 'NO' | 'NZ';
 
 /**
  * Role

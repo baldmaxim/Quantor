@@ -78,7 +78,7 @@ describe('раздел «Стояки»', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Добавить строку' }));
     expect(screen.getAllByTestId('cad-riser-row')).toHaveLength(2);
     fireEvent.change(screen.getByLabelText('Марка, Стояк 2'), { target: { value: 'В2.1' } });
-    fireEvent.change(screen.getAllByRole('combobox')[2] as HTMLElement, {
+    fireEvent.change(screen.getAllByLabelText('Система')[1] as HTMLElement, {
       target: { value: 'VPV' },
     });
     fireEvent.change(screen.getByLabelText('Количество, Стояк 2'), { target: { value: '2' } });
@@ -117,6 +117,63 @@ describe('раздел «Стояки»', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     expect(await screen.findByText('От 10 до 400 мм.')).toBeInTheDocument();
     expect(screen.getByText('Вид S12 или S123.')).toBeInTheDocument();
+    expect(api.putCadSheetRisers).not.toHaveBeenCalled();
+  });
+
+  it('выбор воздушной системы показывает «Сечение» вместо Ø и сохраняет канал и подробности', async () => {
+    api.readCadSheetRisers.mockResolvedValue({ data: out([ENTRY]) });
+    api.putCadSheetRisers.mockImplementation(async ({ body }: { body: { risers: object[] } }) => ({
+      data: out(body.risers, '2026-11-12T10:00:00Z'),
+    }));
+    renderPanel();
+    await screen.findByTestId('cad-riser-row');
+    expect(screen.queryByLabelText('Сечение a, мм, Стояк 1')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Система'), { target: { value: 'DU' } });
+    expect(screen.queryByLabelText('Диаметр, мм, Стояк 1')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Сечение a, мм, Стояк 1')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Сечение a, мм, Стояк 1'), { target: { value: '400' } });
+    fireEvent.change(screen.getByLabelText('Сечение b, мм, Стояк 1'), { target: { value: '600' } });
+    fireEvent.change(screen.getByLabelText('Этаж от, Стояк 1'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Этаж до, Стояк 1'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('Клапан'), { target: { value: 'NO' } });
+
+    fireEvent.change(screen.getByLabelText('Канал'), { target: { value: 'round' } });
+    expect(screen.getByLabelText('Ø канала, мм, Стояк 1')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('Ø канала, мм, Стояк 1'), { target: { value: '315' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(api.putCadSheetRisers).toHaveBeenCalledTimes(1));
+    const [entry] = (api.putCadSheetRisers.mock.calls[0]?.[0] as { body: { risers: object[] } })
+      .body.risers;
+    expect(entry).toMatchObject({
+      system: 'DU',
+      dn_mm: null,
+      d_mm: 315,
+      floors: [2, 25],
+      valve: 'NO',
+    });
+    expect(entry).not.toHaveProperty('section_mm');
+  });
+
+  it('Ø трубы у воздушной системы - ошибка, на сервер не уходит', async () => {
+    const wrong = { ...ENTRY, system: 'VZH' as const, dn_mm: 50 };
+    api.readCadSheetRisers.mockResolvedValue({ data: out([wrong]) });
+    renderPanel();
+    await screen.findByTestId('cad-riser-row');
+    fireEvent.change(screen.getByLabelText('Марка, Стояк 1'), { target: { value: 'ВЕ1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    expect(await screen.findByText(/У воздушной системы нет Ø трубы/)).toBeInTheDocument();
+    expect(api.putCadSheetRisers).not.toHaveBeenCalled();
+  });
+
+  it('этажи: неполная пара - ошибка в раскрытом блоке «Подробнее»', async () => {
+    api.readCadSheetRisers.mockResolvedValue({ data: out([ENTRY]) });
+    renderPanel();
+    await screen.findByTestId('cad-riser-row');
+    fireEvent.change(screen.getByLabelText('Этаж от, Стояк 1'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    expect(await screen.findByText(/Оба этажа/)).toBeInTheDocument();
     expect(api.putCadSheetRisers).not.toHaveBeenCalled();
   });
 

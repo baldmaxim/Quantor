@@ -8,11 +8,17 @@ import { ClearableInput } from '@/components/ui/ClearableInput';
 import {
   RISER_ROLES,
   RISER_ROLE_LABELS,
-  RISER_SYSTEMS,
+  RISER_SYSTEM_GROUPS,
   RISER_SYSTEM_LABELS,
+  isAirSystem,
+  systemPatch,
   type IRiserDraft,
   type IRiserProblems,
 } from '@/lib/cad/risers';
+
+import { CadRiserChannel } from './CadRiserChannel';
+import { CadRiserDetails } from './CadRiserDetails';
+import { LABEL, Problem, SELECT } from './riser-ui';
 
 interface ICadRiserRowProps {
   readonly index: number;
@@ -23,17 +29,6 @@ interface ICadRiserRowProps {
   readonly onChange: (patch: Partial<IRiserDraft>) => void;
   readonly onRemove: () => void;
 }
-
-const LABEL = 'flex min-w-0 flex-col gap-[var(--s-2)] text-xs text-muted';
-const SELECT =
-  'h-[var(--h-ctl)] w-full min-w-0 rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-4)] text-base text-text md:text-sm max-md:h-[44px]';
-
-const Problem: FC<{ text: string | undefined }> = ({ text }) =>
-  text ? (
-    <span role="alert" className="text-xs text-danger">
-      {text}
-    </span>
-  ) : null;
 
 /**
  * Одна запись реестра: карточка из двух колонок, на узкой панели и на телефоне без
@@ -62,12 +57,16 @@ export const CadRiserRow: FC<ICadRiserRowProps> = ({
           value={draft.system}
           disabled={disabled}
           className={SELECT}
-          onChange={(event) => onChange({ system: event.target.value as RiserSystem })}
+          onChange={(event) => onChange(systemPatch(draft, event.target.value as RiserSystem))}
         >
-          {RISER_SYSTEMS.map((system) => (
-            <option key={system} value={system}>
-              {RISER_SYSTEM_LABELS[system]}
-            </option>
+          {RISER_SYSTEM_GROUPS.map((group) => (
+            <optgroup key={group.label} label={group.label}>
+              {group.systems.map((system) => (
+                <option key={system} value={system}>
+                  {RISER_SYSTEM_LABELS[system]}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>
@@ -89,22 +88,32 @@ export const CadRiserRow: FC<ICadRiserRowProps> = ({
         <Problem text={problems?.mark} />
       </label>
 
-      <label className={LABEL}>
-        Ø, мм
-        <ClearableInput
-          label={`Диаметр, мм, ${title}`}
-          value={draft.dn}
-          inputMode="numeric"
-          maxLength={3}
-          autoComplete="off"
+      {isAirSystem(draft.system) ? (
+        <CadRiserChannel
+          title={title}
+          draft={draft}
+          problems={problems}
           disabled={disabled}
-          wrapperClassName="w-full"
-          aria-invalid={problems?.dn !== undefined}
-          onChange={(event) => onChange({ dn: event.target.value })}
-          onClear={() => onChange({ dn: '' })}
+          onChange={onChange}
         />
-        <Problem text={problems?.dn} />
-      </label>
+      ) : (
+        <label className={LABEL}>
+          Ø, мм
+          <ClearableInput
+            label={`Диаметр, мм, ${title}`}
+            value={draft.dn}
+            inputMode="numeric"
+            maxLength={3}
+            autoComplete="off"
+            disabled={disabled}
+            wrapperClassName="w-full"
+            aria-invalid={problems?.dn !== undefined}
+            onChange={(event) => onChange({ dn: event.target.value })}
+            onClear={() => onChange({ dn: '' })}
+          />
+          <Problem text={problems?.dn} />
+        </label>
+      )}
 
       <label className={LABEL}>
         Количество
@@ -173,6 +182,14 @@ export const CadRiserRow: FC<ICadRiserRowProps> = ({
         />
         <Problem text={problems?.source} />
       </label>
+
+      <CadRiserDetails
+        title={title}
+        draft={draft}
+        problems={problems}
+        disabled={disabled}
+        onChange={onChange}
+      />
 
       <Button
         compact

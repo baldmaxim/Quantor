@@ -17,12 +17,23 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.contracts.cad_risers import RISERS_SCHEMA, CadRiserEntry
+from app.contracts.cad_risers import RISERS_SCHEMA, V10_OPTIONAL_FIELDS, CadRiserEntry
 from app.models import CadSheetRisers
 
 
 def entries_to_json(entries: list[CadRiserEntry]) -> list[dict[str, Any]]:
-    return [entry.model_dump(mode="json") for entry in entries]
+    """Записи для хранения и файла генератора.
+
+    Поля cad_mep.v10 пишутся только заданные: запись без них сериализуется побайтно как до A3
+    (все прежние поля, включая `null`), и sha256 реестра - ключ идемпотентности трасс - не меняется.
+    """
+    return [
+        entry.model_dump(
+            mode="json",
+            exclude={name for name in V10_OPTIONAL_FIELDS if getattr(entry, name) is None},
+        )
+        for entry in entries
+    ]
 
 
 def registry_bytes(risers: list[dict[str, Any]]) -> bytes:
