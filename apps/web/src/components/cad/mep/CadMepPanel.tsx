@@ -22,6 +22,7 @@ export const CadMepPanel: FC<IWorkspaceCadMep> = ({
   route,
   openRemarks,
   onSelectRoute,
+  sections = null,
 }) => (
   <div className="flex min-w-0 flex-col gap-[var(--s-6)]" data-testid="cad-mep">
     <InspectorSection title="1. Одобрение вида">
@@ -41,6 +42,7 @@ export const CadMepPanel: FC<IWorkspaceCadMep> = ({
           parent={parent}
           onCreated={onSelectRoute}
           hasRoutes={routeJobs.some((item) => item.approval_id === approval.id)}
+          sections={sections}
         />
       ) : (
         <p className="text-xs text-muted">Трассы строятся только по одобренному виду.</p>

@@ -55,6 +55,7 @@ const props = (over: Partial<IWorkspaceCadSections> = {}): IWorkspaceCadSections
   loadError: null,
   onReload: vi.fn(),
   pageIndex: 3,
+  isSectionPage: true,
   starting: false,
   onStart: vi.fn(),
   deciding: false,
@@ -85,19 +86,17 @@ describe('CadSectionsPanel', () => {
     expect(onDecide).toHaveBeenCalledWith(['a'], 'accept');
   });
 
-  it('лист не разрез: сводка и переход на страницу-разрез', () => {
-    const onOpenPage = vi.fn();
-    render(<CadSectionsPanel {...props({ pageIndex: 10, onOpenPage })} />);
-    expect(screen.getByTestId('sections-summary')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Стр\. 4/ }));
-    expect(onOpenPage).toHaveBeenCalledWith(3);
-  });
-
   it('задание идёт: кнопка запуска заблокирована, виден статус', () => {
     const data = read({ job: { ...read().job!, status: 'running' } });
     render(<CadSectionsPanel {...props({ data })} />);
     expect((screen.getByRole('button', { name: /Распознать разрезы/ }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Выполняется')).toBeTruthy();
+  });
+
+  it('на странице-разрезе повторный запуск называется «заново»', () => {
+    render(<CadSectionsPanel {...props()} />);
+    expect(screen.getByRole('button', { name: 'Распознать разрезы заново' })).toBeTruthy();
+    expect(screen.queryByTestId('sections-summary')).toBeNull();
   });
 
   it('ошибка задания показывает причину', () => {

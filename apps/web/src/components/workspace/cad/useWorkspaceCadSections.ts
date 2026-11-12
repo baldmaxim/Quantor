@@ -102,6 +102,8 @@ export const useWorkspaceCadSections = ({
     loadError: query.isError ? cadErrorText(query.error) : null,
     onReload: () => void query.refetch(),
     pageIndex,
+    isSectionPage:
+      data !== null && pageIndex !== null && data.pages.some((item) => item.page_index === pageIndex),
     starting: start.isPending,
     onStart: () => {
       decide.reset();

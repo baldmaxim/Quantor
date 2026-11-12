@@ -194,7 +194,7 @@ describe('вкладка «Трассы»: построение', () => {
     mount(value);
     fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
     expect(
-      await screen.findByText(/несколько принятых уровней с разной высотой — уточните в «Разрезах»/),
+      await screen.findByText(/несколько принятых уровней с разной высотой — уточните уровни на листе разреза/),
     ).toBeInTheDocument();
   });
 
@@ -298,7 +298,7 @@ describe('вкладка «Трассы»: выбранные трассы', () 
     expect(await screen.findByTestId('mep-route-levels')).toHaveTextContent(
       'Высота в свету: 3000 мм — по разрезам',
     );
-    expect(screen.getByTestId('mep-route-warning')).toHaveTextContent(/уточните в «Разрезах»/);
+    expect(screen.getByTestId('mep-route-warning')).toHaveTextContent(/уточните уровни на листе разреза/);
   });
 
   it('без источника высоты - допущение движка', async () => {

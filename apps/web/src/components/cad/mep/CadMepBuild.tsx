@@ -13,7 +13,10 @@ import { useBuildMepRoutes } from '@/lib/cad/mep-queries';
 import { sectionWarningText } from '@/lib/cad/sections';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 
+import type { IWorkspaceCadSectionsLink } from '@/components/workspace/cad/types';
+
 import { CadMepFloorFields } from './CadMepFloorFields';
+import { CadMepSectionsLink } from './CadMepSectionsLink';
 
 interface ICadMepBuildProps {
   parent: ICadViewParams;
@@ -21,13 +24,20 @@ interface ICadMepBuildProps {
   onCreated: (routeJobId: string) => void;
   /** По действующему одобрению трассы уже строились: правят их пересчётом. */
   hasRoutes?: boolean;
+  /** Разрезы ревизии: блок «Высота из разрезов»; `null` - блока нет. */
+  sections?: IWorkspaceCadSectionsLink | null;
 }
 
 /**
  * Шаг 2: «Построить трассы». По умолчанию отметку пола и высоту этажа генератор определяет сам
  * по документации (с источником и цитатой в итогах); «Задать вручную» - переопределение человека.
  */
-export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated, hasRoutes = false }) => {
+export const CadMepBuild: FC<ICadMepBuildProps> = ({
+  parent,
+  onCreated,
+  hasRoutes = false,
+  sections = null,
+}) => {
   const build = useBuildMepRoutes(parent);
   const [manual, setManual] = useState(false);
   const [elevation, setElevation] = useState('');
@@ -62,64 +72,67 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated, hasRoute
   };
 
   return (
-    <form
-      aria-label="Построить трассы"
-      className="flex min-w-0 flex-col gap-[var(--s-4)]"
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        submit();
-      }}
-    >
-      {manual ? (
-        <CadMepFloorFields
-          elevation={elevation}
-          height={height}
-          onElevation={setElevation}
-          onHeight={setHeight}
-          elevationProblem={elevationProblem}
-          heightProblem={heightProblem}
-          showProblems={touched}
-        />
-      ) : (
-        <p className="text-xs text-muted">
-          Отметка и высота этажа будут определены по документации.
-        </p>
-      )}
-      <Button
-        onClick={() => {
-          setManual((value) => !value);
-          setTouched(false);
+    <div className="flex min-w-0 flex-col gap-[var(--s-4)]">
+      <form
+        aria-label="Построить трассы"
+        className="flex min-w-0 flex-col gap-[var(--s-4)]"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
         }}
-        className="self-start max-md:h-[44px] max-md:w-full"
-        aria-expanded={manual}
       >
-        {manual ? 'Определить по документации' : 'Задать вручную'}
-      </Button>
-      {hasRoutes && (
-        <p className="text-xs text-muted" role="note">
-          Для этого одобрения трассы уже построены: «Построить» откроет их, а менять отметку и
-          высоту нужно кнопкой «Пересчитать» в разделе 3.
-        </p>
-      )}
-      <Button
-        type="submit"
-        variant="primary"
-        loading={build.isPending}
-        className="self-start max-md:h-[44px] max-md:w-full"
-      >
-        Построить трассы
-      </Button>
-      {problem && (
-        <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
-          {problem}
-        </p>
-      )}
-      {warnings.map((code) => (
-        <p key={code} role="note" className="text-xs text-warning [overflow-wrap:anywhere]">
-          {sectionWarningText(code)}
-        </p>
-      ))}
-    </form>
+        {manual ? (
+          <CadMepFloorFields
+            elevation={elevation}
+            height={height}
+            onElevation={setElevation}
+            onHeight={setHeight}
+            elevationProblem={elevationProblem}
+            heightProblem={heightProblem}
+            showProblems={touched}
+          />
+        ) : (
+          <p className="text-xs text-muted">
+            Отметка и высота этажа будут определены по документации.
+          </p>
+        )}
+        <Button
+          onClick={() => {
+            setManual((value) => !value);
+            setTouched(false);
+          }}
+          className="self-start max-md:h-[44px] max-md:w-full"
+          aria-expanded={manual}
+        >
+          {manual ? 'Определить по документации' : 'Задать вручную'}
+        </Button>
+        {hasRoutes && (
+          <p className="text-xs text-muted" role="note">
+            Для этого одобрения трассы уже построены: «Построить» откроет их, а менять отметку и
+            высоту нужно кнопкой «Пересчитать» в разделе 3.
+          </p>
+        )}
+        <Button
+          type="submit"
+          variant="primary"
+          loading={build.isPending}
+          className="self-start max-md:h-[44px] max-md:w-full"
+        >
+          Построить трассы
+        </Button>
+        {problem && (
+          <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
+            {problem}
+          </p>
+        )}
+        {warnings.map((code) => (
+          <p key={code} role="note" className="text-xs text-warning [overflow-wrap:anywhere]">
+            {sectionWarningText(code)}
+          </p>
+        ))}
+      </form>
+      {sections && <CadMepSectionsLink {...sections} />}
+    </div>
   );
 };

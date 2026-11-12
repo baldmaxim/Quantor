@@ -304,6 +304,8 @@ export interface IWorkspaceCadMep {
   readonly openRemarks: number | null;
   /** Открыть трассы (задание) или вернуться к виду (`null`). */
   readonly onSelectRoute: (jobId: string | null) => void;
+  /** Разрезы ревизии для блока «Высота из разрезов»; `null` или нет - блока нет. */
+  readonly sections?: IWorkspaceCadSectionsLink | null;
 }
 
 /** Вид листа с диагностикой: слои, замечания, масштаб и файлы. */
@@ -394,6 +396,8 @@ export interface IWorkspaceCadSections {
   readonly onReload: () => void;
   /** Индекс страницы открытого листа; `null` - лист не выбран. */
   readonly pageIndex: number | null;
+  /** Открытый лист - страница-разрез (есть в `data.pages`): только на ней есть вкладка «Разрезы». */
+  readonly isSectionPage: boolean;
   /** Постановка задания идёт. */
   readonly starting: boolean;
   readonly onStart: () => void;
@@ -411,3 +415,9 @@ export interface IWorkspaceCadSections {
   /** Открыть страницу-разрез в рабочей области. */
   readonly onOpenPage: (pageIndex: number) => void;
 }
+
+/** Срез разрезов для запуска трасс: сводка, запуск распознавания и переход на страницу-разрез. */
+export type IWorkspaceCadSectionsLink = Pick<
+  IWorkspaceCadSections,
+  'status' | 'data' | 'starting' | 'onStart' | 'onOpenPage' | 'actionError'
+>;

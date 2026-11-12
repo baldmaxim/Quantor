@@ -559,6 +559,7 @@ export const useWorkspaceCad = ({
             view: data.view,
             navigate,
             parentJobId: data.jobId,
+            sections: sectionsState.side,
           }),
           remarks: remarks.remarks,
         }

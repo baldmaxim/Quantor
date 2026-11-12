@@ -35,6 +35,7 @@ import type { CadJobRead } from '@quantor/api-client';
 
 import type {
   IWorkspaceCadConstructions,
+  IWorkspaceCadSections,
   IWorkspaceCadSideProps,
   IWorkspaceCadZones,
 } from './types';
@@ -89,6 +90,26 @@ const VIEW: NonNullable<IWorkspaceCadSideProps['view']> = {
 
 const ZONES = {} as IWorkspaceCadZones;
 
+const SECTIONS = (isSectionPage: boolean) =>
+  ({
+    status: 'ready',
+    data: null,
+    loadError: null,
+    onReload: vi.fn(),
+    pageIndex: 3,
+    isSectionPage,
+    starting: false,
+    onStart: vi.fn(),
+    deciding: false,
+    onDecide: vi.fn(),
+    actionError: null,
+    activeLevelId: null,
+    onSelectLevel: vi.fn(),
+    markupVisible: true,
+    onMarkupVisibleChange: vi.fn(),
+    onOpenPage: vi.fn(),
+  }) as IWorkspaceCadSections;
+
 const mount = (
   patch: Partial<IWorkspaceCadSideProps> & IWorkspaceCadSideJobs & IWorkspaceCadSidePipeline = {},
 ) =>
@@ -108,6 +129,47 @@ const mount = (
   );
 
 describe('WorkspaceCadSide', () => {
+  it('лист плана: вкладки «Разрезы» нет', () => {
+    mount({ sections: SECTIONS(false) });
+    expect(screen.queryByRole('tab', { name: 'Разрезы' })).toBeNull();
+  });
+
+  it('страница-разрез: «Разрезы» первая и открыта по умолчанию', () => {
+    mount({ sections: SECTIONS(true) });
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs[0]).toHaveTextContent('Разрезы');
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Слои' })).toBeInTheDocument();
+  });
+
+  it('переход с плана на страницу-разрез открывает «Разрезы», хотя раздел выбирали', () => {
+    const onSideTabChange = vi.fn();
+    const props = {
+      state: 'ready' as const,
+      sheetLabel: '1',
+      loadError: null,
+      onRetry: vi.fn(),
+      job: JOB,
+      convert: CONVERT,
+      viewLoading: false,
+      viewError: null,
+      view: VIEW,
+      onSideTabChange,
+    };
+    const plan = { ...SECTIONS(false), pageIndex: 10 };
+    const section = { ...SECTIONS(true), pageIndex: 3 };
+    const { rerender } = render(<WorkspaceCadSide {...props} sections={plan} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Файлы' }));
+    rerender(<WorkspaceCadSide {...props} sections={section} />);
+    expect(screen.getByRole('tab', { name: 'Разрезы' })).toHaveAttribute('aria-selected', 'true');
+    expect(onSideTabChange).toHaveBeenLastCalledWith('sections');
+  });
+
+  it('страница-разрез: выбранная вручную вкладка не перебивается', () => {
+    mount({ sections: SECTIONS(true), sideTab: 'files' });
+    expect(screen.getByRole('tab', { name: 'Файлы' })).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('лист с результатом: пять разделов, открыт «Слои» с ползунком непрозрачности PDF', () => {
     mount();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([

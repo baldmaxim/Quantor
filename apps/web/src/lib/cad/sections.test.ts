@@ -141,7 +141,7 @@ describe('страницы и сводка', () => {
 
 describe('предупреждение трасс', () => {
   it('известный код - текст, неизвестный - как есть', () => {
-    expect(sectionWarningText('section_level_ambiguous')).toContain('уточните в «Разрезах»');
+    expect(sectionWarningText('section_level_ambiguous')).toContain('уточните уровни на листе разреза');
     expect(sectionWarningText('other')).toBe('other');
   });
 });

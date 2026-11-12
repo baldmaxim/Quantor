@@ -8,11 +8,11 @@ import { issuesOfPage, isSectionsJobActive, levelsOfPage } from '@/lib/cad/secti
 import { jobLabel, jobTone } from '@/lib/cad/stages';
 
 import { CadSectionsPage } from './CadSectionsPage';
-import { CadSectionsSummary } from './CadSectionsSummary';
 import type { IWorkspaceCadSections } from './types';
 
 /**
- * Вкладка «Разрезы»: запуск распознавания разрезов ревизии, кандидаты уровней и решения человека.
+ * Вкладка «Разрезы» - только на странице-разрезе: повторный запуск распознавания, кандидаты
+ * уровней страницы и решения человека. Со страниц плана разрезы открывают из запуска трасс.
  * Принятые уровни уходят в запуск трасс как высота в свету; кандидаты и отклонённые - нет.
  */
 export const CadSectionsPanel: FC<IWorkspaceCadSections> = ({
@@ -30,7 +30,6 @@ export const CadSectionsPanel: FC<IWorkspaceCadSections> = ({
   onSelectLevel,
   markupVisible,
   onMarkupVisibleChange,
-  onOpenPage,
 }) => {
   if (status === 'loading') {
     return (
@@ -103,7 +102,7 @@ export const CadSectionsPanel: FC<IWorkspaceCadSections> = ({
             />
             Разметка разрезов на листе
           </label>
-          {page !== undefined && pageIndex !== null ? (
+          {page !== undefined && pageIndex !== null && (
             <CadSectionsPage
               page={page}
               levels={levelsOfPage(data.levels, pageIndex)}
@@ -113,8 +112,6 @@ export const CadSectionsPanel: FC<IWorkspaceCadSections> = ({
               onSelectLevel={onSelectLevel}
               onDecide={onDecide}
             />
-          ) : (
-            <CadSectionsSummary data={data} onOpenPage={onOpenPage} />
           )}
         </>
       )}

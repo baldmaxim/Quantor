@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FC } from 'react';
+import { useEffect, useRef, useState, type FC } from 'react';
 
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
 import { CadJobList } from '@/components/cad/CadJobList';
@@ -46,7 +46,8 @@ const HINT = 'p-[var(--s-5)] text-xs text-muted';
  * Раздел «Зоны» - разметка помещений и дверей листа - есть и у листа без задания.
  * Раздел «Отделка» (ADR-0042) - шаблоны проекта и ведомость листа - стоит сразу после «Зон».
  * Раздел «Конструкции» (кладка и монолит, ADR-0038) - у листа с видом.
- * Раздел «Разрезы» (уровни по разрезам АР) - рядом с «Конструкциями», и у листа без вида.
+ * Раздел «Разрезы» (уровни по разрезам АР) - только у страницы-разреза, первый и открыт по умолчанию;
+ * у листа без вида тоже. Со страниц плана разрезы открывают из блока «Высота из разрезов» в «Трассах».
  * Раздел «Задания» (список заданий ревизии) - последний, если передан `jobs`.
  * Показано только задание открытого листа. С идущим или упавшим заданием - только раздел
  * «Задание»: диагностики вида у него нет. Ширину и сворачивание панели ведёт каркас рабочей области.
@@ -74,11 +75,27 @@ export const WorkspaceCadSide: FC<
   // Раздел живёт здесь (или у страницы): при переходе на другой лист панель остаётся на выбранном
   // разделе. Пока раздел не выбран, открыты «Слои».
   const [innerTab, setInnerTab] = useState<string | null>(null);
-  const sideTab = sideTabProp ?? innerTab ?? 'layers';
+  // Вкладка «Разрезы» есть только на странице-разрезе и там открыта по умолчанию.
+  const isSectionPage = sections?.isSectionPage ?? false;
+  const sideTab = sideTabProp ?? innerTab ?? (isSectionPage ? 'sections' : 'layers');
   const setSideTab = (id: string) => {
     setInnerTab(id);
     onSideTabChange?.(id);
   };
+  // Переход на страницу-разрез (ссылка из «Трасс») открывает «Разрезы», даже если раздел выбирали.
+  const sectionsPage = sections?.pageIndex ?? null;
+  const [prevPage, setPrevPage] = useState(sectionsPage);
+  if (prevPage !== sectionsPage) {
+    setPrevPage(sectionsPage);
+    if (isSectionPage) setInnerTab('sections');
+  }
+  const prevPageRef = useRef(sectionsPage);
+  useEffect(() => {
+    if (prevPageRef.current === sectionsPage) return;
+    prevPageRef.current = sectionsPage;
+    // Раздел, которым владеет страница, переключаем её же колбэком.
+    if (isSectionPage) onSideTabChange?.('sections');
+  }, [sectionsPage, isSectionPage, onSideTabChange]);
 
   if (state === 'no-sheet') return <p className={HINT}>Лист не выбран.</p>;
 
@@ -125,8 +142,9 @@ export const WorkspaceCadSide: FC<
         }
       : null;
 
-  // Раздел «Разрезы» работает по PDF ревизии и не требует преобразования листа в CAD.
-  const sectionsTab: ICadSideTab | null = sections
+  // Раздел «Разрезы» работает по PDF ревизии и не требует преобразования листа в CAD; он есть
+  // только у страницы-разреза и стоит первым. С планов разрезы открывают из запуска трасс.
+  const sectionsTab: ICadSideTab | null = sections?.isSectionPage
     ? { id: 'sections', label: 'Разрезы', content: <CadSectionsPanel {...sections} /> }
     : null;
 
@@ -176,10 +194,10 @@ export const WorkspaceCadSide: FC<
       <CadSidePanel
         label="Панель CAD"
         tabs={[
+          ...(sectionsTab ? [sectionsTab] : []),
           { id: 'job', label: 'Задание', content: none },
           ...(zonesTab ? [zonesTab] : []),
           ...(finishTab ? [finishTab] : []),
-          ...(sectionsTab ? [sectionsTab] : []),
           ...(jobsTab ? [jobsTab] : []),
         ]}
         active={sideTab}
@@ -223,6 +241,7 @@ export const WorkspaceCadSide: FC<
 
   const tabs: readonly ICadSideTab[] = view
     ? [
+        ...(sectionsTab ? [sectionsTab] : []),
         {
           id: 'layers',
           label: 'Слои',
@@ -283,14 +302,13 @@ export const WorkspaceCadSide: FC<
               },
             ]
           : []),
-        ...(sectionsTab ? [sectionsTab] : []),
         jobTab,
         ...(jobsTab ? [jobsTab] : []),
       ]
     : [
+        ...(sectionsTab ? [sectionsTab] : []),
         ...(zonesTab ? [zonesTab] : []),
         ...(finishTab ? [finishTab] : []),
-        ...(sectionsTab ? [sectionsTab] : []),
         jobTab,
         ...(jobsTab ? [jobsTab] : []),
       ];

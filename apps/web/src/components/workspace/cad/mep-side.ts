@@ -7,7 +7,7 @@ import {
 } from '@/lib/cad/mep-layers';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 
-import type { IWorkspaceCadMep, IWorkspaceCadMepLayers } from './types';
+import type { IWorkspaceCadMep, IWorkspaceCadMepLayers, IWorkspaceCadSectionsLink } from './types';
 import type { IWorkspaceCadRoutesData } from './useWorkspaceCadRoutes';
 
 /**
@@ -53,6 +53,8 @@ interface IMepInput {
   readonly navigate: (changes: Record<string, string | null>) => void;
   /** Задание-родитель из адреса: к нему возвращает «К виду». */
   readonly parentJobId: string | null;
+  /** Разрезы ревизии; `null` - ревизия не открыта. */
+  readonly sections?: IWorkspaceCadSectionsLink | null;
 }
 
 /** Вкладка «Трассы»; `null` - параметры вида не получены. */
@@ -65,6 +67,7 @@ export const mepOf = ({
   view,
   navigate,
   parentJobId,
+  sections = null,
 }: IMepInput): IWorkspaceCadMep | null => {
   if (parent === null) return null;
   return {
@@ -85,5 +88,6 @@ export const mepOf = ({
     openRemarks,
     onSelectRoute: (jobId) =>
       navigate({ job: jobId ?? parentJobId, view: view !== null ? String(view) : null }),
+    sections,
   };
 };
