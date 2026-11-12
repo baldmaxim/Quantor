@@ -10,6 +10,7 @@ import {
   optionalMm,
 } from '@/lib/cad/mep-gates';
 import { useBuildMepRoutes } from '@/lib/cad/mep-queries';
+import { sectionWarningText } from '@/lib/cad/sections';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 
 import { CadMepFloorFields } from './CadMepFloorFields';
@@ -33,6 +34,8 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated, hasRoute
   const [height, setHeight] = useState('');
   const [touched, setTouched] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // Предупреждения постановки (например, неоднозначная высота по разрезам) в задании не хранятся.
+  const [warnings, setWarnings] = useState<readonly string[]>([]);
 
   const elevationProblem = manual ? elevationError(elevation) : null;
   const heightProblem = manual ? floorHeightError(height) : null;
@@ -42,13 +45,17 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated, hasRoute
     setTouched(true);
     if (!valid || build.isPending) return;
     setProblem(null);
+    setWarnings([]);
     build.mutate(
       {
         floorElevationMm: manual ? optionalMm(elevation) : null,
         floorHeightMm: manual ? optionalMm(height) : null,
       },
       {
-        onSuccess: (job) => onCreated(job.job_id),
+        onSuccess: (job) => {
+          setWarnings(job.warnings ?? []);
+          onCreated(job.job_id);
+        },
         onError: (error) => setProblem(mepErrorText(error)),
       },
     );
@@ -108,6 +115,11 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({ parent, onCreated, hasRoute
           {problem}
         </p>
       )}
+      {warnings.map((code) => (
+        <p key={code} role="note" className="text-xs text-warning [overflow-wrap:anywhere]">
+          {sectionWarningText(code)}
+        </p>
+      ))}
     </form>
   );
 };

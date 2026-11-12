@@ -186,6 +186,18 @@ describe('вкладка «Трассы»: построение', () => {
     });
   });
 
+  it('предупреждение постановки о неоднозначной высоте по разрезам показывается текстом', async () => {
+    api.createCadMepRoutes.mockResolvedValue({
+      data: { job_id: 'job-route', warnings: ['section_level_ambiguous'] },
+    });
+    const value = mep({ approval: decision('view_approval') });
+    mount(value);
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    expect(
+      await screen.findByText(/несколько принятых уровней с разной высотой — уточните в «Разрезах»/),
+    ).toBeInTheDocument();
+  });
+
   it('неверный ручной ввод не уходит на сервер', () => {
     mount(mep({ approval: decision('view_approval') }));
     fireEvent.click(screen.getByRole('button', { name: 'Задать вручную' }));

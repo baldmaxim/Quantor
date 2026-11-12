@@ -18,6 +18,7 @@ import { CadZonesPanel } from '@/components/cad/viewer/CadZonesPanel';
 import { Button, ErrorState, Skeleton, SkeletonRows } from '@/components/ui';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 
+import { CadSectionsPanel } from './CadSectionsPanel';
 import { ConstructionsPanel } from './ConstructionsPanel';
 import type { IWorkspaceCadLeftProps, IWorkspaceCadSideProps } from './types';
 
@@ -45,6 +46,7 @@ const HINT = 'p-[var(--s-5)] text-xs text-muted';
  * Раздел «Зоны» - разметка помещений и дверей листа - есть и у листа без задания.
  * Раздел «Отделка» (ADR-0042) - шаблоны проекта и ведомость листа - стоит сразу после «Зон».
  * Раздел «Конструкции» (кладка и монолит, ADR-0038) - у листа с видом.
+ * Раздел «Разрезы» (уровни по разрезам АР) - рядом с «Конструкциями», и у листа без вида.
  * Раздел «Задания» (список заданий ревизии) - последний, если передан `jobs`.
  * Показано только задание открытого листа. С идущим или упавшим заданием - только раздел
  * «Задание»: диагностики вида у него нет. Ширину и сворачивание панели ведёт каркас рабочей области.
@@ -64,6 +66,7 @@ export const WorkspaceCadSide: FC<
   zones = null,
   constructions = null,
   finishes = null,
+  sections = null,
   jobs = null,
   sideTab: sideTabProp = null,
   onSideTabChange,
@@ -122,6 +125,11 @@ export const WorkspaceCadSide: FC<
         }
       : null;
 
+  // Раздел «Разрезы» работает по PDF ревизии и не требует преобразования листа в CAD.
+  const sectionsTab: ICadSideTab | null = sections
+    ? { id: 'sections', label: 'Разрезы', content: <CadSectionsPanel {...sections} /> }
+    : null;
+
   // Раздел «Задания» - очередь и история заданий ревизии; всегда последний.
   const jobsTab: ICadSideTab | null = jobs
     ? {
@@ -163,7 +171,7 @@ export const WorkspaceCadSide: FC<
       </div>
     );
     // Зоны размечают и лист без задания: эталон для движка нужен до преобразования.
-    if (zonesTab === null && jobsTab === null) return none;
+    if (zonesTab === null && sectionsTab === null && jobsTab === null) return none;
     return (
       <CadSidePanel
         label="Панель CAD"
@@ -171,6 +179,7 @@ export const WorkspaceCadSide: FC<
           { id: 'job', label: 'Задание', content: none },
           ...(zonesTab ? [zonesTab] : []),
           ...(finishTab ? [finishTab] : []),
+          ...(sectionsTab ? [sectionsTab] : []),
           ...(jobsTab ? [jobsTab] : []),
         ]}
         active={sideTab}
@@ -274,12 +283,14 @@ export const WorkspaceCadSide: FC<
               },
             ]
           : []),
+        ...(sectionsTab ? [sectionsTab] : []),
         jobTab,
         ...(jobsTab ? [jobsTab] : []),
       ]
     : [
         ...(zonesTab ? [zonesTab] : []),
         ...(finishTab ? [finishTab] : []),
+        ...(sectionsTab ? [sectionsTab] : []),
         jobTab,
         ...(jobsTab ? [jobsTab] : []),
       ];

@@ -43,6 +43,11 @@ vi.mock('@/lib/cad/zones-queries', () => ({
   useUpdateCadZone: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteCadZone: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+vi.mock('@/lib/cad/sections-queries', () => ({
+  useCadSections: () => ({ data: undefined, isError: false, error: null, refetch: vi.fn() }),
+  useStartCadSections: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+  useDecideCadSectionLevels: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+}));
 vi.mock('@/lib/cad/finishes-queries', () => ({
   useCadFinishTemplates: () => ({ data: undefined }),
   useAssignCadFinishTemplate: () => ({ mutateAsync: vi.fn(), isPending: false }),

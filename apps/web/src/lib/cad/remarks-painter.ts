@@ -67,7 +67,7 @@ const hits = (box: IBox, rects: readonly IBox[]): boolean =>
   boundsIntersectAny(box.x, box.y, box.x + box.width, box.y + box.height, rects);
 
 /** Подготовка слоя, который лежит поверх уже нарисованного: ограничение полосами, без очистки. */
-const beginOverPaint = (
+export const beginOverPaint = (
   context: CanvasRenderingContext2D,
   ratio: number,
   area: readonly PixelRect[] | null,

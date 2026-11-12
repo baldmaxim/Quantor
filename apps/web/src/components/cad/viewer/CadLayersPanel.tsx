@@ -47,6 +47,8 @@ interface ICadLayersPanelProps {
   } | null;
   /** Зоны листа (цвет по типу, скрытие, подписи); нет - блока нет. */
   zones?: ICadZoneLayers | null;
+  /** Разметка разрезов на листе (вкл/выкл); нет - на листе разрезов нет. */
+  sections?: { visible: boolean; onVisibleChange: (visible: boolean) => void } | null;
   /** Трассы механики выбранного route-задания; нет - группы нет. */
   mep?: {
     /** Имена слоёв DXF трасс. */
@@ -82,6 +84,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   onCropChange,
   constructions = null,
   zones = null,
+  sections = null,
   mep = null,
 }) => {
   const groups = useMemo(() => groupLayers(layers), [layers]);
@@ -124,6 +127,21 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
             Контуры всех конструкций
           </label>
           <p className="text-xs text-muted">Без галки рисуются только выбранные конструкции</p>
+        </div>
+      )}
+
+      {sections && (
+        <div className="flex min-w-0 flex-col">
+          <label className={CHECK}>
+            <input
+              type="checkbox"
+              checked={sections.visible}
+              onChange={(event) => sections.onVisibleChange(event.target.checked)}
+              className="size-5 shrink-0"
+            />
+            Разметка разрезов
+          </label>
+          <p className="text-xs text-muted">Отметки, полосы и размеры уровней на листе-разрезе</p>
         </div>
       )}
 

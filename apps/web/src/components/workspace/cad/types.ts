@@ -12,6 +12,7 @@ import type {
   CadVorCoverageRead,
   CadVorDocumentRead,
   CadZoneRead,
+  SectionsRead,
 } from '@quantor/api-client';
 
 import type { IFinishAssignOutcome } from '@/components/cad/finishes/CadZoneFinishBar';
@@ -267,6 +268,11 @@ export interface IWorkspaceCadLayers {
   } | null;
   /** Блок «Зоны» (цвет, скрытие по типам, подписи); `null` или нет - на листе зон нет. */
   readonly zones?: ICadZoneLayers | null;
+  /** Разметка разрезов на листе (вкл/выкл); `null` или нет - переключателя нет (разрезов нет). */
+  readonly sections?: {
+    readonly visible: boolean;
+    readonly onVisibleChange: (visible: boolean) => void;
+  } | null;
 }
 
 /** Выбранное route-задание: то, что нужно блоку «Принять трассы». */
@@ -375,4 +381,33 @@ export interface IWorkspaceCadSideProps {
   readonly constructions?: IWorkspaceCadConstructions | null;
   /** Раздел «Отделка» (нужен и раздел «Зоны»: выбор зон идёт через него); `null` или нет - раздела нет. */
   readonly finishes?: IWorkspaceCadFinishes | null;
+  /** Раздел «Разрезы»; `null` или нет - раздела нет. */
+  readonly sections?: IWorkspaceCadSections | null;
+}
+
+/** Раздел «Разрезы»: распознавание разрезов ревизии, кандидаты уровней и их принятие. */
+export interface IWorkspaceCadSections {
+  /** `loading` - читается; `error` - отказ чтения; `ready` - данные есть (возможно, пустые). */
+  readonly status: 'loading' | 'ready' | 'error';
+  readonly data: SectionsRead | null;
+  readonly loadError: string | null;
+  readonly onReload: () => void;
+  /** Индекс страницы открытого листа; `null` - лист не выбран. */
+  readonly pageIndex: number | null;
+  /** Постановка задания идёт. */
+  readonly starting: boolean;
+  readonly onStart: () => void;
+  /** Решение по уровням отправлено и не завершено. */
+  readonly deciding: boolean;
+  readonly onDecide: (levelIds: readonly string[], decision: 'accept' | 'reject' | 'reset') => void;
+  /** Отказ последнего действия (постановка, решение). */
+  readonly actionError: string | null;
+  /** Выбранный уровень (выделен на листе); `null` - нет. */
+  readonly activeLevelId: string | null;
+  readonly onSelectLevel: (id: string | null) => void;
+  /** Разметка разрезов рисуется на листе. */
+  readonly markupVisible: boolean;
+  readonly onMarkupVisibleChange: (visible: boolean) => void;
+  /** Открыть страницу-разрез в рабочей области. */
+  readonly onOpenPage: (pageIndex: number) => void;
 }

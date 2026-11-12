@@ -16,6 +16,7 @@ import { composePainters, createRemarksPainter } from '@/lib/cad/remarks-painter
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import { useStoredNumber } from '@/lib/cad/useStoredNumber';
 import { createConstructionsPainter } from '@/lib/cad/constructions-painter';
+import { createSectionsPainter } from '@/lib/cad/sections-painter';
 import { createZonesPainter } from '@/lib/cad/zones-painter';
 import { formatNumber } from '@/lib/cad/view-format';
 import {
@@ -51,6 +52,7 @@ import { useWorkspaceCadConstructions } from './useWorkspaceCadConstructions';
 import { useWorkspaceCadJob } from './useWorkspaceCadJob';
 import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
 import { useWorkspaceCadRoutes } from './useWorkspaceCadRoutes';
+import { useWorkspaceCadSections } from './useWorkspaceCadSections';
 import { useWorkspaceCadZones, type IWorkspaceCadZonesState } from './useWorkspaceCadZones';
 
 interface IUseWorkspaceCadInput {
@@ -294,6 +296,23 @@ export const useWorkspaceCad = ({
   // Выбрана конструкция - подложка DXF приглушается, чтобы чужие линии не читались как выделение.
   const dimmed = constructionsState.selection.selectedIds.size > 0;
 
+  // --- переходы: всё в адрес рабочей области ---
+  // Лист вне списка адресуется по индексу страницы (позиция обычно ему равна), а не теряется молча.
+  const positionOf = (target: number): number => sheetPosition(sheets, target) ?? target + 1;
+  const goToSheet = (target: number, changes: Record<string, string | null>) => {
+    navigate({ page: String(positionOf(target)), region: null, ...changes });
+  };
+
+  // --- разрезы АР: уровни, решения человека, разметка на листе ---
+  const sectionsState = useWorkspaceCadSections({
+    projectId,
+    revisionId,
+    pageIndex,
+    load: enabled && opened && revisionId !== null,
+    active,
+    onOpenPage: (target) => goToSheet(target, { job: null, view: null }),
+  });
+
   const paintData = useMemo(() => {
     const base = overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
       dxfVisible: render.dxfVisible,
@@ -348,6 +367,20 @@ export const useWorkspaceCad = ({
     [zonesState.paintData, cadPainter, constructionsPainter],
   );
 
+  const sectionsPainter = useMemo(
+    () =>
+      sectionsState.paintData
+        ? createSectionsPainter(sectionsState.paintData, {
+            clear:
+              cadPainter === null &&
+              constructionsPainter === null &&
+              zonesPainter === null &&
+              remarks.marks.length === 0,
+          })
+        : null,
+    [sectionsState.paintData, cadPainter, constructionsPainter, zonesPainter, remarks.marks.length],
+  );
+
   const painter = useMemo<LayerPainter | null>(
     () =>
       composePainters(
@@ -363,23 +396,18 @@ export const useWorkspaceCad = ({
               },
             )
           : null,
+        sectionsPainter,
       ),
     [
       cadPainter,
       constructionsPainter,
       zonesPainter,
+      sectionsPainter,
       remarks.marks,
       remarks.activeId,
       colors.remarks,
     ],
   );
-
-  // --- переходы: всё в адрес рабочей области ---
-  // Лист вне списка адресуется по индексу страницы (позиция обычно ему равна), а не теряется молча.
-  const positionOf = (target: number): number => sheetPosition(sheets, target) ?? target + 1;
-  const goToSheet = (target: number, changes: Record<string, string | null>) => {
-    navigate({ page: String(positionOf(target)), region: null, ...changes });
-  };
 
   // Задание выбрано (из списка или только что создано): рабочая область встаёт на его лист.
   const openJob = (
@@ -478,6 +506,7 @@ export const useWorkspaceCad = ({
     onCropChange: setCropVisible,
     constructions: constructionsState.layers,
     zones: zonesState.layers,
+    sections: sectionsState.layers,
   };
 
   const side: IWorkspaceCadSideProps = {
@@ -536,6 +565,7 @@ export const useWorkspaceCad = ({
       : null,
     zones: zonesState.zones,
     constructions: constructionsState.side,
+    sections: sectionsState.side,
     finishes: {
       projectId,
       revisionId,
