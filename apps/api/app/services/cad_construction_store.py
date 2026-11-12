@@ -7,23 +7,33 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from contextlib import aclosing
+from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contracts.cad_constructions import (
     CadConstructionProps,
     CadSheetLevelsRead,
     CadSheetLevelsWrite,
+    WallsConstruction,
+    WallsDocument,
 )
+from app.core.logging import get_logger
 from app.models import CadConstructionProps as CadConstructionPropsRow
 from app.models import CadProjectLevels, CadSheetLevels
-from app.services.cad_constructions import ProjectSlab
+from app.services.cad_constructions import SLAB_ID, ProjectSlab, match_orphan_props
+
+log = get_logger(__name__)
 
 PropsEntry = tuple[CadConstructionProps, bool]
+# Прежние результаты `cad_walls` вида, от нового к старому; читаются лениво, по одному.
+OlderWalls = Callable[[], AsyncGenerator[WallsDocument]]
 
 
 def dump_props(props: CadConstructionProps) -> dict[str, Any]:
@@ -59,6 +69,100 @@ async def load_props(
         row.construction_key: (CadConstructionProps.model_validate(row.props), row.accepted)
         for row in rows
     }
+
+
+@dataclass(frozen=True, slots=True)
+class PropsLoad:
+    """Параметры листа после переноса сирот: сами параметры и счётчики для итога."""
+
+    props: dict[str, PropsEntry]
+    # Не нашли конструкцию в текущем файле и по геометрии: в расчёт не входят.
+    orphaned: int
+    # Перенесены на новый адрес в этом запросе.
+    carried_over: int
+
+
+async def reconcile_orphan_props(
+    session: AsyncSession,
+    *,
+    revision_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    current: Sequence[WallsConstruction],
+    has_slab: bool,
+    older: OlderWalls,
+) -> PropsLoad:
+    """Загружает параметры листа, перенося осиротевшие на конструкции текущего файла.
+
+    Адрес конструкции — хеш её геометрии, после пересчёта он меняется, и запись перестаёт
+    находиться. Сирота ищется в прежних файлах вида (`older`), затем сопоставляется с текущими
+    конструкциями по геометрии (`match_orphan_props`); перенос — смена `construction_key` в
+    той же транзакции (`updated_by` не меняется). Без сирот прежние файлы не читаются.
+    """
+    props = await load_props(session, revision_id=revision_id, page_index=page_index, view=view)
+    known = {c.id for c in current}
+    if has_slab:
+        known.add(SLAB_ID)
+    orphan_keys = {key for key in props if key not in known}
+    if not orphan_keys:
+        return PropsLoad(props, 0, 0)
+    old_items: dict[str, WallsConstruction] = {}
+    async with aclosing(older()) as documents:
+        async for document in documents:
+            for item in (*document.constructions, *document.frame_partitions):
+                if item.id in orphan_keys and item.id not in old_items:
+                    old_items[item.id] = item
+            if len(old_items) == len(orphan_keys):
+                break
+    moves = match_orphan_props(
+        old_items,
+        {key: props[key] for key in old_items},
+        current,
+        occupied={key for key in props if key in known},
+    )
+    if not moves:
+        return PropsLoad(props, len(orphan_keys), 0)
+    by_target: dict[str, list[str]] = {}
+    for old_key, new_key in moves.items():
+        by_target.setdefault(new_key, []).append(old_key)
+    sheet = (
+        CadConstructionPropsRow.revision_id == revision_id,
+        CadConstructionPropsRow.page_index == page_index,
+        CadConstructionPropsRow.view == view,
+    )
+    carried = 0
+    for new_key, old_keys in by_target.items():
+        # Слияние: параметры одинаковы (проверил `match_orphan_props`), лишние записи удаляются.
+        keep, *extra = old_keys
+        try:
+            # Гонка с записью на тот же адрес: сирота остаётся сиротой до следующего чтения.
+            async with session.begin_nested():
+                if extra:
+                    await session.execute(
+                        delete(CadConstructionPropsRow).where(
+                            *sheet, CadConstructionPropsRow.construction_key.in_(extra)
+                        )
+                    )
+                await session.execute(
+                    update(CadConstructionPropsRow)
+                    .where(*sheet, CadConstructionPropsRow.construction_key == keep)
+                    .values(construction_key=new_key)
+                )
+        except IntegrityError:
+            continue
+        props[new_key] = props[keep]
+        for old_key in old_keys:
+            del props[old_key]
+        carried += len(old_keys)
+        log.info(
+            "cad_props_carried_over",
+            revision_id=str(revision_id),
+            page_index=page_index,
+            view=view,
+            old_keys=old_keys,
+            new_key=new_key,
+        )
+    return PropsLoad(props, len(orphan_keys) - carried, carried)
 
 
 async def save_props(

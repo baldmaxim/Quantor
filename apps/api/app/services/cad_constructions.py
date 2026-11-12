@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Final
 
@@ -690,3 +690,92 @@ def compute_sheet(
         totals=totals,
         summary=summary,
     )
+
+
+# --------------------------------------------------------------------------- перенос параметров
+
+# Допустимое изменение площади конструкции между пересчётами при переносе параметров.
+CARRY_AREA_RATIO_MIN: Final = 0.5
+CARRY_AREA_RATIO_MAX: Final = 2.0
+_NOMINAL_TOLERANCE_MM: Final = 1e-6
+
+
+def _in_ring(point: tuple[float, float], ring: list[list[float]]) -> bool:
+    """Точка в кольце: чётно-нечётное правило (луч вправо)."""
+    x, y = point
+    inside = False
+    n = len(ring)
+    for i in range(n):
+        x0, y0 = ring[i][0], ring[i][1]
+        x1, y1 = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
+        if (y0 > y) != (y1 > y) and x < x0 + (y - y0) * (x1 - x0) / (y1 - y0):
+            inside = not inside
+    return inside
+
+
+def _in_polygon(point: list[float], polygon: WallsPolygon) -> bool:
+    """Точка внутри внешнего кольца и вне отверстий."""
+    if len(point) < 2 or len(polygon.shell) < 3:
+        return False
+    pt = (point[0], point[1])
+    if not _in_ring(pt, polygon.shell):
+        return False
+    return not any(len(hole) >= 3 and _in_ring(pt, hole) for hole in polygon.holes)
+
+
+def _polygon_area_mm2(polygon: WallsPolygon) -> float:
+    if len(polygon.shell) < 3:
+        return 0.0
+    holes = math.fsum(_ring_area_mm2(hole) for hole in polygon.holes if len(hole) >= 3)
+    return max(0.0, _ring_area_mm2(polygon.shell) - holes)
+
+
+def _same_nominal(old: float | None, new: float | None) -> bool:
+    if old is None or new is None:
+        return old is None and new is None
+    return abs(old - new) <= _NOMINAL_TOLERANCE_MM
+
+
+def is_same_construction(old: WallsConstruction, new: WallsConstruction) -> bool:
+    """Старая и новая конструкция — вероятно, одна и та же стена после пересчёта.
+
+    Тот же вид и номинальная толщина (обе не определены — тоже равны), центроид одной лежит внутри
+    контура другой (отверстия не считаются), площади отличаются не более чем вдвое.
+    """
+    if old.kind != new.kind or not _same_nominal(
+        old.thickness_nominal_mm, new.thickness_nominal_mm
+    ):
+        return False
+    old_area = _polygon_area_mm2(old.polygon)
+    new_area = _polygon_area_mm2(new.polygon)
+    if old_area <= 0.0 or new_area <= 0.0:
+        return False
+    if not CARRY_AREA_RATIO_MIN <= new_area / old_area <= CARRY_AREA_RATIO_MAX:
+        return False
+    return _in_polygon(old.centroid, new.polygon) or _in_polygon(new.centroid, old.polygon)
+
+
+def match_orphan_props(
+    orphans: Mapping[str, WallsConstruction],
+    props: PropsByKey,
+    current: Sequence[WallsConstruction],
+    occupied: Collection[str],
+) -> dict[str, str]:
+    """Осиротевший адрес -> адрес конструкции текущего файла; неоднозначное пропускается.
+
+    `orphans` — старая геометрия осиротевших адресов, `props` — их параметры, `occupied` — адреса
+    текущих конструкций, у которых уже есть своя запись (перезаписывать её нельзя). Перенос, только
+    если кандидат ровно один; несколько сирот на одну конструкцию (слияние) переносятся, лишь когда
+    их параметры и признак принятия совпадают.
+    """
+    targets: dict[str, list[str]] = defaultdict(list)
+    for key, old in orphans.items():
+        candidates = [c.id for c in current if is_same_construction(old, c)]
+        if len(candidates) == 1 and candidates[0] not in occupied and key in props:
+            targets[candidates[0]].append(key)
+    moves: dict[str, str] = {}
+    for target, keys in targets.items():
+        first = props[keys[0]]
+        if all(props[key] == first for key in keys):
+            moves.update(dict.fromkeys(keys, target))
+    return moves

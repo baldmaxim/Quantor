@@ -41,6 +41,7 @@ from app.services import cad_construction_store as construction_store
 from app.services import cad_floor3d, cad_floor3d_dxf, cad_views, cad_zones
 from app.services import cad_floor3d_store as store
 from app.services import projects as projects_service
+from app.services.cad_walls_version import current_walls_generator
 
 router = APIRouter(tags=["cad-floor3d"], dependencies=[require_feature("cad.export")])
 
@@ -125,7 +126,11 @@ async def _door_zones(
 
 
 async def _floor3d(
-    session: SessionDep, storage: StorageDep, sheet: _Sheet, walls: _Walls
+    session: SessionDep,
+    storage: StorageDep,
+    settings: SettingsDep,
+    sheet: _Sheet,
+    walls: _Walls,
 ) -> CadFloor3dRead:
     overrides = await construction_store.load_levels(
         session, revision_id=sheet.revision_id, page_index=sheet.page_index, view=sheet.view
@@ -147,6 +152,7 @@ async def _floor3d(
         hole_decisions=decisions,
         door_zones=zones,
         extra_warnings=zone_warnings,
+        current_generator=current_walls_generator(settings),
     )
 
 
@@ -198,10 +204,11 @@ async def read_cad_floor3d(
     session: SessionDep,
     context: AuthDep,
     storage: StorageDep,
+    settings: SettingsDep,
 ) -> CadFloor3dRead:
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
-    return await _floor3d(session, storage, sheet, walls)
+    return await _floor3d(session, storage, settings, sheet, walls)
 
 
 @router.post(
@@ -224,7 +231,7 @@ async def create_cad_floor3d_dxf(
     """Модель собирается тем же сервисом, что у GET floor3d; DXF - файл `floor3d.dxf` задания."""
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
-    model = await _floor3d(session, storage, sheet, walls)
+    model = await _floor3d(session, storage, settings, sheet, walls)
     job = await cad_floor3d_dxf.schedule(
         session,
         storage,
@@ -263,6 +270,7 @@ async def put_cad_floor3d_hole(
     session: SessionDep,
     context: AuthDep,
     storage: StorageDep,
+    settings: SettingsDep,
 ) -> CadFloor3dRead:
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     walls = await _load_walls(session, storage, sheet)
@@ -279,7 +287,7 @@ async def put_cad_floor3d_hole(
         enabled=body.enabled,
         user_id=context.principal.user_id,
     )
-    response = await _floor3d(session, storage, sheet, walls)
+    response = await _floor3d(session, storage, settings, sheet, walls)
     await session.commit()
     return response
 

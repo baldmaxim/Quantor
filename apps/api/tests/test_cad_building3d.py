@@ -298,6 +298,28 @@ def test_reference_is_the_lowest_floor_with_axes_in_both_directions() -> None:
     assert floors[0].alignment_message == "оси не распознаны: пересчитайте конструкции листа"
 
 
+def test_reference_is_the_floor_sharing_most_axes_not_the_lowest_parking() -> None:
+    # Подземный этаж с другой сеткой: общая с остальными только ось «А».
+    parking = built(
+        elevation=BASE - 3000,
+        order=0,
+        axes=axes_block({"П1": 1000.0, "П2": 2000.0}, {"А": REF_Y["А"], "П3": 9000.0}),
+    )
+    first = built(elevation=BASE, order=1, axes=ref_axes())
+    second = built(elevation=BASE + 3000, order=2, axes=ref_axes())
+    floors = b3d.align_floors([parking, first, second])
+    # Эталон - самый нижний из двух верхних (ничья по числу общих осей), подземный не совмещён.
+    assert [f.alignment for f in floors] == ["none", "reference", "axes"]
+    assert floors[0].alignment_message is not None
+    assert floors[2].alignment_axes == ["3.1", "3.2", "3.3", "А", "Б"]
+
+
+def test_reference_tie_by_shared_axes_keeps_the_lowest_floor() -> None:
+    low = built(elevation=BASE, order=0, axes=ref_axes())
+    high = built(elevation=BASE + 3000, order=1, axes=ref_axes())
+    assert [f.alignment for f in b3d.align_floors([high, low])] == ["axes", "reference"]
+
+
 def test_single_floor_group_is_reference_only_with_axes() -> None:
     (with_axes,) = b3d.align_floors([built(axes=ref_axes())])
     assert with_axes.alignment == "reference"

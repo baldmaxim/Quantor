@@ -302,6 +302,9 @@ class CadFinishTotalRead(BaseModel):
     area_m2: float | None
     material_qty: float | None
     zone_count: int
+    # Зоны с неопределёнными площадью или количеством: в суммы не вошли (итог неполный).
+    unknown_zone_count: int
+    incomplete: bool
 
 
 class CadFinishRoomTypeRead(BaseModel):
@@ -310,6 +313,9 @@ class CadFinishRoomTypeRead(BaseModel):
     floor_area_m2: float | None
     wall_area_m2: float | None
     ceiling_area_m2: float | None
+    # Зоны, у которых хотя бы одна из трёх площадей неопределена: в суммы они не вошли.
+    unknown_zone_count: int
+    incomplete: bool
 
 
 class CadFinishWarningRead(BaseModel):

@@ -58,6 +58,7 @@ from app.services.cad_finish_edges import (
     ZoneEdges,
     construction_base,
 )
+from app.services.cad_walls_version import walls_outdated
 from app.services.cad_zones import ROOM_KINDS
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
@@ -218,10 +219,14 @@ def _points(ring: Sequence[Sequence[float]]) -> list[Point]:
 def _edge_input(
     sheet: _SheetWalls,
     props: Mapping[str, tuple[CadConstructionProps, bool]],
+    current_generator: str | None,
 ) -> tuple[list[EdgeConstruction], list[EdgeOpening]] | None:
-    """Стены с основаниями и проёмы с перемычками; `None` - файл старый (нет перемычек)."""
+    """Стены с основаниями и проёмы с перемычками; `None` - файл устарел (нет плиты и перемычек
+    либо построен генератором старше закреплённого)."""
     extras = sheet.extras
-    if extras is None or extras.is_outdated:
+    if extras is None or walls_outdated(
+        sheet.document.generator, extras.has_slab_key, current_generator
+    ):
         return None
     constructions: list[EdgeConstruction] = []
     base_by_id: dict[str, Base] = {}
@@ -266,6 +271,7 @@ async def load_finish_context(
     project_id: uuid.UUID,
     revision_id: uuid.UUID,
     page_index: int,
+    current_generator: str | None = None,
 ) -> FinishSheetContext:
     """Высота стен листа и привязка рёбер: тот же путь, что у 3D-вида этажа.
 
@@ -316,7 +322,7 @@ async def load_finish_context(
                 props = await cad_construction_store.load_props(
                     session, revision_id=revision_id, page_index=page_index, view=view
                 )
-                linked = _edge_input(sheet, props)
+                linked = _edge_input(sheet, props, current_generator)
                 if linked is not None:
                     walls = FinishWallsInput(
                         linked[0], linked[1], frame, levels.door_height.value_mm
@@ -362,11 +368,31 @@ def _sum_known(values: Sequence[float | None]) -> float | None:
     return sum(known) if known else None
 
 
+def _room_type_row(code: CadRoomType, group: Sequence[CadFinishZoneRead]) -> CadFinishRoomTypeRead:
+    """Итог по типу помещения; зона с любой неопределённой площадью в сумму не вошла."""
+    unknown = sum(
+        1
+        for row in group
+        if row.floor_area_m2 is None or row.wall_area_m2 is None or row.ceiling_area_m2 is None
+    )
+    return CadFinishRoomTypeRead(
+        room_type=code,
+        zone_count=len(group),
+        floor_area_m2=_sum_known([row.floor_area_m2 for row in group]),
+        wall_area_m2=_sum_known([row.wall_area_m2 for row in group]),
+        ceiling_area_m2=_sum_known([row.ceiling_area_m2 for row in group]),
+        unknown_zone_count=unknown,
+        incomplete=unknown > 0,
+    )
+
+
 @dataclass(slots=True)
 class _Total:
     areas: list[float | None] = field(default_factory=list)
     quantities: list[float | None] = field(default_factory=list)
     zone_ids: set[uuid.UUID] = field(default_factory=set)
+    # Зоны, у которых площадь или количество не определены: в сумму они не вошли.
+    unknown_zone_ids: set[uuid.UUID] = field(default_factory=set)
 
 
 def _template_for(
@@ -676,6 +702,8 @@ def build_finish_sheet(
                     total.areas.append(layer_area)
                     total.quantities.append(quantity)
                     total.zone_ids.add(zone.id)
+                    if layer_area is None or quantity is None:
+                        total.unknown_zone_ids.add(zone.id)
         row = CadFinishZoneRead(
             zone_id=zone.id,
             name=zone.name,
@@ -716,6 +744,8 @@ def build_finish_sheet(
             area_m2=_sum_known(total.areas),
             material_qty=_sum_known(total.quantities),
             zone_count=len(total.zone_ids),
+            unknown_zone_count=len(total.unknown_zone_ids),
+            incomplete=bool(total.unknown_zone_ids),
         )
         for (surface, work, material, unit), total in sorted(
             totals.items(),
@@ -729,13 +759,7 @@ def build_finish_sheet(
     ]
     type_order = {code: position for position, code in enumerate(ROOM_TYPE_VALUES)}
     by_room_type = [
-        CadFinishRoomTypeRead(
-            room_type=code,
-            zone_count=len(group),
-            floor_area_m2=_sum_known([row.floor_area_m2 for row in group]),
-            wall_area_m2=_sum_known([row.wall_area_m2 for row in group]),
-            ceiling_area_m2=_sum_known([row.ceiling_area_m2 for row in group]),
-        )
+        _room_type_row(code, group)
         for code, group in sorted(kinds.items(), key=lambda item: type_order[item[0]])
     ]
 

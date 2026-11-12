@@ -43,7 +43,10 @@ _NUMBER_RE: Final = re.compile(r"-?\d+(?:\.\d+)?")
 _MAX_ABS_QUANTITY: Final = Decimal(10) ** 15
 
 # Размеры блока «200х300х600» - не толщина: вырезаются до поиска «NNN мм».
-_DIMENSIONS_RE: Final = re.compile(r"\d+(?:[.,]\d+)?(?:\s*[хx×*]\s*\d+(?:[.,]\d+)?)+")
+# Старт только на границе числа (?<!\d): иначе длинные цифровые строки дают ReDoS (перебор O(n²)).
+_DIMENSIONS_RE: Final = re.compile(r"(?<!\d)\d+(?:[.,]\d+)?(?:\s*[хx×*]\s*\d+(?:[.,]\d+)?)+")
+# Сколько первых символов наименования анализируется на толщину; полное имя хранится как есть.
+THICKNESS_HINT_MAX_CHARS: Final = 1000
 _THICKNESS_RES: Final = (
     re.compile(r"толщ\w*\.?\s*[:=]?\s*(\d{2,3})(?!\d)"),
     re.compile(r"δ\s*=?\s*(\d{2,3})(?!\d)"),
@@ -152,7 +155,7 @@ def parse_number(value: object) -> Decimal | None:
 
 def thickness_hint(name_norm: str) -> int | None:
     """Толщина в мм из наименования: «толщиной 100», «δ=100», «100 мм»; не нашлась - None."""
-    cleaned = _DIMENSIONS_RE.sub(" ", name_norm)
+    cleaned = _DIMENSIONS_RE.sub(" ", name_norm[:THICKNESS_HINT_MAX_CHARS])
     for pattern in _THICKNESS_RES:
         found = pattern.search(cleaned)
         if found is not None:

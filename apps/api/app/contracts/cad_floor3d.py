@@ -83,8 +83,9 @@ class WallsFloorExtras(BaseModel):
     openings: list[WallsOpeningExtras] = Field(default_factory=list)
 
     @property
-    def is_outdated(self) -> bool:
-        return "slab" not in self.model_fields_set
+    def has_slab_key(self) -> bool:
+        """Ключ `slab` есть в файле (даже `null`): файл построен версией с плитой."""
+        return "slab" in self.model_fields_set
 
 
 # --------------------------------------------------------------------------- ответы

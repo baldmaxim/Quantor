@@ -423,6 +423,13 @@ def _fallback(
     )
 
 
+def _shared_axes(first: BuiltFloor, second: BuiltFloor) -> int:
+    """Число общих подписей осей двух этажей (вертикальные и горизонтальные по отдельности)."""
+    return len(first.axes.vertical.keys() & second.axes.vertical.keys()) + len(
+        first.axes.horizontal.keys() & second.axes.horizontal.keys()
+    )
+
+
 def align_floors(items: Sequence[BuiltFloor]) -> list[CadBuilding3dFloorRead]:
     """Совмещение этажей каждой группы с эталоном; порядок результата - как у входа."""
     result: list[CadBuilding3dFloorRead | None] = [None] * len(items)
@@ -431,10 +438,13 @@ def align_floors(items: Sequence[BuiltFloor]) -> list[CadBuilding3dFloorRead]:
         groups.setdefault(item.floor.group_key, []).append(index)
     for indexes in groups.values():
         usable = [i for i in indexes if items[i].axes.usable]
+        # Эталон - этаж с наибольшим числом общих подписей осей с остальными этажами группы
+        # (подземный этаж с другой сеткой эталоном не становится); при равенстве - самый нижний.
         ref_index = (
             min(
                 usable,
                 key=lambda i: (
+                    -sum(_shared_axes(items[i], items[j]) for j in usable if j != i),
                     not items[i].floor.elevation_known,
                     items[i].floor.base_z_mm,
                     items[i].order,

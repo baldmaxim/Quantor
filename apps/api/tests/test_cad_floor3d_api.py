@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain import Role
 from app.main import create_app
 from app.models import CadProjectLevels, CadSheetLevels, CadSlabHoleDecision, Job, Workspace
+from tests.cad_pins_helper import write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_constructions_api import (
     PARAMS,
@@ -328,6 +329,57 @@ async def test_old_walls_json_gives_walls_outdated(
             _floor(project_id, job_id, "floor3d/holes/abc"), json={"enabled": True}
         )
         assert missing.status_code == 404
+
+
+async def test_walls_from_older_generator_than_the_pin_give_walls_outdated(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools, tmp_path)
+    params = floor_tools / "params" / "v1.json"
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _rev, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        # walls.json написан генератором cad_walls.v1; pins.json на минор выше - файл устарел.
+        write_pins(tmp_path, walls=params, walls_version="cad_walls.v1.1")
+        body = (await api.get(_floor(project_id, job_id))).json()
+        assert _codes(body) == ["walls_outdated"]
+        assert len(body["walls"]) == 4
+        # Версия совпадает с закреплённой или новее - предупреждения нет.
+        for pinned in ("cad_walls.v1", "cad_walls.v0.9"):
+            write_pins(tmp_path, walls=params, walls_version=pinned)
+            body = (await api.get(_floor(project_id, job_id))).json()
+            assert body["warnings"] == [], pinned
+
+
+async def test_recompute_after_pin_change_creates_a_new_walls_job(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _rev, job_id, first = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        old = await db_session.get(Job, uuid.UUID(first))
+        assert old is not None and old.payload["generator_version"] == "cad_walls.v1"
+        write_pins(
+            tmp_path, walls=floor_tools / "params" / "v1.json", walls_version="cad_walls.v1.1"
+        )
+        queued = await api.post(_url(project_id, job_id, "walls"))
+        assert queued.status_code == 202, queued.text
+        assert queued.json()["job_id"] != first
+        new = await db_session.get(Job, uuid.UUID(queued.json()["job_id"]))
+        assert new is not None
+        assert new.payload["generator_version"] == "cad_walls.v1.1"
+        assert new.idempotency_key != old.idempotency_key
 
 
 async def test_sheet_floor_elevation_override_moves_the_model(

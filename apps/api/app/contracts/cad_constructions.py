@@ -473,6 +473,11 @@ class CadConstructionsSummaryRead(BaseModel):
     door_openings_without_host: int
     # Монолитные перемычки без определимого объёма (нет высоты, толщины, хозяина): в итоги не вошли.
     lintels_without_volume: int = 0
+    # Параметры человека, чья конструкция пропала после пересчёта и не нашлась по геометрии:
+    # в расчёт не входят, строки в базе сохранены.
+    orphaned_props: int = 0
+    # Параметры, перенесённые на новые адреса конструкций по геометрии в этом запросе.
+    props_carried_over: int = 0
 
 
 class CadWallsWarningRead(BaseModel):

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import io
+import time
 import zipfile
 from decimal import Decimal
 
@@ -153,6 +154,23 @@ def test_parse_number(value: object, expected: Decimal | None) -> None:
 )
 def test_thickness_hint(text: str, expected: int | None) -> None:
     assert vor.thickness_hint(vor.normalize_text(text)) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["1" * 32_000, "1х" * 16_000, "1х " * 11_000, "1 " * 16_000, "1х" + " " * 32_000],
+)
+def test_thickness_hint_is_not_redos_prone(text: str) -> None:
+    started = time.perf_counter()
+    vor.thickness_hint(vor.normalize_text(text))
+    vor.thickness_hint(text)
+    assert time.perf_counter() - started < 0.5
+
+
+def test_thickness_hint_looks_only_at_name_head() -> None:
+    tail = " " * vor.THICKNESS_HINT_MAX_CHARS + "толщиной 100"
+    assert vor.thickness_hint("Кладка" + tail) is None
+    assert vor.thickness_hint("Кладка толщиной 100") == 100
 
 
 @pytest.mark.parametrize(

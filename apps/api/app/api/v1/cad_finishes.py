@@ -13,7 +13,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.api.v1.deps import AuthDep, SessionDep, StorageDep, require, require_feature
+from app.api.v1.deps import AuthDep, SessionDep, SettingsDep, StorageDep, require, require_feature
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
 from app.contracts.cad_finishes import (
@@ -29,6 +29,7 @@ from app.models import CadFinishTemplate
 from app.services import cad as cad_service
 from app.services import cad_finish_templates, cad_finishes, cad_zones
 from app.services import projects as projects_service
+from app.services.cad_walls_version import current_walls_generator
 
 router = APIRouter(
     tags=["cad-finishes"],
@@ -167,6 +168,7 @@ async def read_cad_finishes(
     session: SessionDep,
     context: AuthDep,
     storage: StorageDep,
+    settings: SettingsDep,
     page_index: Annotated[int, Query(ge=0)],
 ) -> CadFinishSheetRead:
     project = await projects_service.get_project(
@@ -188,6 +190,7 @@ async def read_cad_finishes(
         project_id=project_id,
         revision_id=revision_id,
         page_index=page_index,
+        current_generator=current_walls_generator(settings),
     )
     return cad_finishes.build_finish_sheet(
         revision_id=revision_id,

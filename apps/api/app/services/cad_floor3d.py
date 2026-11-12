@@ -43,6 +43,7 @@ from app.contracts.cad_floor3d import (
 )
 from app.services import cad_constructions
 from app.services.cad_constructions import ProjectSlab
+from app.services.cad_walls_version import walls_outdated
 
 _MM2_IN_M2: Final = 1e6
 _KEY_CENTROID_STEP_MM: Final = 10
@@ -283,6 +284,7 @@ def build_floor3d(
     hole_decisions: Mapping[str, bool],
     door_zones: Sequence[DoorZoneMm],
     extra_warnings: Sequence[CadFloor3dWarningRead] = (),
+    current_generator: str | None = None,
 ) -> CadFloor3dRead:
     """Модель этажа: плита с отверстиями, стены, перемычки, высоты с источниками, предупреждения."""
     levels = cad_constructions.effective_levels(document.heights, overrides, project_slab)
@@ -292,14 +294,14 @@ def build_floor3d(
         for w in document.checks.warnings
         if w.code == DOOR_WITHOUT_GAP
     )
-    outdated = extras.is_outdated
+    outdated = walls_outdated(document.generator, extras.has_slab_key, current_generator)
     if outdated:
         warnings.append(
             CadFloor3dWarningRead(
                 code="walls_outdated",
                 message=(
-                    "Результат конструкций построен прежней версией: нет плиты, отверстий и "
-                    "перемычек. Пересчитайте конструкции."
+                    "Результат конструкций построен прежней версией генератора или без плиты, "
+                    "отверстий и перемычек. Пересчитайте конструкции."
                 ),
             )
         )

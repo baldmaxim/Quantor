@@ -362,6 +362,21 @@ def test_sheet_totals_sum_zones_by_work_material_and_unit() -> None:
         ("living", 1),
         ("kitchen", 1),
     ]
+    assert all(t.unknown_zone_count == 0 and not t.incomplete for t in sheet.totals)
+    assert all(r.unknown_zone_count == 0 and not r.incomplete for r in sheet.by_room_type)
+
+
+def test_sheet_totals_flag_zones_dropped_from_the_sum_as_incomplete() -> None:
+    template = _template(room_types=["living", "kitchen"], walls=[PRIMER], ceiling=[PAINT])
+    unknown = _zone(room_type="kitchen", area=None, perimeter=None, calibration_missing=True)
+    sheet = _sheet([_zone(), unknown], [template])
+    ceiling = next(total for total in sheet.totals if total.surface == "ceiling")
+    # В сумму вошла только известная зона, но итог помечен неполным.
+    assert ceiling.zone_count == 2 and ceiling.area_m2 == 20.0
+    assert ceiling.unknown_zone_count == 1 and ceiling.incomplete
+    by_type = {row.room_type: row for row in sheet.by_room_type}
+    assert not by_type["living"].incomplete and by_type["living"].unknown_zone_count == 0
+    assert by_type["kitchen"].incomplete and by_type["kitchen"].unknown_zone_count == 1
 
 
 def test_sheet_explicit_template_wins_over_type() -> None:
@@ -385,6 +400,8 @@ def test_sheet_without_calibration_has_null_not_zero() -> None:
     assert zone.layers[0].material_unit == "кг"
     assert sheet.totals[0].area_m2 is None and sheet.totals[0].material_qty is None
     assert sheet.by_room_type[0].floor_area_m2 is None
+    assert all(t.unknown_zone_count == 1 and t.incomplete for t in sheet.totals)
+    assert sheet.by_room_type[0].unknown_zone_count == 1 and sheet.by_room_type[0].incomplete
     assert {w.code: w.zone_ids for w in sheet.warnings}["calibration_missing"] == [zone_in.id]
 
 

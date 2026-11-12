@@ -3,7 +3,8 @@
 Движок и настоящий скрипт не нужны: родитель `cad_pdf_convert` выставляется прямо в базе и
 хранилище (как у тестов трасс), а скрипт `cad_walls` подменён заглушкой, которая пишет
 `walls.json` по CLI-контракту. Режим заглушки задаёт файл `mode` рядом со скриптом: `fail` — код
-выхода 2, `badsha` — walls.json другого DXF, `badschema` — чужая схема, `extra` — лишний файл.
+выхода 2, `badsha` — walls.json другого DXF, `badschema` — чужая схема, `extra` — лишний файл,
+`renamed` — те же конструкции под другими id, `gone` — конструкции `aaaaaaaaaaaa` больше нет.
 """
 
 from __future__ import annotations
@@ -71,6 +72,8 @@ if mode == "badsha":
 
 
 def cons(key, kind, nominal, area, axis, status="matched"):
+    if mode == "renamed":
+        key = "r" + key[1:]
     return {
         "id": key, "kind": kind, "source_layers": ["01_КЛАДКА_И_ПЕРЕГОРОДКИ"],
         "polygon": {"shell": [[0.0, 0.0], [5000.0, 0.0], [5000.0, 200.0], [0.0, 200.0]],
@@ -108,6 +111,8 @@ doc = {
     "checks": {"area_union_mm2": 1.0, "area_constructions_mm2": 1.0, "residue_ratio": 0.0,
                "warnings": [{"code": "area_residue", "message": "тест"}]},
 }
+if mode == "gone":
+    doc["constructions"] = [c for c in doc["constructions"] if c["id"] != "aaaaaaaaaaaa"]
 out = pathlib.Path(args.out)
 out.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
 if mode == "extra":
@@ -919,3 +924,125 @@ async def test_convert_success_survives_missing_walls_params(
         await cad_walls_service.enqueue_after_convert(db_session, fake_storage, parent, settings)
         == []
     )
+
+
+# ------------------------------------------------------------------ перенос параметров
+
+
+async def _props_rows(session: AsyncSession) -> dict[str, dict[str, Any]]:
+    session.expire_all()
+    rows = (await session.scalars(select(CadConstructionProps))).all()
+    return {row.construction_key: row.props for row in rows}
+
+
+async def _recompute(
+    api: AsyncClient,
+    session: AsyncSession,
+    storage: FakeObjectStorage,
+    settings: Settings,
+    ids: tuple[str, str],
+) -> Job:
+    queued = await api.post(_url(ids[0], ids[1], "walls"))
+    assert queued.status_code == 202, queued.text
+    job = await _run_walls_worker(session, storage, settings, queued.json()["job_id"])
+    assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+    return job
+
+
+async def test_props_are_carried_to_the_new_id_after_a_recompute(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    walls_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(walls_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _rev, job_id, _first = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        url = _url(project_id, job_id, "constructions/aaaaaaaaaaaa/props")
+        assert (await api.put(url, json={"props": {"purpose": "external"}})).status_code == 200
+        before = (await db_session.scalars(select(CadConstructionProps))).one()
+        updated_by = before.updated_by
+
+        (walls_tools / "mode").write_text("renamed")
+        await _recompute(api, db_session, fake_storage, settings, (project_id, job_id))
+        response = await api.get(_url(project_id, job_id, "constructions"))
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert {c["id"] for c in body["constructions"]} >= {"raaaaaaaaaaa"}
+        assert _construction(body, "raaaaaaaaaaa")["props"]["purpose"] == "external"
+        assert body["summary"]["props_carried_over"] == 1 and body["summary"]["orphaned_props"] == 0
+        assert not any(w["code"] == "props_orphaned" for w in body["warnings"])
+        rows = await _props_rows(db_session)
+        assert set(rows) == {"raaaaaaaaaaa"} and rows["raaaaaaaaaaa"]["purpose"] == "external"
+        db_session.expire_all()
+        assert (
+            await db_session.scalars(select(CadConstructionProps))
+        ).one().updated_by == updated_by
+
+        # Повторное чтение: переносить больше нечего, параметры на месте.
+        again = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert again["summary"]["props_carried_over"] == 0
+        assert _construction(again, "raaaaaaaaaaa")["props"]["purpose"] == "external"
+
+
+async def test_props_without_a_match_are_reported_as_orphaned(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    walls_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(walls_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _rev, job_id, _first = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        url = _url(project_id, job_id, "constructions/aaaaaaaaaaaa/props")
+        assert (await api.put(url, json={"props": {"purpose": "external"}})).status_code == 200
+
+        (walls_tools / "mode").write_text("gone")
+        await _recompute(api, db_session, fake_storage, settings, (project_id, job_id))
+        body = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert body["summary"]["orphaned_props"] == 1
+        assert body["summary"]["props_carried_over"] == 0
+        assert any(w["code"] == "props_orphaned" for w in body["warnings"])
+        assert all(c["props"]["purpose"] is None for c in body["constructions"])
+        # Запись не удаляется и не переписывается: она может пригодиться при откате.
+        assert set(await _props_rows(db_session)) == {"aaaaaaaaaaaa"}
+
+
+async def test_constructions_are_not_ready_when_the_dxf_changed_after_the_walls_job(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    walls_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(walls_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _rev, job_id, _first = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        payload = json.loads(json.dumps(parent.payload))
+        for artifact in payload["cad_result"]["artifacts"]:
+            if artifact["name"].endswith("plan_candidates.dxf"):
+                artifact["sha256"] = "e" * 64
+        await db_session.execute(update(Job).where(Job.id == parent.id).values(payload=payload))
+        await db_session.commit()
+        db_session.expire_all()
+
+        response = await api.get(_url(project_id, job_id, "constructions"))
+        assert response.status_code == 404, response.text
+        detail = response.json()["detail"]
+        assert detail["code"] == "CAD_WALLS_NOT_READY"
+        assert detail["issue"]["reason"] == "dxf_changed"
+        # Пересчёт по новому DXF снова даёт результат (заглушка считает sha по входному файлу).
+        put = await api.put(
+            _url(project_id, job_id, "constructions/aaaaaaaaaaaa/props"), json={"props": {}}
+        )
+        assert put.status_code == 404 and put.json()["detail"]["code"] == "CAD_WALLS_NOT_READY"
