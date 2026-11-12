@@ -13,7 +13,12 @@ import { beginLayerPaint, boundsIntersectAny, visibleRects } from '@/lib/viewer/
 import type { PixelRect } from '@/lib/viewer/layer-paint';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
 
-import { ZONE_CATEGORIES, zoneCategory, type ZoneCategory } from './zone-categories';
+import {
+  ZONE_CATEGORIES,
+  zoneCategory,
+  zoneCategoryToken,
+  type ZoneCategory,
+} from './zone-categories';
 import { doorLabelFits, fitRoomLabel, LABEL_LINE_HEIGHT, roomLabelLines } from './zone-labels';
 import { apartmentColorIndex, APARTMENT_PALETTE_SIZE, type IZoneView } from './zone-view';
 import { zoneCanvasLabel, zoneCentroid, type ZoneKind } from './zones';
@@ -69,7 +74,7 @@ export const readZoneColors = (): IZoneColors => {
   const style = getComputedStyle(document.documentElement);
   const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
   const categories = Object.fromEntries(
-    ZONE_CATEGORIES.map((category) => [category, token(`--cad-zone-${category}`, 'CanvasText')]),
+    ZONE_CATEGORIES.map((category) => [category, token(zoneCategoryToken(category), 'CanvasText')]),
   ) as Record<ZoneCategory, string>;
   return {
     apartment: token('--cad-zone-apartment', 'CanvasText'),
@@ -186,7 +191,7 @@ const roomColor = (
   apartments: ReadonlyMap<string, number>,
 ): string => {
   const { colors, view } = data;
-  if (zone.kind === 'room_mop') return colors.mop;
+  if (zone.kind === 'room_mop') return colors.categories[zoneCategory(zone)];
   if (view.colorMode === 'apartment' && zone.apartment_no !== null) {
     const index = apartments.get(zone.apartment_no);
     if (index !== undefined) return colors.apartments[index] ?? colors.categories.other;

@@ -120,6 +120,10 @@
   --cad-zone-apt-1: #1d5bb3;
   --cad-zone-apt-2: #c0392b;
   --cad-zone-apt-3: #1e8a3c;
+  --cad-zone-mop-lift: #0b7a5a;
+  --cad-zone-mop-vestibule: #5c9e00;
+  --cad-zone-mop-corridor: #a3361f;
+  --cad-zone-mop-stair: #4d3fa8;
   --cad-zone-apt-4: #7e3fb8;
   --cad-zone-apt-5: #d9730d;
   --cad-zone-apt-6: #0d8a8a;
@@ -306,6 +310,10 @@
     --cad-construction-not-in-vor: #ff6b7a;
 
     --tooltip-bg: #c8d2de;
+    --cad-zone-mop-lift: #1fae82;
+    --cad-zone-mop-vestibule: #9ccc3a;
+    --cad-zone-mop-corridor: #e0644a;
+    --cad-zone-mop-stair: #7a6ad8;
     --tooltip-text: #0f141a;
     --skeleton: #232932;
     --skeleton-hi: #2c333d;
@@ -419,6 +427,10 @@
 /* Единственная точка перелома на всё приложение: на широком мониторе панели
    могут позволить себе больше, чертежу это не мешает. */
 @media (min-width: 1800px) {
+  --cad-zone-mop-lift: #1fae82;
+  --cad-zone-mop-vestibule: #9ccc3a;
+  --cad-zone-mop-corridor: #e0644a;
+  --cad-zone-mop-stair: #7a6ad8;
   :root {
     --w-pane-left: 300px;
     --w-pane-right: 340px;
