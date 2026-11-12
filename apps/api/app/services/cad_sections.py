@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -60,6 +60,8 @@ LEVELS_SOURCE_DOC_ANSWER: Final = "doc_answer"
 LEVELS_SOURCE_PROJECT_SLAB: Final = "project_slab"
 LEVELS_SOURCE_NONE: Final = "none"
 WARNING_AMBIGUOUS: Final = "section_level_ambiguous"
+# Принятые разрезы есть, но отметка этажа листа не известна: уровни пропущены.
+WARNING_FLOOR_ELEVATION_UNKNOWN: Final = "section_floor_elevation_unknown"
 WARNING_DOC_AMBIGUOUS: Final = "doc_answer_ambiguous"
 WARNING_DOC_OUT_OF_RANGE: Final = "doc_answer_out_of_range"
 CONSISTENCY_FLAG: Final = "project.consistency"
@@ -558,8 +560,24 @@ async def resolve_route_levels(
     разные -> ничего и предупреждение `section_level_ambiguous` (документация и плита не берутся).
     Принятых уровней нет (или отметка этажа не известна) -> подтверждённые ответы к документации
     (`doc_answer`, только при включённом флаге `project.consistency`), затем толщина плиты проекта,
-    если задана, иначе ничего. Оба значения не уходят никогда.
+    если задана, иначе ничего. Оба значения не уходят никогда. Отметка этажа не известна, но
+    принятые уровни в проекте есть -> к любому исходу добавляется `section_floor_elevation_unknown`:
+    разрезы пропущены не молча.
     """
+    skipped: tuple[str, ...] = ()
+    if floor_elevation_mm is None:
+        has_accepted = await session.scalar(
+            select(CadSectionLevel.id)
+            .where(
+                CadSectionLevel.project_id == project_id,
+                CadSectionLevel.status == "accepted",
+                CadSectionLevel.clear_height_mm.is_not(None),
+                CadSectionLevel.clear_height_mm.between(CLEAR_HEIGHT_MIN_MM, CLEAR_HEIGHT_MAX_MM),
+            )
+            .limit(1)
+        )
+        if has_accepted is not None:
+            skipped = (WARNING_FLOOR_ELEVATION_UNKNOWN,)
     if floor_elevation_mm is not None:
         rows = list(
             (
@@ -604,12 +622,12 @@ async def resolve_route_levels(
             plan_page_index=plan_page_index,
         )
         if doc_levels is not None:
-            return doc_levels
+            return replace(doc_levels, warnings=skipped + doc_levels.warnings)
     slab = await cad_construction_store.load_project_slab(session, project_id=project_id)
     if slab is not None and SLAB_THICKNESS_MIN_MM <= slab.thickness_mm <= SLAB_THICKNESS_MAX_MM:
         return RouteLevels(
             slab_thickness_mm=slab.thickness_mm,
             source=LEVELS_SOURCE_PROJECT_SLAB,
-            warnings=doc_warnings,
+            warnings=skipped + doc_warnings,
         )
-    return RouteLevels(warnings=doc_warnings)
+    return RouteLevels(warnings=skipped + doc_warnings)

@@ -25,6 +25,7 @@ from app.auth.dev import DEV_USER_ID
 from app.cad_worker import HANDLERS
 from app.cad_worker.sections_handler import execute_cad_sections
 from app.core.config import Settings
+from app.core.workspace import DEV_WORKSPACE_ID
 from app.domain import JobStatus, JobType
 from app.main import create_app
 from app.models import CadSectionLevel, Job, Workspace
@@ -583,3 +584,47 @@ async def test_rerun_replaces_old_rows_and_carries_decisions_over(
         assert read["job"]["job_id"] == third_job and read["job"]["status"] == "failed"
         assert read["result_job_id"] == second_job
         assert len(read["levels"]) == 4 and len(read["issues"]) == 2 and len(read["pages"]) == 2
+
+
+# ------------------------------------------------------------------ уровни для трасс
+
+
+async def test_unknown_floor_elevation_with_accepted_levels_warns_instead_of_skipping_silently(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    sections_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = sections_settings(sections_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, levels = await _published(api, db_session, fake_storage, settings)
+
+        async def resolve(elevation: int | None) -> cad_sections.RouteLevels:
+            return await cad_sections.resolve_route_levels(
+                db_session,
+                settings=settings,
+                workspace_id=DEV_WORKSPACE_ID,
+                project_id=uuid.UUID(project_id),
+                floor_elevation_mm=elevation,
+                plan_revision_id=uuid.UUID(revision_id),
+                plan_page_index=0,
+            )
+
+        # Принятых уровней нет: предупреждать не о чем.
+        assert (await resolve(None)).warnings == ()
+
+        decide = f"/api/v1/projects/{project_id}/cad/sections/levels/decide"
+        ids = [levels[0]["id"], levels[1]["id"]]
+        accepted = await api.post(decide, json={"level_ids": ids, "decision": "accept"})
+        assert accepted.status_code == 200, accepted.text
+
+        unknown = await resolve(None)
+        assert unknown.warnings == (cad_sections.WARNING_FLOOR_ELEVATION_UNKNOWN,)
+        assert cad_sections.WARNING_FLOOR_ELEVATION_UNKNOWN == "section_floor_elevation_unknown"
+        assert unknown.source == cad_sections.LEVELS_SOURCE_NONE and unknown.clear_height_mm is None
+
+        # Отметка известна: уровни работают, предупреждения нет.
+        known = await resolve(47600)
+        assert known.warnings == ()
+        assert known.source == cad_sections.LEVELS_SOURCE_SECTION and known.clear_height_mm == 3000

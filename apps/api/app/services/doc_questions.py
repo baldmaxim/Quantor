@@ -24,7 +24,7 @@ import asyncio
 import json
 import uuid
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Final
 
 from sqlalchemy import delete, select
@@ -36,7 +36,9 @@ from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.errors import ErrorCode
 from app.models import (
+    CadSectionLevel,
     DocQuestionCandidate,
+    DocumentRevision,
     Job,
     Project,
     RevisionPageText,
@@ -47,12 +49,15 @@ from app.services.consistency.dictionaries import SheetKind
 from app.services.consistency.doc_questions import (
     DOC_QUESTIONS,
     DOC_QUESTIONS_VERSION,
+    DocQuestionCode,
     DocValueKind,
     is_customer_document,
+    question_by_code,
 )
 from app.services.consistency.doc_search import (
     DEFAULT_TOP_N,
     DocCandidate,
+    DocScope,
     DocSearchPage,
     DocValue,
     doc_search_versions,
@@ -73,6 +78,13 @@ _ACTIVE: Final = (JobStatus.QUEUED, JobStatus.RUNNING)
 _COMPACT_AT: Final = 2000
 _COMPACT_KEEP: Final = 500
 _MM_KINDS: Final = (DocValueKind.LENGTH_MM, DocValueKind.RANGE_MM, DocValueKind.SECTION_MM)
+# Кандидаты из уровней по разрезам: принятый человеком выше любой текстовой находки (при равных
+# очках выигрывает меньший `source_rank`), непринятый - средняя оценка.
+SECTION_SOURCE_LABEL: Final = "Уровни по разрезам АР"
+SECTION_ACCEPTED_SCORE: Final = 100
+SECTION_CANDIDATE_SCORE: Final = 60
+_SECTION_ACCEPTED_RANK: Final = -1
+_SECTION_LISTED_ELEVATIONS: Final = 3
 
 
 # --------------------------------------------------------------------------- значения
@@ -272,6 +284,103 @@ def _row_of(
     )
 
 
+def _elevation_text(elevation_mm: int) -> str:
+    return f"{elevation_mm / 1000:+.3f}"
+
+
+def _clear_height_of(level: CadSectionLevel) -> int | None:
+    return level.clear_height_mm
+
+
+def _slab_thickness_of(level: CadSectionLevel) -> int | None:
+    return level.structure_mm
+
+
+def _common(values: Iterable[str | None]) -> str | None:
+    """Единственное общее значение метки (корпус, секция); разные или пустые - None."""
+    distinct = set(values)
+    return distinct.pop() if len(distinct) == 1 else None
+
+
+def section_level_candidates(
+    levels: Sequence[tuple[CadSectionLevel, str]],
+) -> list[DocCandidate]:
+    """Кандидаты `clear_height` и `slab_thickness` из уровней по разрезам; отклонённые не берутся.
+
+    Одно значение - один кандидат: отметки уровней перечисляются в цитате, ссылка (ревизия,
+    страница) - на первый принятый уровень значения, а если принятых нет - на первый по порядку.
+    Принят хотя бы один уровень значения - кандидат с высокой оценкой, иначе со средней. Значения
+    вне границ вопроса отбрасываются. `levels` - пары (уровень, имя файла ревизии).
+    """
+    fields: tuple[tuple[DocQuestionCode, str, Callable[[CadSectionLevel], int | None]], ...] = (
+        (DocQuestionCode.CLEAR_HEIGHT, "высота в свету", _clear_height_of),
+        (DocQuestionCode.SLAB_THICKNESS, "толщина плиты перекрытия", _slab_thickness_of),
+    )
+    result: list[DocCandidate] = []
+    for code, label, getter in fields:
+        question = question_by_code(code)
+        groups: dict[int, list[tuple[CadSectionLevel, str]]] = {}
+        for pair in levels:
+            level = pair[0]
+            mm = getter(level)
+            if level.status == "rejected" or mm is None:
+                continue
+            if question.min_mm <= mm <= question.max_mm:
+                groups.setdefault(mm, []).append(pair)
+        for mm, group in groups.items():
+            accepted = [pair for pair in group if pair[0].status == "accepted"]
+            reference, file_name = (accepted or group)[0]
+            elevations = list(dict.fromkeys(pair[0].elevation_mm for pair in group))
+            listed = ", ".join(_elevation_text(e) for e in elevations[:_SECTION_LISTED_ELEVATIONS])
+            more = " и др." if len(elevations) > _SECTION_LISTED_ELEVATIONS else ""
+            head = f"Разрез, отм. {listed}{more}: {label} "
+            quote = f"{head}{mm} мм (уровней: {len(group)})"
+            result.append(
+                DocCandidate(
+                    question=code,
+                    value=DocValue(DocValueKind.LENGTH_MM, str(mm), (mm,), None, None),
+                    quote=quote,
+                    quote_focus=len(head),
+                    file_name=file_name,
+                    revision_id=str(reference.revision_id),
+                    page_index=reference.page_index,
+                    page_label=None,
+                    source_label=SECTION_SOURCE_LABEL,
+                    source_rank=_SECTION_ACCEPTED_RANK if accepted else 0,
+                    section_mark="АР",
+                    sheet_kind=SheetKind.SECTION,
+                    scope=DocScope(
+                        building=_common(pair[0].corps for pair in group),
+                        section=_common(pair[0].section for pair in group),
+                    ),
+                    score=SECTION_ACCEPTED_SCORE if accepted else SECTION_CANDIDATE_SCORE,
+                    occurrences=len(group),
+                )
+            )
+    return result
+
+
+async def _section_levels(
+    session: AsyncSession, project_id: uuid.UUID, *, skip_revisions: set[uuid.UUID]
+) -> list[tuple[CadSectionLevel, str]]:
+    """Не отклонённые уровни проекта с именем файла ревизии; ревизии из `skip_revisions` пропущены.
+
+    Нечитаемую ревизию пропускаем: её прежние кандидаты остаются в базе, дубль не нужен.
+    """
+    rows = await session.execute(
+        select(CadSectionLevel, DocumentRevision.source_filename)
+        .join(DocumentRevision, DocumentRevision.id == CadSectionLevel.revision_id)
+        .where(CadSectionLevel.project_id == project_id, CadSectionLevel.status != "rejected")
+        .order_by(CadSectionLevel.revision_id, CadSectionLevel.page_index, CadSectionLevel.seq)
+        .execution_options(populate_existing=True)
+    )
+    return [
+        (level, file_name)
+        for level, file_name in rows.tuples()
+        if level.revision_id not in skip_revisions
+    ]
+
+
 async def _replace_candidates(
     session: AsyncSession,
     *,
@@ -290,6 +399,11 @@ async def _replace_candidates(
     if keep_revisions:
         stale = stale.where(DocQuestionCandidate.revision_id.not_in(list(keep_revisions)))
     await session.execute(stale)
+    collector.add(
+        section_level_candidates(
+            await _section_levels(session, project_id, skip_revisions=keep_revisions)
+        )
+    )
     found = total = 0
     for question in DOC_QUESTIONS:
         code = question.code.value

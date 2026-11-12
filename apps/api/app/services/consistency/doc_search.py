@@ -39,6 +39,7 @@ from app.services.consistency.doc_questions import (
     DocAnchor,
     DocQuestion,
     DocQuestionCode,
+    DocSource,
     DocValueKind,
     ExtractorKind,
     NormAssumption,
@@ -504,6 +505,13 @@ def _source_rank(question: DocQuestion, page: DocSearchPage, *, customer: bool) 
     return None
 
 
+def _anchor_applies(rule: DocAnchor, source: DocSource) -> bool:
+    """Якорь с `labels` - только в названных источниках; эксклюзивный источник - только им."""
+    if rule.labels:
+        return source.label in rule.labels
+    return not source.exclusive
+
+
 def _quote(text: str, lo: int, hi: int, anchor_start: int) -> tuple[str, int]:
     """Цитата ≤ QUOTE_LIMIT вокруг [lo, hi): границы подтягиваются к пробелам; позиция якоря."""
     span = hi - lo
@@ -541,8 +549,11 @@ def _sort_key(candidate: DocCandidate) -> tuple[int, int, str, int, str]:
 def _search_question(
     question: DocQuestion, page: DocSearchPage, rank: int, text: str, search: str
 ) -> list[DocCandidate]:
+    source = question.sources[rank]
     hits: list[tuple[int, int, int]] = []  # (начало, конец, номер якоря)
     for index, rule in enumerate(question.anchors):
+        if not _anchor_applies(rule, source):
+            continue
         hits.extend((m.start(), m.end(), index) for m in rule.pattern.finditer(search))
     if not hits:
         return []
@@ -554,7 +565,6 @@ def _search_question(
         if passport is None
         else DocScope(passport.building, passport.section, passport.level_from, passport.level_to)
     )
-    source = question.sources[rank]
     source_points = max(8, 40 - 8 * rank)
     result: list[DocCandidate] = []
     for start, end, index in hits:
@@ -562,8 +572,13 @@ def _search_question(
         rule = question.anchors[index]
         lo, hi = _window(search, anchor)
         has_context = any(pattern.search(search, lo, hi) for pattern in question.context)
-        if question.context_required and not has_context:
+        if question.context_required and not has_context and not rule.context_free:
             continue
+        excluded = [
+            (m.start(), m.end())
+            for pattern in question.value_exclusions
+            for m in pattern.finditer(search, lo, hi)
+        ]
         weak = any(pattern.search(search, lo, end) for pattern in question.weak_markers)
         extras = {
             other
@@ -571,7 +586,12 @@ def _search_question(
             if other != index and o_start < hi and o_end > lo
         }
         evidence = min(10, 5 * len(extras) + (5 if has_context else 0))
-        for position, found in enumerate(_extract(question, search, anchor, rule)):
+        values = [
+            found
+            for found in _extract(question, search, anchor, rule)
+            if not any(found.start < e_end and found.end > e_start for e_start, e_end in excluded)
+        ]
+        for position, found in enumerate(values):
             quote, focus = _quote(text, min(start, found.start), max(end, found.end), start)
             score = (
                 source_points
