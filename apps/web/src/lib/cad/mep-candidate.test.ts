@@ -78,6 +78,11 @@ describe('подписи', () => {
   it('системы по-русски, незнакомая - как есть', () => {
     expect(mepSystemLabel('heating')).toBe('Отопление');
     expect(mepSystemLabel('sewer')).toBe('Канализация');
+    expect(mepSystemLabel('vent')).toBe('Вентиляция');
+    expect(mepSystemLabel('smoke')).toBe('Противодымная вентиляция');
+    expect(mepSystemLabel('cooling')).toBe('Кондиционирование');
+    expect(mepSystemLabel('drain')).toBe('Дренаж');
+    expect(mepSystemLabel('storm')).toBe('Водосток');
     expect(mepSystemLabel('gas')).toBe('gas');
   });
 

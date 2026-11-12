@@ -104,6 +104,11 @@ export const MEP_SYSTEMS: readonly { readonly key: string; readonly label: strin
   { key: 'water', label: 'Водоснабжение' },
   { key: 'fire', label: 'Пожаротушение' },
   { key: 'sewer', label: 'Канализация' },
+  { key: 'storm', label: 'Водосток' },
+  { key: 'drain', label: 'Дренаж' },
+  { key: 'vent', label: 'Вентиляция' },
+  { key: 'smoke', label: 'Противодымная вентиляция' },
+  { key: 'cooling', label: 'Кондиционирование' },
 ];
 
 export const mepSystemLabel = (key: string): string =>

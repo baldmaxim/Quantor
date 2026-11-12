@@ -101,13 +101,29 @@
   --cad-mep-vk-v1: #0b78b0;
   --cad-mep-vk-t3: #1a7f37;
   --cad-mep-vk-t4: #7a4a1d;
-  --cad-mep-vk-k1: #6d3fd1;
+  --cad-mep-vk-k1: #6e5a4a;
   --cad-mep-node: #5b6573;
   --cad-mep-riser: #1f2937;
+  --cad-mep-vk-k2: #8f7350;
+  --cad-mep-vk-k4: #567a8e;
+  --cad-mep-kv-dr: #7f86b0;
+  --cad-mep-ov-vzh: #4d7c0f;
+  --cad-mep-ov-mo: #a0891a;
+  --cad-mep-ov-vmop: #6b6b12;
+  --cad-mep-ov-pmop: #7a9e0f;
+  --cad-mep-ov-tr: #6b7a52;
+  --cad-mep-pd-du: #dc4a16;
+  --cad-mep-pd-kdu: #d97706;
+  --cad-mep-pd-dp: #6d3fd1;
+  --cad-mep-kv-fr: #0a8f9c;
 
   /* Зоны листа (вкладка CAD): помещения квартир, МОП, двери; читаются на светлой бумаге чертежа */
   --cad-zone-apartment: #1d5bb3;
   --cad-zone-mop: #116b2f;
+  --cad-zone-mop-lift: #0b7a5a;
+  --cad-zone-mop-vestibule: #5c9e00;
+  --cad-zone-mop-corridor: #a3361f;
+  --cad-zone-mop-stair: #4d3fa8;
   --cad-zone-door: #b45309;
   --cad-zone-wet: #1a5fb4;
   --cad-zone-kitchen: #d9480f;
@@ -120,10 +136,6 @@
   --cad-zone-apt-1: #1d5bb3;
   --cad-zone-apt-2: #c0392b;
   --cad-zone-apt-3: #1e8a3c;
-  --cad-zone-mop-lift: #0b7a5a;
-  --cad-zone-mop-vestibule: #5c9e00;
-  --cad-zone-mop-corridor: #a3361f;
-  --cad-zone-mop-stair: #4d3fa8;
   --cad-zone-apt-4: #7e3fb8;
   --cad-zone-apt-5: #d9730d;
   --cad-zone-apt-6: #0d8a8a;
@@ -281,11 +293,27 @@
     --cad-mep-vk-v1: #1b86bd;
     --cad-mep-vk-t3: #1b843e;
     --cad-mep-vk-t4: #9a6234;
-    --cad-mep-vk-k1: #775dde;
+    --cad-mep-vk-k1: #a58b73;
     --cad-mep-node: #7a8594;
     --cad-mep-riser: #5d6877;
+    --cad-mep-vk-k2: #c2a27a;
+    --cad-mep-vk-k4: #7fa3b8;
+    --cad-mep-kv-dr: #a3a9d1;
+    --cad-mep-ov-vzh: #6fa82a;
+    --cad-mep-ov-mo: #cdb43a;
+    --cad-mep-ov-vmop: #a3a32c;
+    --cad-mep-ov-pmop: #a8cc3a;
+    --cad-mep-ov-tr: #93a37a;
+    --cad-mep-pd-du: #f06a3c;
+    --cad-mep-pd-kdu: #ee9a1f;
+    --cad-mep-pd-dp: #8d72ec;
+    --cad-mep-kv-fr: #1fb5c4;
     --cad-zone-apartment: #2b71d3;
     --cad-zone-mop: #1b843e;
+    --cad-zone-mop-lift: #1fae82;
+    --cad-zone-mop-vestibule: #9ccc3a;
+    --cad-zone-mop-corridor: #e0644a;
+    --cad-zone-mop-stair: #7a6ad8;
     --cad-zone-door: #c26a14;
     --cad-zone-wet: #3a82de;
     --cad-zone-kitchen: #f0662a;
@@ -310,10 +338,6 @@
     --cad-construction-not-in-vor: #ff6b7a;
 
     --tooltip-bg: #c8d2de;
-    --cad-zone-mop-lift: #1fae82;
-    --cad-zone-mop-vestibule: #9ccc3a;
-    --cad-zone-mop-corridor: #e0644a;
-    --cad-zone-mop-stair: #7a6ad8;
     --tooltip-text: #0f141a;
     --skeleton: #232932;
     --skeleton-hi: #2c333d;
@@ -386,11 +410,27 @@
   --cad-mep-vk-v1: #1b86bd;
   --cad-mep-vk-t3: #1b843e;
   --cad-mep-vk-t4: #9a6234;
-  --cad-mep-vk-k1: #775dde;
+  --cad-mep-vk-k1: #a58b73;
   --cad-mep-node: #7a8594;
   --cad-mep-riser: #5d6877;
+  --cad-mep-vk-k2: #c2a27a;
+  --cad-mep-vk-k4: #7fa3b8;
+  --cad-mep-kv-dr: #a3a9d1;
+  --cad-mep-ov-vzh: #6fa82a;
+  --cad-mep-ov-mo: #cdb43a;
+  --cad-mep-ov-vmop: #a3a32c;
+  --cad-mep-ov-pmop: #a8cc3a;
+  --cad-mep-ov-tr: #93a37a;
+  --cad-mep-pd-du: #f06a3c;
+  --cad-mep-pd-kdu: #ee9a1f;
+  --cad-mep-pd-dp: #8d72ec;
+  --cad-mep-kv-fr: #1fb5c4;
   --cad-zone-apartment: #2b71d3;
   --cad-zone-mop: #1b843e;
+  --cad-zone-mop-lift: #1fae82;
+  --cad-zone-mop-vestibule: #9ccc3a;
+  --cad-zone-mop-corridor: #e0644a;
+  --cad-zone-mop-stair: #7a6ad8;
   --cad-zone-door: #c26a14;
   --cad-zone-wet: #3a82de;
   --cad-zone-kitchen: #f0662a;
@@ -427,10 +467,6 @@
 /* Единственная точка перелома на всё приложение: на широком мониторе панели
    могут позволить себе больше, чертежу это не мешает. */
 @media (min-width: 1800px) {
-  --cad-zone-mop-lift: #1fae82;
-  --cad-zone-mop-vestibule: #9ccc3a;
-  --cad-zone-mop-corridor: #e0644a;
-  --cad-zone-mop-stair: #7a6ad8;
   :root {
     --w-pane-left: 300px;
     --w-pane-right: 340px;

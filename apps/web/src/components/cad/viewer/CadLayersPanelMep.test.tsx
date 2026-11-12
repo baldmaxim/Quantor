@@ -34,21 +34,32 @@ const mount = (visible: number[] = [0, 1, 2]) => {
       }}
     />,
   );
-  return { onToggle, onSetHidden, group: screen.getByTestId('layer-group-mep') };
+  return { onToggle, onSetHidden, group: screen.getByTestId('layer-group-mep-heating') };
 };
 
 describe('CadLayersPanel: группа «Трассы механики»', () => {
-  it('рядом с чертежом DXF стоит вторая группа, слой подписан системой и именем', () => {
+  it('слои трасс разложены по системам, слой подписан системой и именем', () => {
     const { group } = mount();
     expect(screen.getByText('Чертёж (DXF вида)')).toBeInTheDocument();
-    expect(within(group).getByText('Трассы механики')).toBeInTheDocument();
-    expect(within(group).getByRole('checkbox', { name: 'Отопление подача · M-OV-T1' })).toBeChecked();
-    expect(within(group).getByText('3 / 3')).toBeInTheDocument();
+    expect(within(group).getByText('Отопление')).toBeInTheDocument();
+    expect(within(group).getByRole('checkbox', { name: 'Отопление подача Т1 · M-OV-T1' })).toBeChecked();
+    expect(within(group).getByText('2 / 2')).toBeInTheDocument();
+    const headers = within(screen.getByTestId('mep-layers'))
+      .getAllByRole('checkbox', { name: /^Группа «/ })
+      .map((box) => box.getAttribute('aria-label'));
+    expect(headers).toEqual(['Группа «Отопление»', 'Группа «Узлы и стояки»']);
+  });
+
+  it('пустые группы не выводятся', () => {
+    mount();
+    expect(screen.queryByTestId('layer-group-mep-water')).toBeNull();
+    expect(screen.queryByTestId('layer-group-mep-vent')).toBeNull();
+    expect(screen.queryByText('Водоснабжение')).toBeNull();
   });
 
   it('образец цвета - токен системы, выключенный слой приглушён', () => {
-    const { group } = mount([0, 2]);
-    const swatches = within(group).getAllByTestId('layer-swatch');
+    mount([0, 2]);
+    const swatches = within(screen.getByTestId('mep-layers')).getAllByTestId('layer-swatch');
     expect(swatches.map((swatch) => swatch.getAttribute('style'))).toEqual([
       expect.stringContaining('var(--cad-mep-ov-t1)'),
       expect.stringContaining('var(--cad-mep-ov-t2)'),
@@ -61,20 +72,29 @@ describe('CadLayersPanel: группа «Трассы механики»', () =>
 
   it('слой включается и выключается своим чекбоксом', () => {
     const { onToggle, group } = mount();
-    fireEvent.click(within(group).getByRole('checkbox', { name: 'Отопление обратка · M-OV-T2' }));
+    fireEvent.click(within(group).getByRole('checkbox', { name: 'Отопление обратка Т2 · M-OV-T2' }));
     expect(onToggle).toHaveBeenCalledWith(1);
   });
 
-  it('общий выключатель группы гасит все слои, а при погашенных - включает', () => {
+  it('общий выключатель группы гасит все её слои и не трогает чужие', () => {
     const shown = mount();
-    fireEvent.click(within(shown.group).getByRole('checkbox', { name: 'Группа «Трассы механики»' }));
-    expect(shown.onSetHidden).toHaveBeenCalledWith([0, 1, 2], true);
+    fireEvent.click(within(shown.group).getByRole('checkbox', { name: 'Группа «Отопление»' }));
+    expect(shown.onSetHidden).toHaveBeenCalledWith([0, 1], true);
   });
 
-  it('все слои выключены - общий выключатель возвращает их', () => {
-    const { onSetHidden, group } = mount([]);
-    fireEvent.click(within(group).getByRole('checkbox', { name: 'Группа «Трассы механики»' }));
-    expect(onSetHidden).toHaveBeenCalledWith([0, 1, 2], false);
+  it('все слои группы выключены - общий выключатель возвращает их', () => {
+    const { onSetHidden, group } = mount([2]);
+    fireEvent.click(within(group).getByRole('checkbox', { name: 'Группа «Отопление»' }));
+    expect(onSetHidden).toHaveBeenCalledWith([0, 1], false);
+  });
+
+  it('часть слоёв группы скрыта - общий выключатель в неопределённом состоянии', () => {
+    const { onSetHidden, group } = mount([0, 2]);
+    const master = within(group).getByRole('checkbox', { name: 'Группа «Отопление»' });
+    expect((master as HTMLInputElement).indeterminate).toBe(true);
+    expect(master).not.toBeChecked();
+    fireEvent.click(master);
+    expect(onSetHidden).toHaveBeenCalledWith([0, 1], false);
   });
 
   it('в режиме 3D слои трасс доступны для переключения, подписи «только план» нет', () => {
@@ -105,7 +125,7 @@ describe('CadLayersPanel: группа «Трассы механики»', () =>
       />,
     );
     const group = screen.getByTestId('mep-layers');
-    const checkbox = within(group).getByRole('checkbox', { name: 'Отопление обратка · M-OV-T2' });
+    const checkbox = within(group).getByRole('checkbox', { name: 'Отопление обратка Т2 · M-OV-T2' });
     expect(checkbox).not.toBeDisabled();
     fireEvent.click(checkbox);
     expect(onToggle).toHaveBeenCalledWith(1);

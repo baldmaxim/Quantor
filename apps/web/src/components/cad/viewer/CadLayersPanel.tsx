@@ -4,7 +4,7 @@ import { useMemo, type FC } from 'react';
 
 import { categoryOfLayer, type CadExtraCategory } from '@/lib/cad/layer-categories';
 import { groupLayers } from '@/lib/cad/layer-groups';
-import { mepColorVar } from '@/lib/cad/mep-layers';
+import { groupMepLayers, mepColorVar, mepLayerDef } from '@/lib/cad/mep-layers';
 import { formatInt } from '@/lib/cad/view-format';
 import { MAX_PDF_OPACITY, MIN_PDF_OPACITY } from '@/lib/cad/view-mode';
 import { useWorkspaceStore } from '@/store/workspace';
@@ -61,8 +61,6 @@ interface ICadLayersPanelProps {
   } | null;
 }
 
-const MEP_GROUP = 'mep';
-
 const CHECK = 'flex min-h-[44px] items-center gap-[var(--s-3)] text-sm';
 
 /** Раздел «Слои»: непрозрачность PDF, область проверки масштаба, слои DXF с цветом. */
@@ -96,6 +94,19 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
       ),
     [mode3d, layers],
   );
+  // Слои трасс по системам: индексы указывают в mep.names; пустые системы не показываются.
+  const mepGroups = useMemo(() => {
+    const names = mep?.names ?? [];
+    const defs = names.flatMap((name) => {
+      const def = mepLayerDef(name);
+      return def ? [def] : [];
+    });
+    return groupMepLayers(defs).map((item) => ({
+      key: `mep-${item.group}`,
+      label: item.label,
+      indices: item.layers.map((def) => names.indexOf(def.name)),
+    }));
+  }, [mep?.names]);
   // Показ распознанных блоков один на всё окно: тот же флаг, что у кнопки панели инструментов.
   const regionsVisible = useWorkspaceStore((state) => state.overlayVisible);
   const toggleRegions = useWorkspaceStore((state) => state.toggleOverlay);
@@ -237,18 +248,19 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
       {mep && (
         <fieldset className="min-w-0 border-0 p-0" data-testid="mep-layers">
           <legend className="sr-only">Слои трасс механики</legend>
-          <CadLayerGroup
-            group={{
-              key: MEP_GROUP,
-              label: 'Трассы механики',
-              indices: mep.names.map((_, index) => index),
-            }}
-            layers={mep.titles}
-            visibleLayers={mep.visible}
-            onToggleLayer={mep.onToggle}
-            onSetLayersHidden={(indices, hidden) => mep.onSetHidden(indices, hidden)}
-            swatchColor={(index) => mepColorVar(mep.names[index] ?? '')}
-          />
+          <div className="flex flex-col">
+            {mepGroups.map((group) => (
+              <CadLayerGroup
+                key={group.key}
+                group={group}
+                layers={mep.titles}
+                visibleLayers={mep.visible}
+                onToggleLayer={mep.onToggle}
+                onSetLayersHidden={(indices, hidden) => mep.onSetHidden(indices, hidden)}
+                swatchColor={(index) => mepColorVar(mep.names[index] ?? '')}
+              />
+            ))}
+          </div>
         </fieldset>
       )}
 
