@@ -25,6 +25,7 @@ import { CadConstructionPicker } from '@/components/workspace/cad/CadConstructio
 import { CadFloor3dOverlay } from '@/components/workspace/cad/floor3d/CadFloor3dOverlay';
 import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
 import { WorkspaceCadBar } from '@/components/workspace/cad/WorkspaceCadBar';
+import { autoZonesOf } from '@/components/workspace/cad/autoZones';
 import { useWorkspaceCadPipeline } from '@/components/workspace/cad/useWorkspaceCadPipeline';
 import { WorkspaceCadSide } from '@/components/workspace/cad/WorkspaceCadSide';
 import { openablePanels } from '@/components/workspace/cad/WorkspaceCadPipeline';
@@ -507,6 +508,18 @@ const WorkspacePage = ({ params }: IPageProps) => {
     viewParam: cadSelection.view,
     navigate: setQuery,
   });
+
+  // Кнопка «Разметить автоматически» в разделе «Зоны» - из того же конвейера, второго хука нет.
+  const sideZones = cad.side.zones ?? null;
+  const { sheet: pipelineSheet, startAutoZones, startingZones, zonesError } = pipeline;
+  const autoZones = useMemo(
+    () => autoZonesOf({ sheet: pipelineSheet, startAutoZones, startingZones, zonesError }),
+    [pipelineSheet, startAutoZones, startingZones, zonesError],
+  );
+  const zonesWithAuto = useMemo(
+    () => (sideZones ? { ...sideZones, autoZones } : null),
+    [sideZones, autoZones],
+  );
 
   const failure = renderError ?? errorCode ?? null;
 
@@ -1003,6 +1016,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   )}
                   <WorkspaceCadSide
                     {...cad.side}
+                    zones={zonesWithAuto}
                     jobs={cad.left}
                     sideTab={cadSideTab}
                     onSideTabChange={setCadSideTab}

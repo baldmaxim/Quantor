@@ -57,23 +57,44 @@ export const CadZonesPanel: FC<IWorkspaceCadZones> = ({
   shapeEditDisabledReason,
   onStartEdit,
   onStartSplit,
+  autoZones = null,
 }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const open = pickerOpen || drawing;
+  // Сервер отказывает (409 CAD_ZONES_NOT_EMPTY), если на листе уже есть зоны: кнопка - только на пустом листе.
+  const showAuto =
+    autoZones !== null && zones.length === 0 && !loading && loadError === null;
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-5)]">
-      <Button
-        variant={open ? 'default' : 'primary'}
-        aria-expanded={open}
-        className="self-start max-md:h-[44px]"
-        onClick={() => {
-          if (drawing) onStopDrawing();
-          setPickerOpen(!open);
-        }}
-      >
-        {open ? 'Свернуть' : 'Отрисовать зону'}
-      </Button>
+      <div className="flex min-w-0 flex-wrap items-center gap-[var(--s-3)]">
+        <Button
+          variant={open ? 'default' : 'primary'}
+          aria-expanded={open}
+          className="max-md:h-[44px]"
+          onClick={() => {
+            if (drawing) onStopDrawing();
+            setPickerOpen(!open);
+          }}
+        >
+          {open ? 'Свернуть' : 'Отрисовать зону'}
+        </Button>
+        {showAuto && autoZones !== null && (
+          <Button
+            loading={autoZones.starting}
+            disabled={drawing}
+            className="max-md:h-[44px]"
+            onClick={autoZones.onStart}
+          >
+            Разметить автоматически
+          </Button>
+        )}
+      </div>
+      {autoZones?.error != null && (
+        <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
+          {autoZones.error}
+        </p>
+      )}
 
       {open && (
         <div className="flex min-w-0 flex-col gap-[var(--s-4)]" data-testid="cad-zone-form">

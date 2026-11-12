@@ -2,7 +2,7 @@ import type { CadZoneRead } from '@quantor/api-client';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { IWorkspaceCadZones } from '@/components/workspace/cad/types';
+import type { IWorkspaceCadAutoZones, IWorkspaceCadZones } from '@/components/workspace/cad/types';
 
 import { CadZonesPanel } from './CadZonesPanel';
 
@@ -286,5 +286,48 @@ describe('CadZonesPanel', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Разрезать' })).toBeDisabled();
+  });
+
+  describe('автоматическая разметка', () => {
+    const auto = (patch: Partial<IWorkspaceCadAutoZones> = {}): IWorkspaceCadAutoZones => ({
+      onStart: vi.fn(),
+      starting: false,
+      error: null,
+      ...patch,
+    });
+
+    it('кнопки нет без autoZones', () => {
+      render(<CadZonesPanel {...props()} />);
+      expect(screen.queryByRole('button', { name: 'Разметить автоматически' })).toBeNull();
+    });
+
+    it('клик вызывает onStart', () => {
+      const onStart = vi.fn();
+      render(<CadZonesPanel {...props({ autoZones: auto({ onStart }) })} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Разметить автоматически' }));
+      expect(onStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('на листе с зонами кнопки нет: сервер отказывает при существующих зонах', () => {
+      render(<CadZonesPanel {...props({ zones: [zone({})], autoZones: auto() })} />);
+      expect(screen.queryByRole('button', { name: 'Разметить автоматически' })).toBeNull();
+    });
+
+    it('во время рисования кнопка отключена', () => {
+      render(<CadZonesPanel {...props({ drawing: true, autoZones: auto() })} />);
+      expect(screen.getByRole('button', { name: 'Разметить автоматически' })).toBeDisabled();
+    });
+
+    it('пока идёт постановка или задание, повторный клик не вызывает onStart', () => {
+      const onStart = vi.fn();
+      render(<CadZonesPanel {...props({ autoZones: auto({ onStart, starting: true }) })} />);
+      fireEvent.click(screen.getByRole('button', { name: /Разметить автоматически/ }));
+      expect(onStart).not.toHaveBeenCalled();
+    });
+
+    it('показывает отказ запуска', () => {
+      render(<CadZonesPanel {...props({ autoZones: auto({ error: 'Исполнитель недоступен' }) })} />);
+      expect(screen.getByRole('alert')).toHaveTextContent('Исполнитель недоступен');
+    });
   });
 });

@@ -66,6 +66,15 @@ export interface IWorkspaceCadFinishes {
   readonly load: boolean;
 }
 
+/** Автоматическая разметка зон листа: то же задание, что кнопка в окне «Обработка листа». */
+export interface IWorkspaceCadAutoZones {
+  readonly onStart: () => void;
+  /** Постановка идёт или задание зон листа в очереди либо выполняется. */
+  readonly starting: boolean;
+  /** Отказ последнего запуска. */
+  readonly error: string | null;
+}
+
 /** Раздел «Зоны»: помещения квартир, МОП и двери открытого листа. */
 export interface IWorkspaceCadZones {
   readonly zones: readonly CadZoneRead[];
@@ -111,6 +120,8 @@ export interface IWorkspaceCadZones {
   readonly shapeEditDisabledReason: string | null;
   readonly onStartEdit: (id: string) => void;
   readonly onStartSplit: (id: string) => void;
+  /** Автоматическая разметка; `null` или нет - кнопки нет (нет вида с DXF). */
+  readonly autoZones?: IWorkspaceCadAutoZones | null;
 }
 
 /** ВОР Заказчика в разделе «Конструкции»: только объект сверки, на расчёт не влияет (ADR-0038 п. 5). */
