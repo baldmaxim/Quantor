@@ -218,7 +218,7 @@ async def test_worker_builds_eom_and_the_sheet_reads_it_in_3d(
     async with build_api(make_context(), settings=settings) as api:
         project_id, revision_id, job_id, base = await _parent(api, db_session, fake_storage)
         sheet = f"/api/v1/projects/{project_id}/cad/eom"
-        query = {"revision_id": revision_id, "page_index": 0, "view": 1}
+        query: dict[str, str | int] = {"revision_id": revision_id, "page_index": 0, "view": 1}
         none = await api.get(f"{sheet}/routes3d", params=query)
         assert none.status_code == 404 and none.json()["detail"]["code"] == "CAD_EOM_NOT_FOUND"
 
@@ -286,10 +286,8 @@ async def test_failed_generator_publishes_nothing(
         assert job.status is JobStatus.FAILED
         assert job.error_code == error_code and message in (job.error_message or "")
         assert set(fake_storage.objects) == before, "неудачная попытка ничего не публикует"
-        state = await api.get(
-            f"/api/v1/projects/{project_id}/cad/eom/job",
-            params={"revision_id": revision_id, "page_index": 0, "view": 1},
-        )
+        query: dict[str, str | int] = {"revision_id": revision_id, "page_index": 0, "view": 1}
+        state = await api.get(f"/api/v1/projects/{project_id}/cad/eom/job", params=query)
         assert state.json()["status"] == "failed" and state.json()["error_code"] == error_code
 
 

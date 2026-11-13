@@ -17,7 +17,7 @@ import {
 } from './mep-layers';
 
 describe('слои трасс механики', () => {
-  it('29 слоёв в порядке группы: 20 трасс движка, 2 служебных и 7 приборов; у каждого подпись и токен', () => {
+  it('41 слой в порядке группы: 20 трасс движка, 2 служебных, 7 приборов и 12 слоёв ЭОМ и СС; у каждого подпись и токен', () => {
     expect(MEP_LAYERS.map((def) => def.name)).toEqual([
       'M-VK-V1',
       'M-VK-T3',
@@ -48,14 +48,28 @@ describe('слои трасс механики', () => {
       'M-SAN-KSINK',
       'M-SAN-WASHER',
       'M-SAN-MOPSINK',
+      'E-EO-FEED',
+      'E-EO-LT',
+      'E-EO-MOP',
+      'E-EO-PE',
+      'E-EO-RISER',
+      'E-EO-DEV',
+      'E-SS-TRAY',
+      'E-SS-OPT',
+      'E-SS-UTP',
+      'E-SS-RAD',
+      'E-SS-RISER',
+      'E-SS-DEV',
     ]);
-    expect(new Set(MEP_LAYERS.map((def) => def.name)).size).toBe(29);
-    // У 7 приборов один общий токен `--cad-mep-san`: свой цвет у каждой из 22 остальных записей.
-    expect(new Set(MEP_LAYERS.map((def) => def.token)).size).toBe(23);
+    expect(new Set(MEP_LAYERS.map((def) => def.name)).size).toBe(41);
+    // У 7 приборов один общий токен `--cad-mep-san`: свой цвет у каждой из 34 остальных записей.
+    expect(new Set(MEP_LAYERS.map((def) => def.token)).size).toBe(35);
     expect(MEP_LAYERS.filter((def) => def.token === '--cad-mep-san')).toHaveLength(7);
-    expect(new Set(MEP_LAYERS.map((def) => def.label)).size).toBe(29);
+    expect(new Set(MEP_LAYERS.map((def) => def.label)).size).toBe(41);
     expect(MEP_LAYERS.every((def) => def.label.trim() !== '')).toBe(true);
-    expect(MEP_LAYERS.every((def) => def.token.startsWith('--cad-mep-'))).toBe(true);
+    expect(
+      MEP_LAYERS.every((def) => /^--cad-(mep|eom|ss)-/.test(def.token)),
+    ).toBe(true);
   });
 
   it('подписи по-русски: «подпись · код»', () => {
@@ -73,10 +87,10 @@ describe('слои трасс механики', () => {
     }
   });
 
-  it('маска держит все 29 бит; старые слои не сдвинулись', () => {
+  it('маска держит все 41 бит; старые слои не сдвинулись', () => {
     const all = MEP_LAYERS.map((def) => def.name);
     const full = withMepLayersHidden(0, all, true);
-    expect(full).toBe(2 ** 29 - 1);
+    expect(full).toBe(2 ** 41 - 1);
     expect(withMepLayersHidden(0, ['M-SAN-MOPSINK'], true)).toBe(2 ** 28);
     expect(all.every((name) => isMepLayerHidden(full, name))).toBe(true);
     const last = withMepLayersHidden(0, ['M-RISER'], true);
@@ -116,7 +130,7 @@ describe('слои трасс механики', () => {
     expect(withMepLayersHidden(Number.NaN, ['M-NODE'], true)).toBeGreaterThan(0);
   });
 
-  it('группы слоёв: порядок, подписи, каждая из 29 записей в своей группе', () => {
+  it('группы слоёв: порядок, подписи, каждая из 41 записи в своей группе', () => {
     expect(MEP_GROUPS.map((group) => `${group.key}:${group.label}`)).toEqual([
       'water:Водоснабжение',
       'sewer:Канализация',
@@ -127,6 +141,8 @@ describe('слои трасс механики', () => {
       'fire:Пожаротушение',
       'common:Узлы и стояки',
       'sanitary:Сантехника',
+      'electric:Электроснабжение ЭОМ',
+      'lowcurrent:Слаботочные системы СС',
     ]);
     const all = groupMepLayers(MEP_LAYERS);
     expect(all.map((item) => [item.group, item.layers.map((def) => def.name)])).toEqual([
@@ -150,8 +166,10 @@ describe('слои трасс механики', () => {
           'M-SAN-MOPSINK',
         ],
       ],
+      ['electric', ['E-EO-FEED', 'E-EO-LT', 'E-EO-MOP', 'E-EO-PE', 'E-EO-RISER', 'E-EO-DEV']],
+      ['lowcurrent', ['E-SS-TRAY', 'E-SS-OPT', 'E-SS-UTP', 'E-SS-RAD', 'E-SS-RISER', 'E-SS-DEV']],
     ]);
-    expect(all.flatMap((item) => item.layers)).toHaveLength(29);
+    expect(all.flatMap((item) => item.layers)).toHaveLength(41);
     expect(MEP_LAYERS.every((def) => MEP_GROUPS.some((group) => group.key === def.group))).toBe(true);
   });
 
@@ -166,6 +184,6 @@ describe('слои трасс механики', () => {
     expect(mepColorVar('X')).toBe('var(--muted)');
     const colors = readMepColors((token) => `v:${token}`);
     expect(colors['M-VK-T3']).toBe('v:--cad-mep-vk-t3');
-    expect(Object.keys(colors)).toHaveLength(29);
+    expect(Object.keys(colors)).toHaveLength(41);
   });
 });

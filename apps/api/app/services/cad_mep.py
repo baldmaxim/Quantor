@@ -169,7 +169,8 @@ def entry_int(entry: object, key: str) -> int | None:
 
 
 def parent_job_id_of(job: Job) -> uuid.UUID | None:
-    if job.job_type is not JobType.CAD_MEP_ROUTE:
+    """Родитель `cad_pdf_convert` задания по виду: трасс механики или ЭОМ и СС (тот же payload)."""
+    if job.job_type not in (JobType.CAD_MEP_ROUTE, JobType.CAD_EOM_ROUTE):
         return None
     try:
         return uuid.UUID(str(job.payload.get("parent_job_id")))
