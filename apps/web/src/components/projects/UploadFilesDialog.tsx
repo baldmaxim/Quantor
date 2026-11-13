@@ -12,6 +12,7 @@ import { usePickedFiles, type IExistingStems } from '@/components/projects/usePi
 import { Button, Dialog, DialogActions } from '@/components/ui';
 import { baseName, isRecognizedPackage } from '@/lib/documentSections';
 import { useProjectDocuments } from '@/lib/queries';
+import { stemKey } from '@/lib/uploads/packageFolder';
 
 /**
  * Загрузка файлов в существующий проект.
@@ -36,7 +37,7 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
   const existing = useMemo<IExistingStems>(() => {
     const items = documents.data?.items ?? [];
     const stems = (pick: (item: (typeof items)[number]) => boolean): ReadonlySet<string> =>
-      new Set(items.filter(pick).map((item) => baseName(item.display_name).toLowerCase()));
+      new Set(items.filter(pick).map((item) => stemKey(baseName(item.display_name))));
     return {
       packages: stems((item) => isRecognizedPackage(item.display_name, item.document_kind)),
       pdfs: stems(

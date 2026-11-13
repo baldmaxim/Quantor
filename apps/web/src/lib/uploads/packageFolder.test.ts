@@ -4,6 +4,7 @@ import {
   isMissingOnlyPdf,
   mergeFolderPlan,
   planFolderUpload,
+  stemKey,
   type IFolderEntry,
 } from './packageFolder';
 
@@ -291,5 +292,27 @@ describe('комплект из нескольких выборов', () => {
 
     expect(plan.packages).toHaveLength(0);
     expect(plan.warnings.map(isMissingOnlyPdf)).toEqual([false]);
+  });
+});
+
+describe('сопоставление распознавания с PDF: пробелы и подчёркивания', () => {
+  it('комплект с «_» вместо пробелов прикрепляется к PDF проекта', () => {
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: recognition('МЛДГВ-КАМ_0925-П-КР2_(Часть_1)_ver3'),
+      existingStems: NONE,
+      existingPdfStems: new Set([stemKey('МЛДГВ-КАМ_0925-П-КР2 (Часть 1)_ver3')]),
+    });
+
+    expect(plan.packages.map((pkg) => pkg.stem)).toEqual(['МЛДГВ-КАМ_0925-П-КР2_(Часть_1)_ver3']);
+    expect(plan.packages[0]?.pdf).toBeNull();
+    expect(plan.attachToExisting).toEqual(['МЛДГВ-КАМ_0925-П-КР2_(Часть_1)_ver3']);
+    expect(plan.warnings).toHaveLength(0);
+    expect(plan.pending).toHaveLength(0);
+  });
+
+  it('stemKey: пробелы и подчёркивания — один символ, регистр не важен', () => {
+    expect(stemKey('A  b_c')).toBe('a_b_c');
   });
 });

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
@@ -26,6 +27,7 @@ from app.models import (
 )
 from app.services import job_runner
 from app.services.legacy import importer
+from app.services.uploads import normalize_pdf_stem
 from tests.conftest import FakeObjectStorage
 from tests.test_legacy_archive import BASE_NAME, PDF_BYTES, blocks_payload, build_package
 
@@ -294,6 +296,39 @@ class TestPackageWithoutPdf:
         assert await _count(db_session, DocumentRevision) == 2
         assert await _count(db_session, Region) == 2
 
+    async def test_recognition_with_underscores_attaches_to_pdf_with_spaces(
+        self,
+        api: AsyncClient,
+        db_session: AsyncSession,
+        fake_storage: FakeObjectStorage,
+        settings: Settings,
+    ) -> None:
+        project_id = await _new_project(api)
+        pdf = await _upload_file(
+            api, project_id, "КР2 (Часть 1)_ver3.pdf", PDF_BYTES, "application/pdf"
+        )
+        stem = "КР2_(Часть_1)_ver3"
+        payload = build_package(
+            blocks=None,
+            with_md=False,
+            omit_pdf=True,
+            extra={
+                f"{stem}_blocks.json": json.dumps(
+                    blocks_payload(document_name="КР2 (Часть 1)_ver3.pdf"), ensure_ascii=False
+                ).encode("utf-8"),
+                f"{stem}_results.md": b"### BLOCK #1 [TEXT]: blk_text_1\n",
+                f"{stem}_results.html": "<html><body>отчёт</body></html>".encode(),
+            },
+        )
+        archive = await _upload_file(api, project_id, f"{stem}.zip", payload, "application/zip")
+
+        job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
+
+        assert job.status is JobStatus.SUCCEEDED, job.error_message
+        assert job.payload["attached_to_existing"] is True
+        assert job.payload["attached_by"] == "filename"
+        assert job.payload["imported_revision_id"] == pdf["revision"]["id"]
+
     async def test_falls_back_to_document_name(
         self,
         api: AsyncClient,
@@ -392,3 +427,10 @@ class TestPackageWithoutPdf:
         assert job.error_code == "PDF_PAGE_COUNT_MISMATCH"
         assert await _count(db_session, Region) == 0
         assert await _count(db_session, Document) == 2
+
+
+class TestNormalizePdfStem:
+    def test_recognition_stem_matches_pdf_name_with_spaces(self) -> None:
+        assert normalize_pdf_stem("КР2 (Часть 1)_ver3.pdf") == normalize_pdf_stem(
+            "кр2_(часть_1)_ver3"
+        )

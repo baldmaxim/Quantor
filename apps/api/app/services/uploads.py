@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import re
 import unicodedata
 import uuid
 from collections.abc import AsyncIterator
@@ -195,7 +196,8 @@ def normalize_pdf_stem(name: str) -> str:
     base = name.replace("\\", "/").rsplit("/", 1)[-1].strip()
     if base.casefold().endswith(".pdf"):
         base = base[: -len(".pdf")]
-    return unicodedata.normalize("NFC", base).strip().casefold()
+    # Распознавалка заменяет пробелы имени PDF на `_`: пробелы и `_` считаются одним.
+    return re.sub(r"[\s_]+", "_", unicodedata.normalize("NFC", base).strip().casefold())
 
 
 async def find_project_pdf_revisions_by_stem(

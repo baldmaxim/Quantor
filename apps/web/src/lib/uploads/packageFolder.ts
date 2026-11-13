@@ -60,6 +60,13 @@ const roleFileName = (stem: string, role: Role): string => {
   return `${stem}${found?.suffix ?? ''}`;
 };
 
+/**
+ * Ключ сравнения имени комплекта с документом проекта: NFC, нижний регистр, пробелы и
+ * подчёркивания — одно и то же (распознавалка заменяет пробелы имени PDF на `_`).
+ */
+export const stemKey = (stem: string): string =>
+  stem.normalize('NFC').trim().toLowerCase().replace(/[\s_]+/g, '_');
+
 export const baseName = (path: string): string => {
   const normalized = path.replace(/\\/g, '/');
   return normalized.slice(normalized.lastIndexOf('/') + 1);
@@ -142,7 +149,7 @@ const planEntries = (
       resultsMd &&
       resultsHtml &&
       blocks &&
-      attachableStems.has(stem.toLowerCase())
+      attachableStems.has(stemKey(stem))
     ) {
       packages.push({ stem, pdf: null, resultsMd, resultsHtml, blocks });
       attachToExisting.push(stem);
@@ -228,7 +235,7 @@ export const mergeFolderPlan = ({
     attachable,
   );
 
-  const isExisting = (stem: string): boolean => existingStems.has(stem.toLowerCase());
+  const isExisting = (stem: string): boolean => existingStems.has(stemKey(stem));
   return {
     packages: plan.packages,
     plainFiles: plan.plainFiles,
