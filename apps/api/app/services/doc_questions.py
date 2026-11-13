@@ -292,10 +292,6 @@ def _clear_height_of(level: CadSectionLevel) -> int | None:
     return level.clear_height_mm
 
 
-def _slab_thickness_of(level: CadSectionLevel) -> int | None:
-    return level.structure_mm
-
-
 def _common(values: Iterable[str | None]) -> str | None:
     """Единственное общее значение метки (корпус, секция); разные или пустые - None."""
     distinct = set(values)
@@ -305,7 +301,10 @@ def _common(values: Iterable[str | None]) -> str | None:
 def section_level_candidates(
     levels: Sequence[tuple[CadSectionLevel, str]],
 ) -> list[DocCandidate]:
-    """Кандидаты `clear_height` и `slab_thickness` из уровней по разрезам; отклонённые не берутся.
+    """Кандидаты `clear_height` из уровней по разрезам; отклонённые не берутся.
+
+    Толщина плиты из разреза не берётся: звено «конструкция» (`structure_mm`) - плита вместе с
+    полом (например 200 + 100 = 300), а не толщина плиты. Плиту ищем в текстах КР.
 
     Одно значение - один кандидат: отметки уровней перечисляются в цитате, ссылка (ревизия,
     страница) - на первый принятый уровень значения, а если принятых нет - на первый по порядку.
@@ -314,7 +313,6 @@ def section_level_candidates(
     """
     fields: tuple[tuple[DocQuestionCode, str, Callable[[CadSectionLevel], int | None]], ...] = (
         (DocQuestionCode.CLEAR_HEIGHT, "высота в свету", _clear_height_of),
-        (DocQuestionCode.SLAB_THICKNESS, "толщина плиты перекрытия", _slab_thickness_of),
     )
     result: list[DocCandidate] = []
     for code, label, getter in fields:

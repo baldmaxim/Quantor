@@ -122,6 +122,16 @@ def test_slab_thickness_with_and_without_unit() -> None:
     assert sorted(c.value.numbers[0] for c in result.candidates) == [200, 240]
 
 
+def test_slab_thickness_kr_plan_title_and_ocr_variant() -> None:
+    text = "План несущих конструкций 4–20 этажа С3 в осях 1-17. Примечание: тщ. плиты 200 мм."
+    result = result_of([page(text, "КР", SheetKind.FLOOR_PLAN)], CODE.SLAB_THICKNESS)
+    assert [c.value.numbers[0] for c in result.candidates] == [200]
+    ocr = result_of(
+        [page("Зона: мщ. плиты 240 мм", "КР", SheetKind.FLOOR_PLAN)], CODE.SLAB_THICKNESS
+    )
+    assert [c.value.numbers[0] for c in ocr.candidates] == [240]
+
+
 def test_slab_thickness_sign_plus_after_anchor_is_elevation() -> None:
     result = result_of([page("тщ. +14.500", "КР", SheetKind.FLOOR_PLAN)], CODE.SLAB_THICKNESS)
     assert result.status == DocSearchStatus.NOT_FOUND

@@ -337,7 +337,8 @@ DOC_QUESTIONS: Final[tuple[DocQuestion, ...]] = (
                 bare_number=True,
             ),
             _anchor(r"(?:плит\w+|перекрыт\w+)[^.;]{0,30}?толщин\w*", 20, bare_number=True),
-            _anchor(r"тщ\.?(?:\s*(?:плит\w+|перекрыт\w+))?", 18, bare_number=True),
+            # «тщ.» и OCR-вариант «мщ.»
+            _anchor(r"(?<!\w)[тм]щ\.?(?:\s*(?:плит\w+|перекрыт\w+))?", 18, bare_number=True),
             _anchor(r"(?:монолитн\w+\s+)?плит\w+\s+перекрыт\w+", 8),
         ),
         min_mm=100,
