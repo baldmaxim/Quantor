@@ -176,7 +176,7 @@ def match_section_mark(
 
 # --------------------------------------------------------------------------- типы листов
 
-SHEET_KINDS_VERSION: Final = "consistency.dict.sheet_kinds.v2"
+SHEET_KINDS_VERSION: Final = "consistency.dict.sheet_kinds.v3"
 
 
 class SheetKind(StrEnum):
@@ -241,6 +241,26 @@ def sheet_kind_match(title: str) -> tuple[SheetKind, int] | None:
             if found is not None and (best is None or found.start() < best[0]):
                 best = (found.start(), kind)
     return None if best is None else (best[1], best[0])
+
+
+# Слабые слова: стоят на любом листе как подпись к легенде и не говорят о типе листа.
+WEAK_SHEET_KEYWORDS: Final[tuple[str, ...]] = ("условные обозначения",)
+
+_WEAK_PATTERNS: Final = tuple(
+    _phrase_pattern(_normalize_text(word)) for word in WEAK_SHEET_KEYWORDS
+)
+
+
+def sheet_kind_is_weak(title: str) -> bool:
+    """Тип по заголовку определило слабое слово («Условные обозначения»), а не тип листа."""
+    match = sheet_kind_match(title)
+    if match is None:
+        return False
+    text = _normalize_text(title)
+    return any(
+        (found := pattern.search(text)) is not None and found.start() == match[1]
+        for pattern in _WEAK_PATTERNS
+    )
 
 
 def sheet_kind_from_title(title: str) -> SheetKind | None:

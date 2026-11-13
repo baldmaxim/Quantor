@@ -19,6 +19,7 @@ from app.services.consistency.dictionaries import (
     normalize_mark,
     room_type_from_name,
     sheet_kind_from_title,
+    sheet_kind_is_weak,
     system_from_code,
 )
 
@@ -183,3 +184,10 @@ def test_system_codes() -> None:
 )
 def test_room_type_from_name(name: str, expected: RoomType | None) -> None:
     assert room_type_from_name(name) == expected
+
+
+def test_legend_caption_is_weak_sheet_keyword() -> None:
+    assert sheet_kind_is_weak("Условные обозначения:")
+    assert not sheet_kind_is_weak("Общие данные")
+    assert not sheet_kind_is_weak("План 3 этажа")
+    assert not sheet_kind_is_weak("")

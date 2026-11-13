@@ -300,3 +300,72 @@ def test_floor_range_with_space_before_dash_is_not_negative() -> None:
 def test_negative_floor_after_comma_stays_negative() -> None:
     result = parse_page(_page(_stamp("ПД-00000001-12-АР1", "План типовых -2, -1 этажей")))
     assert (result.level_from_ordinal, result.level_to_ordinal) == (-2, -1)
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Корпус 9. Секция 3. План 15 этажа на отм. +50,900",
+        "Корпус 8. Секции 1-2. План 2 этажа на отм. +9,300 (1 : 200)",
+        "Корпус 14. План 1 этажа на отм. +0,000",
+        "Секция 4.1, Этап 2. Блок-секция А1. План кровли",
+        "ООО «АБ»Корпус 9. Секция 3. План 12 этажа на отм. +41,000",
+    ],
+)
+def test_address_prefix_does_not_hide_sheet_kind(title: str) -> None:
+    result = parse_page(_page(_stamp("ПД-00000001-12-АР1", title)))
+    assert result.sheet_kind == SheetKind.FLOOR_PLAN
+    assert result.title is not None
+    assert result.title.endswith(title[title.index("План") :].strip())
+    assert result.title.startswith(("Корпус", "Секци"))
+
+
+def test_title_keeps_full_address_prefix() -> None:
+    title = "Корпус 9. Секция 3. План 15 этажа на отм. +50,900"
+    result = parse_page(_page(_stamp("ПД-00000001-12-АР1", title)))
+    assert result.title == title
+    assert (result.building, result.section) == ("9", "3")
+    assert result.level_from_ordinal == 15
+
+
+def test_prose_with_block_word_is_not_address_prefix() -> None:
+    result = parse_page(_page(_stamp("ПД-00000001-12-АР1", "Фасады блоков 2 и 4")))
+    assert result.sheet_kind == SheetKind.FACADE
+    assert result.title == "Фасады блоков 2 и 4"
+
+
+def test_legend_caption_at_stamp_yields_to_plan_title_on_sheet() -> None:
+    plan = "Корпус 9. Секция 3. План 15 этажа на отм. +50,900"
+    filler = "\n".join(f"{n}/{n + 1}" for n in range(30))
+    text = f"{plan}\n{filler}\n" + _stamp("ПД-00000001-12-АР1", "Условные обозначения:")
+    result = parse_page(_page(text))
+    assert result.sheet_kind == SheetKind.FLOOR_PLAN
+    assert result.title == plan
+    assert result.level_from_ordinal == 15
+
+
+def test_legend_caption_alone_stays_general_data() -> None:
+    result = parse_page(_page(_stamp("ПД-00000001-12-АР1", "Условные обозначения:")))
+    assert result.sheet_kind == SheetKind.GENERAL_DATA
+    assert result.title == "Условные обозначения:"
+
+
+def test_strong_general_data_is_not_overridden_by_plan_line() -> None:
+    filler = "\n".join(f"{n}/{n + 1}" for n in range(30))
+    text = f"План 1 этажа\n{filler}\n" + _stamp("ПД-00000001-12-АР1", "Общие данные")
+    result = parse_page(_page(text))
+    assert result.sheet_kind == SheetKind.GENERAL_DATA
+
+
+def test_sheet_register_rows_are_not_floor_plans() -> None:
+    rows = "\n".join(
+        f"МЛДГВ-КАМ/0925-П-АР1.1 Секция 6. Корпус 7. План {n} этажа на отм. +{n},300 {70 + n}"
+        for n in range(7, 12)
+    )
+    result = parse_page(_page(rows + "\nЛист\n5\nИзм. Кол.уч. Лист № док. Подпись Дата"))
+    assert result.sheet_kind != SheetKind.FLOOR_PLAN
+
+
+def test_register_row_with_leading_sheet_number_is_not_title() -> None:
+    result = parse_page(_page(_stamp("ПД-00000001-12-АР1", "71 Корпус 9. План 3 этажа")))
+    assert result.sheet_kind != SheetKind.FLOOR_PLAN

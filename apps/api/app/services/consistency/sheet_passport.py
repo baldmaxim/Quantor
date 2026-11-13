@@ -21,6 +21,7 @@ from app.services.consistency.dictionaries import (
     SHEET_KINDS_VERSION,
     SheetKind,
     match_section_mark,
+    sheet_kind_is_weak,
     sheet_kind_match,
 )
 from app.services.consistency.pdf_text import page_text
@@ -126,6 +127,21 @@ _CONTINUATION_START_RE: Final = re.compile(
 _TOC_RE: Final = re.compile(r"\.{4,}|…{2,}")
 # Титульный лист и заголовки частей томов — не заголовок листа: «Раздел 2. Схема планировочной…».
 _NOT_TITLE_RE: Final = re.compile(r"^(?:под)?раздел\b|^часть\s+\d|^том\b|^книга\b", _FLAGS)
+
+# Ведущие обозначения адреса перед названием листа: «Корпус 9. Секция 3. План 15 этажа…».
+_ADDR_ID: Final = r"\d+[A-Za-zА-Яа-яЁё]?(?:\s?[-–—.,]\s?\d+[A-Za-zА-Яа-яЁё]?)*"
+_ADDRESS_PREFIX_RE: Final = re.compile(
+    rf"(?<!\w)(?:(?:Корпус\w*|Секци[яи]|Этап\w*|Блок[\s-]*секци[яи]|Блок(?![А-Яа-яЁё]))\s*{_ADDR_ID}[\s.,;:]*)+",
+    _FLAGS,
+)
+# Строка ведомости листов: начинается с номера листа или кончается отметкой и номером листа.
+_SHEET_ROW_RE: Final = re.compile(r"^\d{1,3}[\s.]|\d[,.]\d{1,3}\s+\d{1,3}$")
+
+_DIGIT_RE: Final = re.compile(r"\d")
+
+_STRONG_DRAWING_KINDS: Final = frozenset(
+    {SheetKind.FLOOR_PLAN, SheetKind.SECTION, SheetKind.FACADE}
+)
 
 _TITLE_MAX_LEN: Final = 200
 _TITLE_START_MAX: Final = 20
@@ -234,10 +250,44 @@ def _page_code(text: str, lines: list[str], stamp: Stamp, file_code: str | None)
 # --------------------------------------------------------------------------- заголовок
 
 
+def _address_prefix(line: str) -> re.Match[str] | None:
+    """Префикс адреса в строке; текст перед ним — мусор штампа без цифр.
+
+    С цифрами перед префиксом это строка ведомости («Шифр Секция 6. Корпус 7. План…»).
+    """
+    prefix = _ADDRESS_PREFIX_RE.search(line)
+    if prefix is None:
+        return None
+    before = line[: prefix.start()]
+    # Посреди строки префикс — с заглавной буквы: «Фасады блоков 2 и 4» префиксом не является.
+    if _DIGIT_RE.search(before) or (before and not line[prefix.start()].isupper()):
+        return None
+    return prefix
+
+
+def _kind_after_prefix(line: str) -> tuple[SheetKind, int, bool, bool] | None:
+    """(тип, позиция слова, слабое ли слово, был ли префикс адреса) для строки-кандидата.
+
+    Ведущие «Корпус N.», «Секция N.» и т. п. отбрасываются, позиция отсчитывается после них;
+    перед префиксом допустим посторонний текст штампа («ООО «АБ»Корпус 9. …»). Нет префикса
+    или после него нет типа листа — разбор строки целиком.
+    """
+    prefix = _address_prefix(line)
+    if prefix is not None:
+        rest = line[prefix.end() :]
+        match = sheet_kind_match(rest)
+        if match is not None and match[1] <= _TITLE_START_MAX:
+            return match[0], match[1], sheet_kind_is_weak(rest), True
+    match = sheet_kind_match(line)
+    if match is None:
+        return None
+    return match[0], match[1], sheet_kind_is_weak(line), False
+
+
 def _title_candidates(
     lines: list[str], indices: tuple[int, ...], anchors: tuple[int, ...], *, capital: bool = False
-) -> list[tuple[int, int, SheetKind]]:
-    """(расстояние до штампа, индекс строки, тип) для строк, начинающихся с типа листа.
+) -> list[tuple[int, int, SheetKind, bool]]:
+    """(расстояние до штампа, индекс строки, тип, слабое ли слово) для строк с типом листа.
 
     `capital` — строка обязана начинаться с заглавной буквы (отсекает обрывки фраз из текста).
     """
@@ -248,33 +298,49 @@ def _title_candidates(
             continue
         if capital and not line[:1].isupper():
             continue
-        match = sheet_kind_match(line)
-        if match is None or match[1] > _TITLE_START_MAX:
+        found = _kind_after_prefix(line)
+        if found is None or found[1] > _TITLE_START_MAX:
             continue
-        result.append((min((abs(i - a) for a in anchors), default=0), i, match[0]))
+        if (found[3] or found[0] in _STRONG_DRAWING_KINDS) and _SHEET_ROW_RE.search(line):
+            continue
+        result.append((min((abs(i - a) for a in anchors), default=0), i, found[0], found[2]))
     return result
 
 
-def _pick_title(lines: list[str], stamp: Stamp) -> tuple[int, SheetKind] | None:
-    """Заголовок в окне штампа: ближайшая к штампу строка."""
+def _pick_title(lines: list[str], stamp: Stamp) -> tuple[int, SheetKind, bool] | None:
+    """Заголовок в окне штампа: ближайшая к штампу строка. Третье — слабое ли слово."""
     candidates = _title_candidates(lines, stamp.window, stamp.anchors)
     if not candidates:
         return None
-    _, index, kind = min(candidates, key=lambda item: (item[0], item[1]))
-    return index, kind
+    _, index, kind, weak = min(candidates, key=lambda item: (item[0], item[1]))
+    return index, kind, weak
 
 
-def _pick_title_global(lines: list[str]) -> tuple[int, SheetKind] | None:
-    """Запасной путь без заголовка у штампа: чертёжные типы раньше таблиц, ранняя строка раньше."""
-    candidates = _title_candidates(lines, tuple(range(len(lines))), (), capital=True)
+def _pick_title_global(
+    lines: list[str], kinds: frozenset[SheetKind] | None = None
+) -> tuple[int, SheetKind, bool] | None:
+    """Поиск по всей странице: чертёжные типы раньше таблиц, ранняя строка раньше.
+
+    `kinds` ограничивает допустимые типы (для слабого заголовка у штампа).
+    """
+    candidates = [
+        item
+        for item in _title_candidates(lines, tuple(range(len(lines))), (), capital=True)
+        if kinds is None or item[2] in kinds
+    ]
     if not candidates:
         return None
-    _, index, kind = min(candidates, key=lambda item: (_KIND_PRIORITY[item[2]], item[1]))
-    return index, kind
+    _, index, kind, weak = min(candidates, key=lambda item: (_KIND_PRIORITY[item[2]], item[1]))
+    return index, kind, weak
 
 
 def _join_title(lines: list[str], index: int) -> str:
-    parts = [lines[index]]
+    first = lines[index]
+    prefix = _address_prefix(first)
+    # Заголовок начинается с префикса адреса: «ООО «АБ»Корпус 9. План…» → «Корпус 9. План…».
+    if prefix is not None and prefix.start() > 0:
+        first = first[prefix.start() :]
+    parts = [first]
     cursor = index
     while len(parts) <= _MAX_CONTINUATION and cursor + 1 < len(lines):
         nxt = lines[cursor + 1]
@@ -355,6 +421,9 @@ def parse_page(page: PageInput) -> PassportCandidate:
     picked = _pick_title(lines, stamp)
     if picked is None and not is_text:
         picked = _pick_title_global(lines)
+    elif picked is not None and picked[2] and not is_text:
+        # «Условные обозначения» — подпись к легенде, не название листа: ищем чертёжный тип.
+        picked = _pick_title_global(lines, _STRONG_DRAWING_KINDS) or picked
     title: str | None = None
     sheet_kind: SheetKind | None = None
     if picked is not None:
