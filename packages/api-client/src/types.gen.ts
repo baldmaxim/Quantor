@@ -3061,6 +3061,7 @@ export type CadPipelineSheetRead = {
      * Title
      */
     title: string | null;
+    update?: CadPipelineStageRead | null;
     /**
      * Views
      */

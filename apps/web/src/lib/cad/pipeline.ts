@@ -334,11 +334,39 @@ export const sheetSummary = (sheet: CadPipelineSheetRead): IPipelineSummary => {
   return { tone: 'neutral', label: 'В работе' };
 };
 
+/** Идёт или стоит в очереди обновление CAD листа (более новый прогон после показанного). */
+export const isUpdateActive = (sheet: CadPipelineSheetRead): boolean =>
+  isActive(sheet.update ?? null);
+
+/**
+ * Метка обновления CAD листа: новый прогон идёт или упал, а лист остаётся готовым по прежнему.
+ * Нет обновления - `null`. Итог листа (`sheetSummary`) от обновления не зависит.
+ */
+export const sheetUpdateBadge = (
+  sheet: CadPipelineSheetRead,
+): { tone: 'accent' | 'danger'; label: string; hint: string } | null => {
+  const update = sheet.update ?? null;
+  if (update === null) return null;
+  if (isActive(update)) {
+    return {
+      tone: 'accent',
+      label: 'обновляется',
+      hint: 'Идёт новый прогон CAD листа; показан прежний готовый результат.',
+    };
+  }
+  return {
+    tone: 'danger',
+    label: 'обновление не удалось',
+    hint: `${failureText(update)}. Показан прежний готовый результат.`,
+  };
+};
+
 /** Хоть один этап хоть одного листа в очереди или идёт: ответ нужно опрашивать. */
 export const pipelineHasActive = (data: CadPipelineRead | null | undefined): boolean =>
   (data?.sheets ?? []).some(
     (sheet) =>
       isActive(sheet.convert) ||
+      isActive(sheet.update ?? null) ||
       sheet.views.some(
         (view) =>
           isActive(view.walls) ||

@@ -471,6 +471,26 @@ describe('следующий шаг', () => {
   });
 });
 
+describe('isBulkLaunchable и обновление листа', () => {
+  it('идущее обновление блокирует массовый запуск, упавшее - нет', () => {
+    const update = (status: 'queued' | 'running' | 'failed') => ({
+      job_id: 'u',
+      job_type: 'cad_pdf_convert',
+      status,
+      progress: null,
+      stage: null,
+      result_status: null,
+      error_code: null,
+      created_at: '2026-11-11T10:00:00Z',
+      finished_at: null,
+    });
+    const base = sheet({ calibrated: false, convert: null, views: [] });
+    expect(isBulkLaunchable({ ...base, update: update('queued') })).toBe(false);
+    expect(isBulkLaunchable({ ...base, update: update('running') })).toBe(false);
+    expect(isBulkLaunchable({ ...base, update: update('failed') })).toBe(true);
+  });
+});
+
 describe('isBulkLaunchable', () => {
   const unconfirmed = failedOf('cad_pdf_convert', 'CAD_AUTO_SCALE_UNCONFIRMED');
 

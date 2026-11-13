@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FC } from 'react';
+import { useEffect, useRef, useState, type FC, type ReactNode } from 'react';
 
 import { CadJobDetail } from '@/components/cad/CadJobDetail';
 import { CadJobList } from '@/components/cad/CadJobList';
@@ -19,6 +19,7 @@ import { Button, ErrorState, Skeleton, SkeletonRows } from '@/components/ui';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 
 import { CadSectionsPanel } from './CadSectionsPanel';
+import { CadUpdateBanner } from './CadUpdateBanner';
 import { ConstructionsPanel } from './ConstructionsPanel';
 import type { IWorkspaceCadLeftProps, IWorkspaceCadSideProps } from './types';
 
@@ -49,7 +50,7 @@ const HINT = 'p-[var(--s-5)] text-xs text-muted';
  * Раздел «Разрезы» (уровни по разрезам АР) - только у страницы-разреза, первый и открыт по умолчанию;
  * у листа без вида тоже. Со страниц плана разрезы открывают из блока «Высота из разрезов» в «Трассах».
  * Раздел «Задания» (список заданий ревизии) - последний, если передан `jobs`.
- * Показано только задание открытого листа. С идущим или упавшим заданием - только раздел
+ * Показано только задание открытого листа; более новое неготовое (`update`) - плашкой сверху. С идущим или упавшим заданием - только раздел
  * «Задание»: диагностики вида у него нет. Ширину и сворачивание панели ведёт каркас рабочей области.
  */
 export const WorkspaceCadSide: FC<
@@ -61,6 +62,7 @@ export const WorkspaceCadSide: FC<
   loadError,
   onRetry,
   job,
+  update = null,
   viewLoading,
   viewError,
   view,
@@ -166,6 +168,17 @@ export const WorkspaceCadSide: FC<
       }
     : null;
 
+  // Обновление CAD листа: плашка над панелью, прежний результат остаётся на экране.
+  const withUpdate = (panel: ReactNode) =>
+    update !== null ? (
+      <>
+        <CadUpdateBanner update={update} />
+        {panel}
+      </>
+    ) : (
+      panel
+    );
+
   if (state === 'none' || job === null) {
     const none = (
       <div className="flex flex-col gap-[var(--s-3)] p-[var(--s-5)]" data-testid="workspace-cad-none">
@@ -190,7 +203,7 @@ export const WorkspaceCadSide: FC<
     );
     // Зоны размечают и лист без задания: эталон для движка нужен до преобразования.
     if (zonesTab === null && sectionsTab === null && jobsTab === null) return none;
-    return (
+    return withUpdate(
       <CadSidePanel
         label="Панель CAD"
         tabs={[
@@ -202,7 +215,7 @@ export const WorkspaceCadSide: FC<
         ]}
         active={sideTab}
         onActiveChange={setSideTab}
-      />
+      />,
     );
   }
 
@@ -313,7 +326,7 @@ export const WorkspaceCadSide: FC<
         ...(jobsTab ? [jobsTab] : []),
       ];
 
-  return (
-    <CadSidePanel label="Панель CAD" tabs={tabs} active={sideTab} onActiveChange={setSideTab} />
+  return withUpdate(
+    <CadSidePanel label="Панель CAD" tabs={tabs} active={sideTab} onActiveChange={setSideTab} />,
   );
 };

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cadErrorText } from '@/lib/cad/errors';
 import { sheetRows, type IPipelineAction } from '@/lib/cad/pipeline-actions';
 import { nextBatchStep } from '@/lib/cad/pipeline-batch';
+import { isUpdateActive } from '@/lib/cad/pipeline';
 import { cadPipelineKey } from '@/lib/cad/pipeline-queries';
 import { cadSummaryKey } from '@/lib/cad/queue-queries';
 import { cadKeys } from '@/lib/cad/queries';
@@ -165,6 +166,8 @@ export const useBulkPipelineRun = (
             finish(pageIndex, 'Лист не найден в конвейере');
             continue;
           }
+          // Идёт обновление CAD листа: ждём его завершения, повторно не запускаем.
+          if (isUpdateActive(sheet)) continue;
           const rows = sheetRows(projectId, revisionId, positionRef.current(pageIndex), sheet);
           const decision = nextBatchStep(rows, batch.launched.get(pageIndex) ?? new Set());
           if (decision.kind === 'done') finish(pageIndex);

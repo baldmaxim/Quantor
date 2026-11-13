@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { ViewportSheet } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
+import { cadCodeText } from '@/lib/cad/errors';
 import { FLOOR3D_MODE_KEY } from '@/lib/cad/floor3d-queries';
 import { cropToNormalized, overlayPaths } from '@/lib/cad/frame';
 import { readCadPaintColors } from '@/lib/cad/paint-colors';
@@ -520,6 +521,15 @@ export const useWorkspaceCad = ({
     floorTitle,
     loadError: data.jobsError,
     onRetry: data.refetchJobs,
+    update:
+      data.updateJob !== null
+        ? {
+            status: data.updateJob.status,
+            shownAt: data.shownJob?.created_at ?? null,
+            errorText:
+              data.updateJob.error_code !== null ? cadCodeText(data.updateJob.error_code) : null,
+          }
+        : null,
     job:
       state === 'ready' && data.jobId !== null && revisionId !== null
         ? {

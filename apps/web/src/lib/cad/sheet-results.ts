@@ -79,3 +79,53 @@ export const latestSheetJobs = (jobs: readonly JobForSheets[]): Map<number, IShe
   });
   return result;
 };
+
+const toSheetResult = (job: JobForSheets, kind: SheetResultKind): ISheetResult => ({
+  jobId: job.job_id,
+  kind,
+  view: null,
+  dxf: job.result_status === 'completed_requires_review',
+});
+
+/**
+ * Задания листа для показа: `shown` - самое новое с итогом `recognized`, а без него - самое новое
+ * задание листа; `update` - более новое задание после показываемого (идёт или упало), иначе `null`.
+ * Старый готовый CAD листа не пропадает, пока новый прогон в очереди, идёт или упал.
+ * Трассы механики не считаются; задание без понятного итога обновлением не бывает.
+ */
+export const sheetJobsForPage = <T extends JobForSheets>(
+  jobs: readonly T[],
+  page: number,
+): { readonly shown: T | null; readonly update: T | null } => {
+  let newest: T | null = null;
+  let ready: T | null = null;
+  for (const job of jobs) {
+    if (job.job_type === 'cad_mep_route' || !(job.requested_pages ?? []).includes(page)) continue;
+    if (newest === null || timeOf(job) > timeOf(newest)) newest = job;
+    if (jobResultKind(job) === 'recognized' && (ready === null || timeOf(job) > timeOf(ready))) {
+      ready = job;
+    }
+  }
+  const shown = ready ?? newest;
+  const update =
+    newest !== null && newest !== shown && jobResultKind(newest) !== null ? newest : null;
+  return { shown, update };
+};
+
+/**
+ * Карта «индекс страницы → показываемый результат» (см. `sheetJobsForPage`): лист с готовым
+ * прогоном и идущим или упавшим обновлением остаётся готовым.
+ */
+export const shownSheetJobs = (jobs: readonly JobForSheets[]): Map<number, ISheetResult> => {
+  const pages = new Set<number>();
+  for (const job of jobs) {
+    if (job.job_type !== 'cad_mep_route') (job.requested_pages ?? []).forEach((p) => pages.add(p));
+  }
+  const result = new Map<number, ISheetResult>();
+  pages.forEach((page) => {
+    const { shown } = sheetJobsForPage(jobs, page);
+    const kind = shown ? jobResultKind(shown) : null;
+    if (shown && kind !== null) result.set(page, toSheetResult(shown, kind));
+  });
+  return result;
+};

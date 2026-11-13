@@ -11,7 +11,7 @@ import { useMemo } from 'react';
 import { cadErrorText } from '@/lib/cad/errors';
 import { frameOf, type ICadFrame } from '@/lib/cad/frame';
 import { useCadJob, useCadJobs } from '@/lib/cad/queries';
-import { jobResultKind, latestSheetJobs, type SheetResultKind } from '@/lib/cad/sheet-results';
+import { jobResultKind, sheetJobsForPage, type SheetResultKind } from '@/lib/cad/sheet-results';
 import {
   cadViewErrorText,
   isQuietPreviewError,
@@ -57,8 +57,12 @@ export interface IWorkspaceCadJobData {
    * `null`, когда трассы выбраны явно (`routeSummary`) или для вида их нет.
    */
   readonly autoRoute: CadJobSummaryRead | null;
-  /** Показанное задание: из адреса, если оно закрывает лист, иначе последнее по листу. */
+  /** Показанное задание: из адреса, если оно закрывает лист, иначе самое новое готовое по листу. */
   readonly jobId: string | null;
+  /** Более новое задание листа после показанного (идёт или упало); `null` - нет или выбрано явно. */
+  readonly updateJob: CadJobSummaryRead | null;
+  /** Показанное задание листа (сводка); `null` - листа без задания. */
+  readonly shownJob: CadJobSummaryRead | null;
   readonly kind: SheetResultKind | null;
   readonly job: CadJobRead | null;
   readonly views: readonly number[];
@@ -78,8 +82,8 @@ export interface IWorkspaceCadJobData {
  * Задание, вид, диагностика и предпросмотр DXF для листа рабочей области.
  *
  * Выбор живёт в адресе (`job`, `view`): явное задание берётся, только если оно закрывает лист, а
- * без него - последнее задание листа и его первый вид. Так устаревший адрес после перехода на
- * другой лист не показывает чужой результат.
+ * без него - самое новое готовое задание листа (нет готового - самое новое) и его первый вид.
+ * Так устаревший адрес после перехода на другой лист не показывает чужой результат.
  *
  * Route-задание (трассы механики) в «последнее задание листа» не входит. Если оно выбрано в адресе,
  * показан вид его родителя (DXF вида под трассами), а само задание отдаётся как `routeSummary`.
@@ -97,9 +101,12 @@ export const useWorkspaceCadJob = ({
   const jobs = useCadJobs(projectId, loadRevision);
   const items = useMemo(() => jobs.data?.items ?? [], [jobs.data]);
   const converts = useMemo(() => items.filter((item) => !isRouteJob(item)), [items]);
-  const results = useMemo(() => latestSheetJobs(converts), [converts]);
-
-  const latest = pageIndex !== null ? (results.get(pageIndex) ?? null) : null;
+  // Без явного задания: самое новое готовое задание листа (старый CAD не пропадает, пока идёт
+  // или упало новое), без готового - самое новое; более новое неготовое отдаётся как обновление.
+  const pageJobs = useMemo(
+    () => (pageIndex !== null ? sheetJobsForPage(converts, pageIndex) : null),
+    [converts, pageIndex],
+  );
   const routeSummary =
     jobParam !== null && pageIndex !== null
       ? (items.find(
@@ -118,7 +125,8 @@ export const useWorkspaceCadJob = ({
         ? (converts.find((item) => item.job_id === jobParam && jobCoversPage(item, pageIndex)) ??
           null)
         : null;
-  const summary = explicit ?? converts.find((item) => item.job_id === latest?.jobId) ?? null;
+  const summary = explicit ?? pageJobs?.shown ?? null;
+  const updateJob = explicit === null ? (pageJobs?.update ?? null) : null;
   const jobId = summary?.job_id ?? null;
   const kind = summary ? jobResultKind(summary) : null;
 
@@ -205,6 +213,8 @@ export const useWorkspaceCadJob = ({
     routeSummary,
     autoRoute,
     jobId,
+    updateJob,
+    shownJob: summary,
     kind,
     job,
     views: pick?.views ?? [],

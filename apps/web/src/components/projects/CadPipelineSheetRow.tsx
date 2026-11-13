@@ -9,6 +9,7 @@ import {
   sheetProgress,
   sheetSteps,
   sheetSummary,
+  sheetUpdateBadge,
   type PipelineStepState,
 } from '@/lib/cad/pipeline';
 import { workspaceCadHref } from '@/lib/cad/workspace-url';
@@ -56,6 +57,7 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   const steps = sheetSteps(sheet);
   const summary = sheetSummary(sheet);
   const progress = sheetProgress(sheet);
+  const updateBadge = sheetUpdateBadge(sheet);
   const failed = steps.find((step) => step.state === 'failed' && step.key !== 'floor3d');
   const floor3d = steps.find((step) => step.key === 'floor3d');
   const floor3dBadge = floor3d ? FLOOR3D_BADGES[floor3d.state] : undefined;
@@ -121,6 +123,13 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
             <StatusBadge tone={summary.tone} wrap>
               {summary.label}
             </StatusBadge>
+            {updateBadge && (
+              <span title={updateBadge.hint}>
+                <StatusBadge tone={updateBadge.tone} wrap>
+                  {updateBadge.label}
+                </StatusBadge>
+              </span>
+            )}
             <span
               className="font-mono text-xs text-muted"
               title="Завершено основных шагов конвейера"

@@ -56,8 +56,10 @@ class CadPipelineSheetRead(BaseModel):
     # Заголовок плана (корпус, секция, этаж) из последнего успешного `cad_walls` листа;
     # конструкций нет, заголовок не найден или задание старше cad_walls v1.5 — `null`.
     floor_title: CadSheetFloorTitle | None = None
-    # Последнее задание `cad_pdf_convert`, в котором есть этот лист.
+    # Задание, чей результат показывается: самое новое готовое по листу, без него - самое новое.
     convert: CadPipelineStageRead | None
+    # Более новое задание после показываемого (идёт или упало) - обновление CAD листа; `null` - нет.
+    update: CadPipelineStageRead | None = None
     # Каким масштабом сделано это задание: калибровкой человека или движком по размерным цепочкам
     # (ADR-0045); `null` - задания нет.
     scale_source: Literal["calibration", "auto"] | None

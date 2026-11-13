@@ -9,6 +9,7 @@ import {
   AUTO_SCALE_UNCONFIRMED,
   convertStep,
   isAutoScaleUnconfirmed,
+  isUpdateActive,
   PIPELINE_STEP_LABELS,
   sheetSteps,
   VIEW_KEYS,
@@ -482,6 +483,8 @@ export const nextPipelineAction = (rows: readonly IPipelineRow[]): IPipelineNext
  * `CAD_AUTO_SCALE_UNCONFIRMED`, а лист с тех пор откалиброван человеком.
  */
 export const isBulkLaunchable = (sheet: CadPipelineSheetRead): boolean => {
+  // Идущее обновление CAD листа блокирует повторный запуск.
+  if (isUpdateActive(sheet)) return false;
   if (sheet.convert === null) return true;
   // Повтор с теми же параметрами вернёт то же упавшее задание (идемпотентность), поэтому массово
   // ставится только лист, у которого параметры сменились: автомасштаб не подтвердился, а теперь

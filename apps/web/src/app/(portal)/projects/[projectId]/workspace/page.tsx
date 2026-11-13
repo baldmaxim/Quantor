@@ -60,7 +60,7 @@ import { cadEnabled } from '@/lib/cad/access';
 import { resolveSheetPosition } from '@/lib/cad/building3d-queries';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import { useCadJobs } from '@/lib/cad/queries';
-import { latestSheetJobs, type ISheetResult } from '@/lib/cad/sheet-results';
+import { shownSheetJobs, type ISheetResult } from '@/lib/cad/sheet-results';
 import { parseWorkspaceJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
 import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
@@ -171,7 +171,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const pages = sheets.data?.items ?? [];
   // Готовые результаты CAD по листам; без флага cad.export задания не запрашиваются.
   const cadJobs = useCadJobs(projectId, cadOn ? revisionId : null);
-  const cadResults = useMemo(() => latestSheetJobs(cadJobs.data?.items ?? []), [cadJobs.data]);
+  const cadResults = useMemo(() => shownSheetJobs(cadJobs.data?.items ?? []), [cadJobs.data]);
   const pageIndex = Math.min(Math.max(pageParam - 1, 0), Math.max(pages.length - 1, 0));
   const sheet = pages[pageIndex] ?? null;
 

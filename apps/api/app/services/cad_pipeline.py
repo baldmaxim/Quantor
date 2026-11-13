@@ -2,9 +2,10 @@
 
 Читает только то, что уже лежит в базе: задания, решения человека, зоны, листы и калибровки. Число
 запросов не зависит от числа листов и видов: задания ревизий, решения, зоны и листы берутся по
-одному запросу на список ревизий (`build_pipelines`). Задание-родитель листа - последнее
-`cad_pdf_convert`, в запрошенных страницах которого есть лист (то же правило, что у сводки листов
-в интерфейсе).
+одному запросу на список ревизий (`build_pipelines`). Задание-родитель листа - самое новое
+успешное `cad_pdf_convert` с видами этого листа, без него - самое новое `cad_pdf_convert`, в
+запрошенных страницах которого есть лист. Более новое задание после показываемого (идёт или упало)
+отдаётся отдельно как `update`.
 """
 
 from __future__ import annotations
@@ -127,7 +128,9 @@ def _pipeline_of(
     acceptances: set[_DecisionKey],
 ) -> CadPipelineRead:
     """Сборка вида конвейера одной ревизии из уже прочитанных данных (без запросов)."""
-    latest_convert: dict[int, Job] = {}
+    # Самое новое задание листа (любой статус) и самое новое успешное с видами по этому листу.
+    latest_any: dict[int, Job] = {}
+    latest_ready: dict[int, Job] = {}
     latest_child: dict[_ChildKey, Job] = {}
     # Заголовок плана берётся из последнего УСПЕШНОГО cad_walls, даже если позже запущен новый.
     latest_walls_ok: dict[_ChildKey, Job] = {}
@@ -136,7 +139,9 @@ def _pipeline_of(
         if job.job_type is JobType.CAD_PDF_CONVERT:
             for page in _convert_pages(job):
                 job_pages.add(page)
-                latest_convert[page] = _newest(latest_convert.get(page), job)
+                latest_any[page] = _newest(latest_any.get(page), job)
+                if job.status is JobStatus.SUCCEEDED and _view_rows(job, page):
+                    latest_ready[page] = _newest(latest_ready.get(page), job)
             continue
         key = _child_key(job)
         if key is not None:
@@ -144,6 +149,11 @@ def _pipeline_of(
             latest_child[key] = _newest(latest_child.get(key), job)
             if job.job_type is JobType.CAD_WALLS and job.status is JobStatus.SUCCEEDED:
                 latest_walls_ok[key] = _newest(latest_walls_ok.get(key), job)
+
+    # Показываемый прогон: самое новое готовое задание листа, без него - самое новое.
+    latest_convert: dict[int, Job] = {
+        page: latest_ready.get(page, job) for page, job in latest_any.items()
+    }
 
     # Все листы ревизии: листы-планы (штамп или паспорт листа) входят в конвейер и без работы
     # (массовый запуск, ADR-0045). Название: штамп -> паспорт -> подпись страницы.
@@ -182,6 +192,8 @@ def _pipeline_of(
     sheets: list[CadPipelineSheetRead] = []
     for page_index in sorted(job_pages | calibrated | plan_pages):
         convert = latest_convert.get(page_index)
+        newest = latest_any.get(page_index)
+        update = newest if newest is not None and newest is not convert else None
         convert_attempt = None if convert is None else cad_service.result_of(convert).get("attempt")
         children = by_page.get(page_index, {})
         views: list[CadPipelineViewRead] = []
@@ -223,6 +235,7 @@ def _pipeline_of(
                 calibrated=page_index in calibrated,
                 floor_title=titles[page_index][1] if page_index in titles else None,
                 convert=None if convert is None else stage_of(convert),
+                update=None if update is None else stage_of(update),
                 scale_source=_scale_source(convert, page_index),
                 views=views,
             )

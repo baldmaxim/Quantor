@@ -6566,6 +6566,16 @@
             ],
             "title": "Title"
           },
+          "update": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadPipelineStageRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "views": {
             "items": {
               "$ref": "#/components/schemas/CadPipelineViewRead"

@@ -12,6 +12,7 @@ import type {
   CadVorCoverageRead,
   CadVorDocumentRead,
   CadZoneRead,
+  JobStatus,
   SectionsRead,
 } from '@quantor/api-client';
 
@@ -372,6 +373,15 @@ export type WorkspaceCadState =
   /** У листа есть задание. */
   | 'ready';
 
+/** Обновление CAD листа: более новый прогон после показанного (идёт или упал). */
+export interface IWorkspaceCadUpdate {
+  readonly status: JobStatus;
+  /** Когда создан показанный (прежний) прогон; `null` - неизвестно. */
+  readonly shownAt: string | null;
+  /** Понятная причина отказа обновления; `null` - не указана. */
+  readonly errorText: string | null;
+}
+
 export interface IWorkspaceCadSideProps {
   readonly state: WorkspaceCadState;
   /** Подпись листа для подсказок. */
@@ -381,6 +391,8 @@ export interface IWorkspaceCadSideProps {
   readonly loadError: string | null;
   readonly onRetry: () => void;
   readonly job: IWorkspaceCadJob | null;
+  /** Обновление CAD листа поверх показанного прогона; `null` или нет - обновления нет. */
+  readonly update?: IWorkspaceCadUpdate | null;
   /** `null` - лист или ревизия не выбраны. */
   readonly convert: IWorkspaceCadConvert | null;
   /** Диагностика вида ещё читается. */

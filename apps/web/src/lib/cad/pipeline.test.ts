@@ -7,10 +7,12 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  isUpdateActive,
   pipelineHasActive,
   sheetProgress,
   sheetSteps,
   sheetSummary,
+  sheetUpdateBadge,
   type PipelineStepKey,
 } from './pipeline';
 
@@ -455,5 +457,47 @@ describe('pipelineHasActive', () => {
     for (const key of ['walls', 'zones', 'routes', 'floor3d'] as const) {
       expect(pipelineHasActive(pipeline([sheet({ views: [view({ [key]: running })] })]))).toBe(true);
     }
+  });
+});
+
+describe('обновление CAD листа', () => {
+  const running = stage({ job_id: 'new', status: 'running', result_status: null, progress: 0.3 });
+  const failed = stage({
+    job_id: 'new',
+    status: 'failed',
+    result_status: null,
+    error_code: 'CAD_AUTO_SCALE_UNCONFIRMED',
+  });
+
+  it('лист остаётся готовым по показанному прогону, метка - «обновляется»', () => {
+    const s = sheet({
+      update: running,
+      views: [view({ walls, zones: zonesReady, approved: true })],
+    });
+    expect(sheetSummary(s)).not.toMatchObject({ tone: 'danger' });
+    expect(sheetUpdateBadge(s)).toMatchObject({ tone: 'accent', label: 'обновляется' });
+    expect(isUpdateActive(s)).toBe(true);
+  });
+
+  it('упавшее обновление - метка с причиной, активным не считается', () => {
+    const s = sheet({ update: failed });
+    expect(sheetUpdateBadge(s)).toMatchObject({ tone: 'danger', label: 'обновление не удалось' });
+    expect(sheetUpdateBadge(s)?.hint).toContain('Показан прежний готовый результат');
+    expect(isUpdateActive(s)).toBe(false);
+  });
+
+  it('без обновления метки нет', () => {
+    expect(sheetUpdateBadge(sheet())).toBeNull();
+    expect(sheetUpdateBadge(sheet({ update: null }))).toBeNull();
+  });
+
+  it('идущее обновление держит опрос конвейера', () => {
+    const pipeline = (sheets: CadPipelineSheetRead[]): CadPipelineRead => ({
+      revision_id: 'r1',
+      server_time: '2026-11-11T10:00:00Z',
+      sheets,
+    });
+    expect(pipelineHasActive(pipeline([sheet({ update: running })]))).toBe(true);
+    expect(pipelineHasActive(pipeline([sheet({ update: failed })]))).toBe(false);
   });
 });

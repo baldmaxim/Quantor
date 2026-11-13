@@ -285,3 +285,100 @@ async def test_summary_counts_sheets_of_the_latest_openable_revisions(
         assert body["sheets_total"] == sum(
             body[key] for key in ("sheets_done", "sheets_running", "sheets_failed", "sheets_idle")
         )
+
+
+async def _pipeline_sheet(
+    api: AsyncClient, project_id: str, revision_id: uuid.UUID
+) -> dict[str, Any]:
+    response = await api.get(f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad/pipeline")
+    assert response.status_code == 200, response.text
+    (sheet,) = response.json()["sheets"]
+    assert isinstance(sheet, dict)
+    return sheet
+
+
+async def test_pipeline_keeps_the_ready_run_while_a_newer_one_is_not_ready(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    workspace_id: uuid.UUID,
+) -> None:
+    """Показывается самое новое готовое задание, более новое, но не готовое — `update`."""
+    async with build_api(make_context(), settings=queue_settings()) as api:
+        project_id = await make_project(api)
+        pid = uuid.UUID(project_id)
+        revision = await add_pdf(db_session, fake_storage, project_id, "АР План.pdf")
+        add_sheets(db_session, revision.id, ["План 1 этажа"])
+        ready = convert_job(
+            db_session,
+            workspace_id=workspace_id,
+            project_id=pid,
+            revision_id=revision.id,
+            pages=[0],
+            status=JobStatus.SUCCEEDED,
+        )
+        await db_session.flush()
+        child_job(
+            db_session,
+            parent=ready,
+            job_type=JobType.CAD_WALLS,
+            page_index=0,
+            status=JobStatus.SUCCEEDED,
+        )
+        newer = convert_job(
+            db_session,
+            workspace_id=workspace_id,
+            project_id=pid,
+            revision_id=revision.id,
+            pages=[0],
+            status=JobStatus.QUEUED,
+            minutes=10,
+        )
+        await db_session.commit()
+
+        for status in (JobStatus.QUEUED, JobStatus.FAILED, JobStatus.CANCELLED):
+            newer.status = status
+            await db_session.commit()
+            sheet = await _pipeline_sheet(api, project_id, revision.id)
+            assert sheet["convert"]["job_id"] == str(ready.id)
+            assert sheet["update"]["job_id"] == str(newer.id)
+            assert sheet["update"]["status"] == status.value
+            (view,) = sheet["views"]
+            assert view["walls"]["status"] == "succeeded"
+
+        # Обновление завершилось с видами: оно и показывается, обновления нет.
+        newer.status = JobStatus.SUCCEEDED
+        newer.payload = {
+            **newer.payload,
+            "cad_result": {"attempt": 1, "pages": [{"index": 0, "views": [{"view": 0}]}]},
+        }
+        await db_session.commit()
+        sheet = await _pipeline_sheet(api, project_id, revision.id)
+        assert sheet["convert"]["job_id"] == str(newer.id)
+        assert sheet["update"] is None
+        assert sheet["views"][0]["walls"] is None
+
+
+async def test_pipeline_shows_the_only_queued_run_without_update(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    workspace_id: uuid.UUID,
+) -> None:
+    async with build_api(make_context(), settings=queue_settings()) as api:
+        project_id = await make_project(api)
+        revision = await add_pdf(db_session, fake_storage, project_id, "АР План.pdf")
+        add_sheets(db_session, revision.id, ["План 1 этажа"])
+        only = convert_job(
+            db_session,
+            workspace_id=workspace_id,
+            project_id=uuid.UUID(project_id),
+            revision_id=revision.id,
+            pages=[0],
+            status=JobStatus.QUEUED,
+        )
+        await db_session.commit()
+        sheet = await _pipeline_sheet(api, project_id, revision.id)
+        assert sheet["convert"]["job_id"] == str(only.id)
+        assert sheet["update"] is None
+        assert sheet["views"] == []

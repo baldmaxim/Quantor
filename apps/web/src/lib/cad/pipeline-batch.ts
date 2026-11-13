@@ -1,5 +1,6 @@
 import type { CadPipelineSheetRead } from '@quantor/api-client';
 
+import { isUpdateActive } from './pipeline';
 import {
   isBulkLaunchable,
   isMachineAction,
@@ -53,7 +54,8 @@ export const machineNextAction = (rows: readonly IPipelineRow[]): IPipelineActio
 export const isPipelineSelectable = (
   sheet: CadPipelineSheetRead,
   rows: readonly IPipelineRow[],
-): boolean => isBulkLaunchable(sheet) || machineNextAction(rows) !== null;
+): boolean =>
+  !isUpdateActive(sheet) && (isBulkLaunchable(sheet) || machineNextAction(rows) !== null);
 
 export const nextBatchStep = (
   rows: readonly IPipelineRow[],

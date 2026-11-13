@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { latestSheetJobs } from './sheet-results';
+import { latestSheetJobs, shownSheetJobs, sheetJobsForPage } from './sheet-results';
 
 const job = (patch: Record<string, unknown>) =>
   ({
@@ -69,5 +69,62 @@ describe('последний результат листа', () => {
 
   it('завершено без понятного итога - листа в карте нет', () => {
     expect(latestSheetJobs([job({ result_status: null })]).size).toBe(0);
+  });
+});
+
+describe('показываемое задание листа и обновление', () => {
+  const ready = job({ job_id: 'ready', created_at: '2026-11-10T10:00:00Z' });
+  const newer = (patch: Record<string, unknown>) =>
+    job({ job_id: 'newer', created_at: '2026-11-10T12:00:00Z', ...patch });
+
+  it('более новое в очереди или идёт - показано готовое, новое - update', () => {
+    for (const status of ['queued', 'running']) {
+      const { shown, update } = sheetJobsForPage(
+        [newer({ status, result_status: null }), ready],
+        0,
+      );
+      expect(shown?.job_id).toBe('ready');
+      expect(update?.job_id).toBe('newer');
+    }
+  });
+
+  it('более новое упало или отменено - то же', () => {
+    for (const status of ['failed', 'cancelled']) {
+      const { shown, update } = sheetJobsForPage(
+        [ready, newer({ status, result_status: null })],
+        0,
+      );
+      expect(shown?.job_id).toBe('ready');
+      expect(update?.job_id).toBe('newer');
+    }
+  });
+
+  it('более новое готово - показано оно, обновления нет', () => {
+    const { shown, update } = sheetJobsForPage([ready, newer({})], 0);
+    expect(shown?.job_id).toBe('newer');
+    expect(update).toBeNull();
+  });
+
+  it('готового нет - показано самое новое, обновления нет', () => {
+    const only = newer({ status: 'queued', result_status: null });
+    const failed = job({
+      job_id: 'old',
+      status: 'failed',
+      result_status: null,
+      created_at: '2026-11-09T10:00:00Z',
+    });
+    expect(sheetJobsForPage([failed, only], 0)).toEqual({ shown: only, update: null });
+    expect(sheetJobsForPage([], 0)).toEqual({ shown: null, update: null });
+  });
+
+  it('чужая страница и трассы механики не считаются', () => {
+    const route = newer({ job_type: 'cad_mep_route', status: 'queued', result_status: null });
+    const other = newer({ requested_pages: [3], status: 'queued', result_status: null });
+    expect(sheetJobsForPage([ready, route, other], 0)).toEqual({ shown: ready, update: null });
+  });
+
+  it('карта для списка листов: лист с обновлением остаётся готовым', () => {
+    const map = shownSheetJobs([ready, newer({ status: 'running', result_status: null })]);
+    expect(map.get(0)).toEqual({ jobId: 'ready', kind: 'recognized', view: null, dxf: true });
   });
 });
