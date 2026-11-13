@@ -30,6 +30,8 @@ export const CadEomBuild: FC<ICadEomBuildProps> = ({ parent }) => {
   const routes = useCadEomRoutes3d(parent, true);
   const [problem, setProblem] = useState<string | null>(null);
   const current = job.data ?? null;
+  const quantities = routes.status === 'ready' ? (routes.data.quantities ?? []) : [];
+  const issues = routes.status === 'ready' ? (routes.data.issues ?? []) : [];
   const busy = build.isPending || current?.status === 'queued' || current?.status === 'running';
 
   return (
@@ -63,7 +65,7 @@ export const CadEomBuild: FC<ICadEomBuildProps> = ({ parent }) => {
             приборов и щитов: {routes.data.elements.length}. Слои — в 3D этажа, группы «Электроснабжение ЭОМ»
             и «Слаботочные системы СС».
           </p>
-          {routes.data.quantities.length > 0 && (
+          {quantities.length > 0 && (
             <table className="w-full text-xs" aria-label="Ведомость ЭОМ и СС этажа">
               <thead>
                 <tr className="text-left text-muted">
@@ -73,7 +75,7 @@ export const CadEomBuild: FC<ICadEomBuildProps> = ({ parent }) => {
                 </tr>
               </thead>
               <tbody>
-                {routes.data.quantities.map((row) => (
+                {quantities.map((row) => (
                   <tr key={`${row.system}|${row.item}`} title={row.formula ?? row.source ?? undefined}>
                     <td className="pr-[var(--s-2)] align-top">{row.system}</td>
                     <td className="pr-[var(--s-2)] align-top">{row.item}</td>
@@ -85,11 +87,11 @@ export const CadEomBuild: FC<ICadEomBuildProps> = ({ parent }) => {
               </tbody>
             </table>
           )}
-          {routes.data.issues.length > 0 && (
+          {issues.length > 0 && (
             <details className="text-xs text-muted">
-              <summary>Замечания генератора: {routes.data.issues.length}</summary>
+              <summary>Замечания генератора: {issues.length}</summary>
               <ul className="list-disc pl-[var(--s-6)]">
-                {routes.data.issues.map((text) => (
+                {issues.map((text) => (
                   <li key={text}>{text}</li>
                 ))}
               </ul>

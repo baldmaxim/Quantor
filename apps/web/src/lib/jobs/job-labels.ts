@@ -13,6 +13,7 @@ export const JOB_TYPE_LABELS: Readonly<Record<JobType, string>> = {
   cad_floor3d_dxf: 'CAD: 3D DXF',
   cad_zones: 'CAD: зоны',
   cad_sections: 'CAD: разрезы',
+  cad_eom_route: 'CAD: ЭОМ и СС',
   sheet_passport_extract: 'Паспорт листа',
   doc_questions_search: 'Вопросы к документации',
 };
