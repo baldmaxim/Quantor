@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+import { createClickTracker } from './floor3d-click';
 import type { IFloor3dHighlight } from './floor3d-geometry';
+import { hitScene } from './floor3d-hit';
+import type { IMepPick } from './floor3d-mep-pick';
 import type { IFloor3dRoutes } from './floor3d-routes';
 import type { CadLayerCategory } from './layer-categories';
 import { attachPivotOrbit } from './pivot-orbit';
@@ -17,7 +20,6 @@ import {
   type Triangle3,
 } from './floor3d-measure';
 import {
-  pickOf,
   readFloor3dColors,
   type IFloor3dPick,
   type IFloor3dPickData,
@@ -45,7 +47,7 @@ export interface IFloor3dEngine {
   setCategoryVisible: (category: CadLayerCategory, visible: boolean) => void;
   /** Скрыть конструкции по id (подгруппы сцены) без пересборки; переживает пересборку модели. */
   setHiddenIds: (ids: ReadonlySet<string>) => void;
-  /** Трассы механики: отдельная группа вне модели, в клик не входит; прежняя освобождается, `null` - снять. */
+  /** Трассы механики: отдельная группа вне модели, в клик входят тела трасс и элементы; прежняя освобождается, `null` - снять. */
   setRoutes: (routes: IFloor3dRoutes | null) => void;
   /** Перерисовать кадр после смены видимости трасс. */
   refresh: () => void;
@@ -58,7 +60,13 @@ export interface IFloor3dEngineOptions {
   readonly reducedMotion: boolean;
   /** Щелчок (не перетаскивание): элемент под курсором или `null`; точка - от угла холста. */
   readonly onPick: (pick: IFloor3dPick | null, anchor: { x: number; y: number }) => void;
-  /** Камера пошла двигаться: карточка у курсора устарела. */
+  /** Щелчок по трассе или элементу ВИС (не перетаскивание); точка - от угла холста. */
+  readonly onPickMep: (pick: IMepPick, anchor: { x: number; y: number }) => void;
+  /**
+   * Камера пошла двигаться: карточка у курсора устарела. Только при реальном перемещении - указатель
+   * ушёл от точки нажатия дальше порога или крутят колесо, а не на каждом нажатии: `start` у
+   * `OrbitControls` приходит уже на pointerdown и гасил бы выбор до отпускания.
+   */
   readonly onMove: () => void;
   /** Состояние замера: точки сцены и экранная точка середины отрезка (px от угла холста); `null` - замера нет. */
   readonly onMeasure: (state: IFloor3dMeasureState | null) => void;
@@ -82,8 +90,6 @@ export interface IFloor3dMeasureState {
 }
 
 const FOV_DEG = 45;
-/** Порог, после которого нажатие считается перетаскиванием, px. */
-const CLICK_SLOP_PX = 6;
 /** Сверху камера чуть смещена к югу: ось «вверх по экрану» = север плана, без вырождения. */
 export const TOP_DIRECTION = new THREE.Vector3(0, 1, 0.012).normalize();
 /**
@@ -155,7 +161,6 @@ export const createFloor3dEngine = (
     frame = requestAnimationFrame(render);
   }
   controls.addEventListener('change', requestRender);
-  controls.addEventListener('start', options.onMove);
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const pivotOrbit = attachPivotOrbit({
@@ -279,16 +284,16 @@ export const createFloor3dEngine = (
   observer.observe(host);
   resize();
 
-  // Щелчок отличается от перетаскивания смещением указателя.
-  let down: { x: number; y: number } | null = null;
-  const onDown = (event: PointerEvent): void => {
-    down = { x: event.clientX, y: event.clientY };
+  // Щелчок отличается от перетаскивания смещением указателя; им же определяется «камера пошла».
+  const clicks = createClickTracker();
+  const onDown = (event: PointerEvent): void => clicks.down(event.clientX, event.clientY);
+  const onDrag = (event: PointerEvent): void => {
+    if (clicks.move(event.clientX, event.clientY)) options.onMove();
   };
+  const onWheel = (): void => options.onMove();
   const onUp = (event: PointerEvent): void => {
-    const start = down;
-    down = null;
-    if (start === null || model === null) return;
-    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP_PX) return;
+    const click = clicks.up(event.clientX, event.clientY);
+    if (!click || model === null) return;
     const rect = dom.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
     if (measuring) {
@@ -298,15 +303,9 @@ export const createFloor3dEngine = (
     ndc.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
     const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    // Скрытое категорией в клик не входит: Raycaster флаг visible не проверяет.
-    for (const hit of raycaster.intersectObjects(model.pickables.filter((mesh) => mesh.visible), false)) {
-      const pick = pickOf(hit.object, hit.faceIndex);
-      if (pick !== null) {
-        options.onPick(pick, anchor);
-        return;
-      }
-    }
-    options.onPick(null, anchor);
+    const hit = hitScene(raycaster, model, routes);
+    if (hit?.kind === 'mep') options.onPickMep(hit.pick, anchor);
+    else options.onPick(hit === null ? null : hit.pick, anchor);
   };
   // Рёбра сетки считаются один раз на меш при первом наведении: модель пересобрана - меши новые.
   const featureCache = new WeakMap<THREE.Mesh, IFeatureEdges>();
@@ -490,6 +489,9 @@ export const createFloor3dEngine = (
   };
   dom.addEventListener('pointerdown', onDown);
   dom.addEventListener('pointerup', onUp);
+  dom.addEventListener('pointercancel', clicks.cancel);
+  dom.addEventListener('pointermove', onDrag);
+  dom.addEventListener('wheel', onWheel, { passive: true });
   dom.addEventListener('pointermove', onHoverMove);
   dom.addEventListener('pointerleave', clearHover);
   controls.addEventListener('start', clearHover);
@@ -569,6 +571,9 @@ export const createFloor3dEngine = (
       observer.disconnect();
       dom.removeEventListener('pointerdown', onDown);
       dom.removeEventListener('pointerup', onUp);
+      dom.removeEventListener('pointercancel', clicks.cancel);
+      dom.removeEventListener('pointermove', onDrag);
+      dom.removeEventListener('wheel', onWheel);
       dom.removeEventListener('pointermove', onHoverMove);
       dom.removeEventListener('pointerleave', clearHover);
       controls.removeEventListener('start', clearHover);
@@ -576,7 +581,6 @@ export const createFloor3dEngine = (
       disposeHoverObjects();
       scene.remove(hoverGroup);
       controls.removeEventListener('change', requestRender);
-      controls.removeEventListener('start', options.onMove);
       pivotOrbit.dispose();
       controls.dispose();
       clearMeasureObjects();

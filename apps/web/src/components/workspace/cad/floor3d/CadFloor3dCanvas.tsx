@@ -17,6 +17,7 @@ import {
   type IFloor3dPlan,
 } from '@/lib/cad/floor3d-geometry';
 import type { IFloor3dMepElement } from '@/lib/cad/floor3d-mep-elements';
+import type { IMepPick } from '@/lib/cad/floor3d-mep-pick';
 import {
   buildFloor3dRoutes,
   readFloor3dRouteColors,
@@ -39,7 +40,7 @@ export interface IFloor3dViewRequest {
 /** Трассы механики листа: полилинии в мм DXF, Z от чистого пола этажа модели. */
 export interface ICadFloor3dRoutes {
   readonly polylines: readonly IFloor3dRoutePolyline[];
-  /** Фасонина, арматура и гильзы (формат v2); у v1 пусто. */
+  /** Фасонина, арматура, гильзы и приборы (формат v2); у v1 пусто. */
   readonly elements?: readonly IFloor3dMepElement[];
   /** Чистый пол модели (`routesBaseZMm`), мм: верх плиты ниже на пирог пола. */
   readonly baseZMm: number;
@@ -55,6 +56,8 @@ interface ICadFloor3dCanvasProps {
   readonly viewRequest: IFloor3dViewRequest | null;
   /** Выбранный элемент: подсвечивается оверлеем. */
   readonly selected: IFloor3dPick | null;
+  /** Выбранная трасса или элемент ВИС: подсвечивается оверлеем (свой вид выбора, не конструкция). */
+  readonly selectedMep?: IMepPick | null;
   /** Общий выбор конструкций (план и 3D): стены и плита подсвечиваются все. */
   readonly selectedIds?: ReadonlySet<string>;
   /** Скрытые категории (вкладка «Слои»): скрываются без пересборки сцены. */
@@ -68,6 +71,8 @@ interface ICadFloor3dCanvasProps {
   /** Режим измерения: клики ставят точки, элемент не выбирается. */
   readonly measuring: boolean;
   readonly onPick: (pick: IFloor3dPick | null, anchor: { x: number; y: number }) => void;
+  /** Щелчок по трассе или элементу ВИС. */
+  readonly onPickMep?: (pick: IMepPick, anchor: { x: number; y: number }) => void;
   readonly onMove: () => void;
   /** Холст создать не удалось (нет WebGL). */
   readonly onError: (message: string) => void;
@@ -102,6 +107,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   showSlabCap,
   viewRequest,
   selected,
+  selectedMep = null,
   selectedIds = NO_IDS,
   hiddenCategories = NO_CATEGORIES,
   hiddenConstructionIds = NO_IDS,
@@ -109,6 +115,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   hostCategoryOf,
   measuring,
   onPick,
+  onPickMep,
   onMove,
   onError,
 }) => {
@@ -119,9 +126,9 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   const [snap, setSnap] = useState<IFloor3dSnapState | null>(null);
 
   // Колбэки читаются в момент события: смена пропсов движок не пересоздаёт.
-  const handlers = useRef({ onPick, onMove, onError });
+  const handlers = useRef({ onPick, onPickMep, onMove, onError });
   useEffect(() => {
-    handlers.current = { onPick, onMove, onError };
+    handlers.current = { onPick, onPickMep, onMove, onError };
   });
 
   useEffect(() => {
@@ -131,6 +138,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
       engine.current = createFloor3dEngine(element, {
         reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         onPick: (pick, anchor) => handlers.current.onPick(pick, anchor),
+        onPickMep: (pick, anchor) => handlers.current.onPickMep?.(pick, anchor),
         onMove: () => handlers.current.onMove(),
         onMeasure: setMeasure,
         onSnap: setSnap,
@@ -170,6 +178,12 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
     routeScene.current = built;
     engine.current?.setRoutes(built);
   }, [routes, plan.center, theme]);
+
+  // Выделение трассы или элемента ВИС - после пересборки трасс (эффект выше) и при смене выбора.
+  useEffect(() => {
+    routeScene.current?.setHighlight(selectedMep);
+    engine.current?.refresh();
+  }, [routes, plan.center, theme, selectedMep]);
 
   // Видимость слоёв трасс - после пересборки (эффект выше): та же маска, что у слоёв трасс в 2D.
   useEffect(() => {

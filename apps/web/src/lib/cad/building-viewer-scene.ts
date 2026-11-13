@@ -33,7 +33,10 @@ export interface IBuildingViewerOptions {
   readonly onHover: (key: string | null, anchor: { x: number; y: number } | null) => void;
   /** Щелчок или касание (не перетаскивание) по этажу. */
   readonly onSelect: (key: string) => void;
-  /** Щелчок по стене уже выбранного этажа - конструкция; `null` - щелчок в пустоту, выбор конструкции снят. */
+  /**
+   * Щелчок по стене уже выбранного этажа - конструкция; `null` - выбор конструкции снят: щелчок в
+   * пустоту или повторный щелчок по уже выбранной конструкции.
+   */
   readonly onSelectConstruction: (id: string | null) => void;
   /** Двойной щелчок или двойное касание по этажу. */
   readonly onOpenDetail: (key: string) => void;
@@ -364,7 +367,8 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
     }
     lastTap = { target, at: now };
     if (wallId === null) options.onSelect(hit.key);
-    else options.onSelectConstruction(wallId);
+    // Повторный щелчок по уже выбранной конструкции снимает выбор.
+    else options.onSelectConstruction(wallId === constructionId ? null : wallId);
   };
   const onCancel = (): void => {
     down = null;

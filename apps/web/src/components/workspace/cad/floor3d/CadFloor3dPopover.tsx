@@ -11,12 +11,10 @@ import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
 import { findConstruction, wallQuantities } from '@/lib/cad/floor3d-volume';
 import { formatNumber } from '@/lib/cad/view-format';
 
+import { CadFloor3dPopoverFrame } from './CadFloor3dPopoverFrame';
+
 /** Идентификатор плиты листа среди конструкций и призм 3D-плана. */
 const SLAB_ID = 'slab';
-const WIDTH_PX = 252;
-const HEIGHT_ESTIMATE_PX = 340;
-const GAP_PX = 12;
-const EDGE_PX = 8;
 
 const HOLE_STATE_TEXT = {
   candidate: 'кандидат, решения нет',
@@ -207,35 +205,14 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
     return null;
   }
 
-  const left = Math.max(EDGE_PX, Math.min(anchor.x + GAP_PX, bounds.width - WIDTH_PX - EDGE_PX));
-  const top = Math.max(EDGE_PX, Math.min(anchor.y + GAP_PX, bounds.height - HEIGHT_ESTIMATE_PX));
-
   return (
-    <div
-      role="dialog"
-      aria-label={title}
-      data-testid="floor3d-popover"
-      // Положение у курсора - динамическое значение.
-      style={{ left, top }}
-      className="absolute z-10 flex max-h-[60%] w-[252px] max-w-[calc(100%-16px)] flex-col gap-[var(--s-3)] overflow-auto overscroll-contain rounded-[var(--radius-md)] border border-border-strong bg-surface-raised p-[var(--s-4)] shadow-[var(--shadow-2)]"
-    >
-      <div className="flex items-start justify-between gap-[var(--s-3)]">
-        <h4 className="text-sm font-semibold [overflow-wrap:anywhere]">{title}</h4>
-        <button
-          type="button"
-          aria-label="Закрыть карточку"
-          onClick={onClose}
-          className="press -mt-[var(--s-2)] -mr-[var(--s-2)] grid h-[44px] w-[44px] flex-none place-items-center rounded-[var(--radius-xs)] text-muted hover:bg-surface-muted hover:text-text md:h-[28px] md:w-[28px]"
-        >
-          <span aria-hidden="true">×</span>
-        </button>
-      </div>
+    <CadFloor3dPopoverFrame title={title} anchor={anchor} bounds={bounds} onClose={onClose}>
       {body}
       {error !== null && (
         <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
           {error}
         </p>
       )}
-    </div>
+    </CadFloor3dPopoverFrame>
   );
 };

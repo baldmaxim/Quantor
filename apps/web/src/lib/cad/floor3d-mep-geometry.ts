@@ -36,10 +36,19 @@ interface ISectionFields {
 const positive = (value: number | null | undefined): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
 
-/** Сечение полилинии; `null` - рисовать линией (файл v1, нет формы или размера). */
+/**
+ * Условный Ø трубы, мм, когда у круглой полилинии размер не задан (старые файлы). Только для
+ * отрисовки, чтобы труба не превращалась в линию; в плашке такой Ø показывается как «не определён».
+ */
+export const DISPLAY_DN_UNKNOWN_MM = 20;
+
+/**
+ * Сечение полилинии; `null` - рисовать линией (файл v1 без формы или короб без размеров). Круглая
+ * без Ø рисуется трубой условного Ø (`DISPLAY_DN_UNKNOWN_MM`).
+ */
 export const routeSection = (polyline: ISectionFields): RouteSection | null => {
-  if (polyline.shape === 'round' && positive(polyline.dn_mm)) {
-    return { shape: 'round', dnMm: polyline.dn_mm };
+  if (polyline.shape === 'round') {
+    return { shape: 'round', dnMm: positive(polyline.dn_mm) ? polyline.dn_mm : DISPLAY_DN_UNKNOWN_MM };
   }
   if (polyline.shape === 'rect' && positive(polyline.w_mm) && positive(polyline.h_mm)) {
     return { shape: 'rect', wMm: polyline.w_mm, hMm: polyline.h_mm };

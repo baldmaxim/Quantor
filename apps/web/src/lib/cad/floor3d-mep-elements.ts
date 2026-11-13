@@ -9,15 +9,18 @@ import {
   axisBasis,
   normalizeAxis,
 } from './floor3d-mep-geometry';
+import { MEP_PICK_KEY, type IMepElementPickData } from './floor3d-mep-pick';
 
 /**
- * Элементы сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура, гильзы. Один `InstancedMesh` на
- * каждую пару (слой, вид геометрии); единичная деталь с осью `+Z` масштабируется под размер
- * элемента. Планирование (`planMepElement`) - чистая функция без three-сцены.
+ * Элементы сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура, гильзы и оконечные приборы. Один
+ * `InstancedMesh` на каждую пару (слой, вид геометрии); единичная деталь с осью `+Z` масштабируется
+ * под размер элемента. Прибор (`terminal`) - корпус по осям вида: коробка `w x length x h` с центром
+ * `pos` или цилиндр Ø `dn_mm` высотой `h_mm` (ороситель). Планирование (`planMepElement`) - чистая
+ * функция без three-сцены.
  */
 
 export interface IFloor3dMepElement {
-  readonly type: 'fitting' | 'valve' | 'sleeve';
+  readonly type: 'fitting' | 'valve' | 'sleeve' | 'terminal';
   readonly subtype: string;
   readonly layer: string;
   readonly pos: readonly number[];
@@ -27,6 +30,9 @@ export interface IFloor3dMepElement {
   readonly h_mm?: number | null;
   readonly length_mm?: number | null;
   readonly outer_d_mm?: number | null;
+  readonly apt?: string | null;
+  /** Марка прибора или ПК, если известна. */
+  readonly mark?: string | null;
 }
 
 export interface IMepElementColors {
@@ -43,7 +49,14 @@ export interface IMepElementsFrame {
   readonly baseZMm: number;
 }
 
-export type MepElementKind = 'sphere' | 'reducer' | 'cleanout' | 'box' | 'damper' | 'sleeve';
+export type MepElementKind =
+  | 'sphere'
+  | 'reducer'
+  | 'cleanout'
+  | 'box'
+  | 'damper'
+  | 'sleeve'
+  | 'cylinder';
 /** Цвет детали: слоя, слоя темнее (арматура) или токен гильзы. */
 export type MepElementTone = 'layer' | 'dark' | 'sleeve';
 
@@ -98,9 +111,36 @@ export const planMepElement = (
   if (![x, y, z].every(Number.isFinite)) return null;
   const [u, h, v] = toScenePoint(x, y, frame.baseZMm + z, frame.center);
   const position = new THREE.Vector3(u, h, v);
-  const axis = normalizeAxis(element.axis);
   const dn = positive(element.dn_mm) ? element.dn_mm / MM_IN_M : null;
   const layer = element.layer;
+
+  if (element.type === 'terminal') {
+    // Корпус по осям вида (X сцены = x DXF, Z сцены = -y DXF, Y = высота): ось элемента не нужна.
+    if (element.subtype === 'sprinkler') {
+      if (dn === null || !positive(element.h_mm)) return null;
+      return {
+        layer,
+        kind: 'cylinder',
+        tone: 'layer',
+        matrix: compose(position, null, dn, element.h_mm / MM_IN_M, dn),
+      };
+    }
+    if (!positive(element.w_mm) || !positive(element.length_mm) || !positive(element.h_mm)) return null;
+    return {
+      layer,
+      kind: 'box',
+      tone: 'layer',
+      matrix: compose(
+        position,
+        null,
+        element.w_mm / MM_IN_M,
+        element.h_mm / MM_IN_M,
+        element.length_mm / MM_IN_M,
+      ),
+    };
+  }
+
+  const axis = normalizeAxis(element.axis);
 
   if (element.type === 'fitting') {
     if (dn === null) return null;
@@ -233,6 +273,8 @@ export interface IMepElements {
   readonly group: THREE.Group;
   /** Слои, у которых есть хотя бы один элемент. */
   readonly layers: readonly string[];
+  /** `InstancedMesh` для выбора кликом: `instanceId` -> индекс элемента (`userData.mepPick`). */
+  readonly pickables: readonly THREE.InstancedMesh[];
   setLayerVisible: (layer: string, visible: boolean) => void;
   dispose: () => void;
 }
@@ -240,6 +282,9 @@ export interface IMepElements {
 /** Единичные детали с осью `+Z` и диаметром (или стороной) 1; сфера - радиусом 1. */
 const unitGeometry = (kind: MepElementKind): THREE.BufferGeometry => {
   switch (kind) {
+    case 'cylinder':
+      // Вертикальный цилиндр (ось по Y сцены): ороситель.
+      return new THREE.CylinderGeometry(0.5, 0.5, 1, PIPE_RADIAL_SEGMENTS);
     case 'sphere':
       return new THREE.SphereGeometry(1, JOINT_WIDTH_SEGMENTS, JOINT_HEIGHT_SEGMENTS);
     case 'reducer':
@@ -258,6 +303,15 @@ const unitGeometry = (kind: MepElementKind): THREE.BufferGeometry => {
   }
 };
 
+/** Тело одного элемента в координатах сцены (для оверлея выделения); `null` - данных не хватает. */
+export const mepElementGeometry = (
+  element: IFloor3dMepElement,
+  frame: IMepElementsFrame,
+): THREE.BufferGeometry | null => {
+  const plan = planMepElement(element, frame);
+  return plan === null ? null : unitGeometry(plan.kind).applyMatrix4(plan.matrix);
+};
+
 const toneColor = (tone: MepElementTone, layer: string, colors: IMepElementColors): THREE.Color => {
   if (tone === 'sleeve') return new THREE.Color(colors.sleeve);
   const base = new THREE.Color(colors.layers[layer] ?? colors.fallback);
@@ -271,23 +325,28 @@ export const buildMepElements = (
   renderOrder: number,
 ): IMepElements => {
   const group = new THREE.Group();
-  const groups = new Map<string, IMepElementPlan[]>();
-  for (const element of elements) {
+  interface IPlanned {
+    readonly plan: IMepElementPlan;
+    /** Индекс элемента в исходном массиве. */
+    readonly index: number;
+  }
+  const groups = new Map<string, IPlanned[]>();
+  elements.forEach((element, index) => {
     const plan = planMepElement(element, frame);
-    if (plan === null) continue;
+    if (plan === null) return;
     const key = `${plan.layer}|${plan.kind}|${plan.tone}`;
     const list = groups.get(key);
-    if (list === undefined) groups.set(key, [plan]);
-    else list.push(plan);
-  }
+    if (list === undefined) groups.set(key, [{ plan, index }]);
+    else list.push({ plan, index });
+  });
 
   const geometries = new Map<MepElementKind, THREE.BufferGeometry>();
   const materials = new Map<string, THREE.MeshStandardMaterial>();
   const meshes: THREE.InstancedMesh[] = [];
   const byLayer = new Map<string, THREE.InstancedMesh[]>();
 
-  for (const plans of groups.values()) {
-    const first = plans[0];
+  for (const planned of groups.values()) {
+    const first = planned[0]?.plan;
     if (first === undefined) continue;
     let geometry = geometries.get(first.kind);
     if (geometry === undefined) {
@@ -303,10 +362,12 @@ export const buildMepElements = (
       });
       materials.set(materialKey, material);
     }
-    const mesh = new THREE.InstancedMesh(geometry, material, plans.length);
-    plans.forEach((plan, index) => mesh.setMatrixAt(index, plan.matrix));
+    const mesh = new THREE.InstancedMesh(geometry, material, planned.length);
+    planned.forEach((item, at) => mesh.setMatrixAt(at, item.plan.matrix));
     mesh.instanceMatrix.needsUpdate = true;
     mesh.renderOrder = renderOrder;
+    const pickData: IMepElementPickData = { kind: 'element', indices: planned.map((item) => item.index) };
+    mesh.userData[MEP_PICK_KEY] = pickData;
     group.add(mesh);
     meshes.push(mesh);
     const list = byLayer.get(first.layer);
@@ -317,6 +378,7 @@ export const buildMepElements = (
   return {
     group,
     layers: [...byLayer.keys()],
+    pickables: meshes,
     setLayerVisible: (layer, visible) => {
       for (const mesh of byLayer.get(layer) ?? []) mesh.visible = visible;
     },

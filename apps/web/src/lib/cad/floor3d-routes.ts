@@ -5,10 +5,25 @@ import { toScenePoint, type IFloor3dCenter } from './floor3d-geometry';
 import {
   buildMepElements,
   createFittingLookup,
+  mepElementGeometry,
   type IFloor3dMepElement,
   type IMepElements,
 } from './floor3d-mep-elements';
-import { MM_IN_M, mergeSolids, polylineSolids, routeSection } from './floor3d-mep-geometry';
+import {
+  MM_IN_M,
+  mergeSolids,
+  polylineSolids,
+  routeSection,
+  type RouteSection,
+} from './floor3d-mep-geometry';
+import {
+  MEP_PICK_KEY,
+  createMepHighlight,
+  triangleCount,
+  type IMepHighlight,
+  type IMepPick,
+  type IMepRoutePickData,
+} from './floor3d-mep-pick';
 import { readMepColors } from './mep-layers';
 
 /**
@@ -16,12 +31,16 @@ import { readMepColors } from './mep-layers';
  * чистого пола этажа (отметка листа; отопление в стяжке имеет отрицательный Z). Перевод в сцену тот
  * же, что у призм: `toScenePoint` (метры, центр модели в нуле, `Z = -y`), по высоте к Z трассы
  * прибавляется чистый пол модели (`routesBaseZMm`; верх плиты, от которого строятся низ стен и плита,
- * ниже на пирог пола). В клик трассы не входят.
+ * ниже на пирог пола).
  *
  * Формат `cad_mep_routes3d.v2`: полилиния с сечением (`shape`) рисуется объёмно - труба цилиндрами
  * по Ø, воздуховод коробами, изоляция полупрозрачной оболочкой; геометрии слоя слиты в один Mesh.
- * Полилиния без сечения (файл v1, нет DN или размеров) - линией, как раньше. Фасонина, арматура и
- * гильзы - `floor3d-mep-elements.ts`.
+ * Круглая без Ø - труба условного Ø (`DISPLAY_DN_UNKNOWN_MM`). Полилиния без `shape` (файл v1) или
+ * короб без размеров - линией, как раньше. Фасонина, арматура, гильзы и приборы - `floor3d-mep-elements.ts`.
+ *
+ * Выбор кликом (`floor3d-mep-pick.ts`): слитый меш слоя хранит диапазоны треугольников по полилиниям,
+ * `InstancedMesh` элементов - соответствие экземпляра элементу; оболочка изоляции и линии v1 в выбор
+ * не входят. Выделение - оверлей из тел выбранной трассы или элемента.
  */
 
 /** Чистый пол модели этажа, мм: отметка листа, а без неё - база модели (`base_z_mm`). */
@@ -44,6 +63,8 @@ export interface IFloor3dRouteColors {
   readonly insulation: string;
   /** Гильзы (`--cad-mep-sleeve`). */
   readonly sleeve: string;
+  /** Выделение выбранной трассы или элемента (`--accent`). */
+  readonly accent: string;
 }
 
 export interface IFloor3dRoutePolyline {
@@ -55,12 +76,22 @@ export interface IFloor3dRoutePolyline {
   readonly w_mm?: number | null;
   readonly h_mm?: number | null;
   readonly insulation_mm?: number | null;
+  /** С v15: вид полилинии, источник Ø, марка стояка, уклон, квартира; у старых файлов пусто. */
+  readonly kind?: 'route' | 'jumper' | 'riser' | 'leadin' | null;
+  readonly dn_source?: 'line' | 'registry' | 'rule' | null;
+  readonly mark?: string | null;
+  readonly slope?: number | null;
+  readonly apt?: string | null;
 }
 
 export interface IFloor3dRoutes {
   readonly group: THREE.Group;
   /** Слои, у которых есть трассы или элементы: по ним применяется видимость. */
   readonly layers: readonly string[];
+  /** Меши, по которым работает выбор ВИС: слитые тела трасс и `InstancedMesh` элементов. */
+  readonly pickables: readonly THREE.Object3D[];
+  /** Выделить трассу или элемент оверлеем; `null` - снять. Переживает смену видимости слоя. */
+  setHighlight: (pick: IMepPick | null) => void;
   setLayerVisible: (layer: string, visible: boolean) => void;
   setAllVisible: (visible: boolean) => void;
   dispose: () => void;
@@ -82,6 +113,7 @@ export const readFloor3dRouteColors = (): IFloor3dRouteColors => {
       fallback: FALLBACK_COLOR,
       insulation: FALLBACK_COLOR,
       sleeve: FALLBACK_COLOR,
+      accent: FALLBACK_COLOR,
     };
   }
   const style = getComputedStyle(document.documentElement);
@@ -91,6 +123,7 @@ export const readFloor3dRouteColors = (): IFloor3dRouteColors => {
     fallback: token('--text'),
     insulation: token('--cad-mep-insulation'),
     sleeve: token('--cad-mep-sleeve'),
+    accent: token('--accent'),
   };
 };
 
@@ -133,7 +166,9 @@ export const buildFloor3dRoutes = (
   const lineMaterials = new Map<string, THREE.LineBasicMaterial>();
   const solidMaterials = new Map<string, THREE.MeshStandardMaterial>();
   const byLayer = new Map<string, THREE.Object3D[]>();
-  const solids = new Map<string, THREE.BufferGeometry[]>();
+  const pickables: THREE.Object3D[] = [];
+  /** Тела трасс слоя по полилиниям: индекс полилинии и её детали (для карты треугольников). */
+  const solids = new Map<string, { readonly index: number; readonly parts: THREE.BufferGeometry[] }[]>();
   const shells = new Map<string, THREE.BufferGeometry[]>();
   const hasFittingNear = createFittingLookup(elements);
   const layerColor = (layer: string): THREE.Color =>
@@ -161,9 +196,25 @@ export const buildFloor3dRoutes = (
     depthWrite: false,
   });
 
-  for (const polyline of polylines) {
+  // Тела полилинии (и её изоляции при `inflateM`): сферы стыка ставятся там, где нет фасонины.
+  const bodiesOf = (
+    polyline: IFloor3dRoutePolyline,
+    points: readonly THREE.Vector3[],
+    source: readonly (readonly [number, number, number])[],
+    section: RouteSection,
+    inflateM = 0,
+  ): THREE.BufferGeometry[] => {
+    const toleranceMm = (section.shape === 'round' ? section.dnMm / 2 : 0) + 10;
+    const hasFittingAt = (index: number): boolean => {
+      const at = source[index];
+      return at !== undefined && hasFittingNear(polyline.layer, at[0], at[1], at[2], toleranceMm);
+    };
+    return polylineSolids(points, section, { inflateM, hasFittingAt });
+  };
+
+  polylines.forEach((polyline, index) => {
     const { points, source } = scenePoints(polyline, frame);
-    if (points.length < 2) continue;
+    if (points.length < 2) return;
     const section = routeSection(polyline);
     if (section === null) {
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -172,23 +223,16 @@ export const buildFloor3dRoutes = (
       line.renderOrder = ROUTES_RENDER_ORDER;
       group.add(line);
       push(byLayer, polyline.layer, line);
-      continue;
+      return;
     }
-    const toleranceMm = (section.shape === 'round' ? section.dnMm / 2 : 0) + 10;
-    const hasFittingAt = (index: number): boolean => {
-      const at = source[index];
-      return at !== undefined && hasFittingNear(polyline.layer, at[0], at[1], at[2], toleranceMm);
-    };
-    for (const part of polylineSolids(points, section, { hasFittingAt }))
-      push(solids, polyline.layer, part);
+    push(solids, polyline.layer, { index, parts: bodiesOf(polyline, points, source, section) });
     const insulation = polyline.insulation_mm;
     if (typeof insulation === 'number' && Number.isFinite(insulation) && insulation > 0) {
-      const inflateM = insulation / MM_IN_M;
-      for (const part of polylineSolids(points, section, { inflateM, hasFittingAt })) {
+      for (const part of bodiesOf(polyline, points, source, section, insulation / MM_IN_M)) {
         push(shells, polyline.layer, part);
       }
     }
-  }
+  });
 
   const addMeshes = (
     parts: Map<string, THREE.BufferGeometry[]>,
@@ -205,7 +249,32 @@ export const buildFloor3dRoutes = (
       push(byLayer, layer, mesh);
     }
   };
-  addMeshes(solids, solidMaterialOf, ROUTES_RENDER_ORDER);
+  // Тела трасс: один меш на слой, у меша - карта «диапазон треугольников -> полилиния».
+  for (const [layer, items] of solids) {
+    const flat: THREE.BufferGeometry[] = [];
+    const starts: number[] = [];
+    const indices: number[] = [];
+    let total = 0;
+    for (const item of items) {
+      if (item.parts.length === 0) continue;
+      starts.push(total);
+      indices.push(item.index);
+      for (const part of item.parts) {
+        total += triangleCount(part);
+        flat.push(part);
+      }
+    }
+    const merged = mergeSolids(flat);
+    if (merged === null) continue;
+    geometries.push(merged);
+    const mesh = new THREE.Mesh(merged, solidMaterialOf(layer));
+    mesh.renderOrder = ROUTES_RENDER_ORDER;
+    const pickData: IMepRoutePickData = { kind: 'route', starts, indices, total };
+    mesh.userData[MEP_PICK_KEY] = pickData;
+    group.add(mesh);
+    push(byLayer, layer, mesh);
+    pickables.push(mesh);
+  }
   addMeshes(shells, () => shellMaterial, INSULATION_RENDER_ORDER);
 
   const mepElements: IMepElements = buildMepElements(
@@ -215,19 +284,61 @@ export const buildFloor3dRoutes = (
     ROUTES_RENDER_ORDER,
   );
   group.add(mepElements.group);
+  pickables.push(...mepElements.pickables);
   const layers = [...new Set([...byLayer.keys(), ...mepElements.layers])];
+
+  // Выделение: оверлей тел выбранной трассы или элемента; скрывается вместе со своим слоем.
+  const hiddenLayers = new Set<string>();
+  let overlay: { readonly highlight: IMepHighlight; readonly layer: string } | null = null;
+  const clearOverlay = (): void => {
+    if (overlay === null) return;
+    group.remove(overlay.highlight.group);
+    overlay.highlight.dispose();
+    overlay = null;
+  };
+  const highlightBodies = (
+    pick: IMepPick,
+  ): { readonly layer: string; readonly bodies: THREE.BufferGeometry[] } | null => {
+    if (pick.kind === 'element') {
+      const element = elements[pick.index];
+      const body = element === undefined ? null : mepElementGeometry(element, frame);
+      return element === undefined || body === null ? null : { layer: element.layer, bodies: [body] };
+    }
+    const polyline = polylines[pick.index];
+    if (polyline === undefined) return null;
+    const section = routeSection(polyline);
+    const { points, source } = scenePoints(polyline, frame);
+    if (section === null || points.length < 2) return null;
+    return { layer: polyline.layer, bodies: bodiesOf(polyline, points, source, section) };
+  };
 
   return {
     group,
     layers,
+    pickables,
+    setHighlight: (pick) => {
+      clearOverlay();
+      if (pick === null) return;
+      const target = highlightBodies(pick);
+      if (target === null) return;
+      const highlight = createMepHighlight(target.bodies, colors.accent);
+      if (highlight === null) return;
+      highlight.group.visible = !hiddenLayers.has(target.layer);
+      group.add(highlight.group);
+      overlay = { highlight, layer: target.layer };
+    },
     setLayerVisible: (layer, visible) => {
+      if (visible) hiddenLayers.delete(layer);
+      else hiddenLayers.add(layer);
       for (const object of byLayer.get(layer) ?? []) object.visible = visible;
       mepElements.setLayerVisible(layer, visible);
+      if (overlay !== null && overlay.layer === layer) overlay.highlight.group.visible = visible;
     },
     setAllVisible: (visible) => {
       group.visible = visible;
     },
     dispose: () => {
+      clearOverlay();
       for (const geometry of geometries) geometry.dispose();
       for (const material of lineMaterials.values()) material.dispose();
       for (const material of solidMaterials.values()) material.dispose();

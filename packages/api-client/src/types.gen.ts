@@ -2768,7 +2768,11 @@ export type CadMepRecomputeCreate = {
 /**
  * CadMepRoute3dElement
  *
- * Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура или гильза.
+ * Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура, гильза или оконечный прибор.
+ *
+ * `terminal` и `mark` - с `cad_mep.v15` (аддитивно). У прибора корпус - коробка `w_mm` (вдоль X) x
+ * `length_mm` (вдоль Y) x `h_mm` (высота) с центром `pos`; у `sprinkler` - цилиндр Ø `dn_mm`
+ * высотой `h_mm`.
  */
 export type CadMepRoute3dElement = {
     /**
@@ -2800,6 +2804,10 @@ export type CadMepRoute3dElement = {
      */
     length_mm?: number | null;
     /**
+     * Mark
+     */
+    mark?: string | null;
+    /**
      * Outer D Mm
      */
     outer_d_mm?: number | null;
@@ -2818,7 +2826,7 @@ export type CadMepRoute3dElement = {
     /**
      * Type
      */
-    type: 'fitting' | 'valve' | 'sleeve';
+    type: 'fitting' | 'valve' | 'sleeve' | 'terminal';
     /**
      * W Mm
      */
@@ -2831,7 +2839,8 @@ export type CadMepRoute3dElement = {
  * 3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.
  *
  * Поля сечения и изоляции - с `cad_mep_routes3d.v2`; у файла v1 они пусты (`shape` не задан,
- * изоляции нет), и вид рисует такую полилинию линией.
+ * изоляции нет), и вид рисует такую полилинию линией. `dn_source` и `mark` - с `cad_mep.v15`
+ * (аддитивно): откуда взят Ø или сечение и марка стояка из реестра; у старых файлов `None`.
  */
 export type CadMepRoute3dPolyline = {
     /**
@@ -2842,6 +2851,10 @@ export type CadMepRoute3dPolyline = {
      * Dn Mm
      */
     dn_mm?: number | null;
+    /**
+     * Dn Source
+     */
+    dn_source?: 'line' | 'registry' | 'rule' | null;
     /**
      * H Mm
      */
@@ -2858,6 +2871,10 @@ export type CadMepRoute3dPolyline = {
      * Layer
      */
     layer: string;
+    /**
+     * Mark
+     */
+    mark?: string | null;
     /**
      * Pts
      */

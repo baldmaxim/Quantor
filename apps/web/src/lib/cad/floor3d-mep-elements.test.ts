@@ -152,6 +152,70 @@ describe('планирование элементов', () => {
   });
 });
 
+describe('оконечные приборы (terminal)', () => {
+  const terminal = (patch: Partial<IFloor3dMepElement> = {}): IFloor3dMepElement => ({
+    type: 'terminal',
+    subtype: 'wc',
+    layer: 'M-SAN-WC',
+    pos: [2000, 3000, 400],
+    axis: [0, 0, 1000],
+    w_mm: 360,
+    length_mm: 600,
+    h_mm: 800,
+    ...patch,
+  });
+
+  it('коробка w x length x h по осям вида, центр в pos с учётом чистого пола', () => {
+    const plan = planMepElement(terminal(), frame);
+    expect(plan?.kind).toBe('box');
+    expect(plan?.tone).toBe('layer');
+    const { position, scale, axis } = parts((plan as { matrix: THREE.Matrix4 }).matrix);
+    expect(position.toArray()).toEqual([2, 1.4, -3]);
+    // X сцены - ширина (вдоль X вида), Y - высота, Z - длина (вдоль Y вида).
+    expect(scale.toArray()).toEqual([0.36, 0.8, 0.6]);
+    // Без поворота: ось элемента корпус не вращает.
+    expect(axis.distanceTo(new THREE.Vector3(0, 0, 1))).toBeCloseTo(0, 9);
+    expect(
+      planMepElement(terminal({ axis: [1000, 0, 0] }), frame)?.matrix.equals(
+        (plan as { matrix: THREE.Matrix4 }).matrix,
+      ),
+    ).toBe(true);
+  });
+
+  it('ороситель - вертикальный цилиндр Ø dn_mm высотой h_mm', () => {
+    const plan = planMepElement(
+      terminal({ subtype: 'sprinkler', dn_mm: 15, h_mm: 50, w_mm: null, length_mm: null }),
+      frame,
+    );
+    expect(plan?.kind).toBe('cylinder');
+    const { scale } = parts((plan as { matrix: THREE.Matrix4 }).matrix);
+    expect(scale.toArray()).toEqual([0.015, 0.05, 0.015]);
+  });
+
+  it('без размеров корпуса - пропускается', () => {
+    expect(planMepElement(terminal({ w_mm: null }), frame)).toBeNull();
+    expect(planMepElement(terminal({ h_mm: 0 }), frame)).toBeNull();
+    expect(planMepElement(terminal({ subtype: 'sprinkler', dn_mm: null, h_mm: 50 }), frame)).toBeNull();
+  });
+
+  it('InstancedMesh по слою с токеном слоя; сантехника M-SAN-* - свой цвет', () => {
+    const colors: IMepElementColors = { ...COLORS, layers: { ...COLORS.layers, 'M-SAN-WC': 'rgb(10, 200, 90)' } };
+    const built = buildMepElements(
+      [terminal(), terminal({ pos: [5000, 0, 400] }), terminal({ layer: 'M-OV-T1', subtype: 'convector' })],
+      colors,
+      frame,
+      5,
+    );
+    const meshes = instanced(built.group);
+    expect(meshes.map((mesh) => mesh.count).sort()).toEqual([1, 2]);
+    const san = meshes.find((mesh) => mesh.count === 2) as THREE.InstancedMesh;
+    expect((san.material as THREE.MeshStandardMaterial).color.getHex()).toBe(new THREE.Color('rgb(10, 200, 90)').getHex());
+    built.setLayerVisible('M-SAN-WC', false);
+    expect(meshes.filter((mesh) => mesh.visible)).toHaveLength(1);
+    built.dispose();
+  });
+});
+
 describe('InstancedMesh элементов', () => {
   const all: IFloor3dMepElement[] = [
     element({ subtype: 'elbow' }),

@@ -5888,7 +5888,7 @@
       },
       "CadMepRoute3dElement": {
         "additionalProperties": false,
-        "description": "Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура или гильза.",
+        "description": "Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура, гильза или оконечный прибор.\n\n`terminal` и `mark` - с `cad_mep.v15` (аддитивно). У прибора корпус - коробка `w_mm` (вдоль X) x\n`length_mm` (вдоль Y) x `h_mm` (высота) с центром `pos`; у `sprinkler` - цилиндр Ø `dn_mm`\nвысотой `h_mm`.",
         "properties": {
           "apt": {
             "anyOf": [
@@ -5964,6 +5964,18 @@
             ],
             "title": "Length Mm"
           },
+          "mark": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark"
+          },
           "outer_d_mm": {
             "anyOf": [
               {
@@ -6004,7 +6016,8 @@
             "enum": [
               "fitting",
               "valve",
-              "sleeve"
+              "sleeve",
+              "terminal"
             ],
             "title": "Type",
             "type": "string"
@@ -6035,7 +6048,7 @@
       },
       "CadMepRoute3dPolyline": {
         "additionalProperties": false,
-        "description": "3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.\n\nПоля сечения и изоляции - с `cad_mep_routes3d.v2`; у файла v1 они пусты (`shape` не задан,\nизоляции нет), и вид рисует такую полилинию линией.",
+        "description": "3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.\n\nПоля сечения и изоляции - с `cad_mep_routes3d.v2`; у файла v1 они пусты (`shape` не задан,\nизоляции нет), и вид рисует такую полилинию линией. `dn_source` и `mark` - с `cad_mep.v15`\n(аддитивно): откуда взят Ø или сечение и марка стояка из реестра; у старых файлов `None`.",
         "properties": {
           "apt": {
             "anyOf": [
@@ -6061,6 +6074,22 @@
               }
             ],
             "title": "Dn Mm"
+          },
+          "dn_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "line",
+                  "registry",
+                  "rule"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dn Source"
           },
           "h_mm": {
             "anyOf": [
@@ -6104,6 +6133,18 @@
             "minLength": 1,
             "title": "Layer",
             "type": "string"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark"
           },
           "pts": {
             "items": {

@@ -8,6 +8,7 @@ import {
   mergeSolids,
   normalizeAxis,
   polylineSolids,
+  DISPLAY_DN_UNKNOWN_MM,
   routeSection,
 } from './floor3d-mep-geometry';
 
@@ -25,6 +26,13 @@ const near = (value: number, expected: number): void =>
 const v = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z);
 
 describe('сечение полилинии', () => {
+  it('round без Ø или с нулём - труба условного Ø 20 мм, а не линия', () => {
+    expect(DISPLAY_DN_UNKNOWN_MM).toBe(20);
+    expect(routeSection({ shape: 'round', dn_mm: null })).toEqual({ shape: 'round', dnMm: 20 });
+    expect(routeSection({ shape: 'round', dn_mm: 0 })).toEqual({ shape: 'round', dnMm: 20 });
+    expect(routeSection({ shape: 'round' })).toEqual({ shape: 'round', dnMm: 20 });
+  });
+
   it('round с DN и rect с размерами - сечение; остальное - линия', () => {
     expect(routeSection({ shape: 'round', dn_mm: 110 })).toEqual({ shape: 'round', dnMm: 110 });
     expect(routeSection({ shape: 'rect', w_mm: 400, h_mm: 200 })).toEqual({
@@ -33,8 +41,6 @@ describe('сечение полилинии', () => {
       hMm: 200,
     });
     expect(routeSection({})).toBeNull();
-    expect(routeSection({ shape: 'round', dn_mm: null })).toBeNull();
-    expect(routeSection({ shape: 'round', dn_mm: 0 })).toBeNull();
     expect(routeSection({ shape: 'rect', w_mm: 400, h_mm: null })).toBeNull();
   });
 });

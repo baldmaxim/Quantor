@@ -16,10 +16,11 @@ from app.services import cad_mep as cad_mep_service
 
 CadJobType = Literal["cad_pdf_convert", "cad_mep_route"]
 
-# Границы полей 3D-трасс: размеры в мм, подпись квартиры, подтип элемента.
+# Границы полей 3D-трасс: размеры в мм, подпись квартиры, подтип элемента, марка.
 ROUTE3D_MAX_SIZE_MM = 1_000_000
 ROUTE3D_MAX_APT = 32
 ROUTE3D_MAX_SUBTYPE = 32
+ROUTE3D_MAX_MARK = 32
 
 
 class CadApprovalCreate(BaseModel):
@@ -286,7 +287,8 @@ class CadMepRoute3dPolyline(BaseModel):
     """3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.
 
     Поля сечения и изоляции - с `cad_mep_routes3d.v2`; у файла v1 они пусты (`shape` не задан,
-    изоляции нет), и вид рисует такую полилинию линией.
+    изоляции нет), и вид рисует такую полилинию линией. `dn_source` и `mark` - с `cad_mep.v15`
+    (аддитивно): откуда взят Ø или сечение и марка стояка из реестра; у старых файлов `None`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -299,6 +301,11 @@ class CadMepRoute3dPolyline(BaseModel):
     dn_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
     w_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
     h_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    # Источник Ø или сечения: line - линия генератора, registry - реестр стояков и сечений,
+    # rule - умолчание из params; None - не определён (файлы до v15).
+    dn_source: Literal["line", "registry", "rule"] | None = None
+    # Марка стояка из реестра («Ст К1-3», «ПК-1»), только у kind=riser.
+    mark: Annotated[str, Field(max_length=ROUTE3D_MAX_MARK)] | None = None
     # Толщина изоляции, мм; 0 - без изоляции.
     insulation_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] = 0
     # Уклон самотёка; иначе None.
@@ -307,13 +314,19 @@ class CadMepRoute3dPolyline(BaseModel):
 
 
 class CadMepRoute3dElement(BaseModel):
-    """Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура или гильза."""
+    """Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура, гильза или оконечный прибор.
+
+    `terminal` и `mark` - с `cad_mep.v15` (аддитивно). У прибора корпус - коробка `w_mm` (вдоль X) x
+    `length_mm` (вдоль Y) x `h_mm` (высота) с центром `pos`; у `sprinkler` - цилиндр Ø `dn_mm`
+    высотой `h_mm`.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["fitting", "valve", "sleeve"]
+    type: Literal["fitting", "valve", "sleeve", "terminal"]
     # fitting: elbow/tee/cross/reducer/cleanout; valve: ball_valve ... fire_damper;
-    # sleeve: wall/slab.
+    # sleeve: wall/slab; terminal: wc/washbasin/bath/shower/kitchen_sink/washer/floor_drain/
+    # convector/sprinkler/pk_cabinet/grille/ac_unit/ac_inlet.
     subtype: Annotated[str, Field(min_length=1, max_length=ROUTE3D_MAX_SUBTYPE)]
     layer: Annotated[str, Field(min_length=1, max_length=64)]
     # Центр элемента (мм) и единичная ось трубы в точке (целые, умноженные на 1000).
@@ -325,6 +338,8 @@ class CadMepRoute3dElement(BaseModel):
     length_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
     outer_d_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
     apt: Annotated[str, Field(max_length=ROUTE3D_MAX_APT)] | None = None
+    # Марка прибора или ПК, если известна.
+    mark: Annotated[str, Field(max_length=ROUTE3D_MAX_MARK)] | None = None
 
 
 class CadMepRoutes3dFile(BaseModel):

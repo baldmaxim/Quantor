@@ -1,6 +1,5 @@
 'use client';
 
-import { cx } from '@quantor/ui';
 import { useEffect, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
@@ -16,6 +15,7 @@ import {
   useSaveFloor3dSheetLevels,
   useSetFloor3dHole,
 } from '@/lib/cad/floor3d-queries';
+import type { IMepPick } from '@/lib/cad/floor3d-mep-pick';
 import { routesBaseZMm } from '@/lib/cad/floor3d-routes';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
 import { layerGroupKeys, type CadLayerCategory } from '@/lib/cad/layer-categories';
@@ -29,8 +29,11 @@ import { CadFloor3dDxfButton } from './CadFloor3dDxfButton';
 import { CadFloor3dHeights } from './CadFloor3dHeights';
 import { CadFloor3dHoleList } from './CadFloor3dHoleList';
 import { CadFloor3dInfoPanel } from './CadFloor3dInfoPanel';
+import { CadFloor3dLegend } from './CadFloor3dLegend';
+import { CadFloor3dMepPopover } from './CadFloor3dMepPopover';
 import { CadFloor3dPopover } from './CadFloor3dPopover';
 import { CadFloor3dWarnings } from './CadFloor3dWarnings';
+import { useFloor3dMepPick } from './useFloor3dMepPick';
 
 export interface ICadFloor3dViewProps {
   /** Лист и вид, которые показывает план: те же задание, страница и вид. */
@@ -62,19 +65,6 @@ const isConstructionPick = (pick: IFloor3dPick): boolean =>
     pick.category === 'masonry' ||
     pick.category === 'monolith' ||
     pick.category === 'frame_partition');
-
-const LEGEND: readonly { readonly label: string; readonly className: string }[] = [
-  { label: 'Плита', className: 'bg-border-strong' },
-  { label: 'Кладка', className: 'bg-[var(--cad-construction-masonry)]' },
-  { label: 'Монолит', className: 'bg-[var(--cad-construction-monolith)]' },
-  // Цвет как у кладки (так же в 2D): перегородка отличается штрихом, отдельного токена нет.
-  { label: 'Перегородки ГКЛ', className: 'bg-[var(--cad-construction-masonry)]' },
-  { label: 'Перемычки', className: 'bg-[var(--cad-construction-check)]' },
-  { label: 'Двери', className: 'bg-[var(--cad-layer-6)]' },
-  { label: 'Отверстие (кандидат)', className: 'bg-danger' },
-  { label: 'Отверстие (включено)', className: 'bg-success' },
-  { label: 'Не отверстие', className: 'bg-[var(--muted)]' },
-];
 
 const notReadyText = (error: unknown): string => {
   const status = wallsJobStatus(error);
@@ -147,11 +137,14 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const [selected, setSelected] = useState<IFloor3dPick | null>(null);
   const [measuring, setMeasuring] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
+  const mep = useFloor3dMepPick(routesData, stage);
+  const { clear: clearMep } = mep;
 
   // Локальное: плашка и подсветка перемычки, двери, отверстия.
   const closeLocal = () => {
     setPicked(null);
     setSelected(null);
+    mep.clear();
     setPopoverError(null);
   };
   // Плашка закрыта или выбор снят: общий выбор конструкций тоже очищается.
@@ -166,7 +159,9 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   };
 
   useEffect(() => {
-    if (picked === null && selected === null && selectedIds.size === 0 && !measuring) return undefined;
+    if (picked === null && selected === null && mep.pick === null && selectedIds.size === 0 && !measuring) {
+      return undefined;
+    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       if (measuring) {
@@ -175,12 +170,13 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
       }
       setPicked(null);
       setSelected(null);
+      clearMep();
       setPopoverError(null);
       onSelectConstruction?.(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [picked, selected, selectedIds, measuring, onSelectConstruction]);
+  }, [picked, selected, mep.pick, clearMep, selectedIds, measuring, onSelectConstruction]);
 
   const request = (kind: IFloor3dViewRequest['kind']) =>
     setViewRequest((current) => ({ kind, seq: (current?.seq ?? 0) + 1 }));
@@ -191,6 +187,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
     // Решение по отверстию - запись: в режиме просмотра плашка отверстия не открывается.
     if (readOnly && pick?.kind === 'hole') return;
     setPopoverError(null);
+    mep.clear();
     // Повторный клик по уже выбранному элементу снимает выбор и в 3D, и в плане.
     // Признак - открытая плашка этого же элемента (выбор из плана плашку не открывает).
     const again =
@@ -211,6 +208,21 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
     setPicked(
       pick === null || !rect ? null : { pick, anchor, bounds: { width: rect.width, height: rect.height } },
     );
+  };
+
+  // Трасса или элемент ВИС: повторный клик по выбранному снимает выбор; иначе выбор заменяет
+  // конструкцию (общий выбор очищается), плашка открывается у курсора.
+  const onPickMep = (pick: IMepPick, anchor: { x: number; y: number }) => {
+    if (measuring || routesData === null) return;
+    if (mep.isSelected(pick)) {
+      closePick();
+      return;
+    }
+    setPicked(null);
+    setSelected(null);
+    setPopoverError(null);
+    onSelectConstruction?.(null);
+    mep.select(pick, anchor);
   };
 
   // «Выбрать стену» в плашке проёма: локальный выбор снимается, стена уходит в общий выбор,
@@ -290,6 +302,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
           showSlabCap={showSlabCap}
           viewRequest={viewRequest}
           selected={selected}
+          selectedMep={mep.pick}
           selectedIds={selectedIds}
           hiddenCategories={hiddenCategories}
           hiddenConstructionIds={hiddenConstructionIds}
@@ -297,13 +310,18 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
           hostCategoryOf={groupKeys.categoryOf}
           measuring={measuring}
           onPick={onPick}
+          onPickMep={onPickMep}
           // Камера пошла - плашка у курсора устарела, а выделение остаётся.
           onMove={() => {
             setPicked(null);
             setPopoverError(null);
+            mep.hidePopup();
           }}
           onError={setCanvasError}
         />
+        {mep.popup !== null && mep.info !== null && (
+          <CadFloor3dMepPopover info={mep.info} anchor={mep.popup.anchor} bounds={mep.popup.bounds} onClose={closePick} />
+        )}
         {popup !== null && (
           <CadFloor3dPopover
             pick={popup.pick}
@@ -462,19 +480,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
               Измерение: укажите две точки. Esc - выход.
             </p>
           )}
-          {interactive && (
-            <ul
-              aria-label="Условные обозначения"
-              className="pointer-events-none absolute bottom-[var(--s-4)] left-[var(--s-4)] flex max-w-[calc(100%-16px)] flex-wrap gap-x-[var(--s-4)] gap-y-[var(--s-2)] rounded-[var(--radius-sm)] bg-surface/80 px-[var(--s-3)] py-[var(--s-2)] text-xs"
-            >
-              {LEGEND.map((item) => (
-                <li key={item.label} className="flex items-center gap-[var(--s-2)]">
-                  <span aria-hidden="true" className={cx('h-[10px] w-[10px] rounded-[2px]', item.className)} />
-                  {item.label}
-                </li>
-              ))}
-            </ul>
-          )}
+          {interactive && <CadFloor3dLegend />}
         </div>
       </div>
     </div>

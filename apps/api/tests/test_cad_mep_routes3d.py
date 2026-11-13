@@ -238,6 +238,8 @@ async def test_routes3d_reads_the_file_and_compares_heights_with_the_sheet_level
             "dn_mm": None,
             "w_mm": None,
             "h_mm": None,
+            "dn_source": None,
+            "mark": None,
             "insulation_mm": 0,
             "slope": None,
             "apt": None,
@@ -330,6 +332,55 @@ def test_routes3d_contract_accepts_both_schemas_and_rejects_foreign_ones() -> No
                         "axis": [1, 0, 0],
                     }
                 ],
+            }
+        )
+
+
+def test_routes3d_contract_v15_adds_dn_source_mark_and_terminals() -> None:
+    base = {"frame": "view_dxf_mm", "floor_elevation_mm": None, "floor_height_mm": None}
+    old_line = {"layer": "M-VK-V1", "pts": [[0, 0, 0], [1, 0, 0]], "shape": "round", "dn_mm": 25}
+    old = CadMepRoutes3dFile.model_validate(
+        {**base, "schema": "cad_mep_routes3d.v2", "polylines": [old_line], "elements": []}
+    )
+    assert old.polylines[0].dn_source is None and old.polylines[0].mark is None
+    new_line = {**old_line, "kind": "riser", "dn_source": "registry", "mark": "Ст К1-3"}
+    terminal = {
+        "type": "terminal",
+        "subtype": "wc",
+        "layer": "M-SAN-WC",
+        "pos": [100, 200, 400],
+        "axis": [0, 0, 1000],
+        "w_mm": 360,
+        "length_mm": 600,
+        "h_mm": 800,
+        "mark": "У-1",
+    }
+    new = CadMepRoutes3dFile.model_validate(
+        {**base, "schema": "cad_mep_routes3d.v2", "polylines": [new_line], "elements": [terminal]}
+    )
+    assert (new.polylines[0].dn_source, new.polylines[0].mark) == ("registry", "Ст К1-3")
+    assert (new.elements[0].type, new.elements[0].mark) == ("terminal", "У-1")
+    old_valve = {k: v for k, v in terminal.items() if k != "mark"} | {"type": "valve"}
+    assert (
+        CadMepRoutes3dFile.model_validate(
+            {**base, "schema": "cad_mep_routes3d.v2", "polylines": [], "elements": [old_valve]}
+        )
+        .elements[0]
+        .mark
+        is None
+    )
+    for bad_line in ({**old_line, "dn_source": "guess"}, {**old_line, "mark": "x" * 33}):
+        with pytest.raises(ValidationError):
+            CadMepRoutes3dFile.model_validate(
+                {**base, "schema": "cad_mep_routes3d.v2", "polylines": [bad_line]}
+            )
+    with pytest.raises(ValidationError):
+        CadMepRoutes3dFile.model_validate(
+            {
+                **base,
+                "schema": "cad_mep_routes3d.v2",
+                "polylines": [],
+                "elements": [{**terminal, "mark": "x" * 33}],
             }
         )
 

@@ -17,6 +17,7 @@ const COLORS: IFloor3dRouteColors = {
   fallback: 'rgb(9, 9, 9)',
   insulation: 'rgb(220, 200, 120)',
   sleeve: 'rgb(120, 130, 140)',
+  accent: 'rgb(255, 0, 255)',
 };
 
 const plan = buildFloor3dPlan(floor3dFixture());
@@ -204,7 +205,7 @@ describe('объёмные трассы (cad_mep_routes3d.v2)', () => {
     ...patch,
   });
 
-  it('полилиния без shape (файл v1) или без DN остаётся линией', () => {
+  it('полилиния без shape (файл v1) или короб без размеров остаётся линией; круглая без Ø - труба', () => {
     const routes = buildFloor3dRoutes(
       [
         {
@@ -214,14 +215,22 @@ describe('объёмные трассы (cad_mep_routes3d.v2)', () => {
             [1000, 0, 0],
           ],
         },
-        pipe({ dn_mm: null }),
         pipe({ shape: 'rect', w_mm: 400, h_mm: null }),
       ],
       COLORS,
       frame,
     );
-    expect(lines(routes.group)).toHaveLength(3);
+    expect(lines(routes.group)).toHaveLength(2);
     expect(meshes(routes.group)).toHaveLength(0);
+    routes.dispose();
+  });
+
+  it('круглая без Ø рисуется трубой условного Ø 20 мм', () => {
+    const routes = buildFloor3dRoutes([pipe({ dn_mm: null })], COLORS, frame);
+    expect(lines(routes.group)).toHaveLength(0);
+    const [mesh] = meshes(routes.group);
+    const box = new THREE.Box3().setFromObject(mesh as THREE.Mesh);
+    expect(box.getSize(new THREE.Vector3()).x).toBeCloseTo(0.02, 2);
     routes.dispose();
   });
 
