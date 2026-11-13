@@ -83,6 +83,24 @@ async def heartbeat(
     )
 
 
+async def touch(session: AsyncSession, *, worker_id: str) -> bool:
+    """Отмечает исполнителя живым, не трогая его текущую работу. False — записи нет.
+
+    Отдельно от `heartbeat`: отметка идёт по таймеру из своей сессии, параллельно захвату
+    и завершению задания. Пиши она `current_job_id`, она затирала бы только что захваченное
+    задание устаревшим значением.
+
+    False означает, что запись убрали — сборщик решил, что исполнитель умер, пока тот,
+    например, не мог достучаться до базы. Тогда исполнитель регистрируется заново.
+    """
+    # `returning id` вместо rowcount — по той же причине, что и в пульсе задания.
+    updated = await session.scalar(
+        text("update workers set heartbeat_at = now() where id = :id returning id"),
+        {"id": worker_id},
+    )
+    return updated is not None
+
+
 async def unregister(session: AsyncSession, *, worker_id: str) -> None:
     """Убирает запись при корректной остановке.
 
@@ -131,6 +149,9 @@ async def prune_stale(session: AsyncSession, *, older_than_seconds: int) -> int:
 
     Задания они уже отпустили — этим занимается сборщик брошенных, — и держать их
     записи значит копить мусор, по которому потом судят о состоянии установки.
+
+    Живого исполнителя это не задевает: он отмечается по таймеру (`touch`) и в простое,
+    и во время долгого задания, так что его отметка всегда свежее порога.
     """
     result = await session.execute(
         text(

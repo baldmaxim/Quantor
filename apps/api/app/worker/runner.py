@@ -15,6 +15,11 @@ Celery и Temporal добавили бы инфраструктуру, кото�
   задание могли отобрать, решив, что исполнитель умер;
 - **брошенные задания подбирает тот же процесс.** Отдельного сторожа нет: он был бы
   ещё одним, что надо запускать и мониторить, а работы там на один запрос раз в полминуты.
+
+Отметка жизни исполнителя (`workers.heartbeat_at`) идёт по своему таймеру, а не только
+при захвате задания: иначе простаивающий исполнитель через порог молчания выглядел бы
+в готовности мёртвым, а сборщик потом и вовсе удалял бы его запись. Тот же таймер держит
+отметку свежей во время долгого задания — пульс аренды пишет в `jobs`, а не в `workers`.
 """
 
 from __future__ import annotations
@@ -27,6 +32,8 @@ import signal
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import API_VERSION
 from app.core.config import Settings, get_settings
@@ -93,19 +100,34 @@ class Worker:
         """
         self._stopping.set()
 
+    async def _register(self, session: AsyncSession) -> None:
+        await workers_service.register(
+            session,
+            worker_id=self.worker_id,
+            host=platform.node()[:255] or "unknown",
+            pid=os.getpid(),
+            version=API_VERSION,
+            job_types=self._supported_types(),
+        )
+
+    async def beat(self, session: AsyncSession) -> None:
+        """Одна отметка жизни. Запись пропала — исполнитель регистрируется заново.
+
+        Пропасть она может, если исполнитель долго не мог достучаться до базы и сборщик
+        другого процесса счёл его мёртвым. Работающий процесс не должен оставаться
+        невидимым для готовности до перезапуска.
+        """
+        if await workers_service.touch(session, worker_id=self.worker_id):
+            return
+        await self._register(session)
+        log.warning("worker_reregistered", worker_id=self.worker_id)
+
     async def run(self) -> None:
         settings = self._settings
         factory = get_worker_session_factory()
 
         async with factory() as session:
-            await workers_service.register(
-                session,
-                worker_id=self.worker_id,
-                host=platform.node()[:255] or "unknown",
-                pid=os.getpid(),
-                version=API_VERSION,
-                job_types=self._supported_types(),
-            )
+            await self._register(session)
             await session.commit()
 
         log.info(
@@ -116,6 +138,7 @@ class Worker:
         )
 
         reaper = asyncio.create_task(self._reap_forever())
+        pulse = asyncio.create_task(self._beat_forever())
         try:
             while not self._stopping.is_set():
                 claimed = await self._claim_and_run()
@@ -125,8 +148,11 @@ class Worker:
                         async with asyncio.timeout(settings.worker_poll_interval_seconds):
                             await self._stopping.wait()
         finally:
+            # Отметка гасится до снятия с учёта: иначе удар после `unregister` вернул бы
+            # остановленного исполнителя в список живых.
             reaper.cancel()
-            await asyncio.gather(reaper, return_exceptions=True)
+            pulse.cancel()
+            await asyncio.gather(reaper, pulse, return_exceptions=True)
             async with factory() as session:
                 await workers_service.unregister(session, worker_id=self.worker_id)
                 await session.commit()
@@ -227,6 +253,26 @@ class Worker:
                 error_message=reason,
             )
             await session.commit()
+
+    async def _beat_forever(self) -> None:
+        """Отмечает исполнителя живым не реже порога молчания — и в простое, и в работе.
+
+        Раз в интервал пульса аренды (треть её срока): порог молчания — три аренды, так что
+        до тревоги в готовности должно пропасть девять отметок подряд. Нагрузка — одно
+        обновление по ключу раз в двадцать секунд на процесс, на фоне опроса очереди
+        раз в секунду её не видно.
+        """
+        settings = self._settings
+        factory = get_worker_session_factory()
+        while True:
+            await asyncio.sleep(settings.worker_heartbeat_interval_seconds)
+            try:
+                async with factory() as session:
+                    await self.beat(session)
+                    await session.commit()
+            except Exception as error:
+                # Как и сборщик: недоступная на минуту база — не повод останавливать работу.
+                log.warning("worker_heartbeat_failed", error_type=type(error).__name__)
 
     async def _reap_forever(self) -> None:
         """Подбирает задания, чей исполнитель замолчал."""

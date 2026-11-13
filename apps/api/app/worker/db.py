@@ -31,9 +31,10 @@ def get_worker_engine() -> AsyncEngine:
         pool_pre_ping=True,
         # Соединений ровно столько, сколько заданий процесс исполняет одновременно,
         # плюс одно на пульс: он ходит своей сессией, потому что сессия задания занята
-        # длинной транзакцией.
+        # длинной транзакцией. Запас — на редкие короткие сессии отметки жизни
+        # исполнителя и сборщика брошенных, когда они совпали с пульсом аренды.
         pool_size=settings.worker_concurrency + 1,
-        max_overflow=1,
+        max_overflow=2,
         echo=False,
         connect_args={"command_timeout": STATEMENT_TIMEOUT_SECONDS},
     )

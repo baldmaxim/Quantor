@@ -21,9 +21,12 @@ from app.models import Job
 from app.services import jobs as jobs_service
 from app.services import projects as projects_service
 from app.services import workers as workers_service
+from app.worker import runner
 
 LEASE = 60
 TYPES = [JobType.LEGACY_IMPORT.value]
+# Порог молчания исполнителя — как `worker_stale_after_seconds` по умолчанию.
+STALE = 180
 
 
 async def _queued(session: AsyncSession, workspace_id: uuid.UUID, name: str = "Проект") -> Job:
@@ -346,6 +349,98 @@ async def test_stopped_worker_is_not_counted_as_dead(db_session: AsyncSession) -
     await db_session.commit()
 
     assert (await workers_service.health(db_session, stale_after_seconds=180)).is_present is False
+
+
+async def _silence(session: AsyncSession, worker_id: str) -> None:
+    """Сдвигает отметку на час назад: дольше и порога молчания, и порога сборщика."""
+    await session.execute(
+        text("update workers set heartbeat_at = now() - interval '1 hour' where id = :id"),
+        {"id": worker_id},
+    )
+    await session.commit()
+
+
+async def test_idle_worker_stays_alive_past_the_threshold(db_session: AsyncSession) -> None:
+    """Простаивающий исполнитель не становится молчащим и не попадает под сборщик.
+
+    Регрессия боевого стенда: отметка ставилась только при захвате задания, и живой
+    исполнитель без заданий через три минуты числился молчащим, а через полчаса сборщик
+    удалял его запись. Теперь цикл отмечается по таймеру (`Worker.beat`); тишина дольше
+    обоих порогов имитируется сдвигом отметки, без ожидания.
+    """
+    worker = runner.Worker(handlers={})
+    await workers_service.register(
+        db_session, worker_id=worker.worker_id, host="host", pid=1, version="v1", job_types=[]
+    )
+    await workers_service.register(
+        db_session, worker_id="w-dead", host="host", pid=2, version="v1", job_types=TYPES
+    )
+    await db_session.commit()
+    await _silence(db_session, worker.worker_id)
+    await _silence(db_session, "w-dead")
+
+    await worker.beat(db_session)
+    await db_session.commit()
+
+    health = await workers_service.health(db_session, stale_after_seconds=STALE)
+    assert health.alive == 1
+    assert health.stale == 1
+
+    # Порог сборщика — как в цикле исполнителя: десять порогов молчания.
+    pruned = await workers_service.prune_stale(db_session, older_than_seconds=STALE * 10)
+    await db_session.commit()
+    assert pruned == 1, "уходит только умерший"
+
+    left = await workers_service.list_workers(db_session)
+    assert [item.id for item in left] == [worker.worker_id]
+
+
+async def test_beat_keeps_the_current_job(
+    db_session: AsyncSession, workspace_id: uuid.UUID
+) -> None:
+    """Отметка по таймеру не затирает задание, которое исполнитель сейчас делает.
+
+    Она идёт своей сессией параллельно захвату: пиши она `current_job_id`, в админке
+    выполняющееся задание пропадало бы у исполнителя.
+    """
+    job = await _queued(db_session, workspace_id)
+    worker = runner.Worker(handlers={})
+    await workers_service.register(
+        db_session, worker_id=worker.worker_id, host="host", pid=1, version="v1", job_types=TYPES
+    )
+    await workers_service.heartbeat(db_session, worker_id=worker.worker_id, current_job_id=job.id)
+    await db_session.commit()
+
+    await worker.beat(db_session)
+    await db_session.commit()
+
+    current = await db_session.scalar(
+        text("select current_job_id from workers where id = :id"), {"id": worker.worker_id}
+    )
+    assert current == job.id
+
+
+async def test_pruned_worker_registers_again_on_beat(db_session: AsyncSession) -> None:
+    """Запись убрал сборщик — живой исполнитель возвращается следующей отметкой.
+
+    Так бывает, если процесс долго не мог достучаться до базы. Без повторной регистрации
+    работающий исполнитель оставался бы невидимым для готовности до перезапуска.
+    """
+    worker = runner.Worker(handlers={})
+    await workers_service.register(
+        db_session, worker_id=worker.worker_id, host="host", pid=1, version="v1", job_types=[]
+    )
+    await db_session.commit()
+    await _silence(db_session, worker.worker_id)
+    assert await workers_service.prune_stale(db_session, older_than_seconds=STALE * 10) == 1
+    await db_session.commit()
+    assert (await workers_service.health(db_session, stale_after_seconds=STALE)).is_present is False
+
+    await worker.beat(db_session)
+    await db_session.commit()
+
+    health = await workers_service.health(db_session, stale_after_seconds=STALE)
+    assert health.alive == 1
 
 
 async def test_claim_takes_jobs_of_every_scope(
