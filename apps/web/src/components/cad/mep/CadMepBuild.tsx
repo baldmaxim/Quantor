@@ -3,12 +3,8 @@
 import { useState, type FC } from 'react';
 
 import { Button } from '@/components/ui';
-import {
-  elevationError,
-  floorHeightError,
-  mepErrorText,
-  optionalMm,
-} from '@/lib/cad/mep-gates';
+import { useBuildEom } from '@/lib/cad/eom-queries';
+import { elevationError, floorHeightError, mepErrorText, optionalMm } from '@/lib/cad/mep-gates';
 import { reusedRouteNotice } from '@/lib/cad/mep-reuse';
 import { useBuildMepRoutes } from '@/lib/cad/mep-queries';
 import { sectionWarningText } from '@/lib/cad/sections';
@@ -32,8 +28,11 @@ interface ICadMepBuildProps {
 }
 
 /**
- * Шаг 2: «Построить трассы». По умолчанию отметку пола и высоту этажа генератор определяет сам
- * по документации (с источником и цитатой в итогах); «Задать вручную» - переопределение человека.
+ * Шаг 2: «Построить трассы, ЭОМ и СС». По умолчанию отметку пола и высоту этажа генератор определяет
+ * сам по документации (с источником и цитатой в итогах); «Задать вручную» - переопределение человека.
+ * Одна кнопка ставит оба задания по одному одобренному виду и с одними значениями: сначала трассы
+ * механики, затем ЭОМ и СС (`cad_eom_route`). Сервер идемпотентен: повторное нажатие с теми же
+ * параметрами возвращает прежние задания, а не плодит новые.
  */
 export const CadMepBuild: FC<ICadMepBuildProps> = ({
   parent,
@@ -43,6 +42,8 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({
   sections = null,
 }) => {
   const build = useBuildMepRoutes(parent);
+  const eom = useBuildEom(parent);
+  const [eomProblem, setEomProblem] = useState<string | null>(null);
   const [manual, setManual] = useState(false);
   const [elevation, setElevation] = useState('');
   const [height, setHeight] = useState('');
@@ -59,31 +60,32 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({
 
   const submit = () => {
     setTouched(true);
-    if (!valid || build.isPending) return;
+    if (!valid || build.isPending || eom.isPending) return;
     setProblem(null);
+    setEomProblem(null);
     setWarnings([]);
     setReusedNotice(null);
     const known = new Set(knownRouteJobIds);
-    build.mutate(
-      {
-        floorElevationMm: manual ? optionalMm(elevation) : null,
-        floorHeightMm: manual ? optionalMm(height) : null,
+    const levels = {
+      floorElevationMm: manual ? optionalMm(elevation) : null,
+      floorHeightMm: manual ? optionalMm(height) : null,
+    };
+    build.mutate(levels, {
+      onSuccess: (job) => {
+        setWarnings(job.warnings ?? []);
+        setReusedNotice(reusedRouteNotice(job, known));
+        onCreated(job.job_id);
+        // ЭОМ и СС - следом, по тому же виду и с теми же отметкой и высотой.
+        eom.mutate(levels, { onError: (error) => setEomProblem(mepErrorText(error)) });
       },
-      {
-        onSuccess: (job) => {
-          setWarnings(job.warnings ?? []);
-          setReusedNotice(reusedRouteNotice(job, known));
-          onCreated(job.job_id);
-        },
-        onError: (error) => setProblem(mepErrorText(error)),
-      },
-    );
+      onError: (error) => setProblem(mepErrorText(error)),
+    });
   };
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-4)]">
       <form
-        aria-label="Построить трассы"
+        aria-label="Построить трассы, ЭОМ и СС"
         className="flex min-w-0 flex-col gap-[var(--s-4)]"
         noValidate
         onSubmit={(event) => {
@@ -122,17 +124,26 @@ export const CadMepBuild: FC<ICadMepBuildProps> = ({
             высоту нужно кнопкой «Пересчитать» в разделе 3.
           </p>
         )}
+        <p className="text-xs text-muted">
+          Вместе с трассами механики строятся ЭОМ и СС этажа: ход и ведомость — в разделе 4, слои —
+          в 3D этажа.
+        </p>
         <Button
           type="submit"
           variant="primary"
-          loading={build.isPending}
+          loading={build.isPending || eom.isPending}
           className="self-start max-md:h-[44px] max-md:w-full"
         >
-          Построить трассы
+          Построить трассы, ЭОМ и СС
         </Button>
         {problem && (
           <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
             {problem}
+          </p>
+        )}
+        {eomProblem && (
+          <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
+            ЭОМ и СС не поставлены: {eomProblem}
           </p>
         )}
         {reusedNotice && (

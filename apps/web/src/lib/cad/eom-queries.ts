@@ -119,14 +119,23 @@ export const useCadEomRoutes3d = (sheet: ICadEomSheet, enabled: boolean): CadEom
   return query.isError ? { status: 'error' } : { status: 'loading' };
 };
 
+/**
+ * Отметка и высота этажа для ЭОМ и СС - те же, что у трасс механики: `null` (или без аргумента) -
+ * генератор определяет их по документации, число - ручной ввод человека.
+ */
+export interface IEomBuildInput {
+  floorElevationMm: number | null;
+  floorHeightMm: number | null;
+}
+
 /** Построить ЭОМ и СС по одобренному виду (`parent` - задание CAD и попытка вида). */
 export const useBuildEom = (
   parent: ICadViewParams,
-): UseMutationResult<CadEomJobRead, unknown, void> => {
+): UseMutationResult<CadEomJobRead, unknown, IEomBuildInput | void> => {
   const client = useQueryClient();
   const sheet: ICadEomSheet = parent;
   return useMutation({
-    mutationFn: async () =>
+    mutationFn: async (input: IEomBuildInput | void) =>
       unwrap(
         await createCadEomRoutes({
           throwOnError: true,
@@ -137,7 +146,11 @@ export const useBuildEom = (
             page_index: parent.pageIndex,
             view: parent.view,
           },
-          body: { attempt: parent.attempt, floor_elevation_mm: null, floor_height_mm: null },
+          body: {
+            attempt: parent.attempt,
+            floor_elevation_mm: input ? input.floorElevationMm : null,
+            floor_height_mm: input ? input.floorHeightMm : null,
+          },
         }),
       ),
     onSettled: () => {

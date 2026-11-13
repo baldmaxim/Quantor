@@ -9,6 +9,7 @@ import { CANDIDATE_SCHEMA } from '@/lib/cad/mep-candidate';
 const api = vi.hoisted(() => ({
   approveCadView: vi.fn(),
   createCadMepRoutes: vi.fn(),
+  createCadEomRoutes: vi.fn(),
   acceptCadMepRoutes: vi.fn(),
   downloadCadArtifact: vi.fn(),
   revokeCadDecision: vi.fn(),
@@ -120,6 +121,9 @@ const failure = (code: string) => ({ detail: { code } });
 beforeEach(() => {
   vi.clearAllMocks();
   api.downloadCadArtifact.mockResolvedValue({ data: candidate });
+  api.createCadEomRoutes.mockResolvedValue({
+    data: { job_id: 'job-eom', status: 'queued', attempt: 0 },
+  });
 });
 
 describe('вкладка «Трассы»: одобрение вида', () => {
@@ -167,7 +171,7 @@ describe('вкладка «Трассы»: одобрение вида', () => {
 describe('вкладка «Трассы»: построение', () => {
   it('без одобрения формы нет, есть подсказка', () => {
     mount(mep());
-    expect(screen.queryByRole('form', { name: 'Построить трассы' })).toBeNull();
+    expect(screen.queryByRole('form', { name: 'Построить трассы, ЭОМ и СС' })).toBeNull();
     expect(screen.getByText('Трассы строятся только по одобренному виду.')).toBeInTheDocument();
   });
 
@@ -179,11 +183,49 @@ describe('вкладка «Трассы»: построение', () => {
       screen.getByText('Отметка и высота этажа будут определены по документации.'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Отметка пола, мм' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
     await waitFor(() => expect(value.onSelectRoute).toHaveBeenCalledWith('job-route'));
     expect(api.createCadMepRoutes.mock.calls[0]?.[0]).toMatchObject({
       body: { attempt: 2, floor_elevation_mm: null, floor_height_mm: null },
     });
+  });
+
+  it('одна кнопка ставит и трассы, и ЭОМ и СС: тот же вид, те же отметка и высота', async () => {
+    api.createCadMepRoutes.mockResolvedValue({ data: { job_id: 'job-route', status: 'queued', attempt: 0 } });
+    const value = mep({ approval: decision('view_approval') });
+    mount(value);
+    fireEvent.click(screen.getByRole('button', { name: 'Задать вручную' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Отметка пола, мм' }), {
+      target: { value: '47600' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Высота этажа, мм' }), {
+      target: { value: '3300' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
+    await waitFor(() => expect(api.createCadEomRoutes).toHaveBeenCalledTimes(1));
+    expect(api.createCadMepRoutes).toHaveBeenCalledTimes(1);
+    expect(api.createCadEomRoutes.mock.calls[0]?.[0]).toMatchObject({
+      path: { job_id: 'job-parent', page_index: 80, view: 1 },
+      body: { attempt: 2, floor_elevation_mm: 47600, floor_height_mm: 3300 },
+    });
+  });
+
+  it('трассы не поставлены - ЭОМ и СС не ставятся', async () => {
+    api.createCadMepRoutes.mockRejectedValue(failure('CAD_VIEW_NOT_APPROVED'));
+    mount(mep({ approval: decision('view_approval') }));
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
+    expect(await screen.findByText('Вид не одобрен: сначала одобрите его.')).toBeInTheDocument();
+    expect(api.createCadEomRoutes).not.toHaveBeenCalled();
+  });
+
+  it('отказ ЭОМ и СС показан отдельно, трассы при этом открыты', async () => {
+    api.createCadMepRoutes.mockResolvedValue({ data: { job_id: 'job-route', status: 'queued', attempt: 0 } });
+    api.createCadEomRoutes.mockRejectedValue(failure('CAD_VIEW_NOT_APPROVED'));
+    const value = mep({ approval: decision('view_approval') });
+    mount(value);
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
+    await waitFor(() => expect(value.onSelectRoute).toHaveBeenCalledWith('job-route'));
+    expect(await screen.findByText(/^ЭОМ и СС не поставлены: Вид не одобрен/)).toBeInTheDocument();
   });
 
   it('новое задание - без сообщения о прежнем', async () => {
@@ -192,7 +234,7 @@ describe('вкладка «Трассы»: построение', () => {
     });
     const value = mep({ approval: decision('view_approval') });
     mount(value);
-    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
     await waitFor(() => expect(value.onSelectRoute).toHaveBeenCalledWith('job-route'));
     expect(screen.queryByText(/с этими параметрами/)).toBeNull();
   });
@@ -203,7 +245,7 @@ describe('вкладка «Трассы»: построение', () => {
     });
     const value = mep({ approval: decision('view_approval') });
     mount(value);
-    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
     await waitFor(() => expect(value.onSelectRoute).toHaveBeenCalledWith('job-route'));
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Трассы с этими параметрами уже построены — открыт готовый результат.',
@@ -216,7 +258,7 @@ describe('вкладка «Трассы»: построение', () => {
     });
     const value = mep({ approval: decision('view_approval') });
     mount(value);
-    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
     expect(
       await screen.findByText(/несколько принятых уровней с разной высотой — уточните уровни на листе разреза/),
     ).toBeInTheDocument();
@@ -228,7 +270,7 @@ describe('вкладка «Трассы»: построение', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Высота этажа, мм' }), {
       target: { value: '1500' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
     expect(api.createCadMepRoutes).not.toHaveBeenCalled();
     expect(screen.getByText(/Высота этажа вне пределов/)).toBeInTheDocument();
   });
@@ -253,7 +295,7 @@ describe('вкладка «Трассы»: построение', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Высота этажа, мм' }), {
       target: { value: '3300' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
     await waitFor(() => expect(value.onSelectRoute).toHaveBeenCalledWith('job-route'));
     expect(api.createCadMepRoutes.mock.calls[0]?.[0]).toMatchObject({
       path: { job_id: 'job-parent', page_index: 80, view: 1 },
@@ -271,7 +313,7 @@ describe('вкладка «Трассы»: построение', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Высота этажа, мм' }), {
       target: { value: '3000' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Построить трассы, ЭОМ и СС' }));
     expect(await screen.findByText('Вид не одобрен: сначала одобрите его.')).toBeInTheDocument();
   });
 });

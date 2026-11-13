@@ -37,7 +37,7 @@ export const CadMepPanel: FC<IWorkspaceCadMep> = ({
       />
     </InspectorSection>
 
-    <InspectorSection title="2. Построить трассы">
+    <InspectorSection title="2. Построить трассы, ЭОМ и СС">
       {approval ? (
         <CadMepBuild
           parent={parent}
