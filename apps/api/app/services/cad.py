@@ -60,10 +60,11 @@ FLOOR3D_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/floor3d\.dxf$")
 ZONES_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/zones\.json$")
 # Артефакт задания «Разрезы» (`cad_sections`): один файл в корне артефактов задания.
 SECTIONS_ARTIFACT_NAME: Final = re.compile(r"^sections\.json$")
-# Артефакты задания ЭОМ и СС (`cad_eom_route`): отчёт, манифест и три файла в каталоге вида.
+# Артефакты задания ЭОМ и СС (`cad_eom_route`): отчёт, манифест и файлы в каталоге вида.
 EOM_ARTIFACT_NAME: Final = re.compile(
     r"^(?:report\.json|manifest\.json|"
-    r"views/p\d{3}_v\d{2}/(?:eom_routes\.dxf|eom_candidate\.json|eom_routes3d\.json))$"
+    r"views/p\d{3}_v\d{2}/(?:eom_routes\.dxf|eom_candidate\.json|eom_routes3d\.json|"
+    r"eom_preview\.json))$"
 )
 CONTENT_TYPES: Final = {".dxf": "application/dxf", ".json": "application/json"}
 # Типы заданий контура CAD: у обоих один и тот же вид доступа (пространство, проект, ревизия).

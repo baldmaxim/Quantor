@@ -11,8 +11,8 @@
 
 Коды выхода: 0 - готово; 2 - ошибка входа; 3 - ЭОМ и СС не построены (причина - одной строкой
 JSON `{"code", "message"}` в stderr). Выход строго по контракту: `views/<вид>/eom_routes3d.json`,
-`eom_candidate.json`, `eom_routes.dxf` (R2018), необязательный `report.json`; `manifest.json`
-пишет исполнитель.
+`eom_candidate.json`, `eom_routes.dxf` (R2018), необязательные `eom_preview.json` (2D для листа)
+и `report.json`; `manifest.json` пишет исполнитель.
 """
 
 from __future__ import annotations
@@ -163,7 +163,9 @@ def verified_outputs(
     folder = source.folder
     required = {f"{folder}/{name}" for name in cad_eom_service.OUTPUT_FILES}
     present = {p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file()}
-    extra = present - required - {"report.json", "manifest.json"}
+    preview_name = f"{folder}/{cad_eom_service.PREVIEW_JSON}"
+    optional = {preview_name} & present
+    extra = present - required - optional - {"report.json", "manifest.json"}
     if extra or not required <= present:
         raise CadError(ErrorCode.CAD_ENGINE_FAILED, "состав out/ не совпал с контрактом генератора")
     for name in sorted(present):
@@ -179,6 +181,10 @@ def verified_outputs(
     candidate = _read_json_file(out / folder / cad_eom_service.CANDIDATE_JSON)
     if candidate.get("schema") != cad_eom_service.CANDIDATE_SCHEMA:
         raise CadError(ErrorCode.CAD_ENGINE_FAILED, "eom_candidate.json вне контракта")
+    if optional:
+        preview = _read_json_file(out / preview_name)
+        if preview.get("schema") != cad_eom_service.PREVIEW_SCHEMA or preview.get("units") != "mm":
+            raise CadError(ErrorCode.CAD_ENGINE_FAILED, "eom_preview.json вне контракта")
     if "report.json" not in present:
         report = {
             "schema": "quantor.cad_eom.report.v1",
@@ -203,7 +209,7 @@ def verified_outputs(
         _read_json_file(out / "report.json")
     files = [
         {"name": name, "sha256": _sha256(out / name), "size": (out / name).stat().st_size}
-        for name in sorted(required | {"report.json"})
+        for name in sorted(required | optional | {"report.json"})
     ]
     manifest = {
         "schema": "quantor.cad_eom.manifest.v1",

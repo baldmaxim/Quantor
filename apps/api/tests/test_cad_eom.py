@@ -55,6 +55,16 @@ if elevation == 88888:
 folder = pathlib.Path(args.out) / "views" / args.view_folder
 folder.mkdir(parents=True)
 (folder / "eom_routes.dxf").write_bytes(b"0\\nSECTION\\n9\\n$ACADVER\\n1\\nAC1032\\n0\\nEOF\\n")
+import hashlib
+dxf_sha = hashlib.sha256((folder / "eom_routes.dxf").read_bytes()).hexdigest()
+(folder / "eom_preview.json").write_text(json.dumps({
+    "schema": "quantor.cad_engine.preview.v1", "units": "mm", "bbox": [0, 0, 1000, 500],
+    "dxf": "views/" + args.view_folder + "/eom_routes.dxf", "dxf_sha256": dxf_sha,
+    "flatten_mm": 0, "layers": ["E-EO-FEED", "E-EO-DEV"], "points": 7, "skipped": {},
+    "truncated": False,
+    "paths": [{"layer": 0, "closed": False, "fill": False, "points": [0, 0, 1000, 0]},
+              {"layer": 1, "closed": True, "fill": False,
+               "points": [0, 0, 800, 0, 800, 160, 0, 160, 0, 0]}]}))
 (folder / "eom_routes3d.json").write_text(json.dumps({
     "schema": "cad_eom_routes3d.v1", "frame": "view_dxf_mm",
     "floor_elevation_mm": elevation, "floor_height_mm": height,
@@ -269,6 +279,7 @@ async def test_worker_builds_eom_and_the_sheet_reads_it_in_3d(
             f"{FOLDER}/eom_routes3d.json",
             f"{FOLDER}/eom_candidate.json",
             f"{FOLDER}/eom_routes.dxf",
+            f"{FOLDER}/eom_preview.json",
         }
         assert job.payload["cad_result"]["floor_elevation"]["value_mm"] == 47600
 
@@ -288,6 +299,12 @@ async def test_worker_builds_eom_and_the_sheet_reads_it_in_3d(
         [row] = data["quantities"]
         assert row["item"] == "ППГнг(А)-HF 5×6" and row["qty"] == 12.5 and row["route_m"] == 10.0
         assert data["apartments"] == 2 and data["issues"] == ["Сечение лотка условное"]
+        preview = await api.get(f"{sheet}/preview", params=query)
+        assert preview.status_code == 200, preview.text
+        body = preview.json()
+        assert body["job_id"] == eom_id and body["layers"] == ["E-EO-FEED", "E-EO-DEV"]
+        assert body["point_count"] == 7 and body["frame"] is not None
+        assert body["paths"][1]["closed"] is True
         done = (await api.get(f"{sheet}/job", params=query)).json()
         assert done["status"] == "succeeded"
 

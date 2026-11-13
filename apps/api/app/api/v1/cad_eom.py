@@ -25,6 +25,7 @@ from app.api.v1.deps import (
 )
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
+from app.contracts.cad import CadPreviewPathRead, CadPreviewRead
 from app.contracts.cad_eom import (
     CadEomJobRead,
     CadEomRoutes3dFile,
@@ -37,7 +38,7 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.services import cad as cad_service
 from app.services import cad_eom as cad_eom_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_sections
+from app.services import cad_sections, cad_views
 
 router = APIRouter(
     prefix="/projects/{project_id}/revisions/{revision_id}/cad",
@@ -195,6 +196,101 @@ async def read_cad_eom_routes3d(
         candidate if isinstance(candidate, dict) else None,
         levels_elevation_mm=elevation,
         levels_height_mm=height,
+    )
+
+
+@sheet_router.get(
+    "/preview",
+    response_model=CadPreviewRead,
+    summary="ЭОМ и СС листа в 2D поверх PDF: пути по слоям в мм DXF вида и кадр родителя",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_cad_eom_preview(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+) -> CadPreviewRead:
+    """Превью того же формата, что у трасс механики; кадр PDF -> DXF - вида родителя."""
+    await _scope(session, context, project_id, revision_id)
+    job = await cad_eom_service.latest_succeeded_eom_job(
+        session,
+        workspace_id=context.tenant,
+        project_id=project_id,
+        revision_id=revision_id,
+        page_index=page_index,
+        view=view,
+    )
+    if job is None:
+        raise DomainError(ErrorCode.CAD_EOM_NOT_FOUND)
+    attempt = cad_service.result_of(job).get("attempt")
+    try:
+        folder = cad_service.view_folder(page_index, view)
+    except ValueError as error:
+        raise not_found("Вид") from error
+    if type(attempt) is not int:
+        raise DomainError(ErrorCode.CAD_EOM_NOT_FOUND)
+    dxf_name = f"{folder}/{cad_eom_service.ROUTES_DXF}"
+    dxf = cad_service.find_artifact(job, dxf_name, attempt)
+    raw = await _read_artifact_json(
+        storage, job, revision_id, attempt, f"{folder}/{cad_eom_service.PREVIEW_JSON}"
+    )
+    if dxf is None or raw is None:
+        raise not_found("Предпросмотр")
+    if (
+        not isinstance(raw, dict)
+        or raw.get("schema") != cad_eom_service.PREVIEW_SCHEMA
+        or raw.get("units") != "mm"
+        or raw.get("dxf") != dxf_name
+        or raw.get("dxf_sha256") != dxf.get("sha256")
+    ):
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр не относится к DXF попытки")
+    layers = [str(name)[:64] for name in raw.get("layers", []) if isinstance(name, str)]
+    try:
+        paths = [CadPreviewPathRead.model_validate(path) for path in raw.get("paths", [])]
+    except ValidationError as error:
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр вне контракта") from error
+    if any(p.layer >= len(layers) or len(p.points) % 2 or len(p.points) < 4 for p in paths):
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "предпросмотр вне контракта")
+    parent_id = cad_mep_service.parent_job_id_of(job)
+    parent_attempt = cad_mep_service.payload_int(job, "parent_attempt")
+    parent = (
+        await cad_service.get_cad_job(
+            session,
+            workspace_id=context.tenant,
+            project_id=project_id,
+            revision_id=revision_id,
+            job_id=parent_id,
+        )
+        if parent_id is not None
+        else None
+    )
+    if parent is None or parent_attempt is None:
+        raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "родительский результат ЭОМ недоступен")
+    scale = cad_views.scale_from(
+        await _read_artifact_json(storage, parent, revision_id, parent_attempt, f"{folder}/scale.json")
+    )
+    cad_checks = await _read_artifact_json(
+        storage, parent, revision_id, parent_attempt, f"{folder}/cad_checks.json"
+    )
+    bbox = raw.get("bbox")
+    return CadPreviewRead(
+        job_id=job.id,
+        attempt=attempt,
+        page_index=page_index,
+        view=view,
+        units="mm",
+        dxf_sha256=str(dxf["sha256"]),
+        layers=layers,
+        paths=paths,
+        point_count=sum(len(p.points) // 2 for p in paths),
+        truncated=raw.get("truncated") is True,
+        flatten_mm=float(raw.get("flatten_mm") or 0),
+        bbox=tuple(bbox) if isinstance(bbox, list) and len(bbox) == 4 else None,
+        frame=cad_views.frame_from(scale, cad_checks),
     )
 
 

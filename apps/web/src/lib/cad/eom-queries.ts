@@ -3,9 +3,11 @@
 import {
   createCadEomRoutes,
   readCadEomJob,
+  readCadEomPreview,
   readCadEomRoutes3D,
   type CadEomJobRead,
   type CadEomRoutes3dOut,
+  type CadPreviewRead,
 } from '@quantor/api-client';
 import {
   useMutation,
@@ -142,4 +144,54 @@ export const useBuildEom = (
       void client.invalidateQueries({ queryKey: eomKeys.job(sheet) });
     },
   });
+};
+
+/** 2D ЭОМ и СС листа поверх PDF (формат превью трасс); нет построенных или нет файла - `null`. */
+export const useCadEomPreview = (
+  sheet: ICadEomSheet,
+  enabled: boolean,
+): CadPreviewRead | null => {
+  const job = useCadEomJob(sheet, enabled);
+  const mark = eomMark(job.data);
+  const query = useQuery<CadPreviewRead | null>({
+    queryKey: [...eomKeys.routes3d(sheet, mark), 'preview'] as const,
+    enabled: enabled && mark !== 'none',
+    queryFn: async () => {
+      try {
+        return unwrap(
+          await readCadEomPreview({
+            throwOnError: true,
+            path: { project_id: sheet.projectId },
+            query: queryOf(sheet),
+          }),
+        );
+      } catch (error) {
+        const code = extractCode(error);
+        if (code === EOM_NOT_FOUND || code === 'NOT_FOUND') return null;
+        throw error;
+      }
+    },
+    retry: (count, error) => extractCode(error) === 'NETWORK_ERROR' && count < 2,
+  });
+  return mark === 'none' ? null : (query.data ?? null);
+};
+
+/**
+ * Превью трасс механики и ЭОМ/СС одним наложением: слои ЭОМ дописываются после слоёв механики,
+ * индексы их путей сдвигаются. Кадр общий (DXF вида родителя), поэтому пути складываются как есть.
+ */
+export const withEomPreview = (
+  mep: CadPreviewRead | null,
+  eom: CadPreviewRead | null,
+): CadPreviewRead | null => {
+  if (eom === null) return mep;
+  if (mep === null) return eom;
+  const shift = mep.layers.length;
+  return {
+    ...mep,
+    layers: [...mep.layers, ...eom.layers],
+    paths: [...mep.paths, ...eom.paths.map((path) => ({ ...path, layer: path.layer + shift }))],
+    point_count: mep.point_count + eom.point_count,
+    truncated: mep.truncated || eom.truncated,
+  };
 };

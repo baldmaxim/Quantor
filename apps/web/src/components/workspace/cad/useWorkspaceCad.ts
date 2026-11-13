@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ViewportSheet } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
 import { cadCodeText } from '@/lib/cad/errors';
+import { useCadEomPreview, withEomPreview } from '@/lib/cad/eom-queries';
 import { FLOOR3D_MODE_KEY } from '@/lib/cad/floor3d-queries';
 import { cropToNormalized, overlayPaths } from '@/lib/cad/frame';
 import { readCadPaintColors } from '@/lib/cad/paint-colors';
@@ -187,10 +188,23 @@ export const useWorkspaceCad = ({
     route: shownRoute,
   });
   const mepVisibility = useMepLayerVisibility();
+  // ЭОМ и СС листа (cad_eom): рисуются поверх DXF теми же слоями и маской, что трассы механики.
+  const eomPreview = useCadEomPreview(
+    {
+      projectId,
+      revisionId: revisionId ?? '',
+      pageIndex: pageIndex ?? 0,
+      view: params?.view ?? 0,
+    },
+    loadOverlay && revisionId !== null && pageIndex !== null && params !== null,
+  );
   const routePreview = useMemo(
     () =>
-      routes.diagnostics ? matchingPreview(routes.diagnostics, routes.preview ?? undefined) : null,
-    [routes.diagnostics, routes.preview],
+      withEomPreview(
+        routes.diagnostics ? matchingPreview(routes.diagnostics, routes.preview ?? undefined) : null,
+        eomPreview,
+      ),
+    [routes.diagnostics, routes.preview, eomPreview],
   );
 
   // DXF накладывается на PDF, только когда его уже можно нарисовать; иначе виден один PDF.

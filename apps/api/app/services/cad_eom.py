@@ -34,6 +34,9 @@ from app.services import jobs as jobs_service
 ROUTES3D_JSON: Final = "eom_routes3d.json"
 CANDIDATE_JSON: Final = "eom_candidate.json"
 ROUTES_DXF: Final = "eom_routes.dxf"
+# 2D-превью для листа (формат превью механики); необязательно: прежние версии его не пишут.
+PREVIEW_JSON: Final = "eom_preview.json"
+PREVIEW_SCHEMA: Final = "quantor.cad_engine.preview.v1"
 ROUTES3D_SCHEMA: Final = "cad_eom_routes3d.v1"
 CANDIDATE_SCHEMA: Final = "quantor.cad_eom.candidate.v1"
 OUTPUT_FILES: Final = (ROUTES3D_JSON, CANDIDATE_JSON, ROUTES_DXF)
