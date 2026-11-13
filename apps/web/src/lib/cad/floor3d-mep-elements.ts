@@ -166,13 +166,24 @@ export const planMepElement = (
   }
 
   // sleeve
-  if (!positive(element.outer_d_mm) || !positive(element.length_mm)) return null;
+  if (!positive(element.length_mm)) return null;
+  const sleeveLength = element.length_mm / MM_IN_M;
+  if (!positive(element.outer_d_mm)) {
+    // Гильза короба: прямоугольная обойма по сечению (w × h) вдоль оси.
+    if (!positive(element.w_mm) || !positive(element.h_mm)) return null;
+    return {
+      layer,
+      kind: 'box',
+      tone: 'sleeve',
+      matrix: compose(position, basis, element.w_mm / MM_IN_M, element.h_mm / MM_IN_M, sleeveLength),
+    };
+  }
   const outer = element.outer_d_mm / MM_IN_M;
   return {
     layer,
     kind: 'sleeve',
     tone: 'sleeve',
-    matrix: compose(position, basis, outer, outer, element.length_mm / MM_IN_M),
+    matrix: compose(position, basis, outer, outer, sleeveLength),
   };
 };
 

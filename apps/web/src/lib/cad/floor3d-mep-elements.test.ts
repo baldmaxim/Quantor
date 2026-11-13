@@ -114,6 +114,15 @@ describe('планирование элементов', () => {
     expect([scale.x, scale.y, scale.z]).toEqual(
       [0.135, 0.135, 0.26].map((n) => expect.closeTo(n, 9)),
     );
+    const box = planMepElement(
+      element({ type: 'sleeve', subtype: 'slab', length_mm: 260, w_mm: 400, h_mm: 200 }),
+      frame,
+    );
+    expect(box?.kind).toBe('box');
+    expect(box?.tone).toBe('sleeve');
+  });
+
+  it('гильза без outer_d_mm и без w_mm/h_mm - null', () => {
     expect(
       planMepElement(element({ type: 'sleeve', subtype: 'slab', length_mm: 260 }), frame),
     ).toBeNull();
