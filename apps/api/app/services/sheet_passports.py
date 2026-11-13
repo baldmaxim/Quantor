@@ -39,10 +39,13 @@ from app.models import (
     DocumentRevision,
     Job,
     Project,
+    Region,
     RevisionPageText,
+    Sheet,
     SheetPassport,
 )
 from app.services import jobs as jobs_service
+from app.services.calc.adapters.recognized import Stamp, parse_stamp
 from app.services.consistency.page_texts import (
     PAGE_TEXT_FORMAT,
     REASON_STORE_FAILED,
@@ -53,6 +56,7 @@ from app.services.consistency.passport_process import (
     PassportParseError,
     parse_pdf_in_subprocess,
 )
+from app.services.consistency.recognized_stamp import apply_recognized_stamp
 from app.services.consistency.sheet_passport import (
     PARSER_VERSION,
     EvidenceSource,
@@ -176,6 +180,43 @@ async def _upsert_candidates(
             updated += 1
     await session.flush()
     return created, updated, skipped
+
+
+async def recognized_stamps(session: AsyncSession, revision_id: uuid.UUID) -> dict[int, Stamp]:
+    """Штампы распознавалки ревизии по страницам: одним запросом, без листов - пусто.
+
+    На лист берётся первая по порядку область со строкой штампа (как в `sheet_titles`).
+    """
+    query = (
+        select(Sheet.page_index, Region.raw_content_md)
+        .join(Region, Region.sheet_id == Sheet.id)
+        .where(Sheet.revision_id == revision_id, Region.raw_content_md.contains("**Stamp:**"))
+        .distinct(Sheet.id)
+        .order_by(Sheet.id, Region.ordinal.asc().nulls_last(), Region.id)
+    )
+    stamps: dict[int, Stamp] = {}
+    for page_index, text in (await session.execute(query)).all():
+        stamp = parse_stamp(text or "")
+        if stamp is not None and page_index not in stamps:
+            stamps[page_index] = stamp
+    return stamps
+
+
+def _with_stamps(
+    candidates: list[PassportCandidate], stamps: dict[int, Stamp]
+) -> list[PassportCandidate]:
+    """Штамп распознавалки перекрывает текстовый разбор; страницы без штампа - как были."""
+    return [
+        apply_recognized_stamp(candidate, stamps[candidate.page_index])
+        if candidate.page_index in stamps
+        else candidate
+        for candidate in candidates
+    ]
+
+
+def _stamp_only(stamps: dict[int, Stamp]) -> list[PassportCandidate]:
+    """Файл не разобран pypdf: кандидаты только из штампов распознавалки."""
+    return _with_stamps([PassportCandidate(page_index=index) for index in sorted(stamps)], stamps)
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,11 +364,13 @@ async def execute_sheet_passport_extract(
     for number, revision in enumerate(revisions, start=1):
         file_name = revision.source_filename
         revision_id = revision.id
+        stamps = await recognized_stamps(session, revision_id)
         if await _already_parsed(session, revision_id):
             already += 1
             await jobs_service.report_progress(session, job=job, progress=number / total)
             await session.commit()
             continue
+        parsed_ok = False
         try:
             parsed = await _download_and_parse(
                 storage,
@@ -347,6 +390,7 @@ async def execute_sheet_passport_extract(
             log.warning("sheet_passport_file_failed", job_id=str(job.id), reason=reason)
         else:
             reason = ""
+            parsed_ok = True
             try:
                 # Своя точка сохранения: отказ базы на одном файле не валит задание целиком.
                 async with session.begin_nested():
@@ -355,7 +399,7 @@ async def execute_sheet_passport_extract(
                         project_id=project_id,
                         revision_id=revision_id,
                         file_name=file_name,
-                        candidates=parsed.candidates,
+                        candidates=_with_stamps(parsed.candidates, stamps),
                     )
                     if parsed.text is not None:
                         await _upsert_page_text(
@@ -374,6 +418,27 @@ async def execute_sheet_passport_extract(
                 )
                 made = changed = left = 0
                 parsed = _ParsedFile(candidates=[], text=None)
+        if not parsed_ok and stamps:
+            # Файл не разобран pypdf, но листы распознавалки есть: паспорта - по штампам.
+            # Ошибка файла остаётся в итоге: текст страниц не выгружен, повтор доделает.
+            try:
+                async with session.begin_nested():
+                    made, changed, left = await _upsert_candidates(
+                        session,
+                        project_id=project_id,
+                        revision_id=revision_id,
+                        file_name=file_name,
+                        candidates=_stamp_only(stamps),
+                    )
+                created += made
+                updated += changed
+                skipped += left
+            except DBAPIError as error:
+                log.warning(
+                    "sheet_passport_stamp_only_failed",
+                    job_id=str(job.id),
+                    db_error=type(error.orig).__name__,
+                )
         if not reason:
             files += 1
             pages += len(parsed.candidates)

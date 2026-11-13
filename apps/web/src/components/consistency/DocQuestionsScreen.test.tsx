@@ -171,7 +171,7 @@ describe('экран «Вопросы к документации»', () => {
     ]);
     const row = within(await screen.findByTestId('doc-question'));
     expect(screen.getByTestId('search-result')).toHaveTextContent('1 из 1');
-    expect(screen.getByText('Без текстового слоя: 1')).toBeInTheDocument();
+    expect(screen.getByText('Текст не извлечён: 1')).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Вопросы к документации' })).toBeInTheDocument();
 
     expect(row.getByText('Высота помещения в свету')).toBeInTheDocument();

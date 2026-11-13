@@ -41,6 +41,7 @@ export const STATUS_TONES: Readonly<Record<SheetPassportStatus, BadgeTone>> = {
 
 export const EVIDENCE_LABELS: Readonly<Record<string, string>> = {
   stamp: 'штамп',
+  recognized_stamp: 'штамп (распознавание)',
   title: 'заголовок',
   page_label: 'метка стр.',
   file_name: 'имя файла',

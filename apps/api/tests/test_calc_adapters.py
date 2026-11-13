@@ -39,7 +39,11 @@ from app.services.calc.adapters.pipeline import (
     collect,
     validate_candidate,
 )
-from app.services.calc.adapters.recognized import RecognizedDocument, RecognizedRegion
+from app.services.calc.adapters.recognized import (
+    RecognizedDocument,
+    RecognizedRegion,
+    parse_stamp,
+)
 from app.services.calc.adapters.table_kinds import TABLE_KIND_TITLES, classify
 
 STAMP = (
@@ -552,3 +556,15 @@ class TestCustomerVor:
         assert counts[CalcInspectionIssueCode.VOR_DIAMETER_IGNORED] == 2
         values = {str(item.canonical.model_dump().get("value")) for item in result.accepted}
         assert not values & {"1280", "320", "50", "110"}
+
+
+def test_stamp_reads_sheet_number_and_ignores_unread_keys() -> None:
+    stamp = parse_stamp(STAMP)
+    assert stamp is not None
+    assert stamp.code is not None and stamp.code.value == "00-000-АР"
+    assert stamp.stage is not None and stamp.stage.value == "П"
+    assert stamp.sheet is not None and stamp.sheet.value == "12"
+    assert stamp.name is not None and stamp.name.value == "План 3 этажа на отм. +6.600"
+    assert STAMP[stamp.sheet.start : stamp.sheet.end] == "12"
+    empty = parse_stamp("> **Stamp:** Code: X | Sheet: | Name: Y")
+    assert empty is not None and empty.sheet is None

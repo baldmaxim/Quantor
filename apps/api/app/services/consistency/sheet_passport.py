@@ -38,9 +38,9 @@ from app.services.consistency.sheet_stamp import (
     stamp_window,
 )
 
-PARSER_VERSION: Final = "consistency.sheet_passport.v2"
+PARSER_VERSION: Final = "consistency.sheet_passport.v4"
 
-_SNIPPET_MAX: Final = 120
+SNIPPET_MAX: Final = 120
 
 
 class EvidenceSource(StrEnum):
@@ -48,6 +48,7 @@ class EvidenceSource(StrEnum):
     TITLE = "title"
     PAGE_LABEL = "page_label"
     FILE_NAME = "file_name"
+    RECOGNIZED_STAMP = "recognized_stamp"
     MANUAL = "manual"
 
 
@@ -164,7 +165,7 @@ _KIND_PRIORITY: Final = {
 
 
 def _snippet(text: str) -> str:
-    return SPACES_RE.sub(" ", text).strip()[:_SNIPPET_MAX]
+    return SPACES_RE.sub(" ", text).strip()[:SNIPPET_MAX]
 
 
 def _lines(text: str) -> list[str]:

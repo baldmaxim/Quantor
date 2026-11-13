@@ -27,7 +27,9 @@ from app.models import (
     Document,
     DocumentRevision,
     Job,
+    Region,
     RevisionPageText,
+    Sheet,
     SheetPassport,
     Workspace,
 )
@@ -852,3 +854,108 @@ async def test_page_text_store_failure_keeps_candidates_and_next_run_completes_t
         assert retry.payload["files_already_parsed"] == 0 and retry.payload["files_parsed"] == 1
         assert retry.payload["page_texts_stored"] == 1 and retry.payload["error_count"] == 0
         assert retry.payload["created"] == 0 and retry.payload["updated"] == 1
+
+
+async def _add_stamp(
+    session: AsyncSession, revision: DocumentRevision, page_index: int, line: str
+) -> None:
+    sheet = Sheet(revision_id=revision.id, page_index=page_index)
+    session.add(sheet)
+    await session.flush()
+    session.add(
+        Region(
+            sheet_id=sheet.id,
+            external_block_id=f"stamp_{page_index}",
+            ordinal=1,
+            block_type="text",
+            shape_type="rectangle",
+            coords_norm=[0.1, 0.1, 0.2, 0.2],
+            raw_content_md=f"> **Created:** 2026-09-28\n> **Stamp:** {line}\n\nТекст",
+        )
+    )
+    await session.commit()
+
+
+async def test_recognized_stamp_overrides_pdf_text_and_keeps_manual_fields(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        plan = await _add_pdf(db_session, fake_storage, project_id, PLAN_PDF)
+        await _add_stamp(
+            db_session,
+            plan,
+            0,
+            "Code: ПД-00000001-12-АР1 | Stage: Р | Sheet: 5 из 12 | Name: План 5 этажа",
+        )
+        # Вторая страница: в штампе только шифр, остальное остаётся от pypdf.
+        await _add_stamp(db_session, plan, 1, "Code: ПД -00000001-12-АР2 | Sheet: | Name:")
+        await _extract(api, db_session, fake_storage, project_id)
+
+        items = (await api.get(_url(project_id))).json()["items"]
+        first, second = items
+        assert first["code"] == "ПД-00000001-12-АР1"
+        assert first["stage"] == "РД" and first["sheet_number"] == "5"
+        assert first["title"] == "План 5 этажа"
+        for name in ("code", "stage", "sheet_number", "title"):
+            assert first["evidence"][name]["source"] == "recognized_stamp"
+        assert first["evidence"]["sheet_number"]["snippet"] == "5 из 12"
+        assert second["code"] == "ПД-00000001-12-АР2"
+        assert second["evidence"]["code"]["source"] == "recognized_stamp"
+        # Поля, которых нет в штампе, - от текстового слоя.
+        assert second["stage"] == "П" and second["sheet_number"] == "8"
+        assert second["evidence"]["sheet_number"]["source"] == "stamp"
+        assert second["title"] == "План 3 этажа на отм. +9.600"
+
+        # Ручная правка не перезаписывается повторным разбором.
+        edited = await api.patch(_url(project_id, f"/{first['id']}"), json={"title": "Моё"})
+        assert edited.status_code == 200, edited.text
+        await _make_stale(db_session)
+        await _extract(api, db_session, fake_storage, project_id)
+        after = {i["id"]: i for i in (await api.get(_url(project_id))).json()["items"]}
+        assert after[first["id"]]["title"] == "Моё"
+        assert after[first["id"]]["evidence"]["title"]["source"] == "manual"
+        assert after[first["id"]]["code"] == "ПД-00000001-12-АР1"
+
+
+async def test_pdf_without_recognized_sheets_is_parsed_as_before(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        await _add_pdf(db_session, fake_storage, project_id, SCHEME_PDF)
+        await _extract(api, db_session, fake_storage, project_id)
+        (item,) = (await api.get(_url(project_id))).json()["items"]
+        assert item["code"] == "ПД-00000001-12-ИОС2.1"
+        assert item["evidence"]["code"]["source"] == "stamp"
+        assert all(v["source"] != "recognized_stamp" for v in item["evidence"].values())
+
+
+async def test_unparsed_file_still_gets_passports_from_recognized_stamps(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        broken = await _add_pdf(
+            db_session, fake_storage, project_id, BROKEN_PDF, data=b"not a pdf at all"
+        )
+        await _add_stamp(
+            db_session,
+            broken,
+            0,
+            "Code: ПД-00000001-12-АР1 | Stage: П | Sheet: 1 | Name: Общие данные",
+        )
+        job = await _extract(api, db_session, fake_storage, project_id)
+        assert job.payload["error_count"] == 1 and job.payload["created"] == 1
+        (item,) = (await api.get(_url(project_id))).json()["items"]
+        assert item["code"] == "ПД-00000001-12-АР1" and item["title"] == "Общие данные"
+        assert item["evidence"]["code"]["source"] == "recognized_stamp"

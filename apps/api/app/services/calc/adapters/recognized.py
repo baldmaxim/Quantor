@@ -3,7 +3,7 @@
 Текст блока — ровно то, что импорт legacy-v1 положил в `Region.raw_content_md`. В начале тела
 стоят строки метаданных распознавалки (`> **Created:**`, `> **Crop:**`, `> **Stamp:**`), в конце
 иногда — разделитель следующей страницы (`## Page N`). Метаданные — не содержание: из штампа
-берутся только шифр, стадия и название листа; объект, организация и изменения не читаются.
+берутся только шифр, стадия, номер и название листа; объект, организация и изменения не читаются.
 """
 
 from __future__ import annotations
@@ -79,11 +79,12 @@ class StampField:
 class Stamp:
     code: StampField | None
     stage: StampField | None
+    sheet: StampField | None
     name: StampField | None
 
 
 def parse_stamp(text: str) -> Stamp | None:
-    """Шифр, стадия и название листа из строки штампа. Остальные поля не читаются вовсе."""
+    """Шифр, стадия, номер и название листа из строки штампа. Остальные поля не читаются вовсе."""
     line = _STAMP_LINE.search(text)
     if line is None:
         return None
@@ -96,7 +97,12 @@ def parse_stamp(text: str) -> Stamp | None:
             found[key] = StampField(
                 value, base + match.start("value"), base + match.start("value") + len(value)
             )
-    return Stamp(code=found.get("Code"), stage=found.get("Stage"), name=found.get("Name"))
+    return Stamp(
+        code=found.get("Code"),
+        stage=found.get("Stage"),
+        sheet=found.get("Sheet"),
+        name=found.get("Name"),
+    )
 
 
 def stage_from_mark(mark: str) -> CalcDocumentStage | None:

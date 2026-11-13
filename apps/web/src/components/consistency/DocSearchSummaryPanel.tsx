@@ -37,24 +37,28 @@ const FileList: FC<{
   readonly title: string;
   readonly files: readonly string[];
   readonly count: number | null;
-}> = ({ title, files, count }) => {
+  readonly hint?: string;
+}> = ({ title, files, count, hint }) => {
   const shown = count ?? files.length;
   if (shown === 0 && files.length === 0) {
     return <p>{`${title}: 0`}</p>;
   }
   return (
-    <details>
-      <summary className="min-h-[44px] cursor-pointer py-[var(--s-3)]">
-        {title}: {shown}
-      </summary>
-      <ul className="flex flex-col gap-[var(--s-1)] pb-[var(--s-3)] text-xs text-muted">
-        {files.map((name) => (
-          <li key={name} className="[overflow-wrap:anywhere]">
-            {name}
-          </li>
-        ))}
-      </ul>
-    </details>
+    <>
+      <details>
+        <summary className="min-h-[44px] cursor-pointer py-[var(--s-3)]">
+          {title}: {shown}
+        </summary>
+        <ul className="flex flex-col gap-[var(--s-1)] pb-[var(--s-3)] text-xs text-muted">
+          {files.map((name) => (
+            <li key={name} className="[overflow-wrap:anywhere]">
+              {name}
+            </li>
+          ))}
+        </ul>
+      </details>
+      {hint ? <p className="text-xs text-muted">{hint}</p> : null}
+    </>
   );
 };
 
@@ -71,9 +75,10 @@ const Result: FC<{ readonly summary: DocSearchSummary; readonly total: number }>
       Просмотрено ревизий: {num(summary.revisions_scanned)} из {num(summary.revisions_total)}
     </p>
     <FileList
-      title="Без текстового слоя"
+      title="Текст не извлечён"
       files={summary.no_text_files}
       count={summary.revisions_no_text}
+      hint="Нажмите «Разобрать листы» на вкладке «Листы комплекта», затем повторите поиск."
     />
     <FileList
       title="Не читается"
