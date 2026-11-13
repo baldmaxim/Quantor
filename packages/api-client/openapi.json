@@ -2896,6 +2896,429 @@
         "title": "CadEngineStateRead",
         "type": "object"
       },
+      "CadEomElementOut": {
+        "description": "Элемент для 3D-вида: центр (мм), единичная ось ×1000 (как у механики), габарит.",
+        "properties": {
+          "apt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apt"
+          },
+          "axis": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Axis",
+            "type": "array"
+          },
+          "d_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D Mm"
+          },
+          "h_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H Mm"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "string"
+          },
+          "length_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length Mm"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "outer_d_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outer D Mm"
+          },
+          "pos": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Pos",
+            "type": "array"
+          },
+          "subtype": {
+            "title": "Subtype",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "device",
+              "box",
+              "sleeve"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "w_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "W Mm"
+          }
+        },
+        "required": [
+          "type",
+          "subtype",
+          "layer",
+          "pos",
+          "axis"
+        ],
+        "title": "CadEomElementOut",
+        "type": "object"
+      },
+      "CadEomJobRead": {
+        "description": "Состояние задания ЭОМ и СС листа.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "generator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator Version"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "stage",
+          "progress",
+          "error_code",
+          "error_message",
+          "generator_version",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "CadEomJobRead",
+        "type": "object"
+      },
+      "CadEomQuantity": {
+        "description": "Строка ведомости кандидата: количество, длина по трассе, формула и источник.",
+        "properties": {
+          "formula": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula"
+          },
+          "item": {
+            "title": "Item",
+            "type": "string"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "number"
+          },
+          "route_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route M"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "system": {
+            "title": "System",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "system",
+          "item",
+          "unit",
+          "qty"
+        ],
+        "title": "CadEomQuantity",
+        "type": "object"
+      },
+      "CadEomRoutes3dOut": {
+        "description": "ЭОМ и СС листа в 3D и ведомость кандидата.",
+        "properties": {
+          "apartments": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartments"
+          },
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/CadEomElementOut"
+            },
+            "title": "Elements",
+            "type": "array"
+          },
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Elevation Mm"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Mm"
+          },
+          "generator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator Version"
+          },
+          "heights_match": {
+            "title": "Heights Match",
+            "type": "boolean"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "levels_elevation_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels Elevation Mm"
+          },
+          "levels_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels Height Mm"
+          },
+          "polylines": {
+            "items": {
+              "$ref": "#/components/schemas/CadMepRoute3dPolyline"
+            },
+            "title": "Polylines",
+            "type": "array"
+          },
+          "quantities": {
+            "items": {
+              "$ref": "#/components/schemas/CadEomQuantity"
+            },
+            "title": "Quantities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "job_id",
+          "generator_version",
+          "floor_elevation_mm",
+          "floor_height_mm",
+          "levels_elevation_mm",
+          "levels_height_mm",
+          "heights_match",
+          "polylines",
+          "elements"
+        ],
+        "title": "CadEomRoutes3dOut",
+        "type": "object"
+      },
       "CadEventRead": {
         "properties": {
           "at": {
@@ -23515,6 +23938,7 @@
           "cad_floor3d_dxf",
           "cad_zones",
           "cad_sections",
+          "cad_eom_route",
           "sheet_passport_extract",
           "doc_questions_search"
         ],
@@ -36799,6 +37223,148 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/cad/eom/job": {
+      "get": {
+        "operationId": "read_cad_eom_job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadEomJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Новейшее задание ЭОМ и СС листа в любом статусе (ход и отказ)",
+        "tags": [
+          "cad-eom"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/eom/routes3d": {
+      "get": {
+        "operationId": "read_cad_eom_routes3d",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadEomRoutes3dOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "ЭОМ и СС листа в 3D: сети и приборы (мм DXF вида, Z от отметки этажа) и ведомость",
+        "tags": [
+          "cad-eom"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/cad/finish-templates": {
       "get": {
         "operationId": "list_cad_finish_templates",
@@ -40908,6 +41474,97 @@
         "summary": "Одобрить вид результата CAD для построения трасс (решение человека)",
         "tags": [
           "cad-mep"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/eom-routes": {
+      "post": {
+        "operationId": "create_cad_eom_routes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadMepRoutesCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadEomJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Поставить построение ЭОМ и СС этажа по одобренному виду",
+        "tags": [
+          "cad-eom"
         ]
       }
     },

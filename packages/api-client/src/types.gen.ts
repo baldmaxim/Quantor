@@ -1455,6 +1455,203 @@ export type CadEngineStateRead = {
 };
 
 /**
+ * CadEomElementOut
+ *
+ * Элемент для 3D-вида: центр (мм), единичная ось ×1000 (как у механики), габарит.
+ */
+export type CadEomElementOut = {
+    /**
+     * Apt
+     */
+    apt?: string | null;
+    /**
+     * Axis
+     */
+    axis: [
+        number,
+        number,
+        number
+    ];
+    /**
+     * D Mm
+     */
+    d_mm?: number | null;
+    /**
+     * H Mm
+     */
+    h_mm?: number | null;
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Length Mm
+     */
+    length_mm?: number | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Outer D Mm
+     */
+    outer_d_mm?: number | null;
+    /**
+     * Pos
+     */
+    pos: [
+        number,
+        number,
+        number
+    ];
+    /**
+     * Subtype
+     */
+    subtype: string;
+    /**
+     * Type
+     */
+    type: 'device' | 'box' | 'sleeve';
+    /**
+     * W Mm
+     */
+    w_mm?: number | null;
+};
+
+/**
+ * CadEomJobRead
+ *
+ * Состояние задания ЭОМ и СС листа.
+ */
+export type CadEomJobRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Generator Version
+     */
+    generator_version: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    status: JobStatus;
+};
+
+/**
+ * CadEomQuantity
+ *
+ * Строка ведомости кандидата: количество, длина по трассе, формула и источник.
+ */
+export type CadEomQuantity = {
+    /**
+     * Formula
+     */
+    formula?: string | null;
+    /**
+     * Item
+     */
+    item: string;
+    /**
+     * Qty
+     */
+    qty: number;
+    /**
+     * Route M
+     */
+    route_m?: number | null;
+    /**
+     * Source
+     */
+    source?: string | null;
+    /**
+     * System
+     */
+    system: string;
+    /**
+     * Unit
+     */
+    unit: string;
+};
+
+/**
+ * CadEomRoutes3dOut
+ *
+ * ЭОМ и СС листа в 3D и ведомость кандидата.
+ */
+export type CadEomRoutes3dOut = {
+    /**
+     * Apartments
+     */
+    apartments?: number | null;
+    /**
+     * Elements
+     */
+    elements: Array<CadEomElementOut>;
+    /**
+     * Floor Elevation Mm
+     */
+    floor_elevation_mm: number | null;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number | null;
+    /**
+     * Generator Version
+     */
+    generator_version: string | null;
+    /**
+     * Heights Match
+     */
+    heights_match: boolean;
+    /**
+     * Issues
+     */
+    issues?: Array<string>;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Levels Elevation Mm
+     */
+    levels_elevation_mm: number | null;
+    /**
+     * Levels Height Mm
+     */
+    levels_height_mm: number | null;
+    /**
+     * Polylines
+     */
+    polylines: Array<CadMepRoute3dPolyline>;
+    /**
+     * Quantities
+     */
+    quantities?: Array<CadEomQuantity>;
+};
+
+/**
  * CadEventRead
  */
 export type CadEventRead = {
@@ -11821,7 +12018,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'sheet_passport_extract' | 'doc_questions_search';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search';
 
 /**
  * LengthUnit
@@ -19272,6 +19469,92 @@ export type ReadCadBuilding3dResponses = {
 
 export type ReadCadBuilding3dResponse = ReadCadBuilding3dResponses[keyof ReadCadBuilding3dResponses];
 
+export type ReadCadEomJobData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/eom/job';
+};
+
+export type ReadCadEomJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadEomJobError = ReadCadEomJobErrors[keyof ReadCadEomJobErrors];
+
+export type ReadCadEomJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadEomJobRead;
+};
+
+export type ReadCadEomJobResponse = ReadCadEomJobResponses[keyof ReadCadEomJobResponses];
+
+export type ReadCadEomRoutes3dData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/eom/routes3d';
+};
+
+export type ReadCadEomRoutes3dErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadEomRoutes3dError = ReadCadEomRoutes3dErrors[keyof ReadCadEomRoutes3dErrors];
+
+export type ReadCadEomRoutes3dResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadEomRoutes3dOut;
+};
+
+export type ReadCadEomRoutes3dResponse = ReadCadEomRoutes3dResponses[keyof ReadCadEomRoutes3dResponses];
+
 export type ListCadFinishTemplatesData = {
     body?: never;
     path: {
@@ -21624,6 +21907,52 @@ export type ApproveCadViewResponses = {
 };
 
 export type ApproveCadViewResponse = ApproveCadViewResponses[keyof ApproveCadViewResponses];
+
+export type CreateCadEomRoutesData = {
+    body: CadMepRoutesCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/eom-routes';
+};
+
+export type CreateCadEomRoutesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCadEomRoutesError = CreateCadEomRoutesErrors[keyof CreateCadEomRoutesErrors];
+
+export type CreateCadEomRoutesResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadEomJobRead;
+};
+
+export type CreateCadEomRoutesResponse = CreateCadEomRoutesResponses[keyof CreateCadEomRoutesResponses];
 
 export type CreateCadMepRoutesData = {
     body: CadMepRoutesCreate;
