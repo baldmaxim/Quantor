@@ -176,13 +176,15 @@ export const useWorkspaceCad = ({
   });
   const { diagnostics, preview, frame, params, availability } = data;
 
-  // Трассы механики: выбранное (явно или автоматически) route-задание рисуется поверх DXF вида его родителя.
+  // Трассы механики: выбранное (явно или автоматически) route-задание рисуется поверх DXF вида его
+  // родителя. Это же задание - источник итогов и 3D этажа: одни трассы во всех видах.
+  const shownRoute = data.routeSummary ?? data.autoRoute;
   const routes = useWorkspaceCadRoutes({
     projectId,
     revisionId,
     load: loadOverlay,
     pageIndex,
-    route: data.routeSummary ?? data.autoRoute,
+    route: shownRoute,
   });
   const mepVisibility = useMepLayerVisibility();
   const routePreview = useMemo(
@@ -610,10 +612,11 @@ export const useWorkspaceCad = ({
       ),
     [constructionList, visibility.hiddenCategories, visibility.hiddenLayerNames],
   );
-  const link = {
+  const link: ICadFloor3dLink = {
     ...constructionsState.selection,
     hiddenCategories: visibility.hiddenCategories,
     hiddenConstructionIds,
+    routeJobId: shownRoute?.job_id ?? null,
   };
   const floor3d = bar !== null && view3d && params !== null ? { params, link } : null;
 

@@ -19483,6 +19483,10 @@ export type ReadCadMepRoutes3dData = {
          * View
          */
         view: number;
+        /**
+         * Job Id
+         */
+        job_id?: string | null;
     };
     url: '/api/v1/projects/{project_id}/cad/mep/routes3d';
 };

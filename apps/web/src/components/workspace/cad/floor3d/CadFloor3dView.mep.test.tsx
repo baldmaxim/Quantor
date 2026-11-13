@@ -95,7 +95,8 @@ const mount = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <CadFloor3dView params={params} onSelectConstruction={vi.fn()} />
+      {/* Рабочая область: 3D рисует route-задание плана (`j2`). */}
+      <CadFloor3dView params={params} routeJobId="j2" onSelectConstruction={vi.fn()} />
     </QueryClientProvider>,
   );
 };

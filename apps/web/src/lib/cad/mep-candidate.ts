@@ -15,8 +15,13 @@ export const viewFolder = (pageIndex: number, view: number): string =>
 
 export const CANDIDATE_SCHEMA = 'quantor.cad_mep.candidate.v1';
 
-const lengthSchema = z.object({ plan_m: z.number(), len3d_m: z.number() });
-const layerLengthSchema = lengthSchema.extend({ polylines: z.number().optional() });
+/**
+ * Длина трасс - одна расчётная величина: длина по оси с вертикальными участками (`len3d_m`
+ * генератора). Проекция на план (`plan_m`) - не количество, а свойство вида: не читается.
+ */
+const lengthSchema = z
+  .object({ len3d_m: z.number() })
+  .transform(({ len3d_m }) => ({ length_m: len3d_m }));
 const sourcedSchema = z.object({ value: z.number(), source: z.string() });
 /** Отметка пола / высота этажа в происхождении: значение, источник и цитата из документации. */
 const provenanceValueSchema = z.object({
@@ -59,7 +64,7 @@ const candidateSchema = z.object({
     )
     .default([]),
   routes: z.object({
-    by_layer: z.record(z.string(), layerLengthSchema).default({}),
+    by_layer: z.record(z.string(), lengthSchema).default({}),
     by_system: z.record(z.string(), lengthSchema).default({}),
     totals: lengthSchema,
   }),
@@ -76,7 +81,7 @@ const candidateSchema = z.object({
 });
 
 export type MepCandidate = z.infer<typeof candidateSchema>;
-export type MepLength = z.infer<typeof lengthSchema>;
+export type MepLength = z.output<typeof lengthSchema>;
 
 /** Разбор файла; чужая схема или битая форма - `null` (вызывающий скажет об этом человеку). */
 export const parseCandidate = (raw: unknown): MepCandidate | null => {

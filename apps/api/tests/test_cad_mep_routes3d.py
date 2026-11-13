@@ -79,11 +79,14 @@ def both_settings(
     )
 
 
-def _routes3d_url(project_id: str, revision_id: str, page: int = 0, view: int = 1) -> str:
-    return (
+def _routes3d_url(
+    project_id: str, revision_id: str, page: int = 0, view: int = 1, job_id: str | None = None
+) -> str:
+    url = (
         f"/api/v1/projects/{project_id}/cad/mep/routes3d"
         f"?revision_id={revision_id}&page_index={page}&view={view}"
     )
+    return url if job_id is None else f"{url}&job_id={job_id}"
 
 
 async def _payload(session: AsyncSession, job_id: str) -> dict[str, object]:
@@ -416,6 +419,37 @@ async def test_routes3d_takes_the_newest_succeeded_route_job(
         await _run_route_worker(db_session, fake_storage, settings, route_id)
         body = (await api.get(_routes3d_url(project_id, revision_id))).json()
         assert body["job_id"] == route_id and body["floor_height_mm"] == 3300
+
+
+async def test_routes3d_reads_exactly_the_route_job_shown_on_the_plan(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    mep_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(mep_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        route_id = await _approve_and_queue(api, base, job_id)
+        # Задание плана ещё не успешно - трасс нет, хотя задание существует.
+        queued = await api.get(_routes3d_url(project_id, revision_id, job_id=route_id))
+        assert queued.json()["detail"]["code"] == "CAD_ROUTES_NOT_FOUND"
+
+        await _run_route_worker(db_session, fake_storage, settings, route_id)
+        read = await api.get(_routes3d_url(project_id, revision_id, job_id=route_id))
+        assert read.status_code == 200, read.text
+        assert read.json()["job_id"] == route_id
+
+        # Чужое задание, задание CAD вместо трасс, задание другого вида - не подменяются новейшим.
+        for url in (
+            _routes3d_url(project_id, revision_id, job_id=str(uuid.uuid4())),
+            _routes3d_url(project_id, revision_id, job_id=job_id),
+            _routes3d_url(project_id, revision_id, view=2, job_id=route_id),
+        ):
+            refused = await api.get(url)
+            assert refused.status_code == 404
+            assert refused.json()["detail"]["code"] == "CAD_ROUTES_NOT_FOUND"
 
 
 async def test_routes3d_is_closed_for_strangers_and_without_the_flag(

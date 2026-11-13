@@ -1,6 +1,6 @@
 import type { CadDecisionRead } from '@quantor/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IWorkspaceCadMep } from '@/components/workspace/cad/types';
@@ -359,6 +359,11 @@ describe('вкладка «Трассы»: выбранные трассы', () 
     mount(withRoute());
     expect(await screen.findByTestId('mep-candidate')).toBeInTheDocument();
     expect(screen.getByText('Итого по системам')).toBeInTheDocument();
+    // Одна колонка «Длина, м» - расчёт; «План» и «3D» - только виды, своих чисел у них нет.
+    const totals = screen.getByRole('table', { name: 'Итого по системам' });
+    expect(within(totals).getByRole('columnheader', { name: 'Длина, м' })).toBeInTheDocument();
+    expect(within(totals).queryByRole('columnheader', { name: 'План, м' })).toBeNull();
+    expect(within(totals).getByRole('row', { name: 'Всего 5,00' })).toBeInTheDocument();
     expect(screen.getByText('Квартира Кв 1')).toBeInTheDocument();
     expect(screen.getByText('elevation_mismatch')).toBeInTheDocument();
     expect(screen.getByText(/Допущения \(1\)/)).toBeInTheDocument();

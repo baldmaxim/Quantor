@@ -54,11 +54,12 @@ const params: ICadViewParams = {
   view: 1,
 };
 
-const mount = () => {
+/** Рабочая область: 3D получает route-задание, которое показывает план (`j2`). */
+const mount = (routeJobId: string | null = 'j2') => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <CadFloor3dView params={params} />
+      <CadFloor3dView params={params} routeJobId={routeJobId} />
     </QueryClientProvider>,
   );
 };
@@ -78,6 +79,7 @@ const routes3dFixture = (patch: Partial<client.CadMepRoutes3dOut> = {}): client.
 });
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(client.listCadJobs).mockImplementation(() => ok({ items: [] }) as never);
   vi.mocked(client.readCadMepRoutes3D).mockImplementation(
     () => Promise.reject({ detail: { code: 'CAD_ROUTES_NOT_FOUND' } }) as never,
@@ -312,6 +314,21 @@ describe('3D-вид этажа', () => {
       await open();
       await waitFor(() => expect(client.readCadMepRoutes3D).toHaveBeenCalled());
       expect(screen.queryByText(/перестройте трассы/)).toBeNull();
+    });
+
+    it('читает то же route-задание, что показывает план', async () => {
+      await open();
+      await waitFor(() => expect(client.readCadMepRoutes3D).toHaveBeenCalled());
+      expect(vi.mocked(client.readCadMepRoutes3D).mock.calls[0]?.[0]).toMatchObject({
+        query: { revision_id: 'r1', page_index: 2, view: 1, job_id: 'j2' },
+      });
+    });
+
+    it('на плане трасс нет - 3D их не запрашивает', async () => {
+      vi.mocked(client.readCadFloor3D).mockImplementation(() => ok(floor3dFixture()) as never);
+      mount(null);
+      await screen.findByTestId('floor3d-heights');
+      expect(client.readCadMepRoutes3D).not.toHaveBeenCalled();
     });
 
     it('задание старее v7 - плашка про старую версию генератора', async () => {

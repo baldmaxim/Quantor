@@ -887,7 +887,7 @@ def heights_match(
     )
 
 
-async def latest_succeeded_route_job(
+async def succeeded_route_job(
     session: AsyncSession,
     *,
     workspace_id: uuid.UUID,
@@ -895,21 +895,25 @@ async def latest_succeeded_route_job(
     revision_id: uuid.UUID,
     page_index: int,
     view: int,
+    job_id: uuid.UUID | None = None,
 ) -> Job | None:
-    """Новейшее успешное `cad_mep_route` листа (ревизия, страница, вид) - как в web-автовыборе."""
+    """Успешное `cad_mep_route` листа (ревизия, страница, вид).
+
+    `job_id` - то самое задание, которое показывает план: план, итоги и 3D читают одни трассы.
+    Без него - новейшее успешное задание листа. Чужое, неуспешное или другого листа - `None`.
+    """
+    query = select(Job).where(
+        Job.job_type == JobType.CAD_MEP_ROUTE,
+        Job.workspace_id == workspace_id,
+        Job.project_id == project_id,
+        Job.status == JobStatus.SUCCEEDED,
+        Job.payload["revision_id"].astext == str(revision_id),
+        Job.payload["page_index"].astext == str(page_index),
+        Job.payload["view"].astext == str(view),
+    )
+    if job_id is not None:
+        query = query.where(Job.id == job_id)
     found: Job | None = await session.scalar(
-        select(Job)
-        .where(
-            Job.job_type == JobType.CAD_MEP_ROUTE,
-            Job.workspace_id == workspace_id,
-            Job.project_id == project_id,
-            Job.status == JobStatus.SUCCEEDED,
-            Job.payload["revision_id"].astext == str(revision_id),
-            Job.payload["page_index"].astext == str(page_index),
-            Job.payload["view"].astext == str(view),
-        )
-        .order_by(Job.created_at.desc())
-        .limit(1)
-        .execution_options(populate_existing=True)
+        query.order_by(Job.created_at.desc()).limit(1).execution_options(populate_existing=True)
     )
     return found

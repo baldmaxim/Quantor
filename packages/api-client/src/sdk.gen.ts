@@ -1097,6 +1097,8 @@ export const putCadProjectLevels = <ThrowOnError extends boolean = false>(option
 
 /**
  * Трассы механики листа в 3D: вершины в мм DXF вида, Z от отметки этажа
+ *
+ * `job_id` - route-задание, которое показывает план; без него - новейшее успешное листа.
  */
 export const readCadMepRoutes3D = <ThrowOnError extends boolean = false>(options: Options<ReadCadMepRoutes3dData, ThrowOnError>): RequestResult<ReadCadMepRoutes3dResponses, ReadCadMepRoutes3dErrors, ThrowOnError> => (options.client ?? client).get<ReadCadMepRoutes3dResponses, ReadCadMepRoutes3dErrors, ThrowOnError>({ url: '/api/v1/projects/{project_id}/cad/mep/routes3d', ...options });
 

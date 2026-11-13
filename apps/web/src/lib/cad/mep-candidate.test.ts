@@ -44,8 +44,11 @@ const sample = (patch: Record<string, unknown> = {}) => ({
 describe('parseCandidate', () => {
   it('читает длины, проблемы и допущения, лишние поля пропускает', () => {
     const candidate = parseCandidate(sample());
-    expect(candidate?.routes.totals).toEqual({ plan_m: 10.5, len3d_m: 11.25 });
-    expect(candidate?.routes.by_system.heating?.len3d_m).toBe(11.25);
+    // Одна расчётная длина - длина по оси с вертикалями; проекция на план не читается.
+    expect(candidate?.routes.totals).toEqual({ length_m: 11.25 });
+    expect(candidate?.routes.by_system.heating).toEqual({ length_m: 11.25 });
+    expect(candidate?.routes.by_layer['M-OV-T1']).toEqual({ length_m: 5.5 });
+    expect(candidate?.apartments[0]?.lengths_own_lines.heating).toEqual({ length_m: 11.25 });
     expect(candidate?.apartments[0]?.number).toBe('Кв 1');
     expect(candidate?.issues[0]?.code).toBe('elevation_mismatch');
     expect(candidate?.assumptions).toHaveLength(2);
@@ -56,7 +59,8 @@ describe('parseCandidate', () => {
     expect(parseCandidate(sample({ schema: 'quantor.cad_mep.candidate.v2' }))).toBeNull();
     expect(parseCandidate(null)).toBeNull();
     expect(parseCandidate('{}')).toBeNull();
-    expect(parseCandidate(sample({ routes: { totals: { plan_m: 'много' } } }))).toBeNull();
+    expect(parseCandidate(sample({ routes: { totals: { len3d_m: 'много' } } }))).toBeNull();
+    expect(parseCandidate(sample({ routes: { totals: { plan_m: 10.5 } } }))).toBeNull();
   });
 
   it('списки без значения становятся пустыми', () => {

@@ -37101,6 +37101,7 @@
     },
     "/api/v1/projects/{project_id}/cad/mep/routes3d": {
       "get": {
+        "description": "`job_id` - route-задание, которое показывает план; без него - новейшее успешное листа.",
         "operationId": "read_cad_mep_routes3d",
         "parameters": [
           {
@@ -37139,6 +37140,23 @@
             "schema": {
               "title": "View",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
             }
           }
         ],

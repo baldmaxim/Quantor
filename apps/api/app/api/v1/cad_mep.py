@@ -286,15 +286,18 @@ async def read_cad_mep_routes3d(
     session: SessionDep,
     context: AuthDep,
     storage: StorageDep,
+    job_id: uuid.UUID | None = None,
 ) -> CadMepRoutes3dOut:
+    """`job_id` - route-задание, которое показывает план; без него - новейшее успешное листа."""
     await _scope(session, context, project_id, revision_id)
-    route = await cad_mep_service.latest_succeeded_route_job(
+    route = await cad_mep_service.succeeded_route_job(
         session,
         workspace_id=context.tenant,
         project_id=project_id,
         revision_id=revision_id,
         page_index=page_index,
         view=view,
+        job_id=job_id,
     )
     if route is None:
         raise DomainError(ErrorCode.CAD_ROUTES_NOT_FOUND)

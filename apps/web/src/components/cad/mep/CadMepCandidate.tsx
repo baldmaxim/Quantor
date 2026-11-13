@@ -25,12 +25,13 @@ interface ICadMepCandidateProps {
 const CELL = 'px-[var(--s-3)] py-[var(--s-2)] text-right tabular';
 const HEAD = 'px-[var(--s-3)] py-[var(--s-2)] text-right text-xs font-normal text-muted';
 
+/** Одна расчётная длина на строку: план и 3D - только виды этого расчёта, своих чисел у них нет. */
 const LengthTable: FC<{
   caption: string;
-  rows: readonly { key: string; label: string; plan: number; len3d: number }[];
+  rows: readonly { key: string; label: string; length: number }[];
 }> = ({ caption, rows }) => (
   <div className="min-w-0 overflow-x-auto">
-    <table className="w-full min-w-[260px] border-collapse text-xs">
+    <table className="w-full min-w-[220px] border-collapse text-xs">
       <caption className="pb-[var(--s-2)] text-left text-xs text-muted">{caption}</caption>
       <thead>
         <tr className="border-b border-border">
@@ -38,10 +39,7 @@ const LengthTable: FC<{
             &nbsp;
           </th>
           <th scope="col" className={HEAD}>
-            План, м
-          </th>
-          <th scope="col" className={HEAD}>
-            3D, м
+            Длина, м
           </th>
         </tr>
       </thead>
@@ -51,8 +49,7 @@ const LengthTable: FC<{
             <th scope="row" className="px-[var(--s-3)] py-[var(--s-2)] text-left font-normal [overflow-wrap:anywhere]">
               {row.label}
             </th>
-            <td className={CELL}>{formatMeters(row.plan)}</td>
-            <td className={CELL}>{formatMeters(row.len3d)}</td>
+            <td className={CELL}>{formatMeters(row.length)}</td>
           </tr>
         ))}
       </tbody>
@@ -91,15 +88,13 @@ export const CadMepCandidateBody: FC<{ candidate: MepCandidate }> = ({ candidate
     (item) => ({
       key: item.key,
       label: item.label,
-      plan: routes.by_system[item.key]?.plan_m ?? 0,
-      len3d: routes.by_system[item.key]?.len3d_m ?? 0,
+      length: routes.by_system[item.key]?.length_m ?? 0,
     }),
   );
   const layers = Object.entries(routes.by_layer).map(([name, value]) => ({
     key: name,
     label: `${mepLayerDef(name)?.label ?? name} · ${name}`,
-    plan: value.plan_m,
-    len3d: value.len3d_m,
+    length: value.length_m,
   }));
   const withApartments = apartments.filter((apartment) =>
     Object.keys(apartment.lengths_own_lines).length > 0,
@@ -129,7 +124,7 @@ export const CadMepCandidateBody: FC<{ candidate: MepCandidate }> = ({ candidate
         caption="Итого по системам"
         rows={[
           ...systems,
-          { key: 'total', label: 'Всего', plan: routes.totals.plan_m, len3d: routes.totals.len3d_m },
+          { key: 'total', label: 'Всего', length: routes.totals.length_m },
         ]}
       />
       <LengthTable caption="По слоям" rows={layers} />
@@ -141,8 +136,7 @@ export const CadMepCandidateBody: FC<{ candidate: MepCandidate }> = ({ candidate
           rows={Object.entries(apartment.lengths_own_lines).map(([key, value]) => ({
             key,
             label: mepSystemLabel(key),
-            plan: value.plan_m,
-            len3d: value.len3d_m,
+            length: value.length_m,
           }))}
         />
       ))}

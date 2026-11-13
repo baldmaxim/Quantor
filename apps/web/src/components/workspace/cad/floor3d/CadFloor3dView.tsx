@@ -48,12 +48,17 @@ export interface ICadFloor3dViewProps {
   readonly hiddenConstructionIds?: ReadonlySet<string>;
   /** Только просмотр (страница объекта): без правки высот, отверстий и выгрузки DXF. */
   readonly readOnly?: boolean;
+  /**
+   * Route-задание, которое показывает план: 3D рисует те же трассы. `null` - на плане трасс нет.
+   * Не задано (страница объекта) - автовыбор плана по заданию листа.
+   */
+  readonly routeJobId?: string | null;
 }
 
-/** Связь 3D-вида с общим выбором и слоями рабочей области: всё, кроме листа. */
+/** Связь 3D-вида с общим выбором, слоями и трассами рабочей области: всё, кроме листа. */
 export type ICadFloor3dLink = Pick<
   ICadFloor3dViewProps,
-  'selectedIds' | 'onSelectConstruction' | 'hiddenCategories' | 'hiddenConstructionIds'
+  'selectedIds' | 'onSelectConstruction' | 'hiddenCategories' | 'hiddenConstructionIds' | 'routeJobId'
 >;
 
 const NO_IDS: ReadonlySet<string> = new Set<string>();
@@ -85,6 +90,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   hiddenCategories,
   hiddenConstructionIds,
   readOnly = false,
+  routeJobId,
 }) => {
   const query = useCadFloor3d(params, true);
   const projectLevels = useCadProjectLevels(params.projectId, true);
@@ -105,13 +111,15 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const model = query.data ?? null;
   const plan = useMemo(() => (model ? buildFloor3dPlan(model) : null), [model]);
 
-  // Трассы механики листа: сбой чтения или их отсутствие 3D-вид не ломают. Слои трасс скрываются той
-  // же маской, что и в 2D (общее хранилище), поэтому одна истина на плане и в 3D.
+  // Трассы механики листа: сбой чтения или их отсутствие 3D-вид не ломают. Задание трасс - то же,
+  // что рисует план, слои скрываются той же маской (общее хранилище): одна истина на плане и в 3D.
   const routesState = useCadMepRoutes3d({
     projectId: params.projectId,
     revisionId: params.revisionId,
     pageIndex: params.pageIndex,
     view: params.view,
+    parentJobId: params.jobId,
+    routeJobId,
     enabled: model !== null,
   });
   const routesMask = useMepLayerVisibility().mask;
