@@ -60,9 +60,11 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   const floor3d = steps.find((step) => step.key === 'floor3d');
   const floor3dBadge = floor3d ? FLOOR3D_BADGES[floor3d.state] : undefined;
   const sheetName = `Лист ${sheet.page_label ?? sheet.page_index + 1}`;
-  // Лист называется этажом по заголовку плана; номер листа - второй серой подписью.
+  // Главное - этаж по заголовку плана или наименование листа; номер листа - серой подписью ниже.
   const floorTitle = formatFloorTitle(sheet.floor_title, '');
-  const name = floorTitle || sheetName;
+  const name = floorTitle || sheet.title || sheetName;
+  const subtitle =
+    name === sheetName ? null : [sheetName, floorTitle && sheet.title].filter(Boolean).join(' · ');
 
   const toggle = () => setOpen((value) => !value);
 
@@ -100,16 +102,17 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
             )}
           />
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
-            <span
-              className="text-sm font-medium [overflow-wrap:anywhere]"
-              title={formatFloorTitleFull(sheet.floor_title) ?? undefined}
-            >
-              {name}
+            <span className="flex min-w-0 flex-col">
+              <span
+                className="text-sm font-medium [overflow-wrap:anywhere]"
+                title={formatFloorTitleFull(sheet.floor_title) ?? undefined}
+              >
+                {name}
+              </span>
+              {subtitle && (
+                <span className="text-xs text-muted [overflow-wrap:anywhere]">{subtitle}</span>
+              )}
             </span>
-            {floorTitle && <span className="text-xs text-muted">{sheetName}</span>}
-            {sheet.title && (
-              <span className="text-xs text-muted [overflow-wrap:anywhere]">{sheet.title}</span>
-            )}
             {sheet.scale_source === 'auto' && (
               <StatusBadge tone="neutral" dot={false}>
                 Масштаб: авто
