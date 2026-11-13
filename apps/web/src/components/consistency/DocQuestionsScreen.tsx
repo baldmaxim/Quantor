@@ -9,7 +9,7 @@ import { useDocQuestions } from '@/lib/consistency/doc-question-queries';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 import { useFeatures, useMeta, useProject } from '@/lib/queries';
 
-import { DocQuestionCard } from './DocQuestionCard';
+import { DocQuestionsTable } from './DocQuestionsTable';
 import { DocSearchSummaryPanel } from './DocSearchSummaryPanel';
 
 /**
@@ -75,9 +75,7 @@ export const DocQuestionsScreen: FC<IScreenProps> = ({ projectId }) => {
           {questions.data && (
             <>
               <DocSearchSummaryPanel projectId={projectId} data={questions.data} />
-              {questions.data.questions.map((question) => (
-                <DocQuestionCard key={question.code} projectId={projectId} question={question} />
-              ))}
+              <DocQuestionsTable projectId={projectId} questions={questions.data.questions} />
             </>
           )}
         </div>
