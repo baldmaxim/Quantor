@@ -53,6 +53,8 @@ DEFAULT_FLOOR_HEIGHT_MM: Final = 3000
 DEFAULT_SLAB_THICKNESS_MM: Final = 200
 # Допуск расхождения смещений по общим осям: больше - оси разных этажей «не сходятся».
 AXIS_TOLERANCE_MM: Final = 150.0
+# Минимальная доля перекрытия bbox совмещённого этажа с эталоном (от меньшего bbox).
+MIN_ALIGN_OVERLAP: Final = 0.3
 GROUP_NONE_KEY: Final = "none"
 GROUP_NONE_LABEL: Final = "Корпус не указан"
 MESSAGE_AXES_OUTDATED: Final = "оси не распознаны: пересчитайте конструкции листа"
@@ -423,6 +425,19 @@ def _fallback(
     )
 
 
+def _overlap_share(first: Sequence[float], second: Sequence[float]) -> float:
+    """Площадь пересечения двух bbox / меньшая из их площадей; нулевая площадь даёт 0."""
+    width = min(first[2], second[2]) - max(first[0], second[0])
+    height = min(first[3], second[3]) - max(first[1], second[1])
+    smallest = min(
+        (first[2] - first[0]) * (first[3] - first[1]),
+        (second[2] - second[0]) * (second[3] - second[1]),
+    )
+    if width <= 0 or height <= 0 or smallest <= 0:
+        return 0.0
+    return width * height / smallest
+
+
 def _shared_axes(first: BuiltFloor, second: BuiltFloor) -> int:
     """Число общих подписей осей двух этажей (вертикальные и горизонтальные по отдельности)."""
     return len(first.axes.vertical.keys() & second.axes.vertical.keys()) + len(
@@ -484,10 +499,20 @@ def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead
         problems = [m for m in (along_x, along_y) if isinstance(m, str)]
         return _fallback(item, reference, "; ".join(problems))
     shifted = _shifted(item.floor, along_x[0], along_y[0])
+    labels = [*along_x[1], *along_y[1]]
+    if shifted.bbox is not None and reference.floor.bbox is not None:
+        share = _overlap_share(shifted.bbox, reference.floor.bbox)
+        if share < MIN_ALIGN_OVERLAP:
+            return _fallback(
+                item,
+                reference,
+                f"после совмещения по осям {', '.join(labels)} этаж не перекрывает эталон "
+                f"({share:.0%})",
+            )
     return shifted.model_copy(
         update={
             "alignment": "axes",
-            "alignment_axes": [*along_x[1], *along_y[1]],
+            "alignment_axes": labels,
             "alignment_message": None,
         }
     )

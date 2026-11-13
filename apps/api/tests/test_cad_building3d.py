@@ -412,6 +412,28 @@ def test_disagreeing_axes_are_not_aligned_and_named() -> None:
     assert floor.alignment_message == "вертикальных оси расходятся с эталоном: 3.3"
 
 
+def test_single_common_labels_with_far_shift_do_not_overlap_reference() -> None:
+    reference = built(axes=ref_axes())
+    # Одноимённые метки 3.1 и «А» - на деле другие оси: сдвиг уводит этаж далеко от эталона.
+    other = built(
+        elevation=BASE + 3000,
+        order=1,
+        axes=axes_block({"3.1": 1000.0 + 50000.0}, {"А": 2000.0 + 30000.0}),
+    )
+    _ref, floor = b3d.align_floors([reference, other])
+    assert floor.alignment == "none" and floor.alignment_axes == []
+    assert floor.alignment_message is not None
+    assert "не перекрывает" in floor.alignment_message
+    assert "3.1, А" in floor.alignment_message
+    assert floor.bbox == pytest.approx([0.0, 0.0, 6000.0, 4000.0])
+
+
+def test_overlap_share_is_zero_for_degenerate_or_disjoint_boxes() -> None:
+    assert b3d._overlap_share([0, 0, 0, 10], [0, 0, 10, 10]) == 0.0
+    assert b3d._overlap_share([0, 0, 10, 10], [20, 0, 30, 10]) == 0.0
+    assert b3d._overlap_share([0, 0, 10, 10], [5, 0, 15, 10]) == pytest.approx(0.5)
+
+
 def test_axes_within_tolerance_are_aligned_by_median() -> None:
     reference = built(axes=ref_axes())
     close = {"3.1": 1100.0, "3.2": 5100.0, "3.3": 9000.0 + b3d.AXIS_TOLERANCE_MM - 10.0 + 100.0}
