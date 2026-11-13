@@ -355,9 +355,10 @@ def build_floor3d(
     classes = cad_constructions.classify_partitions(
         document.constructions, props_by_key, () if partition is None else partition.zones
     )
-    document = cad_constructions.rehost_openings_to_full_height(document, classes, props_by_key)
     candidates = cad_constructions.partition_candidate_ids(classes)
     partition_heights = cad_constructions.partition_heights_by_id(classes, partition)
+    # Проём с откосом из маячного ряда - разрыв выкладки: ни полотна, ни перемычки.
+    marker_gaps = cad_constructions.marker_row_gap_ids(document, partition_heights, props_by_key)
     warnings.extend(
         CadFloor3dWarningRead(code=code, message=message)
         for code, message in cad_constructions.partition_warnings(
@@ -409,6 +410,8 @@ def build_floor3d(
     for opening in document.openings:
         if outdated:
             break
+        if opening.id in marker_gaps:
+            continue
         if opening.kind == "window" and opening.opening_height_mm is None:
             # окно без высоты: проём не строится, стена сплошная; высоту двери не подставляем
             windows_without_height += 1

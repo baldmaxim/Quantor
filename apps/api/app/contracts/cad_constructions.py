@@ -490,6 +490,9 @@ class CadOpeningRead(BaseModel):
     block_name: str | None
     handle: str | None
     center: list[float]
+    # Проём между перегородками с маячным рядом: разрыв выкладки, не проём кладки - без полотна,
+    # перемычки и надпроёмной части, из объёма не вычитается.
+    marker_row_gap: bool = False
 
 
 class CadConstructionGroupRead(BaseModel):

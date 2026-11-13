@@ -613,44 +613,42 @@ def partition_heights_by_id(
     return result
 
 
-_FULL_HEIGHT_BASES: Final = frozenset({"bathroom_wall", "shaft_enclosure"})
+def _is_beacon_row_wall(
+    key: str,
+    partition_heights: Mapping[str, PartitionHeight | PartitionFullHeight],
+    props_by_key: PropsByKey,
+) -> bool:
+    """Стена с действующим маячным рядом: ответ принят, ручной высоты нет."""
+    if not isinstance(partition_heights.get(key), PartitionHeight):
+        return False
+    return props_by_key.get(key, (CadConstructionProps(), False))[0].height_override_mm is None
 
 
-def rehost_openings_to_full_height(
-    document: WallsDocument, classes: Mapping[str, CadHeightBasis], props_by_key: PropsByKey
-) -> WallsDocument:
-    """Проём в маячном ряду, смежный со стеной санузла или шахты, переходит к ней как к хозяину.
+def marker_row_gap_ids(
+    document: WallsDocument,
+    partition_heights: Mapping[str, PartitionHeight | PartitionFullHeight],
+    props_by_key: PropsByKey,
+) -> frozenset[str]:
+    """Проёмы маячного ряда: проём, у которого хотя бы один откос - маячный ряд.
 
-    Дверь стоит между двумя кусками одной стены; классы кусков считаются по зонам каждого и
-    могут разойтись: хозяин-перегородка (маячный ряд) при соседе-стене санузла оставил бы над
-    дверью пустоту (верх перемычки и надпроёмная часть берутся по высоте хозяина). Стена там
-    на полную высоту, поэтому хозяином становится смежная стена санузла или шахты. Ручная высота
-    хозяина (ввод человека) сильнее: такой проём не переносится. Чистая функция.
+    Откос - хозяин или примыкающая конструкция с действующим маячным рядом (ответ принят, ручной
+    высоты нет). По проекту такая стена - один блок высотой ряда: перемычка над проёмом
+    бесполезна, поэтому в проёме нет ни полотна, ни перемычки, ни надпроёмной части, из кладки он
+    не вычитается. Относится к двери, разрыву и окну, в том числе к проёму между рядом и стеной на
+    полную высоту. Перемычка остаётся, когда оба откоса - стены на полную высоту или проём в оси
+    такой стены (дверь в стене санузла). Дверь без разрыва в контуре (`no_data`) сюда не входит.
+    Чистая функция.
     """
-    moved: dict[str, str] = {}
+    result: set[str] = set()
     for opening in document.openings:
-        host = opening.host_id
-        if host is None or classes.get(host) != "apartment_partition":
+        if opening.kind == "door" and opening.status == "no_data":
             continue
-        if (
-            props_by_key.get(host, (CadConstructionProps(), False))[0].height_override_mm
-            is not None
-        ):
-            continue
-        for neighbour in opening.adjacent_ids:
-            if classes.get(neighbour) in _FULL_HEIGHT_BASES:
-                moved[opening.id] = neighbour
-                break
-    if not moved:
-        return document
-    return document.model_copy(
-        update={
-            "openings": [
-                o.model_copy(update={"host_id": moved[o.id]}) if o.id in moved else o
-                for o in document.openings
-            ]
-        }
-    )
+        jambs = set(opening.adjacent_ids)
+        if opening.host_id is not None:
+            jambs.add(opening.host_id)
+        if any(_is_beacon_row_wall(key, partition_heights, props_by_key) for key in jambs):
+            result.add(opening.id)
+    return frozenset(result)
 
 
 def partition_warnings(
@@ -1046,12 +1044,20 @@ def compute_sheet(
     classes = classify_partitions(
         document.constructions, props_by_key, () if partition is None else partition.zones
     )
-    document = rehost_openings_to_full_height(document, classes, props_by_key)
     candidates = partition_candidate_ids(classes)
     partition_heights = partition_heights_by_id(classes, partition)
+    # Проёмы маячного ряда - разрыв выкладки: в расчёт хозяев, перемычек и сводку не входят.
+    marker_gaps = marker_row_gap_ids(document, partition_heights, props_by_key)
+    counted = (
+        document.model_copy(
+            update={"openings": [o for o in document.openings if o.id not in marker_gaps]}
+        )
+        if marker_gaps
+        else document
+    )
     known = {c.id for c in items_all}
     by_host: dict[str, list[WallsOpening]] = defaultdict(list)
-    for opening in document.openings:
+    for opening in counted.openings:
         if opening.host_id is not None and opening.host_id in known:
             by_host[opening.host_id].append(opening)
 
@@ -1114,7 +1120,7 @@ def compute_sheet(
         return (KIND_ORDER.index(key[0]), key[1], key[2] or "")
 
     lintel_groups, lintels_without_volume = compute_lintels(
-        document, items_all, props_by_key, levels, partition_heights
+        counted, items_all, props_by_key, levels, partition_heights
     )
     lintel_element: CadGroupElement = "lintel"
     lintel_totals = [
@@ -1168,11 +1174,11 @@ def compute_sheet(
         thickness_check_count=check_count,
         height_missing_count=height_missing_count,
         unaccounted_gap_openings=sum(
-            1 for o in document.openings if o.kind != "door" and o.opening_height_mm is None
+            1 for o in counted.openings if o.kind != "door" and o.opening_height_mm is None
         ),
         door_openings_without_host=sum(
             1
-            for o in document.openings
+            for o in counted.openings
             if o.kind == "door" and (o.host_id is None or o.host_id not in known)
         ),
         lintels_without_volume=lintels_without_volume,
@@ -1193,6 +1199,7 @@ def compute_sheet(
             block_name=o.block_name,
             handle=o.handle,
             center=o.center,
+            marker_row_gap=o.id in marker_gaps,
         )
         for o in document.openings
     ]

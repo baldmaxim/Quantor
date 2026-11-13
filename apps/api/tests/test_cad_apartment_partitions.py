@@ -376,8 +376,8 @@ def test_floor3d_partition_top_is_base_plus_beacon_row_and_has_no_reaches_top_wa
     assert (other.z_top_mm, other.height_basis) == (BASE + 2800, "sheet")
     assert "opening_reaches_wall_top" not in {w.code for w in model.warnings}
     assert model.lintels == []
-    (door,) = model.doors
-    assert (door.z_bottom_mm, door.z_top_mm) == (BASE, BASE + 188)
+    # дверь в маячном ряду (соседей, кроме хозяина, нет) - разрыв выкладки: полотна нет
+    assert model.doors == []
     assert model.heights.apartment_partition_height is not None
 
 
@@ -460,42 +460,193 @@ def test_door_in_beacon_row_has_no_above_part_and_no_lintel() -> None:
     assert build_3d(context).lintels == []
 
 
-def test_door_hosted_by_beacon_piece_next_to_bathroom_piece_goes_to_the_bathroom_wall() -> None:
+def test_door_between_beacon_piece_and_bathroom_piece_has_no_above_part_on_either() -> None:
     context = calc.PartitionContext(zones_with_bath_second_piece(), HEIGHT)
-    door = opening("d1", PARTITION_ID, width=800.0)
-    door["adjacent_ids"] = [PARTITION_ID, SECOND_ID]
-    result = calc.compute_sheet(
-        document([thin(), second_piece()], [door]), {}, NO_LEVELS, partition=context
-    )
+    result = sheet_two_pieces(context, adjacent=[PARTITION_ID, SECOND_ID])
+    assert result.openings[0].marker_row_gap is True
     beacon, bath = (c.computed for c in result.constructions)
     assert (beacon.height_basis, bath.height_basis) == ("apartment_partition", "bathroom_wall")
     assert beacon.volume_m3 == pytest.approx(2000 * 80 * 188 / 1e9, abs=5e-5)
-    assert bath.volume_m3 == pytest.approx((2000 * 2800 + 800 * 700) * 80 / 1e9, abs=5e-5)
+    # стена санузла на полную высоту, но откос маячный: надпроёмной части нет
+    assert bath.volume_m3 == pytest.approx(2000 * 2800 * 80 / 1e9, abs=5e-5)
+    assert [g for g in result.totals if g.element == "lintel"] == []
 
 
-def test_floor3d_door_between_beacon_and_bathroom_pieces_gets_lintel_to_wall_top() -> None:
+# ------------------------------------------------------------------ проём маячного ряда
+
+FIRST_3D = "aaaaaaaaaaaa"
+
+
+def zones_beacon_both_pieces() -> list[calc.PartitionZone]:
+    def box(x0: float, x1: float) -> calc.PartitionZone:
+        shell = [[x0, 2300.0], [x1, 2300.0], [x1, 4300.0], [x0, 4300.0]]
+        return calc.PartitionZone("room_apartment", "12", shell, "living")
+
+    return [*BEACON_ZONES, box(0.0, 2960.0), box(3040.0, 6000.0)]
+
+
+def build_3d_two_pieces(
+    context: calc.PartitionContext,
+    *,
+    adjacent: list[str],
+    entries: dict[str, tuple[CadConstructionProps, bool]] | None = None,
+    door_host: str = FIRST_3D,
+) -> Any:
     raw = raw_document()
     raw["constructions"][0]["polygon"] = {"shell": THIN_SHELL, "holes": []}
     raw["constructions"][0]["thickness_nominal_mm"] = 80.0
     second = {**raw["constructions"][0], "id": SECOND_ID}
     second["polygon"] = {"shell": SECOND_SHELL, "holes": []}
     raw["constructions"].append(second)
-    raw["openings"][0]["adjacent_ids"] = ["aaaaaaaaaaaa", SECOND_ID]
-    zones = zones_with_bath_second_piece()
-    model = f3d.build_floor3d(
+    raw["openings"][0]["host_id"] = door_host
+    raw["openings"][0]["adjacent_ids"] = adjacent
+    extras = raw_extras()
+    extras["openings"][0]["leaf"] = [[500.0, 30.0], [1500.0, 30.0], [1500.0, 50.0], [500.0, 50.0]]
+    return f3d.build_floor3d(
         WallsDocument.model_validate(raw),
-        WallsFloorExtras.model_validate(raw_extras()),
-        props_by_key={},
+        WallsFloorExtras.model_validate(extras),
+        props_by_key=entries or {},
         overrides=NO_LEVELS,
         project_slab=None,
         hole_decisions={},
         door_zones=[],
-        partition=calc.PartitionContext(zones, HEIGHT),
+        partition=context,
     )
+
+
+def sheet_two_pieces(
+    context: calc.PartitionContext,
+    *,
+    adjacent: list[str],
+    host: str = PARTITION_ID,
+    kind: str = "door",
+    door_status: str = "ok",
+    entries: dict[str, tuple[CadConstructionProps, bool]] | None = None,
+    extra: list[dict[str, Any]] | None = None,
+) -> calc.SheetResult:
+    door = opening("d1", host, kind=kind, status=door_status, width=800.0)
+    door["adjacent_ids"] = adjacent
+    return calc.compute_sheet(
+        document([thin(), second_piece(), *(extra or [])], [door]),
+        entries or {},
+        NO_LEVELS,
+        partition=context,
+    )
+
+
+def test_door_between_two_beacon_pieces_is_a_gap_in_the_row_in_volume() -> None:
+    context = calc.PartitionContext(zones_beacon_both_pieces(), HEIGHT)
+    result = sheet_two_pieces(context, adjacent=[PARTITION_ID, SECOND_ID])
+    (read,) = result.openings
+    assert read.marker_row_gap is True
+    first, second = (c.computed for c in result.constructions)
+    # проём не вычитается и надпроёмной части нет: объём - только блок ряда
+    assert first.volume_m3 == pytest.approx(2000 * 80 * 188 / 1e9, abs=5e-5)
+    assert second.volume_m3 == pytest.approx(2000 * 80 * 188 / 1e9, abs=5e-5)
+    assert first.wall_area_m2 == pytest.approx(2.0 * 0.188)
+    assert first.sources.door_height is None
+    assert result.summary.door_openings_without_host == 0
+    assert [g for g in result.totals if g.element == "lintel"] == []
+
+
+def test_marker_row_gap_ignores_missing_door_height_and_monolith_lintel() -> None:
+    context = calc.PartitionContext(zones_beacon_both_pieces(), HEIGHT)
+    door = opening("d1", PARTITION_ID, width=800.0)
+    door["adjacent_ids"] = [PARTITION_ID, SECOND_ID]
+    door["lintel"] = [[100.0, 0.0], [900.0, 0.0], [900.0, 80.0], [100.0, 80.0]]
+    door["lintel_material"] = "monolith"
+    result = calc.compute_sheet(
+        document(
+            [thin(), second_piece()],
+            [door],
+            heights_patch={"door_height_mm": None, "door_height_status": "missing"},
+        ),
+        {},
+        NO_LEVELS,
+        partition=context,
+    )
+    assert result.openings[0].marker_row_gap is True
+    assert {c.computed.status for c in result.constructions} == {"ok"}
+    assert result.summary.lintels_without_volume == 0
+    assert [g for g in result.totals if g.element == "lintel"] == []
+
+
+def test_floor3d_door_between_two_beacon_pieces_has_no_leaf_no_lintel_no_warning() -> None:
+    context = calc.PartitionContext(zones_beacon_both_pieces(), HEIGHT)
+    model = build_3d_two_pieces(context, adjacent=[FIRST_3D, SECOND_ID])
+    assert model.doors == []
+    assert model.lintels == []
+    codes = {w.code for w in model.warnings}
+    assert not codes & {"opening_reaches_wall_top", "lintel_missing", "door_height_missing"}
     assert wall_of(model).z_top_mm == BASE + 188
+
+
+def test_floor3d_door_between_beacon_and_bathroom_pieces_has_no_lintel() -> None:
+    context = calc.PartitionContext(zones_with_bath_second_piece(), HEIGHT)
+    # хозяин - стена санузла, второй откос - маячный ряд: перемычки над маячным рядом нет
+    model = build_3d_two_pieces(context, adjacent=[FIRST_3D, SECOND_ID], door_host=SECOND_ID)
+    assert wall_of(model).z_top_mm == BASE + 188
+    assert model.lintels == []
+    assert model.doors == []
+
+
+def test_door_in_bathroom_wall_between_two_full_height_pieces_keeps_its_lintel() -> None:
+    zones = [*zones_with_bath_second_piece()]
+    zones[0:2] = [
+        calc.PartitionZone("room_apartment", "12", z.shell, "living" if i == 0 else "bath")
+        for i, z in enumerate(BEACON_ZONES)
+    ]
+    context = calc.PartitionContext(zones, HEIGHT)
+    model = build_3d_two_pieces(context, adjacent=[FIRST_3D, SECOND_ID])
+    assert {w.construction_key: w.height_basis for w in model.walls if w.kind == "masonry"} == {
+        FIRST_3D: "bathroom_wall",
+        SECOND_ID: "bathroom_wall",
+    }
     (lintel,) = model.lintels
     assert (lintel.z_bottom_mm, lintel.z_top_mm) == (BASE + 2100, BASE + 2800)
-    assert lintel.host_id == SECOND_ID
+    result = sheet_two_pieces(context, adjacent=[PARTITION_ID, SECOND_ID])
+    assert result.openings[0].marker_row_gap is False
+
+
+def test_beacon_jamb_makes_any_opening_kind_a_marker_gap() -> None:
+    context = calc.PartitionContext(zones_beacon_both_pieces(), HEIGHT)
+    for kind in ("door", "gap", "window"):
+        result = sheet_two_pieces(context, adjacent=[PARTITION_ID, SECOND_ID], kind=kind)
+        assert result.openings[0].marker_row_gap is True, kind
+
+
+def test_door_beside_non_partition_neighbour_and_full_height_host_is_not_a_marker_gap() -> None:
+    context = calc.PartitionContext(zones_with_bath_second_piece(), HEIGHT)
+    # хозяин - стена санузла, второй откос - не перегородка (колонна): оба откоса не маячный ряд
+    result = sheet_two_pieces(context, adjacent=[SECOND_ID, "bbbbbbbbbbbb"], host=SECOND_ID)
+    assert result.openings[0].marker_row_gap is False
+    bath = result.constructions[1].computed
+    assert bath.volume_m3 == pytest.approx((2000 * 2800 + 800 * 700) * 80 / 1e9, abs=5e-5)
+
+
+def test_marker_gap_needs_accepted_answer_and_no_manual_height_and_a_real_gap() -> None:
+    adjacent = [PARTITION_ID, SECOND_ID]
+    zones = zones_beacon_both_pieces()
+    no_answer = sheet_two_pieces(calc.PartitionContext(zones, None), adjacent=adjacent)
+    assert no_answer.openings[0].marker_row_gap is False
+    manual = {
+        PARTITION_ID: (props(height_override_mm=1500), False),
+        SECOND_ID: (props(height_override_mm=1500), False),
+    }
+    with_manual = sheet_two_pieces(
+        calc.PartitionContext(zones, HEIGHT), adjacent=adjacent, entries=manual
+    )
+    assert with_manual.openings[0].marker_row_gap is False
+    no_data = sheet_two_pieces(
+        calc.PartitionContext(zones, HEIGHT), adjacent=adjacent, door_status="no_data"
+    )
+    assert no_data.openings[0].marker_row_gap is False
+    # разрыв без высоты (`no_data` у gap) - это не отсутствие проёма в контуре
+    gap = sheet_two_pieces(
+        calc.PartitionContext(zones, HEIGHT), adjacent=adjacent, kind="gap", door_status="no_data"
+    )
+    assert gap.openings[0].marker_row_gap is True
+    assert gap.summary.unaccounted_gap_openings == 0
 
 
 # ------------------------------------------------------------------ якорь вопроса
