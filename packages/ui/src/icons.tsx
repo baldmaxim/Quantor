@@ -35,6 +35,13 @@ export const IconProjects = (props: IconProps) => (
   </Base>
 );
 
+export const IconQueue = (props: IconProps) => (
+  <Base {...props}>
+    <path d="M4 6h16M4 12h16M4 18h10" />
+    <path d="M18 16v4M18 20l2-2M18 20l-2-2" />
+  </Base>
+);
+
 export const IconTemplates = (props: IconProps) => (
   <Base {...props}>
     <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />

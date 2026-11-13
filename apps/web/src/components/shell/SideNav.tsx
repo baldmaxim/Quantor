@@ -9,11 +9,14 @@ import { cx } from '@/components/ui';
 import {
   IconModels,
   IconProjects,
+  IconQueue,
   IconReports,
   IconSettings,
   IconTemplates,
 } from '@/components/ui/icons';
+import { QUEUE_ACCESS_PERMISSION } from '@/lib/jobs/permissions';
 import { useFeatures } from '@/lib/queries';
+import { useHasPermission } from '@/lib/session';
 
 /**
  * Навигационная рейка.
@@ -56,6 +59,9 @@ const PRIMARY: readonly NavItem[] = [
   },
   { href: '/reports', label: 'Отчёты', Icon: IconReports, feature: 'reports', stage: 'Этап 2' },
 ];
+
+// Очередь заданий — эксплуатационный раздел: только тем, у кого есть право читать задания.
+const QUEUE: NavItem = { href: '/queue', label: 'Очередь', Icon: IconQueue };
 
 const SETTINGS: NavItem = { href: '/settings', label: 'Настройки', Icon: IconSettings };
 
@@ -108,6 +114,7 @@ const RailButton = ({ item, active, enabled }: IRailButtonProps) => {
 export const SideNav = () => {
   const pathname = usePathname();
   const features = useFeatures();
+  const canSeeQueue = useHasPermission(QUEUE_ACCESS_PERMISSION);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const isEnabled = (item: NavItem) => !item.feature || features[item.feature] === true;
@@ -131,7 +138,7 @@ export const SideNav = () => {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center gap-[var(--s-4)] pt-[var(--s-4)] pb-[var(--s-5)]">
-        {PRIMARY.map((item) => (
+        {(canSeeQueue ? [...PRIMARY, QUEUE] : PRIMARY).map((item) => (
           <RailButton
             key={item.href}
             item={item}

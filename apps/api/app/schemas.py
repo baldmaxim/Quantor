@@ -417,6 +417,8 @@ class AdminJobRead(ApiModel):
 
     id: uuid.UUID
     project_id: uuid.UUID | None
+    project_name: str | None = None
+    """Имя проекта. Заполняется только в списке заданий, в остальных ответах пусто."""
     workspace_id: uuid.UUID | None
     """Пусто — задание общесистемное: оно вне арендаторов и не видно ни одному из них."""
     scope: JobScope
@@ -439,6 +441,35 @@ class AdminJobRead(ApiModel):
     updated_at: datetime
     is_retryable: bool
     """Считается сервером по коду отказа: битый архив повтором не чинится."""
+
+
+class AdminJobsCancelRequest(BaseModel):
+    """Массовая отмена заданий: выбранные по идентификаторам либо вся активная очередь.
+
+    Ровно одно из двух: непустой `job_ids` или `all_active=true`. Пустое тело отменило бы
+    ничего, а оба сразу — неясно, чего хотел вызывающий.
+    """
+
+    job_ids: Annotated[list[uuid.UUID] | None, Field(max_length=500)] = None
+    all_active: bool = False
+    project_id: uuid.UUID | None = None
+    """Сужает отмену до проекта: и для `all_active`, и для `job_ids`."""
+
+    @model_validator(mode="after")
+    def _exactly_one_selector(self) -> AdminJobsCancelRequest:
+        has_ids = bool(self.job_ids)
+        if has_ids == self.all_active:
+            raise ValueError("Укажите ровно одно: непустой job_ids или all_active=true")
+        return self
+
+
+class AdminJobsCancelResult(BaseModel):
+    """Итог массовой отмены."""
+
+    cancelled: int
+    skipped: int
+    """Запрошенные `job_ids`, которые не найдены, не видны или уже завершены."""
+    cancelled_ids: list[uuid.UUID]
 
 
 class JobStatsRead(BaseModel):

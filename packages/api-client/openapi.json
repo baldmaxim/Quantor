@@ -115,6 +115,17 @@
             ],
             "title": "Project Id"
           },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          },
           "scope": {
             "$ref": "#/components/schemas/JobScope"
           },
@@ -197,6 +208,74 @@
           "is_retryable"
         ],
         "title": "AdminJobRead",
+        "type": "object"
+      },
+      "AdminJobsCancelRequest": {
+        "description": "Массовая отмена заданий: выбранные по идентификаторам либо вся активная очередь.\n\nРовно одно из двух: непустой `job_ids` или `all_active=true`. Пустое тело отменило бы\nничего, а оба сразу — неясно, чего хотел вызывающий.",
+        "properties": {
+          "all_active": {
+            "default": false,
+            "title": "All Active",
+            "type": "boolean"
+          },
+          "job_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Ids"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "title": "AdminJobsCancelRequest",
+        "type": "object"
+      },
+      "AdminJobsCancelResult": {
+        "description": "Итог массовой отмены.",
+        "properties": {
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "cancelled_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Cancelled Ids",
+            "type": "array"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cancelled",
+          "skipped",
+          "cancelled_ids"
+        ],
+        "title": "AdminJobsCancelResult",
         "type": "object"
       },
       "AdminSetPasswordRequest": {
@@ -31508,6 +31587,18 @@
               "description": "Фильтр по области видимости",
               "title": "Scope"
             }
+          },
+          {
+            "description": "Только очередь: ожидающие и выполняющиеся, в порядке взятия",
+            "in": "query",
+            "name": "active",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Только очередь: ожидающие и выполняющиеся, в порядке взятия",
+              "title": "Active",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -31533,6 +31624,48 @@
           }
         },
         "summary": "Задания",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/jobs/cancel": {
+      "post": {
+        "description": "Отменяет выбранные задания или всю активную очередь (в границах видимости).\n\nБерутся только ожидающие и выполняющиеся. Чужое пространство не отменяется и не\nраскрывается: такие идентификаторы просто попадают в `skipped`. Выполняющиеся\nпрерываются на ближайшем продлении аренды исполнителем.",
+        "operationId": "cancel_admin_jobs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminJobsCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminJobsCancelResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отменить задания",
         "tags": [
           "admin"
         ]
@@ -31631,7 +31764,7 @@
     },
     "/api/v1/admin/jobs/{job_id}/cancel": {
       "post": {
-        "description": "Отменяет задание, которое ещё не начали.\n\nТолько ожидающее. Прерывать выполняющийся импорт на середине нечем: он оставит\nполуразобранный пакет, и разбираться с этим дороже, чем дождаться. Совместная\nотмена появится тогда, когда для неё будет настоящий механизм, а не раньше.",
+        "description": "Отменяет ожидающее или выполняющееся задание.\n\nВыполняющееся исполнитель бросает при следующем продлении аренды: пульс с условием\n`status='running'` вернёт False, а CAD-исполнитель по `_still_owned` убивает подпроцесс.\nПрерывание наступает не мгновенно, а на ближайшем пульсе.",
         "operationId": "cancel_admin_job",
         "parameters": [
           {

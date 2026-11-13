@@ -13,18 +13,25 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
-from sqlalchemy import ColumnElement, and_, func, select
+from sqlalchemy import ColumnElement, and_, case, func, select
 
 from app.api.v1.deps import DEFAULT_PAGE_SIZE, AuthDep, LimitDep, OffsetDep, SessionDep, require
 from app.auth.permissions import Permission
 from app.core.config import get_settings
 from app.domain import AuditAction, JobScope, JobStatus, JobType
 from app.errors import not_found
-from app.models import Job
-from app.schemas import AdminJobRead, JobStatsRead, Page, WorkerRead
+from app.models import Job, Project
+from app.schemas import (
+    AdminJobRead,
+    AdminJobsCancelRequest,
+    AdminJobsCancelResult,
+    JobStatsRead,
+    Page,
+    WorkerRead,
+)
 from app.services import audit as audit_service
 from app.services import jobs as jobs_service
 from app.services import workers as workers_service
@@ -35,11 +42,15 @@ router = APIRouter(prefix="/jobs")
 # поломок, длиннее — счётчик перестаёт меняться и его перестают замечать.
 RECENT_FAILURES_WINDOW = timedelta(days=1)
 
+# Состояния, в которых задание ещё можно отменить: ждёт или выполняется.
+ACTIVE_STATUSES = (JobStatus.QUEUED, JobStatus.RUNNING)
 
-def _to_read(job: Job) -> AdminJobRead:
+
+def _to_read(job: Job, project_name: str | None = None) -> AdminJobRead:
     return AdminJobRead(
         id=job.id,
         project_id=job.project_id,
+        project_name=project_name,
         workspace_id=job.workspace_id,
         scope=job.scope,
         job_type=job.job_type,
@@ -98,6 +109,9 @@ async def list_admin_jobs(
     job_type: Annotated[JobType | None, Query(description="Фильтр по типу")] = None,
     project_id: Annotated[uuid.UUID | None, Query(description="Фильтр по проекту")] = None,
     scope: Annotated[JobScope | None, Query(description="Фильтр по области видимости")] = None,
+    active: Annotated[
+        bool, Query(description="Только очередь: ожидающие и выполняющиеся, в порядке взятия")
+    ] = False,
 ) -> Page[AdminJobRead]:
     """Страница списка заданий.
 
@@ -119,18 +133,30 @@ async def list_admin_jobs(
         conditions.append(Job.job_type == job_type)
     if project_id is not None:
         conditions.append(Job.project_id == project_id)
+    if active:
+        conditions.append(Job.status.in_(ACTIVE_STATUSES))
 
-    # Соединение с `projects` больше не нужно: принадлежность лежит на самом задании.
-    base = select(Job).where(*conditions)
-    total = await session.scalar(select(func.count()).select_from(Job).where(*conditions))
-    rows = (
-        (await session.execute(base.order_by(Job.created_at.desc()).limit(limit).offset(offset)))
-        .scalars()
-        .all()
+    # Принадлежность лежит на самом задании; `projects` соединяется только ради имени.
+    base = (
+        select(Job, Project.name)
+        .outerjoin(Project, Project.id == Job.project_id)
+        .where(*conditions)
     )
+    total = await session.scalar(select(func.count()).select_from(Job).where(*conditions))
+    order: list[ColumnElement[Any]]
+    if active:
+        # Как в очереди: сначала выполняющиеся, затем по сроку и времени постановки.
+        order = [
+            case((Job.status == JobStatus.RUNNING, 0), else_=1),
+            Job.available_at.asc(),
+            Job.created_at.asc(),
+        ]
+    else:
+        order = [Job.created_at.desc()]
+    rows = (await session.execute(base.order_by(*order).limit(limit).offset(offset))).all()
 
     return Page(
-        items=[_to_read(job) for job in rows],
+        items=[_to_read(job, name) for job, name in rows],
         total=int(total or 0),
         limit=limit,
         offset=offset,
@@ -209,6 +235,65 @@ async def _job_or_404(session: SessionDep, context: AuthDep, job_id: uuid.UUID) 
     return job
 
 
+@router.post(
+    "/cancel",
+    response_model=AdminJobsCancelResult,
+    summary="Отменить задания",
+    dependencies=[require(Permission.JOBS_MANAGE)],
+)
+async def cancel_admin_jobs(
+    body: AdminJobsCancelRequest, session: SessionDep, context: AuthDep
+) -> AdminJobsCancelResult:
+    """Отменяет выбранные задания или всю активную очередь (в границах видимости).
+
+    Берутся только ожидающие и выполняющиеся. Чужое пространство не отменяется и не
+    раскрывается: такие идентификаторы просто попадают в `skipped`. Выполняющиеся
+    прерываются на ближайшем продлении аренды исполнителем.
+    """
+    conditions: list[ColumnElement[bool]] = [Job.status.in_(ACTIVE_STATUSES)]
+    visible = _visible_to(context)
+    if visible is not None:
+        conditions.append(visible)
+    if body.project_id is not None:
+        conditions.append(Job.project_id == body.project_id)
+    if not body.all_active:
+        conditions.append(Job.id.in_(body.job_ids or []))
+
+    jobs = (
+        (
+            await session.execute(
+                select(Job)
+                .where(*conditions)
+                .order_by(Job.created_at.asc(), Job.id.asc())
+                .with_for_update()
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    cancelled_ids: list[uuid.UUID] = []
+    for job in jobs:
+        before = {"status": job.status.value}
+        updated = await jobs_service.cancel(session, job=job)
+        await audit_service.record(
+            session,
+            context,
+            action=AuditAction.JOB_CANCELLED,
+            resource_type="job",
+            resource_id=str(job.id),
+            before=before,
+            after={"status": updated.status.value},
+        )
+        cancelled_ids.append(job.id)
+    await session.commit()
+
+    skipped = 0 if body.all_active else len(set(body.job_ids or [])) - len(cancelled_ids)
+    return AdminJobsCancelResult(
+        cancelled=len(cancelled_ids), skipped=skipped, cancelled_ids=cancelled_ids
+    )
+
+
 @router.get(
     "/{job_id}",
     response_model=AdminJobRead,
@@ -261,11 +346,11 @@ async def retry_admin_job(job_id: uuid.UUID, session: SessionDep, context: AuthD
 async def cancel_admin_job(
     job_id: uuid.UUID, session: SessionDep, context: AuthDep
 ) -> AdminJobRead:
-    """Отменяет задание, которое ещё не начали.
+    """Отменяет ожидающее или выполняющееся задание.
 
-    Только ожидающее. Прерывать выполняющийся импорт на середине нечем: он оставит
-    полуразобранный пакет, и разбираться с этим дороже, чем дождаться. Совместная
-    отмена появится тогда, когда для неё будет настоящий механизм, а не раньше.
+    Выполняющееся исполнитель бросает при следующем продлении аренды: пульс с условием
+    `status='running'` вернёт False, а CAD-исполнитель по `_still_owned` убивает подпроцесс.
+    Прерывание наступает не мгновенно, а на ближайшем пульсе.
     """
     job = await _job_or_404(session, context, job_id)
     before = {"status": job.status.value}

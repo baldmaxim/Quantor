@@ -153,7 +153,8 @@ describe('CadQueueCard', () => {
     respond([item({ revision_id: null, document_name: null, document_id: null })]);
     renderCard();
     await screen.findAllByRole('listitem');
-    expect(screen.queryByRole('link')).toBeNull();
+    // Ссылка «Вся очередь» в шапке есть всегда; строка без ревизии ссылкой не становится.
+    expect(within(screen.getByRole('list')).queryByRole('link')).toBeNull();
   });
 
   it('отказ загрузки: ошибка и повтор', async () => {

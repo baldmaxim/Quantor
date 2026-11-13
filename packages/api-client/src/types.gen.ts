@@ -67,6 +67,10 @@ export type AdminJobRead = {
      * Project Id
      */
     project_id: string | null;
+    /**
+     * Project Name
+     */
+    project_name?: string | null;
     scope: JobScope;
     /**
      * Stage
@@ -89,6 +93,49 @@ export type AdminJobRead = {
      * Workspace Id
      */
     workspace_id: string | null;
+};
+
+/**
+ * AdminJobsCancelRequest
+ *
+ * Массовая отмена заданий: выбранные по идентификаторам либо вся активная очередь.
+ *
+ * Ровно одно из двух: непустой `job_ids` или `all_active=true`. Пустое тело отменило бы
+ * ничего, а оба сразу — неясно, чего хотел вызывающий.
+ */
+export type AdminJobsCancelRequest = {
+    /**
+     * All Active
+     */
+    all_active?: boolean;
+    /**
+     * Job Ids
+     */
+    job_ids?: Array<string> | null;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
+};
+
+/**
+ * AdminJobsCancelResult
+ *
+ * Итог массовой отмены.
+ */
+export type AdminJobsCancelResult = {
+    /**
+     * Cancelled
+     */
+    cancelled: number;
+    /**
+     * Cancelled Ids
+     */
+    cancelled_ids: Array<string>;
+    /**
+     * Skipped
+     */
+    skipped: number;
 };
 
 /**
@@ -16030,6 +16077,12 @@ export type ListAdminJobsData = {
          * Фильтр по области видимости
          */
         scope?: JobScope | null;
+        /**
+         * Active
+         *
+         * Только очередь: ожидающие и выполняющиеся, в порядке взятия
+         */
+        active?: boolean;
     };
     url: '/api/v1/admin/jobs';
 };
@@ -16051,6 +16104,31 @@ export type ListAdminJobsResponses = {
 };
 
 export type ListAdminJobsResponse = ListAdminJobsResponses[keyof ListAdminJobsResponses];
+
+export type CancelAdminJobsData = {
+    body: AdminJobsCancelRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/jobs/cancel';
+};
+
+export type CancelAdminJobsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CancelAdminJobsError = CancelAdminJobsErrors[keyof CancelAdminJobsErrors];
+
+export type CancelAdminJobsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminJobsCancelResult;
+};
+
+export type CancelAdminJobsResponse = CancelAdminJobsResponses[keyof CancelAdminJobsResponses];
 
 export type ReadJobStatsData = {
     body?: never;

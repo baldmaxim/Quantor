@@ -6,8 +6,10 @@ import type { ComponentType, SVGProps } from 'react';
 
 import { AccountMenu } from '@/components/shell/AccountMenu';
 import { cx } from '@/components/ui';
-import { IconProjects, IconSettings } from '@/components/ui/icons';
+import { IconProjects, IconQueue, IconSettings } from '@/components/ui/icons';
+import { QUEUE_ACCESS_PERMISSION } from '@/lib/jobs/permissions';
 import { useFeatures } from '@/lib/queries';
+import { useHasPermission } from '@/lib/session';
 
 /**
  * Навигация на телефоне.
@@ -32,11 +34,18 @@ const ITEMS: readonly NavItem[] = [
   { href: '/settings', label: 'Настройки', Icon: IconSettings },
 ];
 
+const QUEUE_ITEM: NavItem = { href: '/queue', label: 'Очередь', Icon: IconQueue };
+
 export const BottomNav = () => {
   const pathname = usePathname();
   const features = useFeatures();
+  const canSeeQueue = useHasPermission(QUEUE_ACCESS_PERMISSION);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // Очередь — перед настройками.
+  const items = ITEMS.flatMap((item) =>
+    canSeeQueue && item.href === '/settings' ? [QUEUE_ITEM, item] : [item],
+  );
   const isEnabled = (item: NavItem) => !item.feature || features[item.feature] === true;
 
   return (
@@ -45,7 +54,7 @@ export const BottomNav = () => {
       style={{ viewTransitionName: 'shell-bottomnav' }}
       className="safe-bottom sticky bottom-0 z-30 flex flex-none border-t border-border-strong bg-surface md:hidden"
     >
-      {ITEMS.filter(isEnabled).map(({ href, label, Icon }) => {
+      {items.filter(isEnabled).map(({ href, label, Icon }) => {
         const active = isActive(href);
 
         return (

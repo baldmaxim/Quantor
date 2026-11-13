@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { FC } from 'react';
 
 import { ErrorState, Skeleton } from '@/components/ui';
@@ -26,9 +27,15 @@ export const CadQueueCard: FC<ICadQueueCardProps> = ({ projectId }) => {
       aria-label="Очередь CAD"
       className="min-w-0 overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface xl:flex xl:max-h-full xl:flex-col"
     >
-      <h2 className="shrink-0 border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
-        Очередь CAD
-      </h2>
+      <div className="flex shrink-0 items-center justify-between gap-[var(--s-4)] border-b border-border px-[var(--s-6)] py-[var(--s-5)]">
+        <h2 className="m-0 text-sm font-medium">Очередь CAD</h2>
+        <Link
+          href={`/queue?project=${projectId}`}
+          className="flex min-h-[44px] items-center text-xs text-accent hover:underline focus-visible:underline"
+        >
+          Вся очередь
+        </Link>
+      </div>
 
       <CadRecognitionSummary projectId={projectId} />
 
