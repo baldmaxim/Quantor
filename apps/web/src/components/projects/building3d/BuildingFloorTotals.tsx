@@ -44,7 +44,7 @@ export const BuildingFloorTotals: FC<IBuildingFloorTotalsProps> = ({ params, pen
     );
   }
   return (
-    <div className="max-w-full overflow-x-auto [overscroll-behavior:contain]">
+    <div className="max-w-full overflow-x-auto [overscroll-behavior-x:contain]">
       <ConstructionsTotals data={query.data} activeGroup={null} onSelectGroup={NO_OP} />
     </div>
   );
