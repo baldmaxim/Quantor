@@ -9,7 +9,7 @@ import type {
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, use, useEffect, useMemo, useState } from 'react';
+import { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { CadRemarkCapture } from '@/components/cad/viewer/CadRemarkCapture';
 import { CadZoneCapture } from '@/components/cad/viewer/CadZoneCapture';
@@ -348,16 +348,40 @@ const WorkspacePage = ({ params }: IPageProps) => {
     [tools],
   );
 
+  // «Выбор»: общий путь для кнопки панели и клавиши V.
+  const activatePointerTool = useCallback(() => {
+    setTool('pointer');
+    setToolMode('select');
+    tools.send({ type: 'setMode', mode: 'select' });
+    scaleDraft.cancel();
+    setScaleError(null);
+  }, [tools, setTool, setToolMode, scaleDraft, setScaleError]);
+
   // Клавиатура: Enter завершает, Backspace убирает вершину черновика, Delete — выбранное
   // сохранённое измерение, Esc отменяет. Delete живёт над машиной состояний намеренно:
   // удаление — запрос к серверу, а не переход черновика (UX_MEASUREMENT_WORKFLOW).
   useEffect(() => {
     const isTyping = (target: EventTarget | null) =>
       target instanceof HTMLElement &&
-      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping(event.target)) return;
+
+      // V — «Выбор», H — «Панорама»; по физической клавише, чтобы работало в русской раскладке.
+      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (event.code === 'KeyV') {
+          if (!event.repeat) activatePointerTool();
+          return;
+        }
+        if (event.code === 'KeyH') {
+          if (!event.repeat) setTool('pan');
+          return;
+        }
+      }
 
       const state = tools.getState();
       const canDeleteSaved =
@@ -377,11 +401,6 @@ const WorkspacePage = ({ params }: IPageProps) => {
       if (event.key === 'Enter') tools.send({ type: 'finish' });
       if (event.key === 'Backspace') tools.send({ type: 'backspace' });
       if (event.key === 'Escape') tools.send({ type: 'cancel' });
-      if (event.key === 'v' || event.key === 'V') {
-        setTool('pointer');
-        setToolMode('select');
-        tools.send({ type: 'setMode', mode: 'select' });
-      }
       if (event.code === 'Space') tools.send({ type: 'setPanOverride', pressed: true });
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -394,7 +413,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
     };
-  }, [tools, removeMeasurement, setTool]);
+  }, [tools, removeMeasurement, setTool, activatePointerTool]);
 
   // Esc отменяет черновик, не обращаясь к серверу.
   useEffect(() => {
@@ -627,19 +646,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 label="Выбор"
                 hint="V — выбрать измерение на чертеже"
                 active={activeTool === 'pointer' && toolMode === 'select'}
-                onClick={() => {
-                  setTool('pointer');
-                  setToolMode('select');
-                  tools.send({ type: 'setMode', mode: 'select' });
-                  scaleDraft.cancel();
-                  setScaleError(null);
-                }}
+                onClick={activatePointerTool}
               >
                 <IconCursor width={16} height={16} />
               </ToolButton>
               <ToolButton
                 label="Панорама"
-                hint="пробел или средняя кнопка с перетаскиванием; Shift и Alt с колесом"
+                hint="H; пробел или средняя кнопка с перетаскиванием; Shift и Alt с колесом"
                 active={activeTool === 'pan'}
                 onClick={() => setTool('pan')}
               >
