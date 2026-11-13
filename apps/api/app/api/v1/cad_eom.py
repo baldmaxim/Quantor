@@ -271,7 +271,9 @@ async def read_cad_eom_preview(
     if parent is None or parent_attempt is None:
         raise DomainError(ErrorCode.CAD_ENGINE_FAILED, "родительский результат ЭОМ недоступен")
     scale = cad_views.scale_from(
-        await _read_artifact_json(storage, parent, revision_id, parent_attempt, f"{folder}/scale.json")
+        await _read_artifact_json(
+            storage, parent, revision_id, parent_attempt, f"{folder}/scale.json"
+        )
     )
     cad_checks = await _read_artifact_json(
         storage, parent, revision_id, parent_attempt, f"{folder}/cad_checks.json"

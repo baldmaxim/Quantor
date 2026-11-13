@@ -121,6 +121,12 @@ vi.mock('@/lib/cad/vor-queries', async (importOriginal) => ({
   }),
   useDeleteCadVor: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
 }));
+// ЭОМ и СС листа: в этих тестах не строились, наложения нет.
+vi.mock('@/lib/cad/eom-queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/cad/eom-queries')>()),
+  useCadEomPreview: () => null,
+}));
+
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof ViewQueries>()),
   useCadView: (params: { jobId: string; attempt: number; view: number }, enabled: boolean) => {
