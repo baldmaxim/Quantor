@@ -6,7 +6,7 @@
     "version": "2026.11.13+1afeca5f32b7",
     "archive_name": "Quantor_CAD_source_2026.11.13_1afeca5f32b7.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "6f78b8f19aef3afe4d2bf1583e22a5da7ccb72fe",
+    "repo_ref": "e86283d76d16e80c0f0b068b166ae3912bc00128",
     "archive_path": "engine/dist/Quantor_CAD_source_2026.11.13_1afeca5f32b7.zip",
     "archive_sha256": "619c3910d0d07b7dfbf531ffa093484a95a0b9fb5acac8abff000b802d963888",
     "manifest_sha256": "eddb9a3d44bf23e18fec9d3b58b875626a0acd540f792428e6059b8e29945754",
@@ -30,7 +30,7 @@
   "generators": {
     "path": "generators",
     "cad_mep": {
-      "generator_version": "cad_mep.v13.3",
+      "generator_version": "cad_mep.v13.4",
       "params_path": "generators/cad_mep/params/v1.json",
       "params_sha256": "2ad0e45b6463ab149c78775d7ace701447ff73714cd9115dbf13d2deb98dcd32",
       "params_canonical_sha256": "7c7d6304cc97df9637509c88d4f1121839a2e7c8022b5421c3c47e6e3360c5fb"
