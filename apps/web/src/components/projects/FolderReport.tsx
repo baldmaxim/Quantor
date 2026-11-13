@@ -12,12 +12,20 @@ export type FolderReportData = Pick<IFolderPlan, 'warnings' | 'skipped'> & {
   readonly added: number;
   /** Stem комплектов, чей пакет распознавания уже лежит в проекте. */
   readonly alreadyInProject: readonly string[];
+  /** Stem комплектов без PDF: распознавание прикрепится к PDF, уже загруженному в проект. */
+  readonly attachToExisting: readonly string[];
 };
 
 export const FolderReport = ({ report }: { report: FolderReportData | null }) => {
   if (!report) return null;
-  const { warnings, skipped, added, alreadyInProject } = report;
-  if (warnings.length === 0 && skipped === 0 && added > 0 && alreadyInProject.length === 0) {
+  const { warnings, skipped, added, alreadyInProject, attachToExisting } = report;
+  if (
+    warnings.length === 0 &&
+    skipped === 0 &&
+    added > 0 &&
+    alreadyInProject.length === 0 &&
+    attachToExisting.length === 0
+  ) {
     return null;
   }
 
@@ -34,7 +42,7 @@ export const FolderReport = ({ report }: { report: FolderReportData | null }) =>
         isMissingOnlyPdf(warning) ? (
           <p key={warning.stem} className="text-warning wrap-anywhere">
             Не хватает PDF: {warning.stem}.pdf — добавьте его (перетащите или «выберите на диске»),
-            комплект соберётся сам.
+            комплект соберётся сам, или загрузите PDF отдельно, затем выберите папку снова.
           </p>
         ) : (
           <div key={warning.stem} className="flex flex-col gap-[var(--s-2)]">
@@ -49,6 +57,12 @@ export const FolderReport = ({ report }: { report: FolderReportData | null }) =>
       {alreadyInProject.map((stem) => (
         <p key={stem} className="text-muted wrap-anywhere">
           Уже в проекте: {stem}
+        </p>
+      ))}
+
+      {attachToExisting.map((stem) => (
+        <p key={stem} className="text-muted wrap-anywhere">
+          Распознавание прикрепится к загруженному PDF: {stem}.pdf
         </p>
       ))}
 

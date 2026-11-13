@@ -264,3 +264,131 @@ class TestOldPathUnchanged:
         other_revision = await db_session.get(DocumentRevision, uuid.UUID(other["revision"]["id"]))
         assert other_revision is not None
         assert other_revision.processing_status is ProcessingStatus.UNPROCESSED
+
+
+class TestPackageWithoutPdf:
+    async def test_attaches_to_pdf_with_same_stem_any_case(
+        self,
+        api: AsyncClient,
+        db_session: AsyncSession,
+        fake_storage: FakeObjectStorage,
+        settings: Settings,
+    ) -> None:
+        project_id = await _new_project(api)
+        pdf = await _upload_file(
+            api, project_id, f"{BASE_NAME.upper()}.PDF", PDF_BYTES, "application/pdf"
+        )
+        archive = await _upload_zip(api, project_id, omit_pdf=True, with_html=True)
+        pdf_revision_id = uuid.UUID(pdf["revision"]["id"])
+
+        job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
+
+        assert job.status is JobStatus.SUCCEEDED, job.error_message
+        assert job.payload["attached_to_existing"] is True
+        assert job.payload["attached_by"] == "filename"
+        assert job.payload["imported_revision_id"] == str(pdf_revision_id)
+        assert job.payload["document_id"] == pdf["document"]["id"]
+        assert job.payload["artifact_count"] == 3
+        # Новых документов нет: PDF и ZIP.
+        assert await _count(db_session, Document) == 2
+        assert await _count(db_session, DocumentRevision) == 2
+        assert await _count(db_session, Region) == 2
+
+    async def test_falls_back_to_document_name(
+        self,
+        api: AsyncClient,
+        db_session: AsyncSession,
+        fake_storage: FakeObjectStorage,
+        settings: Settings,
+    ) -> None:
+        project_id = await _new_project(api)
+        pdf = await _upload_file(api, project_id, "Другое имя.pdf", PDF_BYTES, "application/pdf")
+        payload = build_package(
+            blocks=blocks_payload(document_name="Другое имя.pdf"), omit_pdf=True
+        )
+        archive = await _upload_file(
+            api, project_id, f"{BASE_NAME}.zip", payload, "application/zip"
+        )
+
+        job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
+
+        assert job.status is JobStatus.SUCCEEDED, job.error_message
+        assert job.payload["attached_by"] == "filename"
+        assert job.payload["imported_revision_id"] == pdf["revision"]["id"]
+
+    async def test_package_with_pdf_is_attached_by_sha256(
+        self,
+        api: AsyncClient,
+        db_session: AsyncSession,
+        fake_storage: FakeObjectStorage,
+        settings: Settings,
+    ) -> None:
+        project_id = await _new_project(api)
+        await _upload_pdf(api, project_id)
+        archive = await _upload_zip(api, project_id)
+
+        job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
+
+        assert job.payload["attached_by"] == "sha256"
+
+    async def test_no_pdf_in_project_fails(
+        self,
+        api: AsyncClient,
+        db_session: AsyncSession,
+        fake_storage: FakeObjectStorage,
+        settings: Settings,
+    ) -> None:
+        project_id = await _new_project(api)
+        await _upload_file(api, project_id, "other.pdf", PDF_BYTES, "application/pdf")
+        archive = await _upload_zip(api, project_id, omit_pdf=True)
+
+        job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
+
+        assert job.status is JobStatus.FAILED
+        assert job.error_code == "LEGACY_PDF_MISSING"
+        assert BASE_NAME in str(job.error_message)
+        assert await _count(db_session, Region) == 0
+        # Нового документа нет: other.pdf и ZIP.
+        assert await _count(db_session, Document) == 2
+
+    async def test_two_pdfs_with_same_stem_fail(
+        self,
+        api: AsyncClient,
+        db_session: AsyncSession,
+        fake_storage: FakeObjectStorage,
+        settings: Settings,
+    ) -> None:
+        project_id = await _new_project(api)
+        await _upload_file(api, project_id, f"{BASE_NAME}.pdf", PDF_BYTES, "application/pdf")
+        await _upload_file(
+            api, project_id, f"{BASE_NAME.upper()}.pdf", PDF_BYTES + b"2", "application/pdf"
+        )
+        archive = await _upload_zip(api, project_id, omit_pdf=True)
+
+        job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
+
+        assert job.status is JobStatus.FAILED
+        assert job.error_code == "LEGACY_PDF_MISSING"
+        assert "несколько PDF" in str(job.error_message)
+        assert await _count(db_session, Region) == 0
+
+    async def test_page_count_mismatch_fails(
+        self,
+        api: AsyncClient,
+        db_session: AsyncSession,
+        fake_storage: FakeObjectStorage,
+        settings: Settings,
+    ) -> None:
+        project_id = await _new_project(api)
+        pdf = await _upload_pdf(api, project_id)
+        archive = await _upload_zip(api, project_id, omit_pdf=True)
+        for index in range(3):
+            db_session.add(Sheet(revision_id=uuid.UUID(pdf["revision"]["id"]), page_index=index))
+        await db_session.commit()
+
+        job = await _run_import(db_session, fake_storage, archive["job"]["id"], settings)
+
+        assert job.status is JobStatus.FAILED
+        assert job.error_code == "PDF_PAGE_COUNT_MISMATCH"
+        assert await _count(db_session, Region) == 0
+        assert await _count(db_session, Document) == 2

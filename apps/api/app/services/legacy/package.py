@@ -126,7 +126,8 @@ class BlocksDocument(BaseModel):
 class PackageLayout:
     """Роли файлов внутри архива."""
 
-    pdf: ArchiveMember
+    # None — пакет без PDF: распознавание прикрепляется к PDF проекта по имени (ADR-0037).
+    pdf: ArchiveMember | None
     blocks: ArchiveMember
     results_md: ArchiveMember | None
     results_html: ArchiveMember | None
@@ -135,12 +136,12 @@ class PackageLayout:
 def locate(members: list[ArchiveMember]) -> PackageLayout:
     """Определяет роли файлов по именам.
 
+    PDF необязателен: пакет без него прикрепляется к PDF проекта (ADR-0037).
+
     Хрупкое место формата: манифеста нет, и роль угадывается по суффиксу. Именно поэтому
     в ADR-0007 записан переход на пакет с манифестом.
     """
     pdfs = [member for member in members if member.extension == "pdf"]
-    if not pdfs:
-        raise DomainError(ErrorCode.LEGACY_PDF_MISSING, "В пакете нет PDF документа")
     if len(pdfs) > 1:
         raise DomainError(
             ErrorCode.LEGACY_PDF_MISSING,
@@ -152,7 +153,7 @@ def locate(members: list[ArchiveMember]) -> PackageLayout:
         raise DomainError(ErrorCode.LEGACY_BLOCKS_INVALID, "В пакете нет файла *_blocks.json")
 
     return PackageLayout(
-        pdf=pdfs[0],
+        pdf=pdfs[0] if pdfs else None,
         blocks=blocks,
         results_md=_single_with_suffix(members, RESULTS_MD_SUFFIX),
         results_html=_single_with_suffix(members, RESULTS_HTML_SUFFIX),

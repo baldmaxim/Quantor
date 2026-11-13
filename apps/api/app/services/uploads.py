@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -187,6 +188,40 @@ async def find_project_revision_by_hash(
     )
     result = await session.execute(query)
     return result.scalar_one_or_none()
+
+
+def normalize_pdf_stem(name: str) -> str:
+    """Имя PDF для сравнения: без пути и `.pdf`, NFC, без учёта регистра."""
+    base = name.replace("\\", "/").rsplit("/", 1)[-1].strip()
+    if base.casefold().endswith(".pdf"):
+        base = base[: -len(".pdf")]
+    return unicodedata.normalize("NFC", base).strip().casefold()
+
+
+async def find_project_pdf_revisions_by_stem(
+    session: AsyncSession, *, project_id: uuid.UUID, stem: str
+) -> list[DocumentRevision]:
+    """Последние ревизии PDF-документов проекта, у которых имя файла (без `.pdf`) равно stem.
+
+    По одной ревизии на документ (самая поздняя). Несколько элементов — имя неоднозначно.
+    """
+    wanted = normalize_pdf_stem(stem)
+    if not wanted:
+        return []
+    query = (
+        select(DocumentRevision)
+        .join(Document, DocumentRevision.document_id == Document.id)
+        .where(Document.project_id == project_id, Document.document_kind == DocumentKind.PDF)
+        .order_by(DocumentRevision.created_at.asc())
+    )
+    latest: dict[uuid.UUID, DocumentRevision] = {}
+    for revision in (await session.execute(query)).scalars():
+        latest[revision.document_id] = revision
+    return [
+        revision
+        for revision in latest.values()
+        if normalize_pdf_stem(revision.source_filename) == wanted
+    ]
 
 
 async def receive_upload(

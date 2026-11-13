@@ -19,6 +19,8 @@ Document(pdf)                         то, что открывает просм
 идентификатора ревизии пакета, поэтому повторный запуск не создаёт вторую копию, а
 завершается сразу.
 
+Пакет без PDF прикрепляется к PDF проекта по имени файла (поправка к ADR-0037).
+
 Если PDF пакета уже загружен в тот же проект (совпал SHA-256), второй документ не создаётся:
 листы, области и артефакты прикрепляются к существующей ревизии (ADR-0037).
 """
@@ -33,7 +35,7 @@ import zipfile
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,6 +85,9 @@ ARTIFACT_CONTENT_TYPES: Final[dict[ArtifactKind, str]] = {
 }
 
 
+AttachedBy = Literal["sha256", "filename"]
+
+
 @dataclass(frozen=True, slots=True)
 class ImportResult:
     """Итог импорта — то, что задание записывает в свой payload."""
@@ -95,6 +100,8 @@ class ImportResult:
     already_imported: bool
     # True — пакет прикреплён к ранее загруженной ревизии того же PDF, а не создал свою (ADR-0037).
     attached_to_existing: bool = False
+    # Как найдена целевая ревизия: по SHA-256 PDF из пакета или по имени файла (пакет без PDF).
+    attached_by: AttachedBy | None = None
 
 
 def derived_document_id(package_revision_id: uuid.UUID) -> uuid.UUID:
@@ -169,6 +176,24 @@ async def import_package(
             _read_archive, archive_path, limits_from(settings)
         )
 
+        if layout.pdf is None:
+            # Пакет без PDF: целевая ревизия ищется по имени, собственного документа нет никогда.
+            target = await _find_target_by_name(
+                session, project=project, layout=layout, blocks=blocks
+            )
+            return await _attach(
+                session,
+                storage,
+                project=project,
+                package_revision=package_revision,
+                target=target,
+                blocks=blocks,
+                sections=sections,
+                layout=layout,
+                archive_path=archive_path,
+                attached_by="filename",
+            )
+
         pdf_path = Path(workdir) / "source.pdf"
         await asyncio.to_thread(_extract_member, archive_path, layout.pdf, pdf_path, settings)
 
@@ -187,6 +212,7 @@ async def import_package(
                 sections=sections,
                 layout=layout,
                 archive_path=archive_path,
+                attached_by="sha256",
             )
 
         return await _persist(
@@ -202,6 +228,48 @@ async def import_package(
             layout=layout,
             archive_path=archive_path,
         )
+
+
+async def _find_target_by_name(
+    session: AsyncSession,
+    *,
+    project: Project,
+    layout: package.PackageLayout,
+    blocks: package.BlocksDocument,
+) -> DocumentRevision:
+    """Ищет PDF проекта для пакета без PDF: stem `*_blocks.json`, запасной — `document_name`.
+
+    Ровно один подходящий документ; иначе ошибка (ADR-0037, поправка 2026-11-13).
+    """
+    blocks_name = Path(layout.blocks.name.replace("\\", "/")).name
+    stem = blocks_name.removesuffix(package.BLOCKS_SUFFIX)
+    stems = [stem]
+    if blocks.document_name:
+        stems.append(blocks.document_name)
+
+    for candidate in stems:
+        found = await uploads_service.find_project_pdf_revisions_by_stem(
+            session, project_id=project.id, stem=candidate
+        )
+        if len(found) == 1:
+            return found[0]
+        if len(found) > 1:
+            raise DomainError(
+                ErrorCode.LEGACY_PDF_MISSING,
+                f"В проекте несколько PDF «{_display_stem(candidate)}.pdf» — "
+                "к какому прикрепить распознавание, определить нельзя",
+            )
+
+    raise DomainError(
+        ErrorCode.LEGACY_PDF_MISSING,
+        f"В пакете нет PDF, и в проекте нет PDF «{_display_stem(stem)}.pdf». "
+        "Загрузите PDF и повторите загрузку распознавания",
+    )
+
+
+def _display_stem(name: str) -> str:
+    base = name.replace("\\", "/").rsplit("/", 1)[-1].strip()
+    return base[: -len(".pdf")] if base.casefold().endswith(".pdf") else base
 
 
 def _read_archive(
@@ -415,6 +483,7 @@ async def _attach(
     sections: dict[str, str],
     layout: package.PackageLayout,
     archive_path: Path,
+    attached_by: AttachedBy,
 ) -> ImportResult:
     """Прикрепляет распознанное к ревизии уже загруженного PDF (ADR-0037).
 
@@ -436,6 +505,7 @@ async def _attach(
             artifact_count=await _count_artifacts(session, target.id),
             already_imported=True,
             attached_to_existing=True,
+            attached_by=attached_by,
         )
 
     sheets = list(
@@ -506,6 +576,7 @@ async def _attach(
         artifact_count=artifact_count,
         already_imported=False,
         attached_to_existing=True,
+        attached_by=attached_by,
     )
 
 

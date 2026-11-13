@@ -176,6 +176,7 @@ async def execute_legacy_import(
             "region_count": result.region_count,
             "artifact_count": result.artifact_count,
             "attached_to_existing": result.attached_to_existing,
+            "attached_by": result.attached_by,
         },
     )
 

@@ -212,8 +212,16 @@ class TestNameDecoding:
 
 
 class TestPackageLayout:
-    def test_missing_pdf_is_reported(self) -> None:
+    def test_pdf_is_optional(self) -> None:
         members = _inspect(build_package(blocks=blocks_payload(), omit_pdf=True))
+
+        layout = package.locate(members)
+
+        assert layout.pdf is None
+        assert layout.blocks.name.endswith("_blocks.json")
+
+    def test_two_pdfs_are_rejected(self) -> None:
+        members = _inspect(build_package(blocks=blocks_payload(), extra={"второй.pdf": PDF_BYTES}))
 
         with pytest.raises(DomainError) as error:
             package.locate(members)

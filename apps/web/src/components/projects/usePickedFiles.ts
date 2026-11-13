@@ -31,19 +31,26 @@ const loosePdfsOf = (files: readonly PickedFile[]): File[] =>
       : [],
   );
 
+/** Базовые имена (нижний регистр) документов проекта: пакеты распознавания и PDF. */
+export interface IExistingStems {
+  readonly packages: ReadonlySet<string>;
+  readonly pdfs: ReadonlySet<string>;
+}
+
 const unique = (values: readonly string[]): string[] => Array.from(new Set(values));
 
 const merge = (
   state: IPickState,
   incoming: readonly IFolderEntry[],
   rest: readonly File[],
-  existingStems: ReadonlySet<string>,
+  existing: IExistingStems,
 ): IPickState => {
   const plan = mergeFolderPlan({
     pending: state.pending,
     loosePdfs: loosePdfsOf(state.files),
     incoming,
-    existingStems,
+    existingStems: existing.packages,
+    existingPdfStems: existing.pdfs,
   });
   const added = [...plan.packages.map(packagePicked), ...classifyFiles(plan.plainFiles)];
   const kept = state.files.filter(
@@ -61,16 +68,20 @@ const merge = (
         ...(state.report?.alreadyInProject ?? []),
         ...plan.alreadyInProject,
       ]),
+      attachToExisting: unique([
+        ...(state.report?.attachToExisting ?? []),
+        ...plan.attachToExisting,
+      ]),
     },
   };
 };
 
-export const usePickedFiles = (existingStems: ReadonlySet<string>) => {
+export const usePickedFiles = (existing: IExistingStems) => {
   const [state, setState] = useState<IPickState>(EMPTY);
 
   /** Папка выбрана или брошена. */
   const addFolder = (entries: readonly IFolderEntry[]): void =>
-    setState((current) => merge(current, entries, [], existingStems));
+    setState((current) => merge(current, entries, [], existing));
 
   /** Отдельные файлы; PDF достраивают ожидающие комплекты, остальное — как раньше. */
   const addFiles = (files: readonly File[]): void =>
@@ -84,7 +95,7 @@ export const usePickedFiles = (existingStems: ReadonlySet<string>) => {
         current,
         pdfs.map((file) => ({ file, path: file.name })),
         rest,
-        existingStems,
+        existing,
       );
     });
 

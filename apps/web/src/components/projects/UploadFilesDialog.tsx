@@ -8,7 +8,7 @@ import { FolderReport } from '@/components/projects/FolderReport';
 import { useUploadQueue } from '@/components/projects/UploadQueue';
 import { getUploadDialogState } from '@/components/projects/uploadDialogState';
 import { UploadQueueList } from '@/components/projects/UploadQueueList';
-import { usePickedFiles } from '@/components/projects/usePickedFiles';
+import { usePickedFiles, type IExistingStems } from '@/components/projects/usePickedFiles';
 import { Button, Dialog, DialogActions } from '@/components/ui';
 import { baseName, isRecognizedPackage } from '@/lib/documentSections';
 import { useProjectDocuments } from '@/lib/queries';
@@ -32,17 +32,22 @@ export const UploadFilesDialog = ({ projectId, open, onClose }: IUploadFilesDial
 
   // Уже загруженные пакеты проекта: их комплекты в окне не предупреждение, а справка.
   const documents = useProjectDocuments(projectId, open);
-  const existingStems = useMemo<ReadonlySet<string>>(
-    () =>
-      new Set(
-        (documents.data?.items ?? [])
-          .filter((item) => isRecognizedPackage(item.display_name, item.document_kind))
-          .map((item) => baseName(item.display_name).toLowerCase()),
+  // PDF проекта: к ним прикрепится распознавание, выбранное отдельно от PDF.
+  const existing = useMemo<IExistingStems>(() => {
+    const items = documents.data?.items ?? [];
+    const stems = (pick: (item: (typeof items)[number]) => boolean): ReadonlySet<string> =>
+      new Set(items.filter(pick).map((item) => baseName(item.display_name).toLowerCase()));
+    return {
+      packages: stems((item) => isRecognizedPackage(item.display_name, item.document_kind)),
+      pdfs: stems(
+        (item) =>
+          item.document_kind === 'pdf' &&
+          !isRecognizedPackage(item.display_name, item.document_kind),
       ),
-    [documents.data],
-  );
+    };
+  }, [documents.data]);
 
-  const picked = usePickedFiles(existingStems);
+  const picked = usePickedFiles(existing);
   const { files, folderReport } = picked;
   const queue = useUploadQueue();
 

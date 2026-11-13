@@ -51,10 +51,23 @@ describe('сборка ZIP пакета', () => {
     const files = unzipSync(new Uint8Array(await zip.arrayBuffer()));
 
     for (const file of [pkg.pdf, pkg.resultsMd, pkg.resultsHtml, pkg.blocks]) {
+      if (!file) throw new Error('в комплекте нет файла');
       const expected = new Uint8Array(await file.arrayBuffer());
       expect(files[file.name]).toEqual(expected);
     }
     expect(Object.keys(files).every((name) => name.startsWith('АР-1'))).toBe(true);
+  });
+
+  it('комплект без PDF: архив из 3 файлов, имя прежнее', async () => {
+    const pkg = { ...makePackage(), pdf: null };
+    const zip = await buildPackageZip(pkg);
+
+    expect(zip.name).toBe('АР-1.zip');
+    const files = unzipSync(new Uint8Array(await zip.arrayBuffer()));
+    expect(Object.keys(files).sort()).toEqual(
+      ['АР-1_blocks.json', 'АР-1_results.html', 'АР-1_results.md'].sort(),
+    );
+    expect(toLazyPackage(pkg).note).toBe('пакет из папки: 3 файла, без PDF');
   });
 
   it('CRC32 строки "123456789" равен 0xCBF43926', () => {

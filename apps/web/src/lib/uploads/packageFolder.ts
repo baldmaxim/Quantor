@@ -7,7 +7,8 @@ import { extensionOf, isAccepted } from '@/lib/upload';
  * Эта функция только решает, что с чем сложить; сам архив собирает buildPackageZip.
  *
  * Комплект по stem: `<stem>.pdf`, `<stem>_results.md`, `<stem>_results.html`,
- * `<stem>_blocks.json`. Подпапки не важны (markdown/, attachments/, data/ и т.п.),
+ * `<stem>_blocks.json`. Комплект без PDF, чей `<stem>.pdf` уже загружен в проект, идёт без PDF:
+ * сервер прикрепит распознавание к этому PDF. Подпапки не важны (markdown/, attachments/, data/ и т.п.),
  * регистр расширений тоже.
  */
 
@@ -19,7 +20,8 @@ export interface IFolderEntry {
 
 export interface IFolderPackage {
   readonly stem: string;
-  readonly pdf: File;
+  /** null — комплект без PDF: распознавание прикрепится к PDF, уже лежащему в проекте. */
+  readonly pdf: File | null;
   readonly resultsMd: File;
   readonly resultsHtml: File;
   readonly blocks: File;
@@ -82,9 +84,14 @@ interface IPlanned {
   readonly plan: IFolderPlan;
   /** Записи неполных комплектов по stem: их можно спланировать заново вместе с новыми файлами. */
   readonly incomplete: ReadonlyMap<string, readonly IFolderEntry[]>;
+  /** Stem комплектов без PDF, идущих как пакет (PDF уже в проекте). */
+  readonly attachToExisting: readonly string[];
 }
 
-const planEntries = (entries: readonly IFolderEntry[]): IPlanned => {
+const planEntries = (
+  entries: readonly IFolderEntry[],
+  attachableStems: ReadonlySet<string> = new Set(),
+): IPlanned => {
   const groups = new Map<string, Partial<Record<Role, File>>>();
   const groupEntries = new Map<string, IFolderEntry[]>();
   const plainFiles: File[] = [];
@@ -122,6 +129,7 @@ const planEntries = (entries: readonly IFolderEntry[]): IPlanned => {
   const packages: IFolderPackage[] = [];
   const warnings: IFolderWarning[] = [];
   const incomplete = new Map<string, readonly IFolderEntry[]>();
+  const attachToExisting: string[] = [];
 
   for (const [stem, group] of groups) {
     const { pdf, resultsMd, resultsHtml, blocks } = group;
@@ -129,6 +137,15 @@ const planEntries = (entries: readonly IFolderEntry[]): IPlanned => {
 
     if (pdf && resultsMd && resultsHtml && blocks) {
       packages.push({ stem, pdf, resultsMd, resultsHtml, blocks });
+    } else if (
+      !pdf &&
+      resultsMd &&
+      resultsHtml &&
+      blocks &&
+      attachableStems.has(stem.toLowerCase())
+    ) {
+      packages.push({ stem, pdf: null, resultsMd, resultsHtml, blocks });
+      attachToExisting.push(stem);
     } else if (pdf && !hasRecognition) {
       plainFiles.push(pdf);
     } else {
@@ -140,7 +157,7 @@ const planEntries = (entries: readonly IFolderEntry[]): IPlanned => {
     }
   }
 
-  return { plan: { packages, plainFiles, warnings, skipped }, incomplete };
+  return { plan: { packages, plainFiles, warnings, skipped }, incomplete, attachToExisting };
 };
 
 export const planFolderUpload = (entries: readonly IFolderEntry[]): IFolderPlan =>
@@ -159,6 +176,8 @@ export interface IMergeFolderInput {
   readonly incoming: readonly IFolderEntry[];
   /** Базовые имена (нижний регистр) распознанных пакетов, уже лежащих в проекте. */
   readonly existingStems: ReadonlySet<string>;
+  /** Базовые имена (нижний регистр, без `.pdf`) PDF-документов проекта. */
+  readonly existingPdfStems: ReadonlySet<string>;
 }
 
 export interface IMergedPlan extends IFolderPlan {
@@ -168,6 +187,8 @@ export interface IMergedPlan extends IFolderPlan {
   readonly consumed: readonly File[];
   /** Stem неполных комплектов, пакет которых уже есть в проекте. */
   readonly alreadyInProject: readonly string[];
+  /** Stem комплектов без PDF: распознавание прикрепится к уже загруженному PDF. */
+  readonly attachToExisting: readonly string[];
 }
 
 /**
@@ -181,6 +202,7 @@ export const mergeFolderPlan = ({
   loosePdfs,
   incoming,
   existingStems,
+  existingPdfStems,
 }: IMergeFolderInput): IMergedPlan => {
   const parts = [...pending, ...incoming];
   const withRecognition = new Set<string>();
@@ -199,10 +221,12 @@ export const mergeFolderPlan = ({
     return true;
   });
 
-  const { plan, incomplete } = planEntries([
-    ...parts,
-    ...consumed.map((file) => ({ file, path: file.name })),
-  ]);
+  // Пакет с таким именем уже в проекте — это «уже в проекте», а не повторная загрузка.
+  const attachable = new Set([...existingPdfStems].filter((stem) => !existingStems.has(stem)));
+  const { plan, incomplete, attachToExisting } = planEntries(
+    [...parts, ...consumed.map((file) => ({ file, path: file.name }))],
+    attachable,
+  );
 
   const isExisting = (stem: string): boolean => existingStems.has(stem.toLowerCase());
   return {
@@ -213,6 +237,7 @@ export const mergeFolderPlan = ({
     pending: [...incomplete].filter(([stem]) => !isExisting(stem)).flatMap(([, list]) => list),
     consumed,
     alreadyInProject: plan.warnings.map((warning) => warning.stem).filter(isExisting),
+    attachToExisting,
   };
 };
 

@@ -10,6 +10,8 @@ import { buildZipFile } from '@/lib/uploads/zipWriter';
  */
 
 export const PACKAGE_FILE_COUNT = 4;
+/** Комплект без PDF (PDF уже в проекте). */
+const PACKAGE_FILE_COUNT_WITHOUT_PDF = PACKAGE_FILE_COUNT - 1;
 
 /** Отложенный пакет: ZIP собирается перед своей загрузкой, а не при выборе папки. */
 export interface ILazyPackage {
@@ -27,7 +29,7 @@ export const isLazyPackage = (source: UploadSource): source is ILazyPackage =>
   'kind' in source && source.kind === 'folder-package';
 
 const packageFiles = (pkg: IFolderPackage): { file: File; compress: boolean }[] => [
-  { file: pkg.pdf, compress: false },
+  ...(pkg.pdf ? [{ file: pkg.pdf, compress: false }] : []),
   { file: pkg.resultsMd, compress: true },
   { file: pkg.resultsHtml, compress: true },
   { file: pkg.blocks, compress: true },
@@ -48,6 +50,8 @@ export const toLazyPackage = (pkg: IFolderPackage): ILazyPackage => ({
   kind: 'folder-package',
   name: `${pkg.stem}.zip`,
   size: packageFiles(pkg).reduce((sum, { file }) => sum + file.size, 0),
-  note: `пакет из папки: ${PACKAGE_FILE_COUNT} файла`,
+  note: pkg.pdf
+    ? `пакет из папки: ${PACKAGE_FILE_COUNT} файла`
+    : `пакет из папки: ${PACKAGE_FILE_COUNT_WITHOUT_PDF} файла, без PDF`,
   build: () => buildPackageZip(pkg),
 });

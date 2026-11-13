@@ -119,6 +119,7 @@ describe('комплект из нескольких выборов', () => {
       loosePdfs: [],
       incoming: recognition('АР-1'),
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
 
     expect(first.packages).toHaveLength(0);
@@ -133,12 +134,14 @@ describe('комплект из нескольких выборов', () => {
       loosePdfs: [],
       incoming: recognition('АР-1'),
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
     const second = mergeFolderPlan({
       pending: first.pending,
       loosePdfs: [],
       incoming: [entry('pdf/АР-1.pdf'), entry('pdf/Б.pdf')],
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
 
     expect(second.packages.map((pkg) => pkg.stem)).toEqual(['АР-1']);
@@ -156,6 +159,7 @@ describe('комплект из нескольких выборов', () => {
       loosePdfs: [loose, other],
       incoming: recognition('АР-1'),
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
 
     expect(plan.packages.map((pkg) => pkg.stem)).toEqual(['АР-1']);
@@ -169,12 +173,14 @@ describe('комплект из нескольких выборов', () => {
       loosePdfs: [],
       incoming: [entry('a/Х_results.md')],
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
     const second = mergeFolderPlan({
       pending: first.pending,
       loosePdfs: [],
       incoming: [entry('b/Х_results.html'), entry('b/Х_blocks.json')],
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
 
     expect(second.warnings).toEqual([{ stem: 'Х', missing: ['Х.pdf'] }]);
@@ -183,6 +189,7 @@ describe('комплект из нескольких выборов', () => {
       loosePdfs: [],
       incoming: [entry('Х.pdf')],
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
     expect(third.packages).toHaveLength(1);
   });
@@ -193,6 +200,7 @@ describe('комплект из нескольких выборов', () => {
       loosePdfs: [],
       incoming: recognition('АР-1'),
       existingStems: new Set(['ар-1']),
+      existingPdfStems: NONE,
     });
 
     expect(plan.warnings).toHaveLength(0);
@@ -207,6 +215,7 @@ describe('комплект из нескольких выборов', () => {
       loosePdfs: [loose],
       incoming: recognition('АР-1'),
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
 
     expect(plan.consumed).toHaveLength(0);
@@ -218,8 +227,69 @@ describe('комплект из нескольких выборов', () => {
       loosePdfs: [],
       incoming: [entry('Х_results.md')],
       existingStems: NONE,
+      existingPdfStems: NONE,
     });
 
+    expect(plan.warnings.map(isMissingOnlyPdf)).toEqual([false]);
+  });
+
+  it('распознавание без PDF, а PDF уже в проекте: пакет без PDF, не ожидание', () => {
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: recognition('АР-1'),
+      existingStems: NONE,
+      existingPdfStems: new Set(['ар-1']),
+    });
+
+    expect(plan.packages).toHaveLength(1);
+    expect(plan.packages[0]?.stem).toBe('АР-1');
+    expect(plan.packages[0]?.pdf).toBeNull();
+    expect(plan.attachToExisting).toEqual(['АР-1']);
+    expect(plan.warnings).toHaveLength(0);
+    expect(plan.pending).toHaveLength(0);
+    expect(plan.alreadyInProject).toHaveLength(0);
+  });
+
+  it('PDF проекта с другим именем: комплект ждёт PDF, как раньше', () => {
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: recognition('АР-1'),
+      existingStems: NONE,
+      existingPdfStems: new Set(['другой']),
+    });
+
+    expect(plan.packages).toHaveLength(0);
+    expect(plan.attachToExisting).toHaveLength(0);
+    expect(plan.warnings.map(isMissingOnlyPdf)).toEqual([true]);
+    expect(plan.pending).toHaveLength(3);
+  });
+
+  it('пакет уже в проекте важнее PDF проекта: «уже в проекте»', () => {
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: recognition('АР-1'),
+      existingStems: new Set(['ар-1']),
+      existingPdfStems: new Set(['ар-1']),
+    });
+
+    expect(plan.packages).toHaveLength(0);
+    expect(plan.attachToExisting).toHaveLength(0);
+    expect(plan.alreadyInProject).toEqual(['АР-1']);
+  });
+
+  it('не только PDF не хватает: PDF проекта комплект не достраивает', () => {
+    const plan = mergeFolderPlan({
+      pending: [],
+      loosePdfs: [],
+      incoming: [entry('АР-1_results.md')],
+      existingStems: NONE,
+      existingPdfStems: new Set(['ар-1']),
+    });
+
+    expect(plan.packages).toHaveLength(0);
     expect(plan.warnings.map(isMissingOnlyPdf)).toEqual([false]);
   });
 });
