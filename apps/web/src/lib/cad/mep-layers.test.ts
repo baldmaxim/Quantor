@@ -17,7 +17,7 @@ import {
 } from './mep-layers';
 
 describe('слои трасс механики', () => {
-  it('22 слоя в порядке группы: 20 трасс движка и 2 служебных, у каждого подпись и свой токен', () => {
+  it('29 слоёв в порядке группы: 20 трасс движка, 2 служебных и 7 приборов; у каждого подпись и токен', () => {
     expect(MEP_LAYERS.map((def) => def.name)).toEqual([
       'M-VK-V1',
       'M-VK-T3',
@@ -41,10 +41,19 @@ describe('слои трасс механики', () => {
       'M-PT-AUP',
       'M-NODE',
       'M-RISER',
+      'M-SAN-BATH',
+      'M-SAN-SHOWER',
+      'M-SAN-WC',
+      'M-SAN-BASIN',
+      'M-SAN-KSINK',
+      'M-SAN-WASHER',
+      'M-SAN-MOPSINK',
     ]);
-    expect(new Set(MEP_LAYERS.map((def) => def.name)).size).toBe(22);
-    expect(new Set(MEP_LAYERS.map((def) => def.token)).size).toBe(22);
-    expect(new Set(MEP_LAYERS.map((def) => def.label)).size).toBe(22);
+    expect(new Set(MEP_LAYERS.map((def) => def.name)).size).toBe(29);
+    // У 7 приборов один общий токен `--cad-mep-san`: свой цвет у каждой из 22 остальных записей.
+    expect(new Set(MEP_LAYERS.map((def) => def.token)).size).toBe(23);
+    expect(MEP_LAYERS.filter((def) => def.token === '--cad-mep-san')).toHaveLength(7);
+    expect(new Set(MEP_LAYERS.map((def) => def.label)).size).toBe(29);
     expect(MEP_LAYERS.every((def) => def.label.trim() !== '')).toBe(true);
     expect(MEP_LAYERS.every((def) => def.token.startsWith('--cad-mep-'))).toBe(true);
   });
@@ -64,10 +73,11 @@ describe('слои трасс механики', () => {
     }
   });
 
-  it('маска держит все 22 бита, в том числе старший', () => {
+  it('маска держит все 29 бит; старые слои не сдвинулись', () => {
     const all = MEP_LAYERS.map((def) => def.name);
     const full = withMepLayersHidden(0, all, true);
-    expect(full).toBe(2 ** 22 - 1);
+    expect(full).toBe(2 ** 29 - 1);
+    expect(withMepLayersHidden(0, ['M-SAN-MOPSINK'], true)).toBe(2 ** 28);
     expect(all.every((name) => isMepLayerHidden(full, name))).toBe(true);
     const last = withMepLayersHidden(0, ['M-RISER'], true);
     expect(last).toBe(2 ** 21);
@@ -106,7 +116,7 @@ describe('слои трасс механики', () => {
     expect(withMepLayersHidden(Number.NaN, ['M-NODE'], true)).toBeGreaterThan(0);
   });
 
-  it('группы слоёв: порядок, подписи, каждая из 22 записей в своей группе', () => {
+  it('группы слоёв: порядок, подписи, каждая из 29 записей в своей группе', () => {
     expect(MEP_GROUPS.map((group) => `${group.key}:${group.label}`)).toEqual([
       'water:Водоснабжение',
       'sewer:Канализация',
@@ -116,6 +126,7 @@ describe('слои трасс механики', () => {
       'cooling:Кондиционирование',
       'fire:Пожаротушение',
       'common:Узлы и стояки',
+      'sanitary:Сантехника',
     ]);
     const all = groupMepLayers(MEP_LAYERS);
     expect(all.map((item) => [item.group, item.layers.map((def) => def.name)])).toEqual([
@@ -127,8 +138,20 @@ describe('слои трасс механики', () => {
       ['cooling', ['M-KV-FR', 'M-KV-DR']],
       ['fire', ['M-PT-VPV', 'M-PT-AUP']],
       ['common', ['M-NODE', 'M-RISER']],
+      [
+        'sanitary',
+        [
+          'M-SAN-BATH',
+          'M-SAN-SHOWER',
+          'M-SAN-WC',
+          'M-SAN-BASIN',
+          'M-SAN-KSINK',
+          'M-SAN-WASHER',
+          'M-SAN-MOPSINK',
+        ],
+      ],
     ]);
-    expect(all.flatMap((item) => item.layers)).toHaveLength(22);
+    expect(all.flatMap((item) => item.layers)).toHaveLength(29);
     expect(MEP_LAYERS.every((def) => MEP_GROUPS.some((group) => group.key === def.group))).toBe(true);
   });
 
@@ -143,6 +166,6 @@ describe('слои трасс механики', () => {
     expect(mepColorVar('X')).toBe('var(--muted)');
     const colors = readMepColors((token) => `v:${token}`);
     expect(colors['M-VK-T3']).toBe('v:--cad-mep-vk-t3');
-    expect(Object.keys(colors)).toHaveLength(22);
+    expect(Object.keys(colors)).toHaveLength(29);
   });
 });

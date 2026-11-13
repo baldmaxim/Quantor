@@ -7,7 +7,7 @@ import { CadLayersPanel } from './CadLayersPanel';
 
 const defs = presentMepLayers(['M-OV-T1', 'M-OV-T2', 'M-NODE']);
 
-const mount = (visible: number[] = [0, 1, 2]) => {
+const mount = (visible: number[] = [0, 1, 2], counts?: readonly (number | null)[]) => {
   const onToggle = vi.fn();
   const onSetHidden = vi.fn();
   render(
@@ -31,6 +31,7 @@ const mount = (visible: number[] = [0, 1, 2]) => {
         visible: new Set(visible),
         onToggle,
         onSetHidden,
+        counts,
       }}
     />,
   );
@@ -48,6 +49,19 @@ describe('CadLayersPanel: группа «Трассы механики»', () =>
       .getAllByRole('checkbox', { name: /^Группа «/ })
       .map((box) => box.getAttribute('aria-label'));
     expect(headers).toEqual(['Группа «Отопление»', 'Группа «Узлы и стояки»']);
+  });
+
+  it('число у пункта слоя трасс - по индексу names; null и отсутствие - без числа', () => {
+    const { group } = mount([0, 1, 2], [42, null, 5]);
+    const first = within(group).getByRole('checkbox', { name: /Отопление подача Т1 · M-OV-T1/ }).closest('label');
+    expect(within(first as HTMLElement).getByTestId('layer-count')).toHaveTextContent('42');
+    expect(within(group).getAllByTestId('layer-count')).toHaveLength(1);
+    expect(within(screen.getByTestId('mep-layers')).getAllByTestId('layer-count')).toHaveLength(2);
+  });
+
+  it('без counts чисел у слоёв трасс нет', () => {
+    mount();
+    expect(screen.queryByTestId('layer-count')).toBeNull();
   });
 
   it('пустые группы не выводятся', () => {

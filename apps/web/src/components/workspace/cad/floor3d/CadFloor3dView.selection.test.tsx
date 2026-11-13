@@ -206,9 +206,9 @@ describe('3D-вид: общий выбор конструкций', () => {
   });
 
   it('скрытые категории и общий выбор доходят до холста', async () => {
-    mount({ selectedIds: new Set(['w1', 'slab']), hiddenCategories: new Set(['lintel']) });
+    mount({ selectedIds: new Set(['w1', 'slab']), hiddenCategories: new Set(['masonry']) });
     const canvas = await screen.findByTestId('canvas', {}, { timeout: 5000 });
     expect(canvas).toHaveAttribute('data-ids', 'w1,slab');
-    expect(canvas).toHaveAttribute('data-hidden', 'lintel');
+    expect(canvas).toHaveAttribute('data-hidden', 'masonry');
   });
 });

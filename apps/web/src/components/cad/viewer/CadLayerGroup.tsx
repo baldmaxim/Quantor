@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FC } from 'react';
 import { cx } from '@/components/ui';
 import { layerColorVar } from '@/lib/cad/layer-colors';
 import type { ILayerGroup } from '@/lib/cad/layer-groups';
+import { formatInt } from '@/lib/cad/view-format';
 
 interface ICadLayerGroupProps {
   group: ILayerGroup;
@@ -20,6 +21,10 @@ interface ICadLayerGroupProps {
   disabledIndices?: ReadonlySet<number>;
   /** Пометка у недоступного слоя. */
   disabledNote?: string;
+  /** Число справа у пункта; `null` или нет функции - без числа. */
+  countOf?: (index: number) => number | null;
+  /** Число у заголовка группы; `null` или нет - без числа. */
+  groupCount?: number | null;
 }
 
 const CHECK = 'flex min-h-[44px] items-center gap-[var(--s-3)] text-sm';
@@ -34,6 +39,8 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
   swatchColor = layerColorVar,
   disabledIndices,
   disabledNote = '',
+  countOf,
+  groupCount = null,
 }) => {
   const [expanded, setExpanded] = useState(true);
   const master = useRef<HTMLInputElement>(null);
@@ -75,6 +82,11 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
           <span className="tabular text-xs font-normal text-muted">
             {shown} / {group.indices.length}
           </span>
+          {groupCount !== null && (
+            <span className="tabular text-xs font-normal text-muted" data-testid="layer-group-count">
+              {formatInt(groupCount)}
+            </span>
+          )}
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
@@ -98,6 +110,7 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
           const name = layers[index] ?? '';
           const on = visibleLayers.has(index);
           const unavailable = disabledIndices?.has(index) === true;
+          const count = countOf?.(index) ?? null;
           return (
             <label
               key={`${index}-${name}`}
@@ -132,6 +145,11 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
               </span>
               {unavailable && disabledNote !== '' && (
                 <span className="ml-auto text-xs text-muted">{disabledNote}</span>
+              )}
+              {count !== null && (
+                <span className="tabular ml-auto text-xs text-muted" data-testid="layer-count">
+                  {formatInt(count)}
+                </span>
               )}
             </label>
           );

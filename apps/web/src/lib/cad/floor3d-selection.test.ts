@@ -61,6 +61,24 @@ describe('подсветка нескольких конструкций', () =>
     expect(visibilityOf(plan.prisms.find((item) => item.id === 'w1')!)).toBe('masonry');
   });
 
+  it('видимость перемычки: категория хозяина, без хозяина - по материалу', () => {
+    const base = withWalls();
+    const lintel = base.lintels[0]!;
+    const hosted = buildFloor3dPlan({
+      ...base,
+      lintels: [
+        { ...lintel, opening_id: 'l1', host_id: 'w4', material: 'masonry' },
+        { ...lintel, opening_id: 'l2', host_id: 'nope', material: 'monolith' },
+        { ...lintel, opening_id: 'l3', host_id: null, material: 'masonry' },
+      ],
+    });
+    const hostCategoryOf = (id: string) => (id === 'w4' ? ('monolith_column' as const) : undefined);
+    const of = (id: string) => visibilityOf(hosted.prisms.find((item) => item.id === id)!, hostCategoryOf);
+    expect(of('l1')).toBe('monolith_column');
+    expect(of('l2')).toBe('monolith_vertical');
+    expect(of('l3')).toBe('masonry');
+  });
+
   it('оверлей группы - один слитый объект, снимается', () => {
     const scene = buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap: false });
     const before = scene.group.children.length;
@@ -107,8 +125,11 @@ describe('видимость категорий в сцене', () => {
 
     scene.setCategoryVisible('slab', true);
     expect(categoryMeshes(scene, 'slab')[0]!.visible).toBe(true);
-    scene.setCategoryVisible('lintel', false);
+    // Перемычка без хозяина (в фикстуре материал не определён) следует «Кладке»: своей категории нет.
+    scene.setCategoryVisible('masonry', false);
     expect(categoryMeshes(scene, 'lintel').every((mesh) => !mesh.visible)).toBe(true);
+    scene.setCategoryVisible('masonry', true);
+    expect(categoryMeshes(scene, 'lintel').every((mesh) => mesh.visible)).toBe(true);
     scene.setCategoryVisible('door', false);
     expect(categoryMeshes(scene, 'door').every((mesh) => !mesh.visible)).toBe(true);
     scene.dispose();

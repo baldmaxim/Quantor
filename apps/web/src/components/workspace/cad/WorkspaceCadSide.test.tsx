@@ -182,7 +182,7 @@ describe('WorkspaceCadSide', () => {
     expect(screen.getByRole('tab', { name: 'Слои' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Непрозрачность PDF')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'WALLS' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Группа «Стены»' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Группа «Кладка и перегородки»' })).toBeChecked();
   });
 
   it('«Масштаб» - человекочитаемая сводка без технических строк', () => {

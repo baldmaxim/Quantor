@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useWorkspaceStore } from '@/store/workspace';
@@ -105,11 +105,57 @@ describe('CadLayersPanel', () => {
 
   it('слои сгруппированы по типу, пустые группы не показаны', () => {
     mount({ layers: ['A-WALL', 'DOORS', '0', 'WALLS-2'], visibleLayers: new Set([0, 1, 2, 3]) });
-    expect(screen.getByRole('checkbox', { name: 'Группа «Стены»' })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Группа «Двери»' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Группа «Кладка и перегородки»' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Группа «Двери и ворота»' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Группа «Прочее»' })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Группа «Окна»' })).toBeNull();
     expect(screen.getByTestId('layer-group-walls')).toHaveTextContent('2 / 2');
+  });
+
+  it('служебные слои и 02_МОНОЛИТ в списке «Чертёж» не показаны', () => {
+    mount({
+      layers: ['01_КЛАДКА_100', '02_МОНОЛИТ', 'AUX_КОНТУРЫ_СТЕН', 'QA_МАРКЕРЫ_НЕ_УЧИТЫВАТЬ'],
+      visibleLayers: new Set([0, 1, 2, 3]),
+    });
+    expect(screen.getAllByTestId('layer-swatch')).toHaveLength(1);
+    expect(screen.queryByRole('checkbox', { name: '02_МОНОЛИТ' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: 'Группа «Прочее»' })).toBeNull();
+  });
+
+  it('строки «Конструкции листа» по порядку, с числами; нет данных - без числа', () => {
+    const categories = {
+      monolithVertical: true,
+      monolithColumn: false,
+      slab: true,
+      onChange: vi.fn(),
+    };
+    mount({
+      categories,
+      counts: { monolithVertical: 12, monolithColumn: 0, slab: 3, masonry: 1234, doors: 7 },
+      layers: ['01_КЛАДКА_100', '03_ДВЕРИ_БЛОКИ', '04_ОКНА'],
+      visibleLayers: new Set([0, 1, 2]),
+    });
+    const rows = within(screen.getByTestId('category-layers')).getAllByRole('checkbox');
+    expect(rows.map((row) => row.closest('label')?.textContent)).toEqual([
+      'Монолит — стены и пилоны12',
+      'Монолит — колонны0',
+      'Плита3',
+    ]);
+    expect(screen.getByTestId('layer-group-walls')).toHaveTextContent('1 / 1');
+    const counts = screen.getAllByTestId('layer-group-count').map((node) => node.textContent);
+    expect(counts.map((text) => text?.replace(/\D/g, ''))).toEqual(['1234', '7']);
+    expect(within(screen.getByTestId('layer-group-windows')).queryByTestId('layer-group-count')).toBeNull();
+    fireEvent.click(rows[1] as HTMLElement);
+    expect(categories.onChange).toHaveBeenLastCalledWith('monolith_column', true);
+  });
+
+  it('без данных конструкций чисел нет вовсе', () => {
+    mount({
+      categories: { monolithVertical: true, monolithColumn: true, slab: true, onChange: vi.fn() },
+      counts: null,
+    });
+    expect(screen.queryByTestId('category-count')).toBeNull();
+    expect(screen.queryByTestId('layer-group-count')).toBeNull();
   });
 
   it('переключатель группы скрывает все слои группы разом', () => {
@@ -117,7 +163,7 @@ describe('CadLayersPanel', () => {
       layers: ['A-WALL', 'DOORS', 'WALLS-2'],
       visibleLayers: new Set([0, 1, 2]),
     });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Группа «Стены»' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Группа «Кладка и перегородки»' }));
     expect(onSetLayersHidden).toHaveBeenCalledWith([0, 2], true);
   });
 
@@ -126,7 +172,7 @@ describe('CadLayersPanel', () => {
       layers: ['A-WALL', 'WALLS-2'],
       visibleLayers: new Set([0]),
     });
-    const master = screen.getByRole('checkbox', { name: 'Группа «Стены»' }) as HTMLInputElement;
+    const master = screen.getByRole('checkbox', { name: 'Группа «Кладка и перегородки»' }) as HTMLInputElement;
     expect(master.indeterminate).toBe(true);
     expect(master.checked).toBe(false);
     fireEvent.click(master);
@@ -135,7 +181,7 @@ describe('CadLayersPanel', () => {
 
   it('полностью скрытая группа не неопределённая и показывается целиком', () => {
     const { onSetLayersHidden } = mount({ layers: ['DOORS'], visibleLayers: new Set<number>() });
-    const master = screen.getByRole('checkbox', { name: 'Группа «Двери»' }) as HTMLInputElement;
+    const master = screen.getByRole('checkbox', { name: 'Группа «Двери и ворота»' }) as HTMLInputElement;
     expect(master.indeterminate).toBe(false);
     fireEvent.click(master);
     expect(onSetLayersHidden).toHaveBeenCalledWith([0], false);
@@ -143,7 +189,7 @@ describe('CadLayersPanel', () => {
 
   it('заголовок группы сворачивает слои; общий чекбокс при этом не срабатывает', () => {
     const { onSetLayersHidden } = mount({ layers: ['DOORS'], visibleLayers: new Set([0]) });
-    const toggle = screen.getByRole('button', { name: /Двери/ });
+    const toggle = screen.getByRole('button', { name: /Двери и ворота/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('checkbox', { name: 'DOORS' })).toBeVisible();
     fireEvent.click(toggle);

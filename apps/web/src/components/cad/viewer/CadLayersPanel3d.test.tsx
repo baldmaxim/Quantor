@@ -13,7 +13,7 @@ const mount = (mode3d: boolean, onChange = vi.fn(), onToggleLayer = vi.fn()) =>
       onToggleLayer={onToggleLayer}
       onSetLayersHidden={vi.fn()}
       mode3d={mode3d}
-      categories={{ slab: true, lintel: false, onChange }}
+      categories={{ monolithVertical: true, monolithColumn: true, slab: true, onChange }}
       pdfOpacity={1}
       onPdfOpacityChange={vi.fn()}
       pdfOpacityActive
@@ -27,17 +27,14 @@ const mount = (mode3d: boolean, onChange = vi.fn(), onToggleLayer = vi.fn()) =>
   );
 
 describe('CadLayersPanel: категории и режим 3D', () => {
-  it('строки «Плита» и «Перемычки» отражают состояние и переключаются', () => {
+  it('строка «Плита» переключается, строки «Перемычки» нет (перемычка - часть стены)', () => {
     const onChange = vi.fn();
     mount(false, onChange);
     const slab = screen.getByRole('checkbox', { name: 'Плита' });
-    const lintel = screen.getByRole('checkbox', { name: /Перемычки/ });
     expect(slab).toBeChecked();
-    expect(lintel).not.toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: /Перемычки/ })).toBeNull();
     fireEvent.click(slab);
     expect(onChange).toHaveBeenLastCalledWith('slab', false);
-    fireEvent.click(lintel);
-    expect(onChange).toHaveBeenLastCalledWith('lintel', true);
   });
 
   it('в плане все слои DXF доступны', () => {

@@ -38,7 +38,7 @@ describe('видимость слоёв листа', () => {
     expect(result.current.hiddenLayers.size).toBe(0);
   });
 
-  it('«Плита» и «Перемычки» хранятся вместе со слоями', () => {
+  it('«Плита» хранится вместе со слоями', () => {
     const { result } = renderHook(() => useCadLayerVisibility(KEY, NAMES));
     act(() => result.current.setExtraHidden('slab', true));
     act(() => result.current.setLayersHidden([2], true));
@@ -50,11 +50,38 @@ describe('видимость слоёв листа', () => {
   });
 
   it('восстанавливается из хранилища и не зависит от порядка слоёв вида', () => {
-    window.localStorage.setItem(KEY, JSON.stringify({ layers: ['02_МОНОЛИТ'], extra: ['lintel'] }));
-    const reordered = ['04_ОСИ', '02_МОНОЛИТ'];
+    window.localStorage.setItem(KEY, JSON.stringify({ layers: ['01_КЛАДКА'], extra: ['slab'] }));
+    const reordered = ['04_ОСИ', '01_КЛАДКА'];
     const { result } = renderHook(() => useCadLayerVisibility(KEY, reordered));
     expect([...result.current.hiddenLayers]).toEqual([1]);
-    expect([...result.current.hiddenCategories].sort()).toEqual(['lintel', 'monolith']);
+    expect([...result.current.hiddenCategories].sort()).toEqual(['masonry', 'slab']);
+  });
+
+  it('миграция: прежнее скрытие слоя 02_МОНОЛИТ скрывает обе монолитные строки', () => {
+    window.localStorage.setItem(
+      KEY,
+      JSON.stringify({ layers: ['02_МОНОЛИТ', '04_ОСИ'], extra: ['slab'] }),
+    );
+    const { result } = renderHook(() => useCadLayerVisibility(KEY, NAMES));
+    expect([...result.current.hiddenLayers]).toEqual([2]);
+    expect([...result.current.hiddenCategories].sort()).toEqual([
+      'monolith_column',
+      'monolith_vertical',
+      'slab',
+    ]);
+    expect(result.current.categories.monolithVertical).toBe(false);
+    expect(result.current.categories.monolithColumn).toBe(false);
+  });
+
+  it('монолитные строки переключаются по одной и хранятся в extra', () => {
+    const { result } = renderHook(() => useCadLayerVisibility(KEY, NAMES));
+    act(() => result.current.categories.onChange('monolith_column', false));
+    expect([...result.current.hiddenCategories]).toEqual(['monolith_column']);
+    expect(result.current.categories.monolithVertical).toBe(true);
+    expect(JSON.parse(window.localStorage.getItem(KEY) ?? '{}')).toEqual({
+      layers: [],
+      extra: ['monolith_column'],
+    });
   });
 
   it('смена листа читает его собственный выбор', () => {
@@ -123,21 +150,21 @@ describe('видимость слоёв листа', () => {
   it('запись v2 приоритетнее v1', () => {
     const legacy = legacyLayerVisibilityKey('job-1', 3);
     window.localStorage.setItem(legacy, JSON.stringify({ layers: ['01_КЛАДКА'], extra: [] }));
-    window.localStorage.setItem(KEY, JSON.stringify({ layers: ['02_МОНОЛИТ'], extra: [] }));
+    window.localStorage.setItem(KEY, JSON.stringify({ layers: ['04_ОСИ'], extra: [] }));
     const { result } = renderHook(() => useCadLayerVisibility(KEY, NAMES, legacy));
-    expect([...result.current.hiddenLayers]).toEqual([1]);
+    expect([...result.current.hiddenLayers]).toEqual([2]);
   });
 
   it('новое задание того же листа сохраняет выбор: ключ не зависит от job', () => {
     const first = renderHook(() =>
       useCadLayerVisibility(KEY, NAMES, legacyLayerVisibilityKey('job-1', 3)),
     );
-    act(() => first.result.current.toggleLayer(1));
+    act(() => first.result.current.toggleLayer(2));
     first.unmount();
     const second = renderHook(() =>
       useCadLayerVisibility(KEY, NAMES, legacyLayerVisibilityKey('job-2', 3)),
     );
-    expect([...second.result.current.hiddenLayers]).toEqual([1]);
+    expect([...second.result.current.hiddenLayers]).toEqual([2]);
   });
 
   it('слоя нет в новом DXF - он просто не попадает в скрытые', () => {

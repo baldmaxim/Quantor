@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react';
 
 import {
   EXTRA_CATEGORIES,
+  MONOLITH_CATEGORIES,
   hiddenCategoriesOf,
+  isMonolithLayer,
   type CadExtraCategory,
   type CadLayerCategory,
 } from '@/lib/cad/layer-categories';
@@ -23,7 +25,7 @@ export const legacyLayerVisibilityKey = (jobId: string, pageIndex: number): stri
 interface IStored {
   /** Имена скрытых слоёв DXF (не индексы: индексы зависят от вида). */
   readonly layers: readonly string[];
-  /** Скрытые строки без слоя DXF: «Плита» и «Перемычки». */
+  /** Скрытые строки без слоя DXF: «Монолит - …» и «Плита». Прежнее `lintel` при чтении отбрасывается. */
   readonly extra: readonly CadExtraCategory[];
 }
 
@@ -36,13 +38,18 @@ const parseStored = (raw: string | null): IStored | null => {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null) return EMPTY;
     const { layers, extra } = parsed as { layers?: unknown; extra?: unknown };
+    const names = Array.isArray(layers)
+      ? layers.filter((item): item is string => typeof item === 'string')
+      : [];
+    // Прежний слой `02_МОНОЛИТ…` в скрытых - теперь скрыты обе монолитные строки.
+    const legacyMonolith = names.some(isMonolithLayer);
+    const stored = Array.isArray(extra) ? extra : [];
     return {
-      layers: Array.isArray(layers)
-        ? layers.filter((item): item is string => typeof item === 'string')
-        : [],
-      extra: Array.isArray(extra)
-        ? EXTRA_CATEGORIES.filter((category) => extra.includes(category))
-        : [],
+      layers: names.filter((name) => !isMonolithLayer(name)),
+      extra: EXTRA_CATEGORIES.filter(
+        (category) =>
+          stored.includes(category) || (legacyMonolith && MONOLITH_CATEGORIES.includes(category)),
+      ),
     };
   } catch {
     return EMPTY;
@@ -81,17 +88,18 @@ export const writeLayerVisibility = (key: string | null, value: IStored): void =
 export interface ICadLayerVisibility {
   /** Индексы скрытых слоёв DXF в текущем `layerNames`. */
   readonly hiddenLayers: ReadonlySet<number>;
-  /** Скрытые категории конструкций: из слоёв DXF и строки «Плита»/«Перемычки». */
+  /** Скрытые категории конструкций: из слоёв DXF и строк без слоя («Монолит», «Плита»). */
   readonly hiddenCategories: ReadonlySet<CadLayerCategory>;
   /** Имена скрытых слоёв DXF: по ним скрываются конструкции с этими слоями-источниками. */
   readonly hiddenLayerNames: ReadonlySet<string>;
   readonly toggleLayer: (index: number) => void;
   readonly setLayersHidden: (indices: readonly number[], hidden: boolean) => void;
   readonly setExtraHidden: (category: CadExtraCategory, hidden: boolean) => void;
-  /** Строки «Плита» и «Перемычки» вкладки «Слои»: показаны ли и как переключить. */
+  /** Строки без слоя DXF вкладки «Слои»: показаны ли и как переключить. */
   readonly categories: {
+    readonly monolithVertical: boolean;
+    readonly monolithColumn: boolean;
     readonly slab: boolean;
-    readonly lintel: boolean;
     readonly onChange: (category: CadExtraCategory, visible: boolean) => void;
   };
 }
@@ -163,8 +171,9 @@ export const useCadLayerVisibility = (
     setLayersHidden,
     setExtraHidden,
     categories: {
+      monolithVertical: !hiddenExtra.has('monolith_vertical'),
+      monolithColumn: !hiddenExtra.has('monolith_column'),
       slab: !hiddenExtra.has('slab'),
-      lintel: !hiddenExtra.has('lintel'),
       onChange: (category, visible) => setExtraHidden(category, !visible),
     },
   };

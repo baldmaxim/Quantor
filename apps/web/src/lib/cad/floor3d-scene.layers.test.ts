@@ -66,3 +66,73 @@ describe('сцена 3D: скрытие конструкций по слоям',
     scene.dispose();
   });
 });
+
+describe('сцена 3D: перемычка скрывается вместе со стеной-хозяином', () => {
+  const lintel = base.lintels[0]!;
+  const lintelPlan = buildFloor3dPlan(
+    floor3dFixture({
+      walls: [
+        { ...wall, construction_key: 'm1', kind: 'monolith_wall', family: 'monolith' },
+        { ...wall, construction_key: 'k1' },
+        { ...wall, construction_key: 'k2' },
+      ],
+      lintels: [
+        { ...lintel, opening_id: 'lm', host_id: 'm1', material: 'monolith' },
+        { ...lintel, opening_id: 'lk1', host_id: 'k1', material: 'masonry' },
+        { ...lintel, opening_id: 'lk2', host_id: 'k2', material: 'masonry' },
+        { ...lintel, opening_id: 'lx', host_id: null, material: 'monolith' },
+      ],
+      doors: [],
+    }),
+  );
+  const hostKeys = layerGroupKeys([
+    { id: 'm1', kind: 'monolith_wall', source_layers: ['02_МОНОЛИТ'] },
+    { id: 'k1', kind: 'masonry', source_layers: ['01_КЛАДКА_200'] },
+    { id: 'k2', kind: 'masonry', source_layers: ['01_КЛАДКА_80'] },
+  ]);
+  const build = () =>
+    buildFloor3dScene(lintelPlan, readFloor3dColors(), {
+      showSlabCap: false,
+      groupKeyOf: hostKeys.keyOf,
+      hostCategoryOf: hostKeys.categoryOf,
+    });
+  const lintelMesh = (scene: ReturnType<typeof buildFloor3dScene>, id: string): THREE.Mesh =>
+    scene.pickables.find(
+      (mesh) =>
+        (mesh.userData.pick as IFloor3dPickData).category === 'lintel' &&
+        idsOf(mesh).includes(id),
+    )!;
+
+  it('строка монолита скрывает перемычку монолитной стены и перемычку без хозяина с монолитом', () => {
+    const scene = build();
+    const [monolith, withoutHost, masonry] = [
+      lintelMesh(scene, 'lm'),
+      lintelMesh(scene, 'lx'),
+      lintelMesh(scene, 'lk1'),
+    ];
+    scene.setCategoryVisible('monolith_vertical', false);
+    expect(monolith.visible).toBe(false);
+    expect(withoutHost.visible).toBe(false);
+    expect(masonry.visible).toBe(true);
+    scene.dispose();
+  });
+
+  it('скрытие стены по слоям (id хозяина) скрывает только её перемычки', () => {
+    const scene = build();
+    scene.setHiddenIds(new Set(['k1']));
+    expect(lintelMesh(scene, 'lk1').visible).toBe(false);
+    expect(lintelMesh(scene, 'lk2').visible).toBe(true);
+    expect(lintelMesh(scene, 'lm').visible).toBe(true);
+    scene.setHiddenIds(new Set());
+    expect(lintelMesh(scene, 'lk1').visible).toBe(true);
+    scene.dispose();
+  });
+
+  it('скрытая «Кладка» не прячет перемычку монолитной стены', () => {
+    const scene = build();
+    scene.setCategoryVisible('masonry', false);
+    expect(lintelMesh(scene, 'lk1').visible).toBe(false);
+    expect(lintelMesh(scene, 'lm').visible).toBe(true);
+    scene.dispose();
+  });
+});

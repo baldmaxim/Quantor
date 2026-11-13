@@ -18,6 +18,7 @@ import {
   groupKeyOf,
   statusIds,
   sumGroups,
+  type ConstructionGroup,
   type IGroupSum,
 } from '@/lib/cad/constructions';
 import { formatNumber } from '@/lib/cad/view-format';
@@ -35,8 +36,72 @@ const NUM = `${TD} text-right`;
 /** Объём каркасной перегородки не определён: ГКЛ меряется площадью. */
 const NO_VOLUME = '—';
 
-/** Подпись группы монолитных перемычек над проёмами (отдельно от монолитных стен). */
-const LINTEL_LABEL = 'Монолит — перемычки';
+/**
+ * Перемычка - часть стены: в своде отдельной строки нет, её объём входит в строку стен того же вида
+ * и толщины (признак «в т.ч. перемычки» остаётся подписью). Данные API и ВОР по-прежнему делят их.
+ */
+const LINTEL_NOTE = 'в т.ч. перемычки';
+
+const roundVolume = (value: number): number => Math.round(value * 10_000) / 10_000;
+
+/** Строка свода: группа стен и объём перемычек, вошедший в неё (`null` - перемычек нет). */
+interface IWallRow {
+  readonly group: ConstructionGroup;
+  readonly lintelVolume: number | null;
+  /** Строка из одних перемычек: стен такого вида и толщины нет. */
+  readonly lintelOnly: boolean;
+}
+
+/** Объём строки: стены плюс перемычки; обоих нет - `null`. */
+const rowVolume = (row: IWallRow): number | null =>
+  row.lintelOnly
+    ? row.lintelVolume
+    : row.group.volume_m3 === null && row.lintelVolume === null
+      ? null
+      : roundVolume((row.group.volume_m3 ?? 0) + (row.lintelVolume ?? 0));
+
+/**
+ * Строки свода: группы перемычек прибавляются к группе стен того же вида и толщины (материал
+ * предпочтительно тот же); без такой группы - строка из одних перемычек на месте группы перемычек.
+ */
+const wallRowsOf = (groups: readonly ConstructionGroup[]): IWallRow[] => {
+  const walls = groups.filter((group) => group.element !== 'lintel');
+  const added = new Map<ConstructionGroup, number>();
+  const rows: IWallRow[] = [];
+  const hostOf = (lintel: ConstructionGroup): ConstructionGroup | undefined => {
+    const sameSize = walls.filter(
+      (group) => group.kind === lintel.kind && group.thickness_mm === lintel.thickness_mm,
+    );
+    return sameSize.find((group) => group.material === lintel.material) ?? sameSize[0];
+  };
+  for (const lintel of groups) {
+    const host = lintel.element === 'lintel' ? hostOf(lintel) : undefined;
+    if (host !== undefined && lintel.volume_m3 !== null) {
+      added.set(host, (added.get(host) ?? 0) + lintel.volume_m3);
+    }
+  }
+  for (const group of groups) {
+    if (group.element !== 'lintel') {
+      rows.push({ group, lintelVolume: added.has(group) ? (added.get(group) ?? null) : null, lintelOnly: false });
+    } else if (hostOf(group) === undefined) {
+      rows.push({ group, lintelVolume: group.volume_m3, lintelOnly: true });
+    }
+  }
+  return rows;
+};
+
+/** Итог по группам: шт., длина, площадь - только стен, объём - со стенами и перемычками. */
+const sumWithLintels = (
+  groups: readonly ConstructionGroup[],
+  pick: (group: ConstructionGroup) => boolean,
+): IGroupSum | null => {
+  const walls = sumGroups(groups, (group) => group.element !== 'lintel' && pick(group));
+  const lintels = groups.filter((group) => group.element === 'lintel' && pick(group));
+  if (lintels.length === 0) return walls;
+  const volume = lintels.reduce((total, group) => total + (group.volume_m3 ?? 0), 0);
+  const base = walls ?? { count: 0, length_m: 0, wall_area_m2: 0, volume_m3: 0 };
+  return { ...base, volume_m3: roundVolume(base.volume_m3 + volume) };
+};
 
 const SumRow: FC<{ label: string; sum: IGroupSum; withVolume?: boolean }> = ({
   label,
@@ -73,12 +138,13 @@ export const ConstructionsTotals: FC<IConstructionsTotalsProps> = ({
   const { totals, summary, constructions } = data;
   const slabGroups = totals.filter((group) => isFloorSlab(group.kind));
   const wallGroups = totals.filter((group) => !isFloorSlab(group.kind));
-  const masonry = sumGroups(
+  const wallRows = wallRowsOf(wallGroups);
+  const masonry = sumWithLintels(
     wallGroups,
     (group) => !isMonolith(group.kind) && !isFramePartition(group.kind),
   );
-  const monolith = sumGroups(wallGroups, (group) => isMonolith(group.kind));
-  const frame = sumGroups(wallGroups, (group) => isFramePartition(group.kind));
+  const monolith = sumWithLintels(wallGroups, (group) => isMonolith(group.kind));
+  const frame = sumWithLintels(wallGroups, (group) => isFramePartition(group.kind));
 
   /** Подпись источников материала для строки группы: берётся по конструкциям группы. */
   const sourcesOf = (ids: readonly string[]): Set<MaterialSource> => {
@@ -145,20 +211,30 @@ export const ConstructionsTotals: FC<IConstructionsTotalsProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {wallGroups.map((group) => {
-                  if (group.element === 'lintel') {
-                    // Перемычки - не конструкции листа: на холсте подсвечивать нечего, площади стены нет.
+                {wallRows.map((row) => {
+                  const { group } = row;
+                  const volume = rowVolume(row);
+                  const volumeCell = (
+                    <td className={NUM}>
+                      {volume === null ? NO_VOLUME : formatNumber(volume, 3)}
+                      {row.lintelVolume !== null && (
+                        <span className="block text-micro font-normal text-muted">
+                          {LINTEL_NOTE} {formatNumber(row.lintelVolume, 3)} м³
+                        </span>
+                      )}
+                    </td>
+                  );
+                  if (row.lintelOnly) {
+                    // Стен такого вида и толщины нет: строка из одних перемычек, на холсте подсвечивать нечего.
                     return (
                       <tr key={`${groupKeyOf(group)}|lintel`} className="border-t border-border">
-                        <td className={TD}>{LINTEL_LABEL}</td>
+                        <td className={TD}>{KIND_LABELS[group.kind]}</td>
                         <td className={TD}>{group.thickness_mm}</td>
                         <td className={TD}>{materialLabel(group.material)}</td>
-                        <td className={NUM}>{group.count}</td>
-                        <td className={NUM}>{formatNumber(group.length_m, 2)}</td>
                         <td className={NUM}>{NO_VOLUME}</td>
-                        <td className={NUM}>
-                          {group.volume_m3 === null ? NO_VOLUME : formatNumber(group.volume_m3, 3)}
-                        </td>
+                        <td className={NUM}>{NO_VOLUME}</td>
+                        <td className={NUM}>{NO_VOLUME}</td>
+                        {volumeCell}
                       </tr>
                     );
                   }
@@ -191,9 +267,7 @@ export const ConstructionsTotals: FC<IConstructionsTotalsProps> = ({
                       <td className={NUM}>{group.count}</td>
                       <td className={NUM}>{formatNumber(group.length_m, 2)}</td>
                       <td className={NUM}>{formatNumber(group.wall_area_m2, 2)}</td>
-                      <td className={NUM}>
-                        {group.volume_m3 === null ? NO_VOLUME : formatNumber(group.volume_m3, 3)}
-                      </td>
+                      {volumeCell}
                     </tr>
                   );
                 })}

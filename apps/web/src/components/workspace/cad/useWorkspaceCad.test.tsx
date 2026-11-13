@@ -548,12 +548,12 @@ describe('useWorkspaceCad: слои и область проверки масш�
     expect([...(second.result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([1]);
   });
 
-  it('режим 3D не сбрасывает выбор слоёв, строки «Плита» и «Перемычки» общие', () => {
+  it('режим 3D не сбрасывает выбор слоёв, строка «Плита» общая', () => {
     recognized();
     const { result } = mount({ jobParam: JOB_ID, viewParam: 1 });
     act(() => result.current.side.view?.layers.onToggleLayer(1));
     act(() => result.current.side.view?.layers.categories?.onChange('slab', false));
-    expect(result.current.side.view?.layers.categories).toMatchObject({ slab: false, lintel: true });
+    expect(result.current.side.view?.layers.categories).toMatchObject({ slab: false });
     act(() => result.current.bar?.floor3d?.onModeChange('3d'));
     expect(result.current.side.view?.layers.mode3d).toBe(true);
     expect([...(result.current.side.view?.layers.visibleLayers ?? [])]).toEqual([0]);

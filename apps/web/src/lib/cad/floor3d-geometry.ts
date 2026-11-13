@@ -36,8 +36,22 @@ export interface IPrismSpec {
   readonly hostId?: string | null;
 }
 
-/** Категория видимости призмы (слой вкладки «Слои»): совпадает с категорией призмы. */
-export const visibilityOf = (spec: Pick<IPrismSpec, 'category'>): CadLayerCategory => spec.category;
+/** Категория слоя вкладки «Слои» конструкции-владельца проёма по её id; `undefined` - владелец не найден. */
+export type HostCategoryOf = (hostId: string) => CadLayerCategory | undefined;
+
+/**
+ * Категория видимости призмы (слой вкладки «Слои»). Перемычка - часть своей стены: следует категории
+ * стены-хозяина (`hostCategoryOf`); хозяин не найден - монолитная перемычка следует строке
+ * «Монолит - стены и пилоны», остальные - «Кладке».
+ */
+export const visibilityOf = (
+  spec: Pick<IPrismSpec, 'category' | 'material' | 'hostId'>,
+  hostCategoryOf?: HostCategoryOf,
+): CadLayerCategory => {
+  if (spec.category !== 'lintel') return spec.category;
+  const host = spec.hostId == null ? undefined : hostCategoryOf?.(spec.hostId);
+  return host ?? (spec.material === 'monolith' ? 'monolith_vertical' : 'masonry');
+};
 
 /** Отверстие плиты для показа: контур на верхе плиты. */
 export interface IHoleSpec {

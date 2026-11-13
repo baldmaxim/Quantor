@@ -294,6 +294,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
           hiddenCategories={hiddenCategories}
           hiddenConstructionIds={hiddenConstructionIds}
           groupKeyOf={groupKeys.keyOf}
+          hostCategoryOf={groupKeys.categoryOf}
           measuring={measuring}
           onPick={onPick}
           // Камера пошла - плашка у курсора устарела, а выделение остаётся.

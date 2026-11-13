@@ -5,14 +5,14 @@ import { useCallback } from 'react';
 import { useStoredNumber } from './useStoredNumber';
 
 /**
- * Слои трасс механики (ADR-0036 п. 8): по слою на систему (22 слоя: 20 трасс движка cad_mep.v12 и 2 служебных), как в DXF генератора.
+ * Слои трасс механики (ADR-0036 п. 8): по слою на систему (29 слоёв: 20 трасс движка cad_mep.v12, 2 служебных и 7 приборов санузлов и кухонь), как в DXF генератора.
  *
  * Порядок - порядок группы в панели «Слои». Цвета - токены `--cad-mep-*` (packages/ui/src/base.css),
  * свои для каждой темы. Видимость слоёв - личный выбор человека: хранится в браузере битовой маской
  * по этому списку и переживает смену вида и перезагрузку.
  */
 
-export type MepGroupKey = 'water' | 'sewer' | 'heating' | 'vent' | 'smoke' | 'cooling' | 'fire' | 'common';
+export type MepGroupKey = 'water' | 'sewer' | 'heating' | 'vent' | 'smoke' | 'cooling' | 'fire' | 'common' | 'sanitary';
 
 /** Группы слоёв трасс в порядке показа в панели «Слои». */
 export const MEP_GROUPS: readonly { readonly key: MepGroupKey; readonly label: string }[] = [
@@ -24,6 +24,7 @@ export const MEP_GROUPS: readonly { readonly key: MepGroupKey; readonly label: s
   { key: 'cooling', label: 'Кондиционирование' },
   { key: 'fire', label: 'Пожаротушение' },
   { key: 'common', label: 'Узлы и стояки' },
+  { key: 'sanitary', label: 'Сантехника' },
 ];
 
 export interface IMepLayerDef {
@@ -60,6 +61,14 @@ export const MEP_LAYERS: readonly IMepLayerDef[] = [
   { name: 'M-PT-AUP', group: 'fire', label: 'Автоматическое пожаротушение АУП', token: '--cad-mep-pt-aup' },
   { name: 'M-NODE', group: 'common', label: 'Узлы и арматура', token: '--cad-mep-node' },
   { name: 'M-RISER', group: 'common', label: 'Стояки', token: '--cad-mep-riser' },
+  // Приборы: по замкнутой фигуре на прибор, один цвет на все. Новые слои - только в конец списка (маска).
+  { name: 'M-SAN-BATH', group: 'sanitary', label: 'Ванна', token: '--cad-mep-san' },
+  { name: 'M-SAN-SHOWER', group: 'sanitary', label: 'Душевой поддон', token: '--cad-mep-san' },
+  { name: 'M-SAN-WC', group: 'sanitary', label: 'Унитаз', token: '--cad-mep-san' },
+  { name: 'M-SAN-BASIN', group: 'sanitary', label: 'Умывальник', token: '--cad-mep-san' },
+  { name: 'M-SAN-KSINK', group: 'sanitary', label: 'Мойка кухонная', token: '--cad-mep-san' },
+  { name: 'M-SAN-WASHER', group: 'sanitary', label: 'Стиральная машина', token: '--cad-mep-san' },
+  { name: 'M-SAN-MOPSINK', group: 'sanitary', label: 'Раковина ПУИ', token: '--cad-mep-san' },
 ];
 
 /** Ключ браузерного хранилища маски скрытых слоёв. */

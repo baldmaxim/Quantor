@@ -164,20 +164,55 @@ describe('ConstructionsTotals: монолитные перемычки', () => {
     },
   });
 
-  it('строка «Монолит — перемычки»: шт., длина, объём; площадь стены - прочерк; входит в итог монолита', () => {
+  it('отдельной строки «Монолит — перемычки» нет; перемычки без стен своей толщины - строка «Монолит — стена»', () => {
     const onSelectGroup = vi.fn();
     render(<ConstructionsTotals data={data} activeGroup={null} onSelectGroup={onSelectGroup} />);
-    const row = screen.getByText('Монолит — перемычки').closest('tr') as HTMLElement;
-    expect(within(row).getByText('2')).toBeInTheDocument();
-    expect(within(row).getByText('1,9')).toBeInTheDocument();
+    expect(screen.queryByText('Монолит — перемычки')).toBeNull();
+    const row = screen.getByText('Монолит — стена').closest('tr') as HTMLElement;
     expect(within(row).getByText('0,28')).toBeInTheDocument();
-    expect(within(row).getByText('—')).toBeInTheDocument();
+    expect(within(row).getByText('в т.ч. перемычки 0,28 м³')).toBeInTheDocument();
     const total = screen.getByText('Итого монолит').closest('tr') as HTMLElement;
     expect(within(total).getByText('0,28')).toBeInTheDocument();
     const masonryTotal = screen.getByText('Итого кладка').closest('tr') as HTMLElement;
     expect(within(masonryTotal).queryByText('0,28')).toBeNull();
     fireEvent.click(row);
     expect(onSelectGroup).not.toHaveBeenCalled();
+  });
+
+  it('перемычки прибавляются к строке стен той же толщины и вида; в итоге объём общий, шт. - только стен', () => {
+    const merged = constructionsRead({
+      constructions: [construction({ id: 'w', kind: 'monolith_wall' })],
+      totals: [
+        {
+          kind: 'monolith_wall',
+          thickness_mm: 200,
+          material: 'monolith_concrete',
+          count: 4,
+          length_m: 8,
+          wall_area_m2: 20,
+          volume_m3: 4,
+        },
+        {
+          kind: 'monolith_wall',
+          element: 'lintel',
+          thickness_mm: 200,
+          material: 'monolith_concrete',
+          count: 2,
+          length_m: 1.9,
+          wall_area_m2: 0,
+          volume_m3: 0.28,
+        },
+      ],
+    });
+    render(<ConstructionsTotals data={merged} activeGroup={null} onSelectGroup={vi.fn()} />);
+    const row = screen.getByRole('button', { name: 'Монолит — стена' }).closest('tr') as HTMLElement;
+    expect(within(row).getByText('4,28')).toBeInTheDocument();
+    expect(within(row).getByText('в т.ч. перемычки 0,28 м³')).toBeInTheDocument();
+    expect(within(row).getByText('4')).toBeInTheDocument();
+    expect(screen.getAllByText('Монолит — стена')).toHaveLength(1);
+    const total = screen.getByText('Итого монолит').closest('tr') as HTMLElement;
+    expect(within(total).getByText('4,28')).toBeInTheDocument();
+    expect(within(total).getByText('4')).toBeInTheDocument();
   });
 
   it('счётчик перемычек без объёма - в блоке «не вошло»', () => {

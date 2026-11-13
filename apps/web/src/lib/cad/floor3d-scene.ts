@@ -1,8 +1,16 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import type { IFloor3dHighlight, IFloor3dPlan, IHoleSpec, IPrismSpec, Point2, PrismCategory } from './floor3d-geometry';
-import { itemAtTriangle } from './floor3d-geometry';
+import type {
+  HostCategoryOf,
+  IFloor3dHighlight,
+  IFloor3dPlan,
+  IHoleSpec,
+  IPrismSpec,
+  Point2,
+  PrismCategory,
+} from './floor3d-geometry';
+import { itemAtTriangle, visibilityOf } from './floor3d-geometry';
 import type { CadLayerCategory } from './layer-categories';
 
 /**
@@ -191,6 +199,11 @@ export const buildFloor3dScene = (
      * поэтому видимость подгруппы однозначна. Нет функции или ключа - общая группа категории.
      */
     readonly groupKeyOf?: (id: string) => string | undefined;
+    /**
+     * Категория слоя стены-хозяина по её id: перемычки скрываются вместе со стеной. Нет функции или
+     * хозяин не найден - перемычка следует «Монолит - стены и пилоны» (монолит) или «Кладке».
+     */
+    readonly hostCategoryOf?: HostCategoryOf;
   },
 ): IFloor3dScene => {
   const group = new THREE.Group();
@@ -238,7 +251,7 @@ export const buildFloor3dScene = (
   );
 
   // Перемычки красятся по материалу: монолит - цветом монолита, кладка и каркасная перегородка -
-  // цветом кладки, материал не определён - цветом перемычки. Категория `lintel` у всех одна.
+  // цветом кладки, материал не определён - цветом перемычки. Категория видимости - стены-хозяина (см. `visibilityOf`).
   const isUndefinedMaterial = (item: IPrismSpec): boolean =>
     item.material !== 'monolith' && item.material !== 'masonry' && item.material !== 'frame_partition';
   const groups: readonly {
@@ -260,36 +273,56 @@ export const buildFloor3dScene = (
     { category: 'door', color: colors.door, include: () => true },
   ];
   const groupKeyOf = options.groupKeyOf;
+  const hostCategoryOf = options.hostCategoryOf;
   for (const { category, color, include } of groups) {
     const items = plan.prisms.filter((item) => item.category === category && include(item));
     // Кладка, монолит и перегородки делятся на подгруппы по слоям-источникам: слой скрывается без
-    // пересборки. Прочие категории - один меш, как раньше.
-    const subgroups = new Map<string, typeof items>();
-    for (const item of items) {
-      const key = SPLIT_CATEGORIES.has(category) ? (groupKeyOf?.(item.id) ?? '') : '';
-      const list = subgroups.get(key);
-      if (list === undefined) subgroups.set(key, [item]);
-      else list.push(item);
+    // пересборки. Перемычки делятся по категории и слоям стены-хозяина: прячутся вместе с ней.
+    // Прочие категории - один меш, как раньше.
+    interface ISubgroup {
+      readonly visibility: CadLayerCategory;
+      /** Скрывается и по id конструкций (у перемычек - id хозяев); иначе только категорией. */
+      readonly byIds: boolean;
+      readonly members: IPrismSpec[];
     }
-    for (const [key, members] of subgroups) {
+    const subgroups = new Map<string, ISubgroup>();
+    for (const item of items) {
+      const visibility = visibilityOf(item, hostCategoryOf);
+      const hostId = item.hostId ?? null;
+      const lintelKey =
+        category === 'lintel' && hostId !== null && hostCategoryOf?.(hostId) !== undefined
+          ? (groupKeyOf?.(hostId) ?? '')
+          : '';
+      const key = SPLIT_CATEGORIES.has(category) ? (groupKeyOf?.(item.id) ?? '') : lintelKey;
+      const id = `${visibility}\u0005${key}`;
+      const found = subgroups.get(id);
+      if (found !== undefined) found.members.push(item);
+      else subgroups.set(id, { visibility, byIds: key !== '', members: [item] });
+    }
+    for (const sub of subgroups.values()) {
       const merged = mergeItems(
-        members.map((item) => ({ id: item.id, geometry: prismGeometry(item) })),
+        sub.members.map((item) => ({ id: item.id, geometry: prismGeometry(item) })),
         'prism',
         category,
       );
       if (merged === null) continue;
       track(merged.geometry);
-      const ids = key === '' ? null : merged.pick.ids;
+      const ids =
+        !sub.byIds
+          ? null
+          : category === 'lintel'
+            ? [...new Set(sub.members.flatMap((item) => (item.hostId == null ? [] : [item.hostId])))]
+            : merged.pick.ids;
       const mesh = new THREE.Mesh(merged.geometry, solid(color, category === 'door' ? DOOR_OPACITY : 1));
       mesh.userData.pick = merged.pick;
       group.add(mesh);
       pickables.push(mesh);
-      register(category, mesh, ids);
+      register(sub.visibility, mesh, ids);
       const edges = new THREE.EdgesGeometry(merged.geometry, 30);
       track(edges);
       const edgeLines = new THREE.LineSegments(edges, edgeMaterial);
       group.add(edgeLines);
-      register(category, edgeLines, ids);
+      register(sub.visibility, edgeLines, ids);
     }
   }
 

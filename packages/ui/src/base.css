@@ -104,6 +104,7 @@
   --cad-mep-vk-k1: #6e5a4a;
   --cad-mep-node: #5b6573;
   --cad-mep-riser: #1f2937;
+  --cad-mep-san: #0f8a7e;
   --cad-mep-insulation: #d9c68a;
   --cad-mep-sleeve: #7f8792;
   --cad-mep-vk-k2: #8f7350;
@@ -298,6 +299,7 @@
     --cad-mep-vk-k1: #a58b73;
     --cad-mep-node: #7a8594;
     --cad-mep-riser: #5d6877;
+    --cad-mep-san: #2fc2b3;
     --cad-mep-insulation: #eadba5;
     --cad-mep-sleeve: #a3abb6;
     --cad-mep-vk-k2: #c2a27a;
@@ -417,6 +419,7 @@
   --cad-mep-vk-k1: #a58b73;
   --cad-mep-node: #7a8594;
   --cad-mep-riser: #5d6877;
+  --cad-mep-san: #2fc2b3;
   --cad-mep-insulation: #eadba5;
   --cad-mep-sleeve: #a3abb6;
   --cad-mep-vk-k2: #c2a27a;

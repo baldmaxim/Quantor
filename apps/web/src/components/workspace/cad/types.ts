@@ -21,6 +21,7 @@ import type { ICadZoneLayers } from '@/components/cad/viewer/CadZoneLayers';
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { IConstructionIndex } from '@/lib/cad/constructions';
 import type { CadExtraCategory } from '@/lib/cad/layer-categories';
+import type { ICadLayerCounts } from '@/lib/cad/layer-counts';
 import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
 import type { RoomType } from '@/lib/cad/room-types';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
@@ -246,6 +247,8 @@ export interface IWorkspaceCadMepLayers {
   readonly onToggle: (index: number) => void;
   /** Скрыть или показать несколько слоёв разом (переключатель группы). */
   readonly onSetHidden: (indices: readonly number[], hidden: boolean) => void;
+  /** Число рядом с пунктом по индексу `names`; `null` или нет массива - без числа. */
+  readonly counts?: readonly (number | null)[];
 }
 
 export interface IWorkspaceCadLayers {
@@ -258,12 +261,15 @@ export interface IWorkspaceCadLayers {
   readonly onSetLayersHidden: (indices: readonly number[], hidden: boolean) => void;
   /** Открыт режим «3D»: слои без категории конструкций доступны только в плане. */
   readonly mode3d?: boolean;
-  /** Строки «Плита» и «Перемычки» без слоя DXF: видимость в плане (плита) и в 3D. */
+  /** Строки без слоя DXF («Монолит», «Плита»): видимость в плане и в 3D. */
   readonly categories?: {
+    readonly monolithVertical: boolean;
+    readonly monolithColumn: boolean;
     readonly slab: boolean;
-    readonly lintel: boolean;
     readonly onChange: (category: CadExtraCategory, visible: boolean) => void;
   } | null;
+  /** Числа справа у строк и групп; нет - без чисел. */
+  readonly counts?: ICadLayerCounts | null;
   readonly pdfOpacity: number;
   readonly onPdfOpacityChange: (value: number) => void;
   readonly pdfOpacityActive: boolean;

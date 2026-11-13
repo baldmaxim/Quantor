@@ -20,6 +20,7 @@ const fillColors = (
   hidden: IConstructionPaintData['hiddenCategories'],
   hiddenLayerNames?: ReadonlySet<string>,
   paintShapes: readonly IConstructionShape[] = shapes,
+  extra: Partial<IConstructionPaintData> = { showAll: true },
 ): string[] => {
   const fills: string[] = [];
   let fill = '';
@@ -46,6 +47,7 @@ const fillColors = (
       showAll: true,
       hiddenCategories: hidden,
       hiddenLayerNames,
+      ...extra,
     },
     { clear: true },
   ).paint(context, PLACEMENT, 1, null);
@@ -58,9 +60,9 @@ describe('рисовальщик: скрытые категории', () => {
   });
 
   it('скрытая категория не рисуется', () => {
-    expect(fillColors(new Set(['monolith']))).toEqual(['brown', 'brown']);
+    expect(fillColors(new Set(['monolith_vertical']))).toEqual(['brown', 'brown']);
     expect(fillColors(new Set(['masonry', 'frame_partition']))).toEqual(['indigo']);
-    expect(fillColors(new Set(['masonry', 'frame_partition', 'monolith']))).toEqual([]);
+    expect(fillColors(new Set(['masonry', 'frame_partition', 'monolith_vertical']))).toEqual([]);
   });
 
   it('конструкция, все слои-источники которой скрыты, не рисуется', () => {
@@ -78,8 +80,16 @@ describe('рисовальщик: скрытые категории', () => {
     expect(fillColors(undefined, new Set(), layered)).toHaveLength(3);
   });
 
+  it('«всегда рисуемая» категория рисуется без галки «Контуры всех конструкций»', () => {
+    const only = { showAll: false, alwaysCategories: new Set(['monolith_vertical' as const]) };
+    expect(fillColors(undefined, undefined, shapes, only)).toEqual(['indigo']);
+    // Скрытая категория не рисуется даже в «всегда рисуемых»; без списка - только выбранные.
+    expect(fillColors(new Set(['monolith_vertical']), undefined, shapes, only)).toEqual([]);
+    expect(fillColors(undefined, undefined, shapes, { showAll: false })).toEqual([]);
+  });
+
   it('touches не строже paint: всё скрыто - слой пуст', () => {
-    const all = new Set(['masonry', 'monolith', 'frame_partition'] as const);
+    const all = new Set(['masonry', 'monolith_vertical', 'frame_partition'] as const);
     const painter = createConstructionsPainter(
       { shapes, colors: COLORS, selected: new Set<string>(), showAll: true, hiddenCategories: all },
       { clear: true },
@@ -96,7 +106,7 @@ describe('хит-тест: скрытое не выбирается кликом
       y: (target.bounds.minY + target.bounds.maxY) / 2,
     };
     expect(buildConstructionIndex(shapes).hit(centre, 0.01)).not.toBeNull();
-    const visible = withoutHiddenCategories(shapes, new Set(['masonry', 'monolith', 'frame_partition']));
+    const visible = withoutHiddenCategories(shapes, new Set(['masonry', 'monolith_vertical', 'frame_partition']));
     expect(buildConstructionIndex(visible).hit(centre, 0.01)).toBeNull();
   });
 });

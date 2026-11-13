@@ -26,7 +26,11 @@ import {
 } from '@/lib/cad/constructions-queries';
 import { readConstructionColors, type IConstructionPaintData } from '@/lib/cad/constructions-painter';
 import type { ICadFrame } from '@/lib/cad/frame';
-import { withoutHiddenCategories, type CadLayerCategory } from '@/lib/cad/layer-categories';
+import {
+  monolithPaintedByShapes,
+  withoutHiddenCategories,
+  type CadLayerCategory,
+} from '@/lib/cad/layer-categories';
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
@@ -153,6 +157,9 @@ export const useWorkspaceCadConstructions = ({
     return new Set([...selected].filter((id) => known.has(id)));
   }, [selected, shapes]);
 
+  // Включена ровно одна монолитная строка - монолит рисует сам слой конструкций, а не DXF.
+  const alwaysCategories = useMemo(() => monolithPaintedByShapes(hiddenCategories), [hiddenCategories]);
+
   const paintData = useMemo<IConstructionPaintData | null>(
     () =>
       active && shapes.length > 0
@@ -164,9 +171,21 @@ export const useWorkspaceCadConstructions = ({
             notInVor: vor.notInVor,
             hiddenCategories,
             hiddenLayerNames,
+            alwaysCategories,
           }
         : null,
-    [active, visible, shapes.length, allShapes, colors, live, vor.notInVor, hiddenCategories, hiddenLayerNames],
+    [
+      active,
+      visible,
+      shapes.length,
+      allShapes,
+      colors,
+      live,
+      vor.notInVor,
+      hiddenCategories,
+      hiddenLayerNames,
+      alwaysCategories,
+    ],
   );
 
   // --- карточка ---

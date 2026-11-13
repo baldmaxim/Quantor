@@ -3,7 +3,9 @@
 import { useMemo, type FC } from 'react';
 
 import { categoryOfLayer, type CadExtraCategory } from '@/lib/cad/layer-categories';
+import type { ICadLayerCounts } from '@/lib/cad/layer-counts';
 import { groupLayers } from '@/lib/cad/layer-groups';
+import { mepGroupCount } from '@/lib/cad/mep-layer-counts';
 import { groupMepLayers, mepColorVar, mepLayerDef } from '@/lib/cad/mep-layers';
 import { formatInt } from '@/lib/cad/view-format';
 import { MAX_PDF_OPACITY, MIN_PDF_OPACITY } from '@/lib/cad/view-mode';
@@ -21,12 +23,15 @@ interface ICadLayersPanelProps {
   onSetLayersHidden: (indices: readonly number[], hidden: boolean) => void;
   /** Открыт режим «3D»: слои без категории конструкций недоступны («только план»). */
   mode3d?: boolean;
-  /** Строки «Плита» и «Перемычки» без слоя DXF; нет - строк нет. */
+  /** Строки без слоя DXF («Монолит», «Плита»); нет - строк нет. */
   categories?: {
+    monolithVertical: boolean;
+    monolithColumn: boolean;
     slab: boolean;
-    lintel: boolean;
     onChange: (category: CadExtraCategory, visible: boolean) => void;
   } | null;
+  /** Числа справа у строк конструкций и групп DXF; нет - без чисел. */
+  counts?: ICadLayerCounts | null;
   /** Непрозрачность подложки PDF, 0-1: DXF всегда непрозрачный. */
   pdfOpacity: number;
   onPdfOpacityChange: (value: number) => void;
@@ -58,10 +63,27 @@ interface ICadLayersPanelProps {
     visible: ReadonlySet<number>;
     onToggle: (index: number) => void;
     onSetHidden: (indices: readonly number[], hidden: boolean) => void;
+    /** Число рядом с пунктом по индексу `names`; `null` - без числа. */
+    counts?: readonly (number | null)[];
   } | null;
 }
 
 const CHECK = 'flex min-h-[44px] items-center gap-[var(--s-3)] text-sm';
+
+/** Строки блока «Конструкции листа» по порядку; `key` - поле флага видимости и числа. */
+const CATEGORY_ROWS: readonly {
+  readonly category: CadExtraCategory;
+  readonly label: string;
+  readonly key: 'monolithVertical' | 'monolithColumn' | 'slab';
+}[] = [
+  { category: 'monolith_vertical', label: 'Монолит — стены и пилоны', key: 'monolithVertical' },
+  { category: 'monolith_column', label: 'Монолит — колонны', key: 'monolithColumn' },
+  { category: 'slab', label: 'Плита', key: 'slab' },
+];
+
+/** Число группы DXF по ключу группы: кладка и двери; у остальных групп числа нет. */
+const groupCountOf = (key: string, counts: ICadLayerCounts | null): number | null =>
+  key === 'walls' ? (counts?.masonry ?? null) : key === 'doors' ? (counts?.doors ?? null) : null;
 
 /** Раздел «Слои»: непрозрачность PDF, область проверки масштаба, слои DXF с цветом. */
 export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
@@ -71,6 +93,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   onSetLayersHidden,
   mode3d = false,
   categories = null,
+  counts = null,
   pdfOpacity,
   onPdfOpacityChange,
   pdfOpacityActive,
@@ -196,25 +219,28 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
       {categories && (
         <fieldset className="min-w-0 border-0 p-0" data-testid="category-layers">
           <legend className="mb-[var(--s-2)] text-xs text-muted">Конструкции листа</legend>
-          <label className={CHECK}>
-            <input
-              type="checkbox"
-              checked={categories.slab}
-              onChange={(event) => categories.onChange('slab', event.target.checked)}
-              className="size-5 shrink-0"
-            />
-            Плита
-          </label>
-          <label className={CHECK}>
-            <input
-              type="checkbox"
-              checked={categories.lintel}
-              onChange={(event) => categories.onChange('lintel', event.target.checked)}
-              className="size-5 shrink-0"
-            />
-            Перемычки
-            {!mode3d && <span className="ml-auto text-xs text-muted">только 3D</span>}
-          </label>
+          {CATEGORY_ROWS.map((row) => {
+            const count = counts?.[row.key] ?? null;
+            return (
+              <label key={row.category} className={CHECK}>
+                <input
+                  type="checkbox"
+                  checked={categories[row.key]}
+                  onChange={(event) => categories.onChange(row.category, event.target.checked)}
+                  className="size-5 shrink-0"
+                />
+                {row.label}
+                {count !== null && (
+                  <span
+                    className={'tabular ml-auto text-xs text-muted'}
+                    data-testid="category-count"
+                  >
+                    {formatInt(count)}
+                  </span>
+                )}
+              </label>
+            );
+          })}
         </fieldset>
       )}
 
@@ -232,6 +258,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
                 onSetLayersHidden={onSetLayersHidden}
                 disabledIndices={planOnly}
                 disabledNote="только план"
+                groupCount={groupCountOf(group.key, counts)}
               />
             ))}
           </div>
@@ -258,6 +285,8 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
                 onToggleLayer={mep.onToggle}
                 onSetLayersHidden={(indices, hidden) => mep.onSetHidden(indices, hidden)}
                 swatchColor={(index) => mepColorVar(mep.names[index] ?? '')}
+                countOf={(index) => mep.counts?.[index] ?? null}
+                groupCount={mepGroupCount(mep.counts ?? [], group.indices)}
               />
             ))}
           </div>

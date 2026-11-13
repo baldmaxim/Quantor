@@ -1,5 +1,6 @@
 import type { CadJobSummaryRead, CadViewDiagnosticsRead } from '@quantor/api-client';
 
+import { mepLayerCounts, type IMepCountSource } from '@/lib/cad/mep-layer-counts';
 import {
   isMepLayerHidden,
   mepLayerTitle,
@@ -20,6 +21,8 @@ export const mepLayersOf = (
   previewLayers: readonly string[] | null,
   hiddenMask: number,
   setHidden: (names: readonly string[], hidden: boolean) => void,
+  /** Превью трасс для чисел у слоёв приборов; нет - без чисел. */
+  countSource: IMepCountSource | null = null,
 ): IWorkspaceCadMepLayers | null => {
   if (previewLayers === null) return null;
   const defs = presentMepLayers(previewLayers);
@@ -28,6 +31,7 @@ export const mepLayersOf = (
   return {
     names,
     titles: defs.map(mepLayerTitle),
+    ...(countSource ? { counts: mepLayerCounts(countSource, names) } : {}),
     visible: new Set(
       names.map((name, index) => index).filter((index) => !isMepLayerHidden(hiddenMask, names[index] ?? '')),
     ),

@@ -31,7 +31,8 @@ import {
 import { matchingPreview, overlayPaintData, remarkBindingOf } from '@/lib/cad/workspace-cad';
 import { pageForJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { useTheme } from '@/lib/theme';
-import { hiddenConstructionIdsOf } from '@/lib/cad/layer-categories';
+import { hiddenConstructionIdsOf, paintHiddenLayerIndices } from '@/lib/cad/layer-categories';
+import { layerCountsOf } from '@/lib/cad/layer-counts';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { Camera, Viewport } from '@/lib/viewer/camera';
 import type { LayerPainter } from '@/lib/viewer/viewport-layer';
@@ -221,6 +222,11 @@ export const useWorkspaceCad = ({
     () => new Set(layerNames.map((_, index) => index).filter((index) => !hiddenLayers.has(index))),
     [layerNames, hiddenLayers],
   );
+  // В плане не рисуются ещё и служебные слои, а `02_МОНОЛИТ` - когда включена не обе монолитные строки.
+  const paintHiddenLayers = useMemo(
+    () => paintHiddenLayerIndices(layerNames, hiddenLayers, visibility.hiddenCategories),
+    [layerNames, hiddenLayers, visibility.hiddenCategories],
+  );
   const cropContext = diagnostics?.scale?.context_crop_pt;
   const cropRect = useMemo(
     () => (pageSize ? cropToNormalized(cropContext, pageSize) : null),
@@ -322,7 +328,7 @@ export const useWorkspaceCad = ({
   const paintData = useMemo(() => {
     const base = overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
       dxfVisible: render.dxfVisible,
-      hiddenLayers,
+      hiddenLayers: paintHiddenLayers,
       crop,
       paths: dxfPaths,
       dimmed,
@@ -345,7 +351,7 @@ export const useWorkspaceCad = ({
     colors.layers,
     colors.mep,
     render.dxfVisible,
-    hiddenLayers,
+    paintHiddenLayers,
     dimmed,
     crop,
     routePreview,
@@ -488,12 +494,15 @@ export const useWorkspaceCad = ({
   else if (data.jobsError !== null) state = 'error';
   else state = data.jobId === null ? 'none' : 'ready';
 
+  const constructionsData = constructionsState.side?.data ?? null;
+  const layerCounts = useMemo(() => layerCountsOf(constructionsData), [constructionsData]);
   const layers: IWorkspaceCadLayers = {
     mep: mepLayersOf(
       // 3D рисует трассы по той же маске: слои трасс переключаются и в 3D, даже при режиме «PDF».
       (render.dxfVisible || view3d) && routePreview ? routePreview.layers : null,
       mepVisibility.mask,
       mepVisibility.setHidden,
+      routePreview,
     ),
     layers: layerNames,
     visibleLayers,
@@ -501,6 +510,7 @@ export const useWorkspaceCad = ({
     onSetLayersHidden: visibility.setLayersHidden,
     mode3d: view3d,
     categories: visibility.categories,
+    counts: layerCounts,
     pdfOpacity: sliderOpacity,
     onPdfOpacityChange: (value) => setSliderOpacity(clampPdfOpacity(value)),
     pdfOpacityActive: mode === 'overlay',

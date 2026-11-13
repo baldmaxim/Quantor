@@ -9,7 +9,13 @@ import {
   type IFloor3dMeasureState,
   type IFloor3dSnapState,
 } from '@/lib/cad/floor3d-engine';
-import { highlightOf, highlightsOf, visibilityOf, type IFloor3dPlan } from '@/lib/cad/floor3d-geometry';
+import {
+  highlightOf,
+  highlightsOf,
+  visibilityOf,
+  type HostCategoryOf,
+  type IFloor3dPlan,
+} from '@/lib/cad/floor3d-geometry';
 import type { IFloor3dMepElement } from '@/lib/cad/floor3d-mep-elements';
 import {
   buildFloor3dRoutes,
@@ -57,6 +63,8 @@ interface ICadFloor3dCanvasProps {
   readonly hiddenConstructionIds?: ReadonlySet<string>;
   /** Ключ подгруппы конструкции по слоям-источникам; смена пересобирает сцену. */
   readonly groupKeyOf?: (id: string) => string | undefined;
+  /** Категория слоя стены-хозяина по id: перемычки скрываются вместе со стеной; смена пересобирает сцену. */
+  readonly hostCategoryOf?: HostCategoryOf;
   /** Режим измерения: клики ставят точки, элемент не выбирается. */
   readonly measuring: boolean;
   readonly onPick: (pick: IFloor3dPick | null, anchor: { x: number; y: number }) => void;
@@ -98,6 +106,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   hiddenCategories = NO_CATEGORIES,
   hiddenConstructionIds = NO_IDS,
   groupKeyOf,
+  hostCategoryOf,
   measuring,
   onPick,
   onMove,
@@ -140,9 +149,9 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
     engine.current?.setModel(
       plan.prisms.length === 0
         ? null
-        : buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap, groupKeyOf }),
+        : buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap, groupKeyOf, hostCategoryOf }),
     );
-  }, [plan, showSlabCap, theme, groupKeyOf]);
+  }, [plan, showSlabCap, theme, groupKeyOf, hostCategoryOf]);
 
   // Трассы механики: отдельная группа сцены, пересобирается при смене данных, плана и темы.
   const routeScene = useRef<ReturnType<typeof buildFloor3dRoutes> | null>(null);
@@ -191,14 +200,28 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
     const targets = [...highlightsOf(plan, selectedIds), ...(local === null ? [] : [local])].filter(
       (target) => {
         if (target.kind === 'hole') return !hiddenCategories.has('slab');
-        const category = visibilityOf(target.spec);
+        const category = visibilityOf(target.spec, hostCategoryOf);
         if (hiddenCategories.has(category)) return false;
+        // Перемычка скрыта вместе со стеной-хозяином, когда скрыты все слои-источники стены.
+        if (target.spec.category === 'lintel') {
+          const hostId = target.spec.hostId;
+          return !(hostId != null && hiddenConstructionIds.has(hostId));
+        }
         // Подгруппы по слоям есть только у кладки, монолита и перегородок.
         return !(LAYER_SPLIT.has(category) && hiddenConstructionIds.has(target.spec.id));
       },
     );
     engine.current?.setHighlight(targets);
-  }, [plan, showSlabCap, theme, selected, selectedIds, hiddenCategories, hiddenConstructionIds]);
+  }, [
+    plan,
+    showSlabCap,
+    theme,
+    selected,
+    selectedIds,
+    hiddenCategories,
+    hiddenConstructionIds,
+    hostCategoryOf,
+  ]);
 
   useEffect(() => {
     engine.current?.setMeasuring(measuring);
