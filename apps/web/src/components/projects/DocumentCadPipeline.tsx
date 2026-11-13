@@ -3,9 +3,11 @@
 import { useCallback, useMemo, useState, type FC } from 'react';
 
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui';
+import { ClearableInput } from '@/components/ui/ClearableInput';
 import { sheetRows } from '@/lib/cad/pipeline-actions';
 import { isPipelineSelectable } from '@/lib/cad/pipeline-batch';
 import { useCadPipeline } from '@/lib/cad/pipeline-queries';
+import { matchesSheetQuery } from '@/lib/cad/pipeline-search';
 import { sheetPosition } from '@/lib/cad/workspace-url';
 import { useSheets } from '@/lib/queries';
 
@@ -25,6 +27,7 @@ export const DocumentCadPipeline: FC<{
   const sheets = useSheets(revisionId);
   const known = useMemo(() => sheets.data?.items ?? [], [sheets.data]);
   const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
+  const [query, setQuery] = useState('');
 
   const ordered = useMemo(
     () => [...(pipeline.data?.sheets ?? [])].sort((a, b) => a.page_index - b.page_index),
@@ -55,6 +58,10 @@ export const DocumentCadPipeline: FC<{
     [ordered, projectId, revisionId, positionOf],
   );
   const launchableSet = useMemo(() => new Set(launchable), [launchable]);
+  const visible = useMemo(
+    () => ordered.filter((sheet) => matchesSheetQuery(sheet, query)),
+    [ordered, query],
+  );
   // Выбор переживает обновления конвейера, но лист, ставший недоступным, из него выпадает.
   const effective = useMemo(
     () => launchable.filter((pageIndex) => selected.has(pageIndex)),
@@ -100,7 +107,13 @@ export const DocumentCadPipeline: FC<{
       return next;
     });
 
-  const toggleAll = (checked: boolean) => setSelected(new Set(checked ? launchable : []));
+  // «Выбрать все» при поиске - только найденные листы.
+  const toggleAll = (checked: boolean) =>
+    setSelected(
+      new Set(
+        checked ? visible.map((s) => s.page_index).filter((i) => launchableSet.has(i)) : [],
+      ),
+    );
 
   const launch = () => {
     bulk.start(effective);
@@ -122,8 +135,20 @@ export const DocumentCadPipeline: FC<{
         onLaunch={launch}
         onStop={bulk.stop}
       />
+      <ClearableInput
+        type="search"
+        label="Поиск по листам"
+        placeholder="Поиск: номер, этаж, наименование"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onClear={() => setQuery('')}
+        wrapperClassName="w-full"
+      />
+      {visible.length === 0 && (
+        <p className="text-xs text-muted">Листов по запросу «{query.trim()}» нет</p>
+      )}
       <ul className="m-0 list-none p-0" aria-label="Листы CAD">
-        {ordered.map((sheet) => (
+        {visible.map((sheet) => (
           <CadPipelineSheetRow
             key={sheet.page_index}
             projectId={projectId}
