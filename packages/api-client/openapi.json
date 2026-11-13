@@ -37294,6 +37294,78 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/cad/eom/preview": {
+      "get": {
+        "description": "Превью того же формата, что у трасс механики; кадр PDF -> DXF - вида родителя.",
+        "operationId": "read_cad_eom_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadPreviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "ЭОМ и СС листа в 2D поверх PDF: пути по слоям в мм DXF вида и кадр родителя",
+        "tags": [
+          "cad-eom"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/cad/eom/routes3d": {
       "get": {
         "operationId": "read_cad_eom_routes3d",

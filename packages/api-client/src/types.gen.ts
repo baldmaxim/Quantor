@@ -19512,6 +19512,49 @@ export type ReadCadEomJobResponses = {
 
 export type ReadCadEomJobResponse = ReadCadEomJobResponses[keyof ReadCadEomJobResponses];
 
+export type ReadCadEomPreviewData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/eom/preview';
+};
+
+export type ReadCadEomPreviewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadEomPreviewError = ReadCadEomPreviewErrors[keyof ReadCadEomPreviewErrors];
+
+export type ReadCadEomPreviewResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadPreviewRead;
+};
+
+export type ReadCadEomPreviewResponse = ReadCadEomPreviewResponses[keyof ReadCadEomPreviewResponses];
+
 export type ReadCadEomRoutes3dData = {
     body?: never;
     path: {
