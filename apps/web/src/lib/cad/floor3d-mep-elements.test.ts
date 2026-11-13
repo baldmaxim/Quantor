@@ -41,6 +41,34 @@ const instanced = (group: THREE.Group): THREE.InstancedMesh[] =>
   );
 
 describe('планирование элементов', () => {
+  it('щит ЭОМ (device) - короб w×h×d: ширина вдоль стены, высота вертикально, глубина по нормали', () => {
+    const plan = planMepElement(
+      element({
+        type: 'device',
+        subtype: 'panel_floor',
+        layer: 'E-EO-DEV',
+        axis: [0, 1000, 0],
+        dn_mm: null,
+        w_mm: 800,
+        h_mm: 1400,
+        d_mm: 160,
+      }),
+      frame,
+    );
+    expect(plan?.kind).toBe('box');
+    expect(plan?.tone).toBe('layer');
+    const { position, scale, axis } = parts((plan as { matrix: THREE.Matrix4 }).matrix);
+    expect(position.toArray()).toEqual([2, 1.5, -3]);
+    expect([scale.x, scale.y, scale.z].map((v) => Number(v.toFixed(6)))).toEqual([0.8, 1.4, 0.16]);
+    expect(axis.distanceTo(new THREE.Vector3(0, 0, -1))).toBeCloseTo(0, 6);
+    const up = new THREE.Vector3(0, 1, 0).transformDirection((plan as { matrix: THREE.Matrix4 }).matrix);
+    expect(up.distanceTo(new THREE.Vector3(0, 1, 0))).toBeCloseTo(0, 6);
+  });
+
+  it('прибор без габарита не рисуется', () => {
+    expect(planMepElement(element({ type: 'box', w_mm: 80, h_mm: 80, d_mm: null }), frame)).toBeNull();
+  });
+
   it('фасонина elbow/tee/cross - сфера радиусом 0,65 DN в точке с учётом чистого пола', () => {
     for (const subtype of ['elbow', 'tee', 'cross']) {
       const plan = planMepElement(element({ subtype }), frame);
