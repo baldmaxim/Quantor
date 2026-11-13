@@ -568,3 +568,40 @@ def test_stamp_reads_sheet_number_and_ignores_unread_keys() -> None:
     assert STAMP[stamp.sheet.start : stamp.sheet.end] == "12"
     empty = parse_stamp("> **Stamp:** Code: X | Sheet: | Name: Y")
     assert empty is not None and empty.sheet is None
+
+
+RUSSIAN_STAMP = (
+    "> **Created:** 2026-09-28\n"
+    "> **Stamp:** Code: МЛДГВ-КАМ/0925-П-АР1.1 | Stage: П | Sheet: 93 | "
+    'Наименование проекта: "Многофункциональный жилой комплекс" по адресу г. Город | '
+    "Наименование листа: Секция 6. План 28 этажа | Organization: Не указано | "
+    "Revisions: Не указано"
+)
+
+
+def test_stamp_reads_russian_keys() -> None:
+    stamp = parse_stamp(RUSSIAN_STAMP)
+    assert stamp is not None
+    assert stamp.name is not None and stamp.name.value == "Секция 6. План 28 этажа"
+    assert stamp.code is not None and stamp.code.value == "МЛДГВ-КАМ/0925-П-АР1.1"
+    assert stamp.stage is not None and stamp.stage.value == "П"
+    assert stamp.sheet is not None and stamp.sheet.value == "93"
+    for field in (stamp.name, stamp.code, stamp.stage, stamp.sheet):
+        assert RUSSIAN_STAMP[field.start : field.end] == field.value
+
+
+def test_stamp_placeholder_not_specified_is_empty() -> None:
+    stamp = parse_stamp(
+        "> **Stamp:** Code: Не указано | Stage: не указано. | Sheet: 5 | "
+        "Наименование проекта: Дом | Наименование листа: Не указано | Organization: Х"
+    )
+    assert stamp is not None
+    assert stamp.name is None and stamp.code is None and stamp.stage is None
+    assert stamp.sheet is not None and stamp.sheet.value == "5"
+
+
+def test_stamp_english_keys_still_work_next_to_russian() -> None:
+    stamp = parse_stamp("> **Stamp:** Code: X | Object: Дом | Name: План | Sheet: 2")
+    assert stamp is not None
+    assert stamp.name is not None and stamp.name.value == "План"
+    assert stamp.code is not None and stamp.code.value == "X"

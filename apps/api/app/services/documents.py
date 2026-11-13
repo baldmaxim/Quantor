@@ -22,8 +22,9 @@ from app.models import (
     RecognitionArtifact,
     Region,
     Sheet,
+    SheetPassport,
 )
-from app.services.calc.adapters.recognized import parse_stamp
+from app.services.calc.adapters.recognized import is_stamp_placeholder, parse_stamp
 
 
 @dataclass(frozen=True, slots=True)
@@ -308,10 +309,13 @@ async def list_sheets(
 async def sheet_titles(
     session: AsyncSession, *, sheet_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, str]:
-    """Названия листов из штампа распознавалки: один запрос на все листы страницы выборки.
+    """Названия листов: штамп распознавалки, а без него — название из паспорта листа.
 
-    Берётся первый по порядку область листа, где есть строка штампа; без штампа или без
-    названия в нём листа в результате нет.
+    Штамп: один запрос на все листы страницы выборки; берётся первая по порядку область листа,
+    где есть строка штампа. Для листов, у которых названия из штампа нет, одним дополнительным
+    запросом берётся `SheetPassport.title` (связь по ревизии и странице); пустое название и
+    заглушка «Не указано» не берутся. Штамп приоритетнее паспорта; нет ни того ни другого —
+    листа в результате нет.
     """
     if not sheet_ids:
         return {}
@@ -328,6 +332,23 @@ async def sheet_titles(
             name = stamp.name.value.strip()
             if name:
                 titles[sheet_id] = name
+
+    missing = [sheet_id for sheet_id in sheet_ids if sheet_id not in titles]
+    if not missing:
+        return titles
+    fallback = (
+        select(Sheet.id, SheetPassport.title)
+        .join(
+            SheetPassport,
+            (SheetPassport.revision_id == Sheet.revision_id)
+            & (SheetPassport.page_index == Sheet.page_index),
+        )
+        .where(Sheet.id.in_(missing), SheetPassport.title.is_not(None))
+    )
+    for sheet_id, passport_title in (await session.execute(fallback)).all():
+        name = (passport_title or "").strip()
+        if name and not is_stamp_placeholder(name):
+            titles[sheet_id] = name
     return titles
 
 

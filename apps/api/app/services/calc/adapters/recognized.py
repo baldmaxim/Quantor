@@ -60,11 +60,21 @@ def is_metadata_line(line: str) -> bool:
 # ------------------------------------------------------------------------------------ штамп
 
 _STAMP_LINE = re.compile(r"^\s*>\s*\*\*Stamp:\*\*(?P<body>.*)$", re.MULTILINE)
-_STAMP_KEYS = "Code|Stage|Sheet|Object|Name|Organization|Revisions"
+# Русские ключи длиннее и стоят в альтернативе раньше коротких, чтобы разбор был однозначным.
+_STAMP_KEYS = (
+    "Наименование проекта|Наименование листа|Code|Stage|Sheet|Object|Name|Organization|Revisions"
+)
 _STAMP_FIELD = re.compile(
     rf"(?P<key>{_STAMP_KEYS}):\s*(?P<value>.*?)\s*(?=\|\s*(?:{_STAMP_KEYS}):|$)"
 )
 _READ_KEYS: Final = frozenset({"Code", "Stage", "Sheet", "Name"})
+_KEY_ALIASES: Final = {"Наименование листа": "Name", "Наименование проекта": "Object"}
+_STAMP_PLACEHOLDER = re.compile(r"[\s.]*не\s+указано[\s.]*", re.IGNORECASE)
+
+
+def is_stamp_placeholder(value: str) -> bool:
+    """«Не указано» — заглушка распознавалки вместо значения (без учёта регистра и точек)."""
+    return _STAMP_PLACEHOLDER.fullmatch(value) is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,15 +94,23 @@ class Stamp:
 
 
 def parse_stamp(text: str) -> Stamp | None:
-    """Шифр, стадия, номер и название листа из строки штампа. Остальные поля не читаются вовсе."""
+    """Шифр, стадия, номер и название листа из строки штампа. Остальные поля не читаются вовсе.
+
+    Ключи — английские (`Code`, `Stage`, `Sheet`, `Name`) и русские: «Наименование листа» читается
+    как `Name`, «Наименование проекта» — как `Object` (только разделитель, не читается). Значение
+    «Не указано» — заглушка распознавалки: для любого поля оно считается пустым (поле — None).
+    """
     line = _STAMP_LINE.search(text)
     if line is None:
         return None
     base = line.start("body")
     found: dict[str, StampField] = {}
     for match in _STAMP_FIELD.finditer(line.group("body")):
-        key = match.group("key")
+        raw_key = match.group("key")
+        key = _KEY_ALIASES.get(raw_key, raw_key)
         value = match.group("value").strip()
+        if is_stamp_placeholder(value):
+            continue
         if key in _READ_KEYS and value and key not in found:
             found[key] = StampField(
                 value, base + match.start("value"), base + match.start("value") + len(value)

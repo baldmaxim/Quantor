@@ -38,7 +38,7 @@ from app.services.consistency.sheet_stamp import (
     stamp_window,
 )
 
-PARSER_VERSION: Final = "consistency.sheet_passport.v4"
+PARSER_VERSION: Final = "consistency.sheet_passport.v5"
 
 SNIPPET_MAX: Final = 120
 

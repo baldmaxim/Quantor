@@ -20,7 +20,15 @@ from app.domain import (
     GeometryStatus,
     ProcessingStatus,
 )
-from app.models import Document, DocumentRevision, Project, Region, Sheet, Workspace
+from app.models import (
+    Document,
+    DocumentRevision,
+    Project,
+    Region,
+    Sheet,
+    SheetPassport,
+    Workspace,
+)
 from app.services import documents as documents_service
 from app.services import projects as projects_service
 from app.storage.keys import revision_key
@@ -431,6 +439,81 @@ class TestSheetsAndRegions:
 
         assert body["items"][0]["title"] == "План 9 этажа на отм. +27.900"
         assert body["items"][1]["title"] is None
+
+    async def test_sheet_title_from_russian_stamp(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        data = await _build(db_session, workspace_id)
+        db_session.add(
+            Region(
+                sheet_id=data.sheet.id,
+                external_block_id="blk_stamp_ru",
+                ordinal=4,
+                block_type="text",
+                shape_type="rectangle",
+                coords_norm=[0.1, 0.1, 0.2, 0.2],
+                raw_content_md=(
+                    "> **Stamp:** Code: ПД-АР | Sheet: 93 | Наименование проекта: Дом | "
+                    "Наименование листа: Секция 6. План 28 этажа | Organization: Не указано"
+                ),
+            )
+        )
+        await db_session.commit()
+
+        body = (await api.get(f"/api/v1/revisions/{data.revision.id}/sheets")).json()
+
+        assert body["items"][0]["title"] == "Секция 6. План 28 этажа"
+
+    async def test_sheet_title_falls_back_to_passport(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        data = await _build(db_session, workspace_id)
+        for page_index, title in ((0, "План из паспорта"), (1, "Не указано")):
+            db_session.add(
+                SheetPassport(
+                    project_id=data.project.id,
+                    revision_id=data.revision.id,
+                    page_index=page_index,
+                    file_name=RUSSIAN_FILENAME,
+                    title=title,
+                )
+            )
+        await db_session.commit()
+
+        body = (await api.get(f"/api/v1/revisions/{data.revision.id}/sheets")).json()
+
+        assert body["items"][0]["title"] == "План из паспорта"
+        assert body["items"][1]["title"] is None
+
+    async def test_stamp_title_beats_passport_title(
+        self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID
+    ) -> None:
+        data = await _build(db_session, workspace_id)
+        db_session.add_all(
+            [
+                Region(
+                    sheet_id=data.sheet.id,
+                    external_block_id="blk_stamp_win",
+                    ordinal=4,
+                    block_type="text",
+                    shape_type="rectangle",
+                    coords_norm=[0.1, 0.1, 0.2, 0.2],
+                    raw_content_md="> **Stamp:** Code: X | Наименование листа: Из штампа",
+                ),
+                SheetPassport(
+                    project_id=data.project.id,
+                    revision_id=data.revision.id,
+                    page_index=0,
+                    file_name=RUSSIAN_FILENAME,
+                    title="Из паспорта",
+                ),
+            ]
+        )
+        await db_session.commit()
+
+        body = (await api.get(f"/api/v1/revisions/{data.revision.id}/sheets")).json()
+
+        assert body["items"][0]["title"] == "Из штампа"
 
     async def test_regions_expose_normalized_coordinates(
         self, api: AsyncClient, db_session: AsyncSession, workspace_id: uuid.UUID

@@ -921,6 +921,29 @@ async def test_recognized_stamp_overrides_pdf_text_and_keeps_manual_fields(
         assert after[first["id"]]["code"] == "ПД-00000001-12-АР1"
 
 
+async def test_russian_recognized_stamp_gives_passport_title(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        plan = await _add_pdf(db_session, fake_storage, project_id, PLAN_PDF)
+        await _add_stamp(
+            db_session,
+            plan,
+            0,
+            "Code: ПД-00000001-12-АР1 | Stage: Р | Sheet: 5 | Наименование проекта: Дом | "
+            "Наименование листа: Секция 6. План 28 этажа | Organization: Не указано",
+        )
+        await _extract(api, db_session, fake_storage, project_id)
+
+        first = (await api.get(_url(project_id))).json()["items"][0]
+        assert first["title"] == "Секция 6. План 28 этажа"
+        assert first["evidence"]["title"]["source"] == "recognized_stamp"
+
+
 async def test_pdf_without_recognized_sheets_is_parsed_as_before(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],
