@@ -715,6 +715,10 @@ export type CadBuilding3dRead = {
  */
 export type CadBuilding3dWallRead = {
     /**
+     * Id
+     */
+    id: string;
+    /**
      * Kind
      */
     kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition' | 'floor_slab';

@@ -533,6 +533,13 @@ def test_walls_carry_kind_and_integer_open_rings() -> None:
     assert all(isinstance(v, int) for w in walls for p in w.shell for v in p)
 
 
+def test_walls_keep_construction_ids_from_walls_json() -> None:
+    raw = raw_document()
+    walls = floor_with_walls(raw).walls
+    assert walls is not None
+    assert [w.id for w in walls] == [c["id"] for c in raw["constructions"]]
+
+
 def test_floor_slab_and_degenerate_rings_are_not_walls() -> None:
     raw = raw_document()
     slab = {**raw["constructions"][0], "id": "cccccccccccc", "kind": "floor_slab"}
@@ -583,6 +590,8 @@ def test_walls_are_shifted_by_the_same_offset_as_outline() -> None:
     assert ref_floor.walls is not None and floor.walls is not None
     assert floor.offset_mm == pytest.approx((-1234.0, 567.25))
     assert [w.shell for w in floor.walls] == [w.shell for w in ref_floor.walls]
+    # Сдвиг этажа не теряет идентификаторы конструкций.
+    assert [w.id for w in floor.walls] == [w.id for w in ref_floor.walls]
     assert all(isinstance(v, int) for w in floor.walls for p in w.shell for v in p)
 
 

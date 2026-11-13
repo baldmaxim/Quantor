@@ -27,6 +27,8 @@ class CadBuilding3dWarningRead(BaseModel):
 class CadBuilding3dWallRead(BaseModel):
     """Конструкция этажа для общего вида: внешнее кольцо в целых мм системы DXF, без отверстий."""
 
+    # Идентификатор конструкции из walls.json: по нему клик в 3D находит карточку конструкции.
+    id: str
     kind: CadConstructionKind
     # Открытое кольцо (без повтора первой точки), не менее 3 и не более 64 точек.
     shell: list[list[int]]

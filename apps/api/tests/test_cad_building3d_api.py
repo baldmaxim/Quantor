@@ -211,4 +211,5 @@ async def test_walls_query_adds_construction_rings_and_default_stays_light(
     assert light_floor["walls"] is None
     assert floor["walls"], "стены не вернулись"
     assert all(w["kind"] != "floor_slab" and len(w["shell"]) >= 3 for w in floor["walls"])
+    assert all(isinstance(w["id"], str) and w["id"] for w in floor["walls"])
     assert all(isinstance(v, int) for w in floor["walls"] for p in w["shell"] for v in p)

@@ -9,6 +9,7 @@ import { DocumentPipelinePanel } from '@/components/projects/DocumentPipelinePan
 import { DocumentSections } from '@/components/projects/DocumentSections';
 import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
 import { TopBar } from '@/components/shell/TopBar';
+import { IconBim } from '@/components/ui/icons';
 import { Button, ButtonLink, EmptyState, ErrorState, Skeleton, StatusBadge } from '@/components/ui';
 import { projectStatus } from '@/lib/format';
 import {
@@ -98,6 +99,18 @@ const ProjectPage = ({ params }: IPageProps) => {
         status={status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : null}
         actions={
           <>
+            {features[CAD_FEATURE] === true && (
+              <ButtonLink
+                href={`/projects/${projectId}/building3d`}
+                variant="primary"
+                title="Открыть 3D-модель объекта"
+                aria-label="Открыть 3D-модель объекта"
+                transitionTypes={['nav-forward']}
+              >
+                <IconBim />
+                3D-модель объекта
+              </ButtonLink>
+            )}
             {features[TENDER_VERSIONS_FEATURE] === true && (
               <ButtonLink
                 href={`/projects/${projectId}/versions`}
@@ -117,11 +130,6 @@ const ProjectPage = ({ params }: IPageProps) => {
                 transitionTypes={['nav-forward']}
               >
                 Вопросы к документации
-              </ButtonLink>
-            )}
-            {features[CAD_FEATURE] === true && (
-              <ButtonLink href={`/projects/${projectId}/building3d`} transitionTypes={['nav-forward']}>
-                3D
               </ButtonLink>
             )}
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>

@@ -287,7 +287,9 @@ def build_floor(
             if len(walls) >= MAX_WALLS_PER_FLOOR:
                 skipped += 1
                 continue
-            walls.append(CadBuilding3dWallRead(kind=construction.kind, shell=ring))
+            walls.append(
+                CadBuilding3dWallRead(id=construction.id, kind=construction.kind, shell=ring)
+            )
         if skipped:
             warnings.append(
                 CadBuilding3dWarningRead(
@@ -455,6 +457,7 @@ def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding
         if floor.walls is None
         else [
             CadBuilding3dWallRead(
+                id=wall.id,
                 kind=wall.kind,
                 shell=[[_round_mm(x + dx), _round_mm(y + dy)] for x, y in wall.shell],
             )

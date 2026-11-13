@@ -22,6 +22,8 @@ import {
 export type ViewerWallMaterial = 'monolith' | 'masonry';
 
 export interface IViewerWall {
+  /** Идентификатор конструкции из walls.json: по нему клик в 3D находит карточку конструкции. */
+  readonly id: string;
   readonly material: ViewerWallMaterial;
   /** Контур в плане, м, от общего центра. */
   readonly shell: readonly Point2[];
@@ -33,9 +35,37 @@ export interface IViewerFloorSpec extends IBuildingFloorSpec {
   readonly wallTop: number;
 }
 
+/** Подпись группы (корпус, секция) над зданием в режиме «Весь объект»; координаты сцены, м. */
+export interface IViewerGroupLabel {
+  readonly key: string;
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  /** Верхний этаж группы: при разнесении подпись поднимается вместе с ним. */
+  readonly floorKey: string;
+}
+
 export interface IViewerPlan {
   readonly floors: readonly IViewerFloorSpec[];
   readonly size: { readonly width: number; readonly depth: number; readonly height: number };
+  /** Отметка (мм), от которой отсчитаны высоты плана: нужна, чтобы свести группы к общим отметкам. */
+  readonly zCenterMm: number;
+  /** Подписи групп; у плана одного здания пусто. */
+  readonly labels: readonly IViewerGroupLabel[];
+}
+
+/** Диапазон треугольников слитой геометрии, принадлежащий одной конструкции: `[start, end)`. */
+export interface IWallRange {
+  readonly id: string;
+  readonly start: number;
+  readonly end: number;
+}
+
+export interface IMergedWalls {
+  readonly geometry: THREE.BufferGeometry;
+  /** Диапазоны по порядку слияния: по ним `faceIndex` луча переводится в конструкцию. */
+  readonly ranges: readonly IWallRange[];
 }
 
 export interface IViewerBounds {
@@ -112,11 +142,11 @@ export const buildViewerPlan = (floors: readonly CadBuilding3dFloorRead[]): IVie
         (y - base.center.y) / MM_IN_M,
       ]);
       if (polygonAreaM2(shell) < MIN_AREA_M2) continue;
-      walls.push({ material, shell });
+      walls.push({ id: wall.id, material, shell });
     }
     return { ...spec, walls, wallTop: spec.slabTop + wallHeightMm(spec.floor) / MM_IN_M };
   });
-  return { floors: specs, size: base.size };
+  return { floors: specs, size: base.size, zCenterMm: base.center.z, labels: [] };
 };
 
 /** Номер уровня каждого этажа снизу вверх: этажи на одной отметке (мм) делят уровень. */
@@ -207,19 +237,58 @@ export const extrudeShell = (shell: readonly Point2[], yBottom: number, yTop: nu
   }
 };
 
+const triangleCount = (geometry: THREE.BufferGeometry): number =>
+  (geometry.index?.count ?? geometry.getAttribute('position').count) / 3;
+
+/**
+ * Конструкции одним мешем: слияние в одну геометрию с диапазонами треугольников каждой. Контур, который
+ * не строится, пропускается. Нечего сливать - `null`.
+ */
+export const mergeWalls = (
+  walls: readonly { readonly id: string; readonly shell: readonly Point2[] }[],
+  yBottom: number,
+  yTop: number,
+): IMergedWalls | null => {
+  const parts: THREE.BufferGeometry[] = [];
+  const ranges: IWallRange[] = [];
+  let triangles = 0;
+  for (const wall of walls) {
+    const part = extrudeShell(wall.shell, yBottom, yTop);
+    if (part === null) continue;
+    const count = triangleCount(part);
+    ranges.push({ id: wall.id, start: triangles, end: triangles + count });
+    triangles += count;
+    parts.push(part);
+  }
+  if (parts.length === 0) return null;
+  const merged = parts.length === 1 ? (parts[0] ?? null) : mergeGeometries(parts, false);
+  if (parts.length > 1) for (const part of parts) part.dispose();
+  return merged === null ? null : { geometry: merged, ranges };
+};
+
 /** Все контуры одним мешем: слияние в одну геометрию. Нечего сливать - `null`. */
 export const mergeShells = (
   shells: readonly (readonly Point2[])[],
   yBottom: number,
   yTop: number,
-): THREE.BufferGeometry | null => {
-  const parts: THREE.BufferGeometry[] = [];
-  for (const shell of shells) {
-    const part = extrudeShell(shell, yBottom, yTop);
-    if (part !== null) parts.push(part);
+): THREE.BufferGeometry | null =>
+  mergeWalls(
+    shells.map((shell) => ({ id: '', shell })),
+    yBottom,
+    yTop,
+  )?.geometry ?? null;
+
+/** Конструкция, которой принадлежит треугольник слитой геометрии; номера нет в диапазонах - `null`. */
+export const wallIdAtFace = (ranges: readonly IWallRange[], faceIndex: number | null | undefined): string | null => {
+  if (faceIndex === undefined || faceIndex === null || !Number.isInteger(faceIndex) || faceIndex < 0) return null;
+  let low = 0;
+  let high = ranges.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const range = ranges[mid] as IWallRange;
+    if (faceIndex < range.start) high = mid - 1;
+    else if (faceIndex >= range.end) low = mid + 1;
+    else return range.id;
   }
-  if (parts.length === 0) return null;
-  const merged = parts.length === 1 ? (parts[0] ?? null) : mergeGeometries(parts, false);
-  if (parts.length > 1) for (const part of parts) part.dispose();
-  return merged;
+  return null;
 };

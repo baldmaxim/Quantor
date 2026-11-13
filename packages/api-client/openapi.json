@@ -1380,6 +1380,10 @@
       "CadBuilding3dWallRead": {
         "description": "Конструкция этажа для общего вида: внешнее кольцо в целых мм системы DXF, без отверстий.",
         "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
           "kind": {
             "enum": [
               "masonry",
@@ -1404,6 +1408,7 @@
           }
         },
         "required": [
+          "id",
           "kind",
           "shell"
         ],

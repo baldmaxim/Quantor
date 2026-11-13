@@ -8,8 +8,10 @@ import {
   extrudeShell,
   fitDistance,
   mergeShells,
+  mergeWalls,
   viewerBounds,
   wallHeightMm,
+  wallIdAtFace,
   wallMaterialOf,
 } from './building-viewer-geometry';
 
@@ -20,7 +22,12 @@ const rect = (x0: number, y0: number, x1: number, y1: number): number[][] => [
   [x0, y1],
 ];
 
-const wall = (kind: CadBuilding3dWallRead['kind'], shell: number[][]): CadBuilding3dWallRead => ({ kind, shell });
+let wallSeq = 0;
+const wall = (kind: CadBuilding3dWallRead['kind'], shell: number[][]): CadBuilding3dWallRead => ({
+  id: `w${(wallSeq += 1)}`,
+  kind,
+  shell,
+});
 
 const floor = (patch: Partial<CadBuilding3dFloorRead> = {}): CadBuilding3dFloorRead => ({
   job_id: 'j1',
@@ -185,5 +192,62 @@ describe('экструзия и слияние', () => {
     );
     expect(mergeShells([], 0, 1)).toBeNull();
     expect(mergeShells([[[0, 0], [1, 1]]], 0, 1)).toBeNull();
+  });
+});
+
+describe('конструкция по номеру треугольника', () => {
+  const square = (x: number): [number, number][] => [[x, 0], [x + 1, 0], [x + 1, 1], [x, 1]];
+
+  it('диапазоны идут по порядку слияния и покрывают все треугольники', () => {
+    const merged = mergeWalls(
+      [
+        { id: 'a', shell: [[0, 0], [1, 0], [1, 1], [0, 1]] },
+        { id: 'skip', shell: [[0, 0], [1, 1]] },
+        { id: 'b', shell: [[5, 0], [6, 0], [6, 1], [5, 1]] },
+      ],
+      0,
+      1,
+    );
+    if (merged === null) throw new Error('геометрия не построена');
+    expect(merged.ranges.map((range) => range.id)).toEqual(['a', 'b']);
+    const [first, second] = merged.ranges;
+    expect(first?.start).toBe(0);
+    expect(second?.start).toBe(first?.end);
+    // Не индексированная геометрия: по три вершины на треугольник.
+    expect(second?.end).toBe(merged.geometry.getAttribute('position').count / 3);
+    merged.geometry.dispose();
+  });
+
+  it('faceIndex находит свою конструкцию; вне диапазонов и мусор - null', () => {
+    const ranges = [
+      { id: 'a', start: 0, end: 12 },
+      { id: 'b', start: 12, end: 20 },
+      { id: 'c', start: 20, end: 32 },
+    ];
+    expect(wallIdAtFace(ranges, 0)).toBe('a');
+    expect(wallIdAtFace(ranges, 11)).toBe('a');
+    expect(wallIdAtFace(ranges, 12)).toBe('b');
+    expect(wallIdAtFace(ranges, 31)).toBe('c');
+    expect(wallIdAtFace(ranges, 32)).toBeNull();
+    expect(wallIdAtFace(ranges, -1)).toBeNull();
+    expect(wallIdAtFace(ranges, undefined)).toBeNull();
+    expect(wallIdAtFace(ranges, 1.5)).toBeNull();
+    expect(wallIdAtFace([], 0)).toBeNull();
+  });
+
+  it('по настоящей слитой геометрии: треугольник второй стены - вторая конструкция', () => {
+    const merged = mergeWalls(
+      [
+        { id: 'a', shell: square(0) },
+        { id: 'b', shell: square(5) },
+      ],
+      0,
+      1,
+    );
+    if (merged === null) throw new Error('геометрия не построена');
+    const last = merged.geometry.getAttribute('position').count / 3 - 1;
+    expect(wallIdAtFace(merged.ranges, 0)).toBe('a');
+    expect(wallIdAtFace(merged.ranges, last)).toBe('b');
+    merged.geometry.dispose();
   });
 });

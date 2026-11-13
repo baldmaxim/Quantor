@@ -4,12 +4,16 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   explodeOffsets,
   fitDistance,
-  mergeShells,
-  extrudeShell,
   viewerBounds,
+  wallIdAtFace,
   type IViewerFloorSpec,
   type IViewerPlan,
+  type IViewerWall,
 } from './building-viewer-geometry';
+import { buildFloor, wallRanges, type IFloorEntry } from './building-viewer-floor';
+import { readBuildingViewerColors, type IBuildingViewerColors } from './building-viewer-colors';
+import { createGroupLabels } from './building-viewer-labels';
+import { createWallOverlay, disposeWallOverlay, type OverlayKind } from './building-viewer-overlay';
 
 /**
  * Рендер просмотрщика объекта: перспективная камера и `OrbitControls` вокруг здания из настоящих
@@ -17,39 +21,10 @@ import {
  * цикла нет; инерция - только пока идёт движение и если не включён `prefers-reduced-motion`.
  * Все ресурсы освобождаются в `dispose`. Модуль грузится вместе с просмотрщиком: `three` не попадает
  * в чанк страницы.
+ *
+ * Выбор конструкции: слитый меш стен хранит диапазоны треугольников по конструкциям, луч по
+ * `faceIndex` находит конструкцию; выбранная и наведённая конструкции подсвечиваются отдельными мешами.
  */
-
-export interface IBuildingViewerColors {
-  readonly accent: string;
-  readonly muted: string;
-  readonly slab: string;
-  readonly masonry: string;
-  readonly monolith: string;
-}
-
-const FALLBACK_COLOR = 'gray';
-
-/** Цвета только из токенов темы: плита, кладка и монолит - как в 3D этажа. */
-export const readBuildingViewerColors = (): IBuildingViewerColors => {
-  if (typeof document === 'undefined') {
-    return {
-      accent: FALLBACK_COLOR,
-      muted: FALLBACK_COLOR,
-      slab: FALLBACK_COLOR,
-      masonry: FALLBACK_COLOR,
-      monolith: FALLBACK_COLOR,
-    };
-  }
-  const style = getComputedStyle(document.documentElement);
-  const token = (name: string): string => style.getPropertyValue(name).trim() || FALLBACK_COLOR;
-  return {
-    accent: token('--accent'),
-    muted: token('--muted'),
-    slab: token('--border-strong'),
-    masonry: token('--cad-construction-masonry'),
-    monolith: token('--cad-construction-monolith'),
-  };
-};
 
 export interface IBuildingViewerOptions {
   readonly reducedMotion: boolean;
@@ -57,6 +32,8 @@ export interface IBuildingViewerOptions {
   readonly onHover: (key: string | null, anchor: { x: number; y: number } | null) => void;
   /** Щелчок или касание (не перетаскивание) по этажу. */
   readonly onSelect: (key: string) => void;
+  /** Щелчок по стене уже выбранного этажа - конструкция; `null` - щелчок в пустоту, выбор конструкции снят. */
+  readonly onSelectConstruction: (id: string | null) => void;
   /** Двойной щелчок или двойное касание по этажу. */
   readonly onOpenDetail: (key: string) => void;
 }
@@ -66,8 +43,11 @@ export interface IBuildingViewer {
   setPlan: (plan: IViewerPlan | null, colors: IBuildingViewerColors) => void;
   /** Новые цвета темы без пересборки модели и без сдвига камеры. */
   setColors: (colors: IBuildingViewerColors) => void;
-  /** Выбранный этаж (акцент) и наведённый (подсветка); остальные при выборе приглушаются. */
-  setStyle: (selectedKey: string | null, hoverKey: string | null) => void;
+  /**
+   * Выбранный этаж (акцент), наведённый (подсветка) и выбранная конструкция этого этажа; остальные
+   * этажи при выборе приглушаются.
+   */
+  setStyle: (selectedKey: string | null, hoverKey: string | null, constructionId?: string | null) => void;
   setExploded: (exploded: boolean) => void;
   /** Здание целиком в кадре, направление взгляда сохраняется. */
   fit: () => void;
@@ -86,16 +66,6 @@ const MIN_DISTANCE_M = 2;
 /** Изометрия по умолчанию: с юга (+Z сцены) и сверху, как «лист». */
 const START_DIRECTION = new THREE.Vector3(0.7, 0.8, 1).normalize();
 
-type Part = 'slab' | 'monolith' | 'masonry' | 'volume';
-
-interface IFloorEntry {
-  readonly key: string;
-  readonly group: THREE.Group;
-  /** Смещение по высоте при полном разнесении, м. */
-  readonly offset: number;
-  readonly meshes: ReadonlyMap<Part, THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>>;
-}
-
 /** Разнесение этажей: коэффициент, цель камеры и расстояние плывут от прежних значений к новым. */
 interface IExplodeAnim {
   readonly from: number;
@@ -106,39 +76,6 @@ interface IExplodeAnim {
   readonly fromDistance: number;
   readonly toDistance: number;
 }
-
-type FloorMesh = THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>;
-
-const makeMesh = (geometry: THREE.BufferGeometry, key: string): FloorMesh => {
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ transparent: true }));
-  mesh.userData.floorKey = key;
-  return mesh;
-};
-
-/** Меши этажа: плита, стены двух материалов (слиянием), а без стен - прозрачный объём этажа. */
-const buildFloor = (spec: IViewerFloorSpec, offset: number): IFloorEntry | null => {
-  const meshes = new Map<Part, FloorMesh>();
-  const slab = extrudeShell(spec.shell, spec.slabBottom, spec.slabTop);
-  if (slab !== null) meshes.set('slab', makeMesh(slab, spec.key));
-  for (const material of ['monolith', 'masonry'] as const) {
-    const shells = spec.walls.filter((wall) => wall.material === material).map((wall) => wall.shell);
-    const geometry = mergeShells(shells, spec.slabTop, spec.wallTop);
-    if (geometry !== null) meshes.set(material, makeMesh(geometry, spec.key));
-  }
-  if (!meshes.has('monolith') && !meshes.has('masonry')) {
-    const volume = extrudeShell(spec.shell, spec.slabTop, spec.volumeTop);
-    if (volume !== null) {
-      const mesh = makeMesh(volume, spec.key);
-      mesh.material.depthWrite = false;
-      meshes.set('volume', mesh);
-    }
-  }
-  if (meshes.size === 0) return null;
-  const group = new THREE.Group();
-  group.userData.floorKey = spec.key;
-  for (const mesh of meshes.values()) group.add(mesh);
-  return { key: spec.key, group, offset, meshes };
-};
 
 export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewerOptions): IBuildingViewer => {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -169,6 +106,11 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
   let colors: IBuildingViewerColors = readBuildingViewerColors();
   let selectedKey: string | null = null;
   let hoverKey: string | null = null;
+  let constructionId: string | null = null;
+  let hoverWallId: string | null = null;
+  /** Стены этажей для подсветки: ключ `этаж|конструкция`. */
+  let wallIndex = new Map<string, { spec: IViewerFloorSpec; wall: IViewerWall }>();
+  const overlays: Record<OverlayKind, THREE.Group | null> = { selected: null, hover: null };
   let exploded = false;
   let factor = 0;
   let anim: IExplodeAnim | null = null;
@@ -177,6 +119,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
 
   let disposed = false;
   let frame = 0;
+  const labels = createGroupLabels(host);
   const scratch = new THREE.Color();
   const accentColor = new THREE.Color();
 
@@ -202,6 +145,10 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
     }
     const moving = controls.update();
     renderer.render(scene, camera);
+    labels.update(camera, host.clientWidth, host.clientHeight, (key) => {
+      const entry = entries.find((item) => item.key === key);
+      return entry === undefined ? 0 : entry.offset * factor;
+    });
     if (moving || anim !== null) requestRender();
   };
   function requestRender(): void {
@@ -263,7 +210,34 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
   observer.observe(host);
   resize();
 
+  const syncOverlay = (kind: OverlayKind, wallId: string | null): void => {
+    const previous = overlays[kind];
+    if (previous !== null) disposeWallOverlay(previous);
+    overlays[kind] = null;
+    const item = wallId !== null && selectedKey !== null ? wallIndex.get(`${selectedKey}|${wallId}`) : undefined;
+    const entry = item === undefined ? undefined : entries.find((candidate) => candidate.key === item.spec.key);
+    if (item === undefined || entry === undefined) return;
+    const group = createWallOverlay(
+      { shell: item.wall.shell, yBottom: item.spec.slabTop, yTop: item.spec.wallTop },
+      kind,
+      colors.accent,
+    );
+    if (group === null) return;
+    entry.group.add(group);
+    overlays[kind] = group;
+  };
+  const syncOverlays = (): void => {
+    syncOverlay('selected', constructionId);
+    syncOverlay('hover', hoverWallId === constructionId ? null : hoverWallId);
+    requestRender();
+  };
+
   const disposeFloors = (): void => {
+    for (const kind of ['selected', 'hover'] as const) {
+      const overlay = overlays[kind];
+      if (overlay !== null) disposeWallOverlay(overlay);
+      overlays[kind] = null;
+    }
     for (const entry of entries) {
       root.remove(entry.group);
       for (const mesh of entry.meshes.values()) {
@@ -285,7 +259,10 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       for (const [part, mesh] of entry.meshes) {
         const base = part === 'volume' ? colors.muted : colors[part];
         scratch.set(base);
-        if (selected) scratch.copy(accentColor);
+        // Выбрана конструкция: стены этажа остаются своего цвета, чтобы подсветка конструкции была видна.
+        const quiet = selected && constructionId !== null && (part === 'monolith' || part === 'masonry');
+        if (quiet) scratch.lerp(accentColor, 0.15);
+        else if (selected) scratch.copy(accentColor);
         else if (hovered) scratch.lerp(accentColor, 0.55);
         mesh.material.color.copy(scratch);
         let opacity = 1;
@@ -300,13 +277,13 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
         mesh.material.depthWrite = part === 'volume' ? false : opacity >= 1;
       }
     }
-    requestRender();
+    syncOverlays();
   };
 
-  // Выбор мышью: луч по мешам этажей -> ключ этажа.
+  // Выбор мышью: луч по мешам этажей -> ключ этажа и, если попали в стену, её конструкция.
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
-  const pickAt = (clientX: number, clientY: number): string | null => {
+  const pickAt = (clientX: number, clientY: number): { key: string; wallId: string | null } | null => {
     const rect = dom.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0 || pickTargets.length === 0) return null;
     ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
@@ -314,23 +291,34 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
     raycaster.setFromCamera(ndc, camera);
     const hit = raycaster.intersectObjects(pickTargets, false)[0];
     const key: unknown = hit?.object.userData.floorKey;
-    return typeof key === 'string' ? key : null;
+    if (hit === undefined || typeof key !== 'string') return null;
+    const ranges = wallRanges.get(hit.object);
+    return { key, wallId: ranges === undefined ? null : wallIdAtFace(ranges, hit.faceIndex) };
+  };
+  const setHoverWall = (id: string | null): void => {
+    if (id === hoverWallId) return;
+    hoverWallId = id;
+    syncOverlay('hover', hoverWallId === constructionId ? null : hoverWallId);
+    requestRender();
   };
 
   let down: { x: number; y: number; moved: boolean } | null = null;
-  let lastTap: { key: string; at: number } | null = null;
+  let lastTap: { target: string; at: number } | null = null;
   let hoverFrame = 0;
   let hoverPoint: { x: number; y: number } | null = null;
   const flushHover = (): void => {
     hoverFrame = 0;
     const point = hoverPoint;
     if (disposed || point === null || down !== null) return;
-    const key = pickAt(point.x, point.y);
+    const hit = pickAt(point.x, point.y);
     const rect = dom.getBoundingClientRect();
-    options.onHover(key, key === null ? null : { x: point.x - rect.left, y: point.y - rect.top });
+    // Лёгкая подсветка конструкции - только у стен уже выбранного этажа.
+    setHoverWall(hit !== null && hit.key === selectedKey ? hit.wallId : null);
+    options.onHover(hit?.key ?? null, hit === null ? null : { x: point.x - rect.left, y: point.y - rect.top });
   };
   const onDown = (event: PointerEvent): void => {
     options.onHover(null, null);
+    setHoverWall(null);
     down = event.button === 0 ? { x: event.clientX, y: event.clientY, moved: false } : null;
   };
   const onMove = (event: PointerEvent): void => {
@@ -346,22 +334,31 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
     const start = down;
     down = null;
     if (start === null || start.moved) return;
-    const key = pickAt(event.clientX, event.clientY);
-    if (key === null) return;
-    const now = performance.now();
-    if (lastTap !== null && lastTap.key === key && now - lastTap.at < DOUBLE_TAP_MS) {
-      lastTap = null;
-      options.onOpenDetail(key);
+    const hit = pickAt(event.clientX, event.clientY);
+    if (hit === null) {
+      // Клик в пустоту снимает выбор конструкции; этаж остаётся.
+      if (constructionId !== null) options.onSelectConstruction(null);
       return;
     }
-    lastTap = { key, at: now };
-    options.onSelect(key);
+    // Стена выбранного этажа - выбор конструкции, всё остальное - выбор этажа.
+    const wallId = hit.key === selectedKey ? hit.wallId : null;
+    const target = wallId === null ? hit.key : `${hit.key}|${wallId}`;
+    const now = performance.now();
+    if (lastTap !== null && lastTap.target === target && now - lastTap.at < DOUBLE_TAP_MS) {
+      lastTap = null;
+      options.onOpenDetail(hit.key);
+      return;
+    }
+    lastTap = { target, at: now };
+    if (wallId === null) options.onSelect(hit.key);
+    else options.onSelectConstruction(wallId);
   };
   const onCancel = (): void => {
     down = null;
   };
   const onLeave = (): void => {
     hoverPoint = null;
+    setHoverWall(null);
     options.onHover(null, null);
   };
   dom.addEventListener('pointerdown', onDown);
@@ -375,6 +372,9 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       disposeFloors();
       colors = nextColors;
       plan = nextPlan;
+      wallIndex = new Map();
+      hoverWallId = null;
+      labels.set(nextPlan?.labels ?? []);
       if (nextPlan === null) {
         signature = '';
         requestRender();
@@ -386,6 +386,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
         if (entry === null) continue;
         root.add(entry.group);
         entries.push(entry);
+        for (const wall of spec.walls) wallIndex.set(`${spec.key}|${wall.id}`, { spec, wall });
         pickTargets.push(...entry.meshes.values());
       }
       groundY = Math.min(...nextPlan.floors.map((spec) => spec.slabBottom));
@@ -402,9 +403,10 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       colors = nextColors;
       applyStyle();
     },
-    setStyle: (nextSelected, nextHover) => {
+    setStyle: (nextSelected, nextHover, nextConstruction = null) => {
       selectedKey = nextSelected;
       hoverKey = nextHover;
+      constructionId = nextSelected === null ? null : nextConstruction;
       applyStyle();
     },
     setExploded: (next) => {
@@ -436,6 +438,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       if (frame !== 0) cancelAnimationFrame(frame);
       if (hoverFrame !== 0) cancelAnimationFrame(hoverFrame);
       observer.disconnect();
+      labels.dispose();
       dom.removeEventListener('pointerdown', onDown);
       dom.removeEventListener('pointermove', onMove);
       dom.removeEventListener('pointerup', onUp);
