@@ -10,6 +10,7 @@ import {
   type IFloor3dSnapState,
 } from '@/lib/cad/floor3d-engine';
 import { highlightOf, highlightsOf, visibilityOf, type IFloor3dPlan } from '@/lib/cad/floor3d-geometry';
+import type { IFloor3dMepElement } from '@/lib/cad/floor3d-mep-elements';
 import {
   buildFloor3dRoutes,
   readFloor3dRouteColors,
@@ -32,6 +33,8 @@ export interface IFloor3dViewRequest {
 /** Трассы механики листа: полилинии в мм DXF, Z от чистого пола этажа модели. */
 export interface ICadFloor3dRoutes {
   readonly polylines: readonly IFloor3dRoutePolyline[];
+  /** Фасонина, арматура и гильзы (формат v2); у v1 пусто. */
+  readonly elements?: readonly IFloor3dMepElement[];
   /** Чистый пол модели (`routesBaseZMm`), мм: верх плиты ниже на пирог пола. */
   readonly baseZMm: number;
 }
@@ -149,10 +152,12 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
       engine.current?.setRoutes(null);
       return;
     }
-    const built = buildFloor3dRoutes(routes.polylines, readFloor3dRouteColors(), {
-      center: plan.center,
-      baseZMm: routes.baseZMm,
-    });
+    const built = buildFloor3dRoutes(
+      routes.polylines,
+      readFloor3dRouteColors(),
+      { center: plan.center, baseZMm: routes.baseZMm },
+      routes.elements,
+    );
     routeScene.current = built;
     engine.current?.setRoutes(built);
   }, [routes, plan.center, theme]);
@@ -161,8 +166,8 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   useEffect(() => {
     const built = routeScene.current;
     if (built === null) return;
-    for (const polyline of routes?.polylines ?? []) {
-      built.setLayerVisible(polyline.layer, !isMepLayerHidden(hiddenRoutesMask, polyline.layer));
+    for (const layer of built.layers) {
+      built.setLayerVisible(layer, !isMepLayerHidden(hiddenRoutesMask, layer));
     }
     engine.current?.refresh();
   }, [routes, plan.center, theme, hiddenRoutesMask]);

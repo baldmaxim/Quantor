@@ -16,6 +16,11 @@ from app.services import cad_mep as cad_mep_service
 
 CadJobType = Literal["cad_pdf_convert", "cad_mep_route"]
 
+# Границы полей 3D-трасс: размеры в мм, подпись квартиры, подтип элемента.
+ROUTE3D_MAX_SIZE_MM = 1_000_000
+ROUTE3D_MAX_APT = 32
+ROUTE3D_MAX_SUBTYPE = 32
+
 
 class CadApprovalCreate(BaseModel):
     """Одобрение вида: решение человека. Попытка - та, чей результат он смотрел."""
@@ -278,24 +283,62 @@ def view_mep_read(
 
 
 class CadMepRoute3dPolyline(BaseModel):
-    """3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм."""
+    """3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.
+
+    Поля сечения и изоляции - с `cad_mep_routes3d.v2`; у файла v1 они пусты (`shape` не задан,
+    изоляции нет), и вид рисует такую полилинию линией.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     layer: Annotated[str, Field(min_length=1, max_length=64)]
     pts: Annotated[list[tuple[int, int, int]], Field(min_length=2)]
+    kind: Literal["route", "jumper", "riser", "leadin"] | None = None
+    shape: Literal["round", "rect"] | None = None
+    # Наружный Ø трубы (round); ширина и высота сечения воздуховода (rect), мм.
+    dn_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    w_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    h_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    # Толщина изоляции, мм; 0 - без изоляции.
+    insulation_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] = 0
+    # Уклон самотёка; иначе None.
+    slope: float | None = None
+    apt: Annotated[str, Field(max_length=ROUTE3D_MAX_APT)] | None = None
+
+
+class CadMepRoute3dElement(BaseModel):
+    """Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура или гильза."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["fitting", "valve", "sleeve"]
+    # fitting: elbow/tee/cross/reducer/cleanout; valve: ball_valve ... fire_damper;
+    # sleeve: wall/slab.
+    subtype: Annotated[str, Field(min_length=1, max_length=ROUTE3D_MAX_SUBTYPE)]
+    layer: Annotated[str, Field(min_length=1, max_length=64)]
+    # Центр элемента (мм) и единичная ось трубы в точке (целые, умноженные на 1000).
+    pos: tuple[int, int, int]
+    axis: tuple[int, int, int]
+    dn_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    w_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    h_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    length_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    outer_d_mm: Annotated[int, Field(ge=0, le=ROUTE3D_MAX_SIZE_MM)] | None = None
+    apt: Annotated[str, Field(max_length=ROUTE3D_MAX_APT)] | None = None
 
 
 class CadMepRoutes3dFile(BaseModel):
-    """Файл `routes3d.json` генератора (`cad_mep_routes3d.v1`): трассы с Z от отметки этажа."""
+    """Файл `routes3d.json` генератора (`cad_mep_routes3d.v1`/`.v2`): трассы, Z от отметки этажа."""
 
     model_config = ConfigDict(extra="ignore")
 
-    schema_id: Literal["cad_mep_routes3d.v1"] = Field(alias="schema")
+    schema_id: Literal["cad_mep_routes3d.v1", "cad_mep_routes3d.v2"] = Field(alias="schema")
     frame: Literal["view_dxf_mm"]
     floor_elevation_mm: int | None
     floor_height_mm: int | None
     polylines: list[CadMepRoute3dPolyline]
+    # Фасонина, арматура и гильзы: только в v2.
+    elements: list[CadMepRoute3dElement] = Field(default_factory=list)
 
 
 class CadMepRoutes3dOut(BaseModel):
@@ -312,6 +355,7 @@ class CadMepRoutes3dOut(BaseModel):
     # Обе пары известны и равны; иначе - false (трассы стоит перестроить).
     heights_match: bool
     polylines: list[CadMepRoute3dPolyline]
+    elements: list[CadMepRoute3dElement] = Field(default_factory=list)
 
 
 def routes3d_read(
@@ -336,4 +380,5 @@ def routes3d_read(
             levels_height_mm,
         ),
         polylines=data.polylines,
+        elements=data.elements,
     )

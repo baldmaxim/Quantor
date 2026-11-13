@@ -40,7 +40,8 @@ DECISION_KEY: Final = ("kind", "job_id", "attempt", "page_index", "view")
 ROUTES_DXF: Final = "mep_routes.dxf"
 CANDIDATE_JSON: Final = "candidate.json"
 ROUTES3D_JSON: Final = "routes3d.json"
-ROUTES3D_SCHEMA: Final = "cad_mep_routes3d.v1"
+# v1 - линии; v2 - сечения, изоляция и элементы сети (старые файлы в бою читаются дальше).
+ROUTES3D_SCHEMAS: Final = ("cad_mep_routes3d.v1", "cad_mep_routes3d.v2")
 PREVIEW_JSON: Final = "preview.json"
 CANDIDATE_SCHEMA: Final = "quantor.cad_mep.candidate.v1"
 PREVIEW_SCHEMA: Final = "quantor.cad_engine.preview.v1"

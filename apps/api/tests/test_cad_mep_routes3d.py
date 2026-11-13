@@ -15,8 +15,10 @@ from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contracts.cad_mep import CadMepRoutes3dFile
 from app.core.config import Settings
 from app.domain import JobStatus
 from app.models import Job, Workspace
@@ -229,10 +231,22 @@ async def test_routes3d_reads_the_file_and_compares_heights_with_the_sheet_level
         assert (body["floor_elevation_mm"], body["floor_height_mm"]) == (47600, 3000)
         assert (body["levels_elevation_mm"], body["levels_height_mm"]) == (47600, 3000)
         assert body["heights_match"] is True
+        # Файл v1: поля сечения и изоляции - по умолчанию, элементов нет.
+        v1_defaults = {
+            "kind": None,
+            "shape": None,
+            "dn_mm": None,
+            "w_mm": None,
+            "h_mm": None,
+            "insulation_mm": 0,
+            "slope": None,
+            "apt": None,
+        }
         assert body["polylines"] == [
-            {"layer": "M-OV-T1", "pts": [[0, 0, 50], [1000, 0, 50]]},
-            {"layer": "M-VK-V1", "pts": [[500, 500, 0], [500, 500, 2900]]},
+            {"layer": "M-OV-T1", "pts": [[0, 0, 50], [1000, 0, 50]], **v1_defaults},
+            {"layer": "M-VK-V1", "pts": [[500, 500, 0], [500, 500, 2900]], **v1_defaults},
         ]
+        assert body["elements"] == []
 
         # Человек поменял высоту этажа в 3D: трассы построены по прежней - стоит перестроить.
         put = await api.put(_url(project_id, job_id, "levels"), json={"floor_height_mm": 3200})
@@ -244,6 +258,80 @@ async def test_routes3d_reads_the_file_and_compares_heights_with_the_sheet_level
         # Другой вид или страница - трасс нет.
         other = await api.get(_routes3d_url(project_id, revision_id, view=2))
         assert other.json()["detail"]["code"] == "CAD_ROUTES_NOT_FOUND"
+
+
+async def test_routes3d_reads_the_v2_file_with_sections_insulation_and_elements(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    mep_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = mep_settings(mep_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, base = await _parent(api, db_session, fake_storage)
+        (mep_tools / "routes3d_v2").write_text("1", encoding="utf-8")
+        route_id = await _approve_and_queue(api, base, job_id)
+        job = await _run_route_worker(db_session, fake_storage, settings, route_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        read = await api.get(_routes3d_url(project_id, revision_id))
+        assert read.status_code == 200, read.text
+        body = read.json()
+        pipe, duct = body["polylines"]
+        assert (pipe["shape"], pipe["dn_mm"], pipe["insulation_mm"], pipe["apt"]) == (
+            "round",
+            25,
+            9,
+            "12",
+        )
+        assert (duct["shape"], duct["w_mm"], duct["h_mm"], duct["dn_mm"]) == (
+            "rect",
+            400,
+            200,
+            None,
+        )
+        valve, sleeve = body["elements"]
+        assert (valve["type"], valve["subtype"], valve["axis"]) == (
+            "valve",
+            "ball_valve",
+            [1000, 0, 0],
+        )
+        assert (sleeve["type"], sleeve["length_mm"], sleeve["outer_d_mm"]) == ("sleeve", 260, 135)
+
+
+def test_routes3d_contract_accepts_both_schemas_and_rejects_foreign_ones() -> None:
+    base = {"frame": "view_dxf_mm", "floor_elevation_mm": None, "floor_height_mm": None}
+    line = {"layer": "M-VK-V1", "pts": [[0, 0, 0], [1, 0, 0]]}
+    v1 = CadMepRoutes3dFile.model_validate(
+        {**base, "schema": "cad_mep_routes3d.v1", "polylines": [line]}
+    )
+    assert v1.elements == [] and v1.polylines[0].shape is None
+    assert v1.polylines[0].insulation_mm == 0
+    v2 = CadMepRoutes3dFile.model_validate(
+        {**base, "schema": "cad_mep_routes3d.v2", "polylines": [line], "elements": []}
+    )
+    assert v2.schema_id == "cad_mep_routes3d.v2"
+    with pytest.raises(ValidationError):
+        CadMepRoutes3dFile.model_validate(
+            {**base, "schema": "cad_mep_routes3d.v3", "polylines": []}
+        )
+    with pytest.raises(ValidationError):
+        CadMepRoutes3dFile.model_validate(
+            {
+                **base,
+                "schema": "cad_mep_routes3d.v2",
+                "polylines": [],
+                "elements": [
+                    {
+                        "type": "valve",
+                        "subtype": "x",
+                        "layer": "M",
+                        "pos": [0, 0],
+                        "axis": [1, 0, 0],
+                    }
+                ],
+            }
+        )
 
 
 async def test_routes3d_without_walls_has_no_levels_and_no_match(

@@ -97,7 +97,25 @@ folder.mkdir(parents=True)
     "schema": "quantor.cad_engine.preview.v1", "units": "mm", "layers": ["M-OV-T1"],
     "paths": [{"layer": 0, "closed": False, "fill": False, "points": [0, 0, 1000, 0]}],
     "bbox": [0, 0, 1000, 0], "truncated": False, "flatten_mm": 0}))
-if not (pathlib.Path(__file__).parent / "no_routes3d").exists():  # прежний генератор
+if (pathlib.Path(__file__).parent / "routes3d_v2").exists():  # генератор формата v2
+    (folder / "routes3d.json").write_text(json.dumps({
+        "schema": "cad_mep_routes3d.v2", "frame": "view_dxf_mm",
+        "floor_elevation_mm": elevation, "floor_height_mm": height,
+        "polylines": [
+            {"layer": "M-VK-V1", "pts": [[0, 0, 50], [1000, 0, 50]], "kind": "route",
+             "shape": "round", "dn_mm": 25, "w_mm": None, "h_mm": None,
+             "insulation_mm": 9, "slope": None, "apt": "12"},
+            {"layer": "M-OV-VZH", "pts": [[0, 500, 2500], [1000, 500, 2500]], "kind": "route",
+             "shape": "rect", "dn_mm": None, "w_mm": 400, "h_mm": 200,
+             "insulation_mm": 0, "slope": None, "apt": None}],
+        "elements": [
+            {"type": "valve", "subtype": "ball_valve", "layer": "M-VK-V1", "pos": [500, 0, 50],
+             "axis": [1000, 0, 0], "dn_mm": 25, "w_mm": None, "h_mm": None,
+             "length_mm": None, "outer_d_mm": None, "apt": "12"},
+            {"type": "sleeve", "subtype": "wall", "layer": "M-VK-V1", "pos": [900, 0, 50],
+             "axis": [1000, 0, 0], "dn_mm": 25, "w_mm": None, "h_mm": None,
+             "length_mm": 260, "outer_d_mm": 135, "apt": None}]}))
+elif not (pathlib.Path(__file__).parent / "no_routes3d").exists():  # прежний генератор: v1
     (folder / "routes3d.json").write_text(json.dumps({
         "schema": "cad_mep_routes3d.v1", "frame": "view_dxf_mm",
         "floor_elevation_mm": elevation, "floor_height_mm": height,

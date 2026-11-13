@@ -331,7 +331,7 @@ def _verified_route_outputs(
     has_routes3d = routes3d in present
     if has_routes3d:
         routes3d_doc = _read_json_file(out / routes3d)
-        if routes3d_doc.get("schema") != cad_mep_service.ROUTES3D_SCHEMA:
+        if routes3d_doc.get("schema") not in cad_mep_service.ROUTES3D_SCHEMAS:
             raise CadError(ErrorCode.CAD_ENGINE_FAILED, "routes3d.json вне контракта")
     if "report.json" not in present:
         report = {
