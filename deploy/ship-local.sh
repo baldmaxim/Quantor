@@ -57,7 +57,7 @@ echo "→ движок CAD ${ENGINE_REF:0:7} (сверка sha256)"
 mkdir -p "$WT/deploy/cad-engine/generators"
 cp "$EWT/$ARCHIVE_PATH" "$WT/deploy/cad-engine/engine.zip"
 echo "$ARCHIVE_SHA  $WT/deploy/cad-engine/engine.zip" | sha256sum -c --quiet -
-for name in cad_mep cad_walls; do
+for name in cad_mep cad_walls cad_eom; do
   [ -d "$EWT/generators/$name" ] || { echo "В движке нет generators/$name"; exit 1; }
   cp -r "$EWT/generators/$name" "$WT/deploy/cad-engine/generators/$name"
   rm -rf "$WT/deploy/cad-engine/generators/$name/tests"

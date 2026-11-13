@@ -21,7 +21,7 @@ from typing import Any, Final, Literal
 from app.core.config import Settings
 from app.errors import DomainError, ErrorCode
 
-GeneratorName = Literal["cad_mep", "cad_walls"]
+GeneratorName = Literal["cad_mep", "cad_walls", "cad_eom"]
 
 _SHA256: Final = re.compile(r"^[0-9a-f]{64}$")
 _VERSION: Final = re.compile(r"^[A-Za-z0-9._-]{1,48}$")

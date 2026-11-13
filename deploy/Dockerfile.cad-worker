@@ -8,7 +8,8 @@
 #   # <CAD_engine> - чистый checkout коммита pins.engine.repo_ref приватного репозитория движка
 #   cp <CAD_engine>/<pins.engine.archive_path> deploy/cad-engine/engine.zip
 #   mkdir -p deploy/cad-engine/generators
-#   cp -r <CAD_engine>/generators/cad_mep <CAD_engine>/generators/cad_walls deploy/cad-engine/generators/
+#   cp -r <CAD_engine>/generators/cad_mep <CAD_engine>/generators/cad_walls \
+#     <CAD_engine>/generators/cad_eom deploy/cad-engine/generators/
 #   rm -rf deploy/cad-engine/generators/*/tests   # sha256 params сверяет publish.yml (jq по pins.json)
 #   docker buildx build -f deploy/Dockerfile.cad-worker \
 #     --build-arg API_IMAGE=ghcr.io/baldmaxim/quantor-api:<sha> \
@@ -40,6 +41,8 @@ COPY tools/cad_engine/quantor_cad_runner.py tools/cad_engine/pins.json ${CAD_ENG
 # параметров с pins.json; версию и sha256 параметров API берёт из pins.json, не из файлов.
 COPY deploy/cad-engine/generators/cad_mep ${CAD_ENGINE_HOME}/generators/cad_mep
 COPY deploy/cad-engine/generators/cad_walls ${CAD_ENGINE_HOME}/generators/cad_walls
+# ЭОМ и СС этажа (`cad_eom`): модель листа берёт из `../cad_mep`, как `cad_walls`.
+COPY deploy/cad-engine/generators/cad_eom ${CAD_ENGINE_HOME}/generators/cad_eom
 
 # Архив движка кладёт в контекст сборки publish.yml (checkout приватного репозитория по
 # закреплённому коммиту, deploy-key только на чтение); здесь — повторная сверка SHA256 с pins.json.
@@ -61,6 +64,8 @@ ENV CAD_ENGINE_PYTHON=${CAD_ENGINE_HOME}/venv/bin/python \
     CAD_MEP_PARAMS=${CAD_ENGINE_HOME}/generators/cad_mep/params/v1.json \
     CAD_WALLS_RUNNER=${CAD_ENGINE_HOME}/generators/cad_walls/run_walls.py \
     CAD_WALLS_PARAMS=${CAD_ENGINE_HOME}/generators/cad_walls/params/v1.json \
+    CAD_EOM_RUNNER=${CAD_ENGINE_HOME}/generators/cad_eom/run_eom.py \
+    CAD_EOM_PARAMS=${CAD_ENGINE_HOME}/generators/cad_eom/params/v1.json \
     CAD_WORK_ROOT=/var/tmp/quantor-cad
 
 USER quantor

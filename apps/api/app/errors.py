@@ -179,6 +179,9 @@ class ErrorCode(StrEnum):
     # Трассы в 3D (ADR-0041): у листа нет успешных трасс / трассы построены без routes3d.json.
     CAD_ROUTES_NOT_FOUND = "CAD_ROUTES_NOT_FOUND"
     CAD_ROUTES3D_MISSING = "CAD_ROUTES3D_MISSING"
+    # ЭОМ и СС этажа: генератор не построил сети / у листа нет построенных ЭОМ и СС.
+    CAD_EOM_NOT_BUILT = "CAD_EOM_NOT_BUILT"
+    CAD_EOM_NOT_FOUND = "CAD_EOM_NOT_FOUND"
     # ВОР Заказчика в контуре CAD (ADR-0038 п. 5): файл не разобран как таблица ВОР.
     CAD_VOR_PARSE_FAILED = "CAD_VOR_PARSE_FAILED"
     # Шаблоны отделки помещений (ADR-0042): название занято / тип помещения уже у другого шаблона.
@@ -348,6 +351,8 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_ZONES_BUSY: "Разметка зон уже идёт",
     ErrorCode.CAD_ROUTES_NOT_FOUND: "Для листа нет построенных трасс механики",
     ErrorCode.CAD_ROUTES3D_MISSING: "Трассы построены прежней версией: перестройте трассы",
+    ErrorCode.CAD_EOM_NOT_BUILT: "Генератор не построил ЭОМ и СС этажа",
+    ErrorCode.CAD_EOM_NOT_FOUND: "Для листа нет построенных ЭОМ и СС",
     ErrorCode.CAD_VOR_PARSE_FAILED: "Файл не удалось разобрать как ВОР",
     ErrorCode.CAD_FINISH_TEMPLATE_NAME_TAKEN: "Шаблон отделки с таким названием уже есть в проекте",
     ErrorCode.CAD_FINISH_ROOM_TYPE_TAKEN: (
@@ -508,6 +513,8 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_ZONES_BUSY: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_ROUTES_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.CAD_ROUTES3D_MISSING: status.HTTP_404_NOT_FOUND,
+    ErrorCode.CAD_EOM_NOT_BUILT: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_EOM_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.CAD_VOR_PARSE_FAILED: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_FINISH_TEMPLATE_NAME_TAKEN: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_FINISH_ROOM_TYPE_TAKEN: status.HTTP_409_CONFLICT,

@@ -105,6 +105,19 @@
   --cad-mep-node: #5b6573;
   --cad-mep-riser: #1f2937;
   --cad-mep-san: #0f8a7e;
+  /* ЭОМ и СС этажа (генератор cad_eom) */
+  --cad-eom-feed: #c2410c;
+  --cad-eom-lt: #d97706;
+  --cad-eom-mop: #ca8a04;
+  --cad-eom-pe: #15803d;
+  --cad-eom-riser: #7c2d12;
+  --cad-eom-dev: #b91c1c;
+  --cad-ss-tray: #6d28d9;
+  --cad-ss-opt: #db2777;
+  --cad-ss-utp: #2563eb;
+  --cad-ss-rad: #0891b2;
+  --cad-ss-riser: #4c1d95;
+  --cad-ss-dev: #7e22ce;
   --cad-mep-insulation: #d9c68a;
   --cad-mep-sleeve: #7f8792;
   --cad-mep-vk-k2: #8f7350;
@@ -300,6 +313,19 @@
     --cad-mep-node: #7a8594;
     --cad-mep-riser: #5d6877;
     --cad-mep-san: #2fc2b3;
+    /* ЭОМ и СС этажа (генератор cad_eom) */
+    --cad-eom-feed: #fb923c;
+    --cad-eom-lt: #fbbf24;
+    --cad-eom-mop: #facc15;
+    --cad-eom-pe: #4ade80;
+    --cad-eom-riser: #fdba74;
+    --cad-eom-dev: #f87171;
+    --cad-ss-tray: #a78bfa;
+    --cad-ss-opt: #f472b6;
+    --cad-ss-utp: #60a5fa;
+    --cad-ss-rad: #22d3ee;
+    --cad-ss-riser: #c4b5fd;
+    --cad-ss-dev: #c084fc;
     --cad-mep-insulation: #eadba5;
     --cad-mep-sleeve: #a3abb6;
     --cad-mep-vk-k2: #c2a27a;
@@ -420,6 +446,19 @@
   --cad-mep-node: #7a8594;
   --cad-mep-riser: #5d6877;
   --cad-mep-san: #2fc2b3;
+  /* ЭОМ и СС этажа (генератор cad_eom) */
+  --cad-eom-feed: #fb923c;
+  --cad-eom-lt: #fbbf24;
+  --cad-eom-mop: #facc15;
+  --cad-eom-pe: #4ade80;
+  --cad-eom-riser: #fdba74;
+  --cad-eom-dev: #f87171;
+  --cad-ss-tray: #a78bfa;
+  --cad-ss-opt: #f472b6;
+  --cad-ss-utp: #60a5fa;
+  --cad-ss-rad: #22d3ee;
+  --cad-ss-riser: #c4b5fd;
+  --cad-ss-dev: #c084fc;
   --cad-mep-insulation: #eadba5;
   --cad-mep-sleeve: #a3abb6;
   --cad-mep-vk-k2: #c2a27a;

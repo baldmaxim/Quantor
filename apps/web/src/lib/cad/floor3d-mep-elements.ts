@@ -20,7 +20,8 @@ import { MEP_PICK_KEY, type IMepElementPickData } from './floor3d-mep-pick';
  */
 
 export interface IFloor3dMepElement {
-  readonly type: 'fitting' | 'valve' | 'sleeve' | 'terminal';
+  /** `device` и `box` - щиты, приборы и коробки ЭОМ и СС (`cad_eom`): короб w×h×d, ось - нормаль. */
+  readonly type: 'fitting' | 'valve' | 'sleeve' | 'terminal' | 'device' | 'box';
   readonly subtype: string;
   readonly layer: string;
   readonly pos: readonly number[];
@@ -33,6 +34,8 @@ export interface IFloor3dMepElement {
   readonly apt?: string | null;
   /** Марка прибора или ПК, если известна. */
   readonly mark?: string | null;
+  /** Глубина короба прибора вдоль оси (`device`, `box`). */
+  readonly d_mm?: number | null;
 }
 
 export interface IMepElementColors {
@@ -179,6 +182,24 @@ export const planMepElement = (
 
   if (axis === null) return null;
   const basis = axisBasis(axis);
+
+  // Щит, прибор или коробка ЭОМ и СС: короб по центру; ширина - вдоль стены, высота - по вертикали
+  // (у потолочного - в плане), глубина - вдоль нормали.
+  if (element.type === 'device' || element.type === 'box') {
+    if (!positive(element.w_mm) || !positive(element.h_mm) || !positive(element.d_mm)) return null;
+    return {
+      layer,
+      kind: 'box',
+      tone: 'layer',
+      matrix: compose(
+        position,
+        basis,
+        element.w_mm / MM_IN_M,
+        element.h_mm / MM_IN_M,
+        element.d_mm / MM_IN_M,
+      ),
+    };
+  }
 
   if (element.type === 'valve') {
     if (element.subtype === 'fire_damper') {

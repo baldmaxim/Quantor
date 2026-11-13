@@ -20,6 +20,7 @@ import { routesBaseZMm } from '@/lib/cad/floor3d-routes';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
 import { layerGroupKeys, type CadLayerCategory } from '@/lib/cad/layer-categories';
 import { useMepLayerVisibility } from '@/lib/cad/mep-layers';
+import { useCadEomRoutes3d } from '@/lib/cad/eom-queries';
 import { useCadMepRoutes3d } from '@/lib/cad/mep-routes3d-queries';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
@@ -122,13 +123,28 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
     routeJobId,
     enabled: model !== null,
   });
+  // ЭОМ и СС этажа (генератор cad_eom) - теми же слоями и маской, что трассы механики.
+  const eomState = useCadEomRoutes3d(
+    {
+      projectId: params.projectId,
+      revisionId: params.revisionId,
+      pageIndex: params.pageIndex,
+      view: params.view,
+    },
+    model !== null,
+  );
   const routesMask = useMepLayerVisibility().mask;
   const routesData = routesState.status === 'ready' ? routesState.data : null;
+  const eomData = eomState.status === 'ready' ? eomState.data : null;
   const routes = useMemo<ICadFloor3dRoutes | null>(
-    () => (routesData && model
-        ? { polylines: routesData.polylines, elements: routesData.elements, baseZMm: routesBaseZMm(model) }
+    () => (model && (routesData || eomData)
+        ? {
+            polylines: [...(routesData?.polylines ?? []), ...(eomData?.polylines ?? [])],
+            elements: [...(routesData?.elements ?? []), ...(eomData?.elements ?? [])],
+            baseZMm: routesBaseZMm(model),
+          }
         : null),
-    [routesData, model],
+    [routesData, eomData, model],
   );
 
   const [showSlabCap, setShowSlabCap] = useState(false);

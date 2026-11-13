@@ -153,7 +153,7 @@ jobs:
           pins=tools/cad_engine/pins.json
           rm -rf deploy/cad-engine/generators
           mkdir -p deploy/cad-engine/generators
-          for name in cad_mep cad_walls; do
+          for name in cad_mep cad_walls cad_eom; do
             src=".cad-engine-src/generators/$name"
             [ -d "$src" ] || { echo "::error::В движке нет generators/$name"; exit 1; }
             cp -r "$src" "deploy/cad-engine/generators/$name"

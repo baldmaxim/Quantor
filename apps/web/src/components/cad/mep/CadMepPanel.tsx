@@ -5,6 +5,7 @@ import type { FC } from 'react';
 import type { IWorkspaceCadMep } from '@/components/workspace/cad/types';
 import { Button, InspectorSection } from '@/components/ui';
 
+import { CadEomBuild } from './CadEomBuild';
 import { CadMepApproval } from './CadMepApproval';
 import { CadMepBuild } from './CadMepBuild';
 import { CadMepRoute } from './CadMepRoute';
@@ -67,6 +68,14 @@ export const CadMepPanel: FC<IWorkspaceCadMep> = ({
         )}
         {route && <CadMepRoute route={route} parent={parent} openRemarks={openRemarks} />}
       </div>
+    </InspectorSection>
+
+    <InspectorSection title="4. ЭОМ и СС этажа">
+      {approval ? (
+        <CadEomBuild parent={parent} />
+      ) : (
+        <p className="text-xs text-muted">ЭОМ и СС строятся только по одобренному виду.</p>
+      )}
     </InspectorSection>
   </div>
 );

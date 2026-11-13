@@ -12,7 +12,18 @@ import { useStoredNumber } from './useStoredNumber';
  * по этому списку и переживает смену вида и перезагрузку.
  */
 
-export type MepGroupKey = 'water' | 'sewer' | 'heating' | 'vent' | 'smoke' | 'cooling' | 'fire' | 'common' | 'sanitary';
+export type MepGroupKey =
+  | 'water'
+  | 'sewer'
+  | 'heating'
+  | 'vent'
+  | 'smoke'
+  | 'cooling'
+  | 'fire'
+  | 'common'
+  | 'sanitary'
+  | 'electric'
+  | 'lowcurrent';
 
 /** Группы слоёв трасс в порядке показа в панели «Слои». */
 export const MEP_GROUPS: readonly { readonly key: MepGroupKey; readonly label: string }[] = [
@@ -25,6 +36,8 @@ export const MEP_GROUPS: readonly { readonly key: MepGroupKey; readonly label: s
   { key: 'fire', label: 'Пожаротушение' },
   { key: 'common', label: 'Узлы и стояки' },
   { key: 'sanitary', label: 'Сантехника' },
+  { key: 'electric', label: 'Электроснабжение ЭОМ' },
+  { key: 'lowcurrent', label: 'Слаботочные системы СС' },
 ];
 
 export interface IMepLayerDef {
@@ -69,6 +82,19 @@ export const MEP_LAYERS: readonly IMepLayerDef[] = [
   { name: 'M-SAN-KSINK', group: 'sanitary', label: 'Мойка кухонная', token: '--cad-mep-san' },
   { name: 'M-SAN-WASHER', group: 'sanitary', label: 'Стиральная машина', token: '--cad-mep-san' },
   { name: 'M-SAN-MOPSINK', group: 'sanitary', label: 'Раковина ПУИ', token: '--cad-mep-san' },
+  // ЭОМ и СС этажа (генератор cad_eom): сети, стояки и приборы.
+  { name: 'E-EO-FEED', group: 'electric', label: 'Питающие линии ЩЭ → ЩМк', token: '--cad-eom-feed' },
+  { name: 'E-EO-LT', group: 'electric', label: 'Временное освещение квартир', token: '--cad-eom-lt' },
+  { name: 'E-EO-MOP', group: 'electric', label: 'Освещение МОП', token: '--cad-eom-mop' },
+  { name: 'E-EO-PE', group: 'electric', label: 'Уравнивание потенциалов', token: '--cad-eom-pe' },
+  { name: 'E-EO-RISER', group: 'electric', label: 'Стояк ЭО', token: '--cad-eom-riser' },
+  { name: 'E-EO-DEV', group: 'electric', label: 'Щиты и приборы ЭОМ', token: '--cad-eom-dev' },
+  { name: 'E-SS-TRAY', group: 'lowcurrent', label: 'Лоток СБ', token: '--cad-ss-tray' },
+  { name: 'E-SS-OPT', group: 'lowcurrent', label: 'Оптика GPON', token: '--cad-ss-opt' },
+  { name: 'E-SS-UTP', group: 'lowcurrent', label: 'Домофон UTP', token: '--cad-ss-utp' },
+  { name: 'E-SS-RAD', group: 'lowcurrent', label: 'Радиофикация', token: '--cad-ss-rad' },
+  { name: 'E-SS-RISER', group: 'lowcurrent', label: 'Стояк СС', token: '--cad-ss-riser' },
+  { name: 'E-SS-DEV', group: 'lowcurrent', label: 'Шкафы и приборы СС', token: '--cad-ss-dev' },
 ];
 
 /** Ключ браузерного хранилища маски скрытых слоёв. */
