@@ -216,8 +216,10 @@ export const useWorkspaceCadConstructions = ({
           onPick: (id, point) => {
             setPopoverError(null);
             setGroupKey(null);
-            setSelected(id === null ? NO_IDS : new Set([id]));
-            setActiveId(id);
+            // Повторный клик по конструкции с открытой карточкой снимает выбор.
+            const next = id !== null && activeId === id && selected.has(id) ? null : id;
+            setSelected(next === null ? NO_IDS : new Set([next]));
+            setActiveId(next);
             setAnchor(point);
           },
           onDismiss: closePopover,

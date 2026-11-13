@@ -183,6 +183,18 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
     // В режиме измерения клик ставит точку замера и плашку не открывает.
     if (measuring) return;
     setPopoverError(null);
+    // Повторный клик по уже выбранному элементу снимает выбор и в 3D, и в плане.
+    // Признак - открытая плашка этого же элемента (выбор из плана плашку не открывает).
+    const again =
+      pick !== null &&
+      picked !== null &&
+      picked.pick.kind === pick.kind &&
+      picked.pick.id === pick.id &&
+      (onSelectConstruction === undefined || !isConstructionPick(pick) || selectedIds.has(pick.id));
+    if (again) {
+      closePick();
+      return;
+    }
     // Стена и плита выбираются общим выбором (его подсвечивает холст), остальное - локально.
     const construction = pick !== null && isConstructionPick(pick);
     setSelected(pick !== null && !construction ? pick : null);
