@@ -50,3 +50,4 @@ ADR не переписываются задним числом. Если реш
 | [0044](0044-cad-dvizhok-otdelnym-repozitoriem.md)                             | CAD-движок отдельным встраиваемым репозиторием, Quantor берёт его по пину       | принято                |
 | [0045](0045-avtomasshtab-cad-po-razmernym-cepochkam.md)                       | Автомасштаб CAD по размерным цепочкам для листов без калибровки                 | принято                |
 | [0046](0046-pereezd-boevogo-stenda-na-suvpn.md)                               | Переезд боевого стенда на сервер suvpn                                          | принято                |
+| [0047](0047-eom-i-ss-etazha-v-pilote-cad.md)                                  | ЭОМ и СС этажа в пилоте CAD: генератор cad_eom по одобренному виду              | черновик               |
