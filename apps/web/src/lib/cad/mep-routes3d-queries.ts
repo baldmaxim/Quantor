@@ -89,8 +89,8 @@ export const useCadMepRoutes3d = ({
   view,
   enabled,
 }: ICadRoutes3dInput): CadRoutes3dState => {
-  // Список заданий общий с рабочей областью (тот же ключ кэша); пока трассы строятся, он опрашивается.
-  const jobs = useCadJobs(projectId, enabled ? revisionId : null);
+  // Задания листа (общий список ревизии ограничен 20 новейшими); пока трассы строятся, он опрашивается.
+  const jobs = useCadJobs(projectId, enabled ? revisionId : null, pageIndex);
   const latest = useMemo(
     () => latestRouteMark(jobs.data?.items ?? [], pageIndex, view),
     [jobs.data, pageIndex, view],

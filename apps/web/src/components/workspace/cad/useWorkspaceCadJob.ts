@@ -98,7 +98,8 @@ export const useWorkspaceCadJob = ({
   viewParam,
 }: IInput): IWorkspaceCadJobData => {
   const loadRevision = load ? revisionId : null;
-  const jobs = useCadJobs(projectId, loadRevision);
+  // Задания листа запрашиваются по странице: общий список ревизии ограничен 20 новейшими.
+  const jobs = useCadJobs(projectId, pageIndex !== null ? loadRevision : null, pageIndex);
   const items = useMemo(() => jobs.data?.items ?? [], [jobs.data]);
   const converts = useMemo(() => items.filter((item) => !isRouteJob(item)), [items]);
   // Без явного задания: самое новое готовое задание листа (старый CAD не пропадает, пока идёт

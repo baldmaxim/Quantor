@@ -39350,6 +39350,25 @@
               "title": "Revision Id",
               "type": "string"
             }
+          },
+          {
+            "description": "Только задания этой страницы (с 0): преобразование и трассы",
+            "in": "query",
+            "name": "page_index",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Только задания этой страницы (с 0): преобразование и трассы",
+              "title": "Page Index"
+            }
           }
         ],
         "responses": {

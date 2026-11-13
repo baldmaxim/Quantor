@@ -260,10 +260,19 @@ async def list_cad_jobs(
     revision_id: uuid.UUID,
     session: SessionDep,
     context: AuthDep,
+    page_index: int | None = Query(
+        default=None,
+        ge=0,
+        description="Только задания этой страницы (с 0): преобразование и трассы",
+    ),
 ) -> CadJobListRead:
     await _scope(session, context, project_id, revision_id)
     jobs = await cad_service.list_cad_jobs(
-        session, workspace_id=context.tenant, project_id=project_id, revision_id=revision_id
+        session,
+        workspace_id=context.tenant,
+        project_id=project_id,
+        revision_id=revision_id,
+        page_index=page_index,
     )
     return CadJobListRead(items=[summary_of(job) for job in jobs], server_time=_now())
 

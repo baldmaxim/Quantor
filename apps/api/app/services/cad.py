@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -409,20 +409,35 @@ async def list_cad_jobs(
     workspace_id: uuid.UUID,
     project_id: uuid.UUID,
     revision_id: uuid.UUID,
+    page_index: int | None = None,
     limit: int = 20,
 ) -> list[Job]:
-    """Задания CAD ревизии, новые сверху. Пространство и проект — в самом запросе."""
-    query = (
-        select(Job)
-        .where(
-            Job.workspace_id == workspace_id,
-            Job.project_id == project_id,
-            Job.job_type.in_(CAD_JOB_TYPES),
-            Job.payload["revision_id"].astext == str(revision_id),
+    """Задания CAD ревизии, новые сверху. Пространство и проект — в самом запросе.
+
+    С `page_index` (с 0) — только задания этой страницы: преобразование, у которого страница
+    входит в `params.pages`, и трассы MEP с `payload.page_index`. Фильтр в SQL: иначе при
+    массовом прогоне задание листа не попадает в последние `limit` заданий всей ревизии.
+    """
+    conditions = [
+        Job.workspace_id == workspace_id,
+        Job.project_id == project_id,
+        Job.job_type.in_(CAD_JOB_TYPES),
+        Job.payload["revision_id"].astext == str(revision_id),
+    ]
+    if page_index is not None:
+        conditions.append(
+            or_(
+                and_(
+                    Job.job_type == JobType.CAD_PDF_CONVERT,
+                    Job.payload["params"]["pages"].contains([page_index]),
+                ),
+                and_(
+                    Job.job_type == JobType.CAD_MEP_ROUTE,
+                    Job.payload["page_index"].astext == str(page_index),
+                ),
+            )
         )
-        .order_by(Job.created_at.desc())
-        .limit(limit)
-    )
+    query = select(Job).where(*conditions).order_by(Job.created_at.desc()).limit(limit)
     return list((await session.execute(query)).scalars().all())
 
 

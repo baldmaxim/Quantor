@@ -43,6 +43,9 @@ import { sortRemarks, type IRemarkBinding } from './remarks';
 
 export const cadKeys = {
   jobs: (projectId: string, revisionId: string) => ['cad', projectId, revisionId, 'jobs'] as const,
+  /** Задания одного листа: ключ начинается с `jobs`, поэтому сброс по префиксу задевает и его. */
+  jobsOfPage: (projectId: string, revisionId: string, pageIndex: number) =>
+    [...cadKeys.jobs(projectId, revisionId), 'page', pageIndex] as const,
   job: (projectId: string, revisionId: string, jobId: string) =>
     ['cad', projectId, revisionId, 'job', jobId, 'detail'] as const,
   events: (projectId: string, revisionId: string, jobId: string, attempt: number) =>
@@ -74,18 +77,30 @@ const SETTLED_LIST_STALE_MS = 60_000;
 export const isActiveStatus = (status: string | null | undefined): boolean =>
   status === 'queued' || status === 'running';
 
+/**
+ * Список заданий CAD ревизии. Без `pageIndex` - 20 самых новых заданий всей ревизии; с ним -
+ * задания этого листа (преобразование и трассы): после массового прогона задание листа в общие 20
+ * не попадает.
+ */
 export const useCadJobs = (
   projectId: string,
   revisionId: string | null,
+  pageIndex?: number | null,
 ): UseQueryResult<CadJobListRead> =>
   useQuery({
-    queryKey: cadKeys.jobs(projectId, revisionId ?? ''),
+    queryKey:
+      pageIndex === undefined || pageIndex === null
+        ? cadKeys.jobs(projectId, revisionId ?? '')
+        : cadKeys.jobsOfPage(projectId, revisionId ?? '', pageIndex),
     enabled: revisionId !== null,
     queryFn: async () =>
       unwrap(
         await listCadJobs({
           throwOnError: true,
           path: { project_id: projectId, revision_id: revisionId ?? '' },
+          ...(pageIndex === undefined || pageIndex === null
+            ? {}
+            : { query: { page_index: pageIndex } }),
         }),
       ),
     staleTime: (query) =>

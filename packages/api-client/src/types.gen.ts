@@ -20773,7 +20773,14 @@ export type ListCadJobsData = {
          */
         revision_id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Page Index
+         *
+         * Только задания этой страницы (с 0): преобразование и трассы
+         */
+        page_index?: number | null;
+    };
     url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad';
 };
 

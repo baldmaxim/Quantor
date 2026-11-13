@@ -178,14 +178,14 @@ beforeEach(() => {
 describe('useWorkspaceCad: запросы', () => {
   it('без флага cad.export ни одного запроса CAD не уходит', () => {
     mount({ enabled: false });
-    expect(mocks.jobs).toHaveBeenCalledWith('p1', null);
+    expect(mocks.jobs).toHaveBeenCalledWith('p1', null, 0);
     expect(mocks.job).toHaveBeenCalledWith('p1', null, null);
   });
 
   it('режим «Листы»: задания и вид читаются сразу, без захода в CAD; открытие CAD их не перезапускает', () => {
     recognized();
     const hook = mount({ active: false });
-    expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1');
+    expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1', 0);
     // Первый вызов - вид самого задания (второй - трассы, их тут нет).
     expect(mocks.view.mock.calls[0]?.[1]).toBe(true);
     expect(mocks.preview.mock.calls[0]?.[1]).toBe(true);
@@ -194,11 +194,11 @@ describe('useWorkspaceCad: запросы', () => {
     expect(hook.result.current.painter).not.toBeNull();
 
     hook.rerender(inputs({ active: true }));
-    expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1');
+    expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1', 0);
     expect(hook.result.current.opened).toBe(true);
 
     hook.rerender(inputs({ active: false }));
-    expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1');
+    expect(mocks.jobs).toHaveBeenLastCalledWith('p1', 'r1', 0);
     expect(hook.result.current.opened).toBe(true);
   });
 
