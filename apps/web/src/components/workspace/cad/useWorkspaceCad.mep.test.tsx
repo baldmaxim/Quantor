@@ -123,7 +123,7 @@ vi.mock('@/lib/cad/vor-queries', async (importOriginal) => ({
 }));
 // ЭОМ и СС листа: в этих тестах не строились, наложения нет.
 vi.mock('@/lib/cad/eom-queries', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/cad/eom-queries')>()),
+  ...(await importOriginal<Record<string, unknown>>()),
   useCadEomPreview: () => null,
 }));
 
