@@ -133,6 +133,6 @@ Selectel VDS 2-4-50 с соседями TG_Info, MailHub, ServerControl — он
 
 - остановленный стек `quantor-*` и тома `quantor_*` — только для отката, удаление — решением владельца;
 - `/opt/portals/quantor/update.sh` — заглушка, отменяющая выкладку; прежний — `update.sh.moved-20261113`;
-- временный мост `conf.d/quantor.conf`, проксирующий оба имени на suvpn, пока DNS не отработал.
-  После переключения DNS — удалить его, `nginx -t`, `nginx -s reload` (прежний конфиг —
-  `/opt/infra/nginx/quantor.conf.bak-premigrate-20261113`).
+- сайта Quantor в его infra-nginx больше нет: временный мост на suvpn снят 2026-11-13 после
+  переключения DNS (прежние конфиги — `/opt/infra/nginx/quantor.conf.bak-premigrate-20261113` и
+  `quantor.conf.bridge-removed-20261113`).
