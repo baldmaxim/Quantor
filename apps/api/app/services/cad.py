@@ -60,6 +60,11 @@ FLOOR3D_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/floor3d\.dxf$")
 ZONES_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/zones\.json$")
 # Артефакт задания «Разрезы» (`cad_sections`): один файл в корне артефактов задания.
 SECTIONS_ARTIFACT_NAME: Final = re.compile(r"^sections\.json$")
+# Артефакты задания ЭОМ и СС (`cad_eom_route`): отчёт, манифест и три файла в каталоге вида.
+EOM_ARTIFACT_NAME: Final = re.compile(
+    r"^(?:report\.json|manifest\.json|"
+    r"views/p\d{3}_v\d{2}/(?:eom_routes\.dxf|eom_candidate\.json|eom_routes3d\.json))$"
+)
 CONTENT_TYPES: Final = {".dxf": "application/dxf", ".json": "application/json"}
 # Типы заданий контура CAD: у обоих один и тот же вид доступа (пространство, проект, ревизия).
 CAD_JOB_TYPES: Final = (JobType.CAD_PDF_CONVERT, JobType.CAD_MEP_ROUTE)
@@ -178,6 +183,7 @@ def artifact_storage_key(revision_id: uuid.UUID, job_id: uuid.UUID, attempt: int
         or FLOOR3D_ARTIFACT_NAME.fullmatch(name)
         or ZONES_ARTIFACT_NAME.fullmatch(name)
         or SECTIONS_ARTIFACT_NAME.fullmatch(name)
+        or EOM_ARTIFACT_NAME.fullmatch(name)
     ):
         raise ValueError("недопустимое имя артефакта или номер попытки CAD")
     return f"revisions/{revision_id}/cad/{job_id}/attempt-{attempt}/{name}"
