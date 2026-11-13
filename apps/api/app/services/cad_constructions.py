@@ -613,6 +613,46 @@ def partition_heights_by_id(
     return result
 
 
+_FULL_HEIGHT_BASES: Final = frozenset({"bathroom_wall", "shaft_enclosure"})
+
+
+def rehost_openings_to_full_height(
+    document: WallsDocument, classes: Mapping[str, CadHeightBasis], props_by_key: PropsByKey
+) -> WallsDocument:
+    """Проём в маячном ряду, смежный со стеной санузла или шахты, переходит к ней как к хозяину.
+
+    Дверь стоит между двумя кусками одной стены; классы кусков считаются по зонам каждого и
+    могут разойтись: хозяин-перегородка (маячный ряд) при соседе-стене санузла оставил бы над
+    дверью пустоту (верх перемычки и надпроёмная часть берутся по высоте хозяина). Стена там
+    на полную высоту, поэтому хозяином становится смежная стена санузла или шахты. Ручная высота
+    хозяина (ввод человека) сильнее: такой проём не переносится. Чистая функция.
+    """
+    moved: dict[str, str] = {}
+    for opening in document.openings:
+        host = opening.host_id
+        if host is None or classes.get(host) != "apartment_partition":
+            continue
+        if (
+            props_by_key.get(host, (CadConstructionProps(), False))[0].height_override_mm
+            is not None
+        ):
+            continue
+        for neighbour in opening.adjacent_ids:
+            if classes.get(neighbour) in _FULL_HEIGHT_BASES:
+                moved[opening.id] = neighbour
+                break
+    if not moved:
+        return document
+    return document.model_copy(
+        update={
+            "openings": [
+                o.model_copy(update={"host_id": moved[o.id]}) if o.id in moved else o
+                for o in document.openings
+            ]
+        }
+    )
+
+
 def partition_warnings(
     partition: PartitionContext | None, candidates: Collection[str], props_by_key: PropsByKey
 ) -> list[tuple[str, str]]:
@@ -1006,6 +1046,7 @@ def compute_sheet(
     classes = classify_partitions(
         document.constructions, props_by_key, () if partition is None else partition.zones
     )
+    document = rehost_openings_to_full_height(document, classes, props_by_key)
     candidates = partition_candidate_ids(classes)
     partition_heights = partition_heights_by_id(classes, partition)
     known = {c.id for c in items_all}

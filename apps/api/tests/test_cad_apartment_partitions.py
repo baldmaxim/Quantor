@@ -417,6 +417,87 @@ def test_floor3d_without_partition_context_is_unchanged() -> None:
     assert {w.code for w in model.warnings} == set()
 
 
+# ------------------------------------------------------------------ проём над стеной санузла
+
+BATH_ZONES = [LEFT_LIVING, RIGHT_BATH]
+BEACON_ZONES = [LEFT_LIVING, RIGHT_LIVING]
+# Второй кусок той же линии стен (y от 2300 до 4300): дальше 150 мм от первого куска.
+SECOND_ID = "cccccccccccc"
+SECOND_SHELL = [[2960.0, 2300.0], [3040.0, 2300.0], [3040.0, 4300.0], [2960.0, 4300.0]]
+
+
+def second_piece() -> dict[str, Any]:
+    item = thin(key=SECOND_ID)
+    item["polygon"] = {"shell": SECOND_SHELL, "holes": []}
+    return item
+
+
+def zones_with_bath_second_piece() -> list[calc.PartitionZone]:
+    def box(x0: float, x1: float, room_type: str) -> calc.PartitionZone:
+        shell = [[x0, 2300.0], [x1, 2300.0], [x1, 4300.0], [x0, 4300.0]]
+        return calc.PartitionZone("room_apartment", "12", shell, room_type)
+
+    return [*BEACON_ZONES, box(0.0, 2960.0, "living"), box(3040.0, 6000.0, "bath")]
+
+
+def test_door_in_bathroom_wall_has_above_part_in_volume_and_lintel_to_wall_top() -> None:
+    context = calc.PartitionContext(BATH_ZONES, HEIGHT)
+    door = opening("d1", PARTITION_ID, width=800.0)
+    computed = sheet(partition=context, openings=[door]).constructions[0].computed
+    assert (computed.height_mm, computed.height_basis) == (2800, "bathroom_wall")
+    # (2000 x 2800 + 800 x (2800 - 2100)) x 80 мм
+    assert computed.volume_m3 == pytest.approx((2000 * 2800 + 800 * 700) * 80 / 1e9, abs=5e-5)
+    model = build_3d(context)
+    (lintel,) = model.lintels
+    assert (lintel.z_bottom_mm, lintel.z_top_mm) == (BASE + 2100, BASE + 2800)
+
+
+def test_door_in_beacon_row_has_no_above_part_and_no_lintel() -> None:
+    context = calc.PartitionContext(BEACON_ZONES, HEIGHT)
+    door = opening("d1", PARTITION_ID, width=800.0)
+    computed = sheet(partition=context, openings=[door]).constructions[0].computed
+    assert computed.volume_m3 == pytest.approx(2000 * 80 * 188 / 1e9, abs=5e-5)
+    assert build_3d(context).lintels == []
+
+
+def test_door_hosted_by_beacon_piece_next_to_bathroom_piece_goes_to_the_bathroom_wall() -> None:
+    context = calc.PartitionContext(zones_with_bath_second_piece(), HEIGHT)
+    door = opening("d1", PARTITION_ID, width=800.0)
+    door["adjacent_ids"] = [PARTITION_ID, SECOND_ID]
+    result = calc.compute_sheet(
+        document([thin(), second_piece()], [door]), {}, NO_LEVELS, partition=context
+    )
+    beacon, bath = (c.computed for c in result.constructions)
+    assert (beacon.height_basis, bath.height_basis) == ("apartment_partition", "bathroom_wall")
+    assert beacon.volume_m3 == pytest.approx(2000 * 80 * 188 / 1e9, abs=5e-5)
+    assert bath.volume_m3 == pytest.approx((2000 * 2800 + 800 * 700) * 80 / 1e9, abs=5e-5)
+
+
+def test_floor3d_door_between_beacon_and_bathroom_pieces_gets_lintel_to_wall_top() -> None:
+    raw = raw_document()
+    raw["constructions"][0]["polygon"] = {"shell": THIN_SHELL, "holes": []}
+    raw["constructions"][0]["thickness_nominal_mm"] = 80.0
+    second = {**raw["constructions"][0], "id": SECOND_ID}
+    second["polygon"] = {"shell": SECOND_SHELL, "holes": []}
+    raw["constructions"].append(second)
+    raw["openings"][0]["adjacent_ids"] = ["aaaaaaaaaaaa", SECOND_ID]
+    zones = zones_with_bath_second_piece()
+    model = f3d.build_floor3d(
+        WallsDocument.model_validate(raw),
+        WallsFloorExtras.model_validate(raw_extras()),
+        props_by_key={},
+        overrides=NO_LEVELS,
+        project_slab=None,
+        hole_decisions={},
+        door_zones=[],
+        partition=calc.PartitionContext(zones, HEIGHT),
+    )
+    assert wall_of(model).z_top_mm == BASE + 188
+    (lintel,) = model.lintels
+    assert (lintel.z_bottom_mm, lintel.z_top_mm) == (BASE + 2100, BASE + 2800)
+    assert lintel.host_id == SECOND_ID
+
+
 # ------------------------------------------------------------------ якорь вопроса
 
 POLIGRAN_TEXT = (

@@ -355,6 +355,7 @@ def build_floor3d(
     classes = cad_constructions.classify_partitions(
         document.constructions, props_by_key, () if partition is None else partition.zones
     )
+    document = cad_constructions.rehost_openings_to_full_height(document, classes, props_by_key)
     candidates = cad_constructions.partition_candidate_ids(classes)
     partition_heights = cad_constructions.partition_heights_by_id(classes, partition)
     warnings.extend(
