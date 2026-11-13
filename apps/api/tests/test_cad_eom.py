@@ -158,19 +158,42 @@ def test_eom_routes_are_in_openapi_and_job_type_is_registered() -> None:
 
 def test_device_is_placed_at_its_box_centre_with_the_axis_scaled_like_mep() -> None:
     wall = CadEomFileElement.model_validate(
-        {"type": "device", "subtype": "panel_shell", "layer": "E-EO-DEV", "pos": [100, 200, 1700],
-         "axis": [0, 2, 0], "w_mm": 220, "h_mm": 300, "d_mm": 100}
+        {
+            "type": "device",
+            "subtype": "panel_shell",
+            "layer": "E-EO-DEV",
+            "pos": [100, 200, 1700],
+            "axis": [0, 2, 0],
+            "w_mm": 220,
+            "h_mm": 300,
+            "d_mm": 100,
+        }
     )
     out = element_out(wall)
     assert out.pos == (100, 250, 1700) and out.axis == (0, 1000, 0)
     ceiling = CadEomFileElement.model_validate(
-        {"type": "device", "subtype": "light_temp", "layer": "E-EO-DEV", "pos": [0, 0, 3000],
-         "axis": [0, 0, -1], "w_mm": 170, "h_mm": 170, "d_mm": 65}
+        {
+            "type": "device",
+            "subtype": "light_temp",
+            "layer": "E-EO-DEV",
+            "pos": [0, 0, 3000],
+            "axis": [0, 0, -1],
+            "w_mm": 170,
+            "h_mm": 170,
+            "d_mm": 65,
+        }
     )
     assert element_out(ceiling).pos == (0, 0, 2968)
     sleeve = CadEomFileElement.model_validate(
-        {"type": "sleeve", "subtype": "sleeve_50", "layer": "E-SS-RISER", "pos": [5, 5, 3100],
-         "axis": [0, 0, 1], "outer_d_mm": 50, "length_mm": 200}
+        {
+            "type": "sleeve",
+            "subtype": "sleeve_50",
+            "layer": "E-SS-RISER",
+            "pos": [5, 5, 3100],
+            "axis": [0, 0, 1],
+            "outer_d_mm": 50,
+            "length_mm": 200,
+        }
     )
     assert element_out(sleeve).pos == (5, 5, 3100), "у гильзы pos - центр, без сдвига"
 
@@ -191,8 +214,17 @@ def test_idempotency_key_changes_with_levels_and_version() -> None:
 
     base = key()
     assert base.startswith("cadeom:") and base == key()
-    assert len({base, key(floor_height_mm=3000), key(slab_thickness_mm=250),
-                key(generator_version="cad_eom.v0.2")}) == 4
+    assert (
+        len(
+            {
+                base,
+                key(floor_height_mm=3000),
+                key(slab_thickness_mm=250),
+                key(generator_version="cad_eom.v0.2"),
+            }
+        )
+        == 4
+    )
 
 
 def test_generator_exit_codes_map_to_eom_errors() -> None:
