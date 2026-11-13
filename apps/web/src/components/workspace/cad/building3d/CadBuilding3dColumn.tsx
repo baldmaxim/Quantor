@@ -25,6 +25,8 @@ export interface ICadBuilding3dColumnProps {
   /** Открытый сейчас лист: этаж с тем же заданием, страницей и видом выделяется акцентом. */
   readonly current: { readonly jobId: string; readonly pageIndex: number; readonly view: number } | null;
   readonly onSelectFloor: (floor: CadBuilding3dFloorRead) => void;
+  /** `column` - боковая колонка рабочей области (по умолчанию); `page` - вид на всю страницу. */
+  readonly layout?: 'column' | 'page';
 }
 
 interface IHover {
@@ -35,15 +37,37 @@ interface IHover {
 const ROW =
   'flex min-h-[44px] w-full items-center justify-between gap-[var(--s-3)] px-[var(--s-4)] py-[var(--s-2)] text-left text-sm transition-colors motion-reduce:transition-none hover:bg-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
+// Вид `page`: холст на основную площадь, список этажей справа (от lg) или под холстом (уже).
+const PAGE_ASIDE = 'flex h-full min-h-0 min-w-0 flex-1 flex-col bg-surface';
+const PAGE_BODY = 'flex min-h-0 flex-1 flex-col overflow-y-auto [overscroll-behavior:contain] lg:flex-row lg:overflow-hidden';
+const PAGE_CANVAS = 'relative h-[60dvh] min-h-[320px] min-w-0 flex-none lg:h-auto lg:min-h-0 lg:flex-1';
+const PAGE_LIST =
+  'min-h-[200px] flex-none divide-y divide-border overflow-auto border-t border-border [overscroll-behavior:contain] lg:min-h-0 lg:w-[280px] lg:border-l lg:border-t-0';
+
+// Вид `column` (рабочая область): прежняя разметка без изменений.
+const COLUMN_ASIDE =
+  'flex flex-none flex-col border-b border-border bg-surface lg:h-full lg:w-[280px] lg:border-b-0 lg:border-r';
+const COLUMN_BODY = 'flex min-h-0 flex-1 flex-row lg:flex-col';
+const COLUMN_CANVAS = 'relative min-h-0 min-w-0 flex-1 basis-1/2 lg:min-h-[200px] lg:basis-auto';
+const COLUMN_LIST =
+  'min-h-0 flex-1 basis-1/2 divide-y divide-border overflow-auto border-l border-border [overscroll-behavior:contain] lg:max-h-[45%] lg:flex-none lg:basis-auto lg:border-l-0 lg:border-t';
+
 /**
  * Колонка «Здание» вида «3D»: аксонометрия стопки этажей и список этажей одного здания (корпус +
  * секция; при нескольких - переключатель). Действующее здание: ручной выбор (только пока открыт тот же
  * лист, при котором он сделан), иначе здание открытого листа, иначе первое. Этажи уже совмещены сервером по
  * осям; несовмещённые помечены в списке и в подсказке. Щелчок по этажу на
  * холсте или в списке открывает его лист в основном 3D-виде. Этаж без отметки в 3D не строится
- * и стоит в списке внизу. Ширина от `lg` - колонка слева; уже - сворачиваемая полоса сверху.
+ * и стоит в списке внизу. Вид `column`: от `lg` - колонка слева; уже - сворачиваемая полоса сверху.
+ * Вид `page`: на всю страницу, без сворачивания.
  */
-export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, current, onSelectFloor }) => {
+export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({
+  projectId,
+  current,
+  onSelectFloor,
+  layout = 'column',
+}) => {
+  const isPage = layout === 'page';
   const query = useCadBuilding3d(projectId, true);
   const [open, setOpen] = useState(true);
   const [hover, setHover] = useState<IHover | null>(null);
@@ -135,8 +159,8 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
     );
   } else {
     body = (
-      <div className="flex min-h-0 flex-1 flex-row lg:flex-col">
-        <div className="relative min-h-0 min-w-0 flex-1 basis-1/2 lg:min-h-[200px] lg:basis-auto">
+      <div className={isPage ? PAGE_BODY : COLUMN_BODY}>
+        <div className={isPage ? PAGE_CANVAS : COLUMN_CANVAS}>
           {list.known.length > 0 && canvasError === null && (
             <CadBuilding3dCanvas
               floors={floors}
@@ -168,7 +192,7 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
             </div>
           )}
         </div>
-        <ul className="min-h-0 flex-1 basis-1/2 divide-y divide-border overflow-auto border-l border-border [overscroll-behavior:contain] lg:max-h-[45%] lg:flex-none lg:basis-auto lg:border-l-0 lg:border-t">
+        <ul className={isPage ? PAGE_LIST : COLUMN_LIST}>
           {list.known.map(renderRow)}
           {list.unknown.map(renderRow)}
         </ul>
@@ -177,24 +201,25 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({ projectId, 
   }
 
   return (
-    <aside
-      aria-label="Здание"
-      className="flex flex-none flex-col border-b border-border bg-surface lg:h-full lg:w-[280px] lg:border-b-0 lg:border-r"
-    >
+    <aside aria-label="Здание" className={isPage ? PAGE_ASIDE : COLUMN_ASIDE}>
       <div className="flex flex-none items-center justify-between gap-[var(--s-3)] px-[var(--s-4)] py-[var(--s-2)]">
-        <h2 className="hidden text-sm font-medium lg:block">Здание</h2>
-        <Button
-          className="min-h-[44px] lg:hidden"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? 'Здание (свернуть)' : 'Здание (развернуть)'}
-        </Button>
+        <h2 className={isPage ? 'text-sm font-medium' : 'hidden text-sm font-medium lg:block'}>Здание</h2>
+        {!isPage && (
+          <Button
+            className="min-h-[44px] lg:hidden"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? 'Здание (свернуть)' : 'Здание (развернуть)'}
+          </Button>
+        )}
       </div>
       <div
         className={cx(
           'min-h-0 flex-1 flex-col',
-          open ? cx('flex lg:h-auto', groups.length > 1 ? 'h-[272px]' : 'h-[220px]') : 'hidden lg:flex',
+          isPage || open
+            ? cx('flex', !isPage && cx('lg:h-auto', groups.length > 1 ? 'h-[272px]' : 'h-[220px]'))
+            : 'hidden lg:flex',
         )}
       >
         <CadBuilding3dGroupSelect

@@ -19,7 +19,6 @@ import {
   type OpenState,
 } from '@/lib/openability';
 import { CAD_FEATURE } from '@/lib/cad/access';
-import { CALC_FEATURE } from '@/lib/calc/access';
 import { CONSISTENCY_FEATURE } from '@/lib/consistency/access';
 import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 import { useFeatures, useProject, useProjectDocuments, useProjectRevisions } from '@/lib/queries';
@@ -120,9 +119,9 @@ const ProjectPage = ({ params }: IPageProps) => {
                 Вопросы к документации
               </ButtonLink>
             )}
-            {features[CALC_FEATURE] === true && (
-              <ButtonLink href={`/projects/${projectId}/calc`} transitionTypes={['nav-forward']}>
-                Расчёты
+            {features[CAD_FEATURE] === true && (
+              <ButtonLink href={`/projects/${projectId}/building3d`} transitionTypes={['nav-forward']}>
+                3D
               </ButtonLink>
             )}
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>

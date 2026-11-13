@@ -53,7 +53,7 @@ export const pageText = (pageIndex: number, pageLabel: string | null): string =>
 
 /**
  * Ссылка на страницу документа в рабочей области: `page` — номер с 1, как и в остальном
- * интерфейсе (см. `documentHref` в `components/calc/FactEvidence.tsx`).
+ * интерфейсе.
  */
 export const docPageHref = (projectId: string, revisionId: string, pageIndex: number): string =>
   `/projects/${projectId}/workspace?revision=${revisionId}&page=${pageIndex + 1}`;
