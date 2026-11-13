@@ -7,8 +7,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.api.v1.deps import AuthDep, SessionDep, StorageDep, require, require_feature
 from app.auth.permissions import Permission
@@ -28,7 +29,14 @@ router = APIRouter(tags=["cad-building3d"], dependencies=[require_feature("cad.e
     dependencies=[require(Permission.DOCUMENT_READ)],
 )
 async def read_cad_building3d(
-    project_id: uuid.UUID, session: SessionDep, context: AuthDep, storage: StorageDep
+    project_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+    walls: Annotated[
+        bool,
+        Query(description="Добавить контуры конструкций этажей (по умолчанию ответ лёгкий)"),
+    ] = False,
 ) -> CadBuilding3dRead:
     project = await projects_service.get_project(
         session, workspace_id=context.tenant, project_id=project_id
@@ -36,7 +44,7 @@ async def read_cad_building3d(
     if project is None:
         raise not_found("Проект")
     return await cad_building3d.build_building3d(
-        session, storage, workspace_id=context.tenant, project_id=project_id
+        session, storage, workspace_id=context.tenant, project_id=project_id, include_walls=walls
     )
 
 

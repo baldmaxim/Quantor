@@ -20,6 +20,8 @@ import { sheetPosition } from './workspace-url';
 
 export const building3dKeys = {
   project: (projectId: string) => ['cad-building3d', projectId] as const,
+  /** С контурами конструкций; префикс общий с `project`, поэтому инвалидация по `project` его захватывает. */
+  projectWalls: (projectId: string) => ['cad-building3d', projectId, 'walls'] as const,
 };
 
 export const BUILDING3D_STALE_MS = 5 * 60 * 1000;
@@ -34,6 +36,22 @@ export const useCadBuilding3d = (
     staleTime: BUILDING3D_STALE_MS,
     queryFn: async () =>
       unwrap(await readCadBuilding3D({ throwOnError: true, path: { project_id: projectId } })),
+    retry: (count, error) => extractCode(error) === 'NETWORK_ERROR' && count < 2,
+  });
+
+/** Здание с контурами конструкций этажей (`walls=true`): для просмотрщика объекта; ответ тяжелее. */
+export const useCadBuilding3dWalls = (projectId: string): UseQueryResult<CadBuilding3dRead> =>
+  useQuery({
+    queryKey: building3dKeys.projectWalls(projectId),
+    staleTime: BUILDING3D_STALE_MS,
+    queryFn: async () =>
+      unwrap(
+        await readCadBuilding3D({
+          throwOnError: true,
+          path: { project_id: projectId },
+          query: { walls: true },
+        }),
+      ),
     retry: (count, error) => extractCode(error) === 'NETWORK_ERROR' && count < 2,
   });
 

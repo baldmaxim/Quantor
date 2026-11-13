@@ -30,6 +30,7 @@ import { CadFloor3dHeights } from './CadFloor3dHeights';
 import { CadFloor3dHoleList } from './CadFloor3dHoleList';
 import { CadFloor3dInfoPanel } from './CadFloor3dInfoPanel';
 import { CadFloor3dPopover } from './CadFloor3dPopover';
+import { CadFloor3dWarnings } from './CadFloor3dWarnings';
 
 export interface ICadFloor3dViewProps {
   /** Лист и вид, которые показывает план: те же задание, страница и вид. */
@@ -42,6 +43,8 @@ export interface ICadFloor3dViewProps {
   readonly hiddenCategories?: ReadonlySet<CadLayerCategory>;
   /** Конструкции, скрытые вкладкой «Слои» (категория или все слои-источники). */
   readonly hiddenConstructionIds?: ReadonlySet<string>;
+  /** Только просмотр (страница объекта): без правки высот, отверстий и выгрузки DXF. */
+  readonly readOnly?: boolean;
 }
 
 /** Связь 3D-вида с общим выбором и слоями рабочей области: всё, кроме листа. */
@@ -91,6 +94,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   onSelectConstruction,
   hiddenCategories,
   hiddenConstructionIds,
+  readOnly = false,
 }) => {
   const query = useCadFloor3d(params, true);
   const projectLevels = useCadProjectLevels(params.projectId, true);
@@ -123,7 +127,9 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const routesMask = useMepLayerVisibility().mask;
   const routesData = routesState.status === 'ready' ? routesState.data : null;
   const routes = useMemo<ICadFloor3dRoutes | null>(
-    () => (routesData && model ? { polylines: routesData.polylines, baseZMm: routesBaseZMm(model) } : null),
+    () => (routesData && model
+        ? { polylines: routesData.polylines, elements: routesData.elements, baseZMm: routesBaseZMm(model) }
+        : null),
     [routesData, model],
   );
 
@@ -182,6 +188,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const onPick = (pick: IFloor3dPick | null, anchor: { x: number; y: number }) => {
     // В режиме измерения клик ставит точку замера и плашку не открывает.
     if (measuring) return;
+    // Решение по отверстию - запись: в режиме просмотра плашка отверстия не открывается.
+    if (readOnly && pick?.kind === 'hole') return;
     setPopoverError(null);
     // Повторный клик по уже выбранному элементу снимает выбор и в 3D, и в плане.
     // Признак - открытая плашка этого же элемента (выбор из плана плашку не открывает).
@@ -372,15 +380,24 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
           >
             Плита сверху
           </ToolButton>
-          <ToolDivider />
-          <CadFloor3dDxfButton
-            params={params}
-            model={model}
-            title={model?.title}
-            disabled={!interactive}
-            hasCandidates={model?.slab_holes.some((hole) => hole.state === 'candidate') ?? false}
-          />
-          {model !== null && (
+          {!readOnly && (
+            <>
+              <ToolDivider />
+              <CadFloor3dDxfButton
+                params={params}
+                model={model}
+                title={model?.title}
+                disabled={!interactive}
+                hasCandidates={model?.slab_holes.some((hole) => hole.state === 'candidate') ?? false}
+              />
+            </>
+          )}
+          {model !== null && readOnly && model.warnings.length > 0 && (
+            <CadFloor3dInfoPanel label="Предупреждения модели этажа">
+              <CadFloor3dWarnings warnings={model.warnings} />
+            </CadFloor3dInfoPanel>
+          )}
+          {model !== null && !readOnly && (
             <CadFloor3dInfoPanel>
               <CadFloor3dHeights
                 heights={model.heights}
@@ -406,20 +423,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
                   setHole.mutate({ key, enabled }, { onError: (error) => setPanelError(cadErrorText(error)) });
                 }}
               />
-              {model.warnings.length > 0 && (
-                <section aria-label="Предупреждения" className="flex min-w-0 flex-col gap-[var(--s-3)]">
-                  <h4 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
-                    Предупреждения
-                  </h4>
-                  <ul className="flex flex-col gap-[var(--s-2)]">
-                    {model.warnings.map((item) => (
-                      <li key={`${item.code}:${item.message}`} className="text-xs text-warning [overflow-wrap:anywhere]">
-                        {item.message}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
+              <CadFloor3dWarnings warnings={model.warnings} />
             </CadFloor3dInfoPanel>
           )}
         </div>

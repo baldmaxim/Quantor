@@ -259,6 +259,7 @@ def built(
     axes: dict[str, Any] | None = None,
     frame: CadFrameRead = FRAME,
     shift: tuple[float, float] = (0.0, 0.0),
+    include_walls: bool = False,
 ) -> b3d.BuiltFloor:
     """Этаж из walls.json с заголовком плана и (необязательно) осями; `shift` сдвигает DXF."""
     title = {"corps": corps, "section": section, "floors": [1], "text": None}
@@ -277,7 +278,11 @@ def built(
         }
     document = WallsDocument.model_validate(raw)
     floor, _ = b3d.build_floor(
-        sheet(order=(0.0, 0.0, order, 1)), document, WallsFloorExtras.model_validate(extras), None
+        sheet(order=(0.0, 0.0, order, 1)),
+        document,
+        WallsFloorExtras.model_validate(extras),
+        None,
+        include_walls=include_walls,
     )
     return b3d.BuiltFloor(floor, (0.0, 0.0, order, 1), b3d.axes_in_mm(raw, frame))
 
@@ -490,3 +495,104 @@ def test_duplicate_label_with_far_positions_is_dropped() -> None:
     block["items"].append({"label": "3.1", "orient": "vertical", "pos_pt": 9999.0})
     axes = b3d.axes_in_mm({"axes": block}, FRAME)
     assert "3.1" not in axes.vertical and axes.message is not None
+
+
+# ------------------------------------------------------------------ контуры конструкций
+
+
+def floor_with_walls(raw: dict[str, Any], *, include: bool = True) -> CadBuilding3dFloorRead:
+    floor, _warnings = b3d.build_floor(
+        sheet(),
+        WallsDocument.model_validate(raw),
+        WallsFloorExtras.model_validate(raw_extras()),
+        None,
+        include_walls=include,
+    )
+    return floor
+
+
+def test_walls_are_not_requested_by_default() -> None:
+    assert floor_with_walls(raw_document(), include=False).walls is None
+    assert floor_of(raw_document(), raw_extras()).walls is None
+
+
+def test_walls_carry_kind_and_integer_open_rings() -> None:
+    raw = raw_document()
+    raw["constructions"][0]["polygon"]["shell"] = [
+        [0.4, 0.0],
+        [5000.0, 0.0],
+        [5000.0, 0.0],
+        [5000.0, 200.6],
+        [0.4, 200.6],
+        [0.4, 0.0],
+    ]
+    walls = floor_with_walls(raw).walls
+    assert walls is not None
+    assert [w.kind for w in walls] == ["masonry", "monolith_pylon"]
+    assert walls[0].shell == [[0, 0], [5000, 0], [5000, 201], [0, 201]]
+    assert all(isinstance(v, int) for w in walls for p in w.shell for v in p)
+
+
+def test_floor_slab_and_degenerate_rings_are_not_walls() -> None:
+    raw = raw_document()
+    slab = {**raw["constructions"][0], "id": "cccccccccccc", "kind": "floor_slab"}
+    thin = {**raw["constructions"][0], "id": "dddddddddddd"}
+    thin["polygon"] = {"shell": [[0.0, 0.0], [0.2, 0.1], [0.3, 0.2]], "holes": []}
+    raw["constructions"] = [*raw["constructions"], slab, thin]
+    walls = floor_with_walls(raw).walls
+    assert walls is not None
+    assert [w.kind for w in walls] == ["masonry", "monolith_pylon"]
+
+
+def test_wall_with_many_points_is_simplified_to_the_limit() -> None:
+    raw = raw_document()
+    raw["constructions"][0]["polygon"]["shell"] = circle(3000)
+    walls = floor_with_walls(raw).walls
+    assert walls is not None
+    assert 3 <= len(walls[0].shell) <= b3d.MAX_WALL_POINTS
+
+
+def test_walls_over_limit_are_cut_with_warning() -> None:
+    raw = raw_document()
+    raw["constructions"] = [
+        {**raw["constructions"][0], "id": f"{i:012d}"} for i in range(b3d.MAX_WALLS_PER_FLOOR + 5)
+    ]
+    floor, warnings = b3d.build_floor(
+        sheet(),
+        WallsDocument.model_validate(raw),
+        WallsFloorExtras.model_validate(raw_extras()),
+        None,
+        include_walls=True,
+    )
+    assert floor.walls is not None and len(floor.walls) == b3d.MAX_WALLS_PER_FLOOR
+    assert [w.code for w in warnings] == ["walls_truncated"]
+
+
+def test_walls_are_shifted_by_the_same_offset_as_outline() -> None:
+    reference = built(axes=ref_axes(), include_walls=True)
+    moved = built(
+        elevation=BASE + 3000,
+        order=1,
+        axes=axes_block(
+            {k: v + 1234.0 for k, v in REF_X.items()}, {k: v - 567.25 for k, v in REF_Y.items()}
+        ),
+        shift=(1234.0, -567.25),
+        include_walls=True,
+    )
+    ref_floor, floor = b3d.align_floors([reference, moved])
+    assert ref_floor.walls is not None and floor.walls is not None
+    assert floor.offset_mm == pytest.approx((-1234.0, 567.25))
+    assert [w.shell for w in floor.walls] == [w.shell for w in ref_floor.walls]
+    assert all(isinstance(v, int) for w in floor.walls for p in w.shell for v in p)
+
+
+def test_fallback_shift_also_moves_walls_and_keeps_none_when_not_requested() -> None:
+    reference = built(axes=ref_axes(), include_walls=True)
+    partial = built(elevation=BASE + 3000, order=1, shift=(100.0, 0.0), include_walls=True)
+    plain = built(elevation=BASE + 3000, order=1, shift=(100.0, 0.0))
+    ref_floor, floor = b3d.align_floors([reference, partial])
+    _ref, bare = b3d.align_floors([reference, plain])
+    assert bare.walls is None
+    assert ref_floor.walls is not None and floor.walls is not None
+    assert floor.offset_mm == pytest.approx((-100.0, 0.0))
+    assert [w.shell for w in floor.walls] == [w.shell for w in ref_floor.walls]

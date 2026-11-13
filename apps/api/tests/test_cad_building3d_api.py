@@ -192,3 +192,23 @@ async def test_axes_in_walls_file_make_the_single_floor_a_reference(
     assert body["groups"] == [
         {"key": "k9-s3", "label": "Корп. 9 · сек. 3", "floor_count": 1, "aligned_count": 1}
     ]
+
+
+async def test_walls_query_adds_construction_rings_and_default_stays_light(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _rev, _job, _walls = await _ready_sheet(api, db_session, fake_storage, settings)
+        light = (await api.get(_url(project_id))).json()
+        full = (await api.get(_url(project_id), params={"walls": "true"})).json()
+    (light_floor,) = light["floors"]
+    (floor,) = full["floors"]
+    assert light_floor["walls"] is None
+    assert floor["walls"], "стены не вернулись"
+    assert all(w["kind"] != "floor_slab" and len(w["shell"]) >= 3 for w in floor["walls"])
+    assert all(isinstance(v, int) for w in floor["walls"] for p in w["shell"] for v in p)

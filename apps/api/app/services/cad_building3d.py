@@ -1,8 +1,9 @@
 """Общий вид здания для 3D: этажи проекта (листы CAD) с отметками и контуром плиты.
 
 Этаж — тройка (задание `cad_pdf_convert`, страница, вид) с последним успешным `cad_walls`.
-Из `walls.json` берётся только контур плиты (или прямоугольник по стенам) и высоты; модель этажа
-целиком (стены, двери, зоны) здесь не строится. Высоты — действующие значения листа, те же, что
+Из `walls.json` берётся контур плиты (или прямоугольник по стенам) и высоты; по запросу
+(`include_walls`) - ещё внешние кольца конструкций. Модель этажа целиком (двери, зоны) здесь не
+строится. Высоты — действующие значения листа, те же, что
 в `cad_floor3d.build_floor3d` (`cad_constructions.effective_levels`).
 
 Этажи делятся на здания по корпусу и секции из заголовка плана; этажи одного здания совмещаются
@@ -34,6 +35,7 @@ from app.contracts.cad_building3d import (
     CadBuilding3dFloorRead,
     CadBuilding3dGroupRead,
     CadBuilding3dRead,
+    CadBuilding3dWallRead,
     CadBuilding3dWarningRead,
 )
 from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
@@ -47,6 +49,9 @@ from app.services.cad_floor_title import format_floor_title
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 MAX_OUTLINE_POINTS: Final = 200
+# Контуры конструкций (`walls=true`): предел числа на этаж и точек в кольце.
+MAX_WALLS_PER_FLOOR: Final = 4000
+MAX_WALL_POINTS: Final = 64
 READ_CONCURRENCY: Final = 6
 # Для отрисовки, когда высота этажа или толщина плиты не определены (помечаются `*_known = false`).
 DEFAULT_FLOOR_HEIGHT_MM: Final = 3000
@@ -155,6 +160,26 @@ def _rectangle(box: Sequence[float]) -> list[list[float]]:
     return [[minx, miny], [maxx, miny], [maxx, maxy], [minx, maxy]]
 
 
+def _round_mm(value: float) -> int:
+    """Округление к ближайшему целому мм (половина - вверх): разные целые не склеиваются."""
+    return math.floor(value + 0.5)
+
+
+def wall_ring(shell: Sequence[Sequence[float]]) -> list[list[int]] | None:
+    """Кольцо конструкции для вида: открытое, целые мм, без подряд идущих дублей.
+
+    Больше `MAX_WALL_POINTS` точек - Дуглас - Пекер (`simplify_ring`): сохраняет углы и берёт
+    подмножество исходных точек; прореживание «через одну» срезало бы углы стен. Меньше трёх
+    точек - `None` (вырожденное кольцо).
+    """
+    rounded = _open_ring([[_round_mm(p[0]), _round_mm(p[1])] for p in shell])
+    if len(rounded) > MAX_WALL_POINTS:
+        rounded = _open_ring(simplify_ring([[x, y] for x, y in rounded], MAX_WALL_POINTS))
+    if len(rounded) < 3:
+        return None
+    return [[_round_mm(x), _round_mm(y)] for x, y in rounded]
+
+
 # --------------------------------------------------------------------------- лист -> этаж
 
 
@@ -205,8 +230,14 @@ def build_floor(
     document: WallsDocument,
     extras: WallsFloorExtras,
     project_slab: ProjectSlab | None,
+    *,
+    include_walls: bool = False,
 ) -> tuple[CadBuilding3dFloorRead, list[CadBuilding3dWarningRead]]:
-    """Этаж по walls.json: высоты и контур плиты (или прямоугольник по стенам)."""
+    """Этаж по walls.json: высоты и контур плиты (или прямоугольник по стенам).
+
+    `include_walls` - добавить контуры конструкций (`floor_slab` пропускается: плита уже в
+    `outline`); сверх `MAX_WALLS_PER_FLOOR` лишние отбрасываются с предупреждением.
+    """
     levels = effective_levels(document.heights, sheet.overrides, project_slab)
     warnings: list[CadBuilding3dWarningRead] = []
     floor_height = levels.floor_height.value_mm
@@ -243,6 +274,28 @@ def build_floor(
     corps = _clean(title.corps) if title is not None else None
     section = _clean(title.section) if title is not None else None
     group_key, group_label = group_of(corps, section)
+    walls: list[CadBuilding3dWallRead] | None = None
+    if include_walls:
+        walls = []
+        skipped = 0
+        for construction in document.constructions:
+            if construction.kind == "floor_slab":
+                continue
+            ring = wall_ring(construction.polygon.shell)
+            if ring is None:
+                continue
+            if len(walls) >= MAX_WALLS_PER_FLOOR:
+                skipped += 1
+                continue
+            walls.append(CadBuilding3dWallRead(kind=construction.kind, shell=ring))
+        if skipped:
+            warnings.append(
+                CadBuilding3dWarningRead(
+                    code="walls_truncated",
+                    message=f"{sheet.label}: конструкций больше {MAX_WALLS_PER_FLOOR}, "
+                    f"{skipped} не показано.",
+                )
+            )
     floor = CadBuilding3dFloorRead(
         job_id=sheet.job_id,
         revision_id=sheet.revision_id,
@@ -267,6 +320,7 @@ def build_floor(
         alignment="none",
         alignment_axes=[],
         alignment_message=None,
+        walls=walls,
     )
     return floor, warnings
 
@@ -396,8 +450,20 @@ def _match_orient(
 
 def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding3dFloorRead:
     box = floor.bbox
+    walls = (
+        None
+        if floor.walls is None
+        else [
+            CadBuilding3dWallRead(
+                kind=wall.kind,
+                shell=[[_round_mm(x + dx), _round_mm(y + dy)] for x, y in wall.shell],
+            )
+            for wall in floor.walls
+        ]
+    )
     return floor.model_copy(
         update={
+            "walls": walls,
             "outline": [[x + dx, y + dy] for x, y in floor.outline],
             "bbox": None if box is None else [box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy],
             "offset_mm": (round(dx, 3), round(dy, 3)),
@@ -735,7 +801,12 @@ async def _read_frame(
 
 
 async def build_building3d(
-    session: AsyncSession, storage: ObjectStorage, *, workspace_id: uuid.UUID, project_id: uuid.UUID
+    session: AsyncSession,
+    storage: ObjectStorage,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    include_walls: bool = False,
 ) -> CadBuilding3dRead:
     sheets, warnings, project_slab = await collect_sheets(
         session, workspace_id=workspace_id, project_id=project_id
@@ -763,7 +834,9 @@ async def build_building3d(
         try:
             document = WallsDocument.model_validate(raw)
             extras = WallsFloorExtras.model_validate(raw)
-            floor, floor_warnings = build_floor(sheet, document, extras, project_slab)
+            floor, floor_warnings = build_floor(
+                sheet, document, extras, project_slab, include_walls=include_walls
+            )
         except (ValidationError, ValueError):
             warnings.append(
                 CadBuilding3dWarningRead(

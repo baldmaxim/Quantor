@@ -656,6 +656,10 @@ export type CadBuilding3dFloorRead = {
      * View
      */
     view: number;
+    /**
+     * Walls
+     */
+    walls?: Array<CadBuilding3dWallRead> | null;
 };
 
 /**
@@ -702,6 +706,22 @@ export type CadBuilding3dRead = {
      * Warnings
      */
     warnings: Array<CadBuilding3dWarningRead>;
+};
+
+/**
+ * CadBuilding3dWallRead
+ *
+ * Конструкция этажа для общего вида: внешнее кольцо в целых мм системы DXF, без отверстий.
+ */
+export type CadBuilding3dWallRead = {
+    /**
+     * Kind
+     */
+    kind: 'masonry' | 'monolith_wall' | 'monolith_pylon' | 'monolith_column' | 'frame_partition' | 'floor_slab';
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
 };
 
 /**
@@ -2687,11 +2707,94 @@ export type CadMepRecomputeCreate = {
 };
 
 /**
+ * CadMepRoute3dElement
+ *
+ * Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура или гильза.
+ */
+export type CadMepRoute3dElement = {
+    /**
+     * Apt
+     */
+    apt?: string | null;
+    /**
+     * Axis
+     */
+    axis: [
+        number,
+        number,
+        number
+    ];
+    /**
+     * Dn Mm
+     */
+    dn_mm?: number | null;
+    /**
+     * H Mm
+     */
+    h_mm?: number | null;
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Length Mm
+     */
+    length_mm?: number | null;
+    /**
+     * Outer D Mm
+     */
+    outer_d_mm?: number | null;
+    /**
+     * Pos
+     */
+    pos: [
+        number,
+        number,
+        number
+    ];
+    /**
+     * Subtype
+     */
+    subtype: string;
+    /**
+     * Type
+     */
+    type: 'fitting' | 'valve' | 'sleeve';
+    /**
+     * W Mm
+     */
+    w_mm?: number | null;
+};
+
+/**
  * CadMepRoute3dPolyline
  *
  * 3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.
+ *
+ * Поля сечения и изоляции - с `cad_mep_routes3d.v2`; у файла v1 они пусты (`shape` не задан,
+ * изоляции нет), и вид рисует такую полилинию линией.
  */
 export type CadMepRoute3dPolyline = {
+    /**
+     * Apt
+     */
+    apt?: string | null;
+    /**
+     * Dn Mm
+     */
+    dn_mm?: number | null;
+    /**
+     * H Mm
+     */
+    h_mm?: number | null;
+    /**
+     * Insulation Mm
+     */
+    insulation_mm?: number;
+    /**
+     * Kind
+     */
+    kind?: 'route' | 'jumper' | 'riser' | 'leadin' | null;
     /**
      * Layer
      */
@@ -2704,6 +2807,18 @@ export type CadMepRoute3dPolyline = {
         number,
         number
     ]>;
+    /**
+     * Shape
+     */
+    shape?: 'round' | 'rect' | null;
+    /**
+     * Slope
+     */
+    slope?: number | null;
+    /**
+     * W Mm
+     */
+    w_mm?: number | null;
 };
 
 /**
@@ -2712,6 +2827,10 @@ export type CadMepRoute3dPolyline = {
  * Трассы листа в 3D: вершины в мм DXF вида, Z - над отметкой этажа (верх плиты).
  */
 export type CadMepRoutes3dOut = {
+    /**
+     * Elements
+     */
+    elements?: Array<CadMepRoute3dElement>;
     /**
      * Floor Elevation Mm
      */
@@ -18995,7 +19114,14 @@ export type ReadCadBuilding3dData = {
          */
         project_id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Walls
+         *
+         * Добавить контуры конструкций этажей (по умолчанию ответ лёгкий)
+         */
+        walls?: boolean;
+    };
     url: '/api/v1/projects/{project_id}/cad/building3d';
 };
 

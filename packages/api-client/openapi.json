@@ -1266,6 +1266,20 @@
           "view": {
             "title": "View",
             "type": "integer"
+          },
+          "walls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CadBuilding3dWallRead"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walls"
           }
         },
         "required": [
@@ -1361,6 +1375,39 @@
           "warnings"
         ],
         "title": "CadBuilding3dRead",
+        "type": "object"
+      },
+      "CadBuilding3dWallRead": {
+        "description": "Конструкция этажа для общего вида: внешнее кольцо в целых мм системы DXF, без отверстий.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "masonry",
+              "monolith_wall",
+              "monolith_pylon",
+              "monolith_column",
+              "frame_partition",
+              "floor_slab"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "shell"
+        ],
+        "title": "CadBuilding3dWallRead",
         "type": "object"
       },
       "CadBuilding3dWarningRead": {
@@ -5743,10 +5790,219 @@
         "title": "CadMepRecomputeCreate",
         "type": "object"
       },
+      "CadMepRoute3dElement": {
+        "additionalProperties": false,
+        "description": "Элемент сети в 3D (`cad_mep_routes3d.v2`): фасонина, арматура или гильза.",
+        "properties": {
+          "apt": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apt"
+          },
+          "axis": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Axis",
+            "type": "array"
+          },
+          "dn_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dn Mm"
+          },
+          "h_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H Mm"
+          },
+          "layer": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Layer",
+            "type": "string"
+          },
+          "length_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length Mm"
+          },
+          "outer_d_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outer D Mm"
+          },
+          "pos": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Pos",
+            "type": "array"
+          },
+          "subtype": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Subtype",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "fitting",
+              "valve",
+              "sleeve"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "w_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "W Mm"
+          }
+        },
+        "required": [
+          "type",
+          "subtype",
+          "layer",
+          "pos",
+          "axis"
+        ],
+        "title": "CadMepRoute3dElement",
+        "type": "object"
+      },
       "CadMepRoute3dPolyline": {
         "additionalProperties": false,
-        "description": "3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.",
+        "description": "3D-полилиния трассы или стояка: слой и вершины (x, y, z_rel), мм.\n\nПоля сечения и изоляции - с `cad_mep_routes3d.v2`; у файла v1 они пусты (`shape` не задан,\nизоляции нет), и вид рисует такую полилинию линией.",
         "properties": {
+          "apt": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apt"
+          },
+          "dn_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dn Mm"
+          },
+          "h_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H Mm"
+          },
+          "insulation_mm": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Insulation Mm",
+            "type": "integer"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "route",
+                  "jumper",
+                  "riser",
+                  "leadin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
           "layer": {
             "maxLength": 64,
             "minLength": 1,
@@ -5773,6 +6029,45 @@
             "minItems": 2,
             "title": "Pts",
             "type": "array"
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "enum": [
+                  "round",
+                  "rect"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shape"
+          },
+          "slope": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope"
+          },
+          "w_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "W Mm"
           }
         },
         "required": [
@@ -5785,6 +6080,13 @@
       "CadMepRoutes3dOut": {
         "description": "Трассы листа в 3D: вершины в мм DXF вида, Z - над отметкой этажа (верх плиты).",
         "properties": {
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/CadMepRoute3dElement"
+            },
+            "title": "Elements",
+            "type": "array"
+          },
           "floor_elevation_mm": {
             "anyOf": [
               {
@@ -36225,6 +36527,18 @@
               "format": "uuid",
               "title": "Project Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Добавить контуры конструкций этажей (по умолчанию ответ лёгкий)",
+            "in": "query",
+            "name": "walls",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Добавить контуры конструкций этажей (по умолчанию ответ лёгкий)",
+              "title": "Walls",
+              "type": "boolean"
             }
           }
         ],

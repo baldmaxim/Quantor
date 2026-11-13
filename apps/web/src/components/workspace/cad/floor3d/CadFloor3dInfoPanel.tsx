@@ -7,6 +7,8 @@ const LABEL = 'Высоты и отверстия плиты';
 
 interface ICadFloor3dInfoPanelProps {
   readonly children: ReactNode;
+  /** Название панели (кнопка и подпись); по умолчанию - высоты и отверстия плиты. */
+  readonly label?: string;
 }
 
 const InfoIcon: FC = () => (
@@ -33,7 +35,7 @@ const InfoIcon: FC = () => (
  * не шире экрана. Закрытие - Esc, щелчок вне панели, повторное нажатие на (i). Содержимое остаётся
  * смонтированным при закрытии: незаконченная правка высот не теряется.
  */
-export const CadFloor3dInfoPanel: FC<ICadFloor3dInfoPanelProps> = ({ children }) => {
+export const CadFloor3dInfoPanel: FC<ICadFloor3dInfoPanelProps> = ({ children, label = LABEL }) => {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -63,8 +65,8 @@ export const CadFloor3dInfoPanel: FC<ICadFloor3dInfoPanelProps> = ({ children })
       <button
         ref={button}
         type="button"
-        aria-label={LABEL}
-        title={LABEL}
+        aria-label={label}
+        title={label}
         aria-expanded={open}
         aria-controls={panelId}
         aria-haspopup="dialog"
@@ -80,7 +82,7 @@ export const CadFloor3dInfoPanel: FC<ICadFloor3dInfoPanelProps> = ({ children })
         ref={panel}
         id={panelId}
         role="dialog"
-        aria-label={LABEL}
+        aria-label={label}
         data-testid="floor3d-info-panel"
         hidden={!open}
         className="absolute top-full right-[var(--s-4)] left-[var(--s-4)] z-30 mt-[var(--s-2)] md:left-auto md:w-[360px]"

@@ -2,21 +2,23 @@
 
 import type { CadBuilding3dFloorRead } from '@quantor/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { use } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, use } from 'react';
 
 import { TopBar } from '@/components/shell/TopBar';
 import { EmptyState, SkeletonRows } from '@/components/ui';
-import { CadBuilding3dLazy } from '@/components/workspace/cad/building3d/CadBuilding3dLazy';
+import type { IBuildingViewerSelection } from '@/components/projects/building3d/BuildingViewer';
+import { BuildingViewerLazy } from '@/components/projects/building3d/BuildingViewerLazy';
 import { cadAccess } from '@/lib/cad/access';
 import { resolveSheetPosition } from '@/lib/cad/building3d-queries';
 import { workspaceCadHref } from '@/lib/cad/workspace-url';
 import { useFeatures, useMeta, useProject } from '@/lib/queries';
 
 /**
- * «3D: общий вид объекта» — колонка «Здание» на всю страницу. Закрыта флагом `cad.export`
+ * «3D: общий вид объекта» — просмотрщик здания из стен всех этажей. Закрыта флагом `cad.export`
  * (как и вкладка CAD): при выключенном флаге страницы нет, пока мета не пришла — заглушка.
- * Щелчок по этажу открывает лист этажа в рабочей области (вкладка CAD).
+ * Выбранный этаж и детальный вид живут в адресе (`?floor=<ключ этажа>&detail=1`), ссылку можно
+ * переслать; лист этажа в рабочей области открывает отдельная кнопка.
  */
 
 interface IPageProps {
@@ -28,10 +30,27 @@ const SHELL = 'min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)]
 const Building3dPage = ({ params }: IPageProps) => {
   const { projectId } = use(params);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const meta = useMeta();
   const access = cadAccess(meta.isSuccess, useFeatures());
   const project = useProject(projectId);
+
+  const selection: IBuildingViewerSelection = {
+    floor: searchParams.get('floor'),
+    detail: searchParams.get('detail') === '1',
+  };
+
+  const changeSelection = (next: IBuildingViewerSelection): void => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next.floor === null) params.delete('floor');
+    else params.set('floor', next.floor);
+    if (next.floor !== null && next.detail) params.set('detail', '1');
+    else params.delete('detail');
+    const query = params.toString();
+    router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
+  };
 
   const openFloor = async (floor: CadBuilding3dFloorRead): Promise<void> => {
     const position = await resolveSheetPosition(queryClient, floor.revision_id, floor.page_index);
@@ -68,11 +87,11 @@ const Building3dPage = ({ params }: IPageProps) => {
         </main>
       ) : (
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg">
-          <CadBuilding3dLazy
+          <BuildingViewerLazy
             projectId={projectId}
-            current={null}
-            layout="page"
-            onSelectFloor={(floor) => void openFloor(floor)}
+            selection={selection}
+            onSelectionChange={changeSelection}
+            onOpenSheet={(floor) => void openFloor(floor)}
           />
         </main>
       )}
@@ -80,4 +99,11 @@ const Building3dPage = ({ params }: IPageProps) => {
   );
 };
 
-export default Building3dPage;
+// `useSearchParams` требует границы Suspense: иначе страницу нельзя отдать статической оболочкой.
+const Building3dRoute = ({ params }: IPageProps) => (
+  <Suspense fallback={null}>
+    <Building3dPage params={params} />
+  </Suspense>
+);
+
+export default Building3dRoute;

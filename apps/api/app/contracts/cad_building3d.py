@@ -11,6 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.contracts.cad_constructions import CadConstructionKind
+
 CadBuilding3dOutlineSource = Literal["slab", "bbox"]
 # `reference` - эталонный этаж группы; `axes` - совмещён с эталоном по общим осям;
 # `none` - не совмещён (смещение - запасное: центр контура на центр эталона или 0).
@@ -20,6 +22,14 @@ CadBuilding3dAlignment = Literal["reference", "axes", "none"]
 class CadBuilding3dWarningRead(BaseModel):
     code: str
     message: str
+
+
+class CadBuilding3dWallRead(BaseModel):
+    """Конструкция этажа для общего вида: внешнее кольцо в целых мм системы DXF, без отверстий."""
+
+    kind: CadConstructionKind
+    # Открытое кольцо (без повтора первой точки), не менее 3 и не более 64 точек.
+    shell: list[list[int]]
 
 
 class CadBuilding3dFloorRead(BaseModel):
@@ -58,6 +68,10 @@ class CadBuilding3dFloorRead(BaseModel):
     alignment_axes: list[str]
     # Почему этаж не совмещён (`alignment = none`); иначе `None`.
     alignment_message: str | None
+    # Контуры конструкций этажа (без плиты: она рисуется по `outline`), уже сдвинутые на
+    # `offset_mm`. `None` - не запрошено (`walls=false`); при `walls=true` - список
+    # (может быть пустым).
+    walls: list[CadBuilding3dWallRead] | None = None
 
 
 class CadBuilding3dGroupRead(BaseModel):
