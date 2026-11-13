@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
 
 import { AccountMenu } from '@/components/shell/AccountMenu';
+import { BuildBadge } from '@/components/shell/BuildBadge';
 import { cx } from '@/components/ui';
 import {
   IconModels,
@@ -151,6 +152,7 @@ export const SideNav = () => {
 
         <RailButton item={SETTINGS} active={isActive(SETTINGS.href)} enabled />
         <AccountMenu />
+        <BuildBadge placement="rail" />
       </div>
     </nav>
   );

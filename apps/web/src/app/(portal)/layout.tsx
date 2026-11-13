@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 
 import { BottomNav } from '@/components/shell/BottomNav';
+import { BuildBadge } from '@/components/shell/BuildBadge';
 import { SideNav } from '@/components/shell/SideNav';
 import { fetchServerSession } from '@/lib/server-session';
 
@@ -35,6 +36,7 @@ const PortalLayout = async ({ children }: { children: ReactNode }) => {
       <SideNav />
       <div className="scroll-area flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
       <BottomNav />
+      <BuildBadge placement="floating" />
     </div>
   );
 };
