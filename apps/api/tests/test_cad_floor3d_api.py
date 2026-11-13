@@ -314,7 +314,7 @@ async def test_floor3d_model_of_a_sheet(
         assert (door["z_bottom_mm"], door["z_top_mm"]) == (BASE + 2100, BASE + 2800)
         assert (door["door_height_mm"], door["door_height_source"]) == (2100, "assumption")
         assert body["bbox"] == [0.0, 0.0, 6000.0, 4000.0]
-        assert body["warnings"] == []
+        assert _codes(body) == ["slab_holes_unreviewed"]
 
 
 async def test_old_walls_json_gives_walls_outdated(
@@ -357,13 +357,13 @@ async def test_walls_from_older_generator_than_the_pin_give_walls_outdated(
         # walls.json написан генератором cad_walls.v1; pins.json на минор выше - файл устарел.
         write_pins(tmp_path, walls=params, walls_version="cad_walls.v1.1")
         body = (await api.get(_floor(project_id, job_id))).json()
-        assert _codes(body) == ["walls_outdated"]
+        assert _codes(body) == ["slab_holes_unreviewed", "walls_outdated"]
         assert len(body["walls"]) == 4
         # Версия совпадает с закреплённой или новее - предупреждения нет.
         for pinned in ("cad_walls.v1", "cad_walls.v0.9"):
             write_pins(tmp_path, walls=params, walls_version=pinned)
             body = (await api.get(_floor(project_id, job_id))).json()
-            assert body["warnings"] == [], pinned
+            assert _codes(body) == ["slab_holes_unreviewed"], pinned
 
 
 async def test_recompute_after_pin_change_creates_a_new_walls_job(

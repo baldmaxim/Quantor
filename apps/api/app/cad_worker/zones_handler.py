@@ -350,7 +350,11 @@ async def execute_cad_zones(
         if attempt_dir is not None:
             shutil.rmtree(attempt_dir, ignore_errors=True)
 
-    # Строка задания под блокировкой. Зоны могли появиться, пока работал CLI: тогда - ничего.
+    # Строка задания под блокировкой. Зоны могли появиться, пока работал CLI (в том числе у другого
+    # вида той же страницы): блокировка страницы, повторная проверка и вставка - одна транзакция.
+    await cad_zones_service.lock_page_zones(
+        session, revision_id=revision.id, page_index=source.page_index
+    )
     skipped = bool(
         await auto.page_zone_count(session, revision_id=revision.id, page_index=source.page_index)
     )

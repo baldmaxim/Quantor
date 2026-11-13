@@ -52,7 +52,14 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
 from app.services import cad_construction_store as store
-from app.services import cad_constructions, cad_lift_openings, cad_partitions, cad_slab, cad_walls
+from app.services import (
+    cad_constructions,
+    cad_floor3d,
+    cad_lift_openings,
+    cad_partitions,
+    cad_slab,
+    cad_walls,
+)
 from app.services import cad_floor3d_store as floor3d_store
 from app.services import jobs as jobs_service
 from app.services.cad_walls_cache import CachedWalls, walls_cache
@@ -345,6 +352,12 @@ async def read_cad_constructions(
         CadWallsWarningRead(code=code, message=message)
         for code, message in result.partition_warnings
     )
+    decisions = await floor3d_store.load_hole_decisions(
+        session, revision_id=sheet.revision_id, page_index=sheet.page_index, view=sheet.view
+    )
+    unreviewed = cad_floor3d.unreviewed_holes_warning(walls.extras, decisions)
+    if unreviewed is not None:
+        warnings.append(CadWallsWarningRead(code=unreviewed[0], message=unreviewed[1]))
     if result.summary.orphaned_props:
         warnings.append(
             CadWallsWarningRead(

@@ -155,7 +155,8 @@ def test_base_is_the_floor_elevation_and_slab_hangs_below_it() -> None:
     assert (model.slab.z_top_mm, model.slab.z_bottom_mm) == (BASE, BASE - 200)
     assert model.slab.area_m2 == 24.0
     assert model.bbox == [0.0, 0.0, 6000.0, 4000.0]
-    assert codes(model) == []
+    # Два отверстия плиты без решения человека - единственное предупреждение.
+    assert codes(model) == ["slab_holes_unreviewed"]
 
 
 def test_missing_elevation_builds_from_zero_and_says_so() -> None:
@@ -466,7 +467,7 @@ def test_door_without_gap_has_no_lintel_or_leaf_and_warning_is_passed() -> None:
         door_zones=[],
     )
     assert model.lintels == [] and model.doors == []
-    assert codes(model) == ["door_without_gap"]
+    assert codes(model) == ["door_without_gap", "slab_holes_unreviewed"]
 
 
 def test_room_zones_use_the_same_frame_as_door_zones() -> None:
@@ -709,6 +710,16 @@ def test_gap_without_height_uses_the_door_height_as_before() -> None:
     )
 
 
+def test_unreviewed_holes_warning_counts_holes_without_a_decision() -> None:
+    first, second = (h.key for h in build().slab_holes)
+    one = build(decisions={first: True})
+    assert codes(one) == ["slab_holes_unreviewed"]
+    assert one.warnings[0].message == "Отверстия плиты вычтены без проверки человеком: 1"
+    assert codes(build(decisions={first: True, second: False})) == []
+    assert codes(build()) == ["slab_holes_unreviewed"]
+    assert codes(build(outdated=True)) == ["walls_outdated"]
+
+
 def test_slab_without_zones_warning_is_passed_to_the_3d_response() -> None:
     raw = raw_document(**V19)
     raw["checks"]["warnings"] = [
@@ -724,7 +735,7 @@ def test_slab_without_zones_warning_is_passed_to_the_3d_response() -> None:
         hole_decisions={},
         door_zones=[],
     )
-    assert codes(model) == ["slab_without_zones"]
+    assert codes(model) == ["slab_without_zones", "slab_holes_unreviewed"]
 
 
 def test_new_slab_fields_are_parsed_and_old_extras_keep_none() -> None:

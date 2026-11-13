@@ -452,6 +452,64 @@ async def test_handler_inserts_nothing_when_zones_appear_while_cli_runs(
         assert only.apartment_no == "0007", "зона человека не тронута, зон генератора нет"
 
 
+async def test_handler_rechecks_page_zones_after_taking_the_page_lock(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    zones_tools: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Соседний вид страницы вставил зоны, пока ждали блокировку: вставки нет, дублей нет."""
+    settings = zones_settings(zones_tools, tmp_path)
+    locked: list[tuple[uuid.UUID, int]] = []
+    real_lock = cad_zones_service.lock_page_zones
+
+    async def lock_then_neighbour_inserts(
+        session: AsyncSession, *, revision_id: uuid.UUID, page_index: int
+    ) -> None:
+        await real_lock(session, revision_id=revision_id, page_index=page_index)
+        locked.append((revision_id, page_index))
+        owner = (
+            await session.execute(
+                select(Job.workspace_id, Job.project_id).where(Job.job_type == JobType.CAD_ZONES)
+            )
+        ).one()
+        await cad_zones_service.create_zone(
+            session,
+            workspace_id=owner.workspace_id,
+            project_id=owner.project_id,
+            body=CadZoneCreate(
+                revision_id=revision_id,
+                page_index=page_index,
+                kind="room_apartment",
+                apartment_no="0009",
+                points=[(x, y) for x, y in RECT],
+            ),
+            user_id=None,
+        )
+
+    monkeypatch.setattr(cad_zones_service, "lock_page_zones", lock_then_neighbour_inserts)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision, job_id, _base = await _parent(api, db_session, fake_storage)
+        zones_id = (await api.post(_zones_url(project_id, job_id))).json()["job_id"]
+        job = await _run_zones_worker(db_session, fake_storage, settings, zones_id)
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        assert cad_service.result_of(job)["result_status"] == "zones_skipped_existing"
+        assert len(locked) == 1
+        (only,) = await _zones_of(db_session)
+        assert only.apartment_no == "0009"
+
+
+async def test_lock_page_zones_runs_on_a_real_database(db_session: AsyncSession) -> None:
+    await cad_zones_service.lock_page_zones(db_session, revision_id=uuid.uuid4(), page_index=3)
+    # Повторная блокировка того же ключа в той же транзакции не блокируется.
+    revision_id = uuid.uuid4()
+    await cad_zones_service.lock_page_zones(db_session, revision_id=revision_id, page_index=0)
+    await cad_zones_service.lock_page_zones(db_session, revision_id=revision_id, page_index=0)
+    await db_session.rollback()
+
+
 async def test_handler_fails_with_cli_error_and_inserts_nothing(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],
@@ -532,6 +590,7 @@ async def test_pipeline_calibrated_page_without_jobs(
                 "calibrated": True,
                 "floor_title": None,
                 "convert": None,
+                "update": None,
                 "scale_source": None,
                 "views": [],
             }
@@ -611,14 +670,14 @@ async def test_pipeline_converted_page_shows_walls_zones_and_decisions(
         assert (view["zones_count"], view["approved"]) == (1, True)
 
 
-async def test_pipeline_uses_the_latest_convert_per_page(
+async def test_pipeline_shows_the_ready_convert_and_gives_the_newer_as_update(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],
     fake_storage: FakeObjectStorage,
     zones_tools: Path,
     tmp_path: Path,
 ) -> None:
-    """Задания старого родителя в состояние листа не попадают."""
+    """Готовый прогон остаётся показанным, более новый идущий отдаётся как `update`."""
     settings = zones_settings(zones_tools, tmp_path)
     async with build_api(make_context(), settings=settings) as api:
         project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
@@ -635,10 +694,11 @@ async def test_pipeline_uses_the_latest_convert_per_page(
         db_session.add(newer)
         await db_session.commit()
         (sheet,) = (await api.get(_pipeline_url(project_id, revision_id))).json()["sheets"]
-        assert sheet["convert"]["job_id"] == str(newer.id)
-        assert sheet["convert"]["status"] == "running"
-        # У идущей конвертации итога нет, видов нет, чужих (старых) заданий нет.
-        assert sheet["views"] == []
+        assert sheet["convert"]["job_id"] == job_id
+        assert sheet["update"]["job_id"] == str(newer.id)
+        assert sheet["update"]["status"] == "running"
+        # Виды и дочерние задания - от показываемого прогона.
+        assert sheet["views"][0]["zones"]["status"] == "queued"
 
 
 async def test_pipeline_gives_floor_title_from_the_last_successful_walls(

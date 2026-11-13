@@ -64,6 +64,8 @@ SLAB_WITHOUT_ZONES: Final = "slab_without_zones"
 WINDOW_BAY_WITHOUT_HOST: Final = "window_bay_without_host"
 # Код предупреждения cad_walls v1.13: в пролёте балконная дверь, окно урезано или снято.
 WINDOW_BAY_DOOR_OVERLAP: Final = "window_bay_door_overlap"
+# Код предупреждения API: отверстия плиты без решения человека вычтены по умолчанию.
+SLAB_HOLES_UNREVIEWED: Final = "slab_holes_unreviewed"
 _PASSED_WARNING_CODES: Final = frozenset(
     {DOOR_WITHOUT_GAP, SLAB_WITHOUT_ZONES, WINDOW_BAY_WITHOUT_HOST, WINDOW_BAY_DOOR_OVERLAP}
 )
@@ -283,6 +285,21 @@ def _keyed_holes(
     return holes
 
 
+def unreviewed_holes_warning(
+    extras: WallsFloorExtras, decisions: Mapping[str, bool]
+) -> tuple[str, str] | None:
+    """Предупреждение «отверстия вычтены без проверки»: у плиты есть отверстия без решения."""
+    if extras.slab is None:
+        return None
+    count = sum(1 for key in hole_keys(extras) if key not in decisions)
+    if count == 0:
+        return None
+    return (
+        SLAB_HOLES_UNREVIEWED,
+        f"Отверстия плиты вычтены без проверки человеком: {count}",
+    )
+
+
 def hole_keys(extras: WallsFloorExtras) -> list[str]:
     """Ключи отверстий файла в порядке файла (для проверки адреса решения)."""
     return [hole.key for hole in _keyed_holes(extras, {})]
@@ -313,6 +330,9 @@ def build_floor3d(
         for w in document.checks.warnings
         if w.code in _PASSED_WARNING_CODES
     )
+    unreviewed = unreviewed_holes_warning(extras, hole_decisions)
+    if unreviewed is not None:
+        warnings.append(CadFloor3dWarningRead(code=unreviewed[0], message=unreviewed[1]))
     outdated = walls_outdated(document.generator, extras.has_slab_key, current_generator)
     if outdated:
         warnings.append(

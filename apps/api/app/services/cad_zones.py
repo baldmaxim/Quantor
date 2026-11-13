@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from pydantic import TypeAdapter
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contracts.cad_room_types import (
@@ -253,6 +253,20 @@ async def require_template(
     )
     if found is None:
         raise _invalid("Шаблон отделки не найден в проекте")
+
+
+async def lock_page_zones(
+    session: AsyncSession, *, revision_id: uuid.UUID, page_index: int
+) -> None:
+    """Транзакционная блокировка зон страницы: снимается коммитом.
+
+    Зоны - уровень страницы, а задания разметки - уровень вида: два вида одной страницы не должны
+    одновременно пройти проверку «зон нет» и вставить дубли.
+    """
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+        {"key": f"cad_zones:{revision_id}:{page_index}"},
+    )
 
 
 async def create_zone(
