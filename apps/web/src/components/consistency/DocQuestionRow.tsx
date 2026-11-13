@@ -23,6 +23,7 @@ import {
 } from '@/lib/consistency/doc-questions';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 
+import { DocAnswerForm, type DocAnswerMode } from './DocAnswerForm';
 import { DocQuestionDetails } from './DocQuestionDetails';
 
 /**
@@ -150,6 +151,7 @@ export const DocQuestionRow: FC<IRowProps> = ({ projectId, question }) => {
   const remove = useRemoveDocAnswer(projectId);
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [formMode, setFormMode] = useState<DocAnswerMode | null>(null);
   const detailsId = useId();
 
   const alive = question.candidates
@@ -163,6 +165,10 @@ export const DocQuestionRow: FC<IRowProps> = ({ projectId, question }) => {
 
   const submit = (body: DocAnswerBody, done?: () => void) =>
     save.mutate({ code: question.code, body }, { onSuccess: done });
+
+  /** Повторный клик по активной кнопке закрывает форму. */
+  const toggleForm = (mode: DocAnswerMode) =>
+    setFormMode((current) => (current === mode ? null : mode));
 
   const errors = [save, reject, remove].filter((mutation) => mutation.isError);
 
@@ -246,14 +252,27 @@ export const DocQuestionRow: FC<IRowProps> = ({ projectId, question }) => {
                 </Button>
               </>
             ) : (
+              assumption && (
+                <Button disabled={busy} onClick={() => submit(normAssumptionBody())}>
+                  Принять норматив
+                </Button>
+              )
+            )}
+            {!confirmed && (
               <>
-                {assumption && (
-                  <Button disabled={busy} onClick={() => submit(normAssumptionBody())}>
-                    Принять норматив
-                  </Button>
-                )}
-                <Button disabled={busy} onClick={() => setOpen(true)}>
-                  Ввести
+                <Button
+                  disabled={busy}
+                  aria-pressed={formMode === 'manual'}
+                  onClick={() => toggleForm('manual')}
+                >
+                  Ввести вручную
+                </Button>
+                <Button
+                  disabled={busy}
+                  aria-pressed={formMode === 'absent'}
+                  onClick={() => toggleForm('absent')}
+                >
+                  Нет в проекте
                 </Button>
               </>
             )}
@@ -271,6 +290,20 @@ export const DocQuestionRow: FC<IRowProps> = ({ projectId, question }) => {
           </td>
         </tr>
       )}
+      {formMode !== null && (
+        <tr className="max-md:block max-md:px-[var(--s-5)] max-md:pb-[var(--s-4)]">
+          <td colSpan={3} className="px-[var(--s-4)] pb-[var(--s-4)] max-md:block max-md:p-0">
+            <DocAnswerForm
+              key={formMode}
+              question={question}
+              mode={formMode}
+              pending={save.isPending}
+              onSubmit={submit}
+              onClose={() => setFormMode(null)}
+            />
+          </td>
+        </tr>
+      )}
       {open && (
         <tr id={detailsId} className="max-md:block max-md:px-[var(--s-5)] max-md:pb-[var(--s-4)]">
           <td colSpan={3} className="px-[var(--s-4)] pb-[var(--s-4)] max-md:block max-md:p-0">
@@ -280,13 +313,11 @@ export const DocQuestionRow: FC<IRowProps> = ({ projectId, question }) => {
               alive={alive}
               rejected={rejected}
               busy={busy}
-              saving={save.isPending}
               removing={remove.isPending}
               onAccept={(id) => submit(acceptCandidateBody(id))}
               onReject={(id) => reject.mutate(id)}
               onRemove={(id) => remove.mutate(id)}
               onAcceptNorm={() => submit(normAssumptionBody())}
-              onSubmit={submit}
             />
           </td>
         </tr>

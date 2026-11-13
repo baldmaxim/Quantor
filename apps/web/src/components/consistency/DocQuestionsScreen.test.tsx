@@ -202,7 +202,7 @@ describe('экран «Вопросы к документации»', () => {
     expect(screen.queryByTestId('doc-answer')).toBeNull();
   });
 
-  it('раскрытие показывает всех кандидатов, ответы и форму', async () => {
+  it('раскрытие показывает всех кандидатов и ответы', async () => {
     mount([
       question({
         candidates: [
@@ -224,7 +224,7 @@ describe('экран «Вопросы к документации»', () => {
     const confirmed = within(screen.getByTestId('doc-answer'));
     expect(confirmed.getByText('Вручную')).toBeInTheDocument();
     expect(screen.getByText('Отклонённые (1)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ввести вручную' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ввести вручную' })).toBeNull();
 
     await userEvent.click(toggle);
     expect(screen.queryByTestId('doc-answer')).toBeNull();
@@ -262,7 +262,6 @@ describe('экран «Вопросы к документации»', () => {
   it('ручной ответ без пояснения не отправляется; с пояснением — source=manual', async () => {
     mount([question()]);
     expect(await screen.findByText('В документации не найдено')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Ввести' }));
     await userEvent.click(screen.getByRole('button', { name: 'Ввести вручную' }));
     await userEvent.type(screen.getByLabelText('Значение, мм'), '2750');
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
@@ -283,8 +282,7 @@ describe('экран «Вопросы к документации»', () => {
 
   it('размер вне границ каталога не отправляется', async () => {
     mount([question()]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Ввести' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Ввести вручную' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Ввести вручную' }));
     await userEvent.type(screen.getByLabelText('Значение, мм'), '10');
     await userEvent.type(screen.getByLabelText('Откуда значение'), 'расчёт');
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
@@ -292,21 +290,47 @@ describe('экран «Вопросы к документации»', () => {
     expect(client.putDocAnswer).not.toHaveBeenCalled();
   });
 
-  it('«Нет в проекте» — ответ словами, не 0; шлёт source=not_in_project', async () => {
+  it('«Нет в проекте» — ответ словами, не 0', async () => {
     mount([
       question({ answers: [answer({ source: 'not_in_project', value: null, value_text: null })] }),
     ]);
     const row = within(await screen.findByTestId('doc-question'));
     expect(row.getAllByText('Нет в проекте').length).toBeGreaterThan(0);
     expect(row.queryByText('0')).toBeNull();
+    expect(row.queryByRole('button', { name: 'Ввести вручную' })).toBeNull();
+  });
 
-    await userEvent.click(screen.getByRole('button', { name: /^Подробнее/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Нет в проекте' }));
+  it('кнопки ввода есть в строке без раскрытия; «Нет в проекте» шлёт source=not_in_project', async () => {
+    mount([question()]);
+    const row = within(await screen.findByTestId('doc-question'));
+    expect(row.getByRole('button', { name: 'Ввести вручную' })).toBeInTheDocument();
+    const absent = row.getByRole('button', { name: 'Нет в проекте' });
+    expect(absent).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('button', { name: 'Подтвердить: нет в проекте' })).toBeNull();
+
+    await userEvent.click(absent);
+    expect(absent).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Подтвердить: нет в проекте' }));
     await waitFor(() => expect(client.putDocAnswer).toHaveBeenCalled());
     expect(vi.mocked(client.putDocAnswer).mock.calls[0]?.[0]).toMatchObject({
       body: { source: 'not_in_project' },
     });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Подтвердить: нет в проекте' })).toBeNull(),
+    );
+  });
+
+  it('повторный клик по активной кнопке и «Отмена» закрывают форму', async () => {
+    mount([question()]);
+    const manual = await screen.findByRole('button', { name: 'Ввести вручную' });
+    await userEvent.click(manual);
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeInTheDocument();
+    await userEvent.click(manual);
+    expect(screen.queryByRole('button', { name: 'Сохранить' })).toBeNull();
+
+    await userEvent.click(manual);
+    await userEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(screen.queryByRole('button', { name: 'Сохранить' })).toBeNull();
   });
 
   it('нет кандидатов: «не найдено», норматив в строке; «Принять норматив» шлёт допущение', async () => {

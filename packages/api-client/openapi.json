@@ -5974,6 +5974,11 @@
             "title": "Kind",
             "type": "string"
           },
+          "marker_row_gap": {
+            "default": false,
+            "title": "Marker Row Gap",
+            "type": "boolean"
+          },
           "status": {
             "enum": [
               "ok",
@@ -6712,6 +6717,45 @@
           }
         },
         "title": "CadProjectLevelsWrite",
+        "type": "object"
+      },
+      "CadProjectSummaryRead": {
+        "description": "Листы последних открываемых ревизий проекта по состоянию конвейера CAD.\n\nИнвариант: `sheets_total` = `sheets_done` + `sheets_running` + `sheets_failed` + `sheets_idle`.",
+        "properties": {
+          "documents_total": {
+            "title": "Documents Total",
+            "type": "integer"
+          },
+          "sheets_done": {
+            "title": "Sheets Done",
+            "type": "integer"
+          },
+          "sheets_failed": {
+            "title": "Sheets Failed",
+            "type": "integer"
+          },
+          "sheets_idle": {
+            "title": "Sheets Idle",
+            "type": "integer"
+          },
+          "sheets_running": {
+            "title": "Sheets Running",
+            "type": "integer"
+          },
+          "sheets_total": {
+            "title": "Sheets Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sheets_total",
+          "sheets_done",
+          "sheets_running",
+          "sheets_failed",
+          "sheets_idle",
+          "documents_total"
+        ],
+        "title": "CadProjectSummaryRead",
         "type": "object"
       },
       "CadQueueItemRead": {
@@ -36936,6 +36980,49 @@
         "summary": "Принять, отклонить или вернуть в кандидаты уровни разрезов (решение человека)",
         "tags": [
           "cad-sections"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/summary": {
+      "get": {
+        "operationId": "read_cad_summary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadProjectSummaryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сводка распознавания CAD проекта: листы готово / идёт / ошибка / не запускалось",
+        "tags": [
+          "cad-queue"
         ]
       }
     },

@@ -1,15 +1,17 @@
 """Общее состояние конвейера CAD ревизии: лист -> конвертация -> конструкции, зоны, трассы, 3D.
 
 Читает только то, что уже лежит в базе: задания, решения человека, зоны, листы и калибровки. Число
-запросов не зависит от числа листов и видов: задания ревизии, решения, зоны и листы берутся по
-одному запросу на ревизию. Задание-родитель листа - последнее `cad_pdf_convert`, в запрошенных
-страницах которого есть лист (то же правило, что у сводки листов в интерфейсе).
+запросов не зависит от числа листов и видов: задания ревизий, решения, зоны и листы берутся по
+одному запросу на список ревизий (`build_pipelines`). Задание-родитель листа - последнее
+`cad_pdf_convert`, в запрошенных страницах которого есть лист (то же правило, что у сводки листов
+в интерфейсе).
 """
 
 from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Final, Literal
 
@@ -112,23 +114,19 @@ def _view_rows(convert: Job | None, page_index: int) -> list[dict[str, Any]]:
     return []
 
 
-async def build_pipeline(
-    session: AsyncSession,
-    *,
-    workspace_id: uuid.UUID,
-    project_id: uuid.UUID,
+def _pipeline_of(
     revision_id: uuid.UUID,
+    *,
+    jobs: list[Job],
+    calibrated: set[int],
+    sheet_rows: list[Any],
+    stamp_titles: dict[uuid.UUID, str],
+    passports: dict[int, Any],
+    zone_counts: dict[int, int],
+    approvals: set[_DecisionKey],
+    acceptances: set[_DecisionKey],
 ) -> CadPipelineRead:
-    jobs = list(
-        await session.scalars(
-            select(Job).where(
-                Job.workspace_id == workspace_id,
-                Job.project_id == project_id,
-                Job.job_type.in_(_PIPELINE_TYPES),
-                Job.payload["revision_id"].astext == str(revision_id),
-            )
-        )
-    )
+    """Сборка вида конвейера одной ревизии из уже прочитанных данных (без запросов)."""
     latest_convert: dict[int, Job] = {}
     latest_child: dict[_ChildKey, Job] = {}
     # Заголовок плана берётся из последнего УСПЕШНОГО cad_walls, даже если позже запущен новый.
@@ -147,41 +145,8 @@ async def build_pipeline(
             if job.job_type is JobType.CAD_WALLS and job.status is JobStatus.SUCCEEDED:
                 latest_walls_ok[key] = _newest(latest_walls_ok.get(key), job)
 
-    calibrated = set(
-        await session.scalars(
-            select(Sheet.page_index)
-            .join(
-                ScaleCalibration,
-                (ScaleCalibration.sheet_id == Sheet.id) & ScaleCalibration.is_default.is_(True),
-            )
-            .where(Sheet.revision_id == revision_id)
-        )
-    )
     # Все листы ревизии: листы-планы (штамп или паспорт листа) входят в конвейер и без работы
     # (массовый запуск, ADR-0045). Название: штамп -> паспорт -> подпись страницы.
-    sheet_rows = (
-        await session.execute(
-            select(Sheet.id, Sheet.page_index, Sheet.page_label).where(
-                Sheet.revision_id == revision_id
-            )
-        )
-    ).all()
-    stamp_titles = await documents_service.sheet_titles(
-        session, sheet_ids=[row.id for row in sheet_rows]
-    )
-    passports = {
-        row.page_index: row
-        for row in (
-            await session.execute(
-                select(
-                    SheetPassport.page_index, SheetPassport.sheet_kind, SheetPassport.title
-                ).where(
-                    SheetPassport.revision_id == revision_id,
-                    SheetPassport.status != "rejected",
-                )
-            )
-        ).all()
-    }
     labels: dict[int, str | None] = {row.page_index: row.page_label for row in sheet_rows}
     titles_by_page: dict[int, str | None] = {}
     plan_pages: set[int] = set()
@@ -197,32 +162,6 @@ async def build_pipeline(
             page_label=sheet_row.page_label,
         ):
             plan_pages.add(sheet_row.page_index)
-    zone_counts: dict[int, int] = dict(
-        (
-            await session.execute(
-                select(CadZone.page_index, func.count())
-                .where(CadZone.revision_id == revision_id)
-                .group_by(CadZone.page_index)
-            )
-        )
-        .tuples()
-        .all()
-    )
-    approvals: set[_DecisionKey] = set()
-    acceptances: set[_DecisionKey] = set()
-    decisions = await session.scalars(
-        select(CadDecision).where(
-            CadDecision.revision_id == revision_id,
-            CadDecision.workspace_id == workspace_id,
-            CadDecision.revoked_at.is_(None),
-        )
-    )
-    for decision in decisions:
-        decided = (decision.job_id, decision.attempt, decision.page_index, decision.view)
-        if decision.kind == DECISION_VIEW_APPROVAL:
-            approvals.add(decided)
-        elif decision.kind == DECISION_MEP_ACCEPTANCE:
-            acceptances.add(decided)
 
     by_page: dict[int, dict[JobType, dict[int, Job]]] = defaultdict(lambda: defaultdict(dict))
     for (job_type, parent, page_index, view), job in latest_child.items():
@@ -289,3 +228,124 @@ async def build_pipeline(
             )
         )
     return CadPipelineRead(revision_id=revision_id, server_time=datetime.now(UTC), sheets=sheets)
+
+
+async def build_pipelines(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    revision_ids: Sequence[uuid.UUID],
+) -> dict[uuid.UUID, CadPipelineRead]:
+    """Виды конвейера сразу для списка ревизий: тот же код сборки, что и у одной ревизии.
+
+    Читает всё по одному запросу на таблицу для всех ревизий сразу, поэтому число запросов не
+    зависит ни от числа ревизий, ни от числа листов. Ревизии проверяет вызывающий.
+    """
+    wanted = list(dict.fromkeys(revision_ids))
+    if not wanted:
+        return {}
+    jobs_by_revision: dict[str, list[Job]] = defaultdict(list)
+    jobs = await session.scalars(
+        select(Job).where(
+            Job.workspace_id == workspace_id,
+            Job.project_id == project_id,
+            Job.job_type.in_(_PIPELINE_TYPES),
+            Job.payload["revision_id"].astext.in_([str(revision_id) for revision_id in wanted]),
+        )
+    )
+    for job in jobs:
+        raw = job.payload.get("revision_id")
+        if isinstance(raw, str):
+            jobs_by_revision[raw].append(job)
+
+    calibrated_by_revision: dict[uuid.UUID, set[int]] = defaultdict(set)
+    calibrated_rows = await session.execute(
+        select(Sheet.revision_id, Sheet.page_index)
+        .join(
+            ScaleCalibration,
+            (ScaleCalibration.sheet_id == Sheet.id) & ScaleCalibration.is_default.is_(True),
+        )
+        .where(Sheet.revision_id.in_(wanted))
+    )
+    for revision_id, page_index in calibrated_rows.tuples():
+        calibrated_by_revision[revision_id].add(page_index)
+
+    sheet_rows_by_revision: dict[uuid.UUID, list[Any]] = defaultdict(list)
+    sheet_rows = await session.execute(
+        select(Sheet.id, Sheet.revision_id, Sheet.page_index, Sheet.page_label).where(
+            Sheet.revision_id.in_(wanted)
+        )
+    )
+    for sheet_row in sheet_rows.all():
+        sheet_rows_by_revision[sheet_row.revision_id].append(sheet_row)
+    stamp_titles = await documents_service.sheet_titles(
+        session,
+        sheet_ids=[row.id for rows in sheet_rows_by_revision.values() for row in rows],
+    )
+
+    passports_by_revision: dict[uuid.UUID, dict[int, Any]] = defaultdict(dict)
+    passport_rows = await session.execute(
+        select(
+            SheetPassport.revision_id,
+            SheetPassport.page_index,
+            SheetPassport.sheet_kind,
+            SheetPassport.title,
+        ).where(SheetPassport.revision_id.in_(wanted), SheetPassport.status != "rejected")
+    )
+    for passport_row in passport_rows.all():
+        passports_by_revision[passport_row.revision_id][passport_row.page_index] = passport_row
+
+    zone_counts_by_revision: dict[uuid.UUID, dict[int, int]] = defaultdict(dict)
+    zone_rows = await session.execute(
+        select(CadZone.revision_id, CadZone.page_index, func.count())
+        .where(CadZone.revision_id.in_(wanted))
+        .group_by(CadZone.revision_id, CadZone.page_index)
+    )
+    for revision_id, page_index, count in zone_rows.tuples():
+        zone_counts_by_revision[revision_id][page_index] = count
+
+    # Ключ решения содержит идентификатор задания, поэтому наборы общие для всех ревизий.
+    approvals: set[_DecisionKey] = set()
+    acceptances: set[_DecisionKey] = set()
+    decisions = await session.scalars(
+        select(CadDecision).where(
+            CadDecision.revision_id.in_(wanted),
+            CadDecision.workspace_id == workspace_id,
+            CadDecision.revoked_at.is_(None),
+        )
+    )
+    for decision in decisions:
+        decided = (decision.job_id, decision.attempt, decision.page_index, decision.view)
+        if decision.kind == DECISION_VIEW_APPROVAL:
+            approvals.add(decided)
+        elif decision.kind == DECISION_MEP_ACCEPTANCE:
+            acceptances.add(decided)
+
+    return {
+        revision_id: _pipeline_of(
+            revision_id,
+            jobs=jobs_by_revision.get(str(revision_id), []),
+            calibrated=calibrated_by_revision.get(revision_id, set()),
+            sheet_rows=sheet_rows_by_revision.get(revision_id, []),
+            stamp_titles=stamp_titles,
+            passports=passports_by_revision.get(revision_id, {}),
+            zone_counts=zone_counts_by_revision.get(revision_id, {}),
+            approvals=approvals,
+            acceptances=acceptances,
+        )
+        for revision_id in wanted
+    }
+
+
+async def build_pipeline(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+) -> CadPipelineRead:
+    pipelines = await build_pipelines(
+        session, workspace_id=workspace_id, project_id=project_id, revision_ids=[revision_id]
+    )
+    return pipelines[revision_id]

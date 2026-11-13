@@ -9,14 +9,7 @@ import { DocumentPipelinePanel } from '@/components/projects/DocumentPipelinePan
 import { DocumentSections } from '@/components/projects/DocumentSections';
 import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
 import { TopBar } from '@/components/shell/TopBar';
-import {
-  Button,
-  ButtonLink,
-  EmptyState,
-  ErrorState,
-  Skeleton,
-  StatusBadge,
-} from '@/components/ui';
+import { Button, ButtonLink, EmptyState, ErrorState, Skeleton, StatusBadge } from '@/components/ui';
 import { projectStatus } from '@/lib/format';
 import {
   chooseOpenTarget,
@@ -60,7 +53,10 @@ const ProjectPage = ({ params }: IPageProps) => {
   const features = useFeatures();
 
   const items = documents.data?.items ?? [];
-  const revisions = useProjectRevisions(projectId, items.map((document) => document.id));
+  const revisions = useProjectRevisions(
+    projectId,
+    items.map((document) => document.id),
+  );
   const revisionsOf = (documentId: string): readonly DocumentRevisionRead[] =>
     revisions.byDocument.get(documentId)?.items ?? [];
 
@@ -143,10 +139,11 @@ const ProjectPage = ({ params }: IPageProps) => {
         }
       />
 
-      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)]">
-        <div className="mx-auto grid w-full max-w-[1400px] items-start gap-[var(--s-6)] lg:grid-cols-[1.6fr_1fr]">
-          <section className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface">
-            <header className="flex flex-wrap items-center gap-[var(--s-4)] border-b border-border px-[var(--s-6)] py-[var(--s-3)]">
+      <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)] lg:min-h-0 lg:overflow-hidden">
+        {/* lg+: страница в высоту экрана, каждая колонка листается сама. */}
+        <div className="mx-auto grid w-full max-w-[1760px] items-start gap-[var(--s-6)] lg:h-full lg:grid-cols-[1.6fr_1fr] xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <section className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface lg:flex lg:max-h-full lg:flex-col">
+            <header className="flex shrink-0 flex-wrap items-center gap-[var(--s-4)] border-b border-border px-[var(--s-6)] py-[var(--s-3)]">
               <h2 className="flex min-h-[var(--h-ctl)] items-center gap-[var(--s-5)] text-sm font-medium max-md:min-h-[44px]">
                 Документы
                 {documents.data && (
@@ -157,7 +154,7 @@ const ProjectPage = ({ params }: IPageProps) => {
               </h2>
             </header>
 
-            <div className="px-[var(--s-6)]">
+            <div className="px-[var(--s-6)] lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
               {documents.isPending && <Skeleton className="my-[var(--s-6)] h-[64px] w-full" />}
 
               {documents.isError && (
@@ -193,9 +190,12 @@ const ProjectPage = ({ params }: IPageProps) => {
             </div>
           </section>
 
-          <div className="flex min-w-0 flex-col gap-[var(--s-6)]">
-            {features[CAD_FEATURE] === true && <CadQueueCard projectId={projectId} />}
-            <div ref={panelRef} className="scroll-mt-[var(--s-6)]">
+          {/* lg: обработка и очередь одной колонкой; xl: contents — три колонки сетки. */}
+          <div className="flex min-w-0 flex-col gap-[var(--s-6)] lg:max-h-full lg:overflow-y-auto lg:overscroll-contain xl:contents">
+            <div
+              ref={panelRef}
+              className="min-w-0 scroll-mt-[var(--s-6)] xl:flex xl:max-h-full xl:min-h-0 xl:flex-col"
+            >
               {selected ? (
                 <DocumentPipelinePanel
                   key={selected.id}
@@ -214,12 +214,15 @@ const ProjectPage = ({ params }: IPageProps) => {
                     {documents.isPending ? (
                       <Skeleton className="h-[96px] w-full" />
                     ) : (
-                      <p className="text-sm text-muted">Выберите документ, чтобы увидеть обработку.</p>
+                      <p className="text-sm text-muted">
+                        Выберите документ, чтобы увидеть обработку.
+                      </p>
                     )}
                   </div>
                 </section>
               )}
             </div>
+            {features[CAD_FEATURE] === true && <CadQueueCard projectId={projectId} />}
           </div>
         </div>
       </main>

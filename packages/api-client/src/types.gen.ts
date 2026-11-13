@@ -2799,6 +2799,10 @@ export type CadOpeningRead = {
      */
     kind: 'door' | 'gap' | 'window';
     /**
+     * Marker Row Gap
+     */
+    marker_row_gap?: boolean;
+    /**
      * Status
      */
     status: 'ok' | 'estimate' | 'no_data';
@@ -3173,6 +3177,40 @@ export type CadProjectLevelsWrite = {
      * Толщина плиты по разрезам, мм
      */
     slab_thickness_mm?: number | null;
+};
+
+/**
+ * CadProjectSummaryRead
+ *
+ * Листы последних открываемых ревизий проекта по состоянию конвейера CAD.
+ *
+ * Инвариант: `sheets_total` = `sheets_done` + `sheets_running` + `sheets_failed` + `sheets_idle`.
+ */
+export type CadProjectSummaryRead = {
+    /**
+     * Documents Total
+     */
+    documents_total: number;
+    /**
+     * Sheets Done
+     */
+    sheets_done: number;
+    /**
+     * Sheets Failed
+     */
+    sheets_failed: number;
+    /**
+     * Sheets Idle
+     */
+    sheets_idle: number;
+    /**
+     * Sheets Running
+     */
+    sheets_running: number;
+    /**
+     * Sheets Total
+     */
+    sheets_total: number;
 };
 
 /**
@@ -19422,6 +19460,36 @@ export type DecideCadSectionLevelsResponses = {
 };
 
 export type DecideCadSectionLevelsResponse = DecideCadSectionLevelsResponses[keyof DecideCadSectionLevelsResponses];
+
+export type ReadCadSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/summary';
+};
+
+export type ReadCadSummaryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadSummaryError = ReadCadSummaryErrors[keyof ReadCadSummaryErrors];
+
+export type ReadCadSummaryResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadProjectSummaryRead;
+};
+
+export type ReadCadSummaryResponse = ReadCadSummaryResponses[keyof ReadCadSummaryResponses];
 
 export type ListCadVorDocumentsData = {
     body?: never;

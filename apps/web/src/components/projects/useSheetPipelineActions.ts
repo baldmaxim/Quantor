@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from 'react';
 import { cadErrorText } from '@/lib/cad/errors';
 import type { IPipelineAction } from '@/lib/cad/pipeline-actions';
 import { cadPipelineKey } from '@/lib/cad/pipeline-queries';
+import { cadSummaryKey } from '@/lib/cad/queue-queries';
 import { cadKeys } from '@/lib/cad/queries';
 import { runPipelineAction } from '@/lib/cad/runPipelineAction';
 
@@ -51,6 +52,7 @@ export const useSheetPipelineActions = (
       launching.current = false;
       void client.invalidateQueries({ queryKey: cadPipelineKey(projectId, revisionId) });
       void client.invalidateQueries({ queryKey: cadKeys.jobs(projectId, revisionId) });
+      void client.invalidateQueries({ queryKey: cadSummaryKey(projectId) });
       if (action.kind === 'retry' && action.jobId !== null) {
         void client.invalidateQueries({
           queryKey: cadKeys.job(projectId, revisionId, action.jobId),

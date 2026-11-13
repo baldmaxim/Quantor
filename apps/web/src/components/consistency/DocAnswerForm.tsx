@@ -19,26 +19,28 @@ import {
 /**
  * Ввод ответа человеком: «Ввести вручную» (размеры в мм целыми и обязательное пояснение
  * «откуда») и «Нет в проекте» (пояснение необязательно). Область — весь проект.
+ * Режим задаёт строка вопроса (кнопки в колонке «Действие»); форма закрывается через `onClose`.
  */
+
+export type DocAnswerMode = 'manual' | 'absent';
 
 interface IFormProps {
   readonly question: Pick<DocQuestionOut, 'code' | 'value_kind' | 'min_mm' | 'max_mm'>;
+  readonly mode: DocAnswerMode;
   readonly pending: boolean;
   /** `done` вызывается после успешной записи: форма закрывается. */
   readonly onSubmit: (body: DocAnswerBody, done: () => void) => void;
+  readonly onClose: () => void;
 }
-
-type Mode = 'closed' | 'manual' | 'absent';
 
 const FIELD =
   'w-full rounded-[var(--radius-sm)] border border-border-control bg-surface px-[var(--s-4)] text-base text-text md:text-sm';
 const SELECT = `${FIELD} h-[var(--h-ctl)] max-md:h-[44px]`;
 const LABEL = 'flex min-w-0 flex-col gap-[var(--s-2)] text-xs text-muted';
 
-export const DocAnswerForm: FC<IFormProps> = ({ question, pending, onSubmit }) => {
+export const DocAnswerForm: FC<IFormProps> = ({ question, mode, pending, onSubmit, onClose }) => {
   const baseId = useId();
   const layout = manualLayout(question);
-  const [mode, setMode] = useState<Mode>('closed');
   const [form, setForm] = useState<IManualForm>(() => emptyManualForm(layout));
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -49,8 +51,9 @@ export const DocAnswerForm: FC<IFormProps> = ({ question, pending, onSubmit }) =
   const setNumber = (index: number, value: string) =>
     patch({ numbers: form.numbers.map((item, at) => (at === index ? value : item)) });
   const close = () => {
-    setMode('closed');
+    setForm(emptyManualForm(layout));
     setProblem(null);
+    onClose();
   };
 
   const submitManual = () => {
@@ -61,15 +64,6 @@ export const DocAnswerForm: FC<IFormProps> = ({ question, pending, onSubmit }) =
     }
     onSubmit(result.body, close);
   };
-
-  if (mode === 'closed') {
-    return (
-      <div className="flex flex-wrap gap-[var(--s-3)]">
-        <Button onClick={() => setMode('manual')}>Ввести вручную</Button>
-        <Button onClick={() => setMode('absent')}>Нет в проекте</Button>
-      </div>
-    );
-  }
 
   const noteField = (required: boolean) => (
     <label className={LABEL}>

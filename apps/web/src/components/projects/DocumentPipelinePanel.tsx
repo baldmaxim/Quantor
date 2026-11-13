@@ -58,9 +58,9 @@ export const DocumentPipelinePanel: FC<IDocumentPipelinePanelProps> = ({
   return (
     <section
       aria-label="Обработка документа"
-      className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface"
+      className="flex max-h-full min-h-0 flex-col overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface"
     >
-      <header className="flex flex-wrap items-center gap-[var(--s-4)] border-b border-border px-[var(--s-6)] py-[var(--s-3)]">
+      <header className="flex shrink-0 flex-wrap items-center gap-[var(--s-4)] border-b border-border px-[var(--s-6)] py-[var(--s-3)]">
         <div className="min-w-0 flex-1">
           <p className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
             Обработка
@@ -87,7 +87,7 @@ export const DocumentPipelinePanel: FC<IDocumentPipelinePanelProps> = ({
         )}
       </header>
 
-      <div className="flex flex-col gap-[var(--s-5)] px-[var(--s-6)] py-[var(--s-5)]">
+      <div className="flex min-h-0 flex-col gap-[var(--s-5)] overflow-y-auto overscroll-contain px-[var(--s-6)] py-[var(--s-5)]">
         <Section title="Подготовка">
           {revisions === null ? (
             <Skeleton className="h-[20px] w-[180px]" />

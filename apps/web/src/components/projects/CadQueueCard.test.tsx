@@ -1,14 +1,15 @@
 import type * as ApiClient from '@quantor/api-client';
-import type { CadQueueItemRead, CadQueueRead } from '@quantor/api-client';
+import type { CadProjectSummaryRead, CadQueueItemRead, CadQueueRead } from '@quantor/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ queue: vi.fn() }));
+const mocks = vi.hoisted(() => ({ queue: vi.fn(), summary: vi.fn() }));
 
 vi.mock('@quantor/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof ApiClient>()),
   readCadQueue: mocks.queue,
+  readCadSummary: mocks.summary,
 }));
 
 import { CadQueueCard } from './CadQueueCard';
@@ -31,6 +32,16 @@ const item = (overrides: Partial<CadQueueItemRead> = {}): CadQueueItemRead => ({
   ...overrides,
 });
 
+const summaryOf = (overrides: Partial<CadProjectSummaryRead>): CadProjectSummaryRead => ({
+  sheets_total: 0,
+  sheets_done: 0,
+  sheets_running: 0,
+  sheets_failed: 0,
+  sheets_idle: 0,
+  documents_total: 0,
+  ...overrides,
+});
+
 const respond = (items: CadQueueItemRead[], totals = { running_total: 1, queued_total: 2 }) => {
   const data: CadQueueRead = { items, ...totals };
   mocks.queue.mockResolvedValue({ data });
@@ -38,7 +49,9 @@ const respond = (items: CadQueueItemRead[], totals = { running_total: 1, queued_
 
 const renderCard = () =>
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <CadQueueCard projectId="p-1" />
     </QueryClientProvider>,
   );
@@ -46,6 +59,21 @@ const renderCard = () =>
 describe('CadQueueCard', () => {
   beforeEach(() => {
     mocks.queue.mockReset();
+    mocks.summary.mockReset();
+    // По умолчанию листов для CAD нет: сводка не добавляет строк списка в проверки очереди.
+    mocks.summary.mockResolvedValue({ data: summaryOf({}) });
+  });
+
+  it('над очередью показана сводка распознавания проекта', async () => {
+    mocks.summary.mockResolvedValue({
+      data: summaryOf({ sheets_total: 4, sheets_done: 3, sheets_idle: 1, documents_total: 1 }),
+    });
+    respond([]);
+    renderCard();
+    expect(await screen.findByText('Распознавание: 3 из 4 листов · 75 %')).toBeInTheDocument();
+    expect(mocks.summary).toHaveBeenCalledWith(
+      expect.objectContaining({ path: { project_id: 'p-1' } }),
+    );
   });
 
   it('сводка исполнителя по всем проектам', async () => {

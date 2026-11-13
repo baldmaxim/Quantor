@@ -4,15 +4,13 @@ import type { DocCandidateOut, DocQuestionOut } from '@quantor/api-client';
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui';
-import type { DocAnswerBody } from '@/lib/consistency/doc-questions';
 
-import { DocAnswerForm } from './DocAnswerForm';
 import { DocAnswerItem } from './DocAnswerItem';
 import { DocCandidateItem } from './DocCandidateItem';
 
 /**
  * Раскрытая часть строки вопроса: все подтверждённые ответы, живые и отклонённые кандидаты,
- * норматив-допущение, ручной ввод.
+ * норматив-допущение. Ручной ввод — в строке вопроса.
  *
  * Норматив — допущение каталога, а не ответ проекта: он принимается отдельной кнопкой.
  */
@@ -23,13 +21,11 @@ interface IDetailsProps {
   readonly alive: readonly DocCandidateOut[];
   readonly rejected: readonly DocCandidateOut[];
   readonly busy: boolean;
-  readonly saving: boolean;
   readonly removing: boolean;
   readonly onAccept: (candidateId: string) => void;
   readonly onReject: (candidateId: string) => void;
   readonly onRemove: (answerId: string) => void;
   readonly onAcceptNorm: () => void;
-  readonly onSubmit: (body: DocAnswerBody, done?: () => void) => void;
 }
 
 export const DocQuestionDetails: FC<IDetailsProps> = ({
@@ -38,13 +34,11 @@ export const DocQuestionDetails: FC<IDetailsProps> = ({
   alive,
   rejected,
   busy,
-  saving,
   removing,
   onAccept,
   onReject,
   onRemove,
   onAcceptNorm,
-  onSubmit,
 }) => {
   const { assumption } = question;
 
@@ -124,8 +118,6 @@ export const DocQuestionDetails: FC<IDetailsProps> = ({
           </div>
         </div>
       )}
-
-      <DocAnswerForm question={question} pending={saving} onSubmit={onSubmit} />
     </div>
   );
 };

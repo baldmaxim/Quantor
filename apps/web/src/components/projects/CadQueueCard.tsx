@@ -6,6 +6,7 @@ import { ErrorState, Skeleton } from '@/components/ui';
 import { useCadQueue } from '@/lib/cad/queue-queries';
 
 import { CadQueueRow } from './CadQueueRow';
+import { CadRecognitionSummary } from './CadRecognitionSummary';
 
 /**
  * Очередь CAD проекта на главной: исполнитель берёт задания по одному, поэтому видно, что
@@ -23,11 +24,13 @@ export const CadQueueCard: FC<ICadQueueCardProps> = ({ projectId }) => {
   return (
     <section
       aria-label="Очередь CAD"
-      className="overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface"
+      className="min-w-0 overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface xl:flex xl:max-h-full xl:flex-col"
     >
-      <h2 className="border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
+      <h2 className="shrink-0 border-b border-border px-[var(--s-6)] py-[var(--s-5)] text-sm font-medium">
         Очередь CAD
       </h2>
+
+      <CadRecognitionSummary projectId={projectId} />
 
       {queue.isPending && <Skeleton className="m-[var(--s-6)] h-[48px] w-auto" />}
 
@@ -44,7 +47,7 @@ export const CadQueueCard: FC<ICadQueueCardProps> = ({ projectId }) => {
         <>
           <p
             data-testid="cad-queue-summary"
-            className="m-0 border-b border-border px-[var(--s-6)] py-[var(--s-3)] text-xs text-muted"
+            className="m-0 shrink-0 border-b border-border px-[var(--s-6)] py-[var(--s-3)] text-xs text-muted"
           >
             Исполнитель: выполняется {data.running_total}, в очереди {data.queued_total} (все
             проекты)
@@ -54,7 +57,10 @@ export const CadQueueCard: FC<ICadQueueCardProps> = ({ projectId }) => {
               Заданий CAD нет
             </p>
           ) : (
-            <ul aria-label="Задания CAD проекта" className="m-0 list-none p-0">
+            <ul
+              aria-label="Задания CAD проекта"
+              className="m-0 max-h-[60dvh] list-none overflow-y-auto overscroll-contain p-0 xl:max-h-none xl:min-h-0"
+            >
               {data.items.map((item) => (
                 <CadQueueRow key={item.job_id} projectId={projectId} item={item} />
               ))}
