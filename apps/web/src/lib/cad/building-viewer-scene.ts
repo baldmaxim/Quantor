@@ -14,6 +14,7 @@ import { buildFloor, wallRanges, type IFloorEntry } from './building-viewer-floo
 import { readBuildingViewerColors, type IBuildingViewerColors } from './building-viewer-colors';
 import { createGroupLabels } from './building-viewer-labels';
 import { createWallOverlay, disposeWallOverlay, type OverlayKind } from './building-viewer-overlay';
+import { attachPivotOrbit } from './pivot-orbit';
 
 /**
  * Рендер просмотрщика объекта: перспективная камера и `OrbitControls` вокруг здания из настоящих
@@ -283,15 +284,27 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
   // Выбор мышью: луч по мешам этажей -> ключ этажа и, если попали в стену, её конструкция.
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
-  const pickAt = (clientX: number, clientY: number): { key: string; wallId: string | null } | null => {
+  const rayHit = (clientX: number, clientY: number): THREE.Intersection | null => {
     const rect = dom.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0 || pickTargets.length === 0) return null;
     ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     root.updateMatrixWorld(true);
     raycaster.setFromCamera(ndc, camera);
-    const hit = raycaster.intersectObjects(pickTargets, false)[0];
+    return raycaster.intersectObjects(pickTargets, false)[0] ?? null;
+  };
+  const pivotOrbit = attachPivotOrbit({
+    camera,
+    controls,
+    dom,
+    scene,
+    pickPoint: (clientX, clientY) => rayHit(clientX, clientY)?.point.clone() ?? null,
+    markerColor: () => colors.accent,
+    onChange: requestRender,
+  });
+  const pickAt = (clientX: number, clientY: number): { key: string; wallId: string | null } | null => {
+    const hit = rayHit(clientX, clientY);
     const key: unknown = hit?.object.userData.floorKey;
-    if (hit === undefined || typeof key !== 'string') return null;
+    if (hit === null || typeof key !== 'string') return null;
     const ranges = wallRanges.get(hit.object);
     return { key, wallId: ranges === undefined ? null : wallIdAtFace(ranges, hit.faceIndex) };
   };
@@ -444,6 +457,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       dom.removeEventListener('pointerup', onUp);
       dom.removeEventListener('pointercancel', onCancel);
       dom.removeEventListener('pointerleave', onLeave);
+      pivotOrbit.dispose();
       controls.dispose();
       disposeFloors();
       renderer.dispose();

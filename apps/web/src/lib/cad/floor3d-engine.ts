@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { IFloor3dHighlight } from './floor3d-geometry';
 import type { IFloor3dRoutes } from './floor3d-routes';
 import type { CadLayerCategory } from './layer-categories';
+import { attachPivotOrbit } from './pivot-orbit';
 import {
   buildFeatureEdges,
   midpoint,
@@ -155,6 +156,21 @@ export const createFloor3dEngine = (
   }
   controls.addEventListener('change', requestRender);
   controls.addEventListener('start', options.onMove);
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const pivotOrbit = attachPivotOrbit({
+    camera, controls, dom, scene,
+    pickPoint: (clientX, clientY) => {
+      const rect = dom.getBoundingClientRect();
+      if (model === null || rect.width === 0 || rect.height === 0) return null;
+      ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      const hit = raycaster.intersectObjects(model.pickables.filter((mesh) => mesh.visible), false)[0];
+      return hit === undefined ? null : hit.point.clone();
+    },
+    markerColor: () => readFloor3dColors().accent,
+    onChange: requestRender,
+  });
 
   let model: IFloor3dScene | null = null;
   let routes: IFloor3dRoutes | null = null;
@@ -265,8 +281,6 @@ export const createFloor3dEngine = (
 
   // Щелчок отличается от перетаскивания смещением указателя.
   let down: { x: number; y: number } | null = null;
-  const raycaster = new THREE.Raycaster();
-  const ndc = new THREE.Vector2();
   const onDown = (event: PointerEvent): void => {
     down = { x: event.clientX, y: event.clientY };
   };
@@ -563,6 +577,7 @@ export const createFloor3dEngine = (
       scene.remove(hoverGroup);
       controls.removeEventListener('change', requestRender);
       controls.removeEventListener('start', options.onMove);
+      pivotOrbit.dispose();
       controls.dispose();
       clearMeasureObjects();
       scene.remove(measureGroup);
