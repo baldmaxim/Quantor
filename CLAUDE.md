@@ -53,8 +53,9 @@ pnpm benchmark:viewer            # замер просмотрщика: холс
 ```
 
 Боевая выкладка — `deploy.md` (обычный деплой) и `deploy/README.md` (первичная установка, ADR-0032):
-образы собирает `publish.yml` в GHCR, сервер Selectel (SSH-алиас `quantor`) обновляется
-`deploy/update.sh <git-sha>`. Вход в бою — `AUTH_MODE=local` с одобрением заявок в админке (ADR-0031);
+образы собирает `publish.yml` в GHCR, сервер **`suvpn`** (SSH-алиас `suvpn`) обновляется
+`deploy/update.sh <git-sha>`. С 2026-11-13 Quantor живёт только на suvpn ([ADR-0046](docs/adr/0046-pereezd-boevogo-stenda-na-suvpn.md));
+прежний сервер `quantor` (Selectel) выведен из выкладки — на него не деплоить. Вход в бою — `AUTH_MODE=local` с одобрением заявок в админке (ADR-0031);
 первый администратор — `python -m app.cli create-admin`.
 
 ## Границы этапа

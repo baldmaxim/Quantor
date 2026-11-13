@@ -3,7 +3,13 @@
 Выкладка изменений на `quantor.meridianai.ru`. Сборка — только в CI (GitHub Actions → GHCR), на
 сервере — `update.sh` с git-sha. Первичная установка сервера, сертификат и `.env` —
 [deploy/README.md](deploy/README.md); решения — [ADR-0031](docs/adr/0031-lokalnaya-autentifikaciya-s-odobreniem.md)
-(вход) и [ADR-0032](docs/adr/0032-boevoe-razvyortyvanie-na-selectel.md) (развёртывание).
+(вход), [ADR-0032](docs/adr/0032-boevoe-razvyortyvanie-na-selectel.md) (развёртывание) и
+[ADR-0046](docs/adr/0046-pereezd-boevogo-stenda-na-suvpn.md) (переезд на suvpn).
+
+> **С 2026-11-13 боевой Quantor живёт на сервере `suvpn` — деплоить только туда.**
+> Старый сервер `quantor` (Selectel) выведен из выкладки: стек остановлен, тома оставлены для отката,
+> `update.sh` там — заглушка, отменяющая выкладку (`/opt/portals/quantor/MOVED.txt`). Команды
+> `ssh quantor …` из старых заметок и истории не использовать.
 
 ## Production
 
@@ -11,12 +17,12 @@
 | --------------- | ------------------------------------------------------------------------------------ |
 | Портал          | <https://quantor.meridianai.ru>                                                      |
 | Админка         | <https://admin.quantor.meridianai.ru>                                                |
-| Сервер          | Selectel VDS 2-4-50, Ubuntu 24.04 — `ssh quantor` (адрес только в `~/.ssh/config`)   |
+| Сервер          | `suvpn`: 4 vCPU / 16 ГБ / 493 ГБ, Ubuntu 24.04 — `ssh suvpn` (адрес только в `~/.ssh/config`) |
 | Каталог портала | `/opt/portals/quantor` — compose-проект `quantor`, `.env`, `RELEASE`, скрипты        |
 | Вход (ingress)  | `/opt/infra/nginx` — infra-nginx и certbot, сайт в `conf.d/quantor.conf`             |
 | Образы          | `ghcr.io/baldmaxim/quantor-{api,web,admin}` с тегом git-sha, зеркало `quantor-minio` |
 | Текущий выпуск  | `/opt/portals/quantor/RELEASE`                                                       |
-| Резервная копия | cron 03:17 → `/opt/portals/quantor/backups`, база, 7 дней; файлы MinIO не копируются |
+| Резервная копия | cron 03:17 UTC → `/opt/portals/quantor/backups`, база, 7 дней; файлы MinIO не копируются |
 | Сертификат      | Let's Encrypt на оба имени, certbot продлевает сам                                   |
 
 ## Обычный деплой
@@ -32,7 +38,7 @@
 3. Выкатить ровно этот коммит:
 
    ```bash
-   ssh quantor "/opt/portals/quantor/update.sh $(git rev-parse HEAD)"
+   ssh suvpn "/opt/portals/quantor/update.sh $(git rev-parse HEAD)"
    ```
 
    Скрипт: скачивает образы → создаёт бакет, если его нет → накатывает миграции → перезапускает
@@ -54,7 +60,8 @@ deploy/ship-local.sh <git-ref>       # конкретный коммит; --buil
 api/web/admin/cad-worker как `publish.yml`, передаёт их `docker save | ssh docker load`, кладёт на
 сервер `update.sh` из образа и запускает его с `SKIP_PULL=1`. Нужны docker, jq и клон CAD_engine рядом
 с Quantor (`CAD_ENGINE_REPO`). Образов такой сборки в GHCR нет; коммиты раньше появления `SKIP_PULL`
-этим путём не выкатываются. Собирать на сервере нельзя: 2 vCPU / 4 ГБ и соседи.
+этим путём не выкатываются. Собирать на сервере нельзя: там нет исходников, а сборка должна совпадать с CI.
+Сервер по умолчанию — `suvpn` (переменная `QUANTOR_SSH`).
 
 ## CAD-исполнитель (PDF → DXF, ADR-0036)
 
@@ -74,8 +81,8 @@ api/web/admin/cad-worker как `publish.yml`, передаёт их `docker sav
 
 ```bash
 curl -fsS https://quantor.meridianai.ru/health/ready      # 200, все компоненты ok
-ssh quantor '/opt/portals/quantor/compose.sh ps'          # все контейнеры Up
-ssh quantor 'docker ps --format "{{.Names}}"'             # соседи tginfo-* на месте
+ssh suvpn '/opt/portals/quantor/compose.sh ps'          # все контейнеры Up
+ssh suvpn 'docker ps --format "{{.Names}}"'             # сосед amnezia-awg2 (VPN) на месте
 ```
 
 В браузере: вход, список проектов, открытие документа, админка.
@@ -83,8 +90,8 @@ ssh quantor 'docker ps --format "{{.Names}}"'             # соседи tginfo-
 ## Откат
 
 ```bash
-ssh quantor 'cat /opt/portals/quantor/RELEASE'                    # что сейчас
-ssh quantor '/opt/portals/quantor/update.sh <предыдущий git-sha>'
+ssh suvpn 'cat /opt/portals/quantor/RELEASE'                    # что сейчас
+ssh suvpn '/opt/portals/quantor/update.sh <предыдущий git-sha>'
 ```
 
 Откат образа не откатывает миграции: если версия меняла схему базы, откат решается отдельно, по
@@ -93,11 +100,11 @@ ssh quantor '/opt/portals/quantor/update.sh <предыдущий git-sha>'
 ## Частые операции
 
 ```bash
-ssh quantor '/opt/portals/quantor/compose.sh logs --tail 100 api'      # также worker, web, admin
-ssh -t quantor '/opt/portals/quantor/compose.sh run --rm api python -m app.cli create-admin --email <почта>'
-ssh -L 9001:127.0.0.1:9001 quantor                                     # консоль MinIO: http://localhost:9001
-ssh quantor 'ls -lh /opt/portals/quantor/backups'
-ssh quantor 'free -m; df -h /'
+ssh suvpn '/opt/portals/quantor/compose.sh logs --tail 100 api'      # также worker, web, admin
+ssh -t suvpn '/opt/portals/quantor/compose.sh run --rm api python -m app.cli create-admin --email <почта>'
+ssh -L 9001:127.0.0.1:9001 suvpn                                     # консоль MinIO: http://localhost:9001
+ssh suvpn 'ls -lh /opt/portals/quantor/backups'
+ssh suvpn 'free -m; df -h /'
 ```
 
 `create-admin` — первый администратор или восстановление доступа: пароль вводится в терминале,
@@ -106,7 +113,8 @@ ssh quantor 'free -m; df -h /'
 
 ## Нельзя
 
-- Собирать образы на сервере — там нет ни исходников, ни места в памяти.
+- Собирать образы на сервере — там нет исходников, сборка — только CI или `ship-local.sh`.
+- Выкатывать на старый сервер `quantor` — портал переехал на `suvpn` (ADR-0046).
 - Менять `.env` скриптами или из чата: значения вписывает владелец руками на сервере.
 - `docker system prune -a` и `docker compose down -v` — сносят чужие образы и тома с данными.
 - Перезагружать nginx без `nginx -t`: вход общий, ошибка в одном файле роняет оба портала.
@@ -114,7 +122,17 @@ ssh quantor 'free -m; df -h /'
 
 ## Соседи на сервере
 
-TG_Info (`pulse.meridianai.ru`) — compose-проект `tginfo` в `/opt/portals/tg-info`, своя база, свой
-файл `conf.d/tginfo.conf` в общем infra-nginx. Выкладка Quantor его не трогает, и наоборот.
-Памяти на двоих впритык: если `free -m` показывает меньше 500 МБ доступной, пора менять тариф на
-4-8-80 — без переезда.
+На `suvpn` рядом с Quantor работает только VPN AmneziaWG (контейнер `amnezia-awg2`, свои интерфейсы
+`awg*` и правила ufw). Выкладка Quantor его не трогает: не менять его правила ufw, не трогать
+сети `amnezia-*`. infra-nginx на suvpn обслуживает только Quantor.
+
+## Старый сервер `quantor` (до 2026-11-13)
+
+Selectel VDS 2-4-50 с соседями TG_Info, MailHub, ServerControl — они там и остаются, их выкладка
+не меняется. От Quantor на нём:
+
+- остановленный стек `quantor-*` и тома `quantor_*` — только для отката, удаление — решением владельца;
+- `/opt/portals/quantor/update.sh` — заглушка, отменяющая выкладку; прежний — `update.sh.moved-20261113`;
+- временный мост `conf.d/quantor.conf`, проксирующий оба имени на suvpn, пока DNS не отработал.
+  После переключения DNS — удалить его, `nginx -t`, `nginx -s reload` (прежний конфиг —
+  `/opt/infra/nginx/quantor.conf.bak-premigrate-20261113`).

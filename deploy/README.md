@@ -1,9 +1,12 @@
-# Выкладка Quantor на Selectel
+# Выкладка Quantor на сервер suvpn
 
-Решение и границы — [ADR-0032](../docs/adr/0032-boevoe-razvyortyvanie-na-selectel.md); вход — [ADR-0031](../docs/adr/0031-lokalnaya-autentifikaciya-s-odobreniem.md).
+Решение и границы — [ADR-0032](../docs/adr/0032-boevoe-razvyortyvanie-na-selectel.md) и
+[ADR-0046](../docs/adr/0046-pereezd-boevogo-stenda-na-suvpn.md) (переезд); вход — [ADR-0031](../docs/adr/0031-lokalnaya-autentifikaciya-s-odobreniem.md).
 
-Сервер — отдельный Selectel VDS (2 vCPU / 4 ГБ / 50 ГБ, Ubuntu 24.04), SSH-алиас `quantor`
-в `~/.ssh/config`. Адрес сервера в репозитории не хранится.
+Сервер — `suvpn` (4 vCPU / 16 ГБ / 493 ГБ, swap 8 ГБ, Ubuntu 24.04), SSH-алиас `suvpn`
+в `~/.ssh/config`. Адрес сервера в репозитории не хранится. С 2026-11-13 Quantor работает только
+здесь; прежний сервер `quantor` (Selectel) выведен из выкладки — см. «Старый сервер» в [deploy.md](../deploy.md).
+Сосед на suvpn — VPN AmneziaWG (`amnezia-awg2`): его правила ufw и сети `amnezia-*` не трогать.
 
 ```
 браузер ─ HTTPS ─► infra-nginx (/opt/infra/nginx, Let's Encrypt)
@@ -37,24 +40,24 @@ workflow): `ghcr.io/baldmaxim/quantor-{api,web,admin,cad-worker}` с тегам�
 
 ### 1. Сервер
 
-Docker, compose, swap 2 ГБ, ufw (22, 80, 443), часовой пояс Asia/Almaty — уже настроено
-при подготовке сервера. Проверка: `ssh quantor 'docker compose version; swapon --show; ufw status'`.
+Docker, `docker-compose-v2`, `rsync`, swap 8 ГБ, ufw (22, 80/tcp, 443/tcp, 8443/udp для HTTP/3) —
+настроено при переезде 2026-11-13; часовой пояс — UTC. Проверка: `ssh suvpn 'docker compose version; swapon --show; ufw status'`.
 
 ### 2. Ingress и сертификат
 
 ```bash
-ssh quantor 'docker network create infra_web; mkdir -p /opt/infra/nginx/conf.d /opt/portals/quantor/backups'
-scp deploy/nginx/docker-compose.yml deploy/nginx/nginx.conf quantor:/opt/infra/nginx/
-scp deploy/nginx/conf.d/00-acme.conf quantor:/opt/infra/nginx/conf.d/
-ssh quantor 'cd /opt/infra/nginx && docker compose up -d'
+ssh suvpn 'docker network create infra_web; mkdir -p /opt/infra/nginx/conf.d /opt/portals/quantor/backups'
+scp deploy/nginx/docker-compose.yml deploy/nginx/nginx.conf suvpn:/opt/infra/nginx/
+scp deploy/nginx/conf.d/00-acme.conf suvpn:/opt/infra/nginx/conf.d/
+ssh suvpn 'cd /opt/infra/nginx && docker compose up -d'
 
 # Сертификат на оба имени. Почта не передаётся.
-ssh quantor 'cd /opt/infra/nginx && docker compose run --rm --entrypoint certbot certbot \
+ssh suvpn 'cd /opt/infra/nginx && docker compose run --rm --entrypoint certbot certbot \
   certonly --webroot -w /var/www/certbot --agree-tos --register-unsafely-without-email \
   -d quantor.meridianai.ru -d admin.quantor.meridianai.ru'
 
-scp deploy/nginx/quantor.conf quantor:/opt/infra/nginx/conf.d/
-ssh quantor 'docker exec infra-nginx nginx -t && docker exec infra-nginx nginx -s reload'
+scp deploy/nginx/quantor.conf suvpn:/opt/infra/nginx/conf.d/
+ssh suvpn 'docker exec infra-nginx nginx -t && docker exec infra-nginx nginx -s reload'
 ```
 
 До запуска портала nginx на HTTPS отвечает 502 — это нормально.
@@ -63,13 +66,13 @@ ssh quantor 'docker exec infra-nginx nginx -t && docker exec infra-nginx nginx -
 
 ```bash
 scp deploy/docker-compose.yml deploy/update.sh deploy/compose.sh deploy/backup.sh \
-  deploy/quantor.env.example quantor:/opt/portals/quantor/
+  deploy/quantor.env.example suvpn:/opt/portals/quantor/
 ```
 
 `.env` создаёт и заполняет **владелец на сервере**, скрипты его не меняют:
 
 ```bash
-ssh quantor
+ssh suvpn
 cd /opt/portals/quantor && cp quantor.env.example .env && chmod 600 .env
 openssl rand -hex 24   # дважды: для POSTGRES_PASSWORD и S3_SECRET_ACCESS_KEY
 nano .env
@@ -86,13 +89,13 @@ nano .env
 
 ```bash
 gh auth refresh -h github.com -s read:packages
-gh auth token | ssh quantor 'docker login ghcr.io -u baldmaxim --password-stdin'
+gh auth token | ssh suvpn 'docker login ghcr.io -u baldmaxim --password-stdin'
 ```
 
 ### 5. Запуск
 
 ```bash
-ssh quantor '/opt/portals/quantor/update.sh <git-sha>'
+ssh suvpn '/opt/portals/quantor/update.sh <git-sha>'
 ```
 
 Скрипт скачивает образы, создаёт бакет, накатывает миграции, поднимает стек и ждёт
@@ -104,7 +107,7 @@ ssh quantor '/opt/portals/quantor/update.sh <git-sha>'
 Пароль вводится в терминале сервера без эха, не аргументом:
 
 ```bash
-ssh -t quantor '/opt/portals/quantor/compose.sh run --rm api \
+ssh -t suvpn '/opt/portals/quantor/compose.sh run --rm api \
   python -m app.cli create-admin --email <почта владельца> --name "<Имя>"'
 ```
 
@@ -114,7 +117,7 @@ ssh -t quantor '/opt/portals/quantor/compose.sh run --rm api \
 ### 7. Резервные копии базы
 
 ```bash
-ssh quantor 'cat > /etc/cron.d/quantor-backup <<"EOF"
+ssh suvpn 'cat > /etc/cron.d/quantor-backup <<"EOF"
 17 3 * * * root /opt/portals/quantor/backup.sh
 EOF'
 ```
@@ -146,7 +149,7 @@ venv; PyMuPDF и Shapely есть только в нём). Команда `pytho
 curl -sS https://quantor.meridianai.ru/health/ready          # 200, schema_revision = head
 curl -sS -o /dev/null -w '%{http_code}\n' https://quantor.meridianai.ru/api/docs   # 404
 curl -sS -o /dev/null -w '%{http_code}\n' -X PUT https://quantor.meridianai.ru/quantor-files/x  # 403
-ssh quantor '/opt/portals/quantor/compose.sh ps; free -m; df -h /'
+ssh suvpn '/opt/portals/quantor/compose.sh ps; free -m; df -h /'
 ```
 
 В браузере:
@@ -161,8 +164,8 @@ ssh quantor '/opt/portals/quantor/compose.sh ps; free -m; df -h /'
 ## Обновление и откат
 
 ```bash
-ssh quantor '/opt/portals/quantor/update.sh <новый git-sha>'
-ssh quantor '/opt/portals/quantor/update.sh <предыдущий git-sha>'   # откат
+ssh suvpn '/opt/portals/quantor/update.sh <новый git-sha>'
+ssh suvpn '/opt/portals/quantor/update.sh <предыдущий git-sha>'   # откат
 ```
 
 Миграции вперёд откат образа не отменяет: если новая версия меняла схему, откат кода
@@ -171,10 +174,10 @@ ssh quantor '/opt/portals/quantor/update.sh <предыдущий git-sha>'   # 
 ## Обслуживание
 
 ```bash
-ssh quantor 'docker logs --tail 100 quantor-api'
-ssh quantor 'docker logs --tail 100 quantor-worker'
-ssh -L 9001:127.0.0.1:9001 quantor        # консоль MinIO: http://localhost:9001
-ssh quantor 'ls -lh /opt/portals/quantor/backups'
+ssh suvpn 'docker logs --tail 100 quantor-api'
+ssh suvpn 'docker logs --tail 100 quantor-worker'
+ssh -L 9001:127.0.0.1:9001 suvpn        # консоль MinIO: http://localhost:9001
+ssh suvpn 'ls -lh /opt/portals/quantor/backups'
 ```
 
 Флаги возможностей включаются в админке. `calc.portal` не включается ни там, ни в

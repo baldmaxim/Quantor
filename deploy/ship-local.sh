@@ -11,7 +11,7 @@
 # незакоммиченные правки рабочей копии в образ не попадают. Движок CAD и генераторы — из репозитория
 # CAD_engine по tools/cad_engine/pins.json со сверкой sha256.
 #
-# Окружение: QUANTOR_SSH (по умолчанию quantor), CAD_ENGINE_REPO (по умолчанию ../CAD_engine),
+# Окружение: QUANTOR_SSH (по умолчанию suvpn — боевой сервер с 2026-11-13, ADR-0046), CAD_ENGINE_REPO (по умолчанию ../CAD_engine),
 # QUANTOR_PUBLIC_ORIGIN, QUANTOR_ADMIN_ORIGIN. Образов этой сборки в GHCR нет: повторить выкладку
 # того же sha можно только этим скриптом.
 set -euo pipefail
@@ -22,7 +22,7 @@ REF="${1:-origin/main}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENGINE_REPO="${CAD_ENGINE_REPO:-$ROOT/../CAD_engine}"
-SSH_HOST="${QUANTOR_SSH:-quantor}"
+SSH_HOST="${QUANTOR_SSH:-suvpn}"
 PUBLIC_ORIGIN="${QUANTOR_PUBLIC_ORIGIN:-https://quantor.meridianai.ru}"
 ADMIN_ORIGIN="${QUANTOR_ADMIN_ORIGIN:-https://admin.quantor.meridianai.ru}"
 REG=ghcr.io/baldmaxim
