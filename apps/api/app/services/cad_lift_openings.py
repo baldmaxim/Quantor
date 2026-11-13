@@ -23,6 +23,7 @@ from app.services.cad_constructions import (
     PartitionContext,
     PartitionZone,
     _in_ring,
+    _point_in_any_zone,
     _point_segment_distance,
 )
 
@@ -66,10 +67,6 @@ def _near_ring(point: tuple[float, float], ring: Sequence[Sequence[float]], reac
     )
 
 
-def _in_any_room(point: tuple[float, float], zones: Sequence[PartitionZone]) -> bool:
-    return any(len(zone.shell) >= 3 and _in_ring(point, zone.shell) for zone in zones)
-
-
 def is_lift_door_gap(
     opening: WallsOpening, direction: Sequence[float] | None, zones: Sequence[PartitionZone]
 ) -> bool:
@@ -89,7 +86,7 @@ def is_lift_door_gap(
         return False
     for hall_side, other_side in (sides, sides[::-1]):
         if any(_near_ring(hall_side, zone.shell, LIFT_SIDE_REACH_MM) for zone in halls) and (
-            not _in_any_room(other_side, zones)
+            not _point_in_any_zone(other_side, zones)
         ):
             return True
     return False

@@ -40,9 +40,11 @@ HEIGHT = calc.PartitionHeight(188, "observed", ANSWER_ID, "АР ПЗ.pdf", 4, "�
 THIN_SHELL = [[2960.0, 0.0], [3040.0, 0.0], [3040.0, 2000.0], [2960.0, 2000.0]]
 
 
-def room(kind: str, apartment_no: str | None, x0: float, x1: float) -> calc.PartitionZone:
+def room(
+    kind: str, apartment_no: str | None, x0: float, x1: float, room_type: str | None = None
+) -> calc.PartitionZone:
     return calc.PartitionZone(
-        kind, apartment_no, [[x0, 0.0], [x1, 0.0], [x1, 2000.0], [x0, 2000.0]]
+        kind, apartment_no, [[x0, 0.0], [x1, 0.0], [x1, 2000.0], [x0, 2000.0]], room_type
     )
 
 
@@ -50,6 +52,10 @@ LEFT_12 = room("room_apartment", "12", 0.0, 2960.0)
 RIGHT_12 = room("room_apartment", "12", 3040.0, 6000.0)
 RIGHT_13 = room("room_apartment", "13", 3040.0, 6000.0)
 RIGHT_MOP = room("room_mop", None, 3040.0, 6000.0)
+LEFT_LIVING = room("room_apartment", "12", 0.0, 2960.0, "living")
+RIGHT_LIVING = room("room_apartment", "12", 3040.0, 6000.0, "living")
+RIGHT_BATH = room("room_apartment", "12", 3040.0, 6000.0, "bath")
+RIGHT_WC = room("room_apartment", "12", 3040.0, 6000.0, "wc")
 
 
 def thin(
@@ -78,7 +84,7 @@ def props(**fields: Any) -> CadConstructionProps:
         ([LEFT_12, RIGHT_12], True),  # две комнаты одной квартиры
         ([LEFT_12, RIGHT_MOP], False),  # квартира и МОП
         ([LEFT_12, RIGHT_13], False),  # две квартиры
-        ([LEFT_12], True),  # касается одной комнаты квартиры
+        ([LEFT_12], False),  # с другой стороны нет зоны: обстройка шахты, не маячный ряд
         ([], False),  # зон нет
         ([room("room_apartment", None, 0.0, 2960.0)], False),  # номера квартиры нет
         ([room("room_apartment", "12", 0.0, 2000.0)], False),  # зона дальше 150 мм
@@ -122,6 +128,122 @@ def test_manual_purpose_cancels_the_rule_except_interior(
     assert calc.is_apartment_partition(wall(), props(purpose=purpose), [LEFT_12, RIGHT_12]) is (
         expected
     )
+
+
+# ------------------------------------------------------------------ санузлы и шахты
+
+
+@pytest.mark.parametrize(
+    ("zones", "expected"),
+    [
+        ([LEFT_LIVING, RIGHT_LIVING], "apartment_partition"),  # две жилые комнаты
+        ([LEFT_LIVING, RIGHT_BATH], "bathroom_wall"),  # комната и ванная
+        ([LEFT_LIVING, RIGHT_WC], "bathroom_wall"),  # комната и туалет
+        ([LEFT_LIVING], "shaft_enclosure"),  # комната и пустота
+        ([RIGHT_LIVING], "shaft_enclosure"),
+        ([LEFT_LIVING, RIGHT_MOP], None),  # квартира и МОП - не квартирная
+        ([room("room_apartment", "12", 0.0, 2000.0)], None),  # зона дальше 150 мм: пустота с обеих
+    ],
+)
+def test_classify_partition_bathroom_shaft_and_beacon_row(
+    zones: list[calc.PartitionZone], expected: str | None
+) -> None:
+    assert calc.classify_partition(wall(), props(), zones) == expected
+
+
+def test_wall_with_both_sides_empty_is_not_a_partition() -> None:
+    far = [room("room_apartment", "12", 0.0, 1000.0), room("room_apartment", "12", 5000.0, 6000.0)]
+    assert calc.classify_partition(wall(), props(), far) is None
+
+
+def test_side_is_empty_when_most_probes_are_outside_zones() -> None:
+    # Зона справа закрывает только нижнюю треть стены: 1 проба из 3 - зона, 2 - пустота.
+    partial = calc.PartitionZone(
+        "room_apartment", "12", [[3040.0, 0.0], [6000.0, 0.0], [6000.0, 600.0], [3040.0, 600.0]]
+    )
+    assert calc.classify_partition(wall(), props(), [LEFT_LIVING, partial]) == "shaft_enclosure"
+    # Закрывает две трети (две пробы из трёх): сторона с зоной.
+    most = calc.PartitionZone(
+        "room_apartment", "12", [[3040.0, 0.0], [6000.0, 0.0], [6000.0, 1200.0], [3040.0, 1200.0]]
+    )
+    assert calc.classify_partition(wall(), props(), [LEFT_LIVING, most]) == "apartment_partition"
+
+
+# Перегородка 5600 x 80 мм с выступом-нишей на правом конце: грани 5600, 5520, 500 и 420 мм.
+NICHE_SHELL = [
+    [0.0, 0.0],
+    [5600.0, 0.0],
+    [5600.0, 500.0],
+    [5520.0, 500.0],
+    [5520.0, 80.0],
+    [0.0, 80.0],
+]
+
+
+def niche_wall() -> WallsConstruction:
+    item = thin()
+    item["polygon"] = {"shell": NICHE_SHELL, "holes": []}
+    return WallsConstruction.model_validate(item)
+
+
+def block(apartment_no: str, x1: float, y0: float, y1: float) -> calc.PartitionZone:
+    return calc.PartitionZone(
+        "room_apartment", apartment_no, [[0.0, y0], [x1, y0], [x1, y1], [0.0, y1]], "living"
+    )
+
+
+def test_long_partition_with_short_empty_niche_face_is_beacon_row() -> None:
+    # Комнаты по обе стороны до x=5400: у ниши справа пусто только одна грань в 500 мм из ~12 м.
+    zones = [block("12", 6000.0, -3000.0, -40.0), block("12", 5400.0, 120.0, 3000.0)]
+    assert calc.classify_partition(niche_wall(), props(), zones) == "apartment_partition"
+
+
+def test_wall_with_most_face_length_without_zones_is_shaft_enclosure() -> None:
+    # Зона только снизу: грани сверху и у ниши (5520 + 500 + 420 мм) без зон - больше половины.
+    zones = [block("12", 6000.0, -3000.0, -40.0)]
+    assert calc.classify_partition(niche_wall(), props(), zones) == "shaft_enclosure"
+
+
+@pytest.mark.parametrize(
+    ("zones", "basis"),
+    [
+        ([LEFT_LIVING, RIGHT_BATH], "bathroom_wall"),
+        ([LEFT_LIVING], "shaft_enclosure"),
+    ],
+)
+def test_bathroom_and_shaft_walls_get_full_height_with_reason(
+    zones: list[calc.PartitionZone], basis: str
+) -> None:
+    result = sheet(partition=calc.PartitionContext(zones, HEIGHT))
+    computed = result.constructions[0].computed
+    assert (computed.height_mm, computed.height_basis, computed.sources.height) == (
+        2800,
+        basis,
+        "derived",
+    )
+    assert computed.wall_area_m2 == pytest.approx(2.0 * 2.8)
+    assert result.summary.apartment_partition_count == 0
+    assert result.partition_warnings == []
+
+
+def test_bathroom_wall_has_no_warning_without_answer() -> None:
+    result = sheet(partition=calc.PartitionContext([LEFT_LIVING, RIGHT_BATH], None))
+    assert result.partition_warnings == []
+    assert result.constructions[0].computed.height_basis == "bathroom_wall"
+
+
+def test_manual_height_and_purpose_beat_bathroom_and_shaft_rules() -> None:
+    zones = [LEFT_LIVING, RIGHT_BATH]
+    context = calc.PartitionContext(zones, HEIGHT)
+    manual = sheet({PARTITION_ID: (props(height_override_mm=1500), False)}, partition=context)
+    assert (
+        manual.constructions[0].computed.height_mm,
+        manual.constructions[0].computed.height_basis,
+    ) == (1500, "manual")
+    for purpose in ("external", "shaft", "inter_apartment", "mop"):
+        assert calc.classify_partition(wall(), props(purpose=purpose), zones) is None
+        plain = sheet({PARTITION_ID: (props(purpose=purpose), False)}, partition=context)
+        assert plain.constructions[0].computed.height_basis == "sheet"
 
 
 # ------------------------------------------------------------------ высота и объём
@@ -257,6 +379,25 @@ def test_floor3d_partition_top_is_base_plus_beacon_row_and_has_no_reaches_top_wa
     (door,) = model.doors
     assert (door.z_bottom_mm, door.z_top_mm) == (BASE, BASE + 188)
     assert model.heights.apartment_partition_height is not None
+
+
+def test_floor3d_and_volume_agree_for_bathroom_and_shaft_walls() -> None:
+    for zones, basis in (
+        ([LEFT_LIVING, RIGHT_BATH], "bathroom_wall"),
+        ([LEFT_LIVING], "shaft_enclosure"),
+    ):
+        context = calc.PartitionContext(zones, HEIGHT)
+        model = build_3d(context)
+        assert (wall_of(model).z_top_mm, wall_of(model).height_basis) == (BASE + 2800, basis)
+        assert model.heights.apartment_partition_height is not None
+        computed = sheet(partition=context).constructions[0].computed
+        assert (computed.height_mm, computed.height_basis) == (2800, basis)
+    # Рядом жилые комнаты: маячный ряд и в 3D, и в объёме.
+    model = build_3d(calc.PartitionContext([LEFT_LIVING, RIGHT_LIVING], HEIGHT))
+    assert (wall_of(model).z_top_mm, wall_of(model).height_basis) == (
+        BASE + 188,
+        "apartment_partition",
+    )
 
 
 def test_floor3d_manual_height_beats_beacon_row() -> None:

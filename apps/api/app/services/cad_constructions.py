@@ -10,6 +10,7 @@
 - толщина `t` = переопределение человека, иначе номинал скрипта; номинала нет — `thickness_check`;
 - высота `H` = переопределение человека, иначе высота маячного ряда (внутриквартирная
   перегородка, ответ принят в «Вопросах к документации»), иначе (высота этажа - толщина плиты);
+  стены санузлов и обстройка шахт маячным рядом не ограничены: у них высота стены листа;
   высота этажа и толщина плиты — переопределение листа, иначе значение из walls.json; нет
   высоты — `height_missing`;
 - материал: ввод человека (`props.material`), иначе подсказка из условных обозначений листа, если
@@ -302,6 +303,16 @@ PARTITION_ZONE_REACH_MM: Final = 150.0
 # Назначение, заданное человеком, при котором конструкция - не внутриквартирная перегородка.
 _NOT_PARTITION_PURPOSES: Final = frozenset({"external", "inter_apartment", "mop", "shaft"})
 APARTMENT_ROOM_KIND: Final = "room_apartment"
+# Санитарные («мокрые») типы помещений квартиры: перегородка, касающаяся такой зоны, - стена
+# санузла из ПГП 80 (ПЗ АР), её возводят на полную высоту, а не маячным рядом.
+WET_ROOM_TYPES: Final = frozenset({"bath", "wc"})
+# Пробы сторон стены: доли длины каждой длинной грани контура; грань короче порога пробами не
+# проверяется (торец и косой срез). Сторона без зон - если большинство проб вне всех зон.
+SIDE_PROBE_FRACTIONS: Final = (0.25, 0.5, 0.75)
+SIDE_MIN_EDGE_MM: Final = 300.0
+# Доля длины граней контура без зон, с которой стена - обстройка шахты. Решает длина, а не
+# наличие одной грани без зон: короткая грань-ниша у длинной перегородки шахтой её не делает.
+SHAFT_EMPTY_LENGTH_SHARE: Final = 0.5
 
 WARNING_PARTITION_HEIGHT_UNKNOWN: Final = "apartment_partition_height_unknown"
 WARNING_APARTMENT_ZONES_MISSING: Final = "apartment_zones_missing"
@@ -322,7 +333,8 @@ class PartitionZone:
     kind: str
     apartment_no: str | None
     shell: list[list[float]]
-    # Действующий тип помещения (`lift_hall`, `corridor`, ...); нужен распознаванию лифтовых дверей.
+    # Действующий тип помещения (`lift_hall`, `bath`, ...); нужен распознаванию лифтовых дверей и
+    # стен санузлов.
     room_type: str | None = None
 
 
@@ -350,6 +362,13 @@ class PartitionHeight:
 
 
 @dataclass(frozen=True, slots=True)
+class PartitionFullHeight:
+    """Перегородка на полную высоту стены листа с названной причиной (не маячный ряд)."""
+
+    basis: CadHeightBasis
+
+
+@dataclass(frozen=True, slots=True)
 class PartitionContext:
     """Вход классификации перегородок листа: зоны помещений в мм листа и принятый ответ."""
 
@@ -371,15 +390,20 @@ class ConstructionHeight:
 def construction_height(
     props: CadConstructionProps,
     levels: EffectiveLevels,
-    partition_height: PartitionHeight | None = None,
+    partition_height: PartitionHeight | PartitionFullHeight | None = None,
 ) -> ConstructionHeight:
     """Высота конструкции: ввод человека, затем маячный ряд, затем высота стены листа.
 
-    `partition_height` передаётся только внутриквартирной перегородке при принятом ответе.
-    Общая функция расчёта, 3D этажа и перемычек.
+    `partition_height` передаётся только внутриквартирной перегородке при принятом ответе;
+    `PartitionFullHeight` (стена санузла, обстройка шахты) даёт высоту стены листа с основанием
+    этого правила. Общая функция расчёта, 3D этажа и перемычек.
     """
     if props.height_override_mm is not None:
         return ConstructionHeight(props.height_override_mm, "manual", "manual")
+    if isinstance(partition_height, PartitionFullHeight):
+        return ConstructionHeight(
+            levels.wall_height_mm, levels.wall_height_source, partition_height.basis
+        )
     if partition_height is not None:
         return ConstructionHeight(
             partition_height.height_mm, partition_height.source, "apartment_partition"
@@ -462,56 +486,131 @@ def _touched_zones(shell: list[list[float]], zones: Sequence[PartitionZone]) -> 
     return touched
 
 
+def _point_in_any_zone(point: tuple[float, float], zones: Sequence[PartitionZone]) -> bool:
+    return any(len(zone.shell) >= 3 and _in_ring(point, zone.shell) for zone in zones)
+
+
+def _wall_side_lengths(
+    shell: list[list[float]], zones: Sequence[PartitionZone]
+) -> tuple[float, float]:
+    """Суммарная длина граней контура с зоной и без зон: `(с_зоной_мм, без_зон_мм)`.
+
+    Учитываются длинные грани (не короче `SIDE_MIN_EDGE_MM`); пробы лежат на 150 мм от грани
+    наружу, по 25/50/75 % её длины. Грань «без зон» - большинство проб вне всех зон помещений.
+    """
+    with_zone = 0.0
+    without_zone = 0.0
+    n = len(shell)
+    for i in range(n):
+        ax, ay = shell[i][0], shell[i][1]
+        bx, by = shell[(i + 1) % n][0], shell[(i + 1) % n][1]
+        length = math.hypot(bx - ax, by - ay)
+        if length < SIDE_MIN_EDGE_MM:
+            continue
+        nx, ny = -(by - ay) / length, (bx - ax) / length
+        mid = ((ax + bx) / 2, (ay + by) / 2)
+        if _in_ring((mid[0] + nx, mid[1] + ny), shell):
+            nx, ny = -nx, -ny  # нормаль смотрит внутрь контура - разворачиваем наружу
+        probes = [
+            (
+                ax + (bx - ax) * fraction + nx * PARTITION_ZONE_REACH_MM,
+                ay + (by - ay) * fraction + ny * PARTITION_ZONE_REACH_MM,
+            )
+            for fraction in SIDE_PROBE_FRACTIONS
+        ]
+        empty = sum(1 for probe in probes if not _point_in_any_zone(probe, zones))
+        if empty * 2 > len(probes):
+            without_zone += length
+        else:
+            with_zone += length
+    return with_zone, without_zone
+
+
+def classify_partition(
+    construction: WallsConstruction,
+    props: CadConstructionProps,
+    zones: Sequence[PartitionZone],
+) -> CadHeightBasis | None:
+    """Класс внутриквартирной перегородки или `None`, если конструкция - не она.
+
+    Кладка (не монолит и не каркасная перегородка) номинальной толщины не более 100 мм; все
+    помещения, которых касается её контур (с запасом 150 мм), - квартира с одним и тем же
+    непустым номером. Назначение, заданное человеком (наружная, межквартирная, МОП, шахта),
+    правило отменяет; «внутренняя» его не отменяет. Нет зон - не перегородка. Класс:
+
+    - `bathroom_wall` - касается зоны санузла или ванной (ПГП 80): полная высота стены листа;
+    - `shaft_enclosure` - грани контура без зон составляют не менее `SHAFT_EMPTY_LENGTH_SHARE`
+      суммарной длины граней, и есть грани с зоной квартиры (шахта): полная высота; стена, у
+      которой все грани без зон, - не перегородка;
+    - `apartment_partition` - остальные: маячный ряд.
+    """
+    if construction.kind != "masonry":
+        return None
+    nominal = construction.thickness_nominal_mm
+    if nominal is None or nominal > PARTITION_MAX_THICKNESS_MM:
+        return None
+    if props.purpose in _NOT_PARTITION_PURPOSES:
+        return None
+    touched = _touched_zones(construction.polygon.shell, zones)
+    if not touched or any(zone.kind != APARTMENT_ROOM_KIND for zone in touched):
+        return None
+    numbers = {(zone.apartment_no or "").strip() for zone in touched}
+    if len(numbers) != 1 or "" in numbers:
+        return None
+    with_zone, without_zone = _wall_side_lengths(construction.polygon.shell, zones)
+    if without_zone > 0 and with_zone == 0:
+        return None  # все грани без зон: не квартирная стена
+    if any(zone.room_type in WET_ROOM_TYPES for zone in touched):
+        return "bathroom_wall"
+    if without_zone >= SHAFT_EMPTY_LENGTH_SHARE * (with_zone + without_zone) > 0:
+        return "shaft_enclosure"
+    return "apartment_partition"
+
+
 def is_apartment_partition(
     construction: WallsConstruction,
     props: CadConstructionProps,
     zones: Sequence[PartitionZone],
 ) -> bool:
-    """Внутриквартирная перегородка: тонкая кладка, касающаяся помещений одной квартиры.
-
-    Кладка (не монолит и не каркасная перегородка) номинальной толщины не более 100 мм; все
-    помещения, которых касается её контур (с запасом 150 мм), - квартира с одним и тем же
-    непустым номером. Назначение, заданное человеком (наружная, межквартирная, МОП, шахта),
-    правило отменяет; «внутренняя» его не отменяет. Нет зон - не перегородка.
-    """
-    if construction.kind != "masonry":
-        return False
-    nominal = construction.thickness_nominal_mm
-    if nominal is None or nominal > PARTITION_MAX_THICKNESS_MM:
-        return False
-    if props.purpose in _NOT_PARTITION_PURPOSES:
-        return False
-    touched = _touched_zones(construction.polygon.shell, zones)
-    if not touched or any(zone.kind != APARTMENT_ROOM_KIND for zone in touched):
-        return False
-    numbers = {(zone.apartment_no or "").strip() for zone in touched}
-    return len(numbers) == 1 and "" not in numbers
+    """Перегородка с маячным рядом: `classify_partition` даёт `apartment_partition`."""
+    return classify_partition(construction, props, zones) == "apartment_partition"
 
 
-def partition_candidate_ids(
+def classify_partitions(
     items: Sequence[WallsConstruction],
     props_by_key: PropsByKey,
     zones: Sequence[PartitionZone],
-) -> frozenset[str]:
-    """Адреса внутриквартирных перегородок листа (по геометрии и зонам, без учёта ответа)."""
+) -> dict[str, CadHeightBasis]:
+    """Класс перегородок листа по адресам (по геометрии и зонам, без учёта ответа)."""
     if not zones:
-        return frozenset()
-    return frozenset(
-        item.id
-        for item in items
-        if is_apartment_partition(
+        return {}
+    result: dict[str, CadHeightBasis] = {}
+    for item in items:
+        basis = classify_partition(
             item, props_by_key.get(item.id, (CadConstructionProps(), False))[0], zones
         )
-    )
+        if basis is not None:
+            result[item.id] = basis
+    return result
+
+
+def partition_candidate_ids(classes: Mapping[str, CadHeightBasis]) -> frozenset[str]:
+    """Адреса перегородок с маячным рядом (без стен санузлов и обстройки шахт)."""
+    return frozenset(key for key, basis in classes.items() if basis == "apartment_partition")
 
 
 def partition_heights_by_id(
-    candidates: Collection[str], partition: PartitionContext | None
-) -> dict[str, PartitionHeight]:
-    """Высота маячного ряда по адресам перегородок; ответа нет - пусто."""
-    if partition is None or partition.height is None:
-        return {}
-    return dict.fromkeys(candidates, partition.height)
+    classes: Mapping[str, CadHeightBasis], partition: PartitionContext | None
+) -> dict[str, PartitionHeight | PartitionFullHeight]:
+    """Высота по адресам перегородок: маячный ряд (ответ принят) или полная с причиной."""
+    result: dict[str, PartitionHeight | PartitionFullHeight] = {}
+    for key, basis in classes.items():
+        if basis == "apartment_partition":
+            if partition is not None and partition.height is not None:
+                result[key] = partition.height
+        else:
+            result[key] = PartitionFullHeight(basis)
+    return result
 
 
 def partition_warnings(
@@ -607,13 +706,14 @@ def compute_construction(
     props: CadConstructionProps,
     levels: EffectiveLevels,
     material: CadConstructionMaterialRead | None = None,
-    partition_height: PartitionHeight | None = None,
+    partition_height: PartitionHeight | PartitionFullHeight | None = None,
 ) -> Computed:
     """Величины одной конструкции; `host_openings` — проёмы, чья несущая стена — она.
 
     `material` — действующий материал (по умолчанию из `effective_material`).
     `partition_height` — высота маячного ряда, если это внутриквартирная перегородка и ответ
-    принят (приоритет: ввод человека, маячный ряд, высота стены листа).
+    принят, либо полная высота с причиной (стена санузла, обстройка шахты); приоритет: ввод
+    человека, маячный ряд, высота стены листа.
     """
     if material is None:
         material = effective_material(construction, props)
@@ -834,7 +934,7 @@ def compute_lintels(
     items: list[WallsConstruction],
     props_by_key: PropsByKey,
     levels: EffectiveLevels,
-    partition_heights: Mapping[str, PartitionHeight] | None = None,
+    partition_heights: Mapping[str, PartitionHeight | PartitionFullHeight] | None = None,
 ) -> tuple[dict[float, LintelGroup], int]:
     """Монолитные перемычки над проёмами стен не из монолита: группы по толщине хозяина.
 
@@ -903,10 +1003,11 @@ def compute_sheet(
     """
     levels = effective_levels(document.heights, overrides, project_slab)
     items_all = [*document.constructions, *document.frame_partitions]
-    candidates = partition_candidate_ids(
+    classes = classify_partitions(
         document.constructions, props_by_key, () if partition is None else partition.zones
     )
-    partition_heights = partition_heights_by_id(candidates, partition)
+    candidates = partition_candidate_ids(classes)
+    partition_heights = partition_heights_by_id(classes, partition)
     known = {c.id for c in items_all}
     by_host: dict[str, list[WallsOpening]] = defaultdict(list)
     for opening in document.openings:

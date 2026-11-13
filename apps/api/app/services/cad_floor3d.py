@@ -62,8 +62,10 @@ DOOR_WITHOUT_GAP: Final = "door_without_gap"
 SLAB_WITHOUT_ZONES: Final = "slab_without_zones"
 # Код предупреждения cad_walls v1.12: пролёт остекления без стены-хозяина (окно не построено).
 WINDOW_BAY_WITHOUT_HOST: Final = "window_bay_without_host"
+# Код предупреждения cad_walls v1.13: в пролёте балконная дверь, окно урезано или снято.
+WINDOW_BAY_DOOR_OVERLAP: Final = "window_bay_door_overlap"
 _PASSED_WARNING_CODES: Final = frozenset(
-    {DOOR_WITHOUT_GAP, SLAB_WITHOUT_ZONES, WINDOW_BAY_WITHOUT_HOST}
+    {DOOR_WITHOUT_GAP, SLAB_WITHOUT_ZONES, WINDOW_BAY_WITHOUT_HOST, WINDOW_BAY_DOOR_OVERLAP}
 )
 
 Point = tuple[float, float]
@@ -350,10 +352,11 @@ def build_floor3d(
             )
         )
 
-    candidates = cad_constructions.partition_candidate_ids(
+    classes = cad_constructions.classify_partitions(
         document.constructions, props_by_key, () if partition is None else partition.zones
     )
-    partition_heights = cad_constructions.partition_heights_by_id(candidates, partition)
+    candidates = cad_constructions.partition_candidate_ids(classes)
+    partition_heights = cad_constructions.partition_heights_by_id(classes, partition)
     warnings.extend(
         CadFloor3dWarningRead(code=code, message=message)
         for code, message in cad_constructions.partition_warnings(

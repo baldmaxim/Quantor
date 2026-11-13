@@ -812,7 +812,7 @@ export type CadConstructionComputedRead = {
     /**
      * Height Basis
      */
-    height_basis?: 'sheet' | 'manual' | 'apartment_partition' | null;
+    height_basis?: 'sheet' | 'manual' | 'apartment_partition' | 'bathroom_wall' | 'shaft_enclosure' | null;
     /**
      * Height Mm
      */
@@ -2201,7 +2201,7 @@ export type CadFloor3dWallRead = {
     /**
      * Height Basis
      */
-    height_basis?: 'sheet' | 'manual' | 'apartment_partition';
+    height_basis?: 'sheet' | 'manual' | 'apartment_partition' | 'bathroom_wall' | 'shaft_enclosure';
     /**
      * Holes
      */

@@ -134,11 +134,10 @@ def test_floor3d_builds_a_window_with_height_like_a_gap() -> None:
     assert "window_height_unknown" not in [w.code for w in model.warnings]
 
 
-def test_floor3d_passes_the_window_bay_without_host_warning() -> None:
+@pytest.mark.parametrize("code", ["window_bay_without_host", "window_bay_door_overlap"])
+def test_floor3d_passes_the_window_bay_warnings(code: str) -> None:
     raw = raw_document()
-    raw["checks"] = {
-        "warnings": [{"code": "window_bay_without_host", "message": "пролёт без хозяина"}]
-    }
+    raw["checks"] = {"warnings": [{"code": code, "message": "предупреждение пролёта"}]}
     model = f3d.build_floor3d(
         WallsDocument.model_validate(raw),
         WallsFloorExtras.model_validate(raw_extras()),
@@ -148,4 +147,4 @@ def test_floor3d_passes_the_window_bay_without_host_warning() -> None:
         hole_decisions={},
         door_zones=[],
     )
-    assert "window_bay_without_host" in [w.code for w in model.warnings]
+    assert code in [w.code for w in model.warnings]

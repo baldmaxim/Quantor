@@ -29,8 +29,11 @@ MAX_BULK_KEYS: Final = 2000
 CadValueSource = Literal["observed", "derived", "assumption", "manual"]
 # Основание высоты конструкции: sheet - высота стены листа; manual - ввод человека;
 # apartment_partition - высота маячного ряда внутриквартирных перегородок из «Вопросов к
-# документации».
-CadHeightBasis = Literal["sheet", "manual", "apartment_partition"]
+# документации»; bathroom_wall - стена санузла (ПГП 80) и shaft_enclosure - обстройка шахты:
+# обе на полную высоту стены листа, маячный ряд к ним не применяется.
+CadHeightBasis = Literal[
+    "sheet", "manual", "apartment_partition", "bathroom_wall", "shaft_enclosure"
+]
 # `floor_slab` — плита перекрытия листа: одна на лист, контур и отверстия — из ключа `slab`.
 CadConstructionKind = Literal[
     "masonry",

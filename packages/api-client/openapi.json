@@ -1621,7 +1621,9 @@
                 "enum": [
                   "sheet",
                   "manual",
-                  "apartment_partition"
+                  "apartment_partition",
+                  "bathroom_wall",
+                  "shaft_enclosure"
                 ],
                 "type": "string"
               },
@@ -4571,7 +4573,9 @@
             "enum": [
               "sheet",
               "manual",
-              "apartment_partition"
+              "apartment_partition",
+              "bathroom_wall",
+              "shaft_enclosure"
             ],
             "title": "Height Basis",
             "type": "string"
