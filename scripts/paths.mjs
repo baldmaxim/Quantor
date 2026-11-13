@@ -6,7 +6,14 @@ export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const apiDir = join(repoRoot, 'apps', 'api');
 export const webDir = join(repoRoot, 'apps', 'web');
 export const apiClientDir = join(repoRoot, 'packages', 'api-client');
-export const venvDir = join(apiDir, '.venv');
+// На Linux-машине разработчика окружение лежит в .venv-linux; .venv — основной вариант.
+const LINUX_VENV_DIR = join(apiDir, '.venv-linux');
+export const venvDir =
+  process.platform !== 'win32' &&
+  !existsSync(join(apiDir, '.venv')) &&
+  existsSync(LINUX_VENV_DIR)
+    ? LINUX_VENV_DIR
+    : join(apiDir, '.venv');
 
 /** Путь к интерпретатору внутри venv бэкенда (Windows и POSIX раскладки различаются). */
 export const venvPython = () =>
