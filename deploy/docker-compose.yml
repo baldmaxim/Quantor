@@ -4,7 +4,8 @@
 #   - наружу не публикуется ни один порт: снаружи ходит только nginx из /opt/infra/nginx
 #     по сети infra_web; консоль MinIO — на петле сервера, через SSH-туннель;
 #   - база и хранилище — только во внутренней сети;
-#   - у каждого контейнера предел памяти: на сервере четыре гигабайта на всё;
+#   - у каждого контейнера предел памяти: на сервере suvpn 16 ГБ и 4 vCPU на всё, около 2 ГБ
+#     оставлено ОС и соседу-VPN (ADR-0046); прежние пределы были под 4 ГБ Selectel;
 #   - значения — в .env рядом с этим файлом, здесь только имена и умолчания;
 #   - тег выпуска IMAGE_TAG приходит не из .env, а из файла RELEASE через update.sh и compose.sh.
 #
@@ -56,11 +57,14 @@ services:
     command:
       - postgres
       - -c
-      - shared_buffers=128MB
+      - shared_buffers=1GB
       - -c
-      - max_connections=40
+      - effective_cache_size=6GB
       - -c
-      - work_mem=8MB
+      # API 4 процесса × пул 3+4, воркер и CAD-исполнитель — около 35; остальное — запас.
+      - max_connections=80
+      - -c
+      - work_mem=16MB
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -68,7 +72,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-    mem_limit: 512m
+    mem_limit: 2g
     networks: [internal]
 
   # Права на том хранилища. Образ MinIO работает не от root и без оболочки, а новый том
@@ -102,7 +106,7 @@ services:
     depends_on:
       storage-init:
         condition: service_completed_successfully
-    mem_limit: 512m
+    mem_limit: 1g
     networks: [internal, infra_web]
 
   # Разовые команды обслуживания: миграции и бакет. Отдельным шагом выкладки, а не при
@@ -116,7 +120,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    mem_limit: 384m
+    mem_limit: 768m
     networks: [internal]
 
   api:
@@ -125,8 +129,9 @@ services:
     restart: unless-stopped
     environment:
       <<: *api-env
-      # Процессов uvicorn; один занимает ~175 МиБ. Два — с запасом в mem_limit 768m; пул БД 3+4 на процесс.
-      API_WORKERS: ${API_WORKERS:-2}
+      # Процессов uvicorn — по числу vCPU; один занимает ~175–250 МиБ. Четыре — с запасом в mem_limit 2g;
+      # пул БД 3+4 на процесс (max_connections базы — 80).
+      API_WORKERS: ${API_WORKERS:-4}
     volumes:
       # Загрузки до гигабайта идут через временный файл: на диск, а не в память.
       - api_tmp:/tmp
@@ -147,7 +152,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    mem_limit: 768m
+    mem_limit: 2g
     networks: [internal, infra_web]
 
   worker:
@@ -167,9 +172,9 @@ services:
         condition: service_started
     # Фоновые задания уступают процессору API и базе (см. cad-worker).
     cpu_shares: 256
-    # Разбор паспортов листов (pypdf) на больших PDF упирался в 768m (OOM, 2026-11-12).
-    mem_limit: ${WORKER_MEM_LIMIT:-1536m}
-    memswap_limit: ${WORKER_MEMSWAP_LIMIT:-3g}
+    # Разбор паспортов листов (pypdf) на больших PDF упирался в 768m (OOM, 2026-11-12); на suvpn — 4g.
+    mem_limit: ${WORKER_MEM_LIMIT:-4g}
+    memswap_limit: ${WORKER_MEMSWAP_LIMIT:-6g}
     networks: [internal]
 
   # CAD-исполнитель PDF -> DXF (ADR-0036). Отдельный образ: движок, PyMuPDF и Shapely есть только
@@ -195,12 +200,12 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
-    cpus: 1.0
+    cpus: 2.0
     # Фоновая работа уступает процессору API и базе: на 2 vCPU без этого запросы портала
     # ждали CAD-расчёт (замер 2026-11-12). Ядро без конкуренции исполнитель получает целиком.
     cpu_shares: 256
-    mem_limit: ${CAD_WORKER_MEM_LIMIT:-1536m}
-    memswap_limit: ${CAD_WORKER_MEMSWAP_LIMIT:-3g}
+    mem_limit: ${CAD_WORKER_MEM_LIMIT:-4g}
+    memswap_limit: ${CAD_WORKER_MEMSWAP_LIMIT:-6g}
     networks: [internal]
 
   web:
@@ -213,7 +218,7 @@ services:
     depends_on:
       api:
         condition: service_started
-    mem_limit: 384m
+    mem_limit: 768m
     networks: [internal, infra_web]
 
   admin:
@@ -226,7 +231,7 @@ services:
     depends_on:
       api:
         condition: service_started
-    mem_limit: 256m
+    mem_limit: 512m
     networks: [internal, infra_web]
 
 volumes:

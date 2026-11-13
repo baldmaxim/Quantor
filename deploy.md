@@ -73,8 +73,10 @@ api/web/admin/cad-worker как `publish.yml`, передаёт их `docker sav
 
 - Возможность открывает флаг пространства `cad.export` (админка → пространство); без него маршруты отвечают 403.
 - Лимиты в `.env` (необязательно): `CAD_MAX_MEMORY_MB` (6144, потолок адресного пространства движка),
-  `CAD_WORKER_MEM_LIMIT` (1536m), `CAD_WORKER_MEMSWAP_LIMIT` (3g, память + swap). Замер 2026-11-09: стр. 81 АР1.1 — пик 465 МБ, 54 с.
-- Основной `worker` (импорт, геометрия, паспорт листа): `WORKER_MEM_LIMIT` (1536m), `WORKER_MEMSWAP_LIMIT` (3g); до 2026-11-12 было 768m — разбор больших PDF падал по OOM.
+  `CAD_WORKER_MEM_LIMIT` (4g), `CAD_WORKER_MEMSWAP_LIMIT` (6g, память + swap), `cpus: 2.0`. Замер 2026-11-09: стр. 81 АР1.1 — пик 465 МБ, 54 с.
+- Основной `worker` (импорт, геометрия, паспорт листа): `WORKER_MEM_LIMIT` (4g), `WORKER_MEMSWAP_LIMIT` (6g); до 2026-11-12 было 768m — разбор больших PDF падал по OOM.
+- Пределы остальных под 16 ГБ suvpn (2026-11-13): db 2g (`shared_buffers` 1GB, `max_connections` 80), api 2g и
+  4 процесса uvicorn (`API_WORKERS`), minio 1g, web 768m, admin 512m. Под 4 ГБ Selectel было вчетверо меньше.
 - Если движок не сконфигурирован или не прошёл проверку, контейнер выходит с ошибкой: `compose.sh logs cad-worker`.
 
 ## Проверка

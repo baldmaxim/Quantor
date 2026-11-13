@@ -34,8 +34,9 @@ ServerControl, VPN. На 2 vCPU / 4 ГБ портал, воркер разбор
 
 ## Последствия
 
-- Пределы памяти в `deploy/docker-compose.yml` подобраны под 4 ГБ; на 16 ГБ их можно поднять отдельной
-  правкой по замеру. До тех пор поведение стенда прежнее.
+- Пределы памяти в `deploy/docker-compose.yml` подняты под 16 ГБ в тот же день: db 2g (`shared_buffers` 1GB,
+  `max_connections` 80), api 2g и 4 процесса, worker и cad-worker 4g / swap 6g (CAD — 2 CPU), minio 1g,
+  web 768m, admin 512m; около 2 ГБ оставлено ОС и VPN.
 - Часовой пояс suvpn — UTC: резервная копия по cron `17 3 * * *` идёт в 03:17 UTC.
 - Серверу suvpn нужен вход в GHCR (`docker login ghcr.io`, токен `read:packages` вводит владелец), иначе
   `update.sh` не скачает образы; без входа — только `ship-local.sh` / `SKIP_PULL=1`.
