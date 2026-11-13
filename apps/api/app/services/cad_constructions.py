@@ -316,6 +316,7 @@ SHAFT_EMPTY_LENGTH_SHARE: Final = 0.5
 
 WARNING_PARTITION_HEIGHT_UNKNOWN: Final = "apartment_partition_height_unknown"
 WARNING_APARTMENT_ZONES_MISSING: Final = "apartment_zones_missing"
+WARNING_APARTMENT_WITHOUT_FINISH: Final = "apartment_without_finish"
 MESSAGE_PARTITION_HEIGHT_UNKNOWN: Final = (
     "Высота маячного ряда внутриквартирных перегородок не подтверждена в «Вопросах к "
     "документации»: перегородки посчитаны на высоту этажа"
@@ -361,6 +362,27 @@ class PartitionHeight:
         )
 
 
+FINISHING_WITHOUT: Final = "without_finish"
+FINISHING_WITH: Final = "with_finish"
+
+
+@dataclass(frozen=True, slots=True)
+class ApartmentFinishing:
+    """Принятый ответ «Отделка квартир»: код (`without_finish` / `with_finish`) и происхождение."""
+
+    code: str
+    # observed - ответ из документа; manual - значение ввёл человек.
+    source: CadValueSource
+    answer_id: uuid.UUID
+    file_name: str | None = None
+    page_index: int | None = None
+    quote: str | None = None
+
+    @property
+    def without_finish(self) -> bool:
+        return self.code == FINISHING_WITHOUT
+
+
 @dataclass(frozen=True, slots=True)
 class PartitionFullHeight:
     """Перегородка на полную высоту стены листа с названной причиной (не маячный ряд)."""
@@ -376,6 +398,8 @@ class PartitionContext:
     height: PartitionHeight | None = None
     # Принятая высота проёма двери шахты лифта (LIFT_DOOR_HEIGHT); применяет `cad_lift_openings`.
     lift_door_height: PartitionHeight | None = None
+    # Принятый ответ «Отделка квартир» (APARTMENT_FINISHING); нет ответа - ничего не исключается.
+    finishing: ApartmentFinishing | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -649,6 +673,89 @@ def marker_row_gap_ids(
         if any(_is_beacon_row_wall(key, partition_heights, props_by_key) for key in jambs):
             result.add(opening.id)
     return frozenset(result)
+
+
+# Классы перегородок, у которых дверь - внутриквартирная (маячный ряд, санузел, обстройка шахты).
+_INTERIOR_DOOR_BASES: Final = frozenset({"apartment_partition", "bathroom_wall", "shaft_enclosure"})
+BALCONY_ROOM_TYPE: Final = "balcony"
+
+
+def interior_apartment_door_ids(
+    document: WallsDocument,
+    classes: Mapping[str, CadHeightBasis],
+    zones: Sequence[PartitionZone],
+) -> frozenset[str]:
+    """Внутриквартирные двери: адреса проёмов `door` (любой статус), которых нет при «без отделки».
+
+    Дверь внутриквартирная, если хозяин или хотя бы один откос (`adjacent_ids`) - перегородка
+    квартиры (класс из `classify_partitions`), а контур проёма (контур перемычки, иначе контур
+    хозяина) с допуском `PARTITION_ZONE_REACH_MM` не касается зон МОП, балкона и зон другой
+    квартиры (не той, которой принадлежит перегородка). Входная дверь, дверь между квартирами и
+    балконная в неё не входят. Без зон - пусто. Чистая функция.
+    """
+    if not zones or not classes:
+        return frozenset()
+    shells = {c.id: c.polygon.shell for c in document.constructions}
+    result: set[str] = set()
+    for opening in document.openings:
+        if opening.kind != "door":
+            continue
+        jambs = list(opening.adjacent_ids)
+        if opening.host_id is not None:
+            jambs.append(opening.host_id)
+        partitions = [key for key in jambs if classes.get(key) in _INTERIOR_DOOR_BASES]
+        if not partitions:
+            continue
+        ring = opening.lintel
+        if ring is None and opening.host_id is not None:
+            ring = shells.get(opening.host_id)
+        if ring is None:
+            continue
+        own = {
+            (zone.apartment_no or "").strip()
+            for key in partitions
+            for zone in _touched_zones(shells.get(key, []), zones)
+        }
+        if len(own) != 1 or "" in own:
+            continue  # перегородка не принадлежит одной квартире: не внутриквартирная
+        touched = _touched_zones(ring, zones)
+        if any(
+            zone.kind != APARTMENT_ROOM_KIND
+            or zone.room_type == BALCONY_ROOM_TYPE
+            or (zone.apartment_no or "").strip() not in own
+            for zone in touched
+        ):
+            continue
+        result.add(opening.id)
+    return frozenset(result)
+
+
+def without_finish(partition: PartitionContext | None) -> bool:
+    """Принят ответ «Отделка квартир: без отделки (Shell&Core)»."""
+    return (
+        partition is not None
+        and partition.finishing is not None
+        and partition.finishing.without_finish
+    )
+
+
+def finish_excluded_doors(
+    document: WallsDocument,
+    classes: Mapping[str, CadHeightBasis],
+    partition: PartitionContext | None,
+) -> frozenset[str]:
+    """Двери, исключённые ответом «без отделки»; без такого ответа - пусто."""
+    if partition is None or not without_finish(partition):
+        return frozenset()
+    return interior_apartment_door_ids(document, classes, partition.zones)
+
+
+def without_finish_warning(excluded_doors: int) -> tuple[str, str]:
+    return (
+        WARNING_APARTMENT_WITHOUT_FINISH,
+        "Квартиры без отделки (ответ к документации): внутриквартирные двери не учитываются - "
+        f"{excluded_doors} шт., отделка квартир не считается.",
+    )
 
 
 def partition_warnings(
@@ -1046,6 +1153,7 @@ def compute_sheet(
     )
     candidates = partition_candidate_ids(classes)
     partition_heights = partition_heights_by_id(classes, partition)
+    excluded_doors = finish_excluded_doors(document, classes, partition)
     # Проёмы маячного ряда - разрыв выкладки: в расчёт хозяев, перемычек и сводку не входят.
     marker_gaps = marker_row_gap_ids(document, partition_heights, props_by_key)
     counted = (
@@ -1185,6 +1293,10 @@ def compute_sheet(
         apartment_partition_count=sum(
             1 for c in constructions if c.computed.height_basis == "apartment_partition"
         ),
+        door_count=sum(
+            1 for o in document.openings if o.kind == "door" and o.id not in excluded_doors
+        ),
+        doors_excluded_without_finish=len(excluded_doors),
     )
     openings = [
         CadOpeningRead(
@@ -1213,6 +1325,7 @@ def compute_sheet(
         summary=summary,
         partition_warnings=[
             *partition_warnings(partition, candidates, props_by_key),
+            *([without_finish_warning(len(excluded_doors))] if without_finish(partition) else []),
             *(
                 [(WINDOW_HEIGHT_UNKNOWN, WINDOW_HEIGHT_UNKNOWN_MESSAGE)]
                 if windows_without_height(document.openings)

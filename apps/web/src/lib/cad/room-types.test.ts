@@ -56,7 +56,7 @@ describe('типы помещений', () => {
     expect(FINISH_WARNING_LABELS.edges_unlinked).toBe(
       'Стены не привязаны к конструкциям: площадь по периметру зоны',
     );
-    expect(Object.keys(FINISH_WARNING_LABELS)).toHaveLength(8);
+    expect(Object.keys(FINISH_WARNING_LABELS)).toHaveLength(9);
   });
 
   it('основания стен подписаны', () => {

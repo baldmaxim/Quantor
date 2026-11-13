@@ -119,4 +119,6 @@ export const FINISH_WARNING_LABELS: Readonly<Record<FinishWarningCode, string>> 
   windows_not_detected:
     'Окна не распознаны: оконные участки наружных стен не отделываются целиком, подоконная часть не учтена',
   edges_unlinked: 'Стены не привязаны к конструкциям: площадь по периметру зоны',
+  apartment_without_finish:
+    'Квартиры без отделки (ответ к документации): отделка квартир не считается',
 };

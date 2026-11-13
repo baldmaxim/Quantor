@@ -27,7 +27,7 @@ from app.contracts.cad_finishes import (
 from app.errors import not_found
 from app.models import CadFinishTemplate
 from app.services import cad as cad_service
-from app.services import cad_finish_templates, cad_finishes, cad_zones
+from app.services import cad_finish_templates, cad_finishes, cad_partitions, cad_zones
 from app.services import projects as projects_service
 from app.services.cad_walls_version import current_walls_generator
 
@@ -199,6 +199,9 @@ async def read_cad_finishes(
         templates=[cad_finish_templates.template_read(row) for row in templates],
         levels_wall_height_mm=context_sheet.wall_height_mm,
         walls=context_sheet.walls,
+        apartment_without_finish=await cad_partitions.apartment_without_finish(
+            session, project_id=project_id
+        ),
     )
 
 

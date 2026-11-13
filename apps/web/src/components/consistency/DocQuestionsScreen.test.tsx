@@ -80,6 +80,7 @@ const question = (patch: Partial<DocQuestionOut> = {}): DocQuestionOut => ({
   value_kind: 'length_mm',
   min_mm: 2000,
   max_mm: 6000,
+  options: [],
   assumption: null,
   candidates: [],
   answers: [],
@@ -288,6 +289,40 @@ describe('экран «Вопросы к документации»', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     expect(screen.getByRole('alert')).toHaveTextContent('вне допустимых 2000–6000');
     expect(client.putDocAnswer).not.toHaveBeenCalled();
+  });
+
+  it('перечисление: список из options вопроса, выбранный код уходит в ответ', async () => {
+    mount([
+      question({
+        code: 'apartment_finishing',
+        title: 'Отделка квартир',
+        value_kind: 'enum',
+        options: [
+          { code: 'without_finish', label: 'Без отделки (Shell&Core)' },
+          { code: 'with_finish', label: 'С отделкой' },
+        ],
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Ввести вручную' }));
+    const select = screen.getByLabelText('Значение');
+    expect(within(select).getAllByRole('option').map((item) => item.textContent)).toEqual([
+      '— выберите —',
+      'Без отделки (Shell&Core)',
+      'С отделкой',
+    ]);
+    await userEvent.type(screen.getByLabelText('Откуда значение'), 'ПЗ АР');
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Выберите значение из списка');
+    await userEvent.selectOptions(select, 'without_finish');
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(client.putDocAnswer).toHaveBeenCalled());
+    expect(vi.mocked(client.putDocAnswer).mock.calls[0]?.[0]).toMatchObject({
+      body: {
+        source: 'manual',
+        value_text: 'Без отделки (Shell&Core)',
+        value: { numbers: [], code: 'without_finish' },
+      },
+    });
   });
 
   it('«Нет в проекте» — ответ словами, не 0', async () => {

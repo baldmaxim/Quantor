@@ -24,6 +24,8 @@ from app.contracts.cad_finishes import (
 )
 from app.errors import DomainError, ErrorCode
 from app.models import CadFinishTemplate, CadZone, Project
+from app.services import cad_partitions
+from app.services.cad_constructions import APARTMENT_ROOM_KIND
 from app.services.cad_zones import ROOM_KINDS
 
 
@@ -175,7 +177,9 @@ async def assign_template(
     """Массовое назначение: `template_id=None` снимает явное назначение.
 
     Двери и машино-места пропускаются с отметкой; чужие и несуществующие зоны - тоже
-    («не найдена»), без различия, чтобы не подтверждать существование чужого.
+    («не найдена»), без различия, чтобы не подтверждать существование чужого. При ответе
+    «Отделка квартир: без отделки» зоны квартир не получают шаблон (отметка
+    `apartment_without_finish`); снятие назначения (`template_id=None`) им разрешено.
     """
     unique_ids = list(dict.fromkeys(body.zone_ids))
     rows = await session.execute(
@@ -186,6 +190,9 @@ async def assign_template(
         )
     )
     kinds = dict(rows.tuples().all())
+    no_finish = body.template_id is not None and await cad_partitions.apartment_without_finish(
+        session, project_id=project_id
+    )
     skipped: list[CadFinishAssignSkip] = []
     assignable: list[uuid.UUID] = []
     for zone_id in unique_ids:
@@ -196,6 +203,8 @@ async def assign_template(
             skipped.append(CadFinishAssignSkip(zone_id=zone_id, reason="door"))
         elif kind not in ROOM_KINDS:
             skipped.append(CadFinishAssignSkip(zone_id=zone_id, reason="parking_space"))
+        elif no_finish and kind == APARTMENT_ROOM_KIND:
+            skipped.append(CadFinishAssignSkip(zone_id=zone_id, reason="apartment_without_finish"))
         else:
             assignable.append(zone_id)
     if assignable:

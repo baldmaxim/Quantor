@@ -379,12 +379,17 @@ def build_floor3d(
     partition_heights = cad_constructions.partition_heights_by_id(classes, partition)
     # Проём с откосом из маячного ряда - разрыв выкладки: ни полотна, ни перемычки.
     marker_gaps = cad_constructions.marker_row_gap_ids(document, partition_heights, props_by_key)
+    # «Квартиры без отделки» (ответ к документации): у внутриквартирных дверей полотна нет.
+    excluded_doors = cad_constructions.finish_excluded_doors(document, classes, partition)
     warnings.extend(
         CadFloor3dWarningRead(code=code, message=message)
         for code, message in cad_constructions.partition_warnings(
             partition, candidates, props_by_key
         )
     )
+    if cad_constructions.without_finish(partition):
+        code, message = cad_constructions.without_finish_warning(len(excluded_doors))
+        warnings.append(CadFloor3dWarningRead(code=code, message=message))
 
     walls: list[CadFloor3dWallRead] = []
     top_by_id: dict[str, int | None] = {}
@@ -466,7 +471,7 @@ def build_floor3d(
         # проём до верха стены и выше: перемычки нет, полотно — до верха стены
         reaches_top = z_bottom >= top
         leaf = leaf_by_id.get(opening.id)
-        if leaf is not None and top > opening_floor:
+        if leaf is not None and top > opening_floor and opening.id not in excluded_doors:
             doors.append(
                 CadFloor3dDoorRead(
                     opening_id=opening.id,

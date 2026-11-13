@@ -535,6 +535,10 @@ class CadConstructionsSummaryRead(BaseModel):
     props_carried_over: int = 0
     # Внутриквартирные перегородки, посчитанные по высоте маячного ряда.
     apartment_partition_count: int = 0
+    # Двери листа (проёмы `door`), входящие в спецификацию, - без исключённых при «без отделки».
+    door_count: int = 0
+    # Внутриквартирные двери, не учтённые из-за ответа «Отделка квартир: без отделки».
+    doors_excluded_without_finish: int = 0
 
 
 class CadWallsWarningRead(BaseModel):

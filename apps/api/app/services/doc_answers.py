@@ -27,6 +27,7 @@ from app.contracts.doc_questions import (
     DocAssumptionOut,
     DocCandidateOut,
     DocCandidateStatus,
+    DocOptionOut,
     DocQuestionOut,
     DocScopeOut,
     DocumentAnswerIn,
@@ -49,7 +50,8 @@ from app.services.consistency.doc_questions import (
 )
 from app.services.doc_questions import value_text_of
 
-_ROSETTE_CODES: Final = frozenset({"rosette_down", "rosette_up"})
+# Вопросы, у которых ответ-перечисление без кода не принимается.
+_ENUM_CODE_REQUIRED: Final = frozenset({DocQuestionCode.APARTMENT_FINISHING})
 _ROUND_CODE: Final = "round"
 _QUESTION_ORDER: Final = {
     question.code.value: index for index, question in enumerate(DOC_QUESTIONS)
@@ -166,6 +168,7 @@ async def questions_view(
             value_kind=question.value_kind.value,
             min_mm=question.min_mm,
             max_mm=question.max_mm,
+            options=[DocOptionOut(code=item.code, label=item.label) for item in question.options],
             assumption=_assumption_out(question.assumption),
             candidates=candidates.get(question.code.value, []),
             answers=[
@@ -249,10 +252,11 @@ def manual_value(question: DocQuestion, value: ManualValueIn, value_text: str) -
             else:
                 raise _invalid("для сечения нужны ширина и высота, мм (круглое - один диаметр)")
         case DocValueKind.ENUM:
-            if numbers or (code is not None and code not in _ROSETTE_CODES):
-                raise _invalid(
-                    "для перечисления числа не задаются, код - rosette_down / rosette_up"
-                )
+            allowed = [item.code for item in question.options]
+            required = question.code in _ENUM_CODE_REQUIRED
+            if numbers or (code is None and required) or (code is not None and code not in allowed):
+                codes = " / ".join(allowed) if allowed else "кодов у вопроса нет"
+                raise _invalid(f"для перечисления числа не задаются, код - {codes}")
         case DocValueKind.TEXT:
             if code is not None:
                 raise _invalid("для текстового значения код не задаётся")

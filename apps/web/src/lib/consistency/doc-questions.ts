@@ -74,10 +74,6 @@ export const notInProjectBody = (note: string): DocAnswerBody => {
 /* ------------------------------------------------------------------ ручной ввод */
 
 export const ROUND_CODE = 'round';
-export const ROSETTE_OPTIONS = [
-  { code: 'rosette_down', label: 'Розеткой вниз' },
-  { code: 'rosette_up', label: 'Розеткой вверх' },
-] as const;
 
 export type Qualifier = 'min' | 'max' | '';
 
@@ -87,7 +83,8 @@ export interface IManualForm {
   readonly numbers: readonly string[];
   readonly qualifier: Qualifier;
   readonly round: boolean;
-  readonly rosette: string;
+  /** Код выбранного варианта перечисления (`options` вопроса). */
+  readonly enumCode: string;
   readonly note: string;
 }
 
@@ -98,7 +95,7 @@ export interface IManualLayout {
   readonly showText: boolean;
   readonly showQualifier: boolean;
   readonly showRound: boolean;
-  readonly showRosette: boolean;
+  readonly showEnum: boolean;
 }
 
 export const manualLayout = (
@@ -112,7 +109,7 @@ export const manualLayout = (
         showText: false,
         showQualifier: true,
         showRound: false,
-        showRosette: false,
+        showEnum: false,
       };
     case 'range_mm':
       return {
@@ -121,7 +118,7 @@ export const manualLayout = (
         showText: false,
         showQualifier: true,
         showRound: false,
-        showRosette: false,
+        showEnum: false,
       };
     case 'section_mm':
       return {
@@ -130,7 +127,7 @@ export const manualLayout = (
         showText: false,
         showQualifier: false,
         showRound: question.code === 'duct_section',
-        showRosette: false,
+        showEnum: false,
       };
     case 'enum':
       return {
@@ -139,7 +136,7 @@ export const manualLayout = (
         showText: false,
         showQualifier: false,
         showRound: false,
-        showRosette: true,
+        showEnum: true,
       };
     default:
       return {
@@ -148,7 +145,7 @@ export const manualLayout = (
         showText: true,
         showQualifier: false,
         showRound: false,
-        showRosette: false,
+        showEnum: false,
       };
   }
 };
@@ -158,7 +155,7 @@ export const emptyManualForm = (layout: IManualLayout): IManualForm => ({
   numbers: layout.numberLabels.map(() => ''),
   qualifier: '',
   round: false,
-  rosette: '',
+  enumCode: '',
   note: '',
 });
 
@@ -171,7 +168,7 @@ const parseMm = (raw: string): number | null => {
 
 /** Ручной ответ: пояснение «откуда число» обязательно, числа — целые мм в границах каталога. */
 export const buildManualAnswer = (
-  question: Pick<DocQuestionOut, 'code' | 'value_kind' | 'min_mm' | 'max_mm'>,
+  question: Pick<DocQuestionOut, 'code' | 'value_kind' | 'min_mm' | 'max_mm' | 'options'>,
   form: IManualForm,
 ): ManualResult => {
   const layout = manualLayout(question);
@@ -205,9 +202,9 @@ export const buildManualAnswer = (
   if (layout.showText) {
     valueText = form.text.trim();
     if (!valueText) return { error: 'Введите значение.' };
-  } else if (layout.showRosette) {
-    const option = ROSETTE_OPTIONS.find((item) => item.code === form.rosette);
-    if (!option) return { error: 'Выберите положение розетки.' };
+  } else if (layout.showEnum) {
+    const option = question.options.find((item) => item.code === form.enumCode);
+    if (!option) return { error: 'Выберите значение из списка.' };
     valueText = option.label;
     code = option.code;
   } else if (round) {

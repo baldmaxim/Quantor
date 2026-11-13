@@ -37,10 +37,12 @@ FinishWarningCode = Literal[
     "door_height_missing",
     "windows_not_detected",
     "edges_unlinked",
+    # Квартиры без отделки (ответ «Вопросов к документации»): отделка квартир не считается.
+    "apartment_without_finish",
 ]
 # Основание стены под отделку (ADR-0042, п. 6): монолит, кладка, каркасная перегородка ГКЛ.
 FinishWallBase = Literal["monolith", "masonry", "gkl"]
-FinishSkipReason = Literal["door", "parking_space", "not_found"]
+FinishSkipReason = Literal["door", "parking_space", "not_found", "apartment_without_finish"]
 
 
 def _empty_to_none(value: object) -> object:

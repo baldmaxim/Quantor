@@ -47,7 +47,11 @@ from app.domain import JobStatus, JobType
 from app.models import Job
 from app.services import cad as cad_service
 from app.services import cad_construction_store, cad_floor3d, cad_views, cad_walls, cad_zones
-from app.services.cad_constructions import effective_levels, effective_material
+from app.services.cad_constructions import (
+    APARTMENT_ROOM_KIND,
+    effective_levels,
+    effective_material,
+)
 from app.services.cad_finish_edges import (
     BASES,
     Base,
@@ -590,11 +594,14 @@ def build_finish_sheet(
     templates: Sequence[CadFinishTemplateRead],
     levels_wall_height_mm: int | None,
     walls: FinishWallsInput | None = None,
+    apartment_without_finish: bool = False,
 ) -> CadFinishSheetRead:
     """Ведомость по зонам листа; двери и машино-места не выводятся.
 
     `walls` - результат конструкций с кадром листа: стены считаются по рёбрам зон. Без него -
-    периметр x высота и предупреждение `edges_unlinked`.
+    периметр x высота и предупреждение `edges_unlinked`. `apartment_without_finish` - принят ответ
+    «Отделка квартир: без отделки»: зоны квартир не получают шаблон (ни явный, ни по типу), слоёв
+    и количеств у них нет, они идут в предупреждение `apartment_without_finish`; МОП - как прежде.
     """
     by_id = {template.id: template for template in templates}
     by_type: dict[str, CadFinishTemplateRead] = {}
@@ -610,6 +617,7 @@ def build_finish_sheet(
     geometry_issue: list[uuid.UUID] = []
     no_height: list[uuid.UUID] = []
     no_template: list[uuid.UUID] = []
+    without_finish: list[uuid.UUID] = []
     gap_unknown: list[uuid.UUID] = []
     no_door_height: list[uuid.UUID] = []
     linked_ids: list[uuid.UUID] = []
@@ -637,7 +645,8 @@ def build_finish_sheet(
         )
 
     for zone in rooms:
-        template, source = _template_for(zone, by_id, by_type)
+        skipped = apartment_without_finish and zone.kind == APARTMENT_ROOM_KIND
+        template, source = (None, None) if skipped else _template_for(zone, by_id, by_type)
         height, height_source = _wall_height(template, levels_wall_height_mm)
         area = zone.area_m2
         calc: _WallsCalc | None = None
@@ -653,9 +662,9 @@ def build_finish_sheet(
         if calc is not None:
             wall_area = calc.wall_area
             linked_ids.append(zone.id)
-            if calc.has_gap:
+            if calc.has_gap and not skipped:
                 gap_unknown.append(zone.id)
-            if calc.door_height_missing:
+            if calc.door_height_missing and not skipped:
                 no_door_height.append(zone.id)
         else:
             unlinked_ids.append(zone.id)
@@ -728,15 +737,17 @@ def build_finish_sheet(
             layers=layers,
         )
         rows.append(row)
-        if zone.room_type is not None:
+        if zone.room_type is not None and not skipped:
             kinds.setdefault(zone.room_type, []).append(row)
         if zone.calibration_missing:
             no_calibration.append(zone.id)
         elif zone.geometry_issue is not None:
             geometry_issue.append(zone.id)
-        if height is None:
+        if height is None and not skipped:
             no_height.append(zone.id)
-        if template is None:
+        if skipped:
+            without_finish.append(zone.id)
+        elif template is None:
             no_template.append(zone.id)
 
     surface_order = {surface: index for index, surface in enumerate(SURFACES)}
@@ -773,6 +784,7 @@ def build_finish_sheet(
         ("geometry_issue", geometry_issue),
         ("wall_height_missing", no_height),
         ("no_template", no_template),
+        ("apartment_without_finish", without_finish),
         ("gap_unknown_height", gap_unknown),
         ("door_height_missing", no_door_height),
         # В результате конструкций окон нет: наружные стены считаются без вычета окон.

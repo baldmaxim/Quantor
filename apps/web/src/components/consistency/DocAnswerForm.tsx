@@ -6,7 +6,6 @@ import { useId, useState, type FC } from 'react';
 import { Button } from '@/components/ui';
 import { ClearableInput } from '@/components/ui/ClearableInput';
 import {
-  ROSETTE_OPTIONS,
   buildManualAnswer,
   emptyManualForm,
   manualLayout,
@@ -25,7 +24,7 @@ import {
 export type DocAnswerMode = 'manual' | 'absent';
 
 interface IFormProps {
-  readonly question: Pick<DocQuestionOut, 'code' | 'value_kind' | 'min_mm' | 'max_mm'>;
+  readonly question: Pick<DocQuestionOut, 'code' | 'value_kind' | 'min_mm' | 'max_mm' | 'options'>;
   readonly mode: DocAnswerMode;
   readonly pending: boolean;
   /** `done` вызывается после успешной записи: форма закрывается. */
@@ -138,17 +137,17 @@ export const DocAnswerForm: FC<IFormProps> = ({ question, mode, pending, onSubmi
               </select>
             </label>
           )}
-          {layout.showRosette && (
-            <label className={LABEL} htmlFor={`${baseId}-rosette`}>
-              Положение розетки
+          {layout.showEnum && (
+            <label className={LABEL} htmlFor={`${baseId}-enum`}>
+              Значение
               <select
-                id={`${baseId}-rosette`}
-                value={form.rosette}
-                onChange={(event) => patch({ rosette: event.target.value })}
+                id={`${baseId}-enum`}
+                value={form.enumCode}
+                onChange={(event) => patch({ enumCode: event.target.value })}
                 className={SELECT}
               >
                 <option value="">— выберите —</option>
-                {ROSETTE_OPTIONS.map((option) => (
+                {question.options.map((option) => (
                   <option key={option.code} value={option.code}>
                     {option.label}
                   </option>

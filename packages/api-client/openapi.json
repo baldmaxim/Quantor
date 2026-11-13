@@ -2535,8 +2535,18 @@
             "title": "Apartment Partition Count",
             "type": "integer"
           },
+          "door_count": {
+            "default": 0,
+            "title": "Door Count",
+            "type": "integer"
+          },
           "door_openings_without_host": {
             "title": "Door Openings Without Host",
+            "type": "integer"
+          },
+          "doors_excluded_without_finish": {
+            "default": 0,
+            "title": "Doors Excluded Without Finish",
             "type": "integer"
           },
           "height_missing_count": {
@@ -3094,7 +3104,8 @@
             "enum": [
               "door",
               "parking_space",
-              "not_found"
+              "not_found",
+              "apartment_without_finish"
             ],
             "title": "Reason",
             "type": "string"
@@ -4003,7 +4014,8 @@
               "gap_unknown_height",
               "door_height_missing",
               "windows_not_detected",
-              "edges_unlinked"
+              "edges_unlinked",
+              "apartment_without_finish"
             ],
             "title": "Code",
             "type": "string"
@@ -21639,6 +21651,25 @@
         "title": "DocCandidateStatus",
         "type": "string"
       },
+      "DocOptionOut": {
+        "description": "Допустимое значение перечисления: код и подпись.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "DocOptionOut",
+        "type": "object"
+      },
       "DocQuestionCode": {
         "enum": [
           "corridor_ceiling_height",
@@ -21651,7 +21682,8 @@
           "duct_section",
           "cable_tray_section",
           "apartment_partition_height",
-          "lift_door_height"
+          "lift_door_height",
+          "apartment_finishing"
         ],
         "title": "DocQuestionCode",
         "type": "string"
@@ -21694,6 +21726,13 @@
             "title": "Min Mm",
             "type": "integer"
           },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DocOptionOut"
+            },
+            "title": "Options",
+            "type": "array"
+          },
           "receiver_param": {
             "title": "Receiver Param",
             "type": "string"
@@ -21714,6 +21753,7 @@
           "value_kind",
           "min_mm",
           "max_mm",
+          "options",
           "assumption",
           "candidates",
           "answers"
@@ -23546,7 +23586,7 @@
       },
       "ManualValueIn": {
         "additionalProperties": false,
-        "description": "Значение ручного ответа: размеры в мм целыми; `display` собирает сервер по виду вопроса.\n\nlength_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота\n(для воздуховода круглого сечения - один диаметр с code=\"round\"); text - необязательные\nчисла в границах каталога; enum - без чисел, code только rosette_down / rosette_up.",
+        "description": "Значение ручного ответа: размеры в мм целыми; `display` собирает сервер по виду вопроса.\n\nlength_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота\n(для воздуховода круглого сечения - один диаметр с code=\"round\"); text - необязательные\nчисла в границах каталога; enum - без чисел, code из `options` вопроса (у вопроса с\nобязательным выбором, например «Отделка квартир», code обязателен).",
         "properties": {
           "code": {
             "anyOf": [

@@ -35,6 +35,7 @@ class DocQuestionCode(StrEnum):
     CABLE_TRAY_SECTION = "cable_tray_section"
     APARTMENT_PARTITION_HEIGHT = "apartment_partition_height"
     LIFT_DOOR_HEIGHT = "lift_door_height"
+    APARTMENT_FINISHING = "apartment_finishing"
 
 
 class DocValueKind(StrEnum):
@@ -51,6 +52,7 @@ class ExtractorKind(StrEnum):
     SECTION = "section"
     FLOOR_BUILDUP = "floor_buildup"
     SPRINKLER_MODEL = "sprinkler_model"
+    APARTMENT_FINISHING = "apartment_finishing"
 
 
 class AssumptionStatus(StrEnum):
@@ -106,6 +108,14 @@ class NormAssumption:
 
 
 @dataclass(frozen=True, slots=True)
+class DocOption:
+    """Допустимое значение перечисления (`DocValueKind.ENUM`): код и подпись для человека."""
+
+    code: str
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
 class DocQuestion:
     code: DocQuestionCode
     title: str
@@ -125,6 +135,8 @@ class DocQuestion:
     min_mm: int = 0  # допустимый разброс извлечённых чисел (каждого размера), мм
     max_mm: int = 100_000
     assumption: NormAssumption | None = None
+    # Допустимые коды перечисления; у вопросов не-ENUM пусто.
+    options: tuple[DocOption, ...] = ()
 
 
 def _rx(pattern: str) -> re.Pattern[str]:
@@ -210,6 +222,8 @@ _FLOOR_TO_FLOOR: Final = (
 _SMOKE_CALC_LABEL: Final = "ИОС4 / ОВ: расчёты дымоудаления"
 # Кладка внутриквартирных перегородок: «маячный ряд», камень «ПОЛИГРАН 80», сами перегородки.
 _PARTITION_CTX: Final = (_rx(r"маячн\w+\s+ряд|полигран\s*80|внутриквартирн\w+\s+перегородк"),)
+# Квартиры: без слова «квартир» (в том числе «межквартирн...») фраза об отделке - не наш ответ.
+_APARTMENT_CTX: Final = (_rx(r"квартир|жил\w+\s+помещени"),)
 # Лифты: двери шахт, лифтовые двери, проёмы шахты. Без слова «лифт» рядом высота - не наш ответ.
 _LIFT_CTX: Final = (_rx(r"лифт"),)
 
@@ -359,6 +373,10 @@ DOC_QUESTIONS: Final[tuple[DocQuestion, ...]] = (
             _anchor(r"оросител\w*[^.;]{0,60}?(?:модел\w+|тип\w*|марк\w+)", 20),
             _anchor(r"спринклерн\w+\s+оросител\w*", 15),
             _anchor(r"розетк\w+\s+(?:вниз|вверх)", 15),
+        ),
+        options=(
+            DocOption("rosette_down", "Розеткой вниз"),
+            DocOption("rosette_up", "Розеткой вверх"),
         ),
     ),
     DocQuestion(
@@ -543,6 +561,37 @@ DOC_QUESTIONS: Final[tuple[DocQuestion, ...]] = (
         context_required=True,
         min_mm=1900,
         max_mm=3000,
+    ),
+    DocQuestion(
+        code=DocQuestionCode.APARTMENT_FINISHING,
+        title="Отделка квартир: с отделкой или без (Shell&Core)",
+        receiver_param="apartment_finishing",
+        value_kind=DocValueKind.ENUM,
+        extractor=ExtractorKind.APARTMENT_FINISHING,
+        sources=(
+            DocSource("ПЗ АР", _AR, (_K.TEXT,)),
+            DocSource("Таблицы АР", _AR, (_K.TABLE,)),
+            DocSource("Прочие листы АР", _AR),
+        ),
+        anchors=(
+            _anchor(r"shell\s*(?:&|и|and)\s*core", 20),
+            _anchor(r"отделк\w*[^.;]{0,80}?выполня\w+\s+собственник\w*", 20),
+            _anchor(
+                r"собственник\w*[^.;]{0,120}?(?:выполня\w+|выполнит\w*)\s+отделочн\w+\s+работ\w*",
+                18,
+            ),
+            _anchor(r"с\s+чистов\w+\s+отделк\w*", 18),
+            _anchor(r"предчистов\w*", 15),
+            _anchor(r"white\s*-?\s*box", 15),
+            _anchor(r"без\s+(?:чистов\w+\s+|внутренн\w+\s+)?отделк\w*", 12),
+            _anchor(r"под\s+ключ", 12),
+        ),
+        context=_APARTMENT_CTX,
+        context_required=True,
+        options=(
+            DocOption("without_finish", "Без отделки (Shell&Core)"),
+            DocOption("with_finish", "С отделкой"),
+        ),
     ),
 )
 

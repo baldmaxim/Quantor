@@ -595,6 +595,8 @@ async def test_read_constructions_computes_values_and_sources(
             "orphaned_props": 0,
             "props_carried_over": 0,
             "apartment_partition_count": 0,
+            "door_count": 1,
+            "doors_excluded_without_finish": 0,
         }
         assert [(g["kind"], g["thickness_mm"], g["count"]) for g in body["totals"]] == [
             ("masonry", 100.0, 1),

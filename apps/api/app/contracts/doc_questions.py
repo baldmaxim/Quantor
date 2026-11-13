@@ -36,6 +36,13 @@ class DocValueOut(BaseModel):
     code: str | None
 
 
+class DocOptionOut(BaseModel):
+    """Допустимое значение перечисления: код и подпись."""
+
+    code: str
+    label: str
+
+
 class DocAssumptionOut(BaseModel):
     """Норматив-допущение каталога: предложение со ссылкой на пункт СП, а не ответ проекта."""
 
@@ -115,6 +122,8 @@ class DocQuestionOut(BaseModel):
     # Допустимый разброс каждого размера, мм: границы ручного ввода.
     min_mm: int
     max_mm: int
+    # Допустимые коды перечисления (enum); у остальных видов значения пусто.
+    options: list[DocOptionOut]
     assumption: DocAssumptionOut | None
     candidates: list[DocCandidateOut]
     answers: list[DocAnswerOut]
@@ -195,7 +204,8 @@ class ManualValueIn(BaseModel):
 
     length_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота
     (для воздуховода круглого сечения - один диаметр с code="round"); text - необязательные
-    числа в границах каталога; enum - без чисел, code только rosette_down / rosette_up.
+    числа в границах каталога; enum - без чисел, code из `options` вопроса (у вопроса с
+    обязательным выбором, например «Отделка квартир», code обязателен).
     """
 
     model_config = ConfigDict(extra="forbid")

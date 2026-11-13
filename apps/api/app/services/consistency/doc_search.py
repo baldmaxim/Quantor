@@ -214,6 +214,11 @@ _SPRINKLER_MODEL_RE: Final = re.compile(
 _ROSETTE_RE: Final = re.compile(
     r"розетк\w*\s+(?P<a>вниз|вверх)|(?P<b>вниз|вверх)\s+розетк", re.IGNORECASE
 )
+# Фраза якоря об отделке: «с чистовой отделкой», «под ключ» - квартиры с отделкой; остальные
+# якоря вопроса («Shell&core», «без отделки», «выполняется собственником») - без отделки.
+_FINISH_WITH_RE: Final = re.compile(r"(?<![а-я])с\s+чистов\w+\s+отделк|под\s+ключ", re.IGNORECASE)
+_SENTENCE_END_RE: Final = re.compile(r"[.!?](?=\s|$)")
+_APARTMENT_WORD_RE: Final = re.compile(r"квартир|жил\w+\s+помещени", re.IGNORECASE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -475,6 +480,30 @@ def _sprinkler_found(text: str, anchor: tuple[int, int]) -> list[_Found]:
     return [_Found(value, min(s[0] for s in spans), max(s[1] for s in spans), points)]
 
 
+def _sentence(text: str, anchor: tuple[int, int]) -> tuple[int, int]:
+    """Границы предложения вокруг якоря: от конца прежнего до конца своего."""
+    start = 0
+    for match in _SENTENCE_END_RE.finditer(text, 0, anchor[0]):
+        start = match.end()
+    end = _SENTENCE_END_RE.search(text, anchor[1])
+    return start, len(text) if end is None else end.end()
+
+
+def _finishing_found(text: str, anchor: tuple[int, int]) -> list[_Found]:
+    """Отделка квартир: фраза якоря и код `without_finish` / `with_finish`.
+
+    О квартирах должно говорить само предложение: «отделка коммерческих помещений: Shell&core»
+    ответ об отделке квартир не даёт.
+    """
+    lo, hi = _sentence(text, anchor)
+    if _APARTMENT_WORD_RE.search(text, lo, hi) is None:
+        return []
+    phrase = _SPACES_RE.sub(" ", text[anchor[0] : anchor[1]]).strip()
+    code = "with_finish" if _FINISH_WITH_RE.search(phrase) else "without_finish"
+    value = DocValue(DocValueKind.ENUM, phrase, (), None, code)
+    return [_Found(value, anchor[0], anchor[1], 25)]
+
+
 def _extract(
     question: DocQuestion, text: str, anchor: tuple[int, int], rule: DocAnchor
 ) -> list[_Found]:
@@ -489,6 +518,8 @@ def _extract(
             return _floor_buildup_found(question, text, anchor)
         case ExtractorKind.SPRINKLER_MODEL:
             return _sprinkler_found(text, anchor)
+        case ExtractorKind.APARTMENT_FINISHING:
+            return _finishing_found(text, anchor)
 
 
 # --------------------------------------------------------------------------- источник и цитата

@@ -1237,9 +1237,17 @@ export type CadConstructionsSummaryRead = {
      */
     apartment_partition_count?: number;
     /**
+     * Door Count
+     */
+    door_count?: number;
+    /**
      * Door Openings Without Host
      */
     door_openings_without_host: number;
+    /**
+     * Doors Excluded Without Finish
+     */
+    doors_excluded_without_finish?: number;
     /**
      * Height Missing Count
      */
@@ -1548,7 +1556,7 @@ export type CadFinishAssignSkip = {
     /**
      * Reason
      */
-    reason: 'door' | 'parking_space' | 'not_found';
+    reason: 'door' | 'parking_space' | 'not_found' | 'apartment_without_finish';
     /**
      * Zone Id
      */
@@ -1941,7 +1949,7 @@ export type CadFinishWarningRead = {
     /**
      * Code
      */
-    code: 'calibration_missing' | 'geometry_issue' | 'wall_height_missing' | 'no_template' | 'gap_unknown_height' | 'door_height_missing' | 'windows_not_detected' | 'edges_unlinked';
+    code: 'calibration_missing' | 'geometry_issue' | 'wall_height_missing' | 'no_template' | 'gap_unknown_height' | 'door_height_missing' | 'windows_not_detected' | 'edges_unlinked' | 'apartment_without_finish';
     /**
      * Zone Ids
      */
@@ -10852,9 +10860,25 @@ export type DocCandidateOut = {
 export type DocCandidateStatus = 'candidate' | 'rejected';
 
 /**
+ * DocOptionOut
+ *
+ * Допустимое значение перечисления: код и подпись.
+ */
+export type DocOptionOut = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Label
+     */
+    label: string;
+};
+
+/**
  * DocQuestionCode
  */
-export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section' | 'apartment_partition_height' | 'lift_door_height';
+export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section' | 'apartment_partition_height' | 'lift_door_height' | 'apartment_finishing';
 
 /**
  * DocQuestionOut
@@ -10881,6 +10905,10 @@ export type DocQuestionOut = {
      * Min Mm
      */
     min_mm: number;
+    /**
+     * Options
+     */
+    options: Array<DocOptionOut>;
     /**
      * Receiver Param
      */
@@ -11843,7 +11871,8 @@ export type ManualAnswerIn = {
  *
  * length_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота
  * (для воздуховода круглого сечения - один диаметр с code="round"); text - необязательные
- * числа в границах каталога; enum - без чисел, code только rosette_down / rosette_up.
+ * числа в границах каталога; enum - без чисел, code из `options` вопроса (у вопроса с
+ * обязательным выбором, например «Отделка квартир», code обязателен).
  */
 export type ManualValueIn = {
     /**

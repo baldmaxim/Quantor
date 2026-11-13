@@ -6,6 +6,8 @@
 кадру вида - тем же кодом, что у зон двери 3D-вида. Классификация и выбор высоты - чистые функции
 `cad_constructions`. Модель чисел не выдаёт; ответ `norm_assumption` и «в проекте нет» не берутся.
 Нет кадра вида или зон - зон нет, причина видна как предупреждение `apartment_zones_missing`.
+Там же читается ответ «Отделка квартир» (`without_finish` - квартиры сдаются без отделки):
+внутриквартирные двери и отделка квартир не учитываются; нет ответа - ничего не исключается.
 """
 
 from __future__ import annotations
@@ -20,7 +22,14 @@ from app.errors import ErrorCode, http_error
 from app.models import DocQuestionAnswer, Job
 from app.services import cad as cad_service
 from app.services import cad_floor3d, cad_views, cad_zones
-from app.services.cad_constructions import PartitionContext, PartitionHeight, PartitionZone
+from app.services.cad_constructions import (
+    FINISHING_WITH,
+    FINISHING_WITHOUT,
+    ApartmentFinishing,
+    PartitionContext,
+    PartitionHeight,
+    PartitionZone,
+)
 from app.services.consistency.doc_questions import DocQuestionCode, question_by_code
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
@@ -86,6 +95,48 @@ async def lift_door_height(
     return await accepted_answer_height(
         session, project_id=project_id, code=DocQuestionCode.LIFT_DOOR_HEIGHT
     )
+
+
+def _answer_code(value: Any) -> str | None:
+    code = value.get("code") if isinstance(value, dict) else None
+    return code if code in (FINISHING_WITHOUT, FINISHING_WITH) else None
+
+
+async def apartment_finishing(
+    session: AsyncSession, *, project_id: uuid.UUID
+) -> ApartmentFinishing | None:
+    """Принятый ответ «Отделка квартир» (без отделки / с отделкой): самый поздний подтверждённый
+    ответ документа или человека; нет ответа или код не из вопроса - `None`."""
+    rows = await session.scalars(
+        select(DocQuestionAnswer)
+        .where(
+            DocQuestionAnswer.project_id == project_id,
+            DocQuestionAnswer.question_code == DocQuestionCode.APARTMENT_FINISHING.value,
+            DocQuestionAnswer.source.in_(_ANSWER_SOURCES),
+            DocQuestionAnswer.value.is_not(None),
+        )
+        .order_by(DocQuestionAnswer.confirmed_at.desc(), DocQuestionAnswer.id)
+        .execution_options(populate_existing=True)
+    )
+    for row in rows:
+        code = _answer_code(row.value)
+        if code is None:
+            continue
+        return ApartmentFinishing(
+            code=code,
+            source="observed" if row.source == "document" else "manual",
+            answer_id=row.id,
+            file_name=row.file_name,
+            page_index=row.page_index,
+            quote=row.quote,
+        )
+    return None
+
+
+async def apartment_without_finish(session: AsyncSession, *, project_id: uuid.UUID) -> bool:
+    """Принят ответ «Отделка квартир: без отделки»; нет ответа - `False` (ничего не исключается)."""
+    answer = await apartment_finishing(session, project_id=project_id)
+    return answer is not None and answer.without_finish
 
 
 async def _artifact_json(
@@ -178,9 +229,10 @@ async def load_partition_context(
     page_index: int,
     view: int,
 ) -> PartitionContext:
-    """Высота маячного ряда, высота двери лифта и зоны помещений листа: вход расчёта и 3D этажа."""
+    """Маячный ряд, дверь лифта, отделка квартир и зоны помещений листа: вход расчёта и 3D этажа."""
     height = await apartment_partition_height(session, project_id=project_id)
     lift_height = await lift_door_height(session, project_id=project_id)
+    finishing = await apartment_finishing(session, project_id=project_id)
     zones = await sheet_partition_zones(
         session,
         storage,
@@ -189,4 +241,6 @@ async def load_partition_context(
         page_index=page_index,
         view=view,
     )
-    return PartitionContext(zones=zones, height=height, lift_door_height=lift_height)
+    return PartitionContext(
+        zones=zones, height=height, lift_door_height=lift_height, finishing=finishing
+    )
