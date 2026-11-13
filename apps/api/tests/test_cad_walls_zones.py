@@ -42,3 +42,20 @@ def test_canonical_bytes_ignore_zone_order_and_are_rounded() -> None:
 def test_no_zones_input_is_empty() -> None:
     assert not cad_walls_zones.NO_ZONES.present
     assert cad_walls_zones.NO_ZONES.sha256 == ""
+
+
+def test_stair_zone_carries_name_and_type_others_unchanged() -> None:
+    apartment = cad_floor3d.RoomZoneMm("room_apartment", [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)])
+    stair = cad_walls_zones.LabeledRoomZoneMm(
+        "room_mop",
+        [(20.0, 0.0), (30.0, 0.0), (30.0, 10.0)],
+        "ЛК-1",
+        cad_walls_zones.STAIR_TYPE_LABEL,
+    )
+    rows = json.loads(cad_walls_zones.canonical_bytes([stair, apartment]))
+    assert rows[0] == {"kind": "room_apartment", "shell": [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0]]}
+    assert rows[1]["name"] == "ЛК-1" and "лестн" in rows[1]["type"].lower()
+    # Файл без лестниц побайтно прежний: ключ идемпотентности и sha256 зон не меняются.
+    assert cad_walls_zones.canonical_bytes([apartment]) == (
+        b'[{"kind":"room_apartment","shell":[[0.0,0.0],[10.0,0.0],[10.0,10.0]]}]'
+    )

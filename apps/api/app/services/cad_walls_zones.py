@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -34,6 +35,9 @@ log = get_logger(__name__)
 ViewZonePt = tuple[float, float, float, float]
 
 ROOM_KINDS: Final = ("room_apartment", "room_mop")
+# Подпись лестничной клетки для скрипта: он узнаёт её по «лестн» в `name`/`type` (cad_walls v1.14).
+STAIR_ROOM_TYPE: Final = "stair"
+STAIR_TYPE_LABEL: Final = "Лестничная клетка"
 # Предел входа: контуры зон одного листа, с большим запасом.
 MAX_ZONES_BYTES: Final = 8 * 1024 * 1024
 _ROUND_MM: Final = 1
@@ -60,23 +64,35 @@ class ZonesInput:
 NO_ZONES = ZonesInput(b"", "", 0, None)
 
 
+@dataclass(frozen=True, slots=True)
+class LabeledRoomZoneMm(cad_floor3d.RoomZoneMm):
+    """Зона лестничной клетки: контур плюс `name` (подпись зоны) и `type` для скрипта."""
+
+    name: str = ""
+    type: str = ""
+
+
 def input_key(revision_id: uuid.UUID, sha256: str) -> str:
     """Ключ входного объекта зон; адрес по содержимому, вне каталогов попыток."""
     return f"revisions/{revision_id}/cad/walls-zones-input/{sha256}.json"
 
 
-def canonical_bytes(zones: list[cad_floor3d.RoomZoneMm]) -> bytes:
-    """Канонический JSON `[{"kind", "shell"}]`: те же зоны дают те же байты при любом порядке."""
-    rows = sorted(
-        (
-            {
-                "kind": z.kind,
-                "shell": [[round(x, _ROUND_MM), round(y, _ROUND_MM)] for x, y in z.shell],
-            }
-            for z in zones
-        ),
-        key=lambda row: (row["kind"], json.dumps(row["shell"])),
-    )
+def canonical_bytes(zones: Sequence[cad_floor3d.RoomZoneMm]) -> bytes:
+    """Канонический JSON `[{"kind", "shell"}]`: те же зоны дают те же байты при любом порядке.
+
+    У зон лестничных клеток добавлены `name` и `type`; у прочих состав полей прежний, поэтому
+    sha256 файла без лестниц не меняется.
+    """
+    rows: list[dict[str, Any]] = []
+    for z in zones:
+        row: dict[str, Any] = {
+            "kind": z.kind,
+            "shell": [[round(x, _ROUND_MM), round(y, _ROUND_MM)] for x, y in z.shell],
+        }
+        if isinstance(z, LabeledRoomZoneMm):
+            row["name"], row["type"] = z.name, z.type
+        rows.append(row)
+    rows.sort(key=lambda row: (row["kind"], json.dumps(row["shell"]), row.get("name", "")))
     return json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
 
 
@@ -197,16 +213,24 @@ async def sheet_room_zones(
             f"Контур плиты построен без зон помещений: {reason or 'кадр неполон'}.",
             view_zone,
         )
-    mapped = cad_floor3d.room_zones_to_mm(
-        [
-            cad_floor3d.RoomZoneNormalized(zone.kind, [list(p) for p in zone.points])
-            for zone in rows
-        ],
-        page_width_pt=float(geometry.display_width_pt),
-        page_height_pt=float(geometry.display_height_pt),
-        origin_pt=origin,
-        mm_per_pdf_point=factor,
-    )
+    mapped: list[cad_floor3d.RoomZoneMm] = []
+    for zone in rows:
+        (mm_zone,) = cad_floor3d.room_zones_to_mm(
+            [cad_floor3d.RoomZoneNormalized(zone.kind, [list(p) for p in zone.points])],
+            page_width_pt=float(geometry.display_width_pt),
+            page_height_pt=float(geometry.display_height_pt),
+            origin_pt=origin,
+            mm_per_pdf_point=factor,
+        )
+        room_type, _ = cad_zones.effective_room_type(zone.kind, zone.room_type, zone.name)
+        if room_type == STAIR_ROOM_TYPE:
+            mm_zone = LabeledRoomZoneMm(
+                mm_zone.kind,
+                mm_zone.shell,
+                (zone.name or "").strip() or STAIR_TYPE_LABEL,
+                STAIR_TYPE_LABEL,
+            )
+        mapped.append(mm_zone)
     if not mapped:
         return dataclasses.replace(NO_ZONES, view_zone=view_zone)
     raw = canonical_bytes(mapped)

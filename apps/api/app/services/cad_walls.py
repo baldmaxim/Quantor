@@ -30,6 +30,8 @@ from app.storage.base import ObjectStorage
 log = get_logger(__name__)
 
 WALLS_JSON: Final = "walls.json"
+# Контроль движка PDF->DXF (`Контроль_CAD.json`) в артефактах конвертации; вход `--control` скрипта.
+CONTROL_ARTIFACT: Final = "cad_checks.json"
 _ACTIVE: Final = (JobStatus.QUEUED, JobStatus.RUNNING)
 
 

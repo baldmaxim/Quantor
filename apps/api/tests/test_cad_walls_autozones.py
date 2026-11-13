@@ -88,6 +88,30 @@ async def _apartment_zone(api: AsyncClient, project_id: str, revision_id: str) -
     assert created.status_code == 201, created.text
 
 
+async def _mop_zone(
+    api: AsyncClient, project_id: str, revision_id: str, *, name: str | None, room_type: str | None
+) -> None:
+    """МОП 1000 x 2000 мм DXF в кадре родителя; название и тип — как задал человек."""
+    factor, origin = 35.2778, (10.0, 20.0)
+    corners_mm = [(3000.0, -500.0), (4000.0, -500.0), (4000.0, -2500.0), (3000.0, -2500.0)]
+    points = [
+        [(origin[0] + x / factor) / float(A3_WIDTH), (origin[1] - y / factor) / float(A3_HEIGHT)]
+        for x, y in corners_mm
+    ]
+    created = await api.post(
+        f"/api/v1/projects/{project_id}/cad/zones",
+        json={
+            "revision_id": revision_id,
+            "page_index": 0,
+            "kind": "room_mop",
+            "name": name,
+            "room_type": room_type,
+            "points": points,
+        },
+    )
+    assert created.status_code == 201, created.text
+
+
 async def _walls_jobs(session: AsyncSession) -> list[Job]:
     session.expire_all()
     rows = await session.scalars(
@@ -115,6 +139,44 @@ async def test_auto_enqueue_passes_sheet_zones_to_the_job(
         assert "zones_warning" not in job.payload
         key = cad_walls_zones.input_key(uuid.UUID(revision_id), job.payload["zones_sha256"])
         assert key in fake_storage.objects
+
+
+@pytest.mark.parametrize(
+    ("name", "room_type", "stair"),
+    [
+        ("Лестничная клетка Л1", None, True),
+        ("ЛК", "stair", True),
+        ("Лифтовой холл", None, False),
+    ],
+)
+async def test_stair_zone_goes_to_the_zones_file_with_name_and_type(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    settings: Settings,
+    name: str,
+    room_type: str | None,
+    stair: bool,
+) -> None:
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        await _apartment_zone(api, project_id, revision_id)
+        await _mop_zone(api, project_id, revision_id, name=name, room_type=room_type)
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        (job,) = await cad_walls_service.enqueue_after_convert(
+            db_session, fake_storage, parent, settings
+        )
+        assert job.payload["zones_count"] == 2
+        key = cad_walls_zones.input_key(uuid.UUID(revision_id), job.payload["zones_sha256"])
+        rows = json.loads(fake_storage.objects[key])
+        assert [r["kind"] for r in rows] == ["room_apartment", "room_mop"]
+        assert set(rows[0]) == {"kind", "shell"}
+        if stair:
+            assert rows[1]["name"] == name
+            assert "лестн" in rows[1]["type"].lower()
+        else:
+            assert set(rows[1]) == {"kind", "shell"}
 
 
 async def test_auto_enqueue_without_zones_is_as_before(
@@ -342,6 +404,20 @@ def test_argv_passes_view_zone_with_equals_form(settings: Settings, tmp_path: Pa
     argv = _argv_of(settings, tmp_path, (10.0, -180.004, 110.0, 20.0))
     assert argv[-1] == "--view-zone=10.0,-180.0,110.0,20.0"
     assert not any(a.startswith("--view-zone") for a in _argv_of(settings, tmp_path, None))
+
+
+def test_argv_passes_control_only_when_given(settings: Settings, tmp_path: Path) -> None:
+    control = tmp_path / "cad_checks.json"
+    base = {
+        "dxf": tmp_path / "a.dxf",
+        "params": tmp_path / "v1.json",
+        "out": tmp_path / "walls.json",
+        "pdf": tmp_path / "source.pdf",
+        "page_index": 0,
+    }
+    with_control = walls_handler._argv(settings, **base, control=control)
+    assert with_control[-2:] == ["--control", str(control)]
+    assert "--control" not in walls_handler._argv(settings, **base)
 
 
 def test_view_zone_of_payload_is_validated() -> None:

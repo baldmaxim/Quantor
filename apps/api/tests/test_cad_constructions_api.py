@@ -47,7 +47,7 @@ STUB = """
 import argparse, hashlib, json, pathlib, sys
 
 parser = argparse.ArgumentParser()
-for name in ("dxf", "params", "out", "pdf", "page", "zones", "view-zone"):
+for name in ("dxf", "params", "out", "pdf", "page", "zones", "view-zone", "control"):
     parser.add_argument("--" + name)
 args = parser.parse_args()
 here = pathlib.Path(__file__).parent
@@ -60,7 +60,8 @@ for name in ("dxf", "params", "pdf"):
     "page": args.page, "params_name": pathlib.Path(args.params).name,
     "pdf_head": pathlib.Path(args.pdf).read_bytes()[:5].decode("latin-1"),
     "zones": pathlib.Path(args.zones).read_text() if args.zones else None,
-    "view_zone": args.view_zone}))
+    "view_zone": args.view_zone,
+    "control": pathlib.Path(args.control).read_text() if args.control else None}))
 if mode == "fail":
     print(json.dumps({"code": "pdf_unreadable", "message": "PDF не открывается"}), file=sys.stderr)
     sys.exit(2)
@@ -364,7 +365,40 @@ async def test_worker_publishes_walls_json_and_result_carries_hashes(
         "pdf_head": "%PDF-",
         "zones": None,
         "view_zone": None,
+        # Контроль движка из артефактов родителя (`cad_checks.json`) передан как `--control`.
+        "control": json.dumps({"units": "mm", "origin_pdf_display_pt": [10, 20]}),
     }
+
+
+async def test_worker_runs_without_control_when_parent_has_none(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    walls_tools: Path,
+    tmp_path: Path,
+) -> None:
+    """Старое задание конвертации без `cad_checks.json`: `--control` не передаётся, отказа нет."""
+    settings = walls_settings(walls_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, _revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        result = parent.payload["cad_result"]
+        result["artifacts"] = [
+            a for a in result["artifacts"] if not a["name"].endswith("/cad_checks.json")
+        ]
+        await db_session.execute(
+            update(Job)
+            .where(Job.id == parent.id)
+            .values(payload={**parent.payload, "cad_result": result})
+        )
+        await db_session.commit()
+        db_session.expire_all()
+        queued = await api.post(_url(project_id, job_id, "walls"))
+        assert queued.status_code == 202, queued.text
+        job = await _run_walls_worker(db_session, fake_storage, settings, queued.json()["job_id"])
+        assert job.status is JobStatus.SUCCEEDED, (job.error_code, job.error_message)
+        assert json.loads((walls_tools / "args.json").read_text())["control"] is None
 
 
 async def test_worker_passes_stored_zones_to_the_script(

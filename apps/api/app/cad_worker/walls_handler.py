@@ -4,6 +4,7 @@
 новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
     <python> -I run_walls.py --dxf --params --out --pdf --page [--zones] [--view-zone=X0,Y0,X1,Y1]
+    [--control]
 
 PDF ревизии и номер страницы нужны только разбору отметок этажа (как у генератора трасс); не
 определились — скрипт пишет в `heights` статус `missing`, и это не отказ. Зоны помещений листа
@@ -79,6 +80,7 @@ def _argv(
     page_index: int,
     zones: Path | None = None,
     view_zone: tuple[float, float, float, float] | None = None,
+    control: Path | None = None,
 ) -> list[str]:
     python, runner = settings.cad_engine_python.strip(), cad_walls_service.runner_path(settings)
     if not python or runner is None or not (Path(python).is_file() and runner.is_file()):
@@ -103,6 +105,8 @@ def _argv(
     if view_zone is not None:
         x0, y0, x1, y1 = (round(v, 2) for v in view_zone)
         argv += [f"--view-zone={x0},{y0},{x1},{y1}"]
+    if control is not None:
+        argv += ["--control", str(control)]
     return argv
 
 
@@ -257,6 +261,15 @@ async def execute_cad_walls(
             dxf,
         )
 
+        # Контроль движка — необязательный вход: нет среди артефактов родителя — без аргумента.
+        control_name = f"{source.folder}/{cad_walls_service.CONTROL_ARTIFACT}"
+        control_file: Path | None = None
+        if cad_service.find_artifact(source.parent, control_name) is not None:
+            control_file = attempt_dir / "in" / cad_walls_service.CONTROL_ARTIFACT
+            await _download_artifact(
+                storage, source.parent, revision.id, control_name, None, control_file
+            )
+
         params = cad_walls_service.load_params(settings)
         raw_params = params.path.read_bytes()
         if (
@@ -300,6 +313,7 @@ async def execute_cad_walls(
                 page_index=source.page_index,
                 zones=zones_file,
                 view_zone=_view_zone_of(job.payload),
+                control=control_file,
             ),
             limit_seconds=float(settings.cad_total_timeout_seconds),
             poll_interval=settings.worker_heartbeat_interval_seconds,
