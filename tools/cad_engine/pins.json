@@ -41,6 +41,12 @@
       "params_sha256": "79333d07c9ea2ecbcfd21b4555f6da0c140ff4f71946eb79584c16d5768d2ce0",
       "params_canonical_sha256": "950425eb9f7fe3bb616c22360fb3655b61c8a3b788d0abff2a5d334d5453c511",
       "floor3d_dxf_version": "cad_floor3d_dxf.v2"
+    },
+    "cad_eom": {
+      "generator_version": "cad_eom.v0.1",
+      "params_path": "generators/cad_eom/params/v1.json",
+      "params_sha256": "2080e08f01bd55af3a12d0e49494a1223f30b4a55d720ee2c435bde41dfbb807",
+      "params_canonical_sha256": "f1d47e6c3d69835a8512b5e8f8807a953a161e1b96af814842a2dbb530006937"
     }
   }
 }
