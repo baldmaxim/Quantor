@@ -140,7 +140,7 @@ def generator_failure(code: int, output: bytes) -> CadError:
 
 
 def _elevation_value(candidate: dict[str, Any], key: str) -> dict[str, Any] | None:
-    """Отметка пола или высота этажа из `eom_candidate.json` (как у `cad_mep`): значение и источник."""
+    """Отметка пола или высота этажа из `eom_candidate.json`: значение и источник."""
     for section in ("provenance", "elevation"):
         block = candidate.get(section)
         raw = block.get(key) if isinstance(block, dict) else None
@@ -217,7 +217,11 @@ def verified_outputs(
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2), encoding="utf-8"
     )
     files.append(
-        {"name": "manifest.json", "sha256": _sha256(manifest_path), "size": manifest_path.stat().st_size}
+        {
+            "name": "manifest.json",
+            "sha256": _sha256(manifest_path),
+            "size": manifest_path.stat().st_size,
+        }
     )
     return files, candidate
 
