@@ -39,10 +39,15 @@ export const useCadBuilding3d = (
     retry: (count, error) => extractCode(error) === 'NETWORK_ERROR' && count < 2,
   });
 
-/** Здание с контурами конструкций этажей (`walls=true`): для просмотрщика объекта; ответ тяжелее. */
-export const useCadBuilding3dWalls = (projectId: string): UseQueryResult<CadBuilding3dRead> =>
+/**
+ * Здание с контурами конструкций этажей (`walls=true`): для просмотрщика объекта; ответ тяжелее.
+ * Страница запускает тот же запрос сама, параллельно с загрузкой чанка просмотрщика (`three`),
+ * а не после неё: ключ общий, второго чтения нет.
+ */
+export const useCadBuilding3dWalls = (projectId: string, enabled = true): UseQueryResult<CadBuilding3dRead> =>
   useQuery({
     queryKey: building3dKeys.projectWalls(projectId),
+    enabled,
     staleTime: BUILDING3D_STALE_MS,
     queryFn: async () =>
       unwrap(

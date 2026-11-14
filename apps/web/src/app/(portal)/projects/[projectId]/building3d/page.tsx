@@ -10,7 +10,7 @@ import { EmptyState, SkeletonRows } from '@/components/ui';
 import type { IBuildingViewerSelection } from '@/components/projects/building3d/BuildingViewer';
 import { BuildingViewerLazy } from '@/components/projects/building3d/BuildingViewerLazy';
 import { cadAccess } from '@/lib/cad/access';
-import { resolveSheetPosition } from '@/lib/cad/building3d-queries';
+import { resolveSheetPosition, useCadBuilding3dWalls } from '@/lib/cad/building3d-queries';
 import { workspaceCadHref } from '@/lib/cad/workspace-url';
 import { useFeatures, useMeta, useProject } from '@/lib/queries';
 
@@ -36,6 +36,8 @@ const Building3dPage = ({ params }: IPageProps) => {
   const meta = useMeta();
   const access = cadAccess(meta.isSuccess, useFeatures());
   const project = useProject(projectId);
+  // Данные здания грузятся параллельно с чанком просмотрщика: тот же ключ, просмотрщик берёт их из кэша.
+  useCadBuilding3dWalls(projectId, access === 'open');
 
   const selection: IBuildingViewerSelection = {
     group: searchParams.get('group'),

@@ -1,4 +1,5 @@
 import type { CadBuilding3dFloorRead, CadBuilding3dWallRead } from '@quantor/api-client';
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -167,6 +168,29 @@ describe('экструзия и слияние', () => {
     expect(box?.min.z).toBeCloseTo(-2);
     expect(box?.max.x).toBeCloseTo(4);
     geometry?.dispose();
+  });
+
+  it('грани смотрят наружу при любом обходе контура: верх +Y, низ -Y, бока от центра', () => {
+    const clockwise: [number, number][] = [[0, 0], [0, 2], [4, 2], [4, 0]];
+    for (const shell of [clockwise, [...clockwise].reverse()]) {
+      const geometry = extrudeShell(shell, 1, 3);
+      if (geometry === null) throw new Error('геометрия не построена');
+      const position = geometry.getAttribute('position');
+      const normal = geometry.getAttribute('normal');
+      expect(normal.count).toBe(position.count);
+      for (let t = 0; t < position.count; t += 3) {
+        const v = [0, 1, 2].map((k) => new THREE.Vector3().fromBufferAttribute(position, t + k));
+        const [a, b, c] = v as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+        // Нормаль по обходу треугольника (лицевая сторона three) совпадает с записанной.
+        const face = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+        const stored = new THREE.Vector3().fromBufferAttribute(normal, t);
+        expect(face.dot(stored)).toBeCloseTo(1);
+        // И смотрит от центра призмы (2, 2, -1).
+        const centroid = new THREE.Vector3().add(a).add(b).add(c).divideScalar(3);
+        expect(centroid.sub(new THREE.Vector3(2, 2, -1)).dot(stored)).toBeGreaterThan(0);
+      }
+      geometry.dispose();
+    }
   });
 
   it('нулевая высота и вырожденный контур - без геометрии', () => {

@@ -1,6 +1,5 @@
 import type { CadBuilding3dFloorRead, CadBuilding3dWallRead } from '@quantor/api-client';
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import {
   MM_IN_M,
@@ -215,55 +214,148 @@ const dedupe = (shell: readonly Point2[]): Point2[] | null => {
   return points.length >= 3 ? points : null;
 };
 
-/** Призма из контура от `yBottom` до `yTop`, м; нельзя построить (вырожденный или самопересекающийся контур) - `null`. */
-export const extrudeShell = (shell: readonly Point2[], yBottom: number, yTop: number): THREE.BufferGeometry | null => {
-  const depth = yTop - yBottom;
-  const points = dedupe(shell);
-  if (!(depth > 0) || points === null) return null;
+/** Контур призмы: вершины против часовой стрелки в плане и треугольники крышки (тройки индексов). */
+interface IPrism {
+  readonly points: readonly Point2[];
+  readonly caps: readonly number[];
+}
+
+/** Удвоенная ориентированная площадь треугольника плана: > 0 - против часовой стрелки. */
+const cross2 = (a: Point2, b: Point2, c: Point2): number => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+
+/** Подготовка призмы: обход против часовой стрелки и триангуляция крышки; нечего строить - `null`. */
+const preparePrism = (shell: readonly Point2[]): IPrism | null => {
+  const deduped = dedupe(shell);
+  if (deduped === null) return null;
+  let area = 0;
+  for (let i = 0; i < deduped.length; i += 1) {
+    const a = deduped[i] as Point2;
+    const b = deduped[(i + 1) % deduped.length] as Point2;
+    area += a[0] * b[1] - b[0] * a[1];
+  }
+  if (area === 0 || !Number.isFinite(area)) return null;
+  const points = area > 0 ? deduped : [...deduped].reverse();
+  let faces: number[][];
   try {
-    const geometry = new THREE.ExtrudeGeometry(new THREE.Shape(points.map(([u, v]) => new THREE.Vector2(u, v))), {
-      depth,
-      bevelEnabled: false,
-      steps: 1,
-    });
-    geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, yBottom, 0);
-    if (geometry.getAttribute('position').count > 0) return geometry;
-    geometry.dispose();
-    return null;
+    faces = THREE.ShapeUtils.triangulateShape(
+      points.map(([u, v]) => new THREE.Vector2(u, v)),
+      [],
+    );
   } catch {
     // Триангуляция самопересечения не берёт: контур пропускается, остальные строятся.
     return null;
   }
+  const caps: number[] = [];
+  for (const face of faces) {
+    const [i, j, k] = face;
+    if (i === undefined || j === undefined || k === undefined) continue;
+    const a = points[i];
+    const b = points[j];
+    const c = points[k];
+    if (a === undefined || b === undefined || c === undefined) continue;
+    // Крышка против часовой стрелки в плане: в сцене её нормаль смотрит вверх.
+    if (cross2(a, b, c) >= 0) caps.push(i, j, k);
+    else caps.push(i, k, j);
+  }
+  return caps.length === 0 ? null : { points, caps };
 };
 
-const triangleCount = (geometry: THREE.BufferGeometry): number =>
-  (geometry.index?.count ?? geometry.getAttribute('position').count) / 3;
+/** Треугольников в призме: две крышки и по два на каждую боковую грань. */
+const prismTriangles = (prism: IPrism): number => (prism.caps.length / 3) * 2 + prism.points.length * 2;
 
 /**
- * Конструкции одним мешем: слияние в одну геометрию с диапазонами треугольников каждой. Контур, который
- * не строится, пропускается. Нечего сливать - `null`.
+ * Запись призмы в общие буферы с позиции `offset` (в вершинах). Сцена: `X = u`, `Y` - высота, `Z = -v`.
+ * Нормали плоские, по граням - как у `ExtrudeGeometry` без фасок; UV не нужны (материалы без текстур).
+ */
+const writePrism = (
+  prism: IPrism,
+  yBottom: number,
+  yTop: number,
+  positions: Float32Array,
+  normals: Float32Array,
+  offset: number,
+): number => {
+  let at = offset * 3;
+  const put = (u: number, y: number, v: number, nx: number, ny: number, nz: number): void => {
+    positions[at] = u;
+    positions[at + 1] = y;
+    positions[at + 2] = -v;
+    normals[at] = nx;
+    normals[at + 1] = ny;
+    normals[at + 2] = nz;
+    at += 3;
+  };
+  const { points, caps } = prism;
+  for (let t = 0; t < caps.length; t += 3) {
+    const a = points[caps[t] as number] as Point2;
+    const b = points[caps[t + 1] as number] as Point2;
+    const c = points[caps[t + 2] as number] as Point2;
+    // Верх: обход против часовой стрелки в плане - нормаль +Y; низ - обратный обход, нормаль -Y.
+    put(a[0], yTop, a[1], 0, 1, 0);
+    put(b[0], yTop, b[1], 0, 1, 0);
+    put(c[0], yTop, c[1], 0, 1, 0);
+    put(a[0], yBottom, a[1], 0, -1, 0);
+    put(c[0], yBottom, c[1], 0, -1, 0);
+    put(b[0], yBottom, b[1], 0, -1, 0);
+  }
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i] as Point2;
+    const b = points[(i + 1) % points.length] as Point2;
+    const du = b[0] - a[0];
+    const dv = b[1] - a[1];
+    const length = Math.hypot(du, dv);
+    // Наружная нормаль ребра обхода против часовой стрелки: (dv, -du) в плане, в сцене (dv, 0, du).
+    const nx = length > 0 ? dv / length : 0;
+    const nz = length > 0 ? du / length : 0;
+    put(a[0], yBottom, a[1], nx, 0, nz);
+    put(b[0], yBottom, b[1], nx, 0, nz);
+    put(b[0], yTop, b[1], nx, 0, nz);
+    put(a[0], yBottom, a[1], nx, 0, nz);
+    put(b[0], yTop, b[1], nx, 0, nz);
+    put(a[0], yTop, a[1], nx, 0, nz);
+  }
+  return at / 3;
+};
+
+const geometryOf = (positions: Float32Array, normals: Float32Array): THREE.BufferGeometry => {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  return geometry;
+};
+
+/** Призма из контура от `yBottom` до `yTop`, м; нельзя построить (вырожденный или самопересекающийся контур) - `null`. */
+export const extrudeShell = (shell: readonly Point2[], yBottom: number, yTop: number): THREE.BufferGeometry | null =>
+  mergeWalls([{ id: '', shell }], yBottom, yTop)?.geometry ?? null;
+
+/**
+ * Конструкции одним мешем: все призмы пишутся сразу в один буфер (без промежуточных геометрий и
+ * слияния), с диапазонами треугольников каждой. Контур, который не строится, пропускается. Нечего
+ * строить - `null`.
  */
 export const mergeWalls = (
   walls: readonly { readonly id: string; readonly shell: readonly Point2[] }[],
   yBottom: number,
   yTop: number,
 ): IMergedWalls | null => {
-  const parts: THREE.BufferGeometry[] = [];
+  if (!(yTop - yBottom > 0)) return null;
+  const prisms: { id: string; prism: IPrism }[] = [];
   const ranges: IWallRange[] = [];
   let triangles = 0;
   for (const wall of walls) {
-    const part = extrudeShell(wall.shell, yBottom, yTop);
-    if (part === null) continue;
-    const count = triangleCount(part);
+    const prism = preparePrism(wall.shell);
+    if (prism === null) continue;
+    const count = prismTriangles(prism);
     ranges.push({ id: wall.id, start: triangles, end: triangles + count });
     triangles += count;
-    parts.push(part);
+    prisms.push({ id: wall.id, prism });
   }
-  if (parts.length === 0) return null;
-  const merged = parts.length === 1 ? (parts[0] ?? null) : mergeGeometries(parts, false);
-  if (parts.length > 1) for (const part of parts) part.dispose();
-  return merged === null ? null : { geometry: merged, ranges };
+  if (prisms.length === 0) return null;
+  const positions = new Float32Array(triangles * 9);
+  const normals = new Float32Array(triangles * 9);
+  let offset = 0;
+  for (const { prism } of prisms) offset = writePrism(prism, yBottom, yTop, positions, normals, offset);
+  return { geometry: geometryOf(positions, normals), ranges };
 };
 
 /** Все контуры одним мешем: слияние в одну геометрию. Нечего сливать - `null`. */

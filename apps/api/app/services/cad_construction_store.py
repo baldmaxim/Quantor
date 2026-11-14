@@ -234,6 +234,36 @@ async def load_levels(
     )
 
 
+EMPTY_LEVELS = CadSheetLevelsRead(
+    floor_height_mm=None, slab_thickness_mm=None, door_height_mm=None, floor_elevation_mm=None
+)
+
+
+async def load_levels_many(
+    session: AsyncSession, *, revision_ids: Sequence[uuid.UUID]
+) -> dict[tuple[uuid.UUID, int, int], CadSheetLevelsRead]:
+    """Высоты всех листов ревизий одним запросом: (ревизия, страница, вид) -> значения.
+
+    Листа нет в ответе - высоты не заданы (`EMPTY_LEVELS`), как у `load_levels`.
+    """
+    if not revision_ids:
+        return {}
+    rows = await session.scalars(
+        select(CadSheetLevels)
+        .where(CadSheetLevels.revision_id.in_(set(revision_ids)))
+        .execution_options(populate_existing=True)
+    )
+    return {
+        (row.revision_id, row.page_index, row.view): CadSheetLevelsRead(
+            floor_height_mm=row.floor_height_mm,
+            slab_thickness_mm=row.slab_thickness_mm,
+            door_height_mm=row.door_height_mm,
+            floor_elevation_mm=row.floor_elevation_mm,
+        )
+        for row in rows
+    }
+
+
 async def load_project_slab(session: AsyncSession, *, project_id: uuid.UUID) -> ProjectSlab | None:
     """Толщина плиты проекта из разреза (ввод человека); не введена — `None`."""
     row = await session.scalar(

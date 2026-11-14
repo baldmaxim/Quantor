@@ -83,8 +83,9 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
     [allFloors, selection.floor],
   );
   const groupKey = resolveGroupKey(groups, selection.group, sheetGroup);
-  // Одно здание - «всего объекта» не отличить от него: режим только при двух и более группах.
-  const isAll = groups.length > 1 && selection.group === ALL_GROUPS_KEY;
+  // Одно здание - «всего объекта» не отличить от него: режим только при двух и более группах. Он же
+  // вид по умолчанию: без выбора (или с устаревшим корпусом в адресе) открывается весь объект.
+  const isAll = groups.length > 1 && !groups.some((group) => group.key === selection.group);
   const floors = useMemo(
     () => (isAll ? (allFloors ?? []) : filterFloorsByGroup(allFloors ?? [], groupKey)),
     [allFloors, groupKey, isAll],

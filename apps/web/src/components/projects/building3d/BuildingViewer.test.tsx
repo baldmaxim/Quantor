@@ -1,6 +1,6 @@
 import * as client from '@quantor/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { floorKey } from '@/lib/cad/building3d-geometry';
@@ -270,12 +270,22 @@ describe('Просмотрщик объекта: весь объект', () => {
     } as never);
   });
 
-  it('в переключателе есть «Весь объект»; выбор уходит в адрес и сбрасывает этаж', async () => {
+  it('по умолчанию открыт весь объект, в том числе по ссылке на этаж и с устаревшим корпусом', async () => {
+    for (const selection of [NOTHING, { ...NOTHING, floor: 'j1:0:0' }, { ...NOTHING, group: 'gone' }]) {
+      const view = mount(selection);
+      expect(await screen.findByTestId('canvas')).toHaveAttribute('data-all', 'true');
+      expect(screen.getByLabelText('Корпус')).toHaveValue('all');
+      expect(view).not.toHaveBeenCalled();
+      cleanup();
+    }
+  });
+
+  it('в переключателе есть «Весь объект»; выбор корпуса уходит в адрес и сбрасывает этаж', async () => {
     const change = mount({ ...NOTHING, floor: 'j1:0:0' });
     const select = await screen.findByLabelText('Корпус');
     expect(screen.getByRole('option', { name: 'Весь объект' })).toBeInTheDocument();
-    fireEvent.change(select, { target: { value: 'all' } });
-    expect(change).toHaveBeenCalledWith({ group: 'all', floor: null, detail: false, construction: null });
+    fireEvent.change(select, { target: { value: 'k2' } });
+    expect(change).toHaveBeenCalledWith({ group: 'k2', floor: null, detail: false, construction: null });
   });
 
   it('режим «Весь объект»: холст получает группы, пометка про условное расположение, список по зданиям', async () => {

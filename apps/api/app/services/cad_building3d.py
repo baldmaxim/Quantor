@@ -13,8 +13,11 @@
 поставленных зданий в системе объекта, не поставленных - в системе эталонного этажа группы.
 
 Порядок работы: сначала всё нужное из базы — последовательно (сессия не конкурентна), затем
-`walls.json` листов читаются из хранилища параллельно с ограничением. Ошибка одного листа не
-валит ответ: лист пропускается с предупреждением. В итоги обмера, calc и MEP вид не входит.
+`walls.json` листов читаются из хранилища параллельно с ограничением, проверка контракта и сборка
+этажа идут в потоке. Этаж листа до совмещения запоминается в памяти процесса (`floor_cache`) по
+ключам артефактов и высотам: повторное открытие не читает и не разбирает walls.json заново.
+Ошибка одного листа не валит ответ: лист пропускается с предупреждением. В итоги обмера, calc и
+MEP вид не входит.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ import math
 import re
 import statistics
 import uuid
+from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Final
@@ -182,12 +186,19 @@ def wall_ring(shell: Sequence[Sequence[float]]) -> list[list[int]] | None:
     подмножество исходных точек; прореживание «через одну» срезало бы углы стен. Меньше трёх
     точек - `None` (вырожденное кольцо).
     """
-    rounded = _open_ring([[_round_mm(p[0]), _round_mm(p[1])] for p in shell])
-    if len(rounded) > MAX_WALL_POINTS:
-        rounded = _open_ring(simplify_ring([[x, y] for x, y in rounded], MAX_WALL_POINTS))
-    if len(rounded) < 3:
-        return None
-    return [[_round_mm(x), _round_mm(y)] for x, y in rounded]
+    # Один проход: округление и снятие подряд идущих дублей (стен на объекте - десятки тысяч).
+    floor = math.floor
+    points: list[list[int]] = []
+    for p in shell:
+        x, y = floor(p[0] + 0.5), floor(p[1] + 0.5)
+        if not points or x != points[-1][0] or y != points[-1][1]:
+            points.append([x, y])
+    if len(points) > 1 and points[0] == points[-1]:
+        points.pop()
+    if len(points) > MAX_WALL_POINTS:
+        simplified = _open_ring(simplify_ring(points, MAX_WALL_POINTS))
+        points = [[_round_mm(x), _round_mm(y)] for x, y in simplified]
+    return points if len(points) >= 3 else None
 
 
 # --------------------------------------------------------------------------- лист -> этаж
@@ -297,8 +308,12 @@ def build_floor(
             if len(walls) >= MAX_WALLS_PER_FLOOR:
                 skipped += 1
                 continue
+            # Поля уже проверены контрактом walls.json (тот же `CadConstructionKind`), кольцо -
+            # целые мм из `wall_ring`: повторная проверка тысяч стен только тратит время.
             walls.append(
-                CadBuilding3dWallRead(id=construction.id, kind=construction.kind, shell=ring)
+                CadBuilding3dWallRead.model_construct(
+                    id=construction.id, kind=construction.kind, shell=ring
+                )
             )
         if skipped:
             warnings.append(
@@ -462,14 +477,17 @@ def _match_orient(
 
 def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding3dFloorRead:
     box = floor.bbox
+    # Кольца стен - целые мм, поэтому round(x + d) = x + round(d): сдвиг округляется один раз.
+    ix, iy = _round_mm(dx), _round_mm(dy)
     walls = (
-        None
-        if floor.walls is None
+        floor.walls
+        if floor.walls is None or (ix == 0 and iy == 0)
         else [
-            CadBuilding3dWallRead(
+            # Сдвиг уже проверенной стены: целые мм, без повторной проверки модели.
+            CadBuilding3dWallRead.model_construct(
                 id=wall.id,
                 kind=wall.kind,
-                shell=[[_round_mm(x + dx), _round_mm(y + dy)] for x, y in wall.shell],
+                shell=[[x + ix, y + iy] for x, y in wall.shell],
             )
             for wall in floor.walls
         ]
@@ -980,6 +998,8 @@ async def collect_sheets(
         if type(page) is int and type(view) is int:
             walls_by_view.setdefault((str(walls.payload.get("parent_job_id")), page, view), walls)
     project_slab = await cad_construction_store.load_project_slab(session, project_id=project_id)
+    # Высоты всех листов - одним запросом, а не запросом на каждый вид.
+    levels = await cad_construction_store.load_levels_many(session, revision_ids=list(revisions))
 
     # Сначала новые ревизии, в ревизии — новые задания: страница документа берётся один раз,
     # у более ранней ревизии и более раннего задания она остаётся устаревшей и не показывается.
@@ -1008,8 +1028,8 @@ async def collect_sheets(
                 label = f"{document.display_name} · лист {page_index + 1}"
                 if len(views) > 1:
                     label += f" · вид {view}"
-                overrides = await cad_construction_store.load_levels(
-                    session, revision_id=revision_id, page_index=page_index, view=view
+                overrides = levels.get(
+                    (revision_id, page_index, view), cad_construction_store.EMPTY_LEVELS
                 )
                 folder = cad_service.view_folder(page_index, view)
                 sheets.append(
@@ -1068,8 +1088,11 @@ async def _read_walls(
 
 async def _read_frame(
     storage: ObjectStorage, sheet: SheetRef, gate: asyncio.Semaphore
-) -> CadFrameRead:
-    """Кадр вида листа; не читается или не установлен - неподтверждённый кадр с причиной."""
+) -> tuple[CadFrameRead, bool]:
+    """Кадр вида листа; не читается или не установлен - неподтверждённый кадр с причиной.
+
+    Второе значение - можно ли запомнить итог: сбой хранилища преходящ, его в кеш не кладём.
+    """
 
     def unconfirmed(reason: str) -> CadFrameRead:
         return CadFrameRead(
@@ -1077,19 +1100,169 @@ async def _read_frame(
         )
 
     if sheet.scale_key is None or sheet.checks_key is None:
-        return unconfirmed("DXF в этой попытке нет: сравнивать с PDF нечего.")
+        return unconfirmed("DXF в этой попытке нет: сравнивать с PDF нечего."), True
     async with gate:
         try:
             scale = cad_views.scale_from(await cad_views.read_json(storage, sheet.scale_key))
             checks = await cad_views.read_json(storage, sheet.checks_key)
-        except (
-            ObjectNotFoundError,
-            StorageUnavailableError,
-            cad_views.ArtifactTooLargeError,
-            ValueError,
+        except StorageUnavailableError:
+            return unconfirmed("масштаб или проверки вида не читаются"), False
+        except (ObjectNotFoundError, cad_views.ArtifactTooLargeError, ValueError):
+            return unconfirmed("масштаб или проверки вида не читаются"), True
+    return cad_views.frame_from(scale, checks), True
+
+
+# --------------------------------------------------------------------------- кеш этажей
+
+
+@dataclass(frozen=True, slots=True)
+class _SheetFloor:
+    """Этаж листа до совмещения: этаж, его предупреждения и оси; `floor = None` - лист пропущен.
+
+    `cost` - вес в кеше: число точек в кольцах стен и контуре (память растёт с точками).
+    """
+
+    floor: CadBuilding3dFloorRead | None
+    warnings: tuple[CadBuilding3dWarningRead, ...]
+    axes: FloorAxes
+    cost: int = 1
+
+
+# Ключ - всё, от чего зависит этаж листа: адрес и подпись листа, ключи артефактов (неизменны в
+# пределах попытки задания), высоты человека, плита проекта и `include_walls`. Новая попытка
+# конструкций, правка высот или переименование документа дают новый ключ - устаревшее не отдаётся.
+_SheetKey = tuple[object, ...]
+# Предел кеша процесса: число этажей и суммарное число точек. Точка стены в памяти ~0,15 КБ:
+# 300 тыс. точек - ~45 МБ на процесс (в бою 4 процесса uvicorn в общем лимите памяти).
+FLOOR_CACHE_MAX_ENTRIES: Final = 512
+FLOOR_CACHE_MAX_POINTS: Final = 300_000
+
+
+class _FloorCache:
+    """LRU этажей листов в памяти процесса с пределом по числу этажей и суммарному весу.
+
+    Этажи, взятые или положенные текущим запросом (поколение не старше `begin`), им же не
+    вытесняются: объект больше кеша не гоняет его по кругу с нулевым попаданием - часть этажей
+    остаётся, остальные просто не кладутся.
+    """
+
+    def __init__(self) -> None:
+        self._items: OrderedDict[_SheetKey, tuple[_SheetFloor, int]] = OrderedDict()
+        self._cost = 0
+        self._generation = 0
+
+    def begin(self) -> int:
+        """Поколение нового запроса."""
+        self._generation += 1
+        return self._generation
+
+    def get(self, key: _SheetKey, generation: int) -> _SheetFloor | None:
+        entry = self._items.get(key)
+        if entry is None:
+            return None
+        self._items[key] = (entry[0], max(entry[1], generation))
+        self._items.move_to_end(key)
+        return entry[0]
+
+    def put(self, key: _SheetKey, item: _SheetFloor, generation: int) -> None:
+        if item.cost > FLOOR_CACHE_MAX_POINTS:
+            return
+        previous = self._items.pop(key, None)
+        if previous is not None:
+            self._cost -= previous[0].cost
+        while self._items and (
+            len(self._items) + 1 > FLOOR_CACHE_MAX_ENTRIES
+            or self._cost + item.cost > FLOOR_CACHE_MAX_POINTS
         ):
-            return unconfirmed("масштаб или проверки вида не читаются")
-    return cad_views.frame_from(scale, checks)
+            oldest_key = next(iter(self._items))
+            oldest, used = self._items[oldest_key]
+            if used >= generation:
+                return
+            del self._items[oldest_key]
+            self._cost -= oldest.cost
+        if self._cost + item.cost > FLOOR_CACHE_MAX_POINTS:
+            return
+        self._items[key] = (item, generation)
+        self._cost += item.cost
+
+    def clear(self) -> None:
+        self._items.clear()
+        self._cost = 0
+
+
+floor_cache: Final = _FloorCache()
+
+
+def _sheet_key(sheet: SheetRef, project_slab: ProjectSlab | None, include_walls: bool) -> _SheetKey:
+    return (
+        sheet.job_id,
+        sheet.revision_id,
+        sheet.document_id,
+        sheet.page_index,
+        sheet.view,
+        sheet.label,
+        sheet.walls_key,
+        sheet.scale_key,
+        sheet.checks_key,
+        sheet.overrides.model_dump_json(),
+        project_slab,
+        include_walls,
+    )
+
+
+def _sheet_floor(
+    sheet: SheetRef,
+    raw: Any,
+    frame: CadFrameRead | None,
+    project_slab: ProjectSlab | None,
+    include_walls: bool,
+) -> _SheetFloor:
+    """Этаж из прочитанного walls.json: проверка контракта и сборка. Чисто вычисление, без I/O."""
+    try:
+        document = WallsDocument.model_validate(raw)
+        extras = WallsFloorExtras.model_validate(raw)
+        floor, floor_warnings = build_floor(
+            sheet, document, extras, project_slab, include_walls=include_walls
+        )
+    except (ValidationError, ValueError):
+        warning = CadBuilding3dWarningRead(
+            code="walls_invalid",
+            message=f"{sheet.label}: walls.json вне контракта или без геометрии, лист пропущен.",
+        )
+        return _SheetFloor(None, (warning,), NO_AXES)
+    axes = NO_AXES if frame is None else axes_in_mm(raw, frame)
+    cost = 1 + len(floor.outline) + sum(len(wall.shell) for wall in floor.walls or ())
+    return _SheetFloor(floor, tuple(floor_warnings), axes, cost)
+
+
+async def _load_sheet_floor(
+    storage: ObjectStorage,
+    sheet: SheetRef,
+    project_slab: ProjectSlab | None,
+    include_walls: bool,
+    gate: asyncio.Semaphore,
+    generation: int,
+) -> _SheetFloor:
+    """Этаж листа: из кеша, иначе чтение walls.json (и кадра, если есть оси) и сборка в потоке."""
+    key = _sheet_key(sheet, project_slab, include_walls)
+    cached = floor_cache.get(key, generation)
+    if cached is not None:
+        return cached
+    raw, problem = await _read_walls(storage, sheet, gate)
+    if problem is not None:
+        # Не посчитан или не читается: состояние может смениться без смены ключа - не кешируем.
+        return _SheetFloor(None, (problem,), NO_AXES)
+    frame: CadFrameRead | None = None
+    cacheable = True
+    # Кадр нужен только листам, у которых в walls.json есть блок осей.
+    if isinstance(raw, dict) and isinstance(raw.get("axes"), dict):
+        frame, cacheable = await _read_frame(storage, sheet, gate)
+    # Проверка контракта и сборка тысяч стен - в потоке: на event loop они останавливали бы
+    # все запросы процесса.
+    item = await asyncio.to_thread(_sheet_floor, sheet, raw, frame, project_slab, include_walls)
+    if cacheable:
+        floor_cache.put(key, item, generation)
+    return item
 
 
 async def build_building3d(
@@ -1104,44 +1277,18 @@ async def build_building3d(
         session, workspace_id=workspace_id, project_id=project_id
     )
     gate = asyncio.Semaphore(READ_CONCURRENCY)
-    loaded = await asyncio.gather(*(_read_walls(storage, sheet, gate) for sheet in sheets))
-    # Кадр нужен только листам, у которых в walls.json есть блок осей.
-    needs_frame = [
-        index
-        for index, (raw, problem) in enumerate(loaded)
-        if problem is None and isinstance(raw, dict) and isinstance(raw.get("axes"), dict)
-    ]
-    frames = dict(
-        zip(
-            needs_frame,
-            await asyncio.gather(*(_read_frame(storage, sheets[i], gate) for i in needs_frame)),
-            strict=True,
+    generation = floor_cache.begin()
+    loaded = await asyncio.gather(
+        *(
+            _load_sheet_floor(storage, sheet, project_slab, include_walls, gate, generation)
+            for sheet in sheets
         )
     )
     built: list[BuiltFloor] = []
-    for index, (sheet, (raw, problem)) in enumerate(zip(sheets, loaded, strict=True)):
-        if problem is not None:
-            warnings.append(problem)
-            continue
-        try:
-            document = WallsDocument.model_validate(raw)
-            extras = WallsFloorExtras.model_validate(raw)
-            floor, floor_warnings = build_floor(
-                sheet, document, extras, project_slab, include_walls=include_walls
-            )
-        except (ValidationError, ValueError):
-            warnings.append(
-                CadBuilding3dWarningRead(
-                    code="walls_invalid",
-                    message=f"{sheet.label}: walls.json вне контракта или без геометрии, "
-                    "лист пропущен.",
-                )
-            )
-            continue
-        warnings.extend(floor_warnings)
-        frame = frames.get(index)
-        axes = NO_AXES if frame is None else axes_in_mm(raw, frame)
-        built.append(BuiltFloor(floor, sheet.order, axes))
+    for sheet, item in zip(sheets, loaded, strict=True):
+        warnings.extend(item.warnings)
+        if item.floor is not None:
+            built.append(BuiltFloor(item.floor, sheet.order, item.axes))
     aligned = align_floors(built)
     placements = place_groups(built, aligned)
     placed = apply_placements(aligned, placements)
