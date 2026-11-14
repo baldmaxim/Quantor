@@ -1,4 +1,4 @@
-import type { CadJobSummaryRead } from '@quantor/api-client';
+import type { CadJobSummaryRead, CadPipelineSheetRead } from '@quantor/api-client';
 
 import { READABLE_RESULTS } from './selection';
 
@@ -129,3 +129,17 @@ export const shownSheetJobs = (jobs: readonly JobForSheets[]): Map<number, IShee
   });
   return result;
 };
+
+/**
+ * Листы с готовым DXF для ярлыка «CAD» в списке листов. Источник - конвейер ревизии: он видит все
+ * задания листов, а список заданий ревизии ограничен 20 новейшими, и трассы механики вытесняют из
+ * него преобразования. `convert` конвейера - показываемый прогон листа; «только диагностика» не в счёт.
+ */
+export const readyDxfPages = (
+  sheets: readonly Pick<CadPipelineSheetRead, 'page_index' | 'convert'>[],
+): ReadonlySet<number> =>
+  new Set(
+    sheets.flatMap((row) =>
+      row.convert?.result_status === 'completed_requires_review' ? [row.page_index] : [],
+    ),
+  );

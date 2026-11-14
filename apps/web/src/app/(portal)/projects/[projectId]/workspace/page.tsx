@@ -59,8 +59,7 @@ import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
 import { resolveSheetPosition } from '@/lib/cad/building3d-queries';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
-import { useCadJobs } from '@/lib/cad/queries';
-import { shownSheetJobs, type ISheetResult } from '@/lib/cad/sheet-results';
+import { readyDxfPages } from '@/lib/cad/sheet-results';
 import { parseWorkspaceJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
 import { GEOMETRY_ISSUE_LABELS, geometryIssueOf } from '@/lib/geometry-issues';
@@ -99,10 +98,6 @@ import { useWorkspaceStore, type LeftTab } from '@/store/workspace';
 interface IPageProps {
   params: Promise<{ projectId: string }>;
 }
-
-/** Ярлык «CAD» в списке листов: только готовый DXF, результат «только диагностика» не в счёт. */
-const isReadyDxf = (result: ISheetResult | undefined): boolean =>
-  result?.kind === 'recognized' && result.dxf;
 
 const leftTabs = (
   takeoff: ITakeoffAccess,
@@ -169,9 +164,6 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const [cadSideTab, setCadSideTab] = useState<string | null>(null);
 
   const pages = sheets.data?.items ?? [];
-  // Готовые результаты CAD по листам; без флага cad.export задания не запрашиваются.
-  const cadJobs = useCadJobs(projectId, cadOn ? revisionId : null);
-  const cadResults = useMemo(() => shownSheetJobs(cadJobs.data?.items ?? []), [cadJobs.data]);
   const pageIndex = Math.min(Math.max(pageParam - 1, 0), Math.max(pages.length - 1, 0));
   const sheet = pages[pageIndex] ?? null;
 
@@ -508,6 +500,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
       ),
     [pipeline.sheets],
   );
+  // Ярлык «CAD» в списке листов - из того же ответа конвейера: в нём все листы ревизии.
+  const cadReadyPages = useMemo(() => readyDxfPages(pipeline.sheets), [pipeline.sheets]);
   const floorTitle = formatFloorTitle(pipeline.sheet?.floor_title, '');
 
   const cadSelection = parseWorkspaceJob(searchParams);
@@ -840,7 +834,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       floorTitle: floorTitleByPage.get(item.page_index) ?? null,
                       title: item.title ?? null,
                       regionCount: item.region_count,
-                      cad: isReadyDxf(cadResults.get(item.page_index)),
+                      cad: cadReadyPages.has(item.page_index),
                     }))}
                     activeIndex={pageIndex}
                     onSelect={(index) =>

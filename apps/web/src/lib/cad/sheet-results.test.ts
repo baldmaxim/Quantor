@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { latestSheetJobs, shownSheetJobs, sheetJobsForPage } from './sheet-results';
+import { latestSheetJobs, readyDxfPages, shownSheetJobs, sheetJobsForPage } from './sheet-results';
 
 const job = (patch: Record<string, unknown>) =>
   ({
@@ -126,5 +126,20 @@ describe('показываемое задание листа и обновлен
   it('карта для списка листов: лист с обновлением остаётся готовым', () => {
     const map = shownSheetJobs([ready, newer({ status: 'running', result_status: null })]);
     expect(map.get(0)).toEqual({ jobId: 'ready', kind: 'recognized', view: null, dxf: true });
+  });
+});
+
+describe('ярлык «CAD» в списке листов', () => {
+  const stage = (result_status: string | null) =>
+    ({ result_status }) as unknown as Parameters<typeof readyDxfPages>[0][number]['convert'];
+
+  it('только листы, где показываемый прогон выпустил DXF', () => {
+    const pages = readyDxfPages([
+      { page_index: 0, convert: stage('completed_requires_review') },
+      { page_index: 1, convert: stage('no_cad_review_required') },
+      { page_index: 2, convert: stage('failed') },
+      { page_index: 3, convert: null },
+    ]);
+    expect([...pages]).toEqual([0]);
   });
 });
