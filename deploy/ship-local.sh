@@ -42,7 +42,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-git -C "$ROOT" worktree add -q --detach "$WT" "$SHA"
+# Выписка байт-в-байт, как в репозитории, при любом локальном `core.autocrlf`. На Windows он обычно
+# `true`, а в CAD_engine нет `.gitattributes`: файлы движка получали CRLF, сверка sha256 параметров
+# генераторов с pins.json падала, а образ собрался бы из файлов, которых нет в git.
+checkout() { git -c core.autocrlf=false -C "$1" worktree add -q --detach "$2" "$3"; }
+
+checkout "$ROOT" "$WT" "$SHA"
 
 PINS="$WT/tools/cad_engine/pins.json"
 pin() { jq -er "$1" "$PINS"; }
@@ -51,7 +56,7 @@ ARCHIVE_PATH="$(pin .engine.archive_path)"
 ARCHIVE_SHA="$(pin .engine.archive_sha256)"
 git -C "$ENGINE_REPO" cat-file -e "${ENGINE_REF}^{commit}" 2>/dev/null \
   || git -C "$ENGINE_REPO" fetch -q origin "$ENGINE_REF"
-git -C "$ENGINE_REPO" worktree add -q --detach "$EWT" "$ENGINE_REF"
+checkout "$ENGINE_REPO" "$EWT" "$ENGINE_REF"
 
 echo "→ движок CAD ${ENGINE_REF:0:7} (сверка sha256)"
 mkdir -p "$WT/deploy/cad-engine/generators"
