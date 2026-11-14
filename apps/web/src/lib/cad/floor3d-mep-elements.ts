@@ -36,6 +36,8 @@ export interface IFloor3dMepElement {
   readonly mark?: string | null;
   /** Глубина короба прибора вдоль оси (`device`, `box`). */
   readonly d_mm?: number | null;
+  /** Название прибора по-русски от генератора ЭОМ и СС («ЩМк», «Светильник временный (Кухня)»). */
+  readonly name?: string | null;
 }
 
 export interface IMepElementColors {

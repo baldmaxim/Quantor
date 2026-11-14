@@ -14,6 +14,8 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
   readCadConstructions: vi.fn(),
   readCadProjectLevels: vi.fn(),
   readCadMepRoutes3D: vi.fn(),
+  readCadEomJob: vi.fn(),
+  readCadEomRoutes3D: vi.fn(),
   listCadJobs: vi.fn(),
 }));
 
@@ -30,14 +32,23 @@ vi.mock('./CadFloor3dCanvas', () => ({
     onPickMep: (pick: { kind: string; index: number }, anchor: unknown) => void;
     onMove: () => void;
     selectedMep: { kind: string; index: number } | null;
-    routes: unknown;
+    routes: { elements?: readonly unknown[] } | null;
   }) => (
-    <div data-testid="canvas" data-routes={routes === null ? '' : 'yes'} data-mep={selectedMep === null ? '' : `${selectedMep.kind}:${selectedMep.index}`}>
+    <div
+      data-testid="canvas"
+      data-routes={routes === null ? '' : 'yes'}
+      data-elements={routes?.elements?.length ?? 0} data-mep={selectedMep === null ? '' : `${selectedMep.kind}:${selectedMep.index}`}>
       <button type="button" onClick={() => onPickMep({ kind: 'route', index: 0 }, { x: 20, y: 20 })}>
         трасса
       </button>
       <button type="button" onClick={() => onPickMep({ kind: 'element', index: 0 }, { x: 20, y: 20 })}>
         прибор
+      </button>
+      <button type="button" onClick={() => onPickMep({ kind: 'route', index: 1 }, { x: 20, y: 20 })}>
+        линия ЭОМ
+      </button>
+      <button type="button" onClick={() => onPickMep({ kind: 'element', index: 1 }, { x: 20, y: 20 })}>
+        прибор ЭОМ
       </button>
       <button type="button" onClick={() => onPick({ kind: 'prism', category: 'masonry', id: 'w1' }, { x: 20, y: 20 })}>
         стена
@@ -91,6 +102,56 @@ const routes3d: client.CadMepRoutes3dOut = {
   ],
 };
 
+// ЭОМ и СС листа: в сцене идут после механики, индекс выбора - в общем списке.
+const eomJob: client.CadEomJobRead = {
+  job_id: 'e1',
+  status: 'succeeded',
+  stage: null,
+  progress: 1,
+  error_code: null,
+  error_message: null,
+  generator_version: 'cad_eom.v0.1',
+  created_at: '2026-11-14T10:00:00Z',
+  finished_at: '2026-11-14T10:01:00Z',
+};
+
+const eom3d: client.CadEomRoutes3dOut = {
+  job_id: 'e1',
+  generator_version: 'cad_eom.v0.1',
+  floor_elevation_mm: 3000,
+  floor_height_mm: 2800,
+  levels_elevation_mm: 3000,
+  levels_height_mm: 2800,
+  heights_match: true,
+  polylines: [
+    {
+      layer: 'E-EO-LT',
+      pts: [[0, 0, 2600], [2000, 0, 2600]],
+      shape: 'round',
+      dn_mm: 16,
+      item: 'Кабель ВВГнг(А)-LS 3×1,5 в трубе Ø16',
+      apt: 'Кв 1',
+    },
+  ],
+  elements: [
+    {
+      type: 'device',
+      subtype: 'panel_shell',
+      layer: 'E-EO-DEV',
+      pos: [0, 80, 1900],
+      axis: [0, 1000, 0],
+      w_mm: 300,
+      h_mm: 400,
+      d_mm: 120,
+      name: 'ЩМк',
+      apt: 'Кв 1',
+    },
+  ],
+  quantities: [],
+  apartments: 1,
+  issues: [],
+};
+
 const mount = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -117,6 +178,10 @@ beforeEach(() => {
   vi.mocked(client.readCadConstructions).mockImplementation(() => ok({ constructions: [] }) as never);
   vi.mocked(client.listCadJobs).mockImplementation(() => ok({ items: [] }) as never);
   vi.mocked(client.readCadMepRoutes3D).mockImplementation(() => ok(routes3d) as never);
+  vi.mocked(client.readCadEomJob).mockImplementation(
+    () => Promise.reject({ detail: { code: 'CAD_EOM_NOT_FOUND' } }) as never,
+  );
+  vi.mocked(client.readCadEomRoutes3D).mockImplementation(() => ok(eom3d) as never);
 });
 
 describe('3D-вид: выбор трасс и элементов ВИС', () => {
@@ -165,6 +230,24 @@ describe('3D-вид: выбор трасс и элементов ВИС', () => 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(canvas()).toHaveAttribute('data-mep', '');
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('ЭОМ и СС вместе с механикой: прибор и линия - по названию генератора, с размерами', async () => {
+    vi.mocked(client.readCadEomJob).mockImplementation(() => ok(eomJob) as never);
+    mount();
+    const device = await button('прибор ЭОМ');
+    // Прибор механики и прибор ЭОМ - один список сцены: ЭОМ вторым.
+    await waitFor(() => expect(canvas()).toHaveAttribute('data-elements', '2'), { timeout: 4000 });
+    fireEvent.click(device);
+    const panel = await screen.findByRole('dialog', { name: 'ЩМк' });
+    expect(panel).toHaveTextContent('Щиты и приборы ЭОМ');
+    expect(panel).toHaveTextContent('300×400×120 мм');
+    expect(canvas()).toHaveAttribute('data-mep', 'element:1');
+    fireEvent.click(screen.getByRole('button', { name: 'линия ЭОМ' }));
+    const line = await screen.findByRole('dialog', { name: 'Кабель ВВГнг(А)-LS 3×1,5 в трубе Ø16' });
+    expect(line).toHaveTextContent('Временное освещение квартир');
+    expect(line).toHaveTextContent('Ø 16 мм');
+    expect(line).not.toHaveTextContent('Изоляция');
   });
 
   it('клик по конструкции снимает выбор ВИС', async () => {

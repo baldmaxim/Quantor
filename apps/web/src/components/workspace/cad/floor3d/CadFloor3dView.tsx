@@ -161,7 +161,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const [selected, setSelected] = useState<IFloor3dPick | null>(null);
   const [measuring, setMeasuring] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
-  const mep = useFloor3dMepPick(routesData, stage);
+  // Выбор ВИС - по тем же данным, что в сцене: механика и ЭОМ/СС одним списком.
+  const mep = useFloor3dMepPick(routes, stage);
   const { clear: clearMep } = mep;
 
   // Локальное: плашка и подсветка перемычки, двери, отверстия.
@@ -237,7 +238,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   // Трасса или элемент ВИС: повторный клик по выбранному снимает выбор; иначе выбор заменяет
   // конструкцию (общий выбор очищается), плашка открывается у курсора.
   const onPickMep = (pick: IMepPick, anchor: { x: number; y: number }) => {
-    if (measuring || routesData === null) return;
+    if (measuring || routes === null) return;
     if (mep.isSelected(pick)) {
       closePick();
       return;

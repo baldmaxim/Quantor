@@ -100,6 +100,12 @@ class CadEomElementOut(BaseModel):
     apt: str | None = None
 
 
+class CadEomPolylineOut(CadMepRoute3dPolyline):
+    """Линия ЭОМ и СС для 3D-вида: форма трассы механики плюс изделие («Кабель ... в трубе Ø16»)."""
+
+    item: Annotated[str, Field(max_length=_MAX_TEXT)] | None = None
+
+
 class CadEomQuantity(BaseModel):
     """Строка ведомости кандидата: количество, длина по трассе, формула и источник."""
 
@@ -124,7 +130,7 @@ class CadEomRoutes3dOut(BaseModel):
     levels_elevation_mm: int | None
     levels_height_mm: int | None
     heights_match: bool
-    polylines: list[CadMepRoute3dPolyline]
+    polylines: list[CadEomPolylineOut]
     elements: list[CadEomElementOut]
     quantities: list[CadEomQuantity] = Field(default_factory=list)
     apartments: int | None = None
@@ -194,14 +200,15 @@ def element_out(element: CadEomFileElement) -> CadEomElementOut:
     )
 
 
-def polyline_out(line: CadEomFilePolyline) -> CadMepRoute3dPolyline:
-    return CadMepRoute3dPolyline(
+def polyline_out(line: CadEomFilePolyline) -> CadEomPolylineOut:
+    return CadEomPolylineOut(
         layer=line.layer,
         pts=[(round(x), round(y), round(z)) for x, y, z in line.pts],
         shape=line.shape,
         dn_mm=_opt(line.dn_mm),
         w_mm=_opt(line.w_mm),
         h_mm=_opt(line.h_mm),
+        item=line.item,
         apt=line.apt,
     )
 

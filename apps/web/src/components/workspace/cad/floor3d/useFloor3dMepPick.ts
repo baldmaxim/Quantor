@@ -1,15 +1,17 @@
 'use client';
 
-import type { CadMepRoutes3dOut } from '@quantor/api-client';
 import { useCallback, useState, type RefObject } from 'react';
 
 import { mepInfoOf, type IMepInfo } from '@/lib/cad/floor3d-mep-info';
 import { sameMepPick, type IMepPick } from '@/lib/cad/floor3d-mep-pick';
 
+import type { ICadFloor3dRoutes } from './CadFloor3dCanvas';
+
 /**
  * Выбор трассы или элемента ВИС в 3D-виде этажа: свой вид выбора, не конструкция. Выбор привязан к
  * прочитанным трассам: после их перечитывания индексы устарели, и выбор считается снятым. Плашка
- * у курсора уходит при движении камеры, выбор (подсветка) остаётся.
+ * у курсора уходит при движении камеры, выбор (подсветка) остаётся. Данные - те же, что рисует сцена
+ * (механика и ЭОМ/СС одним списком): индекс выбора указывает в них.
  */
 
 interface IMepPopup {
@@ -19,7 +21,7 @@ interface IMepPopup {
 
 interface IMepState {
   readonly pick: IMepPick;
-  readonly data: CadMepRoutes3dOut;
+  readonly data: ICadFloor3dRoutes;
   readonly popup: IMepPopup | null;
 }
 
@@ -38,7 +40,7 @@ export interface IFloor3dMepPick {
 }
 
 export const useFloor3dMepPick = (
-  routesData: CadMepRoutes3dOut | null,
+  routesData: ICadFloor3dRoutes | null,
   stage: RefObject<HTMLElement | null>,
 ): IFloor3dMepPick => {
   const [state, setState] = useState<IMepState | null>(null);

@@ -82,6 +82,8 @@ export interface IFloor3dRoutePolyline {
   readonly mark?: string | null;
   readonly slope?: number | null;
   readonly apt?: string | null;
+  /** Изделие линии ЭОМ и СС (`cad_eom`): «Кабель ... в трубе Ø16»; у механики нет. */
+  readonly item?: string | null;
 }
 
 export interface IFloor3dRoutes {

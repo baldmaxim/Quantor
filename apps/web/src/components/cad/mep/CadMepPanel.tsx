@@ -5,15 +5,16 @@ import type { FC } from 'react';
 import type { IWorkspaceCadMep } from '@/components/workspace/cad/types';
 import { Button, InspectorSection } from '@/components/ui';
 
-import { CadEomBuild } from './CadEomBuild';
 import { CadMepApproval } from './CadMepApproval';
 import { CadMepBuild } from './CadMepBuild';
 import { CadMepRoute } from './CadMepRoute';
 import { CadMepRouteList } from './CadMepRouteList';
+import { CadMepSpec } from './CadMepSpec';
 
 /**
- * Вкладка «Трассы» правой панели: одобрить вид, построить трассы, открыть построенные, принять
- * этаж целиком и скачать 3D DXF. Каждый шаг - решение человека; трассы до принятия - кандидат.
+ * Вкладка «Трассы» правой панели: одобрить вид, одной кнопкой построить трассы механики и ЭОМ/СС,
+ * открыть построенные, принять этаж целиком и скачать 3D DXF; общая спецификация всех систем.
+ * Каждый шаг - решение человека; результат генераторов до принятия - кандидат.
  */
 export const CadMepPanel: FC<IWorkspaceCadMep> = ({
   parent,
@@ -70,11 +71,11 @@ export const CadMepPanel: FC<IWorkspaceCadMep> = ({
       </div>
     </InspectorSection>
 
-    <InspectorSection title="4. ЭОМ и СС этажа">
+    <InspectorSection title="4. Спецификация">
       {approval ? (
-        <CadEomBuild parent={parent} />
+        <CadMepSpec parent={parent} routeParams={route?.params ?? null} />
       ) : (
-        <p className="text-xs text-muted">ЭОМ и СС строятся только по одобренному виду.</p>
+        <p className="text-xs text-muted">Спецификация появится после построения по одобренному виду.</p>
       )}
     </InspectorSection>
   </div>

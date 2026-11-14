@@ -10,6 +10,8 @@ const api = vi.hoisted(() => ({
   approveCadView: vi.fn(),
   createCadMepRoutes: vi.fn(),
   createCadEomRoutes: vi.fn(),
+  readCadEomJob: vi.fn(),
+  readCadEomRoutes3D: vi.fn(),
   acceptCadMepRoutes: vi.fn(),
   downloadCadArtifact: vi.fn(),
   revokeCadDecision: vi.fn(),
@@ -124,6 +126,7 @@ beforeEach(() => {
   api.createCadEomRoutes.mockResolvedValue({
     data: { job_id: 'job-eom', status: 'queued', attempt: 0 },
   });
+  api.readCadEomJob.mockRejectedValue(failure('CAD_EOM_NOT_FOUND'));
 });
 
 describe('вкладка «Трассы»: одобрение вида', () => {
@@ -412,6 +415,72 @@ describe('вкладка «Трассы»: выбранные трассы', () 
     expect(api.downloadCadArtifact.mock.calls[0]?.[0]).toMatchObject({
       path: { job_id: 'job-route', name: 'views/p081_v01/candidate.json' },
     });
+  });
+
+  it('общая спецификация: механика и ЭОМ/СС одним списком, система раскрывается', async () => {
+    api.downloadCadArtifact.mockResolvedValue({
+      data: {
+        ...candidate,
+        routes: {
+          ...candidate.routes,
+          layers: { 'M-OV-T1': { system: 'heating' } },
+          by_layer_dims: { 'M-OV-T1': { by_dn_mm: { '20': { plan_m: 1, len3d_m: 2 } } } },
+        },
+      },
+    });
+    api.readCadEomJob.mockResolvedValue({
+      data: {
+        job_id: 'job-eom',
+        status: 'succeeded',
+        stage: null,
+        progress: 1,
+        error_code: null,
+        error_message: null,
+        generator_version: 'cad_eom.v0.1',
+        created_at: '2026-11-10T10:00:00Z',
+        finished_at: '2026-11-10T10:01:00Z',
+      },
+    });
+    api.readCadEomRoutes3D.mockResolvedValue({
+      data: {
+        job_id: 'job-eom',
+        generator_version: 'cad_eom.v0.1',
+        floor_elevation_mm: 10000,
+        floor_height_mm: 3000,
+        levels_elevation_mm: 10000,
+        levels_height_mm: 3000,
+        heights_match: true,
+        polylines: [],
+        elements: [],
+        quantities: [
+          { system: 'ЭОМ: питающие линии', item: 'ППГнг(А)-HF 5×6', unit: 'м', qty: 12.5 },
+          { system: 'СС: оборудование', item: 'Шкаф СС', unit: 'шт', qty: 1 },
+        ],
+        apartments: 2,
+        issues: [],
+      },
+    });
+    mount(withRoute());
+    // Отдельной кнопки ЭОМ и СС больше нет: строит одна кнопка раздела 2.
+    expect(screen.queryByRole('button', { name: /^(Построить|Перестроить) ЭОМ и СС$/ })).toBeNull();
+    const spec = await screen.findByTestId('mep-spec');
+    await waitFor(() => expect(within(spec).getAllByTestId('spec-system')).toHaveLength(3));
+    const [heating, feed, ss] = within(spec).getAllByTestId('spec-system') as [HTMLElement, HTMLElement, HTMLElement];
+    expect(heating).toHaveTextContent('Отопление');
+    expect(heating).toHaveTextContent('5,00 м');
+    expect(feed).toHaveTextContent('ЭОМ: питающие линии');
+    expect(feed).toHaveTextContent('1 поз.');
+    expect(ss).toHaveTextContent('СС: оборудование');
+    expect(within(spec).getByTestId('spec-eom-status')).toHaveTextContent('ЭОМ и СС: построены · cad_eom.v0.1 · квартир: 2');
+    fireEvent.click(within(heating).getByText('Отопление'));
+    expect(heating).toHaveAttribute('open');
+    const rows = within(heating).getByRole('table', { name: 'Спецификация: Отопление' });
+    expect(within(rows).getByRole('row', { name: 'Отопление подача Т1, Ø20 мм 2,00 м' })).toBeInTheDocument();
+    expect(
+      within(rows).getByRole('row', { name: 'Отопление подача Т1, размер не определён 0,50 м' }),
+    ).toBeInTheDocument();
+    expect(within(feed).getByText('ППГнг(А)-HF 5×6')).toBeInTheDocument();
+    expect(within(feed).getByText('12,5 м')).toBeInTheDocument();
   });
 
   it('файл не по схеме - понятная ошибка вместо итогов', async () => {

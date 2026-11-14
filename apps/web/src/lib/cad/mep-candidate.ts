@@ -64,7 +64,19 @@ const candidateSchema = z.object({
     )
     .default([]),
   routes: z.object({
+    /** Система каждого слоя по генератору (`routes.layers`); у старых файлов нет. */
+    layers: z.record(z.string(), z.object({ system: z.string() })).default({}),
     by_layer: z.record(z.string(), lengthSchema).default({}),
+    /** Длина слоя по диаметру (`by_dn_mm`, ключ - Ø в мм) и сечению (`by_size`: «AxB» или «ØD»). */
+    by_layer_dims: z
+      .record(
+        z.string(),
+        z.object({
+          by_dn_mm: z.record(z.string(), lengthSchema).default({}),
+          by_size: z.record(z.string(), lengthSchema).default({}),
+        }),
+      )
+      .default({}),
     by_system: z.record(z.string(), lengthSchema).default({}),
     totals: lengthSchema,
   }),

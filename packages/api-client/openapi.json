@@ -3193,6 +3193,186 @@
         "title": "CadEomJobRead",
         "type": "object"
       },
+      "CadEomPolylineOut": {
+        "additionalProperties": false,
+        "description": "Линия ЭОМ и СС для 3D-вида: форма трассы механики плюс изделие («Кабель ... в трубе Ø16»).",
+        "properties": {
+          "apt": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apt"
+          },
+          "dn_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dn Mm"
+          },
+          "dn_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "line",
+                  "registry",
+                  "rule"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dn Source"
+          },
+          "h_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H Mm"
+          },
+          "insulation_mm": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Insulation Mm",
+            "type": "integer"
+          },
+          "item": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "route",
+                  "jumper",
+                  "riser",
+                  "leadin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "layer": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Layer",
+            "type": "string"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark"
+          },
+          "pts": {
+            "items": {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 2,
+            "title": "Pts",
+            "type": "array"
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "enum": [
+                  "round",
+                  "rect"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shape"
+          },
+          "slope": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope"
+          },
+          "w_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "W Mm"
+          }
+        },
+        "required": [
+          "layer",
+          "pts"
+        ],
+        "title": "CadEomPolylineOut",
+        "type": "object"
+      },
       "CadEomQuantity": {
         "description": "Строка ведомости кандидата: количество, длина по трассе, формула и источник.",
         "properties": {
@@ -3349,7 +3529,7 @@
           },
           "polylines": {
             "items": {
-              "$ref": "#/components/schemas/CadMepRoute3dPolyline"
+              "$ref": "#/components/schemas/CadEomPolylineOut"
             },
             "title": "Polylines",
             "type": "array"

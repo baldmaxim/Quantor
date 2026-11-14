@@ -1583,6 +1583,70 @@ export type CadEomJobRead = {
 };
 
 /**
+ * CadEomPolylineOut
+ *
+ * Линия ЭОМ и СС для 3D-вида: форма трассы механики плюс изделие («Кабель ... в трубе Ø16»).
+ */
+export type CadEomPolylineOut = {
+    /**
+     * Apt
+     */
+    apt?: string | null;
+    /**
+     * Dn Mm
+     */
+    dn_mm?: number | null;
+    /**
+     * Dn Source
+     */
+    dn_source?: 'line' | 'registry' | 'rule' | null;
+    /**
+     * H Mm
+     */
+    h_mm?: number | null;
+    /**
+     * Insulation Mm
+     */
+    insulation_mm?: number;
+    /**
+     * Item
+     */
+    item?: string | null;
+    /**
+     * Kind
+     */
+    kind?: 'route' | 'jumper' | 'riser' | 'leadin' | null;
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Mark
+     */
+    mark?: string | null;
+    /**
+     * Pts
+     */
+    pts: Array<[
+        number,
+        number,
+        number
+    ]>;
+    /**
+     * Shape
+     */
+    shape?: 'round' | 'rect' | null;
+    /**
+     * Slope
+     */
+    slope?: number | null;
+    /**
+     * W Mm
+     */
+    w_mm?: number | null;
+};
+
+/**
  * CadEomQuantity
  *
  * Строка ведомости кандидата: количество, длина по трассе, формула и источник.
@@ -1667,7 +1731,7 @@ export type CadEomRoutes3dOut = {
     /**
      * Polylines
      */
-    polylines: Array<CadMepRoute3dPolyline>;
+    polylines: Array<CadEomPolylineOut>;
     /**
      * Quantities
      */

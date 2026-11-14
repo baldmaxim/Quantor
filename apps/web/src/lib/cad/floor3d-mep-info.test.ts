@@ -138,6 +138,26 @@ describe('плашка элемента', () => {
     expect(value(damper, 'Сечение')).toBe('400×200 мм');
   });
 
+  it('ЭОМ и СС: прибор - по названию генератора и размеру короба, линия - по изделию', () => {
+    const panel = elementInfo({
+      type: 'device', subtype: 'panel_floor', layer: 'E-EO-DEV', pos: [0, 0, 0], axis: [0, 1000, 0],
+      w_mm: 800, h_mm: 1400, d_mm: 160, name: 'ЩЭ 1400×800',
+    });
+    expect(panel.title).toBe('ЩЭ 1400×800');
+    expect(value(panel, 'Система')).toBe('Щиты и приборы ЭОМ');
+    expect(value(panel, 'Размеры')).toBe('800×1400×160 мм');
+    const unnamed = elementInfo({ type: 'box', subtype: 'junction', layer: 'E-EO-DEV', pos: [0, 0, 0], axis: [0, 0, -1000] });
+    expect(unnamed.title).toBe('junction');
+    const tray = routeInfo({
+      layer: 'E-SS-TRAY', pts: [[0, 0, 2800], [1000, 0, 2800]], shape: 'rect', w_mm: 100, h_mm: 50, item: 'Лоток СБ 100×50',
+    });
+    expect(tray.title).toBe('Лоток СБ 100×50');
+    expect(value(tray, 'Система')).toBe('Лоток СБ');
+    expect(value(tray, 'Сечение')).toBe('100×50 мм');
+    expect(value(tray, 'Источник сечения')).toBeUndefined();
+    expect(value(tray, 'Изоляция')).toBeUndefined();
+  });
+
   it('mepInfoOf: по индексу; нет в данных - null', () => {
     const data = { polylines: [riser], elements: [] };
     expect(mepInfoOf({ kind: 'route', index: 0 }, data)?.title).toBe('Стояк');

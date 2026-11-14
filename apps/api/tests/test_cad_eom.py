@@ -290,11 +290,13 @@ async def test_worker_builds_eom_and_the_sheet_reads_it_in_3d(
         feed, tray = data["polylines"]
         assert feed["layer"] == "E-EO-FEED" and feed["pts"][0] == [0, 0, 2880]
         assert feed["shape"] == "round" and feed["dn_mm"] == 40 and feed["apt"] == "Кв 1"
+        assert feed["item"] == "Труба ПВХ Ø40" and tray["item"] == "Лоток СБ 100×50"
         assert tray["shape"] == "rect" and (tray["w_mm"], tray["h_mm"]) == (100, 50)
         panel, sleeve = data["elements"]
         assert panel["type"] == "device" and panel["pos"] == [0, 80, 1900]
         assert panel["axis"] == [0, 1000, 0] and panel["d_mm"] == 160
         assert sleeve["type"] == "sleeve" and sleeve["outer_d_mm"] == 32
+        assert panel["name"] == "ЩЭ 1400×800"
         # строка ведомости с нечисловым количеством отбрасывается, остальные - как в файле
         [row] = data["quantities"]
         assert row["item"] == "ППГнг(А)-HF 5×6" and row["qty"] == 12.5 and row["route_m"] == 10.0

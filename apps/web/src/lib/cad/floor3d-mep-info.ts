@@ -47,8 +47,12 @@ export const polylineLengthM = (pts: readonly (readonly number[])[]): number => 
 
 const rowOf = (label: string, value: string): IMepInfoRow => ({ label, value });
 
-/** Плашка трассы: система, вид, марка, сечение и его источник, изоляция, уклон, квартира, длина, отметки. */
+/**
+ * Плашка трассы: система, вид, марка, сечение и его источник, изоляция, уклон, квартира, длина, отметки.
+ * Линия ЭОМ и СС (есть изделие `item`) озаглавлена изделием; источника сечения и изоляции у неё нет.
+ */
 export const routeInfo = (polyline: IFloor3dRoutePolyline): IMepInfo => {
+  const item = polyline.item ? polyline.item : null;
   const rows: IMepInfoRow[] = [rowOf('Система', systemLabel(polyline.layer))];
   const kind = polyline.kind == null ? undefined : ROUTE_KIND_LABELS[polyline.kind];
   if (kind !== undefined) rows.push(rowOf('Вид', kind));
@@ -59,17 +63,19 @@ export const routeInfo = (polyline: IFloor3dRoutePolyline): IMepInfo => {
   if (polyline.shape === 'rect') {
     const known = positive(polyline.w_mm) && positive(polyline.h_mm);
     rows.push(rowOf('Сечение', known ? `${polyline.w_mm}×${polyline.h_mm} мм` : 'не определено'));
-    rows.push(rowOf('Источник сечения', source));
+    if (item === null) rows.push(rowOf('Источник сечения', source));
     if (positive(polyline.h_mm)) halfHeightMm = polyline.h_mm / 2;
   } else if (polyline.shape === 'round') {
     // Условный Ø для отрисовки (DISPLAY_DN_UNKNOWN_MM) в плашке не показывается.
     rows.push(rowOf('Диаметр', positive(polyline.dn_mm) ? `Ø ${polyline.dn_mm} мм` : 'Ø не определён'));
-    rows.push(rowOf('Источник Ø', positive(polyline.dn_mm) ? source : DN_SOURCE_UNKNOWN));
+    if (item === null) rows.push(rowOf('Источник Ø', positive(polyline.dn_mm) ? source : DN_SOURCE_UNKNOWN));
     if (positive(polyline.dn_mm)) halfHeightMm = polyline.dn_mm / 2;
   }
-  rows.push(
-    rowOf('Изоляция', positive(polyline.insulation_mm) ? `${polyline.insulation_mm} мм` : 'нет'),
-  );
+  if (item === null) {
+    rows.push(
+      rowOf('Изоляция', positive(polyline.insulation_mm) ? `${polyline.insulation_mm} мм` : 'нет'),
+    );
+  }
   if (typeof polyline.slope === 'number' && Number.isFinite(polyline.slope)) {
     rows.push(
       rowOf(
@@ -85,11 +91,18 @@ export const routeInfo = (polyline: IFloor3dRoutePolyline): IMepInfo => {
     rows.push(rowOf('Низ от чистого пола, м', formatMeters(Math.min(...zs) - halfHeightMm)));
     rows.push(rowOf('Верх от чистого пола, м', formatMeters(Math.max(...zs) + halfHeightMm)));
   }
-  return { title: kind ?? 'Трасса', rows };
+  return { title: item ?? kind ?? 'Трасса', rows };
 };
 
 const sizeRows = (element: IFloor3dMepElement): IMepInfoRow[] => {
   const rows: IMepInfoRow[] = [];
+  if (element.type === 'device' || element.type === 'box') {
+    // Короб прибора ЭОМ и СС: ширина × высота × глубина вдоль нормали.
+    if (positive(element.w_mm) && positive(element.h_mm) && positive(element.d_mm)) {
+      rows.push(rowOf('Размеры', `${element.w_mm}×${element.h_mm}×${element.d_mm} мм`));
+    }
+    return rows;
+  }
   if (element.type === 'terminal') {
     if (element.subtype === 'sprinkler') {
       if (positive(element.dn_mm)) rows.push(rowOf('Диаметр', `Ø ${element.dn_mm} мм`));
@@ -108,12 +121,16 @@ const sizeRows = (element: IFloor3dMepElement): IMepInfoRow[] => {
   return rows;
 };
 
-/** Плашка элемента: название по-русски, система, размеры, квартира, марка. */
+/**
+ * Плашка элемента: название по-русски, система, размеры, квартира, марка. Название от генератора
+ * (`name`, у ЭОМ и СС) главнее подписи по подтипу.
+ */
 export const elementInfo = (element: IFloor3dMepElement): IMepInfo => {
   const rows: IMepInfoRow[] = [rowOf('Система', systemLabel(element.layer)), ...sizeRows(element)];
   if (element.apt) rows.push(rowOf('Квартира', element.apt));
   if (element.mark) rows.push(rowOf('Марка', element.mark));
-  return { title: mepElementTitle(element.type, element.subtype), rows };
+  const title = element.name ? element.name : mepElementTitle(element.type, element.subtype);
+  return { title, rows };
 };
 
 /** Содержимое плашки по выбору; `null` - выбранного нет в данных (трассы перечитаны). */
