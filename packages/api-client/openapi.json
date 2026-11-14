@@ -21542,7 +21542,10 @@
           "level_elevations",
           "pz_storeys",
           "pz_floors_total",
-          "pz_floor_height"
+          "pz_floor_height",
+          "register_sheets",
+          "sheets_in_register",
+          "register_titles"
         ],
         "title": "CheckCode",
         "type": "string"
@@ -24808,7 +24811,8 @@
           "cad_sections",
           "cad_eom_route",
           "sheet_passport_extract",
-          "doc_questions_search"
+          "doc_questions_search",
+          "sheet_register_extract"
         ],
         "title": "JobType",
         "type": "string"
@@ -27915,7 +27919,8 @@
         "enum": [
           "passport",
           "answer",
-          "level"
+          "level",
+          "register"
         ],
         "title": "RefKind",
         "type": "string"
@@ -28031,6 +28036,193 @@
         "title": "RegionShape",
         "type": "string"
       },
+      "RegisterEntryOut": {
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "snippet",
+          "page_index"
+        ],
+        "title": "RegisterEntryOut",
+        "type": "object"
+      },
+      "RegisterExtractSummary": {
+        "description": "Итог последнего задания разбора ведомостей; чисел, которых нет в итоге, - null.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "no_text_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "No Text Files",
+            "type": "array"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "registers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registers"
+          },
+          "revisions_no_text": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisions No Text"
+          },
+          "revisions_scanned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisions Scanned"
+          },
+          "revisions_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisions Total"
+          },
+          "revisions_unreadable": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisions Unreadable"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "unreadable_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unreadable Files",
+            "type": "array"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "progress",
+          "stage",
+          "error_code",
+          "created_at",
+          "finished_at",
+          "registers",
+          "revisions_total",
+          "revisions_scanned",
+          "revisions_no_text",
+          "no_text_files",
+          "revisions_unreadable",
+          "unreadable_files",
+          "versions"
+        ],
+        "title": "RegisterExtractSummary",
+        "type": "object"
+      },
       "RegisterRequest": {
         "description": "Заявка на доступ к порталу.",
         "properties": {
@@ -28075,6 +28267,15 @@
         },
         "title": "RegisterResponse",
         "type": "object"
+      },
+      "RegisterStatus": {
+        "enum": [
+          "candidate",
+          "confirmed",
+          "rejected"
+        ],
+        "title": "RegisterStatus",
+        "type": "string"
       },
       "RelationTypeDef": {
         "additionalProperties": false,
@@ -30483,6 +30684,155 @@
           "geometry_fingerprint"
         ],
         "title": "SheetRef",
+        "type": "object"
+      },
+      "SheetRegisterBulkOut": {
+        "properties": {
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "updated"
+        ],
+        "title": "SheetRegisterBulkOut",
+        "type": "object"
+      },
+      "SheetRegisterBulkStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegisterStatus"
+          }
+        },
+        "required": [
+          "ids",
+          "status"
+        ],
+        "title": "SheetRegisterBulkStatus",
+        "type": "object"
+      },
+      "SheetRegisterOut": {
+        "properties": {
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "duplicates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Duplicates",
+            "type": "array"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/RegisterEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "heading": {
+            "title": "Heading",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "pages": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegisterStatus"
+          }
+        },
+        "required": [
+          "id",
+          "revision_id",
+          "file_name",
+          "page_index",
+          "pages",
+          "heading",
+          "entries",
+          "duplicates",
+          "status",
+          "confirmed_at"
+        ],
+        "title": "SheetRegisterOut",
+        "type": "object"
+      },
+      "SheetRegistersOut": {
+        "description": "Ведомости последних ревизий PDF проекта и итог последнего разбора.",
+        "properties": {
+          "last_extract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegisterExtractSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registers": {
+            "items": {
+              "$ref": "#/components/schemas/SheetRegisterOut"
+            },
+            "title": "Registers",
+            "type": "array"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "registers",
+          "last_extract",
+          "versions"
+        ],
+        "title": "SheetRegistersOut",
         "type": "object"
       },
       "SourceAvailability": {
@@ -43354,6 +43704,145 @@
         "summary": "Правка полей паспорта и/или статуса; правленое поле получает источник manual",
         "tags": [
           "sheet-passports"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/sheet-registers": {
+      "get": {
+        "operationId": "get_sheet_registers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetRegistersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ведомости листов последних ревизий PDF и итог последнего разбора",
+        "tags": [
+          "sheet-registers"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/sheet-registers/bulk-status": {
+      "post": {
+        "operationId": "bulk_sheet_register_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetRegisterBulkStatus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetRegisterBulkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Единый статус пачке ведомостей листов; чужой id - 404, ничего не меняется",
+        "tags": [
+          "sheet-registers"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/sheet-registers/extract": {
+      "post": {
+        "operationId": "start_sheet_register_extract",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить разбор ведомостей листов по тексту страниц; активное задание возвращается",
+        "tags": [
+          "sheet-registers"
         ]
       }
     },

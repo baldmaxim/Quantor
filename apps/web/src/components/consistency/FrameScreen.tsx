@@ -11,6 +11,7 @@ import { useFeatures, useMeta, useProject } from '@/lib/queries';
 
 import { FrameChecksPanel } from './FrameChecksPanel';
 import { FrameRebuildPanel } from './FrameRebuildPanel';
+import { FrameRegistersPanel } from './FrameRegistersPanel';
 import { FrameTree } from './FrameTree';
 
 /**
@@ -61,7 +62,8 @@ export const FrameScreen: FC<IScreenProps> = ({ projectId }) => {
           <p className="max-w-[80ch] text-sm text-muted">
             Корпуса, секции и уровни собираются из подтверждённых паспортов листов-планов. Кандидат
             идёт в проверки только после подтверждения. Расхождение источников не решается молча:
-            оно остаётся замечанием со ссылкой на лист или ответ к документации.
+            оно остаётся замечанием со ссылкой на лист или ответ к документации. Ведомость листов
+            сверяется с паспортами листов своего документа.
           </p>
           {frame.isPending && <SkeletonRows rows={6} />}
           {frame.isError && (
@@ -75,6 +77,7 @@ export const FrameScreen: FC<IScreenProps> = ({ projectId }) => {
           {frame.data && (
             <>
               <FrameRebuildPanel projectId={projectId} frame={frame.data} />
+              <FrameRegistersPanel projectId={projectId} />
               <FrameChecksPanel checks={frame.data.checks} />
               <FrameTree projectId={projectId} nodes={frame.data.nodes} />
             </>

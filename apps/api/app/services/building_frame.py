@@ -55,7 +55,9 @@ from app.services.consistency.frame_checks import (
     LevelView,
     run_frame_checks,
 )
+from app.services.consistency.register_checks import REGISTER_CHECKS_VERSION, run_register_checks
 from app.services.sheet_passports import latest_pdf_revisions
+from app.services.sheet_registers import register_check_inputs
 
 _KIND_ORDER: Final = {NodeKind.BUILDING: 0, NodeKind.SECTION: 1, NodeKind.LEVEL: 2}
 _LEVEL_FIELDS: Final = ("ordinal", "elevation_m", "height_m")
@@ -68,7 +70,11 @@ _ANSWER_SOURCES: Final = ("document", "manual")
 
 
 def versions() -> dict[str, str]:
-    return {"frame": FRAME_VERSION, "checks": FRAME_CHECKS_VERSION}
+    return {
+        "frame": FRAME_VERSION,
+        "checks": FRAME_CHECKS_VERSION,
+        "register_checks": REGISTER_CHECKS_VERSION,
+    }
 
 
 def _invalid(message: str) -> Exception:
@@ -448,6 +454,10 @@ async def frame_view(session: AsyncSession, *, project_id: uuid.UUID) -> FrameOu
     checks = run_frame_checks(
         _confirmed_levels(rows, heights), passports, await _answers(session, project_id)
     )
+    registers, register_candidates, register_sheets = await register_check_inputs(
+        session, project_id
+    )
+    checks += run_register_checks(registers, register_sheets, candidates=register_candidates)
     confirmed_plans, candidate_plans = await _plan_counts(session, project_id)
     return FrameOut(
         nodes=[_node_out(row, heights.get(str(row.id))) for row in rows],

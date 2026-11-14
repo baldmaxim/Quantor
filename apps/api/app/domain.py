@@ -442,6 +442,10 @@ class JobType(StrEnum):
     # каталога consistency.doc_questions.v1 в основном исполнителе, результат - кандидаты
     # `doc_question_candidates`; ответом их делает человек. Числа модель не выдаёт.
     DOC_QUESTIONS_SEARCH = "doc_questions_search"
+    # Ведомости листов по тексту страниц PDF (ADR-0043, С2, «ведомость ↔ листы»): разбор таблицы
+    # ведомости в основном исполнителе, результат - кандидаты `sheet_registers`; подтверждает
+    # человек.
+    SHEET_REGISTER_EXTRACT = "sheet_register_extract"
 
 
 class JobStatus(StrEnum):

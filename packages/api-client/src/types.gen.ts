@@ -10752,7 +10752,7 @@ export type ChangePasswordResponse = {
 /**
  * CheckCode
  */
-export type CheckCode = 'ar_plan_per_level' | 'scheme_per_system' | 'level_sequence' | 'level_elevations' | 'pz_storeys' | 'pz_floors_total' | 'pz_floor_height';
+export type CheckCode = 'ar_plan_per_level' | 'scheme_per_system' | 'level_sequence' | 'level_elevations' | 'pz_storeys' | 'pz_floors_total' | 'pz_floor_height' | 'register_sheets' | 'sheets_in_register' | 'register_titles';
 
 /**
  * CheckStatus
@@ -12410,7 +12410,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract';
 
 /**
  * LengthUnit
@@ -14102,7 +14102,7 @@ export type RecognitionArtifactRead = {
 /**
  * RefKind
  */
-export type RefKind = 'passport' | 'answer' | 'level';
+export type RefKind = 'passport' | 'answer' | 'level' | 'register';
 
 /**
  * RegionRead
@@ -14164,6 +14164,98 @@ export type RegionRead = {
 export type RegionShape = 'rectangle' | 'polygon';
 
 /**
+ * RegisterEntryOut
+ */
+export type RegisterEntryOut = {
+    /**
+     * Number
+     */
+    number: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Snippet
+     */
+    snippet: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * RegisterExtractSummary
+ *
+ * Итог последнего задания разбора ведомостей; чисел, которых нет в итоге, - null.
+ */
+export type RegisterExtractSummary = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * No Text Files
+     */
+    no_text_files: Array<string>;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Registers
+     */
+    registers: number | null;
+    /**
+     * Revisions No Text
+     */
+    revisions_no_text: number | null;
+    /**
+     * Revisions Scanned
+     */
+    revisions_scanned: number | null;
+    /**
+     * Revisions Total
+     */
+    revisions_total: number | null;
+    /**
+     * Revisions Unreadable
+     */
+    revisions_unreadable: number | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Unreadable Files
+     */
+    unreadable_files: Array<string>;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
+};
+
+/**
  * RegisterRequest
  *
  * Заявка на доступ к порталу.
@@ -14193,6 +14285,11 @@ export type RegisterResponse = {
      */
     status?: 'pending';
 };
+
+/**
+ * RegisterStatus
+ */
+export type RegisterStatus = 'candidate' | 'confirmed' | 'rejected';
 
 /**
  * RelationTypeDef
@@ -15355,6 +15452,89 @@ export type SheetRef = {
      * Sheet Id
      */
     sheet_id: string;
+};
+
+/**
+ * SheetRegisterBulkOut
+ */
+export type SheetRegisterBulkOut = {
+    /**
+     * Updated
+     */
+    updated: number;
+};
+
+/**
+ * SheetRegisterBulkStatus
+ */
+export type SheetRegisterBulkStatus = {
+    /**
+     * Ids
+     */
+    ids: Array<string>;
+    status: RegisterStatus;
+};
+
+/**
+ * SheetRegisterOut
+ */
+export type SheetRegisterOut = {
+    /**
+     * Confirmed At
+     */
+    confirmed_at: string | null;
+    /**
+     * Duplicates
+     */
+    duplicates: Array<string>;
+    /**
+     * Entries
+     */
+    entries: Array<RegisterEntryOut>;
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Heading
+     */
+    heading: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Pages
+     */
+    pages: Array<number>;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    status: RegisterStatus;
+};
+
+/**
+ * SheetRegistersOut
+ *
+ * Ведомости последних ревизий PDF проекта и итог последнего разбора.
+ */
+export type SheetRegistersOut = {
+    last_extract: RegisterExtractSummary | null;
+    /**
+     * Registers
+     */
+    registers: Array<SheetRegisterOut>;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
 };
 
 /**
@@ -22871,6 +23051,96 @@ export type PatchSheetPassportResponses = {
 };
 
 export type PatchSheetPassportResponse = PatchSheetPassportResponses[keyof PatchSheetPassportResponses];
+
+export type GetSheetRegistersData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/sheet-registers';
+};
+
+export type GetSheetRegistersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSheetRegistersError = GetSheetRegistersErrors[keyof GetSheetRegistersErrors];
+
+export type GetSheetRegistersResponses = {
+    /**
+     * Successful Response
+     */
+    200: SheetRegistersOut;
+};
+
+export type GetSheetRegistersResponse = GetSheetRegistersResponses[keyof GetSheetRegistersResponses];
+
+export type BulkSheetRegisterStatusData = {
+    body: SheetRegisterBulkStatus;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/sheet-registers/bulk-status';
+};
+
+export type BulkSheetRegisterStatusErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BulkSheetRegisterStatusError = BulkSheetRegisterStatusErrors[keyof BulkSheetRegisterStatusErrors];
+
+export type BulkSheetRegisterStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: SheetRegisterBulkOut;
+};
+
+export type BulkSheetRegisterStatusResponse = BulkSheetRegisterStatusResponses[keyof BulkSheetRegisterStatusResponses];
+
+export type StartSheetRegisterExtractData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/sheet-registers/extract';
+};
+
+export type StartSheetRegisterExtractErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartSheetRegisterExtractError = StartSheetRegisterExtractErrors[keyof StartSheetRegisterExtractErrors];
+
+export type StartSheetRegisterExtractResponses = {
+    /**
+     * Successful Response
+     */
+    202: JobRead;
+};
+
+export type StartSheetRegisterExtractResponse = StartSheetRegisterExtractResponses[keyof StartSheetRegisterExtractResponses];
 
 export type ListTakeoffItemsData = {
     body?: never;

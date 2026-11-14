@@ -41,6 +41,7 @@ from app.models.revision_page_text import RevisionPageText
 from app.models.scale import ScaleCalibration
 from app.models.sheet import Region, Sheet
 from app.models.sheet_passport import SheetPassport
+from app.models.sheet_register import SheetRegister
 from app.models.takeoff import Measurement, TakeoffItem
 from app.models.tender_version import TenderVersion, TenderVersionDocument
 from app.models.worker import Worker
@@ -95,6 +96,7 @@ __all__ = [
     "SettingOverride",
     "Sheet",
     "SheetPassport",
+    "SheetRegister",
     "TakeoffItem",
     "TenderVersion",
     "TenderVersionDocument",

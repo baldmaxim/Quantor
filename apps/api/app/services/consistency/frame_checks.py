@@ -54,6 +54,10 @@ class CheckCode(StrEnum):
     PZ_STOREYS = "pz_storeys"
     PZ_FLOORS_TOTAL = "pz_floors_total"
     PZ_FLOOR_HEIGHT = "pz_floor_height"
+    # Ведомость листов ↔ листы: каталог `consistency.checks.register.v1` (register_checks.py).
+    REGISTER_SHEETS = "register_sheets"
+    SHEETS_IN_REGISTER = "sheets_in_register"
+    REGISTER_TITLES = "register_titles"
 
 
 CHECK_TITLES: Final[dict[CheckCode, str]] = {
@@ -64,6 +68,9 @@ CHECK_TITLES: Final[dict[CheckCode, str]] = {
     CheckCode.PZ_STOREYS: "ПЗ ↔ этажность",
     CheckCode.PZ_FLOORS_TOTAL: "ПЗ ↔ количество этажей",
     CheckCode.PZ_FLOOR_HEIGHT: "ПЗ ↔ высота этажа",
+    CheckCode.REGISTER_SHEETS: "Ведомость → листы",
+    CheckCode.SHEETS_IN_REGISTER: "Листы → ведомость",
+    CheckCode.REGISTER_TITLES: "Наименования в ведомости и на листах",
 }
 
 
@@ -77,6 +84,7 @@ class RefKind(StrEnum):
     PASSPORT = "passport"
     ANSWER = "answer"
     LEVEL = "level"
+    REGISTER = "register"
 
 
 @dataclass(frozen=True, slots=True)
