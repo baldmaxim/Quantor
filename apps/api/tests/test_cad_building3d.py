@@ -653,7 +653,7 @@ def placed(
     items: list[b3d.BuiltFloor],
 ) -> tuple[dict[str, b3d.GroupPlacement], list[CadBuilding3dFloorRead]]:
     aligned = b3d.align_floors(items)
-    placements = b3d.place_groups(items, aligned)
+    placements = b3d.place_by_cores(items, aligned, b3d.place_groups(items, aligned))
     return placements, b3d.apply_placements(aligned, placements)
 
 
@@ -802,7 +802,8 @@ def test_unnamed_sheets_with_other_grids_become_separate_buildings() -> None:
     split = next(floor for floor in aligned[:2] if floor.group_key == "none-2")
     assert split.alignment == "reference"
     assert split.group_label.startswith("Корпус не указан · ")
-    placements = b3d.place_groups([parking, summary, first, second], aligned)
+    items = [parking, summary, first, second]
+    placements = b3d.place_by_cores(items, aligned, b3d.place_groups(items, aligned))
     # План секций без отметки - связка: обе секции поставлены по маркам с номером секции.
     summary_key = keys[1]
     assert placements[summary_key].placement == "reference"
@@ -947,3 +948,60 @@ def test_shift_moves_level_zones_with_the_floor() -> None:
     assert moved.levels[0].shell[0] == [100, -50]
     assert moved.levels[0].holes[0][0] == [1100, 950]
     assert moved.levels[1].top_mm == 91750
+
+
+# ------------------------------------------------------------------ постановка по ядрам
+
+
+def with_cores(
+    item: b3d.BuiltFloor, rings: list[list[tuple[float, float]]], bbox: list[float] | None = None
+) -> b3d.BuiltFloor:
+    cores = tuple(tuple((round(x), round(y)) for x, y in ring) for ring in rings)
+    floor = item.floor if bbox is None else item.floor.model_copy(update={"bbox": bbox})
+    return b3d.BuiltFloor(floor, item.order, item.axes, cores)
+
+
+def test_building_without_common_axes_is_placed_on_the_parking_by_cores() -> None:
+    """Паркинг (самый большой этаж) несёт ядро корпуса повёрнутым на 27°: корпус встаёт на него."""
+    from tests.test_cad_site_cores import CORE, parking
+
+    under = with_cores(
+        built(corps=None, section=None, elevation=BASE - 5000),
+        parking(),
+        bbox=[0.0, 0.0, 220000.0, 180000.0],
+    )
+    tower = with_cores(built(corps="1", section="1", order=1), CORE)
+    placements, floors = placed([under, tower])
+    root = placements["k1-s1"]
+    assert (root.placement, root.anchor_key, root.message) == ("cores", "none", None)
+    assert root.rotation_deg == pytest.approx(27.0, abs=0.3)
+    assert root.offset_mm == pytest.approx((120000.0, 45000.0), abs=300.0)
+    assert root.share is not None and root.share >= 0.6
+    placed_tower = next(f for f in floors if f.group_key == "k1-s1")
+    assert placed_tower.rotation_deg == pytest.approx(27.0, abs=0.3)
+    # Угол контура (6000, 0) DXF после поворота на 27° и сдвига.
+    x, y = placed_tower.outline[1]
+    expected = (
+        120000 + 6000 * math.cos(math.radians(27)),
+        45000 + 6000 * math.sin(math.radians(27)),
+    )
+    assert (x, y) == pytest.approx(expected, abs=300.0)
+    groups = {g.key: g for g in b3d.build_groups(floors, placements)}
+    assert groups["k1-s1"].site_rotation_deg == pytest.approx(27.0, abs=0.3)
+    assert groups["k1-s1"].placement == "cores"
+
+
+def test_building_whose_cores_do_not_match_stays_aside_with_reason() -> None:
+    from tests.test_cad_site_cores import CORE, parking
+
+    under = with_cores(
+        built(corps=None, section=None, elevation=BASE - 5000),
+        parking(),
+        bbox=[0.0, 0.0, 220000.0, 180000.0],
+    )
+    small = [[(x * 0.72, y * 0.72) for x, y in ring] for ring in CORE]
+    tower = with_cores(built(corps="1", section="1", order=1), small)
+    placements, _ = placed([under, tower])
+    root = placements["k1-s1"]
+    assert root.placement == "none"
+    assert root.message is not None and "по ядрам" in root.message

@@ -696,6 +696,10 @@ export type CadBuilding3dFloorRead = {
      */
     revision_id: string;
     /**
+     * Rotation Deg
+     */
+    rotation_deg?: number;
+    /**
      * Section
      */
     section: string | null;
@@ -742,7 +746,7 @@ export type CadBuilding3dGroupRead = {
     /**
      * Placement
      */
-    placement: 'reference' | 'axes' | 'none';
+    placement: 'reference' | 'axes' | 'cores' | 'none';
     /**
      * Placement Anchor
      */
@@ -756,12 +760,20 @@ export type CadBuilding3dGroupRead = {
      */
     placement_message: string | null;
     /**
+     * Placement Share
+     */
+    placement_share?: number | null;
+    /**
      * Site Offset Mm
      */
     site_offset_mm: [
         number,
         number
     ];
+    /**
+     * Site Rotation Deg
+     */
+    site_rotation_deg?: number;
 };
 
 /**

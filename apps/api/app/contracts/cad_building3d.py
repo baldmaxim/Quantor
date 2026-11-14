@@ -18,8 +18,10 @@ CadBuilding3dOutlineSource = Literal["slab", "bbox"]
 # `none` - не совмещён (смещение - запасное: центр контура на центр эталона или 0).
 CadBuilding3dAlignment = Literal["reference", "axes", "none"]
 # Постановка здания на объект: `reference` - опора (система объекта = система её эталона);
-# `axes` - поставлено по общим маркам осей; `none` - не поставлено, геометрия в своей системе.
-CadBuilding3dPlacement = Literal["reference", "axes", "none"]
+# `axes` - поставлено по общим маркам осей; `cores` - скопление зданий поставлено по совпадению
+# ядер (монолита) с уже поставленными, с поворотом; `none` - не поставлено, геометрия в своей
+# системе.
+CadBuilding3dPlacement = Literal["reference", "axes", "cores", "none"]
 
 
 class CadBuilding3dWarningRead(BaseModel):
@@ -93,6 +95,9 @@ class CadBuilding3dFloorRead(BaseModel):
     # постановка группы на объект (`CadBuilding3dGroupRead.site_offset_mm`). У поставленной группы
     # геометрия в системе объекта, у не поставленной - в системе эталона группы.
     offset_mm: tuple[float, float]
+    # Поворот, уже применённый к геометрии этажа (постановка по ядрам), градусы против часовой:
+    # точка объекта = R(rotation_deg) · точка DXF + `offset_mm`.
+    rotation_deg: float = 0.0
     alignment: CadBuilding3dAlignment
     # Подписи общих осей, по которым совмещён этаж (`alignment = axes`).
     alignment_axes: list[str]
@@ -120,7 +125,12 @@ class CadBuilding3dGroupRead(BaseModel):
     # Постановка на объект по общим маркам осей с другими зданиями (план паркинга несёт оси всех).
     placement: CadBuilding3dPlacement
     # Сдвиг из системы эталона группы в систему объекта, мм; уже применён к этажам группы.
+    # С поворотом: точка объекта = R(site_rotation_deg) · точка группы + site_offset_mm.
     site_offset_mm: tuple[float, float]
+    site_rotation_deg: float = 0.0
+    # Доля монолита скопления, совпавшая с монолитом поставленных зданий (постановка по ядрам);
+    # без попытки - `None`.
+    placement_share: float | None = None
     # Марки, по которым здание поставлено, и ключ здания, к которому оно привязано.
     placement_axes: list[str]
     placement_anchor: str | None

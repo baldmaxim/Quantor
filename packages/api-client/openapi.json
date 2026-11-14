@@ -1342,6 +1342,11 @@
             "title": "Revision Id",
             "type": "string"
           },
+          "rotation_deg": {
+            "default": 0.0,
+            "title": "Rotation Deg",
+            "type": "number"
+          },
           "section": {
             "anyOf": [
               {
@@ -1431,6 +1436,7 @@
             "enum": [
               "reference",
               "axes",
+              "cores",
               "none"
             ],
             "title": "Placement",
@@ -1465,6 +1471,17 @@
             ],
             "title": "Placement Message"
           },
+          "placement_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placement Share"
+          },
           "site_offset_mm": {
             "maxItems": 2,
             "minItems": 2,
@@ -1478,6 +1495,11 @@
             ],
             "title": "Site Offset Mm",
             "type": "array"
+          },
+          "site_rotation_deg": {
+            "default": 0.0,
+            "title": "Site Rotation Deg",
+            "type": "number"
           }
         },
         "required": [
