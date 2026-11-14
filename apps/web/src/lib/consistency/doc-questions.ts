@@ -129,6 +129,15 @@ export const manualLayout = (
         showRound: question.code === 'duct_section',
         showEnum: false,
       };
+    case 'count':
+      return {
+        numberLabels: ['Количество, шт.'],
+        requiredNumbers: 1,
+        showText: false,
+        showQualifier: false,
+        showRound: false,
+        showEnum: false,
+      };
     case 'enum':
       return {
         numberLabels: [],
@@ -175,23 +184,29 @@ export const buildManualAnswer = (
   const note = form.note.trim();
   if (!note) return { error: 'Укажите, откуда значение: документ, лист, расчёт.' };
 
+  const isCount = question.value_kind === 'count';
+  const unit = isCount ? '' : ' мм';
   const round = layout.showRound && form.round;
   const fields = round ? form.numbers.slice(0, 1) : form.numbers;
   const numbers: number[] = [];
   for (const raw of fields) {
     if (!raw.trim()) continue;
     const parsed = parseMm(raw);
-    if (parsed === null) return { error: 'Размеры — целые числа в миллиметрах.' };
+    if (parsed === null) {
+      return {
+        error: isCount ? 'Количество — целое число.' : 'Размеры — целые числа в миллиметрах.',
+      };
+    }
     if (parsed < question.min_mm || parsed > question.max_mm) {
       return {
-        error: `Размер ${parsed} мм вне допустимых ${question.min_mm}–${question.max_mm} мм.`,
+        error: `${isCount ? 'Число' : 'Размер'} ${parsed}${unit} вне допустимых ${question.min_mm}–${question.max_mm}${unit}.`,
       };
     }
     numbers.push(parsed);
   }
   const needed = round ? 1 : layout.requiredNumbers;
   if (fields.slice(0, needed).some((raw) => !raw.trim())) {
-    return { error: 'Заполните обязательные размеры.' };
+    return { error: isCount ? 'Введите количество.' : 'Заполните обязательные размеры.' };
   }
   if (question.value_kind === 'range_mm' && numbers.length === 2 && numbers[0]! >= numbers[1]!) {
     return { error: 'В диапазоне «от» должно быть меньше «до».' };
@@ -210,6 +225,8 @@ export const buildManualAnswer = (
   } else if (round) {
     valueText = `Ø${numbers[0]} мм`;
     code = ROUND_CODE;
+  } else if (isCount) {
+    valueText = String(numbers[0]);
   } else {
     const separator = question.value_kind === 'section_mm' ? '×' : '–';
     valueText = `${numbers.join(separator)} мм`;

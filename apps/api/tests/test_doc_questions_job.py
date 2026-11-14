@@ -13,7 +13,7 @@ from app.domain import JobStatus, JobType
 from app.main import create_app
 from app.models import DocQuestionCandidate, Job, RevisionPageText, SheetPassport
 from app.services import jobs as jobs_service
-from app.services.consistency.doc_questions import DOC_QUESTIONS_VERSION
+from app.services.consistency.doc_questions import DOC_QUESTIONS, DOC_QUESTIONS_VERSION
 from app.worker.registry import supported_types
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.doc_questions_support import (
@@ -73,7 +73,7 @@ async def test_search_saves_candidates_with_scope_and_reports_no_text(
 
         view = (await api.get(questions_url(project_id))).json()
         assert view["catalog_version"] == DOC_QUESTIONS_VERSION
-        assert len(view["questions"]) == 12
+        assert len(view["questions"]) == len(DOC_QUESTIONS)
         by_code = {item["code"]: item for item in view["questions"]}
         slab = by_code["slab_thickness"]["candidates"]
         assert len(slab) == 1

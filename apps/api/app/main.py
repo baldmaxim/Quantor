@@ -17,6 +17,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 
 from app import API_VERSION
 from app.api import health
+from app.api.v1.building_frame import qa_router as building_frame_qa_router
 from app.api.v1.cad import qa_router as cad_qa_router
 from app.api.v1.cad_building3d import qa_router as cad_building3d_qa_router
 from app.api.v1.cad_constructions import qa_router as cad_constructions_qa_router
@@ -129,6 +130,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Паспорт листа (ADR-0043, С1): маршруты закрыты флагом пространства `project.consistency`.
     app.include_router(sheet_passports_qa_router)
     app.include_router(doc_questions_qa_router)
+    app.include_router(building_frame_qa_router)
     return app
 
 

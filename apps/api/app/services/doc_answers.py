@@ -215,9 +215,12 @@ async def list_answers(session: AsyncSession, *, project_id: uuid.UUID) -> DocAn
 
 
 def _check_numbers(question: DocQuestion, numbers: list[int]) -> None:
+    what, unit = ("число", "") if question.value_kind is DocValueKind.COUNT else ("размер", " мм")
     for number in numbers:
         if not question.min_mm <= number <= question.max_mm:
-            raise _invalid(f"размер {number} мм вне допустимых {question.min_mm}-{question.max_mm}")
+            raise _invalid(
+                f"{what} {number}{unit} вне допустимых {question.min_mm}-{question.max_mm}"
+            )
 
 
 def manual_value(question: DocQuestion, value: ManualValueIn, value_text: str) -> dict[str, Any]:
@@ -260,6 +263,12 @@ def manual_value(question: DocQuestion, value: ManualValueIn, value_text: str) -
         case DocValueKind.TEXT:
             if code is not None:
                 raise _invalid("для текстового значения код не задаётся")
+        case DocValueKind.COUNT:
+            if code is not None:
+                raise _invalid("для количества код не задаётся")
+            if len(numbers) != 1:
+                raise _invalid("для количества нужно одно целое число")
+            display = str(numbers[0])
     _check_numbers(question, numbers)
     return {
         "kind": kind.value,

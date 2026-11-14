@@ -36,6 +36,10 @@ class DocQuestionCode(StrEnum):
     APARTMENT_PARTITION_HEIGHT = "apartment_partition_height"
     LIFT_DOOR_HEIGHT = "lift_door_height"
     APARTMENT_FINISHING = "apartment_finishing"
+    # Каркас здания (ADR-0043, С2): факты ПЗ для проверки «ПЗ ↔ каркас».
+    STOREYS = "storeys"
+    FLOORS_TOTAL = "floors_total"
+    FLOOR_HEIGHT = "floor_height"
 
 
 class DocValueKind(StrEnum):
@@ -44,6 +48,7 @@ class DocValueKind(StrEnum):
     SECTION_MM = "section_mm"  # «ширина×высота» в мм или диаметр «Ø»
     TEXT = "text"
     ENUM = "enum"
+    COUNT = "count"  # целое число штук (этажей); границы - `min_mm` / `max_mm` вопроса
 
 
 class ExtractorKind(StrEnum):
@@ -53,6 +58,7 @@ class ExtractorKind(StrEnum):
     FLOOR_BUILDUP = "floor_buildup"
     SPRINKLER_MODEL = "sprinkler_model"
     APARTMENT_FINISHING = "apartment_finishing"
+    COUNT = "count"
 
 
 class AssumptionStatus(StrEnum):
@@ -132,7 +138,7 @@ class DocQuestion:
     # Исключения: число, пересекающееся с совпадением, не значение («высота этажа ... в отметках
     # чистых полов» - расстояние между полами этажей, а не высота в свету).
     value_exclusions: tuple[re.Pattern[str], ...] = ()
-    min_mm: int = 0  # допустимый разброс извлечённых чисел (каждого размера), мм
+    min_mm: int = 0  # допустимый разброс извлечённых чисел (каждого размера), мм; у COUNT - штук
     max_mm: int = 100_000
     assumption: NormAssumption | None = None
     # Допустимые коды перечисления; у вопросов не-ENUM пусто.
@@ -226,6 +232,12 @@ _PARTITION_CTX: Final = (_rx(r"маячн\w+\s+ряд|полигран\s*80|вн
 _APARTMENT_CTX: Final = (_rx(r"квартир|жил\w+\s+помещени"),)
 # Лифты: двери шахт, лифтовые двери, проёмы шахты. Без слова «лифт» рядом высота - не наш ответ.
 _LIFT_CTX: Final = (_rx(r"лифт"),)
+_GENERAL = ("ПЗ", "СП")
+# Высота этажа в свету - не высота этажа «пол - пол»: число рядом с «в свету» не ответ.
+_CLEAR_NOT_FLOOR: Final = (
+    _rx(r"в\s+свету\s*[-:=]?\s*(?:не\s+менее\s+)?\d[\d,. ]*\s*(?:мм|м)?"),
+    _rx(r"\d[\d,. ]*\s*(?:мм|м)\s*\(?\s*в\s+свету"),
+)
 
 
 # --------------------------------------------------------------------------- каталог v1
@@ -592,6 +604,64 @@ DOC_QUESTIONS: Final[tuple[DocQuestion, ...]] = (
             DocOption("without_finish", "Без отделки (Shell&Core)"),
             DocOption("with_finish", "С отделкой"),
         ),
+    ),
+    DocQuestion(
+        code=DocQuestionCode.STOREYS,
+        title="Этажность: число надземных этажей",
+        receiver_param="storeys",
+        value_kind=DocValueKind.COUNT,
+        extractor=ExtractorKind.COUNT,
+        sources=(
+            DocSource("ПЗ / СП: общая записка", _GENERAL, (_K.TEXT,)),
+            DocSource("ПЗ АР", _AR, (_K.TEXT,)),
+            DocSource("ПЗ / СП: прочее", _GENERAL),
+            DocSource("Прочие листы АР", _AR),
+            DocSource("ПЗ КР", _STRUCTURE, (_K.TEXT,)),
+        ),
+        anchors=(
+            _anchor(r"этажност\w*", 20, bare_number=True),
+            _anchor(r"(?:количеств\w+|число)\s+надземн\w+\s+этаж\w*", 20, bare_number=True),
+        ),
+        min_mm=1,
+        max_mm=150,
+    ),
+    DocQuestion(
+        code=DocQuestionCode.FLOORS_TOTAL,
+        title="Количество этажей, включая подземные",
+        receiver_param="floors_total",
+        value_kind=DocValueKind.COUNT,
+        extractor=ExtractorKind.COUNT,
+        sources=(
+            DocSource("ПЗ / СП: общая записка", _GENERAL, (_K.TEXT,)),
+            DocSource("ПЗ АР", _AR, (_K.TEXT,)),
+            DocSource("ПЗ / СП: прочее", _GENERAL),
+            DocSource("Прочие листы АР", _AR),
+            DocSource("ПЗ КР", _STRUCTURE, (_K.TEXT,)),
+        ),
+        anchors=(_anchor(r"(?:количеств\w+|число)\s+этаж\w*", 20, bare_number=True),),
+        min_mm=1,
+        max_mm=160,
+    ),
+    DocQuestion(
+        code=DocQuestionCode.FLOOR_HEIGHT,
+        title="Высота типового этажа: от чистого пола до чистого пола, мм",
+        receiver_param="floor_height_mm",
+        value_kind=DocValueKind.LENGTH_MM,
+        extractor=ExtractorKind.LENGTH,
+        sources=(
+            DocSource("ПЗ АР", _AR, (_K.TEXT,)),
+            DocSource("ПЗ / СП: общая записка", _GENERAL, (_K.TEXT,)),
+            DocSource("Разрезы АР", _AR, (_K.SECTION,)),
+            DocSource("Прочие листы АР", _AR),
+            DocSource("ПЗ КР", _STRUCTURE, (_K.TEXT,)),
+        ),
+        anchors=(
+            _anchor(r"высот\w+\s+(?:всех\s+)?(?:типов\w+\s+|жил\w+\s+)?этаж\w*", 20),
+            _anchor(r"в\s+отметк\w+\s+(?:чист\w+\s+)?пол\w*", 15),
+        ),
+        value_exclusions=_CLEAR_NOT_FLOOR,
+        min_mm=2500,
+        max_mm=7000,
     ),
 )
 

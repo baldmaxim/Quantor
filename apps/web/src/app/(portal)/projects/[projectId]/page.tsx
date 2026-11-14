@@ -132,6 +132,11 @@ const ProjectPage = ({ params }: IPageProps) => {
                 Вопросы к документации
               </ButtonLink>
             )}
+            {features[CONSISTENCY_FEATURE] === true && (
+              <ButtonLink href={`/projects/${projectId}/frame`} transitionTypes={['nav-forward']}>
+                Каркас здания
+              </ButtonLink>
+            )}
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
             {target ? (
               <ButtonLink href={workspaceHref(projectId, target.revision.id)} variant="primary">

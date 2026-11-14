@@ -26,6 +26,7 @@ from app.models.calc_synthesis import CalcSynthesisDecision, CalcSynthesisRun
 from app.models.control_plane import FeatureFlagOverride, SettingOverride
 from app.models.doc_question import DocQuestionAnswer, DocQuestionCandidate
 from app.models.document import Document, DocumentRevision
+from app.models.frame_node import FrameNode
 from app.models.identity import (
     AuthSession,
     LocalCredential,
@@ -81,6 +82,7 @@ __all__ = [
     "Document",
     "DocumentRevision",
     "FeatureFlagOverride",
+    "FrameNode",
     "Job",
     "LocalCredential",
     "Measurement",

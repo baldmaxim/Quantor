@@ -21534,6 +21534,28 @@
         "title": "ChangePasswordResponse",
         "type": "object"
       },
+      "CheckCode": {
+        "enum": [
+          "ar_plan_per_level",
+          "scheme_per_system",
+          "level_sequence",
+          "level_elevations",
+          "pz_storeys",
+          "pz_floors_total",
+          "pz_floor_height"
+        ],
+        "title": "CheckCode",
+        "type": "string"
+      },
+      "CheckStatus": {
+        "enum": [
+          "match",
+          "mismatch",
+          "not_run"
+        ],
+        "title": "CheckStatus",
+        "type": "string"
+      },
       "ClassDef": {
         "additionalProperties": false,
         "description": "Класс элемента. Слой evidence и слой сети описываются раздельно даже для одного объекта.",
@@ -22463,7 +22485,10 @@
           "cable_tray_section",
           "apartment_partition_height",
           "lift_door_height",
-          "apartment_finishing"
+          "apartment_finishing",
+          "storeys",
+          "floors_total",
+          "floor_height"
         ],
         "title": "DocQuestionCode",
         "type": "string"
@@ -23688,6 +23713,612 @@
         "title": "FlagStateRead",
         "type": "object"
       },
+      "FrameBulkOut": {
+        "properties": {
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "updated"
+        ],
+        "title": "FrameBulkOut",
+        "type": "object"
+      },
+      "FrameBulkStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NodeStatus"
+          }
+        },
+        "required": [
+          "ids",
+          "status"
+        ],
+        "title": "FrameBulkStatus",
+        "type": "object"
+      },
+      "FrameCheckOut": {
+        "properties": {
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "code": {
+            "$ref": "#/components/schemas/CheckCode"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "refs": {
+            "items": {
+              "$ref": "#/components/schemas/FrameCheckRefOut"
+            },
+            "title": "Refs",
+            "type": "array"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "title",
+          "status",
+          "message",
+          "building",
+          "section",
+          "level",
+          "refs"
+        ],
+        "title": "FrameCheckOut",
+        "type": "object"
+      },
+      "FrameCheckRefOut": {
+        "properties": {
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RefKind"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "label",
+          "file_name",
+          "page_index"
+        ],
+        "title": "FrameCheckRefOut",
+        "type": "object"
+      },
+      "FrameElevationSource": {
+        "properties": {
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "passport_id": {
+            "title": "Passport Id",
+            "type": "string"
+          },
+          "value_m": {
+            "title": "Value M",
+            "type": "number"
+          }
+        },
+        "required": [
+          "value_m",
+          "passport_id",
+          "file_name",
+          "page_index"
+        ],
+        "title": "FrameElevationSource",
+        "type": "object"
+      },
+      "FrameNodeCreate": {
+        "additionalProperties": false,
+        "description": "Узел, добавленный человеком. Недостающие корпус и секция создаются кандидатами-ручными.",
+        "properties": {
+          "building": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "elevation_m": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": -1000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elevation M"
+          },
+          "height_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 30.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height M"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NodeKind"
+          },
+          "ordinal": {
+            "anyOf": [
+              {
+                "maximum": 300.0,
+                "minimum": -50.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordinal"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "FrameNodeCreate",
+        "type": "object"
+      },
+      "FrameNodeOut": {
+        "properties": {
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "elevation_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elevation M"
+          },
+          "elevation_sources": {
+            "items": {
+              "$ref": "#/components/schemas/FrameElevationSource"
+            },
+            "title": "Elevation Sources",
+            "type": "array"
+          },
+          "elevation_values": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Elevation Values",
+            "type": "array"
+          },
+          "height_derived_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Derived M"
+          },
+          "height_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height M"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NodeKind"
+          },
+          "manual_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Manual Fields",
+            "type": "array"
+          },
+          "ordinal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordinal"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/NodeOrigin"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "passport_count": {
+            "title": "Passport Count",
+            "type": "integer"
+          },
+          "passports": {
+            "items": {
+              "$ref": "#/components/schemas/FramePassportRef"
+            },
+            "title": "Passports",
+            "type": "array"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NodeStatus"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "parent_id",
+          "building",
+          "section",
+          "code",
+          "ordinal",
+          "elevation_m",
+          "height_m",
+          "height_derived_m",
+          "status",
+          "origin",
+          "passport_count",
+          "passports",
+          "elevation_sources",
+          "elevation_values",
+          "manual_fields",
+          "confirmed_at"
+        ],
+        "title": "FrameNodeOut",
+        "type": "object"
+      },
+      "FrameNodePatch": {
+        "additionalProperties": false,
+        "description": "Правка уровня и/или статуса узла; переданное поле меняется (в том числе на null).",
+        "properties": {
+          "elevation_m": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": -1000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elevation M"
+          },
+          "height_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 30.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height M"
+          },
+          "ordinal": {
+            "anyOf": [
+              {
+                "maximum": 300.0,
+                "minimum": -50.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordinal"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "FrameNodePatch",
+        "type": "object"
+      },
+      "FrameOut": {
+        "description": "Каркас проекта, проверки по подтверждённым данным и счётчики входов.",
+        "properties": {
+          "candidate_plans": {
+            "title": "Candidate Plans",
+            "type": "integer"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/FrameCheckOut"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "confirmed_plans": {
+            "title": "Confirmed Plans",
+            "type": "integer"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/FrameNodeOut"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "nodes",
+          "checks",
+          "confirmed_plans",
+          "candidate_plans",
+          "versions"
+        ],
+        "title": "FrameOut",
+        "type": "object"
+      },
+      "FramePassportRef": {
+        "properties": {
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "section_mark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Mark"
+          }
+        },
+        "required": [
+          "id",
+          "file_name",
+          "page_index",
+          "section_mark"
+        ],
+        "title": "FramePassportRef",
+        "type": "object"
+      },
+      "FrameRebuildOut": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "kept_reviewed": {
+            "title": "Kept Reviewed",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "updated",
+          "removed",
+          "kept_reviewed"
+        ],
+        "title": "FrameRebuildOut",
+        "type": "object"
+      },
       "GenerationProvenance": {
         "enum": [
           "evidence_observed",
@@ -24367,7 +24998,7 @@
       },
       "ManualValueIn": {
         "additionalProperties": false,
-        "description": "Значение ручного ответа: размеры в мм целыми; `display` собирает сервер по виду вопроса.\n\nlength_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота\n(для воздуховода круглого сечения - один диаметр с code=\"round\"); text - необязательные\nчисла в границах каталога; enum - без чисел, code из `options` вопроса (у вопроса с\nобязательным выбором, например «Отделка квартир», code обязателен).",
+        "description": "Значение ручного ответа: размеры в мм целыми; `display` собирает сервер по виду вопроса.\n\nlength_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота\n(для воздуховода круглого сечения - один диаметр с code=\"round\"); text - необязательные\nчисла в границах каталога; enum - без чисел, code из `options` вопроса (у вопроса с\nобязательным выбором, например «Отделка квартир», code обязателен); count - одно целое\nчисло (этажи) в границах каталога.",
         "properties": {
           "code": {
             "anyOf": [
@@ -25718,6 +26349,23 @@
         "title": "NetworkSystem",
         "type": "object"
       },
+      "NodeKind": {
+        "enum": [
+          "building",
+          "section",
+          "level"
+        ],
+        "title": "NodeKind",
+        "type": "string"
+      },
+      "NodeOrigin": {
+        "enum": [
+          "passports",
+          "manual"
+        ],
+        "title": "NodeOrigin",
+        "type": "string"
+      },
       "NodeRole": {
         "description": "Топологическая роль узла сети. Роль — не класс: класс задаёт профиль.",
         "enum": [
@@ -25731,6 +26379,15 @@
           "unresolved_anchor"
         ],
         "title": "NodeRole",
+        "type": "string"
+      },
+      "NodeStatus": {
+        "enum": [
+          "candidate",
+          "confirmed",
+          "rejected"
+        ],
+        "title": "NodeStatus",
         "type": "string"
       },
       "NormAssumptionAnswerIn": {
@@ -27253,6 +27910,15 @@
         ],
         "title": "RecognitionArtifactRead",
         "type": "object"
+      },
+      "RefKind": {
+        "enum": [
+          "passport",
+          "answer",
+          "level"
+        ],
+        "title": "RefKind",
+        "type": "string"
       },
       "RegionRead": {
         "description": "Область распознавания.\n\ncoords_norm — [x0, y0, x1, y1] от левого верхнего угла листа, значения в [0, 1].\nПеревод в экранные координаты выполняет клиент при отрисовке (ADR-0008).",
@@ -40319,6 +40985,305 @@
         "summary": "Документы проекта",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/frame": {
+      "get": {
+        "operationId": "get_building_frame",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Каркас здания проекта и проверки комплектности по подтверждённым данным",
+        "tags": [
+          "building-frame"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/frame/bulk-status": {
+      "post": {
+        "operationId": "bulk_frame_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FrameBulkStatus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrameBulkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Единый статус пачке узлов каркаса; чужой id - 404, ничего не меняется",
+        "tags": [
+          "building-frame"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/frame/nodes": {
+      "post": {
+        "operationId": "create_frame_node",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FrameNodeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrameNodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Добавить узел каркаса вручную; недостающие корпус и секция создаются",
+        "tags": [
+          "building-frame"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/frame/nodes/{node_id}": {
+      "delete": {
+        "operationId": "delete_frame_node",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить узел, добавленный вручную; узел из паспортов можно только отклонить",
+        "tags": [
+          "building-frame"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_frame_node",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FrameNodePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrameNodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Правка уровня (номер, отметка, высота) и/или статуса узла каркаса",
+        "tags": [
+          "building-frame"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/frame/rebuild": {
+      "post": {
+        "operationId": "rebuild_building_frame",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrameRebuildOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Пересобрать кандидатов каркаса из подтверждённых паспортов листов",
+        "tags": [
+          "building-frame"
         ]
       }
     },

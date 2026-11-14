@@ -10750,6 +10750,16 @@ export type ChangePasswordResponse = {
 };
 
 /**
+ * CheckCode
+ */
+export type CheckCode = 'ar_plan_per_level' | 'scheme_per_system' | 'level_sequence' | 'level_elevations' | 'pz_storeys' | 'pz_floors_total' | 'pz_floor_height';
+
+/**
+ * CheckStatus
+ */
+export type CheckStatus = 'match' | 'mismatch' | 'not_run';
+
+/**
  * ClassDef
  *
  * Класс элемента. Слой evidence и слой сети описываются раздельно даже для одного объекта.
@@ -11226,7 +11236,7 @@ export type DocOptionOut = {
 /**
  * DocQuestionCode
  */
-export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section' | 'apartment_partition_height' | 'lift_door_height' | 'apartment_finishing';
+export type DocQuestionCode = 'corridor_ceiling_height' | 'clear_height' | 'corridor_floor_buildup' | 'slab_thickness' | 'sprinkler_model' | 'sprinkler_ceiling_gap' | 'hot_over_cold_gap' | 'duct_section' | 'cable_tray_section' | 'apartment_partition_height' | 'lift_door_height' | 'apartment_finishing' | 'storeys' | 'floors_total' | 'floor_height';
 
 /**
  * DocQuestionOut
@@ -11849,6 +11859,301 @@ export type FlagStateRead = {
 };
 
 /**
+ * FrameBulkOut
+ */
+export type FrameBulkOut = {
+    /**
+     * Updated
+     */
+    updated: number;
+};
+
+/**
+ * FrameBulkStatus
+ */
+export type FrameBulkStatus = {
+    /**
+     * Ids
+     */
+    ids: Array<string>;
+    status: NodeStatus;
+};
+
+/**
+ * FrameCheckOut
+ */
+export type FrameCheckOut = {
+    /**
+     * Building
+     */
+    building: string | null;
+    code: CheckCode;
+    /**
+     * Level
+     */
+    level: string | null;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Refs
+     */
+    refs: Array<FrameCheckRefOut>;
+    /**
+     * Section
+     */
+    section: string | null;
+    status: CheckStatus;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * FrameCheckRefOut
+ */
+export type FrameCheckRefOut = {
+    /**
+     * File Name
+     */
+    file_name: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    kind: RefKind;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+};
+
+/**
+ * FrameElevationSource
+ */
+export type FrameElevationSource = {
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Passport Id
+     */
+    passport_id: string;
+    /**
+     * Value M
+     */
+    value_m: number;
+};
+
+/**
+ * FrameNodeCreate
+ *
+ * Узел, добавленный человеком. Недостающие корпус и секция создаются кандидатами-ручными.
+ */
+export type FrameNodeCreate = {
+    /**
+     * Building
+     */
+    building?: string | null;
+    /**
+     * Code
+     */
+    code?: string | null;
+    /**
+     * Elevation M
+     */
+    elevation_m?: number | null;
+    /**
+     * Height M
+     */
+    height_m?: number | null;
+    kind: NodeKind;
+    /**
+     * Ordinal
+     */
+    ordinal?: number | null;
+    /**
+     * Section
+     */
+    section?: string | null;
+};
+
+/**
+ * FrameNodeOut
+ */
+export type FrameNodeOut = {
+    /**
+     * Building
+     */
+    building: string | null;
+    /**
+     * Code
+     */
+    code: string | null;
+    /**
+     * Confirmed At
+     */
+    confirmed_at: string | null;
+    /**
+     * Elevation M
+     */
+    elevation_m: number | null;
+    /**
+     * Elevation Sources
+     */
+    elevation_sources: Array<FrameElevationSource>;
+    /**
+     * Elevation Values
+     */
+    elevation_values: Array<number>;
+    /**
+     * Height Derived M
+     */
+    height_derived_m: number | null;
+    /**
+     * Height M
+     */
+    height_m: number | null;
+    /**
+     * Id
+     */
+    id: string;
+    kind: NodeKind;
+    /**
+     * Manual Fields
+     */
+    manual_fields: Array<string>;
+    /**
+     * Ordinal
+     */
+    ordinal: number | null;
+    origin: NodeOrigin;
+    /**
+     * Parent Id
+     */
+    parent_id: string | null;
+    /**
+     * Passport Count
+     */
+    passport_count: number;
+    /**
+     * Passports
+     */
+    passports: Array<FramePassportRef>;
+    /**
+     * Section
+     */
+    section: string | null;
+    status: NodeStatus;
+};
+
+/**
+ * FrameNodePatch
+ *
+ * Правка уровня и/или статуса узла; переданное поле меняется (в том числе на null).
+ */
+export type FrameNodePatch = {
+    /**
+     * Elevation M
+     */
+    elevation_m?: number | null;
+    /**
+     * Height M
+     */
+    height_m?: number | null;
+    /**
+     * Ordinal
+     */
+    ordinal?: number | null;
+    status?: NodeStatus | null;
+};
+
+/**
+ * FrameOut
+ *
+ * Каркас проекта, проверки по подтверждённым данным и счётчики входов.
+ */
+export type FrameOut = {
+    /**
+     * Candidate Plans
+     */
+    candidate_plans: number;
+    /**
+     * Checks
+     */
+    checks: Array<FrameCheckOut>;
+    /**
+     * Confirmed Plans
+     */
+    confirmed_plans: number;
+    /**
+     * Nodes
+     */
+    nodes: Array<FrameNodeOut>;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * FramePassportRef
+ */
+export type FramePassportRef = {
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Section Mark
+     */
+    section_mark: string | null;
+};
+
+/**
+ * FrameRebuildOut
+ */
+export type FrameRebuildOut = {
+    /**
+     * Created
+     */
+    created: number;
+    /**
+     * Kept Reviewed
+     */
+    kept_reviewed: number;
+    /**
+     * Removed
+     */
+    removed: number;
+    /**
+     * Updated
+     */
+    updated: number;
+};
+
+/**
  * GenerationProvenance
  */
 export type GenerationProvenance = 'evidence_observed' | 'rd_prior_inferred' | 'retrieved_pattern' | 'deterministic_rule' | 'human_confirmed' | 'unresolved';
@@ -12220,7 +12525,8 @@ export type ManualAnswerIn = {
  * length_mm - одно число; range_mm - одно или два (от < до); section_mm - ширина и высота
  * (для воздуховода круглого сечения - один диаметр с code="round"); text - необязательные
  * числа в границах каталога; enum - без чисел, code из `options` вопроса (у вопроса с
- * обязательным выбором, например «Отделка квартир», code обязателен).
+ * обязательным выбором, например «Отделка квартир», code обязателен); count - одно целое
+ * число (этажи) в границах каталога.
  */
 export type ManualValueIn = {
     /**
@@ -12932,11 +13238,26 @@ export type NetworkSystem = {
 };
 
 /**
+ * NodeKind
+ */
+export type NodeKind = 'building' | 'section' | 'level';
+
+/**
+ * NodeOrigin
+ */
+export type NodeOrigin = 'passports' | 'manual';
+
+/**
  * NodeRole
  *
  * Топологическая роль узла сети. Роль — не класс: класс задаёт профиль.
  */
 export type NodeRole = 'source' | 'terminal' | 'junction' | 'equipment' | 'device' | 'transition' | 'endpoint' | 'unresolved_anchor';
+
+/**
+ * NodeStatus
+ */
+export type NodeStatus = 'candidate' | 'confirmed' | 'rejected';
 
 /**
  * NormAssumptionAnswerIn
@@ -13777,6 +14098,11 @@ export type RecognitionArtifactRead = {
      */
     source_filename: string;
 };
+
+/**
+ * RefKind
+ */
+export type RefKind = 'passport' | 'answer' | 'level';
 
 /**
  * RegionRead
@@ -21230,6 +21556,194 @@ export type ListProjectDocumentsResponses = {
 };
 
 export type ListProjectDocumentsResponse = ListProjectDocumentsResponses[keyof ListProjectDocumentsResponses];
+
+export type GetBuildingFrameData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/frame';
+};
+
+export type GetBuildingFrameErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetBuildingFrameError = GetBuildingFrameErrors[keyof GetBuildingFrameErrors];
+
+export type GetBuildingFrameResponses = {
+    /**
+     * Successful Response
+     */
+    200: FrameOut;
+};
+
+export type GetBuildingFrameResponse = GetBuildingFrameResponses[keyof GetBuildingFrameResponses];
+
+export type BulkFrameStatusData = {
+    body: FrameBulkStatus;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/frame/bulk-status';
+};
+
+export type BulkFrameStatusErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BulkFrameStatusError = BulkFrameStatusErrors[keyof BulkFrameStatusErrors];
+
+export type BulkFrameStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: FrameBulkOut;
+};
+
+export type BulkFrameStatusResponse = BulkFrameStatusResponses[keyof BulkFrameStatusResponses];
+
+export type CreateFrameNodeData = {
+    body: FrameNodeCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/frame/nodes';
+};
+
+export type CreateFrameNodeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateFrameNodeError = CreateFrameNodeErrors[keyof CreateFrameNodeErrors];
+
+export type CreateFrameNodeResponses = {
+    /**
+     * Successful Response
+     */
+    201: FrameNodeOut;
+};
+
+export type CreateFrameNodeResponse = CreateFrameNodeResponses[keyof CreateFrameNodeResponses];
+
+export type DeleteFrameNodeData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/frame/nodes/{node_id}';
+};
+
+export type DeleteFrameNodeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteFrameNodeError = DeleteFrameNodeErrors[keyof DeleteFrameNodeErrors];
+
+export type DeleteFrameNodeResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteFrameNodeResponse = DeleteFrameNodeResponses[keyof DeleteFrameNodeResponses];
+
+export type PatchFrameNodeData = {
+    body: FrameNodePatch;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/frame/nodes/{node_id}';
+};
+
+export type PatchFrameNodeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PatchFrameNodeError = PatchFrameNodeErrors[keyof PatchFrameNodeErrors];
+
+export type PatchFrameNodeResponses = {
+    /**
+     * Successful Response
+     */
+    200: FrameNodeOut;
+};
+
+export type PatchFrameNodeResponse = PatchFrameNodeResponses[keyof PatchFrameNodeResponses];
+
+export type RebuildBuildingFrameData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/frame/rebuild';
+};
+
+export type RebuildBuildingFrameErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RebuildBuildingFrameError = RebuildBuildingFrameErrors[keyof RebuildBuildingFrameErrors];
+
+export type RebuildBuildingFrameResponses = {
+    /**
+     * Successful Response
+     */
+    200: FrameRebuildOut;
+};
+
+export type RebuildBuildingFrameResponse = RebuildBuildingFrameResponses[keyof RebuildBuildingFrameResponses];
 
 export type ListProjectJobsData = {
     body?: never;

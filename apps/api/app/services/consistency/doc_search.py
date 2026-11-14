@@ -504,6 +504,41 @@ def _finishing_found(text: str, anchor: tuple[int, int]) -> list[_Found]:
     return [_Found(value, anchor[0], anchor[1], 25)]
 
 
+# Количество (этажей): целое число сразу после якоря, без единицы длины и без дробной части.
+_COUNT_RE: Final = re.compile(
+    r"(?<![\d.,+])(?P<num>\d{1,3})(?!\d|[.,]\d)"
+    r"(?P<unit>\s*(?:(?:мм|см|м|шт|кв|г)(?![а-яa-z])|%|м2|м²))?",
+    re.IGNORECASE,
+)
+_FLOORS_WORD_RE: Final = re.compile(r"\s*-?\s*(?:[а-я]{1,3}\s+)?этаж", re.IGNORECASE)
+_COUNT_NEAR: Final = 40  # число дальше от якоря - уже не про него
+_COUNT_CLOSE: Final = 12
+
+
+def _count_found(question: DocQuestion, text: str, anchor: tuple[int, int]) -> list[_Found]:
+    """Целые числа после якоря («этажность - 25», «количество этажей: 26 этажей»), ближние первыми.
+
+    Число с единицей («3 м», «5 %») и дробное - не количество. Число со словом «этаж» после него
+    или стоящее вплотную к якорю - полная оценка, остальные - ниже.
+    """
+    lo, hi = anchor[1], min(len(text), anchor[1] + _COUNT_NEAR)
+    result: list[_Found] = []
+    seen: set[int] = set()
+    for match in _COUNT_RE.finditer(text, lo, hi):
+        if match.group("unit"):
+            continue
+        number = int(match.group("num"))
+        if not _within(question, number) or number in seen:
+            continue
+        seen.add(number)
+        close = match.start() - anchor[1] <= _COUNT_CLOSE
+        floors_word = _FLOORS_WORD_RE.match(text, match.end()) is not None
+        value = DocValue(DocValueKind.COUNT, str(number), (number,), None, None)
+        points = 30 if close or floors_word else 20
+        result.append(_Found(value, match.start(), match.end(), points))
+    return result[:_MAX_VALUES_PER_ANCHOR]
+
+
 def _extract(
     question: DocQuestion, text: str, anchor: tuple[int, int], rule: DocAnchor
 ) -> list[_Found]:
@@ -520,6 +555,8 @@ def _extract(
             return _sprinkler_found(text, anchor)
         case ExtractorKind.APARTMENT_FINISHING:
             return _finishing_found(text, anchor)
+        case ExtractorKind.COUNT:
+            return _count_found(question, text, anchor)
 
 
 # --------------------------------------------------------------------------- источник и цитата
