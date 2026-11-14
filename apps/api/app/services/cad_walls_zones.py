@@ -33,6 +33,8 @@ from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavaila
 log = get_logger(__name__)
 
 ViewZonePt = tuple[float, float, float, float]
+# Кадр вида для `--frame`: начало DXF в пт отображаемой страницы и мм DXF на пт (cad_walls v1.15).
+ViewFramePt = tuple[float, float, float]
 
 ROOM_KINDS: Final = ("room_apartment", "room_mop")
 # Подпись лестничной клетки для скрипта: он узнаёт её по «лестн» в `name`/`type` (cad_walls v1.14).
@@ -55,6 +57,9 @@ class ZonesInput:
     # Прямоугольник вида в пунктах PDF (x0, y0, x1, y1; левый верхний угол) для `--view-zone`:
     # скрипт по его центру выбирает заголовок плана. `None` — кадр не подтверждён или bbox нет.
     view_zone: ViewZonePt | None = None
+    # Кадр вида (`--frame`): по нему скрипт раскладывает знаки отметок плана по участкам плиты.
+    # `None` — кадр не подтверждён.
+    frame: ViewFramePt | None = None
 
     @property
     def present(self) -> bool:
@@ -168,6 +173,7 @@ async def sheet_room_zones(
     attempt = cad_service.current_result(parent).get("attempt")
     frame = None
     view_zone: ViewZonePt | None = None
+    view_frame: ViewFramePt | None = None
     if type(attempt) is int:
         folder = cad_service.view_folder(page_index, view)
         scale = cad_views.scale_from(
@@ -177,6 +183,12 @@ async def sheet_room_zones(
             storage, parent, revision, attempt, f"{folder}/cad_checks.json"
         )
         frame = cad_views.frame_from(scale, checks)
+        if frame.confirmed and frame.origin_pt is not None and frame.mm_per_pdf_point:
+            view_frame = (
+                round(frame.origin_pt[0], 4),
+                round(frame.origin_pt[1], 4),
+                round(frame.mm_per_pdf_point, 6),
+            )
         if frame.confirmed:
             preview = await _artifact_json(
                 storage, parent, revision, attempt, f"{folder}/preview.json"
@@ -192,7 +204,7 @@ async def sheet_room_zones(
         if zone.kind in ROOM_KINDS and len(zone.points) >= 3
     ]
     if not rows:
-        return dataclasses.replace(NO_ZONES, view_zone=view_zone)
+        return dataclasses.replace(NO_ZONES, view_zone=view_zone, frame=view_frame)
     page = (
         await cad_zones.page_scales(session, revision_id=revision, page_indexes={page_index})
     ).get(page_index)
@@ -212,6 +224,7 @@ async def sheet_room_zones(
             0,
             f"Контур плиты построен без зон помещений: {reason or 'кадр неполон'}.",
             view_zone,
+            view_frame,
         )
     mapped: list[cad_floor3d.RoomZoneMm] = []
     for zone in rows:
@@ -232,11 +245,13 @@ async def sheet_room_zones(
             )
         mapped.append(mm_zone)
     if not mapped:
-        return dataclasses.replace(NO_ZONES, view_zone=view_zone)
+        return dataclasses.replace(NO_ZONES, view_zone=view_zone, frame=view_frame)
     raw = canonical_bytes(mapped)
     if len(raw) > MAX_ZONES_BYTES:
         raise DomainError(ErrorCode.CAD_INPUT_LIMIT_EXCEEDED, "зоны листа больше допустимого")
-    return ZonesInput(raw, hashlib.sha256(raw).hexdigest(), len(mapped), None, view_zone)
+    return ZonesInput(
+        raw, hashlib.sha256(raw).hexdigest(), len(mapped), None, view_zone, view_frame
+    )
 
 
 async def store(

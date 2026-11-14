@@ -1278,9 +1278,28 @@
             "title": "Job Id",
             "type": "string"
           },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "levels": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CadBuilding3dLevelZoneRead"
+            },
+            "title": "Levels",
+            "type": "array"
           },
           "offset_mm": {
             "maxItems": 2,
@@ -1475,6 +1494,78 @@
         "title": "CadBuilding3dGroupRead",
         "type": "object"
       },
+      "CadBuilding3dLevelZoneRead": {
+        "description": "Участок плиты этажа на своей отметке (кровля со скатами, ступенчатый первый этаж).\n\nКольца - целые мм системы DXF, уже сдвинутые на `offset_mm` этажа, без повтора первой точки.\n`top_mm` - верх плиты участка от 0.000 (действующие высоты листа: ручная отметка этажа\nсдвигает все участки вместе); `mark_mm` / `max_mm` - отметки поверхности по знакам плана\n(уклон), `source = base` - знаков на участке нет, основной уровень листа.",
+        "properties": {
+          "holes": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "title": "Holes",
+            "type": "array"
+          },
+          "mark_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Mm"
+          },
+          "max_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mm"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "marks",
+              "base"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "top_mm": {
+            "title": "Top Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shell",
+          "holes",
+          "top_mm",
+          "mark_mm",
+          "max_mm",
+          "source"
+        ],
+        "title": "CadBuilding3dLevelZoneRead",
+        "type": "object"
+      },
       "CadBuilding3dRead": {
         "properties": {
           "floors": {
@@ -1541,6 +1632,17 @@
             },
             "title": "Shell",
             "type": "array"
+          },
+          "top_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Mm"
           }
         },
         "required": [
@@ -9092,6 +9194,24 @@
               "type": "string"
             },
             "title": "Floors",
+            "type": "array"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "marks_mm": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Marks Mm",
             "type": "array"
           },
           "section": {

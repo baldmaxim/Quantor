@@ -22,6 +22,16 @@ export const floorsText = (floors: readonly string[] | undefined): string | null
   return floors.join(', ');
 };
 
+/** Подпись плана без номера этажа по виду заголовка (cad_walls v1.15), как у сервера. */
+export const LEVEL_KINDS: Readonly<Record<string, string>> = {
+  roof: 'кровля',
+  roof_exit: 'выход на кровлю',
+  technical: 'техуровень',
+};
+
+const levelOf = (title: NonNullable<FloorTitleLike>): string | null =>
+  (title.kind ? LEVEL_KINDS[title.kind] : undefined) ?? null;
+
 /** Короткая подпись «К9 · С3 · 14 эт.»; в заголовке нет ни корпуса, ни секции, ни этажа - `fallback`. */
 export const formatFloorTitle = (title: FloorTitleLike, fallback: string): string => {
   if (!title) return fallback;
@@ -29,6 +39,8 @@ export const formatFloorTitle = (title: FloorTitleLike, fallback: string): strin
   if (title.corps) parts.push(`К${title.corps}`);
   if (title.section) parts.push(`С${title.section}`);
   const floors = floorsText(title.floors);
+  const level = levelOf(title);
+  if (floors === null && level !== null) parts.push(level);
   if (floors !== null) parts.push(`${floors} эт.`);
   return parts.length > 0 ? parts.join(' · ') : fallback;
 };
@@ -40,6 +52,8 @@ export const formatFloorTitleFull = (title: FloorTitleLike): string | null => {
   if (title.corps) parts.push(`Корпус ${title.corps}`);
   if (title.section) parts.push(`секция ${title.section}`);
   const floors = floorsText(title.floors);
+  const level = levelOf(title);
+  if (floors === null && level !== null) parts.push(level);
   if (floors !== null) parts.push(`${floors} ${(title.floors?.length ?? 0) > 1 ? 'этажи' : 'этаж'}`);
   return parts.length > 0 ? parts.join(', ') : null;
 };

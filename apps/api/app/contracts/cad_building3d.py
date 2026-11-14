@@ -27,6 +27,9 @@ class CadBuilding3dWarningRead(BaseModel):
     message: str
 
 
+CadBuilding3dLevelSource = Literal["marks", "base"]
+
+
 class CadBuilding3dWallRead(BaseModel):
     """Конструкция этажа для общего вида: внешнее кольцо в целых мм системы DXF, без отверстий."""
 
@@ -35,6 +38,26 @@ class CadBuilding3dWallRead(BaseModel):
     kind: CadConstructionKind
     # Открытое кольцо (без повтора первой точки), не менее 3 и не более 64 точек.
     shell: list[list[int]]
+    # Верх конструкции по знаку отметки на плане (парапет, cad_walls v1.15), мм от 0.000;
+    # `None` - верх по высоте этажа.
+    top_mm: int | None = None
+
+
+class CadBuilding3dLevelZoneRead(BaseModel):
+    """Участок плиты этажа на своей отметке (кровля со скатами, ступенчатый первый этаж).
+
+    Кольца - целые мм системы DXF, уже сдвинутые на `offset_mm` этажа, без повтора первой точки.
+    `top_mm` - верх плиты участка от 0.000 (действующие высоты листа: ручная отметка этажа
+    сдвигает все участки вместе); `mark_mm` / `max_mm` - отметки поверхности по знакам плана
+    (уклон), `source = base` - знаков на участке нет, основной уровень листа.
+    """
+
+    shell: list[list[int]]
+    holes: list[list[list[int]]]
+    top_mm: int
+    mark_mm: int | None
+    max_mm: int | None
+    source: CadBuilding3dLevelSource
 
 
 class CadBuilding3dFloorRead(BaseModel):
@@ -75,6 +98,11 @@ class CadBuilding3dFloorRead(BaseModel):
     alignment_axes: list[str]
     # Почему этаж не совмещён (`alignment = none`); иначе `None`.
     alignment_message: str | None
+    # Вид плана по заголовку (`floor` | `roof` | `roof_exit` | `technical`); старый файл - `None`.
+    kind: str | None = None
+    # Участки плиты на своих отметках (cad_walls v1.15). Есть - плита рисуется по ним, а не по
+    # `outline`; пусто - одна плита на `base_z_mm`.
+    levels: list[CadBuilding3dLevelZoneRead] = []
     # Контуры конструкций этажа (без плиты: она рисуется по `outline`), уже сдвинутые на
     # `offset_mm`. `None` - не запрошено (`walls=false`); при `walls=true` - список
     # (может быть пустым).

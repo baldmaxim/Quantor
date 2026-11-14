@@ -17,6 +17,14 @@ def floors_text(floors: list[str]) -> str | None:
     return ", ".join(floors)
 
 
+# Подпись плана без номера этажа по виду заголовка (cad_walls v1.15).
+LEVEL_KINDS: dict[str, str] = {
+    "roof": "кровля",
+    "roof_exit": "выход на кровлю",
+    "technical": "техуровень",
+}
+
+
 def format_floor_title(title: CadSheetFloorTitle | None, fallback: str) -> str:
     """Короткая подпись листа этажом; ни корпуса, ни секции, ни этажа нет — `fallback`."""
     if title is None:
@@ -27,6 +35,9 @@ def format_floor_title(title: CadSheetFloorTitle | None, fallback: str) -> str:
     if title.section:
         parts.append(f"С{title.section}")
     floors = floors_text(title.floors)
+    level = LEVEL_KINDS.get(title.kind or "")
+    if not floors and level is not None:
+        parts.append(level)
     if floors:
         parts.append(f"{floors} эт.")
     return " · ".join(parts) if parts else fallback

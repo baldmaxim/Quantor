@@ -40,13 +40,14 @@ from app.contracts.cad import CadFrameRead
 from app.contracts.cad_building3d import (
     CadBuilding3dFloorRead,
     CadBuilding3dGroupRead,
+    CadBuilding3dLevelZoneRead,
     CadBuilding3dPlacement,
     CadBuilding3dRead,
     CadBuilding3dWallRead,
     CadBuilding3dWarningRead,
 )
 from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
-from app.contracts.cad_floor3d import WallsFloorExtras
+from app.contracts.cad_floor3d import WallsFloorExtras, WallsLevels
 from app.domain import JobStatus, JobType
 from app.models import Document, DocumentRevision, Job
 from app.services import cad as cad_service
@@ -59,6 +60,9 @@ MAX_OUTLINE_POINTS: Final = 200
 # Контуры конструкций (`walls=true`): предел числа на этаж и точек в кольце.
 MAX_WALLS_PER_FLOOR: Final = 4000
 MAX_WALL_POINTS: Final = 64
+# Участки уровней плиты этажа (cad_walls v1.15): число и точки кольца участка.
+MAX_LEVEL_ZONES: Final = 300
+MAX_LEVEL_POINTS: Final = 400
 READ_CONCURRENCY: Final = 6
 # Для отрисовки, когда высота этажа или толщина плиты не определены (помечаются `*_known = false`).
 DEFAULT_FLOOR_HEIGHT_MM: Final = 3000
@@ -278,19 +282,23 @@ def build_floor(
             )
         )
     wall_rings: list[Sequence[Sequence[float]]] = [c.polygon.shell for c in document.constructions]
+    zones = level_zones(extras.levels, document, levels.base_z_mm, levels.elevation_mm)
     rings = list(wall_rings)
     if extras.slab is not None:
         rings.append(extras.slab.shell)
+    rings.extend(zone.shell for zone in zones)
     box = bbox_of(rings)
     outline: list[list[float]]
     source: str
     if extras.slab is not None and len(_open_ring(extras.slab.shell)) >= 3:
         outline, source = simplify_ring(extras.slab.shell), "slab"
     else:
-        wall_box = bbox_of(wall_rings)
-        if wall_box is None:
+        # План кровли: стен в DXF почти нет, контур - по стенам и участкам уровней.
+        fallback_box = bbox_of([*wall_rings, *(zone.shell for zone in zones)])
+        if fallback_box is None:
             raise ValueError("нет ни плиты, ни стен")
-        outline, source = _rectangle(wall_box), "bbox"
+        outline, source = _rectangle(fallback_box), "bbox"
+    tops = construction_tops(extras.levels, document, levels.base_z_mm, levels.elevation_mm)
     title = document.heights.title
     corps = _clean(title.corps) if title is not None else None
     section = _clean(title.section) if title is not None else None
@@ -312,7 +320,10 @@ def build_floor(
             # целые мм из `wall_ring`: повторная проверка тысяч стен только тратит время.
             walls.append(
                 CadBuilding3dWallRead.model_construct(
-                    id=construction.id, kind=construction.kind, shell=ring
+                    id=construction.id,
+                    kind=construction.kind,
+                    shell=ring,
+                    top_mm=tops.get(construction.id),
                 )
             )
         if skipped:
@@ -347,9 +358,73 @@ def build_floor(
         alignment="none",
         alignment_axes=[],
         alignment_message=None,
+        kind=title.kind if title is not None else None,
+        levels=zones,
         walls=walls,
     )
     return floor, warnings
+
+
+def _level_shift(document: WallsDocument, base_z_mm: int, elevation_mm: int | None) -> int:
+    """Сдвиг отметок walls.json к действующим высотам листа.
+
+    Участки и верх конструкций в walls.json - от отметки листа по документации; если человек задал
+    отметку этажа, они сдвигаются вместе с ней. Отметки листа нет ни там, ни там - сдвига нет.
+    """
+    heights = document.heights
+    own = (
+        heights.slab_top_elevation_mm
+        if heights.slab_top_elevation_mm is not None
+        else heights.floor_elevation_mm
+    )
+    if own is None or elevation_mm is None:
+        return 0
+    return base_z_mm - own
+
+
+def _level_ring(ring: Sequence[Sequence[float]]) -> list[list[int]] | None:
+    points = _open_ring(ring)
+    if len(points) > MAX_LEVEL_POINTS:
+        points = _open_ring(simplify_ring(points, MAX_LEVEL_POINTS))
+    out = [[_round_mm(x), _round_mm(y)] for x, y in points]
+    return out if len(out) >= 3 else None
+
+
+def level_zones(
+    raw: WallsLevels | None, document: WallsDocument, base_z_mm: int, elevation_mm: int | None
+) -> list[CadBuilding3dLevelZoneRead]:
+    """Участки уровней плиты листа для вида; нет блока или отметок - пусто (одна плита)."""
+    if raw is None or not raw.zones:
+        return []
+    shift = _level_shift(document, base_z_mm, elevation_mm)
+    out: list[CadBuilding3dLevelZoneRead] = []
+    for zone in raw.zones[:MAX_LEVEL_ZONES]:
+        shell = _level_ring(zone.shell)
+        top = zone.slab_top_mm if zone.slab_top_mm is not None else zone.mark_mm
+        if shell is None or top is None:
+            continue
+        holes = [ring for ring in (_level_ring(h) for h in zone.holes) if ring is not None]
+        out.append(
+            CadBuilding3dLevelZoneRead(
+                shell=shell,
+                holes=holes,
+                top_mm=top + shift,
+                mark_mm=zone.mark_mm,
+                max_mm=zone.max_mm,
+                source="marks" if zone.source == "marks" else "base",
+            )
+        )
+    return out
+
+
+def construction_tops(
+    raw: WallsLevels | None, document: WallsDocument, base_z_mm: int, elevation_mm: int | None
+) -> dict[str, int]:
+    """Верх конструкций по знакам отметок (парапеты), мм от 0.000 в действующих высотах."""
+    if raw is None or not raw.construction_tops:
+        return {}
+    shift = _level_shift(document, base_z_mm, elevation_mm)
+    return {top.id: top.top_mm + shift for top in raw.construction_tops}
 
 
 def sort_floors(
@@ -524,14 +599,29 @@ def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding
                 id=wall.id,
                 kind=wall.kind,
                 shell=[[x + ix, y + iy] for x, y in wall.shell],
+                top_mm=wall.top_mm,
             )
             for wall in floor.walls
+        ]
+    )
+    levels = (
+        floor.levels
+        if not floor.levels or (ix == 0 and iy == 0)
+        else [
+            zone.model_copy(
+                update={
+                    "shell": [[x + ix, y + iy] for x, y in zone.shell],
+                    "holes": [[[x + ix, y + iy] for x, y in ring] for ring in zone.holes],
+                }
+            )
+            for zone in floor.levels
         ]
     )
     ox, oy = floor.offset_mm
     return floor.model_copy(
         update={
             "walls": walls,
+            "levels": levels,
             "outline": [[x + dx, y + dy] for x, y in floor.outline],
             "bbox": None if box is None else [box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy],
             "offset_mm": (round(ox + dx, 3), round(oy + dy, 3)),
@@ -1337,7 +1427,12 @@ def _sheet_floor(
         )
         return _SheetFloor(None, (warning,), NO_AXES)
     axes = NO_AXES if frame is None else axes_in_mm(raw, frame)
-    cost = 1 + len(floor.outline) + sum(len(wall.shell) for wall in floor.walls or ())
+    cost = (
+        1
+        + len(floor.outline)
+        + sum(len(wall.shell) for wall in floor.walls or ())
+        + sum(len(zone.shell) + sum(len(h) for h in zone.holes) for zone in floor.levels)
+    )
     return _SheetFloor(floor, tuple(floor_warnings), axes, cost)
 
 

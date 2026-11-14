@@ -4,7 +4,7 @@
 новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
     <python> -I run_walls.py --dxf --params --out --pdf --page [--zones] [--view-zone=X0,Y0,X1,Y1]
-    [--control]
+    [--frame=OX,OY,K] [--control]
 
 PDF ревизии и номер страницы нужны только разбору отметок этажа (как у генератора трасс); не
 определились — скрипт пишет в `heights` статус `missing`, и это не отказ. Зоны помещений листа
@@ -81,6 +81,7 @@ def _argv(
     zones: Path | None = None,
     view_zone: tuple[float, float, float, float] | None = None,
     control: Path | None = None,
+    frame: tuple[float, float, float] | None = None,
 ) -> list[str]:
     python, runner = settings.cad_engine_python.strip(), cad_walls_service.runner_path(settings)
     if not python or runner is None or not (Path(python).is_file() and runner.is_file()):
@@ -105,6 +106,9 @@ def _argv(
     if view_zone is not None:
         x0, y0, x1, y1 = (round(v, 2) for v in view_zone)
         argv += [f"--view-zone={x0},{y0},{x1},{y1}"]
+    if frame is not None:
+        ox, oy, k = frame
+        argv += [f"--frame={round(ox, 4)},{round(oy, 4)},{round(k, 6)}"]
     if control is not None:
         argv += ["--control", str(control)]
     return argv
@@ -121,6 +125,19 @@ def _view_zone_of(payload: dict[str, Any]) -> tuple[float, float, float, float] 
     if not all(math.isfinite(v) for v in (x0, y0, x1, y1)) or x1 <= x0 or y1 <= y0:
         return None
     return (x0, y0, x1, y1)
+
+
+def _view_frame_of(payload: dict[str, Any]) -> tuple[float, float, float] | None:
+    """Кадр вида из задания: три конечных числа и мм на пт > 0; иначе — без аргумента."""
+    raw = payload.get("view_frame")
+    if not isinstance(raw, list) or len(raw) != 3:
+        return None
+    if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in raw):
+        return None
+    ox, oy, k = (float(v) for v in raw)
+    if not all(math.isfinite(v) for v in (ox, oy, k)) or k <= 0:
+        return None
+    return (ox, oy, k)
 
 
 async def _download_zones(
@@ -314,6 +331,7 @@ async def execute_cad_walls(
                 zones=zones_file,
                 view_zone=_view_zone_of(job.payload),
                 control=control_file,
+                frame=_view_frame_of(job.payload),
             ),
             limit_seconds=float(settings.cad_total_timeout_seconds),
             poll_interval=settings.worker_heartbeat_interval_seconds,

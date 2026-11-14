@@ -1,5 +1,6 @@
 import type { CadBuilding3dFloorRead, CadBuilding3dWallRead } from '@quantor/api-client';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import {
   MM_IN_M,
@@ -15,7 +16,11 @@ import {
  * Конвенция та же, что в колонке «Здание» и в 3D этажа: контур `(u, v) = (x, y)` DXF в метрах от общего
  * центра здания, в сцене three `X = u`, `Y` = высота, `Z = -v` (поворот призмы на -90° вокруг X).
  * Стены этажа - экструзия `shell` от верха плиты на высоту `floor_height - slab_thickness`
- * (не ниже 100 мм); все стены одного материала сливаются в одну геометрию.
+ * (не ниже 100 мм); все стены одного материала сливаются в одну геометрию. Стена с верхом по знаку
+ * отметки (парапет кровли, `top_mm`) поднимается до него.
+ *
+ * Этаж с участками уровней (`levels`: кровля со скатами и нишами, ступенчатый первый этаж) - плита из
+ * участков, каждый своей толщины плиты под своим верхом, с отверстиями.
  */
 
 export type ViewerWallMaterial = 'monolith' | 'masonry';
@@ -26,10 +31,21 @@ export interface IViewerWall {
   readonly material: ViewerWallMaterial;
   /** Контур в плане, м, от общего центра. */
   readonly shell: readonly Point2[];
+  /** Верх по знаку отметки (парапет), м, от общего центра по высоте; нет - верх стен этажа. */
+  readonly top?: number;
+}
+
+/** Участок плиты на своей отметке; контуры, м, от общего центра; верх плиты, м, по высоте. */
+export interface IViewerLevel {
+  readonly shell: readonly Point2[];
+  readonly holes: readonly (readonly Point2[])[];
+  readonly top: number;
 }
 
 export interface IViewerFloorSpec extends IBuildingFloorSpec {
   readonly walls: readonly IViewerWall[];
+  /** Участки уровней плиты; пусто - одна плита по `shell`. */
+  readonly levels: readonly IViewerLevel[];
   /** Верх стен, м, от общего центра по высоте (низ стен = верх плиты). */
   readonly wallTop: number;
 }
@@ -130,20 +146,35 @@ const polygonAreaM2 = (shell: readonly Point2[]): number => {
 export const buildViewerPlan = (floors: readonly CadBuilding3dFloorRead[]): IViewerPlan | null => {
   const base = buildBuildingPlan(floors);
   if (base === null) return null;
+  const toPlan = ([x, y]: readonly [number, number]): Point2 => [
+    (x - base.center.x) / MM_IN_M,
+    (y - base.center.y) / MM_IN_M,
+  ];
+  const height = (mm: number): number => (mm - base.center.z) / MM_IN_M;
   const specs: IViewerFloorSpec[] = base.floors.map((spec) => {
     const walls: IViewerWall[] = [];
     for (const wall of spec.floor.walls ?? []) {
       const material = wallMaterialOf(wall.kind);
       const outline = cleanOutline(wall.shell);
       if (material === null || outline === null) continue;
-      const shell = outline.map(([x, y]): Point2 => [
-        (x - base.center.x) / MM_IN_M,
-        (y - base.center.y) / MM_IN_M,
-      ]);
+      const shell = outline.map(toPlan);
       if (polygonAreaM2(shell) < MIN_AREA_M2) continue;
-      walls.push({ id: wall.id, material, shell });
+      const top = wall.top_mm;
+      walls.push(
+        top === null || top === undefined ? { id: wall.id, material, shell } : { id: wall.id, material, shell, top: height(top) },
+      );
     }
-    return { ...spec, walls, wallTop: spec.slabTop + wallHeightMm(spec.floor) / MM_IN_M };
+    const levels: IViewerLevel[] = [];
+    for (const zone of spec.floor.levels ?? []) {
+      const outline = cleanOutline(zone.shell);
+      if (outline === null) continue;
+      const holes = zone.holes
+        .map((ring) => cleanOutline(ring))
+        .filter((ring): ring is NonNullable<typeof ring> => ring !== null)
+        .map((ring) => ring.map(toPlan));
+      levels.push({ shell: outline.map(toPlan), holes, top: height(zone.top_mm) });
+    }
+    return { ...spec, walls, levels, wallTop: spec.slabTop + wallHeightMm(spec.floor) / MM_IN_M };
   });
   return { floors: specs, size: base.size, zCenterMm: base.center.z, labels: [] };
 };
@@ -334,28 +365,54 @@ export const extrudeShell = (shell: readonly Point2[], yBottom: number, yTop: nu
  * строить - `null`.
  */
 export const mergeWalls = (
-  walls: readonly { readonly id: string; readonly shell: readonly Point2[] }[],
+  walls: readonly { readonly id: string; readonly shell: readonly Point2[]; readonly top?: number }[],
   yBottom: number,
   yTop: number,
 ): IMergedWalls | null => {
-  if (!(yTop - yBottom > 0)) return null;
-  const prisms: { id: string; prism: IPrism }[] = [];
+  const prisms: { id: string; prism: IPrism; top: number }[] = [];
   const ranges: IWallRange[] = [];
   let triangles = 0;
   for (const wall of walls) {
+    // Верх по знаку отметки (парапет) - свой; ниже низа стены - стена не строится.
+    const top = wall.top ?? yTop;
+    if (!(top - yBottom > 0)) continue;
     const prism = preparePrism(wall.shell);
     if (prism === null) continue;
     const count = prismTriangles(prism);
     ranges.push({ id: wall.id, start: triangles, end: triangles + count });
     triangles += count;
-    prisms.push({ id: wall.id, prism });
+    prisms.push({ id: wall.id, prism, top });
   }
   if (prisms.length === 0) return null;
   const positions = new Float32Array(triangles * 9);
   const normals = new Float32Array(triangles * 9);
   let offset = 0;
-  for (const { prism } of prisms) offset = writePrism(prism, yBottom, yTop, positions, normals, offset);
+  for (const { prism, top } of prisms) offset = writePrism(prism, yBottom, top, positions, normals, offset);
   return { geometry: geometryOf(positions, normals), ranges };
+};
+
+/**
+ * Плита из участков уровней: каждый участок с отверстиями - призма толщиной `thickness` под своим верхом.
+ * Сцена та же: `X = u`, `Y` - высота, `Z = -v` (форма в плоскости XY выдавливается по Z и
+ * поворачивается на -90° вокруг X). Нечего строить - `null`.
+ */
+export const extrudeLevels = (levels: readonly IViewerLevel[], thickness: number): THREE.BufferGeometry | null => {
+  if (!(thickness > 0)) return null;
+  const parts: THREE.BufferGeometry[] = [];
+  for (const level of levels) {
+    const shape = new THREE.Shape(level.shell.map(([u, v]) => new THREE.Vector2(u, v)));
+    for (const hole of level.holes) shape.holes.push(new THREE.Path(hole.map(([u, v]) => new THREE.Vector2(u, v))));
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, level.top - thickness, 0);
+    // Атрибуты как у слитых призм (позиция и нормали): без UV слияние не спотыкается о разный состав.
+    geometry.deleteAttribute('uv');
+    parts.push(geometry.index === null ? geometry : geometry.toNonIndexed());
+  }
+  if (parts.length === 0) return null;
+  const merged = mergeGeometries(parts, false);
+  for (const part of parts) part.dispose();
+  return merged;
 };
 
 /** Все контуры одним мешем: слияние в одну геометрию. Нечего сливать - `null`. */

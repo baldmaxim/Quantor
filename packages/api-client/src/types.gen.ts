@@ -661,9 +661,17 @@ export type CadBuilding3dFloorRead = {
      */
     job_id: string;
     /**
+     * Kind
+     */
+    kind?: string | null;
+    /**
      * Label
      */
     label: string;
+    /**
+     * Levels
+     */
+    levels?: Array<CadBuilding3dLevelZoneRead>;
     /**
      * Offset Mm
      */
@@ -757,6 +765,43 @@ export type CadBuilding3dGroupRead = {
 };
 
 /**
+ * CadBuilding3dLevelZoneRead
+ *
+ * Участок плиты этажа на своей отметке (кровля со скатами, ступенчатый первый этаж).
+ *
+ * Кольца - целые мм системы DXF, уже сдвинутые на `offset_mm` этажа, без повтора первой точки.
+ * `top_mm` - верх плиты участка от 0.000 (действующие высоты листа: ручная отметка этажа
+ * сдвигает все участки вместе); `mark_mm` / `max_mm` - отметки поверхности по знакам плана
+ * (уклон), `source = base` - знаков на участке нет, основной уровень листа.
+ */
+export type CadBuilding3dLevelZoneRead = {
+    /**
+     * Holes
+     */
+    holes: Array<Array<Array<number>>>;
+    /**
+     * Mark Mm
+     */
+    mark_mm: number | null;
+    /**
+     * Max Mm
+     */
+    max_mm: number | null;
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
+    /**
+     * Source
+     */
+    source: 'marks' | 'base';
+    /**
+     * Top Mm
+     */
+    top_mm: number;
+};
+
+/**
  * CadBuilding3dRead
  */
 export type CadBuilding3dRead = {
@@ -796,6 +841,10 @@ export type CadBuilding3dWallRead = {
      * Shell
      */
     shell: Array<Array<number>>;
+    /**
+     * Top Mm
+     */
+    top_mm?: number | null;
 };
 
 /**
@@ -4270,6 +4319,14 @@ export type CadSheetFloorTitle = {
      * Floors
      */
     floors?: Array<string>;
+    /**
+     * Kind
+     */
+    kind?: string | null;
+    /**
+     * Marks Mm
+     */
+    marks_mm?: Array<number>;
     /**
      * Section
      */

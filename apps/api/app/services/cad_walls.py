@@ -165,6 +165,9 @@ def _walls_payload(
     if zones.view_zone is not None:
         # прямоугольник вида в pt PDF: скрипт по центру выбирает заголовок плана (`--view-zone`)
         payload["view_zone"] = list(zones.view_zone)
+    if zones.frame is not None:
+        # кадр вида: знаки отметок плана -> участки плиты (`--frame`, cad_walls v1.15)
+        payload["view_frame"] = list(zones.frame)
     return payload
 
 

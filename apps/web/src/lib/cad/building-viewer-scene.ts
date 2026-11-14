@@ -222,7 +222,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
     const entry = item === undefined ? undefined : entries.find((candidate) => candidate.key === item.spec.key);
     if (item === undefined || entry === undefined) return;
     const group = createWallOverlay(
-      { shell: item.wall.shell, yBottom: item.spec.slabTop, yTop: item.spec.wallTop },
+      { shell: item.wall.shell, yBottom: item.spec.slabTop, yTop: item.wall.top ?? item.spec.wallTop },
       kind,
       colors.accent,
     );

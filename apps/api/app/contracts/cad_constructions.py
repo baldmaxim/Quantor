@@ -176,6 +176,10 @@ class CadSheetFloorTitle(BaseModel):
     section: str | None = None
     floors: list[str] = Field(default_factory=list)
     text: str | None = None
+    # cad_walls v1.15: вид плана (`floor` | `roof` | `roof_exit` | `technical`) и отметки
+    # заголовка, мм; в старых файлах нет.
+    kind: str | None = None
+    marks_mm: list[int] = Field(default_factory=list)
 
     @field_validator("floors", mode="before")
     @classmethod

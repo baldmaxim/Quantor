@@ -73,6 +73,47 @@ class WallsOpeningExtras(BaseModel):
     lintel_material: CadLintelMaterial | None = None
 
 
+class WallsLevelZone(BaseModel):
+    """Участок плиты листа со своей отметкой (cad_walls v1.15): кольца в целых мм DXF.
+
+    `mark_mm` / `max_mm` - нижняя и верхняя отметки поверхности по знакам плана (уклон кровли),
+    `slab_top_mm` - верх плиты (за вычетом пирога пола или кровли); `source = base` - знаков нет,
+    основной уровень листа.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    shell: list[list[float]]
+    holes: list[list[list[float]]] = Field(default_factory=list)
+    mark_mm: int | None
+    max_mm: int | None = None
+    slab_top_mm: int | None
+    source: str
+    marks: int = 0
+
+
+class WallsConstructionTop(BaseModel):
+    """Верх конструкции по знаку отметки рядом с ней (парапет, фундамент под оборудование)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    top_mm: int
+
+
+class WallsLevels(BaseModel):
+    """Блок `levels` walls.json v1.15: уровни плиты листа по знакам отметок плана."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    status: str
+    message: str | None = None
+    base_mm: int | None = None
+    base_source: str | None = None
+    zones: list[WallsLevelZone] = Field(default_factory=list)
+    construction_tops: list[WallsConstructionTop] = Field(default_factory=list)
+
+
 class WallsFloorExtras(BaseModel):
     """Необязательные поля 3D-вида в walls.json. Поля нет в файле — файл старый (`walls_outdated`).
 
@@ -85,6 +126,8 @@ class WallsFloorExtras(BaseModel):
     slab: WallsSlab | None = None
     slab_holes: list[WallsSlabHole] = Field(default_factory=list)
     openings: list[WallsOpeningExtras] = Field(default_factory=list)
+    # Уровни плиты листа (cad_walls v1.15); нет в старых файлах.
+    levels: WallsLevels | None = None
 
     @property
     def has_slab_key(self) -> bool:

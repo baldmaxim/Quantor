@@ -6,6 +6,7 @@ import {
   buildViewerPlan,
   countWalls,
   explodeOffsets,
+  extrudeLevels,
   extrudeShell,
   fitDistance,
   mergeShells,
@@ -273,5 +274,75 @@ describe('конструкция по номеру треугольника', ()
     expect(wallIdAtFace(merged.ranges, 0)).toBe('a');
     expect(wallIdAtFace(merged.ranges, last)).toBe('b');
     merged.geometry.dispose();
+  });
+});
+
+describe('уровни плиты (кровля, ступенчатый этаж)', () => {
+  const square = (u0: number, v0: number, u1: number, v1: number): [number, number][] => [
+    [u0, v0],
+    [u1, v0],
+    [u1, v1],
+    [u0, v1],
+  ];
+  const roof = floor({
+    base_z_mm: 99300,
+    outline: rect(0, 0, 6000, 4000),
+    levels: [
+      {
+        shell: rect(0, 0, 6000, 4000),
+        holes: [rect(1000, 1000, 2000, 2000)],
+        top_mm: 99050,
+        mark_mm: 99050,
+        max_mm: 99300,
+        source: 'marks',
+      },
+      { shell: rect(1000, 1000, 2000, 2000), holes: [], top_mm: 91750, mark_mm: 91750, max_mm: 91750, source: 'marks' },
+    ],
+    walls: [{ ...wall('masonry', rect(0, 0, 6000, 200)), top_mm: 100750 }, wall('masonry', rect(0, 3800, 6000, 4000))],
+  });
+
+  it('участки и верх парапета переводятся в метры от центра плана', () => {
+    const plan = buildViewerPlan([roof]);
+    expect(plan).not.toBeNull();
+    const spec = plan?.floors[0];
+    const center = plan?.zCenterMm ?? 0;
+    expect(spec?.levels.map((level) => level.top)).toEqual([(99050 - center) / 1000, (91750 - center) / 1000]);
+    expect(spec?.levels[0]?.holes).toHaveLength(1);
+    expect(spec?.walls[0]?.top).toBeCloseTo((100750 - center) / 1000);
+    expect(spec?.walls[1]?.top).toBeUndefined();
+  });
+
+  it('плита из участков: каждый под своим верхом, с отверстием', () => {
+    const geometry = extrudeLevels(
+      [
+        { shell: square(0, 0, 6, 4), holes: [square(1, 1, 2, 2)], top: 0 },
+        { shell: square(1, 1, 2, 2), holes: [], top: -7.3 },
+      ],
+      0.2,
+    );
+    expect(geometry).not.toBeNull();
+    geometry?.computeBoundingBox();
+    const box = geometry?.boundingBox;
+    expect(box?.max.y).toBeCloseTo(0);
+    expect(box?.min.y).toBeCloseTo(-7.5);
+    expect(box?.max.x).toBeCloseTo(6);
+    expect(box?.min.z).toBeCloseTo(-4);
+    expect(extrudeLevels([], 0.2)).toBeNull();
+    expect(extrudeLevels([{ shell: square(0, 0, 1, 1), holes: [], top: 0 }], 0)).toBeNull();
+  });
+
+  it('стена со своим верхом строится до него, ниже низа - не строится', () => {
+    const merged = mergeWalls(
+      [
+        { id: 'a', shell: square(0, 0, 1, 1), top: 5 },
+        { id: 'b', shell: square(2, 0, 3, 1) },
+        { id: 'c', shell: square(4, 0, 5, 1), top: -1 },
+      ],
+      0,
+      3,
+    );
+    expect(merged?.ranges.map((range) => range.id)).toEqual(['a', 'b']);
+    merged?.geometry.computeBoundingBox();
+    expect(merged?.geometry.boundingBox?.max.y).toBeCloseTo(5);
   });
 });

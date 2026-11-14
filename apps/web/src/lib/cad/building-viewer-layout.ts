@@ -43,7 +43,16 @@ export const groupGap = (widths: readonly number[]): number =>
 const shiftSpec = (spec: IViewerFloorSpec, dx: number, dy: number): IViewerFloorSpec => ({
   ...spec,
   shell: spec.shell.map(([u, v]) => [u + dx, v] as const),
-  walls: spec.walls.map((wall) => ({ ...wall, shell: wall.shell.map(([u, v]) => [u + dx, v] as const) })),
+  walls: spec.walls.map((wall) => ({
+    ...wall,
+    shell: wall.shell.map(([u, v]) => [u + dx, v] as const),
+    ...(wall.top === undefined ? {} : { top: wall.top + dy }),
+  })),
+  levels: spec.levels.map((level) => ({
+    shell: level.shell.map(([u, v]) => [u + dx, v] as const),
+    holes: level.holes.map((ring) => ring.map(([u, v]) => [u + dx, v] as const)),
+    top: level.top + dy,
+  })),
   slabBottom: spec.slabBottom + dy,
   slabTop: spec.slabTop + dy,
   volumeTop: spec.volumeTop + dy,

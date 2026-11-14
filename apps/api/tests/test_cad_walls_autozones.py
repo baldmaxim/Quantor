@@ -427,6 +427,26 @@ def test_view_zone_of_payload_is_validated() -> None:
     assert walls_handler._view_zone_of({}) is None
 
 
+def test_view_frame_of_payload_is_validated() -> None:
+    assert walls_handler._view_frame_of({"view_frame": [1, 2.5, 70.5]}) == (1.0, 2.5, 70.5)
+    for bad in (None, [1, 2], [1, 2, 0], [1, 2, -3], ["a", 2, 3], [True, 2, 3], "1,2,3"):
+        assert walls_handler._view_frame_of({"view_frame": bad}) is None
+    assert walls_handler._view_frame_of({}) is None
+
+
+def test_argv_passes_frame_only_when_given(settings: Settings, tmp_path: Path) -> None:
+    base = {
+        "dxf": tmp_path / "a.dxf",
+        "params": tmp_path / "v1.json",
+        "out": tmp_path / "walls.json",
+        "pdf": tmp_path / "source.pdf",
+        "page_index": 0,
+    }
+    argv = walls_handler._argv(settings, **base, frame=(265.65515, 1286.75037, 176.395130177))
+    assert argv[-1] == "--frame=265.6552,1286.7504,176.39513"
+    assert not any(a.startswith("--frame") for a in walls_handler._argv(settings, **base))
+
+
 async def test_auto_enqueue_puts_view_zone_into_payload(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],

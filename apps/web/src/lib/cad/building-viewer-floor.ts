@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import {
+  extrudeLevels,
   extrudeShell,
   mergeWalls,
   type IViewerFloorSpec,
@@ -33,7 +34,11 @@ const makeMesh = (geometry: THREE.BufferGeometry, key: string): FloorMesh => {
 /** Меши этажа: плита, стены двух материалов (слиянием), а без стен - прозрачный объём этажа. */
 export const buildFloor = (spec: IViewerFloorSpec, offset: number): IFloorEntry | null => {
   const meshes = new Map<Part, FloorMesh>();
-  const slab = extrudeShell(spec.shell, spec.slabBottom, spec.slabTop);
+  // Участки уровней (кровля, ступенчатый этаж) - плита по ним, иначе одна плита по контуру.
+  const slab =
+    spec.levels.length > 0
+      ? extrudeLevels(spec.levels, spec.slabTop - spec.slabBottom)
+      : extrudeShell(spec.shell, spec.slabBottom, spec.slabTop);
   if (slab !== null) meshes.set('slab', makeMesh(slab, spec.key));
   for (const material of ['monolith', 'masonry'] as const) {
     const merged = mergeWalls(

@@ -53,3 +53,12 @@ describe('floorTitleFileName', () => {
     expect(floorTitleFileName({ floors: [] })).toBeNull();
   });
 });
+
+describe('план без номера этажа (cad_walls v1.15)', () => {
+  it('кровля и выход на кровлю подписываются видом плана', () => {
+    expect(formatFloorTitle({ corps: '9', section: '3', floors: [], kind: 'roof' }, 'лист')).toBe('К9 · С3 · кровля');
+    expect(formatFloorTitle({ section: '17', floors: [], kind: 'roof_exit' }, 'лист')).toBe('С17 · выход на кровлю');
+    expect(formatFloorTitle({ section: '1-6', floors: ['1'], kind: 'floor' }, 'лист')).toBe('С1-6 · 1 эт.');
+    expect(formatFloorTitleFull({ corps: '9', floors: [], kind: 'roof' })).toBe('Корпус 9, кровля');
+  });
+});

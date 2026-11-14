@@ -49,3 +49,14 @@ def test_walls_heights_title_is_optional() -> None:
     assert WallsHeights.model_validate(base).title is None
     with_title = WallsHeights.model_validate({**base, "title": {"corps": "9", "floors": [15]}})
     assert with_title.title is not None and with_title.title.floors == ["15"]
+
+
+def test_roof_and_roof_exit_titles_without_floor_number() -> None:
+    roof = title(corps="9", section="3", floors=[], kind="roof", marks_mm=[99300])
+    assert format_floor_title(roof, FALLBACK) == "К9 · С3 · кровля"
+    assert format_floor_title(title(section="17", kind="roof_exit"), FALLBACK) == (
+        "С17 · выход на кровлю"
+    )
+    assert format_floor_title(title(kind="roof"), FALLBACK) == "кровля"
+    floor = title(section="1-6", floors=[1], kind="floor", marks_mm=[1250, 2550])
+    assert format_floor_title(floor, FALLBACK) == "С1-6 · 1 эт."

@@ -828,3 +828,122 @@ def test_local_axes_without_levels_do_not_place_a_building() -> None:
     assert placements["k2"].placement == "none"
     assert placements["k2"].message is not None
     assert "без номера секции" in placements["k2"].message
+
+
+# ------------------------------------------------------------------ уровни плиты (cad_walls v1.15)
+
+
+def level_extras(**patch: Any) -> dict[str, Any]:
+    """Кровля: основной скат на +99,300 и ниша на +91,750, парапет стены — по знаку +100,750."""
+    levels: dict[str, Any] = {
+        "status": "found",
+        "base_mm": 99300,
+        "base_source": "title",
+        "zones": [
+            {
+                "shell": [[0, 0], [6000, 0], [6000, 4000], [0, 4000], [0, 0]],
+                "holes": [[[1000, 1000], [2000, 1000], [2000, 2000], [1000, 2000]]],
+                "mark_mm": 99050,
+                "max_mm": 99300,
+                "slab_top_mm": 99050,
+                "source": "marks",
+                "marks": 4,
+            },
+            {
+                "shell": [[1000, 1000], [2000, 1000], [2000, 2000], [1000, 2000]],
+                "holes": [],
+                "mark_mm": 91750,
+                "max_mm": 91750,
+                "slab_top_mm": 91750,
+                "source": "marks",
+                "marks": 1,
+            },
+            {
+                "shell": [[0, 0], [1, 0]],
+                "holes": [],
+                "mark_mm": 99300,
+                "slab_top_mm": 99300,
+                "source": "base",
+            },
+        ],
+        "construction_tops": [{"id": "aaaaaaaaaaaa", "top_mm": 100750, "marks": 1}],
+    }
+    levels.update(patch)
+    return {**raw_extras(), "levels": levels}
+
+
+def roof_document(**patch: Any) -> dict[str, Any]:
+    title = {"corps": "9", "section": "3", "floors": [], "text": "План кровли", "kind": "roof"}
+    body: dict[str, Any] = {
+        "floor_elevation_mm": 99300,
+        "slab_top_elevation_mm": 99300,
+        "floor_elevation_basis": "roof_top",
+        "title": title,
+    }
+    body.update(patch)
+    return raw_document(**body)
+
+
+def test_roof_floor_has_level_zones_label_and_parapet_top() -> None:
+    floor = floor_of(roof_document(), level_extras())
+    assert floor.label == "К9 · С3 · кровля"
+    assert (floor.kind, floor.group_key, floor.base_z_mm) == ("roof", "k9-s3", 99300)
+    # Вырожденный участок (две точки) отброшен; кольца без повтора первой точки.
+    assert [(z.top_mm, z.mark_mm, z.max_mm, z.source) for z in floor.levels] == [
+        (99050, 99050, 99300, "marks"),
+        (91750, 91750, 91750, "marks"),
+    ]
+    assert floor.levels[0].shell == [[0, 0], [6000, 0], [6000, 4000], [0, 4000]]
+    assert floor.levels[0].holes == [[[1000, 1000], [2000, 1000], [2000, 2000], [1000, 2000]]]
+    assert floor.walls is None
+    document = WallsDocument.model_validate(roof_document())
+    with_walls, _ = b3d.build_floor(
+        sheet(),
+        document,
+        WallsFloorExtras.model_validate(level_extras()),
+        None,
+        include_walls=True,
+    )
+    assert with_walls.walls is not None
+    assert [w.top_mm for w in with_walls.walls] == [100750, None]
+
+
+def test_manual_elevation_moves_level_zones_and_tops_together() -> None:
+    document = WallsDocument.model_validate(roof_document())
+    overrides = CadSheetLevelsRead(
+        floor_height_mm=None, slab_thickness_mm=None, door_height_mm=None, floor_elevation_mm=99800
+    )
+    floor, _ = b3d.build_floor(
+        sheet(overrides=overrides),
+        document,
+        WallsFloorExtras.model_validate(level_extras()),
+        None,
+        include_walls=True,
+    )
+    assert floor.base_z_mm == 99800
+    assert [z.top_mm for z in floor.levels] == [99550, 92250]
+    assert floor.walls is not None and floor.walls[0].top_mm == 101250
+
+
+def test_old_walls_file_has_no_level_zones() -> None:
+    floor = floor_of(raw_document(), raw_extras())
+    assert (floor.levels, floor.kind) == ([], None)
+
+
+def test_roof_without_slab_and_walls_takes_outline_from_level_zones() -> None:
+    raw = roof_document()
+    raw["constructions"] = []
+    extras = level_extras()
+    extras["slab"] = None
+    floor = floor_of(raw, extras)
+    assert floor.outline_source == "bbox"
+    assert floor.outline == [[0.0, 0.0], [6000.0, 0.0], [6000.0, 4000.0], [0.0, 4000.0]]
+    assert len(floor.levels) == 2
+
+
+def test_shift_moves_level_zones_with_the_floor() -> None:
+    floor = floor_of(roof_document(), level_extras())
+    moved = b3d._shifted(floor, 100.4, -50.0)
+    assert moved.levels[0].shell[0] == [100, -50]
+    assert moved.levels[0].holes[0][0] == [1100, 950]
+    assert moved.levels[1].top_mm == 91750
