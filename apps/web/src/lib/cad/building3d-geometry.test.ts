@@ -1,4 +1,4 @@
-import type { CadBuilding3dFloorRead } from '@quantor/api-client';
+import type { CadBuilding3dFloorRead, CadBuilding3dGroupRead } from '@quantor/api-client';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -148,9 +148,9 @@ describe('здания и совмещение', () => {
   });
 
   it('действующее здание: выбранное, иначе первое, групп нет - null', () => {
-    const groups = [
-      { key: 'k2', label: 'Корп. 2', floor_count: 2, aligned_count: 2 },
-      { key: 'k10', label: 'Корп. 10', floor_count: 1, aligned_count: 0 },
+    const groups: CadBuilding3dGroupRead[] = [
+      { key: 'k2', label: 'Корп. 2', floor_count: 2, aligned_count: 2, placement: 'none', site_offset_mm: [0, 0], placement_axes: [], placement_anchor: null, placement_message: null },
+      { key: 'k10', label: 'Корп. 10', floor_count: 1, aligned_count: 0, placement: 'none', site_offset_mm: [0, 0], placement_axes: [], placement_anchor: null, placement_message: null },
     ];
     expect(resolveGroupKey(groups, null)).toBe('k2');
     expect(resolveGroupKey(groups, 'k10')).toBe('k10');
@@ -159,9 +159,9 @@ describe('здания и совмещение', () => {
   });
 
   it('действующее здание: группа открытого листа вместо первой, ручной выбор главнее', () => {
-    const groups = [
-      { key: 'k2', label: 'Корп. 2', floor_count: 2, aligned_count: 2 },
-      { key: 'k10', label: 'Корп. 10', floor_count: 1, aligned_count: 0 },
+    const groups: CadBuilding3dGroupRead[] = [
+      { key: 'k2', label: 'Корп. 2', floor_count: 2, aligned_count: 2, placement: 'none', site_offset_mm: [0, 0], placement_axes: [], placement_anchor: null, placement_message: null },
+      { key: 'k10', label: 'Корп. 10', floor_count: 1, aligned_count: 0, placement: 'none', site_offset_mm: [0, 0], placement_axes: [], placement_anchor: null, placement_message: null },
     ];
     expect(resolveGroupKey(groups, null, 'k10')).toBe('k10');
     expect(resolveGroupKey(groups, 'k2', 'k10')).toBe('k2');

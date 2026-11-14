@@ -9,9 +9,11 @@ import {
 } from './building-viewer-geometry';
 
 /**
- * Режим «Весь объект»: планы групп (корпус + секция) в одной сцене. Общей системы координат у групп
- * нет - каждая совмещена по осям внутри себя, - поэтому раскладка условная: группы в один ряд по X
- * в порядке списка, каждая отцентрирована по своему габариту. Отметки по высоте общие.
+ * Режим «Весь объект»: планы групп (корпус + секция) в одной сцене. Сервер ставит группы на объект по
+ * общим маркам осей (опора - обычно паркинг) и присылает их этажи уже в системе объекта: такие группы
+ * рисуются одним планом на своих местах. Не поставленные группы (`placement = none`) - в своей системе
+ * координат, их раскладка условная: в ряд по X справа от поставленных, каждая по своему габариту.
+ * Отметки по высоте общие.
  */
 
 /** Значение `?group=` и пункта переключателя: все группы сразу. */
@@ -27,6 +29,11 @@ export interface IGroupPlanInput {
   readonly key: string;
   readonly label: string;
   readonly plan: IViewerPlan;
+  /**
+   * Подписи нескольких групп, поставленных на объект одним планом, в координатах этого плана.
+   * Нет - одна подпись `label` над верхним этажом по центру плана.
+   */
+  readonly labels?: readonly IViewerGroupLabel[];
 }
 
 /** Зазор между соседними группами, м. */
@@ -68,16 +75,21 @@ export const layoutGroupPlans = (parts: readonly IGroupPlanInput[]): IViewerPlan
   const labels: IViewerGroupLabel[] = [];
   let depth = 0;
   let cursor = -total / 2;
-  for (const { key, label, plan } of parts) {
+  for (const part of parts) {
+    const { key, label, plan } = part;
     const dx = cursor + plan.size.width / 2;
     const dy = plan.zCenterMm / MM_IN_M - commonCenter;
     cursor += plan.size.width + gap;
     depth = Math.max(depth, plan.size.depth);
     const shifted = plan.floors.map((spec) => shiftSpec(spec, dx, dy));
-    let top: IViewerFloorSpec | null = null;
-    for (const spec of shifted) if (top === null || spec.volumeTop > top.volumeTop) top = spec;
-    if (top !== null) {
-      labels.push({ key, text: label, x: dx, y: top.volumeTop + LABEL_LIFT_M, z: 0, floorKey: top.key });
+    if (part.labels !== undefined) {
+      labels.push(...part.labels.map((item) => ({ ...item, x: item.x + dx, y: item.y + dy })));
+    } else {
+      let top: IViewerFloorSpec | null = null;
+      for (const spec of shifted) if (top === null || spec.volumeTop > top.volumeTop) top = spec;
+      if (top !== null) {
+        labels.push({ key, text: label, x: dx, y: top.volumeTop + LABEL_LIFT_M, z: 0, floorKey: top.key });
+      }
     }
     floors.push(...shifted);
   }
@@ -90,13 +102,70 @@ export const layoutGroupPlans = (parts: readonly IGroupPlanInput[]): IViewerPlan
   };
 };
 
-/** План всех групп: планы групп из `groups` по порядку списка; группы без этажей с отметкой пропускаются. */
+/**
+ * Подписи групп одного плана: над верхним этажом группы, по центру её контуров в плане.
+ * Ось v контура уходит в сцене в -Z (`extrudeShell` поворачивает фигуру на -90° вокруг X).
+ */
+export const groupLabels = (
+  plan: IViewerPlan,
+  groups: readonly Pick<CadBuilding3dGroupRead, 'key' | 'label'>[],
+): IViewerGroupLabel[] => {
+  const labels: IViewerGroupLabel[] = [];
+  for (const group of groups) {
+    const specs = plan.floors.filter((spec) => spec.floor.group_key === group.key);
+    let top: IViewerFloorSpec | null = null;
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (const spec of specs) {
+      if (top === null || spec.volumeTop > top.volumeTop) top = spec;
+      for (const [u, v] of spec.shell) {
+        minU = Math.min(minU, u);
+        maxU = Math.max(maxU, u);
+        minV = Math.min(minV, v);
+        maxV = Math.max(maxV, v);
+      }
+    }
+    if (top === null || !Number.isFinite(minU)) continue;
+    labels.push({
+      key: group.key,
+      text: group.label,
+      x: (minU + maxU) / 2,
+      y: top.volumeTop + LABEL_LIFT_M,
+      z: -(minV + maxV) / 2,
+      floorKey: top.key,
+    });
+  }
+  return labels;
+};
+
+/** Поставленные на объект группы: опора и поставленные по осям; одной опоры мало - раскладывать нечего. */
+const placedGroups = (groups: readonly CadBuilding3dGroupRead[]): CadBuilding3dGroupRead[] => {
+  const placed = groups.filter((group) => group.placement !== 'none');
+  return placed.length >= 2 ? placed : [];
+};
+
+/**
+ * План всех групп. Поставленные на объект - одним планом на своих местах (первым слева), остальные -
+ * планами групп по порядку списка; группы без этажей с отметкой пропускаются.
+ */
 export const buildAllGroupsPlan = (
   floors: readonly CadBuilding3dFloorRead[],
   groups: readonly CadBuilding3dGroupRead[],
 ): IViewerPlan | null => {
   const parts: IGroupPlanInput[] = [];
+  const placed = placedGroups(groups);
+  const placedKeys = new Set(placed.map((group) => group.key));
+  if (placed.length > 0) {
+    const plan = buildViewerPlan(floors.filter((floor) => placedKeys.has(floor.group_key)));
+    if (plan !== null) {
+      const labels = groupLabels(plan, placed);
+      parts.push({ key: placed[0]?.key ?? '', label: placed[0]?.label ?? '', plan, labels });
+    }
+  }
   for (const group of groups) {
+    if (placedKeys.has(group.key)) continue;
     const plan = buildViewerPlan(floors.filter((floor) => floor.group_key === group.key));
     if (plan !== null) parts.push({ key: group.key, label: group.label, plan });
   }

@@ -605,3 +605,162 @@ def test_fallback_shift_also_moves_walls_and_keeps_none_when_not_requested() -> 
     assert ref_floor.walls is not None and floor.walls is not None
     assert floor.offset_mm == pytest.approx((-100.0, 0.0))
     assert [w.shell for w in floor.walls] == [w.shell for w in ref_floor.walls]
+
+
+# ------------------------------------------------------------------ здания на объекте
+
+
+def section_axes(
+    prefix: str, dx: float = 0.0, dy: float = 0.0
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Оси секции с номером в марке («1.1», «1.А»), сдвинутые на (dx, dy) мм."""
+    return (
+        {f"{prefix}.1": 1000.0 + dx, f"{prefix}.2": 5000.0 + dx},
+        {f"{prefix}.А": 1000.0 + dy, f"{prefix}.Б": 3000.0 + dy},
+    )
+
+
+def parking_with_sections() -> list[b3d.BuiltFloor]:
+    """Паркинг с осями двух секций и своими осями; секции - каждая в своей системе."""
+    v1, h1 = section_axes("1", 20000.0, 10000.0)
+    v2, h2 = section_axes("2", 40000.0, -5000.0)
+    parking = built(
+        corps=None,
+        section=None,
+        elevation=BASE - 4000,
+        axes=axes_block({**v1, **v2, "П1": 0.0}, {**h1, **h2, "ПА": 0.0}),
+    )
+    first = built(corps="1", section=None, order=1, axes=axes_block(*section_axes("1")))
+    second = built(corps="2", section=None, order=2, axes=axes_block(*section_axes("2")))
+    return [first, second, parking]
+
+
+def placed(
+    items: list[b3d.BuiltFloor],
+) -> tuple[dict[str, b3d.GroupPlacement], list[CadBuilding3dFloorRead]]:
+    aligned = b3d.align_floors(items)
+    placements = b3d.place_groups(items, aligned)
+    return placements, b3d.apply_placements(aligned, placements)
+
+
+def test_sections_are_placed_on_the_parking_by_section_axes() -> None:
+    placements, floors = placed(parking_with_sections())
+    assert placements["none"].placement == "reference"
+    first, second = placements["k1"], placements["k2"]
+    assert (first.placement, first.anchor_key, first.message) == ("axes", "none", None)
+    assert first.offset_mm == pytest.approx((20000.0, 10000.0))
+    assert first.axes == ("1.1", "1.2", "1.А", "1.Б")
+    assert second.offset_mm == pytest.approx((40000.0, -5000.0))
+    # Геометрия секций - в системе паркинга: сдвиг совмещения и постановки сложен.
+    assert floors[0].offset_mm == pytest.approx((20000.0, 10000.0))
+    assert floors[0].bbox is not None and floors[0].bbox[0] == pytest.approx(20000.0)
+    assert floors[2].offset_mm == (0.0, 0.0)
+
+
+def test_group_offsets_are_carried_to_groups_of_the_response() -> None:
+    placements, floors = placed(parking_with_sections())
+    groups = {g.key: g for g in b3d.build_groups(floors, placements)}
+    assert groups["k1"].placement == "axes"
+    assert groups["k1"].site_offset_mm == pytest.approx((20000.0, 10000.0))
+    assert groups["k1"].placement_anchor == "none"
+    assert groups["k1"].placement_axes == ["1.1", "1.2", "1.А", "1.Б"]
+    assert groups["none"].placement == "reference" and groups["none"].placement_message is None
+
+
+def test_section_axes_can_chain_through_a_placed_section() -> None:
+    # Паркинг знает только секцию 1, секция 2 делит оси с секцией 1 (сквозная сетка).
+    v1, h1 = section_axes("1", 20000.0, 10000.0)
+    parking = built(corps=None, section=None, elevation=BASE - 4000, axes=axes_block(v1, h1))
+    first = built(
+        corps="1",
+        section=None,
+        order=1,
+        axes=axes_block(
+            {"1.1": 1000.0, "1.2": 5000.0, "1.3": 9000.0}, {"1.А": 1000.0, "1.Б": 3000.0}
+        ),
+    )
+    second = built(
+        corps="2",
+        section=None,
+        order=2,
+        axes=axes_block({"1.3": 0.0, "2.1": 4000.0}, {"1.А": 500.0, "1.Б": 2500.0}),
+    )
+    placements, _ = placed([first, second, parking])
+    # Опора - секция 1: у неё общие марки и с паркингом, и с секцией 2.
+    assert placements["k1"].placement == "reference"
+    assert placements["k2"].anchor_key == "k1" and placements["none"].anchor_key == "k1"
+    k2, base = placements["k2"].offset_mm, placements["none"].offset_mm
+    assert (k2[0] - base[0], k2[1] - base[1]) == pytest.approx((29000.0, 10500.0))
+
+
+def test_typical_sections_with_local_axes_are_not_stacked() -> None:
+    # Две типовые секции с одинаковой местной сеткой на одной отметке: марки совпали случайно.
+    local = axes_block({"1": 1000.0, "2": 5000.0}, {"А": 1000.0, "Б": 3000.0})
+    placements, floors = placed(
+        [
+            built(corps="1", section=None, axes=local),
+            built(corps="2", section=None, order=1, axes=local),
+        ]
+    )
+    assert placements["k1"].placement == "reference"
+    assert placements["k2"].placement == "none"
+    assert placements["k2"].message is not None and "той же отметке" in placements["k2"].message
+    assert floors[1].offset_mm == (0.0, 0.0)
+
+
+def test_local_axes_place_a_section_over_the_parking_on_another_level() -> None:
+    parking = built(
+        corps=None,
+        section=None,
+        elevation=BASE - 4000,
+        axes=axes_block({"1": 11000.0, "2": 15000.0, "3": 19000.0}, {"А": 1000.0, "Б": 3000.0}),
+    )
+    section = built(
+        corps="1",
+        section=None,
+        order=1,
+        axes=axes_block({"1": 1000.0, "2": 5000.0}, {"А": 1000.0, "Б": 3000.0}),
+    )
+    placements, _ = placed([section, parking])
+    assert placements["k1"].placement == "axes"
+    assert placements["k1"].offset_mm == pytest.approx((10000.0, 0.0))
+
+
+def test_one_misread_label_does_not_break_placement_but_disagreement_does() -> None:
+    v1, h1 = section_axes("1", 20000.0, 10000.0)
+    v1 = {**v1, "1.3": 29000.0, "1.4": 33000.0, "1.5": 99999.0}
+    parking = built(corps=None, section=None, elevation=BASE - 4000, axes=axes_block(v1, h1))
+    section = built(
+        corps="1",
+        section=None,
+        order=1,
+        axes=axes_block(
+            {"1.1": 1000.0, "1.2": 5000.0, "1.3": 9000.0, "1.4": 13000.0, "1.5": 17000.0},
+            {"1.А": 1000.0, "1.Б": 3000.0},
+        ),
+    )
+    placements, _ = placed([section, parking])
+    assert placements["k1"].placement == "axes"
+    assert "1.5" not in placements["k1"].axes
+    assert placements["k1"].offset_mm == pytest.approx((20000.0, 10000.0))
+    # Половина марок вразнобой - совпадения нет.
+    wild = {**section_axes("1", 20000.0, 10000.0)[0], "1.3": 1.0, "1.4": 2.0}
+    noisy = built(corps=None, section=None, elevation=BASE - 4000, axes=axes_block(wild, h1))
+    placements, _ = placed([section, noisy])
+    assert [p.placement for p in placements.values()].count("axes") == 0
+    assert placements["none"].placement == "none"
+
+
+def test_group_without_axes_or_single_group_placement() -> None:
+    (only,) = b3d.place_groups(
+        [built(axes=ref_axes())], b3d.align_floors([built(axes=ref_axes())])
+    ).values()
+    assert only.placement == "reference"
+    items = [
+        built(corps="1", section=None, axes=ref_axes()),
+        built(corps="2", section=None, order=1),
+    ]
+    placements, _ = placed(items)
+    assert placements["k1"].placement == "reference"
+    assert placements["k2"].placement == "none"
+    assert placements["k2"].message is not None and "осям" in placements["k2"].message

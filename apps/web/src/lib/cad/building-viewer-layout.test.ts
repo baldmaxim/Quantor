@@ -46,11 +46,21 @@ const floor = (patch: Partial<CadBuilding3dFloorRead> = {}): CadBuilding3dFloorR
   ...patch,
 });
 
-const group = (key: string, label: string, count = 1): CadBuilding3dGroupRead => ({
+const group = (
+  key: string,
+  label: string,
+  count = 1,
+  placement: CadBuilding3dGroupRead['placement'] = 'none',
+): CadBuilding3dGroupRead => ({
   key,
   label,
   floor_count: count,
   aligned_count: count,
+  placement,
+  site_offset_mm: [0, 0],
+  placement_axes: [],
+  placement_anchor: null,
+  placement_message: null,
 });
 
 describe('зазор между группами', () => {
@@ -133,5 +143,64 @@ describe('раскладка групп «Весь объект»', () => {
 
   it('план одного здания без подписей', () => {
     expect(buildViewerPlan([floor()])?.labels).toEqual([]);
+  });
+});
+
+describe('группы, поставленные на объект по осям', () => {
+  // Паркинг (опора) 40×30 м внизу, над ним два корпуса на своих местах в системе объекта, третий не поставлен.
+  const floors = [
+    floor({ job_id: 'p1', group_key: 'p', group_label: 'Паркинг', base_z_mm: -4000, floor_height_mm: 4000, outline: rect(0, 0, 40000, 30000) }),
+    floor({ job_id: 'k1', group_key: 'k1', group_label: 'К1', outline: rect(2000, 2000, 12000, 8000) }),
+    floor({ job_id: 'k2', group_key: 'k2', group_label: 'К2', outline: rect(25000, 20000, 35000, 26000) }),
+    floor({ job_id: 'k3', group_key: 'k3', group_label: 'К3', outline: rect(900000, 900000, 910000, 906000) }),
+  ];
+  const groups = [
+    group('k1', 'К1', 1, 'axes'),
+    group('k2', 'К2', 1, 'axes'),
+    group('k3', 'К3'),
+    group('p', 'Паркинг', 1, 'reference'),
+  ];
+  const span = (shell: readonly (readonly [number, number])[] | undefined, axis: 0 | 1): [number, number] => {
+    const values = (shell ?? []).map((point) => point[axis]);
+    return [Math.min(...values), Math.max(...values)];
+  };
+
+  it('поставленные группы сохраняют взаимное положение из системы объекта', () => {
+    const plan = buildAllGroupsPlan(floors, groups);
+    const shell = (key: string) => plan?.floors.find((spec) => spec.key === key)?.shell;
+    const [parkingMinX] = span(shell('p1:0:0'), 0);
+    const [parkingMinY] = span(shell('p1:0:0'), 1);
+    expect(span(shell('k1:0:0'), 0)[0] - parkingMinX).toBeCloseTo(2);
+    expect(span(shell('k1:0:0'), 1)[0] - parkingMinY).toBeCloseTo(2);
+    expect(span(shell('k2:0:0'), 0)[0] - parkingMinX).toBeCloseTo(25);
+    expect(span(shell('k2:0:0'), 1)[0] - parkingMinY).toBeCloseTo(20);
+  });
+
+  it('не поставленная группа - справа от поставленных с зазором', () => {
+    const plan = buildAllGroupsPlan(floors, groups);
+    const shell = (key: string) => plan?.floors.find((spec) => spec.key === key)?.shell;
+    const placedRight = span(shell('p1:0:0'), 0)[1];
+    // Ширина поставленных 40 м, зазор max(10; 0,15·40) = 10 м.
+    expect(span(shell('k3:0:0'), 0)[0] - placedRight).toBeCloseTo(10);
+    expect(plan?.size.width).toBeCloseTo(40 + 10 + 10);
+  });
+
+  it('подпись каждой поставленной группы - над её верхним этажом по центру её контура', () => {
+    const plan = buildAllGroupsPlan(floors, groups);
+    expect(plan?.labels.map((label) => label.key)).toEqual(['k1', 'k2', 'p', 'k3']);
+    const shellK2 = plan?.floors.find((spec) => spec.key === 'k2:0:0');
+    const labelK2 = plan?.labels.find((label) => label.key === 'k2');
+    const [minU, maxU] = span(shellK2?.shell, 0);
+    const [minV, maxV] = span(shellK2?.shell, 1);
+    expect(labelK2?.x).toBeCloseTo((minU + maxU) / 2);
+    expect(labelK2?.z).toBeCloseTo(-(minV + maxV) / 2);
+    expect(labelK2?.y).toBeCloseTo((shellK2?.volumeTop ?? 0) + LABEL_LIFT_M);
+  });
+
+  it('одна опора без поставленных групп - прежняя раскладка в ряд', () => {
+    const only = [group('k1', 'К1'), group('p', 'Паркинг', 1, 'reference')];
+    const plan = buildAllGroupsPlan([floors[1], floors[0]] as CadBuilding3dFloorRead[], only);
+    expect(plan?.labels.map((label) => label.key)).toEqual(['k1', 'p']);
+    expect(plan?.size.width).toBeCloseTo(10 + 10 + 40);
   });
 });

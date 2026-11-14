@@ -1407,13 +1407,70 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "placement": {
+            "enum": [
+              "reference",
+              "axes",
+              "none"
+            ],
+            "title": "Placement",
+            "type": "string"
+          },
+          "placement_anchor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placement Anchor"
+          },
+          "placement_axes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Placement Axes",
+            "type": "array"
+          },
+          "placement_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placement Message"
+          },
+          "site_offset_mm": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Site Offset Mm",
+            "type": "array"
           }
         },
         "required": [
           "key",
           "label",
           "floor_count",
-          "aligned_count"
+          "aligned_count",
+          "placement",
+          "site_offset_mm",
+          "placement_axes",
+          "placement_anchor",
+          "placement_message"
         ],
         "title": "CadBuilding3dGroupRead",
         "type": "object"

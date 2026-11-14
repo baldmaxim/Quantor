@@ -8,7 +8,9 @@
 
 Этажи делятся на здания по корпусу и секции из заголовка плана; этажи одного здания совмещаются
 в плане по общим осям (`axes` в walls.json, pt -> мм по кадру вида): смещение уже применено к
-контуру, клиент получает геометрию в системе эталонного этажа группы.
+контуру. Затем здания ставятся на объект по общим маркам осей (`place_groups`): опора - здание с
+наибольшим числом общих марок (обычно паркинг), смещение тоже применено, клиент получает геометрию
+поставленных зданий в системе объекта, не поставленных - в системе эталонного этажа группы.
 
 Порядок работы: сначала всё нужное из базы — последовательно (сессия не конкурентна), затем
 `walls.json` листов читаются из хранилища параллельно с ограничением. Ошибка одного листа не
@@ -34,6 +36,7 @@ from app.contracts.cad import CadFrameRead
 from app.contracts.cad_building3d import (
     CadBuilding3dFloorRead,
     CadBuilding3dGroupRead,
+    CadBuilding3dPlacement,
     CadBuilding3dRead,
     CadBuilding3dWallRead,
     CadBuilding3dWarningRead,
@@ -66,6 +69,13 @@ MESSAGE_AXES_OUTDATED: Final = "оси не распознаны: пересчи
 MESSAGE_AXES_EMPTY: Final = "оси на листе не распознаны"
 MESSAGE_FRAME_MISSING: Final = "кадр вида не установлен"
 MESSAGE_NO_REFERENCE: Final = "в группе нет этажа с осями в обоих направлениях"
+# Постановка зданий на объект: не меньше марок всего и доля согласованных среди общих.
+SITE_MIN_AXES: Final = 3
+SITE_MIN_AGREEMENT: Final = 0.75
+# Этажи двух зданий «на одной отметке» и предел их перекрытия в плане (доля меньшего bbox).
+SITE_SAME_LEVEL_MM: Final = 300
+SITE_MAX_OVERLAP: Final = 0.3
+SITE_PREFIXED_LABEL: Final = re.compile(r"\d{1,2}[.\-]")
 
 Point = tuple[float, float]
 
@@ -464,12 +474,13 @@ def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding
             for wall in floor.walls
         ]
     )
+    ox, oy = floor.offset_mm
     return floor.model_copy(
         update={
             "walls": walls,
             "outline": [[x + dx, y + dy] for x, y in floor.outline],
             "bbox": None if box is None else [box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy],
-            "offset_mm": (round(dx, 3), round(dy, 3)),
+            "offset_mm": (round(ox + dx, 3), round(oy + dy, 3)),
         }
     )
 
@@ -587,17 +598,295 @@ def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead
     )
 
 
-def build_groups(floors: Sequence[CadBuilding3dFloorRead]) -> list[CadBuilding3dGroupRead]:
+# --------------------------------------------------------------------------- здания на объекте
+
+
+@dataclass(frozen=True, slots=True)
+class GroupPlacement:
+    """Постановка здания на объект: смещение из системы эталона группы в систему объекта."""
+
+    placement: CadBuilding3dPlacement
+    offset_mm: Point
+    axes: tuple[str, ...]
+    anchor_key: str | None
+    message: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class _GroupInfo:
+    key: str
+    label: str
+    axes: FloorAxes
+    # Этажи с известной отметкой: (низ плиты, верх объёма, отметка, bbox) в системе группы.
+    levels: tuple[tuple[int, int, int, tuple[float, float, float, float]], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _SiteMatch:
+    """Совпадение осей двух зданий: сдвиг из системы `other` в систему `base` и общие марки."""
+
+    shift: Point
+    labels: tuple[str, ...]
+    prefixed: bool
+
+
+def _is_prefixed(label: str) -> bool:
+    """Марка с номером секции («3.1», «2-А»): одна на весь объект, совпадение надёжно."""
+    return SITE_PREFIXED_LABEL.match(label) is not None
+
+
+def _group_axes(
+    items: Sequence[BuiltFloor], aligned: Sequence[CadBuilding3dFloorRead]
+) -> FloorAxes:
+    """Оси группы в системе её эталона: оси совмещённых этажей со сдвигом совмещения.
+
+    Марка, разошедшаяся между этажами больше допуска, отбрасывается: она не годится для постановки.
+    """
+    values: dict[tuple[str, str], list[float]] = {}
+    for item, floor in zip(items, aligned, strict=True):
+        if floor.alignment == "none" or not item.axes.usable:
+            continue
+        dx, dy = floor.offset_mm
+        for label, x in item.axes.vertical.items():
+            values.setdefault(("vertical", label), []).append(x + dx)
+        for label, y in item.axes.horizontal.items():
+            values.setdefault(("horizontal", label), []).append(y + dy)
+    vertical: dict[str, float] = {}
+    horizontal: dict[str, float] = {}
+    for (orient, label), mms in values.items():
+        if max(mms) - min(mms) <= AXIS_TOLERANCE_MM:
+            (vertical if orient == "vertical" else horizontal)[label] = statistics.median(mms)
+    return FloorAxes(vertical, horizontal, None)
+
+
+def _consensus(base: dict[str, float], other: dict[str, float]) -> tuple[float, list[str]] | None:
+    """Сдвиг по одному направлению по согласованным общим маркам; согласия нет - `None`.
+
+    Согласованные - в допуске от медианы разностей; их должно быть не меньше `SITE_MIN_AGREEMENT`
+    от общих: пара ошибочно прочитанных марок постановку не ломает, случайные совпадения не дают.
+    """
+    common = sorted(base.keys() & other.keys(), key=_natural_key)
+    if not common:
+        return None
+    diffs = {label: base[label] - other[label] for label in common}
+    median = statistics.median(diffs.values())
+    agreed = [label for label in common if abs(diffs[label] - median) <= AXIS_TOLERANCE_MM]
+    if len(agreed) < SITE_MIN_AGREEMENT * len(common):
+        return None
+    return statistics.fmean(diffs[label] for label in agreed), agreed
+
+
+def _site_match(base: FloorAxes, other: FloorAxes) -> _SiteMatch | None:
+    """Совпадение осей двух зданий: нужны оба направления и не меньше `SITE_MIN_AXES` марок."""
+    along_x = _consensus(base.vertical, other.vertical)
+    along_y = _consensus(base.horizontal, other.horizontal)
+    if along_x is None or along_y is None:
+        return None
+    labels = (*along_x[1], *along_y[1])
+    if len(labels) < SITE_MIN_AXES:
+        return None
+    return _SiteMatch(
+        (along_x[0], along_y[0]), labels, any(_is_prefixed(label) for label in labels)
+    )
+
+
+def _group_infos(
+    items: Sequence[BuiltFloor], aligned: Sequence[CadBuilding3dFloorRead]
+) -> dict[str, _GroupInfo]:
+    by_group: dict[str, list[int]] = {}
+    for index, floor in enumerate(aligned):
+        by_group.setdefault(floor.group_key, []).append(index)
+    infos: dict[str, _GroupInfo] = {}
+    for key, indexes in by_group.items():
+        levels = tuple(
+            (
+                aligned[i].base_z_mm - aligned[i].slab_thickness_mm,
+                aligned[i].base_z_mm + aligned[i].floor_height_mm,
+                aligned[i].base_z_mm,
+                (box[0], box[1], box[2], box[3]),
+            )
+            for i in indexes
+            if aligned[i].elevation_known and (box := aligned[i].bbox) is not None
+        )
+        infos[key] = _GroupInfo(
+            key=key,
+            label=aligned[indexes[0]].group_label,
+            axes=_group_axes([items[i] for i in indexes], [aligned[i] for i in indexes]),
+            levels=levels,
+        )
+    return infos
+
+
+def _clash(
+    first: _GroupInfo, first_offset: Point, second: _GroupInfo, second_offset: Point
+) -> bool:
+    """Этажи двух зданий на одной отметке занимают одно место в плане: постановка ложная."""
+    for _low, _high, z1, b1 in first.levels:
+        box1 = (
+            b1[0] + first_offset[0],
+            b1[1] + first_offset[1],
+            b1[2] + first_offset[0],
+            b1[3] + first_offset[1],
+        )
+        for _low2, _high2, z2, b2 in second.levels:
+            if abs(z1 - z2) > SITE_SAME_LEVEL_MM:
+                continue
+            box2 = (
+                b2[0] + second_offset[0],
+                b2[1] + second_offset[1],
+                b2[2] + second_offset[0],
+                b2[3] + second_offset[1],
+            )
+            if _overlap_share(box1, box2) > SITE_MAX_OVERLAP:
+                return True
+    return False
+
+
+def place_groups(
+    items: Sequence[BuiltFloor], aligned: Sequence[CadBuilding3dFloorRead]
+) -> dict[str, GroupPlacement]:
+    """Постановка зданий на объект по общим маркам осей.
+
+    Общей системы координат у зданий нет: у каждого - система его эталонного этажа. Здания с общими
+    марками осей (план паркинга несёт оси всех корпусов) ставятся друг относительно друга. Опора -
+    здание с наибольшим числом согласованных общих марок с остальными (обычно паркинг); дальше по
+    одному присоединяется здание с самым надёжным совпадением с уже поставленными: сначала марки с
+    номером секции, затем больше марок. Совпадение только по марке без номера секции («1», «А»)
+    повторяется у типовых секций, поэтому оно не принимается, если этажи на одной отметке ложатся
+    друг на друга в плане. Здание без совпадения остаётся не поставленным (`none`) с причиной.
+    """
+    infos = _group_infos(items, aligned)
+    keys = sorted(infos, key=lambda k: (_natural_key(infos[k].label), k))
+    if len(keys) == 1:
+        return {keys[0]: GroupPlacement("reference", (0.0, 0.0), (), None, None)}
+    with_axes = [k for k in keys if infos[k].axes.usable and infos[k].levels]
+    matches: dict[tuple[str, str], _SiteMatch] = {}
+    for base in with_axes:
+        for other in with_axes:
+            if base != other and (match := _site_match(infos[base].axes, infos[other].axes)):
+                matches[(base, other)] = match
+    result: dict[str, GroupPlacement] = {}
+    if with_axes:
+        root = min(
+            with_axes,
+            key=lambda k: (
+                -sum(len(m.labels) for (b, _o), m in matches.items() if b == k),
+                -(len(infos[k].axes.vertical) + len(infos[k].axes.horizontal)),
+                min(level[0] for level in infos[k].levels),
+                keys.index(k),
+            ),
+        )
+        offsets: dict[str, Point] = {root: (0.0, 0.0)}
+        result[root] = GroupPlacement("reference", (0.0, 0.0), (), None, None)
+        rejected: dict[str, str] = {}
+        while True:
+            candidates = sorted(
+                (
+                    (base, other, match)
+                    for (base, other), match in matches.items()
+                    if base in offsets and other not in offsets
+                ),
+                key=lambda row: (
+                    not row[2].prefixed,
+                    -len(row[2].labels),
+                    keys.index(row[1]),
+                    keys.index(row[0]),
+                ),
+            )
+            placed = False
+            for base, other, match in candidates:
+                offset = (
+                    offsets[base][0] + match.shift[0],
+                    offsets[base][1] + match.shift[1],
+                )
+                clash = None
+                if not match.prefixed:
+                    clash = next(
+                        (k for k in offsets if _clash(infos[k], offsets[k], infos[other], offset)),
+                        None,
+                    )
+                if clash is not None:
+                    rejected[other] = (
+                        f"по осям {', '.join(match.labels)} здание ложится на "
+                        f"«{infos[clash].label}» на той же отметке: совпадение марок случайное"
+                    )
+                    continue
+                offsets[other] = offset
+                result[other] = GroupPlacement(
+                    "axes",
+                    (round(offset[0], 3), round(offset[1], 3)),
+                    tuple(sorted(match.labels, key=_natural_key)),
+                    base,
+                    None,
+                )
+                rejected.pop(other, None)
+                placed = True
+                break
+            if not placed:
+                break
+        root_label = infos[root].label
+        for key in keys:
+            if key in result:
+                continue
+            info = infos[key]
+            if not info.levels:
+                message = "у здания нет этажей с отметкой"
+            elif not info.axes.usable:
+                message = "у здания нет совмещённых по осям этажей с осями в обоих направлениях"
+            else:
+                message = rejected.get(key) or (
+                    f"нет общих осей с «{root_label}» и поставленными рядом зданиями"
+                )
+            result[key] = GroupPlacement("none", (0.0, 0.0), (), None, message)
+    else:
+        for key in keys:
+            result[key] = GroupPlacement(
+                "none", (0.0, 0.0), (), None, "ни у одного здания нет совмещённых по осям этажей"
+            )
+    return result
+
+
+def apply_placements(
+    floors: Sequence[CadBuilding3dFloorRead], placements: dict[str, GroupPlacement]
+) -> list[CadBuilding3dFloorRead]:
+    """Сдвиг этажей поставленных зданий в систему объекта; не поставленные остаются в своей."""
+    result: list[CadBuilding3dFloorRead] = []
+    for floor in floors:
+        placement = placements.get(floor.group_key)
+        if placement is None or placement.placement == "none" or placement.offset_mm == (0.0, 0.0):
+            result.append(floor)
+        else:
+            result.append(_shifted(floor, *placement.offset_mm))
+    return result
+
+
+def build_groups(
+    floors: Sequence[CadBuilding3dFloorRead],
+    placements: dict[str, GroupPlacement] | None = None,
+) -> list[CadBuilding3dGroupRead]:
     """Здания для переключателя: по подписи в естественном порядке."""
     counts: dict[str, tuple[str, int, int]] = {}
     for floor in floors:
         label, total, aligned = counts.get(floor.group_key, (floor.group_label, 0, 0))
         counts[floor.group_key] = (label, total + 1, aligned + (floor.alignment != "none"))
     rows = sorted(counts.items(), key=lambda row: (_natural_key(row[1][0]), row[0]))
-    return [
-        CadBuilding3dGroupRead(key=key, label=label, floor_count=total, aligned_count=aligned)
-        for key, (label, total, aligned) in rows
-    ]
+    groups: list[CadBuilding3dGroupRead] = []
+    for key, (label, total, aligned) in rows:
+        placement = (placements or {}).get(key)
+        groups.append(
+            CadBuilding3dGroupRead(
+                key=key,
+                label=label,
+                floor_count=total,
+                aligned_count=aligned,
+                placement="none" if placement is None else placement.placement,
+                site_offset_mm=(0.0, 0.0) if placement is None else placement.offset_mm,
+                placement_axes=[] if placement is None else list(placement.axes),
+                placement_anchor=None if placement is None else placement.anchor_key,
+                placement_message=None if placement is None else placement.message,
+            )
+        )
+    return groups
 
 
 # --------------------------------------------------------------------------- база
@@ -854,7 +1143,17 @@ async def build_building3d(
         axes = NO_AXES if frame is None else axes_in_mm(raw, frame)
         built.append(BuiltFloor(floor, sheet.order, axes))
     aligned = align_floors(built)
-    floors = sort_floors([(f, item.order) for f, item in zip(aligned, built, strict=True)])
-    return CadBuilding3dRead(
-        units="mm", floors=floors, groups=build_groups(floors), warnings=warnings
-    )
+    placements = place_groups(built, aligned)
+    placed = apply_placements(aligned, placements)
+    floors = sort_floors([(f, item.order) for f, item in zip(placed, built, strict=True)])
+    groups = build_groups(floors, placements)
+    lost = [g.label for g in groups if g.placement == "none"]
+    if len(groups) > 1 and lost:
+        warnings.append(
+            CadBuilding3dWarningRead(
+                code="groups_not_placed",
+                message="Не поставлены на объект по осям: "
+                f"{', '.join(lost)}. В виде «Весь объект» они стоят рядом.",
+            )
+        )
+    return CadBuilding3dRead(units="mm", floors=floors, groups=groups, warnings=warnings)

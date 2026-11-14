@@ -17,6 +17,9 @@ CadBuilding3dOutlineSource = Literal["slab", "bbox"]
 # `reference` - эталонный этаж группы; `axes` - совмещён с эталоном по общим осям;
 # `none` - не совмещён (смещение - запасное: центр контура на центр эталона или 0).
 CadBuilding3dAlignment = Literal["reference", "axes", "none"]
+# Постановка здания на объект: `reference` - опора (система объекта = система её эталона);
+# `axes` - поставлено по общим маркам осей; `none` - не поставлено, геометрия в своей системе.
+CadBuilding3dPlacement = Literal["reference", "axes", "none"]
 
 
 class CadBuilding3dWarningRead(BaseModel):
@@ -63,7 +66,9 @@ class CadBuilding3dFloorRead(BaseModel):
     # Здание (корпус + секция), к которому относится этаж: ключ и подпись для переключателя.
     group_key: str
     group_label: str
-    # Смещение в мм, уже применённое к контуру и bbox этажа: геометрия в системе эталона группы.
+    # Смещение в мм, уже применённое к контуру и bbox этажа: совмещение с эталоном группы плюс
+    # постановка группы на объект (`CadBuilding3dGroupRead.site_offset_mm`). У поставленной группы
+    # геометрия в системе объекта, у не поставленной - в системе эталона группы.
     offset_mm: tuple[float, float]
     alignment: CadBuilding3dAlignment
     # Подписи общих осей, по которым совмещён этаж (`alignment = axes`).
@@ -84,6 +89,15 @@ class CadBuilding3dGroupRead(BaseModel):
     floor_count: int
     # Этажи, совмещённые по осям (эталон входит).
     aligned_count: int
+    # Постановка на объект по общим маркам осей с другими зданиями (план паркинга несёт оси всех).
+    placement: CadBuilding3dPlacement
+    # Сдвиг из системы эталона группы в систему объекта, мм; уже применён к этажам группы.
+    site_offset_mm: tuple[float, float]
+    # Марки, по которым здание поставлено, и ключ здания, к которому оно привязано.
+    placement_axes: list[str]
+    placement_anchor: str | None
+    # Почему здание не поставлено (`placement = none`); иначе `None`.
+    placement_message: str | None
 
 
 class CadBuilding3dRead(BaseModel):

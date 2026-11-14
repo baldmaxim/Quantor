@@ -70,6 +70,11 @@ const group = (key: string, label: string, floorCount: number): CadBuilding3dGro
   label,
   floor_count: floorCount,
   aligned_count: floorCount,
+  placement: 'none',
+  site_offset_mm: [0, 0],
+  placement_axes: [],
+  placement_anchor: null,
+  placement_message: null,
 });
 
 type Current = { jobId: string; pageIndex: number; view: number } | null;

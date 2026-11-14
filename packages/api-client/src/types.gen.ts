@@ -731,6 +731,29 @@ export type CadBuilding3dGroupRead = {
      * Label
      */
     label: string;
+    /**
+     * Placement
+     */
+    placement: 'reference' | 'axes' | 'none';
+    /**
+     * Placement Anchor
+     */
+    placement_anchor: string | null;
+    /**
+     * Placement Axes
+     */
+    placement_axes: Array<string>;
+    /**
+     * Placement Message
+     */
+    placement_message: string | null;
+    /**
+     * Site Offset Mm
+     */
+    site_offset_mm: [
+        number,
+        number
+    ];
 };
 
 /**
