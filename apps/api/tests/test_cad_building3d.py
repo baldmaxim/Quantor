@@ -1005,3 +1005,32 @@ def test_building_whose_cores_do_not_match_stays_aside_with_reason() -> None:
     root = placements["k1-s1"]
     assert root.placement == "none"
     assert root.message is not None and "по ядрам" in root.message
+
+
+def test_without_core_match_the_larger_axes_cluster_stays_the_reference() -> None:
+    """Паркинг ни с чем не совпал по ядрам - секции, связанные осями, остаются вместе."""
+    from tests.test_cad_site_cores import parking
+
+    under = with_cores(
+        built(
+            corps=None,
+            section=None,
+            elevation=BASE - 4000,
+            axes=axes_block({"01": 1000.0, "02": 9000.0}, {"0А": 1000.0, "0Б": 9000.0}),
+        ),
+        parking(),
+        bbox=[0.0, 0.0, 220000.0, 180000.0],
+    )
+    v1, h1 = section_axes("1", 20000.0, 10000.0)
+    v2, h2 = section_axes("2", 50000.0, 10000.0)
+    summary = built(
+        corps=None, section=None, elevation=None, order=1, axes=axes_block(v1 | v2, h1 | h2)
+    )
+    first = built(corps="1", section=None, order=2, axes=axes_block(*section_axes("1")))
+    second = built(corps="2", section=None, order=3, axes=axes_block(*section_axes("2")))
+    placements, _ = placed([under, summary, first, second])
+    assert placements["k1"].placement == "axes"
+    assert placements["k1"].offset_mm == pytest.approx((20000.0, 10000.0))
+    parking_key = next(k for k, p in placements.items() if p.placement == "none")
+    message = placements[parking_key].message
+    assert message is not None and "опора объекта" in message

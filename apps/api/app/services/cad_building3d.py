@@ -86,6 +86,9 @@ SITE_MAX_OVERLAP: Final = 0.3
 SITE_PREFIXED_LABEL: Final = re.compile(r"\d{1,2}[.\-]")
 # Ядра для постановки по совпадению монолита: стены и пилоны (колонны паркинга периодичны).
 CORE_KINDS: Final = frozenset({"monolith_wall", "monolith_pylon"})
+# Нижних этажей скопления, пробуемых по одному, и наименьшее число колец ядер этажа.
+CORE_TRY_FLOORS: Final = 6
+CORE_MIN_RINGS: Final = 4
 
 Point = tuple[float, float]
 
@@ -1114,27 +1117,30 @@ def _moved_ring(ring: CoreRing, rotation: float, dx: float, dy: float) -> CoreRi
     return tuple(moved)
 
 
-def _group_cores(
+def _floor_core_sets(
     items: Sequence[BuiltFloor],
     aligned: Sequence[CadBuilding3dFloorRead],
-    key: str,
-    placement: GroupPlacement,
-) -> list[CoreRing]:
-    """Ядра здания в системе скопления: нижний совмещённый этаж с отметкой (иначе любой).
+    placements: dict[str, GroupPlacement],
+    keys: Sequence[str],
+) -> list[list[CoreRing]]:
+    """Ядра нижних этажей скопления по отдельности, в системе скопления (снизу вверх).
 
-    Ядра проходят сквозь все этажи; нижний этаж ближе всего к паркингу и несёт их целиком.
+    Ядра проходят сквозь все этажи, но выше земли к ним добавляются монолитные стены квартир,
+    которых в подземке нет; а сводный техуровень несёт монолит другого уровня. Поэтому этажи
+    пробуются по одному (не больше `CORE_TRY_FLOORS`), и берётся лучший однозначный.
     """
-    rows = [
+    group_keys = set(keys)
+    rows = sorted(
         (floor.alignment == "none", not floor.elevation_known, floor.base_z_mm, i)
         for i, floor in enumerate(aligned)
-        if floor.group_key == key and items[i].cores
-    ]
-    if not rows:
-        return []
-    *_rank, index = min(rows)
-    fx, fy = aligned[index].offset_mm
-    ox, oy = placement.offset_mm
-    return [_moved_ring(ring, 0.0, fx + ox, fy + oy) for ring in items[index].cores]
+        if floor.group_key in group_keys and len(items[i].cores) >= CORE_MIN_RINGS
+    )
+    out: list[list[CoreRing]] = []
+    for *_rank, index in rows[:CORE_TRY_FLOORS]:
+        fx, fy = aligned[index].offset_mm
+        ox, oy = placements[aligned[index].group_key].offset_mm
+        out.append([_moved_ring(ring, 0.0, fx + ox, fy + oy) for ring in items[index].cores])
+    return out
 
 
 def _floor_area_m2(floor: CadBuilding3dFloorRead) -> int:
@@ -1149,58 +1155,93 @@ def place_by_cores(
 ) -> dict[str, GroupPlacement]:
     """Постановка скоплений зданий на объект по совпадению ядер (`cad_site_cores`).
 
-    Основа - скопление с самым большим этажом (план подземной автостоянки несёт ядра всех
-    корпусов). Остальные скопления, от большего набора ядер к меньшему, совмещаются с монолитом уже
-    поставленных; поставленное скопление добавляет свои ядра к основе, поэтому следующий проход
-    повторяется, пока что-то ставится. Не совместившееся скопление остаётся не поставленным
-    (`none`) с причиной; здания в нём - в системе своего эталона, как раньше.
+    Основа - самый большой этаж объекта (план подземной автостоянки несёт ядра всех корпусов) и
+    его скопление. Остальные скопления, от большего к меньшему, совмещаются с монолитом уже
+    поставленного (каждый из нижних этажей по отдельности, `_floor_core_sets`); поставленное
+    добавляет ядра своего этажа к основе, и проход повторяется, пока что-то ставится. Не
+    совместившееся скопление остаётся не поставленным (`none`) с причиной. Если по ядрам к основе
+    не встало ничего, а скопление по осям больше её, опорой остаётся оно (как до постановки по
+    ядрам).
     """
     clusters: dict[str, list[str]] = {}
     for key, placement in placements.items():
         clusters.setdefault(placement.cluster or key, []).append(key)
     if len(clusters) == 1:
         return placements
-    cores = {key: _group_cores(items, aligned, key, p) for key, p in placements.items()}
     labels = {floor.group_key: floor.group_label for floor in aligned}
-    # Основа - скопление с самым большим этажом (м²), при равенстве - с большим числом зданий.
-    area = dict.fromkeys(placements, 0)
-    for floor in aligned:
-        area[floor.group_key] = max(area.get(floor.group_key, 0), _floor_area_m2(floor))
-    base_root = max(
-        sorted(clusters),
-        key=lambda r: (max(area.get(k, 0) for k in clusters[r]), len(clusters[r])),
+    biggest = max(
+        (i for i, floor in enumerate(aligned) if items[i].cores),
+        key=lambda i: (_floor_area_m2(aligned[i]), -i),
+        default=None,
     )
-    site: list[CoreRing] = [ring for k in clusters[base_root] for ring in cores[k]]
+    if biggest is None:
+        base_root = max(sorted(clusters), key=lambda r: len(clusters[r]))
+        site: list[CoreRing] = []
+    else:
+        floor = aligned[biggest]
+        base_root = placements[floor.group_key].cluster or floor.group_key
+        fx, fy = floor.offset_mm
+        ox, oy = placements[floor.group_key].offset_mm
+        site = [_moved_ring(r, 0.0, fx + ox, fy + oy) for r in items[biggest].cores]
     placed: dict[str, cad_site_cores.CoreMatch] = {}
     tried: dict[str, cad_site_cores.CoreMatch | None] = {}
-    pending = sorted(
-        (r for r in clusters if r != base_root),
-        key=lambda r: (-sum(len(cores[k]) for k in clusters[r]), r),
-    )
+    sets = {
+        root: _floor_core_sets(items, aligned, placements, keys) for root, keys in clusters.items()
+    }
+    pending = sorted((r for r in clusters if r != base_root), key=lambda r: (-len(clusters[r]), r))
     progress = True
     while progress and pending:
         progress = False
         for root in list(pending):
-            rings = [ring for k in clusters[root] for ring in cores[k]]
-            found = _register_cached(site, rings) if rings and site else None
-            tried[root] = found
-            if found is None or not found.accepted:
+            best: tuple[cad_site_cores.CoreMatch, list[CoreRing]] | None = None
+            for rings in sets[root] if site else []:
+                found = _register_cached(site, rings)
+                if found is None:
+                    continue
+                rank = (found.accepted, found.share)
+                if best is None or rank > (best[0].accepted, best[0].share):
+                    best = (found, rings)
+            tried[root] = None if best is None else best[0]
+            if best is None or not best[0].accepted:
                 continue
-            placed[root] = found
-            site.extend(_moved_ring(r, found.rotation_deg, found.tx, found.ty) for r in rings)
+            match, rings = best
+            placed[root] = match
+            site.extend(_moved_ring(r, match.rotation_deg, match.tx, match.ty) for r in rings)
             pending.remove(root)
             progress = True
-    result: dict[str, GroupPlacement] = {}
+    site_size = len(clusters[base_root]) + sum(len(clusters[r]) for r in placed)
+    largest = max(sorted(clusters), key=lambda r: len(clusters[r]))
+    if not placed and len(clusters[largest]) > site_size:
+        # По ядрам не встало ничего: опорой остаётся большее скопление по осям, основа - в стороне.
+        fallback: str | None = base_root
+        base_root = largest
+    else:
+        fallback = None
     base_label = labels.get(base_root, base_root)
+    result: dict[str, GroupPlacement] = {}
     for root, keys in clusters.items():
-        match = placed.get(root)
+        site_match = placed.get(root)
         for key in keys:
             p = placements[key]
             if root == base_root:
                 result[key] = p
-            elif match is not None:
+            elif root == fallback:
+                result[key] = GroupPlacement(
+                    "none",
+                    (0.0, 0.0),
+                    (),
+                    None,
+                    f"ни одно скопление зданий не совпало с этим этажом по ядрам; опора объекта - "
+                    f"«{base_label}» (по осям)",
+                    root,
+                )
+            elif site_match is not None:
                 ox, oy = cad_site_cores.transform_point(
-                    p.offset_mm[0], p.offset_mm[1], match.rotation_deg, match.tx, match.ty
+                    p.offset_mm[0],
+                    p.offset_mm[1],
+                    site_match.rotation_deg,
+                    site_match.tx,
+                    site_match.ty,
                 )
                 result[key] = GroupPlacement(
                     "cores" if key == root else p.placement,
@@ -1209,8 +1250,8 @@ def place_by_cores(
                     base_root if key == root else p.anchor_key,
                     None,
                     root,
-                    match.rotation_deg,
-                    round(match.share, 3) if key == root else None,
+                    site_match.rotation_deg,
+                    round(site_match.share, 3) if key == root else None,
                 )
             else:
                 result[key] = GroupPlacement(
