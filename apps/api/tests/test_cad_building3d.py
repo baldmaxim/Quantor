@@ -254,14 +254,17 @@ def built(
     *,
     corps: str | None = "9",
     section: str | None = "3",
-    elevation: int = BASE,
+    elevation: int | None = BASE,
     order: int = 0,
     axes: dict[str, Any] | None = None,
     frame: CadFrameRead = FRAME,
     shift: tuple[float, float] = (0.0, 0.0),
     include_walls: bool = False,
 ) -> b3d.BuiltFloor:
-    """Этаж из walls.json с заголовком плана и (необязательно) осями; `shift` сдвигает DXF."""
+    """Этаж из walls.json с заголовком плана и (необязательно) осями; `shift` сдвигает DXF.
+
+    `elevation=None` - отметка этажа не определена.
+    """
     title = {"corps": corps, "section": section, "floors": [1], "text": None}
     raw = raw_document(title=title, floor_elevation_mm=elevation)
     raw["heights"] = heights(title=title, floor_elevation_mm=elevation)
@@ -407,14 +410,25 @@ def test_no_common_axes_in_one_direction_is_not_aligned() -> None:
     assert floor.alignment_message == "нет общих горизонтальных осей с эталонным этажом"
 
 
-def test_disagreeing_axes_are_not_aligned_and_named() -> None:
+def test_one_shifted_bubble_is_outvoted_by_agreeing_axes() -> None:
     reference = built(axes=ref_axes())
-    # 3.3 отличается на 400 мм от смещения остальных (медиана 100 мм).
+    # Кружок 3.3 на выноске сдвинут на 400 мм от сдвига остальных (100 мм): совмещение по 3.1, 3.2.
     skewed = {"3.1": 1100.0, "3.2": 5100.0, "3.3": 9500.0}
     other = built(elevation=BASE + 3000, order=1, axes=axes_block(skewed, REF_Y))
     _ref, floor = b3d.align_floors([reference, other])
+    assert floor.alignment == "axes"
+    assert floor.alignment_axes == ["3.1", "3.2", "А", "Б"]
+    assert floor.offset_mm == pytest.approx((-100.0, 0.0))
+
+
+def test_ambiguous_axes_are_not_aligned_and_named() -> None:
+    reference = built(axes=axes_block({**REF_X, "3.4": 13000.0}, REF_Y))
+    # Две марки дают сдвиг 100 мм, две другие - 600 мм: неоднозначность, а не выноска.
+    split = {"3.1": 1100.0, "3.2": 5100.0, "3.3": 9600.0, "3.4": 13600.0}
+    other = built(elevation=BASE + 3000, order=1, axes=axes_block(split, REF_Y))
+    _ref, floor = b3d.align_floors([reference, other])
     assert floor.alignment == "none"
-    assert floor.alignment_message == "вертикальных оси расходятся с эталоном: 3.3"
+    assert floor.alignment_message == "вертикальных оси расходятся с эталоном: 3.1, 3.2, 3.3, 3.4"
 
 
 def test_single_common_labels_with_far_shift_do_not_overlap_reference() -> None:
@@ -743,8 +757,8 @@ def test_one_misread_label_does_not_break_placement_but_disagreement_does() -> N
     assert placements["k1"].placement == "axes"
     assert "1.5" not in placements["k1"].axes
     assert placements["k1"].offset_mm == pytest.approx((20000.0, 10000.0))
-    # Половина марок вразнобой - совпадения нет.
-    wild = {**section_axes("1", 20000.0, 10000.0)[0], "1.3": 1.0, "1.4": 2.0}
+    # Две марки дают один сдвиг, две другие - другой общий сдвиг: неоднозначно, совпадения нет.
+    wild = {**section_axes("1", 20000.0, 10000.0)[0], "1.3": 14000.0, "1.4": 18000.0}
     noisy = built(corps=None, section=None, elevation=BASE - 4000, axes=axes_block(wild, h1))
     placements, _ = placed([section, noisy])
     assert [p.placement for p in placements.values()].count("axes") == 0
@@ -764,3 +778,53 @@ def test_group_without_axes_or_single_group_placement() -> None:
     assert placements["k1"].placement == "reference"
     assert placements["k2"].placement == "none"
     assert placements["k2"].message is not None and "осям" in placements["k2"].message
+
+
+def test_unnamed_sheets_with_other_grids_become_separate_buildings() -> None:
+    # Паркинг со своей сеткой и сводный план секций без отметки - оба «Корпус не указан».
+    parking = built(
+        corps=None,
+        section=None,
+        elevation=BASE - 4000,
+        axes=axes_block({"01": 1000.0, "02": 9000.0}, {"0А": 1000.0, "0Б": 9000.0}),
+    )
+    v1, h1 = section_axes("1", 20000.0, 10000.0)
+    v2, h2 = section_axes("2", 50000.0, 10000.0)
+    summary = built(
+        corps=None, section=None, elevation=None, order=1, axes=axes_block(v1 | v2, h1 | h2)
+    )
+    first = built(corps="1", section=None, order=2, axes=axes_block(*section_axes("1")))
+    second = built(corps="2", section=None, order=3, axes=axes_block(*section_axes("2")))
+    aligned = b3d.align_floors([parking, summary, first, second])
+    keys = [floor.group_key for floor in aligned]
+    assert keys[2:] == ["k1", "k2"]
+    assert set(keys[:2]) == {"none", "none-2"}
+    split = next(floor for floor in aligned[:2] if floor.group_key == "none-2")
+    assert split.alignment == "reference"
+    assert split.group_label.startswith("Корпус не указан · ")
+    placements = b3d.place_groups([parking, summary, first, second], aligned)
+    # План секций без отметки - связка: обе секции поставлены по маркам с номером секции.
+    summary_key = keys[1]
+    assert placements[summary_key].placement == "reference"
+    assert placements["k1"].offset_mm == pytest.approx((20000.0, 10000.0))
+    assert placements["k2"].offset_mm == pytest.approx((50000.0, 10000.0))
+    # У паркинга с секциями нет общих марок - он не поставлен, с причиной.
+    parking_key = keys[0]
+    assert placements[parking_key].placement == "none"
+    assert placements[parking_key].message is not None
+
+
+def test_local_axes_without_levels_do_not_place_a_building() -> None:
+    # Марки без номера секции повторяются, а без отметок наложение не проверить.
+    local = axes_block({"1": 1000.0, "2": 5000.0, "3": 9000.0}, {"А": 1000.0, "Б": 3000.0})
+    shifted = axes_block({"1": 3000.0, "2": 7000.0, "3": 11000.0}, {"А": 1000.0, "Б": 3000.0})
+    placements, _ = placed(
+        [
+            built(corps="1", section=None, axes=local),
+            built(corps="2", section=None, elevation=None, order=1, axes=shifted),
+        ]
+    )
+    assert placements["k1"].placement == "reference"
+    assert placements["k2"].placement == "none"
+    assert placements["k2"].message is not None
+    assert "без номера секции" in placements["k2"].message

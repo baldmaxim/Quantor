@@ -459,20 +459,56 @@ class BuiltFloor:
     axes: FloorAxes
 
 
+def _agreed(diffs: dict[str, float]) -> tuple[list[str], int]:
+    """Наибольшая группа марок с одним сдвигом (в допуске) и размер следующей за ней группы.
+
+    Тесные промежуточные оси подписаны кружками на выносках, и центр такого кружка на разных
+    листах сдвинут на метры (лист 342: 15.3, 15.4, 15.Б, 15.В); главные оси совпадают точно.
+    Поэтому сдвиг даёт согласное большинство, а не все общие марки.
+    """
+    labels = sorted(diffs, key=_natural_key)
+
+    def around(center: str, pool: Sequence[str]) -> list[str]:
+        return [m for m in pool if abs(diffs[m] - diffs[center]) <= AXIS_TOLERANCE_MM]
+
+    best: list[str] = []
+    for label in labels:
+        group = around(label, labels)
+        if len(group) > len(best):
+            best = group
+    rest = [label for label in labels if label not in best]
+    second = max((len(around(label, rest)) for label in rest), default=0)
+    return best, second
+
+
+def _plurality(diffs: dict[str, float]) -> tuple[float, list[str]] | None:
+    """Сдвиг (медиана) по согласному большинству, иначе `None`.
+
+    Группа согласных марок не меньше чем вдвое больше следующей (две марки против двух с другим
+    общим сдвигом - неоднозначность, а не выноска), а при двух и более общих марках в ней не
+    меньше двух.
+    """
+    agreed, second = _agreed(diffs)
+    if len(agreed) < max(2 * second, 1) or len(agreed) == second:
+        return None
+    if len(diffs) >= 2 and len(agreed) < 2:
+        return None
+    return statistics.median(diffs[label] for label in agreed), agreed
+
+
 def _match_orient(
     reference: dict[str, float], other: dict[str, float], name: str
 ) -> tuple[float, list[str]] | str:
-    """Смещение по одному направлению (медиана) и общие подписи, либо причина отказа."""
+    """Смещение по одному направлению (по согласному большинству) и согласные подписи, либо
+    причина отказа."""
     common = sorted(reference.keys() & other.keys(), key=_natural_key)
     if not common:
         return f"нет общих {name} осей с эталонным этажом"
     diffs = {label: reference[label] - other[label] for label in common}
-    median = statistics.median(diffs.values())
-    if len(common) >= 2:
-        bad = [label for label in common if abs(diffs[label] - median) > AXIS_TOLERANCE_MM]
-        if bad:
-            return f"{name} оси расходятся с эталоном: {', '.join(bad)}"
-    return median, common
+    found = _plurality(diffs)
+    if found is None:
+        return f"{name} оси расходятся с эталоном: {', '.join(common)}"
+    return found
 
 
 def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding3dFloorRead:
@@ -543,29 +579,85 @@ def _shared_axes(first: BuiltFloor, second: BuiltFloor) -> int:
     )
 
 
+def _pick_reference(items: Sequence[BuiltFloor], usable: Sequence[int]) -> int | None:
+    """Эталон - этаж с наибольшим числом общих подписей осей с остальными этажами группы
+    (подземный этаж с другой сеткой эталоном не становится); при равенстве - самый нижний."""
+    if not usable:
+        return None
+    return min(
+        usable,
+        key=lambda i: (
+            -sum(_shared_axes(items[i], items[j]) for j in usable if j != i),
+            not items[i].floor.elevation_known,
+            items[i].floor.base_z_mm,
+            items[i].order,
+        ),
+    )
+
+
+def _split_unnamed(
+    items: Sequence[BuiltFloor],
+    indexes: Sequence[int],
+    result: list[CadBuilding3dFloorRead | None],
+) -> list[int]:
+    """Листы без корпуса и секции с осями другой сетки - отдельные здания «Корпус не указан · …».
+
+    Под «Корпус не указан» попадают и паркинг со своей сеткой («01», «0А»), и сводные планы секций
+    (техэтаж, кровля стилобата): общих осей у них нет, и одним эталоном их не совместить. Этажи,
+    не совместившиеся с эталоном, по очереди образуют свои группы со своим эталоном; каждая
+    ставится на объект отдельно. Заполняет `result` для отделённых этажей и возвращает индексы,
+    оставшиеся в основной группе.
+    """
+    usable = [i for i in indexes if items[i].axes.usable]
+    ref = _pick_reference(items, usable)
+    if ref is None:
+        return list(indexes)
+    joined = {i for i in usable if i != ref and _align_to(items[i], items[ref]).alignment == "axes"}
+    pending = [i for i in usable if i != ref and i not in joined]
+    number = 1
+    while pending:
+        number += 1
+        sub_ref = _pick_reference(items, pending)
+        if sub_ref is None:
+            break
+        members = [sub_ref] + [
+            i
+            for i in pending
+            if i != sub_ref and _align_to(items[i], items[sub_ref]).alignment == "axes"
+        ]
+        key = f"{GROUP_NONE_KEY}-{number}"
+        label = f"{GROUP_NONE_LABEL} · {items[sub_ref].floor.label}"
+        renamed = [
+            BuiltFloor(
+                items[i].floor.model_copy(update={"group_key": key, "group_label": label}),
+                items[i].order,
+                items[i].axes,
+            )
+            for i in members
+        ]
+        reference = renamed[0]
+        result[sub_ref] = reference.floor.model_copy(
+            update={"alignment": "reference", "alignment_axes": [], "alignment_message": None}
+        )
+        for i, item in zip(members[1:], renamed[1:], strict=True):
+            result[i] = _align_to(item, reference)
+        pending = [i for i in pending if i not in members]
+    return [i for i in indexes if result[i] is None]
+
+
 def align_floors(items: Sequence[BuiltFloor]) -> list[CadBuilding3dFloorRead]:
-    """Совмещение этажей каждой группы с эталоном; порядок результата - как у входа."""
+    """Совмещение этажей каждой группы с эталоном; порядок результата - как у входа.
+
+    Группа «Корпус не указан» делится на отдельные здания по сеткам осей (`_split_unnamed`).
+    """
     result: list[CadBuilding3dFloorRead | None] = [None] * len(items)
     groups: dict[str, list[int]] = {}
     for index, item in enumerate(items):
         groups.setdefault(item.floor.group_key, []).append(index)
-    for indexes in groups.values():
+    for key, members in groups.items():
+        indexes = _split_unnamed(items, members, result) if key == GROUP_NONE_KEY else members
         usable = [i for i in indexes if items[i].axes.usable]
-        # Эталон - этаж с наибольшим числом общих подписей осей с остальными этажами группы
-        # (подземный этаж с другой сеткой эталоном не становится); при равенстве - самый нижний.
-        ref_index = (
-            min(
-                usable,
-                key=lambda i: (
-                    -sum(_shared_axes(items[i], items[j]) for j in usable if j != i),
-                    not items[i].floor.elevation_known,
-                    items[i].floor.base_z_mm,
-                    items[i].order,
-                ),
-            )
-            if usable
-            else None
-        )
+        ref_index = _pick_reference(items, usable)
         reference = None if ref_index is None else items[ref_index]
         for i in indexes:
             item = items[i]
@@ -680,18 +772,24 @@ def _group_axes(
 def _consensus(base: dict[str, float], other: dict[str, float]) -> tuple[float, list[str]] | None:
     """Сдвиг по одному направлению по согласованным общим маркам; согласия нет - `None`.
 
-    Согласованные - в допуске от медианы разностей; их должно быть не меньше `SITE_MIN_AGREEMENT`
-    от общих: пара ошибочно прочитанных марок постановку не ломает, случайные совпадения не дают.
+    Марка с номером секции («15.1») одна на весь объект: случайного совпадения у неё нет, и
+    сдвиг даёт согласное большинство (кружки тесных осей на выносках сдвинуты, `_agreed`). Без
+    номера секции («1», «А») марки повторяются у типовых секций: согласованных должно быть не
+    меньше `SITE_MIN_AGREEMENT` от общих.
     """
     common = sorted(base.keys() & other.keys(), key=_natural_key)
     if not common:
         return None
     diffs = {label: base[label] - other[label] for label in common}
-    median = statistics.median(diffs.values())
-    agreed = [label for label in common if abs(diffs[label] - median) <= AXIS_TOLERANCE_MM]
-    if len(agreed) < SITE_MIN_AGREEMENT * len(common):
+    found = _plurality(diffs)
+    if found is None:
         return None
-    return statistics.fmean(diffs[label] for label in agreed), agreed
+    agreed = found[1]
+    if not any(_is_prefixed(label) for label in agreed) and (
+        len(agreed) < SITE_MIN_AGREEMENT * len(common)
+    ):
+        return None
+    return found
 
 
 def _site_match(base: FloorAxes, other: FloorAxes) -> _SiteMatch | None:
@@ -777,7 +875,9 @@ def place_groups(
     keys = sorted(infos, key=lambda k: (_natural_key(infos[k].label), k))
     if len(keys) == 1:
         return {keys[0]: GroupPlacement("reference", (0.0, 0.0), (), None, None)}
-    with_axes = [k for k in keys if infos[k].axes.usable and infos[k].levels]
+    # Здание без этажей с отметкой (план 1 этажа, техэтаж без отметки) - тоже связка: марки с
+    # номером секции ставят его без проверки наложения.
+    with_axes = [k for k in keys if infos[k].axes.usable]
     matches: dict[tuple[str, str], _SiteMatch] = {}
     for base in with_axes:
         for other in with_axes:
@@ -790,7 +890,8 @@ def place_groups(
             key=lambda k: (
                 -sum(len(m.labels) for (b, _o), m in matches.items() if b == k),
                 -(len(infos[k].axes.vertical) + len(infos[k].axes.horizontal)),
-                min(level[0] for level in infos[k].levels),
+                not infos[k].levels,
+                min((level[0] for level in infos[k].levels), default=0),
                 keys.index(k),
             ),
         )
@@ -818,6 +919,13 @@ def place_groups(
                     offsets[base][1] + match.shift[1],
                 )
                 clash = None
+                if not match.prefixed and not (infos[other].levels and infos[base].levels):
+                    # Без отметок наложение не проверить, а марки без номера секции повторяются.
+                    rejected[other] = (
+                        f"совпадение по осям {', '.join(match.labels)} без номера секции, а этажей "
+                        "с отметкой для проверки наложения нет"
+                    )
+                    continue
                 if not match.prefixed:
                     clash = next(
                         (k for k in offsets if _clash(infos[k], offsets[k], infos[other], offset)),
@@ -847,9 +955,7 @@ def place_groups(
             if key in result:
                 continue
             info = infos[key]
-            if not info.levels:
-                message = "у здания нет этажей с отметкой"
-            elif not info.axes.usable:
+            if not info.axes.usable:
                 message = "у здания нет совмещённых по осям этажей с осями в обоих направлениях"
             else:
                 message = rejected.get(key) or (
