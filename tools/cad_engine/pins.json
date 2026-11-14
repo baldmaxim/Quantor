@@ -6,7 +6,7 @@
     "version": "2026.11.13+1afeca5f32b7",
     "archive_name": "Quantor_CAD_source_2026.11.13_1afeca5f32b7.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "2023667748342f6b33930589f0d0a660ace71810",
+    "repo_ref": "b60c65d28dd7dddb2244a8e31a601a38e3f753f9",
     "archive_path": "engine/dist/Quantor_CAD_source_2026.11.13_1afeca5f32b7.zip",
     "archive_sha256": "619c3910d0d07b7dfbf531ffa093484a95a0b9fb5acac8abff000b802d963888",
     "manifest_sha256": "eddb9a3d44bf23e18fec9d3b58b875626a0acd540f792428e6059b8e29945754",
@@ -43,7 +43,7 @@
       "floor3d_dxf_version": "cad_floor3d_dxf.v2"
     },
     "cad_eom": {
-      "generator_version": "cad_eom.v0.1",
+      "generator_version": "cad_eom.v0.1.1",
       "params_path": "generators/cad_eom/params/v1.json",
       "params_sha256": "2080e08f01bd55af3a12d0e49494a1223f30b4a55d720ee2c435bde41dfbb807",
       "params_canonical_sha256": "f1d47e6c3d69835a8512b5e8f8807a953a161e1b96af814842a2dbb530006937"
