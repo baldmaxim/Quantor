@@ -61,12 +61,16 @@ describe('планирование элементов', () => {
     expect(position.toArray()).toEqual([2, 1.5, -3]);
     expect([scale.x, scale.y, scale.z].map((v) => Number(v.toFixed(6)))).toEqual([0.8, 1.4, 0.16]);
     expect(axis.distanceTo(new THREE.Vector3(0, 0, -1))).toBeCloseTo(0, 6);
-    const up = new THREE.Vector3(0, 1, 0).transformDirection((plan as { matrix: THREE.Matrix4 }).matrix);
+    const up = new THREE.Vector3(0, 1, 0).transformDirection(
+      (plan as { matrix: THREE.Matrix4 }).matrix,
+    );
     expect(up.distanceTo(new THREE.Vector3(0, 1, 0))).toBeCloseTo(0, 6);
   });
 
   it('прибор без габарита не рисуется', () => {
-    expect(planMepElement(element({ type: 'box', w_mm: 80, h_mm: 80, d_mm: null }), frame)).toBeNull();
+    expect(
+      planMepElement(element({ type: 'box', w_mm: 80, h_mm: 80, d_mm: null }), frame),
+    ).toBeNull();
   });
 
   it('фасонина elbow/tee/cross - сфера радиусом 0,65 DN в точке с учётом чистого пола', () => {
@@ -77,6 +81,32 @@ describe('планирование элементов', () => {
       expect(position.toArray()).toEqual([2, 1.5, -3]);
       expect(scale.x).toBeCloseTo(0.65 * 0.05, 9);
     }
+  });
+
+  it('фасонина короба - угловой блок сечения короба с запасом на фланцы, по оси', () => {
+    const duct = { layer: 'M-OV-VZH', dn_mm: null, w_mm: 300, h_mm: 200, axis: [0, 1000, 0] };
+    for (const subtype of ['elbow', 'tee', 'cross']) {
+      const plan = planMepElement(element({ ...duct, subtype }), frame);
+      expect(plan?.kind).toBe('box');
+      const { position, scale, axis } = parts((plan as { matrix: THREE.Matrix4 }).matrix);
+      expect(position.toArray()).toEqual([2, 1.5, -3]);
+      expect([scale.x, scale.y, scale.z]).toEqual(
+        [0.33, 0.23, 0.33].map((n) => expect.closeTo(n, 9)),
+      );
+      expect(axis.distanceTo(new THREE.Vector3(0, 0, -1))).toBeCloseTo(0, 6);
+    }
+    // стык короба с круглым вводом (есть и DN, и сечение) - тоже блок короба
+    expect(planMepElement(element({ ...duct, dn_mm: 110 }), frame)?.kind).toBe('box');
+    expect(planMepElement(element({ ...duct, axis: [0, 0, 0] }), frame)).toBeNull();
+  });
+
+  it('переход короба: короб на короб - короб, круг на короб - конус от сечения короба', () => {
+    const duct = { layer: 'M-OV-MO', subtype: 'reducer', w_mm: 200, h_mm: 200, axis: [1000, 0, 0] };
+    const rect = planMepElement(element({ ...duct, dn_mm: null }), frame);
+    expect(rect?.kind).toBe('box');
+    const a = parts((rect as { matrix: THREE.Matrix4 }).matrix).scale;
+    expect([a.x, a.y, a.z]).toEqual([0.23, 0.23, 0.8 * 0.23].map((n) => expect.closeTo(n, 9)));
+    expect(planMepElement(element({ ...duct, dn_mm: 110 }), frame)?.kind).toBe('reducer');
   });
 
   it('reducer - конус длиной 1,5 DN вдоль оси', () => {
@@ -223,13 +253,22 @@ describe('оконечные приборы (terminal)', () => {
   it('без размеров корпуса - пропускается', () => {
     expect(planMepElement(terminal({ w_mm: null }), frame)).toBeNull();
     expect(planMepElement(terminal({ h_mm: 0 }), frame)).toBeNull();
-    expect(planMepElement(terminal({ subtype: 'sprinkler', dn_mm: null, h_mm: 50 }), frame)).toBeNull();
+    expect(
+      planMepElement(terminal({ subtype: 'sprinkler', dn_mm: null, h_mm: 50 }), frame),
+    ).toBeNull();
   });
 
   it('InstancedMesh по слою с токеном слоя; сантехника M-SAN-* - свой цвет', () => {
-    const colors: IMepElementColors = { ...COLORS, layers: { ...COLORS.layers, 'M-SAN-WC': 'rgb(10, 200, 90)' } };
+    const colors: IMepElementColors = {
+      ...COLORS,
+      layers: { ...COLORS.layers, 'M-SAN-WC': 'rgb(10, 200, 90)' },
+    };
     const built = buildMepElements(
-      [terminal(), terminal({ pos: [5000, 0, 400] }), terminal({ layer: 'M-OV-T1', subtype: 'convector' })],
+      [
+        terminal(),
+        terminal({ pos: [5000, 0, 400] }),
+        terminal({ layer: 'M-OV-T1', subtype: 'convector' }),
+      ],
       colors,
       frame,
       5,
@@ -237,7 +276,9 @@ describe('оконечные приборы (terminal)', () => {
     const meshes = instanced(built.group);
     expect(meshes.map((mesh) => mesh.count).sort()).toEqual([1, 2]);
     const san = meshes.find((mesh) => mesh.count === 2) as THREE.InstancedMesh;
-    expect((san.material as THREE.MeshStandardMaterial).color.getHex()).toBe(new THREE.Color('rgb(10, 200, 90)').getHex());
+    expect((san.material as THREE.MeshStandardMaterial).color.getHex()).toBe(
+      new THREE.Color('rgb(10, 200, 90)').getHex(),
+    );
     built.setLayerVisible('M-SAN-WC', false);
     expect(meshes.filter((mesh) => mesh.visible)).toHaveLength(1);
     built.dispose();

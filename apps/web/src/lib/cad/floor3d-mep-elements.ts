@@ -55,13 +55,7 @@ export interface IMepElementsFrame {
 }
 
 export type MepElementKind =
-  | 'sphere'
-  | 'reducer'
-  | 'cleanout'
-  | 'box'
-  | 'damper'
-  | 'sleeve'
-  | 'cylinder';
+  'sphere' | 'reducer' | 'cleanout' | 'box' | 'damper' | 'sleeve' | 'cylinder';
 /** Цвет детали: слоя, слоя темнее (арматура) или токен гильзы. */
 export type MepElementTone = 'layer' | 'dark' | 'sleeve';
 
@@ -83,6 +77,10 @@ export const VALVE_SIDE_K = 1.6;
 export const VALVE_LENGTH_K = 2.2;
 export const DAMPER_MARGIN_MM = 60;
 export const DAMPER_LENGTH_MM = 300;
+/** Фасонина короба шире самого короба на фланцы: стык виден. */
+export const DUCT_FITTING_MARGIN_MM = 30;
+/** Длина перехода короба относительно большей стороны сечения. */
+export const DUCT_REDUCER_K = 0.8;
 /** Арматура темнее слоя: множитель яркости цвета. */
 export const DARK_TONE_K = 0.6;
 /** Ячейка индекса фасонины, мм. */
@@ -105,6 +103,39 @@ const compose = (
     basis === null ? IDENTITY_QUATERNION : new THREE.Quaternion().setFromRotationMatrix(basis),
     new THREE.Vector3(sizeX, sizeY, sizeZ),
   );
+
+/**
+ * Фасонина прямоугольного короба (есть `w_mm` и `h_mm`). Отвод, тройник, крестовина - угловой блок
+ * сечения короба (`w + запас`) x (`h + запас`), длиной `w + запас` вдоль оси: закрывает стык прямых
+ * участков, которые сходятся осями в узле (без него наружный угол поворота оставался пустым и
+ * выглядел срезанным под 45). Переход - вставка длиной `DUCT_REDUCER_K * max(w, h)`: короб на
+ * короб - коробом, круг на короб - конусом от сечения короба. `undefined` - это не фасонина короба
+ * (трубы и старые файлы рисуются как раньше), `null` - короба без оси.
+ */
+const ductFitting = (
+  element: IFloor3dMepElement,
+  position: THREE.Vector3,
+  axis: THREE.Vector3 | null,
+  dn: number | null,
+  layer: string,
+): IMepElementPlan | null | undefined => {
+  if (!positive(element.w_mm) || !positive(element.h_mm)) return undefined;
+  if (axis === null) return null;
+  const basis = axisBasis(axis);
+  const margin = DUCT_FITTING_MARGIN_MM / MM_IN_M;
+  const w = element.w_mm / MM_IN_M + margin;
+  const h = element.h_mm / MM_IN_M + margin;
+  if (element.subtype === 'reducer') {
+    const length = DUCT_REDUCER_K * Math.max(w, h);
+    return {
+      layer,
+      kind: dn === null ? 'box' : 'reducer',
+      tone: 'layer',
+      matrix: compose(position, basis, w, h, length),
+    };
+  }
+  return { layer, kind: 'box', tone: 'layer', matrix: compose(position, basis, w, h, w) };
+};
 
 /** Что и как рисовать для элемента; `null` - данных не хватает (элемент пропускается). */
 export const planMepElement = (
@@ -130,7 +161,8 @@ export const planMepElement = (
         matrix: compose(position, null, dn, element.h_mm / MM_IN_M, dn),
       };
     }
-    if (!positive(element.w_mm) || !positive(element.length_mm) || !positive(element.h_mm)) return null;
+    if (!positive(element.w_mm) || !positive(element.length_mm) || !positive(element.h_mm))
+      return null;
     return {
       layer,
       kind: 'box',
@@ -148,6 +180,8 @@ export const planMepElement = (
   const axis = normalizeAxis(element.axis);
 
   if (element.type === 'fitting') {
+    const duct = ductFitting(element, position, axis, dn, layer);
+    if (duct !== undefined) return duct;
     if (dn === null) return null;
     if (element.subtype === 'reducer' || element.subtype === 'cleanout') {
       if (axis === null) return null;
@@ -238,7 +272,13 @@ export const planMepElement = (
       layer,
       kind: 'box',
       tone: 'sleeve',
-      matrix: compose(position, basis, element.w_mm / MM_IN_M, element.h_mm / MM_IN_M, sleeveLength),
+      matrix: compose(
+        position,
+        basis,
+        element.w_mm / MM_IN_M,
+        element.h_mm / MM_IN_M,
+        sleeveLength,
+      ),
     };
   }
   const outer = element.outer_d_mm / MM_IN_M;
@@ -389,7 +429,10 @@ export const buildMepElements = (
     planned.forEach((item, at) => mesh.setMatrixAt(at, item.plan.matrix));
     mesh.instanceMatrix.needsUpdate = true;
     mesh.renderOrder = renderOrder;
-    const pickData: IMepElementPickData = { kind: 'element', indices: planned.map((item) => item.index) };
+    const pickData: IMepElementPickData = {
+      kind: 'element',
+      indices: planned.map((item) => item.index),
+    };
     mesh.userData[MEP_PICK_KEY] = pickData;
     group.add(mesh);
     meshes.push(mesh);
