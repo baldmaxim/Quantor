@@ -1322,6 +1322,185 @@ def _cores_message(
     )
 
 
+def _axis_links(
+    infos: dict[str, _GroupInfo],
+) -> dict[tuple[str, str], _SiteMatch]:
+    """Совпадения осей всех пар зданий с осями в обоих направлениях: сдвиг из `other` в `base`."""
+    with_axes = [k for k in infos if infos[k].axes.usable]
+    links: dict[tuple[str, str], _SiteMatch] = {}
+    for base in with_axes:
+        for other in with_axes:
+            if base != other and (match := _site_match(infos[base].axes, infos[other].axes)):
+                links[(base, other)] = match
+    return links
+
+
+def _group_floor_cores(
+    items: Sequence[BuiltFloor], aligned: Sequence[CadBuilding3dFloorRead], key: str
+) -> list[CoreRing]:
+    """Ядра нижнего этажа здания (совмещённого, с отметкой) в системе эталона здания."""
+    rows = sorted(
+        (floor.alignment == "none", not floor.elevation_known, floor.base_z_mm, i)
+        for i, floor in enumerate(aligned)
+        if floor.group_key == key and len(items[i].cores) >= CORE_MIN_RINGS
+    )
+    if not rows:
+        return []
+    *_rank, index = rows[0]
+    fx, fy = aligned[index].offset_mm
+    return [_moved_ring(ring, 0.0, fx, fy) for ring in items[index].cores]
+
+
+def place_site(
+    items: Sequence[BuiltFloor], aligned: Sequence[CadBuilding3dFloorRead]
+) -> dict[str, GroupPlacement]:
+    """Постановка зданий на объект: опоры по ядрам, остальные - по осям от ближайшей опоры.
+
+    Основа - здание с самым большим этажом (план подземной автостоянки несёт ядра всех корпусов).
+    Каждое здание пробует встать на неё по ядрам своего нижнего этажа (`cad_site_cores`): сводные
+    первые этажи секций ставятся однозначно и становятся опорами, отдельные башни обычно нет. Затем
+    здания присоединяются по общим маркам осей к уже поставленным - сначала к опорам, потом дальше
+    по цепочке (ближайшая опора выигрывает): сводный лист, на котором крыло комплекса нарисовано не
+    в той ориентации, что на объекте, не уводит крыло, у которого есть своя опора. Совпадение марок
+    без номера секции принимается только без наложения этажей на одной отметке.
+
+    Если ни одно здание по ядрам не встало, постановка - как раньше, только по осям
+    (`place_groups` и `place_by_cores`).
+    """
+    infos = _group_infos(items, aligned)
+    keys = sorted(infos, key=lambda k: (_natural_key(infos[k].label), k))
+    if len(keys) == 1:
+        return {keys[0]: GroupPlacement("reference", (0.0, 0.0), (), None, None, keys[0])}
+    biggest = max(
+        (i for i, floor in enumerate(aligned) if len(items[i].cores) >= CORE_MIN_RINGS),
+        key=lambda i: (_floor_area_m2(aligned[i]), -i),
+        default=None,
+    )
+    if biggest is None:
+        return place_by_cores(items, aligned, place_groups(items, aligned))
+    base_key = aligned[biggest].group_key
+    fx, fy = aligned[biggest].offset_mm
+    site = [_moved_ring(r, 0.0, fx, fy) for r in items[biggest].cores]
+    pins: dict[str, cad_site_cores.CoreMatch] = {}
+    tried: dict[str, cad_site_cores.CoreMatch | None] = {}
+    for key in keys:
+        if key == base_key:
+            continue
+        rings = _group_floor_cores(items, aligned, key)
+        found = _register_cached(site, rings) if rings else None
+        tried[key] = found
+        if found is not None and found.accepted:
+            pins[key] = found
+    if not pins:
+        return place_by_cores(items, aligned, place_groups(items, aligned))
+    links = _axis_links(infos)
+    placed: dict[str, GroupPlacement] = {
+        base_key: GroupPlacement("reference", (0.0, 0.0), (), None, None, base_key)
+    }
+    hops: dict[str, int] = {base_key: 0}
+    for key, pin in pins.items():
+        placed[key] = GroupPlacement(
+            "cores",
+            (pin.tx, pin.ty),
+            (),
+            base_key,
+            None,
+            key,
+            pin.rotation_deg,
+            round(pin.share, 3),
+        )
+        hops[key] = 0
+    rejected: dict[str, str] = {}
+    while True:
+        candidates = sorted(
+            (
+                (base, other, match)
+                for (base, other), match in links.items()
+                if base in placed and other not in placed
+            ),
+            key=lambda row: (
+                hops[row[0]],
+                not row[2].prefixed,
+                -len(row[2].labels),
+                keys.index(row[1]),
+                keys.index(row[0]),
+            ),
+        )
+        attached = False
+        for base, other, match in candidates:
+            anchor_p = placed[base]
+            sx, sy = cad_site_cores.transform_point(
+                match.shift[0], match.shift[1], anchor_p.rotation_deg, 0.0, 0.0
+            )
+            offset = (anchor_p.offset_mm[0] + sx, anchor_p.offset_mm[1] + sy)
+            if not match.prefixed:
+                if not (infos[other].levels and infos[base].levels):
+                    rejected[other] = (
+                        f"совпадение по осям {', '.join(match.labels)} без номера секции, а этажей "
+                        "с отметкой для проверки наложения нет"
+                    )
+                    continue
+                clash = next(
+                    (
+                        k
+                        for k, p in placed.items()
+                        if p.rotation_deg == anchor_p.rotation_deg
+                        and _clash(infos[k], p.offset_mm, infos[other], offset)
+                    ),
+                    None,
+                )
+                if clash is not None:
+                    rejected[other] = (
+                        f"по осям {', '.join(match.labels)} здание ложится на "
+                        f"«{infos[clash].label}» на той же отметке: совпадение марок случайное"
+                    )
+                    continue
+            placed[other] = GroupPlacement(
+                "axes",
+                (round(offset[0], 3), round(offset[1], 3)),
+                tuple(sorted(match.labels, key=_natural_key)),
+                base,
+                None,
+                anchor_p.cluster,
+                anchor_p.rotation_deg,
+            )
+            hops[other] = hops[base] + 1
+            rejected.pop(other, None)
+            attached = True
+            break
+        if not attached:
+            break
+    base_label = infos[base_key].label
+    for key in keys:
+        if key in placed:
+            continue
+        found = tried.get(key)
+        message = rejected.get(key)
+        if message is None and found is not None:
+            message = (
+                f"по ядрам не совмещено с «{base_label}»: совпадение {found.share:.0%}, у другого "
+                f"варианта {found.second_share:.0%} (нужно не меньше "
+                f"{cad_site_cores.MIN_SHARE:.0%} и вдвое больше; у листа с неверным масштабом ядра "
+                "не совпадут), общих осей с поставленными зданиями нет"
+            )
+        elif message is None:
+            message = (
+                f"нет общих осей с поставленными зданиями и мало монолита для совмещения по ядрам "
+                f"с «{base_label}»"
+            )
+        placed[key] = GroupPlacement(
+            "none",
+            (0.0, 0.0),
+            (),
+            None,
+            message,
+            key,
+            0.0,
+            None if found is None else round(found.share, 3),
+        )
+    return placed
+
+
 def apply_placements(
     floors: Sequence[CadBuilding3dFloorRead], placements: dict[str, GroupPlacement]
 ) -> list[CadBuilding3dFloorRead]:
@@ -1824,9 +2003,8 @@ async def build_building3d(
         if item.floor is not None:
             built.append(BuiltFloor(item.floor, sheet.order, item.axes, item.cores))
     aligned = align_floors(built)
-    placements = place_groups(built, aligned)
-    # Совмещение по ядрам - чистый расчёт на тысячах точек: в потоке, не на event loop.
-    placements = await asyncio.to_thread(place_by_cores, built, aligned, placements)
+    # Постановка по ядрам - чистый расчёт на тысячах точек: в потоке, не на event loop.
+    placements = await asyncio.to_thread(place_site, built, aligned)
     placed = apply_placements(aligned, placements)
     floors = sort_floors([(f, item.order) for f, item in zip(placed, built, strict=True)])
     groups = build_groups(floors, placements)

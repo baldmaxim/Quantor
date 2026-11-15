@@ -653,7 +653,7 @@ def placed(
     items: list[b3d.BuiltFloor],
 ) -> tuple[dict[str, b3d.GroupPlacement], list[CadBuilding3dFloorRead]]:
     aligned = b3d.align_floors(items)
-    placements = b3d.place_by_cores(items, aligned, b3d.place_groups(items, aligned))
+    placements = b3d.place_site(items, aligned)
     return placements, b3d.apply_placements(aligned, placements)
 
 
@@ -1056,3 +1056,35 @@ def test_small_level_zone_takes_the_floor_level() -> None:
     ]
     floor = floor_of(roof_document(), extras)
     assert [(z.top_mm, z.source) for z in floor.levels] == [(99050, "marks"), (99300, "base")]
+
+
+def test_tower_follows_its_core_anchor_with_rotation() -> None:
+    """Сводный первый этаж крыла встал по ядрам с поворотом; башня с общими осями - за ним."""
+    from tests.test_cad_site_cores import CORE, parking
+
+    under = with_cores(
+        built(corps=None, section=None, elevation=BASE - 5000),
+        parking(),
+        bbox=[0.0, 0.0, 220000.0, 180000.0],
+    )
+    wing = with_cores(
+        built(
+            corps=None, section="1-2", order=1, axes=axes_block(*section_axes("1", 3000.0, 2000.0))
+        ),
+        CORE,
+    )
+    tower = built(corps="1", section="1", order=2, axes=axes_block(*section_axes("1")))
+    placements, _ = placed([under, wing, tower])
+    anchor = placements["s1_2"]
+    assert anchor.placement == "cores" and anchor.rotation_deg == pytest.approx(27.0, abs=0.3)
+    follower = placements["k1-s1"]
+    assert (follower.placement, follower.anchor_key) == ("axes", "s1_2")
+    assert follower.rotation_deg == pytest.approx(anchor.rotation_deg)
+    # Сдвиг башни в системе крыла (3000, 2000) поворачивается вместе с крылом.
+    sx, sy = (
+        3000 * math.cos(math.radians(27)) - 2000 * math.sin(math.radians(27)),
+        (3000 * math.sin(math.radians(27)) + 2000 * math.cos(math.radians(27))),
+    )
+    assert follower.offset_mm == pytest.approx(
+        (anchor.offset_mm[0] + sx, anchor.offset_mm[1] + sy), abs=100.0
+    )
