@@ -1229,7 +1229,7 @@ def place_by_cores(
     clusters: dict[str, list[str]] = {}
     for key, placement in placements.items():
         clusters.setdefault(placement.cluster or key, []).append(key)
-    if len(clusters) == 1:
+    if len(clusters) <= 1:
         return placements
     labels = {floor.group_key: floor.group_label for floor in aligned}
     biggest = max(
@@ -1408,6 +1408,8 @@ def place_site(
     """
     infos = _group_infos(items, aligned)
     keys = sorted(infos, key=lambda k: (_natural_key(infos[k].label), k))
+    if not keys:
+        return {}
     if len(keys) == 1:
         return {keys[0]: GroupPlacement("reference", (0.0, 0.0), (), None, None, keys[0])}
     biggest = max(

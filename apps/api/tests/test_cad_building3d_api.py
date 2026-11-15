@@ -121,7 +121,19 @@ async def test_floor_of_a_ready_sheet_follows_project_levels_for_viewer(
         "лист: оси не распознаны: пересчитайте конструкции листа"
     )
     assert body["groups"] == [
-        {"key": "none", "label": "Корпус не указан", "floor_count": 1, "aligned_count": 0}
+        {
+            "key": "none",
+            "label": "Корпус не указан",
+            "floor_count": 1,
+            "aligned_count": 0,
+            "placement": "reference",
+            "site_offset_mm": [0.0, 0.0],
+            "site_rotation_deg": 0.0,
+            "placement_share": None,
+            "placement_axes": [],
+            "placement_anchor": None,
+            "placement_message": None,
+        }
     ]
 
 
@@ -190,7 +202,19 @@ async def test_axes_in_walls_file_make_the_single_floor_a_reference(
     assert (floor["group_key"], floor["group_label"]) == ("k9-s3", "Корп. 9 · сек. 3")
     assert floor["alignment"] == "reference" and floor["alignment_message"] is None
     assert body["groups"] == [
-        {"key": "k9-s3", "label": "Корп. 9 · сек. 3", "floor_count": 1, "aligned_count": 1}
+        {
+            "key": "k9-s3",
+            "label": "Корп. 9 · сек. 3",
+            "floor_count": 1,
+            "aligned_count": 1,
+            "placement": "reference",
+            "site_offset_mm": [0.0, 0.0],
+            "site_rotation_deg": 0.0,
+            "placement_share": None,
+            "placement_axes": [],
+            "placement_anchor": None,
+            "placement_message": None,
+        }
     ]
 
 

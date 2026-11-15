@@ -1129,3 +1129,9 @@ def test_summary_sheet_gets_own_group_and_no_axes() -> None:
     assert item.floor.group_key.startswith("summary-")
     assert item.floor.group_label == "Сводный лист · АР1.2 · лист 8"
     assert not item.axes.usable
+
+
+def test_project_without_floors_has_no_placements() -> None:
+    """Проект без готовых этажей: пусто, а не ошибка (раньше `max()` от пустого - 500)."""
+    assert b3d.place_site([], []) == {}
+    assert b3d.place_by_cores([], [], {}) == {}
