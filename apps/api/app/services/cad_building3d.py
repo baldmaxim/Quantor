@@ -63,6 +63,9 @@ MAX_WALL_POINTS: Final = 64
 # Участки уровней плиты этажа (cad_walls v1.15): число и точки кольца участка.
 MAX_LEVEL_ZONES: Final = 300
 MAX_LEVEL_POINTS: Final = 400
+# Участок уровня меньше этого (мм²) - на основном уровне этажа; виды планов с участками.
+LEVEL_MIN_AREA_MM2: Final = 25_000_000
+LEVEL_KINDS: Final = frozenset({"roof", "roof_exit"})
 READ_CONCURRENCY: Final = 6
 # Для отрисовки, когда высота этажа или толщина плиты не определены (помечаются `*_known = false`).
 DEFAULT_FLOOR_HEIGHT_MM: Final = 3000
@@ -395,11 +398,35 @@ def _level_ring(ring: Sequence[Sequence[float]]) -> list[list[int]] | None:
     return out if len(out) >= 3 else None
 
 
+def _ring_area(ring: Sequence[Sequence[int]]) -> float:
+    total = 0.0
+    for i, (x0, y0) in enumerate(ring):
+        x1, y1 = ring[(i + 1) % len(ring)]
+        total += x0 * y1 - x1 * y0
+    return abs(total) / 2
+
+
+def levels_apply(document: WallsDocument) -> bool:
+    """Участки уровней показываются у кровель, выходов на кровлю и этажей с несколькими отметками.
+
+    На типовом плане знаки отметок стоят у площадок лестниц, балконов, приямков: плита этажа по ним
+    развалилась бы на ступени на полэтажа ниже - этаж остаётся одной плитой.
+    """
+    title = document.heights.title
+    if title is None or title.kind is None:
+        return False
+    return title.kind in LEVEL_KINDS or (title.kind == "floor" and len(title.marks_mm) > 1)
+
+
 def level_zones(
     raw: WallsLevels | None, document: WallsDocument, base_z_mm: int, elevation_mm: int | None
 ) -> list[CadBuilding3dLevelZoneRead]:
-    """Участки уровней плиты листа для вида; нет блока или отметок - пусто (одна плита)."""
-    if raw is None or not raw.zones:
+    """Участки уровней плиты листа для вида; нет блока, не тот вид плана или один уровень - пусто.
+
+    Участок меньше `LEVEL_MIN_AREA_MM2` (площадка лестницы, приямок, фундамент под оборудование)
+    встаёт на основной уровень этажа: дыры в плите нет, а мелкие ступени не рябят.
+    """
+    if raw is None or not raw.zones or not levels_apply(document):
         return []
     shift = _level_shift(document, base_z_mm, elevation_mm)
     out: list[CadBuilding3dLevelZoneRead] = []
@@ -409,16 +436,21 @@ def level_zones(
         if shell is None or top is None:
             continue
         holes = [ring for ring in (_level_ring(h) for h in zone.holes) if ring is not None]
+        area = _ring_area(shell) - sum(_ring_area(h) for h in holes)
+        small = area < LEVEL_MIN_AREA_MM2
+        marked = zone.source == "marks" and not small
         out.append(
             CadBuilding3dLevelZoneRead(
                 shell=shell,
                 holes=holes,
-                top_mm=top + shift,
-                mark_mm=zone.mark_mm,
-                max_mm=zone.max_mm,
-                source="marks" if zone.source == "marks" else "base",
+                top_mm=top + shift if marked else base_z_mm,
+                mark_mm=zone.mark_mm if marked else None,
+                max_mm=zone.max_mm if marked else None,
+                source="marks" if marked else "base",
             )
         )
+    if all(zone.top_mm == base_z_mm for zone in out):
+        return []
     return out
 
 

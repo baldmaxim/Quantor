@@ -842,8 +842,8 @@ def level_extras(**patch: Any) -> dict[str, Any]:
         "base_source": "title",
         "zones": [
             {
-                "shell": [[0, 0], [6000, 0], [6000, 4000], [0, 4000], [0, 0]],
-                "holes": [[[1000, 1000], [2000, 1000], [2000, 2000], [1000, 2000]]],
+                "shell": [[0, 0], [60000, 0], [60000, 40000], [0, 40000], [0, 0]],
+                "holes": [[[10000, 10000], [20000, 10000], [20000, 20000], [10000, 20000]]],
                 "mark_mm": 99050,
                 "max_mm": 99300,
                 "slab_top_mm": 99050,
@@ -851,7 +851,7 @@ def level_extras(**patch: Any) -> dict[str, Any]:
                 "marks": 4,
             },
             {
-                "shell": [[1000, 1000], [2000, 1000], [2000, 2000], [1000, 2000]],
+                "shell": [[10000, 10000], [20000, 10000], [20000, 20000], [10000, 20000]],
                 "holes": [],
                 "mark_mm": 91750,
                 "max_mm": 91750,
@@ -894,8 +894,10 @@ def test_roof_floor_has_level_zones_label_and_parapet_top() -> None:
         (99050, 99050, 99300, "marks"),
         (91750, 91750, 91750, "marks"),
     ]
-    assert floor.levels[0].shell == [[0, 0], [6000, 0], [6000, 4000], [0, 4000]]
-    assert floor.levels[0].holes == [[[1000, 1000], [2000, 1000], [2000, 2000], [1000, 2000]]]
+    assert floor.levels[0].shell == [[0, 0], [60000, 0], [60000, 40000], [0, 40000]]
+    assert floor.levels[0].holes == [
+        [[10000, 10000], [20000, 10000], [20000, 20000], [10000, 20000]]
+    ]
     assert floor.walls is None
     document = WallsDocument.model_validate(roof_document())
     with_walls, _ = b3d.build_floor(
@@ -938,7 +940,7 @@ def test_roof_without_slab_and_walls_takes_outline_from_level_zones() -> None:
     extras["slab"] = None
     floor = floor_of(raw, extras)
     assert floor.outline_source == "bbox"
-    assert floor.outline == [[0.0, 0.0], [6000.0, 0.0], [6000.0, 4000.0], [0.0, 4000.0]]
+    assert floor.outline == [[0.0, 0.0], [60000.0, 0.0], [60000.0, 40000.0], [0.0, 40000.0]]
     assert len(floor.levels) == 2
 
 
@@ -946,7 +948,7 @@ def test_shift_moves_level_zones_with_the_floor() -> None:
     floor = floor_of(roof_document(), level_extras())
     moved = b3d._shifted(floor, 100.4, -50.0)
     assert moved.levels[0].shell[0] == [100, -50]
-    assert moved.levels[0].holes[0][0] == [1100, 950]
+    assert moved.levels[0].holes[0][0] == [10100, 9950]
     assert moved.levels[1].top_mm == 91750
 
 
@@ -1034,3 +1036,23 @@ def test_without_core_match_the_larger_axes_cluster_stays_the_reference() -> Non
     parking_key = next(k for k, p in placements.items() if p.placement == "none")
     message = placements[parking_key].message
     assert message is not None and "опора объекта" in message
+
+
+def test_typical_floor_keeps_one_slab_despite_marks() -> None:
+    """Типовой этаж: знаки площадок лестниц не разбивают плиту на ступени."""
+    title = {"corps": "9", "section": "3", "floors": [14], "text": "План 14 этажа", "kind": "floor"}
+    floor = floor_of(raw_document(title={**title, "marks_mm": [47600]}), level_extras())
+    assert floor.levels == []
+
+
+def test_small_level_zone_takes_the_floor_level() -> None:
+    """Площадка лестницы (меньше 25 м²) на кровле - на основном уровне, а не дырой и не ступенью."""
+    extras = level_extras()
+    extras["levels"]["zones"][1]["shell"] = [
+        [10000, 10000],
+        [14000, 10000],
+        [14000, 14000],
+        [10000, 14000],
+    ]
+    floor = floor_of(roof_document(), extras)
+    assert [(z.top_mm, z.source) for z in floor.levels] == [(99050, "marks"), (99300, "base")]
