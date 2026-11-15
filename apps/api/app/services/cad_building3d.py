@@ -49,9 +49,10 @@ from app.contracts.cad_building3d import (
 from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
 from app.contracts.cad_floor3d import WallsFloorExtras, WallsLevels
 from app.domain import JobStatus, JobType
-from app.models import Document, DocumentRevision, Job
+from app.models import Document, DocumentRevision, Job, Sheet
 from app.services import cad as cad_service
 from app.services import cad_construction_store, cad_site_cores, cad_views, cad_walls
+from app.services import documents as documents_service
 from app.services.cad_constructions import ProjectSlab, effective_levels
 from app.services.cad_floor_title import format_floor_title
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
@@ -92,6 +93,9 @@ CORE_KINDS: Final = frozenset({"monolith_wall", "monolith_pylon"})
 # Нижних этажей скопления, пробуемых по одному, и наименьшее число колец ядер этажа.
 CORE_TRY_FLOORS: Final = 6
 CORE_MIN_RINGS: Final = 4
+# Опора по ядрам: этажи здания площадью от этого (м², сводный план секций), не больше трёх.
+CORE_PIN_MIN_AREA_M2: Final = 2000
+CORE_PIN_FLOORS: Final = 3
 
 Point = tuple[float, float]
 
@@ -233,6 +237,30 @@ class SheetRef:
     # Масштаб и проверки родительского задания: из них собирается кадр вида (pt -> мм осей).
     scale_key: str | None = None
     checks_key: str | None = None
+    # Название листа из штампа: по нему узнаётся сводный лист отдельных планов секций.
+    stamp_title: str | None = None
+
+
+# «Секции 8, 9, 10, 15-16, 17, …»: перечень секций через запятую в названии листа.
+SUMMARY_SECTIONS: Final = re.compile(r"Секци[ия]\s+([\d\s,\-–]+)", re.IGNORECASE)
+SUMMARY_MIN_SECTIONS: Final = 3
+GROUP_SUMMARY_LABEL: Final = "Сводный лист"
+
+
+def is_summary_sheet(stamp_title: str | None) -> bool:
+    """Сводный лист: в названии три и больше секций через запятую.
+
+    На таком листе планы секций (техпространства, кровли) разложены отдельными картинками, как
+    удобно, а не как на объекте: его оси связывают секции ложно, и в здание одной секции его
+    нельзя отнести по ближайшей подписи («План тех. пространства секции 17»).
+    """
+    if not stamp_title:
+        return False
+    found = SUMMARY_SECTIONS.search(stamp_title)
+    if found is None:
+        return False
+    items = [item for item in found.group(1).split(",") if item.strip(" -–")]
+    return len(items) >= SUMMARY_MIN_SECTIONS
 
 
 def group_of(corps: str | None, section: str | None) -> tuple[str, str]:
@@ -311,6 +339,9 @@ def build_floor(
     corps = _clean(title.corps) if title is not None else None
     section = _clean(title.section) if title is not None else None
     group_key, group_label = group_of(corps, section)
+    if is_summary_sheet(sheet.stamp_title):
+        group_key = f"summary-{sheet.document_id.hex[:8]}-{sheet.page_index}"
+        group_label = f"{GROUP_SUMMARY_LABEL} · {sheet.label}"
     walls: list[CadBuilding3dWallRead] | None = None
     if include_walls:
         walls = []
@@ -1337,18 +1368,26 @@ def _axis_links(
 
 def _group_floor_cores(
     items: Sequence[BuiltFloor], aligned: Sequence[CadBuilding3dFloorRead], key: str
-) -> list[CoreRing]:
-    """Ядра нижнего этажа здания (совмещённого, с отметкой) в системе эталона здания."""
+) -> list[list[CoreRing]]:
+    """Ядра нижних больших этажей здания по отдельности, в системе эталона здания (снизу вверх).
+
+    Пробуются только этажи от `CORE_PIN_MIN_AREA_M2`: сводный план нескольких секций по ядрам
+    встаёт однозначно, а ядро одной башни похоже на многие места подземки - башня встаёт по осям
+    от опоры. Не больше `CORE_PIN_FLOORS`: первый этаж может не совпасть (монолит другого уровня),
+    а следующий - совпасть.
+    """
     rows = sorted(
         (floor.alignment == "none", not floor.elevation_known, floor.base_z_mm, i)
         for i, floor in enumerate(aligned)
-        if floor.group_key == key and len(items[i].cores) >= CORE_MIN_RINGS
+        if floor.group_key == key
+        and len(items[i].cores) >= CORE_MIN_RINGS
+        and _floor_area_m2(floor) >= CORE_PIN_MIN_AREA_M2
     )
-    if not rows:
-        return []
-    *_rank, index = rows[0]
-    fx, fy = aligned[index].offset_mm
-    return [_moved_ring(ring, 0.0, fx, fy) for ring in items[index].cores]
+    out: list[list[CoreRing]] = []
+    for *_rank, index in rows[:CORE_PIN_FLOORS]:
+        fx, fy = aligned[index].offset_mm
+        out.append([_moved_ring(ring, 0.0, fx, fy) for ring in items[index].cores])
+    return out
 
 
 def place_site(
@@ -1386,11 +1425,18 @@ def place_site(
     for key in keys:
         if key == base_key:
             continue
-        rings = _group_floor_cores(items, aligned, key)
-        found = _register_cached(site, rings) if rings else None
-        tried[key] = found
-        if found is not None and found.accepted:
-            pins[key] = found
+        best: cad_site_cores.CoreMatch | None = None
+        for rings in _group_floor_cores(items, aligned, key):
+            found = _register_cached(site, rings)
+            if found is not None and (
+                best is None or (found.accepted, found.share) > (best.accepted, best.share)
+            ):
+                best = found
+        if best is None:
+            continue
+        tried[key] = best
+        if best.accepted:
+            pins[key] = best
     if not pins:
         return place_by_cores(items, aligned, place_groups(items, aligned))
     links = _axis_links(infos)
@@ -1485,8 +1531,8 @@ def place_site(
             )
         elif message is None:
             message = (
-                f"нет общих осей с поставленными зданиями и мало монолита для совмещения по ядрам "
-                f"с «{base_label}»"
+                "нет общих осей с поставленными зданиями; по ядрам ставятся только сводные планы "
+                f"от {CORE_PIN_MIN_AREA_M2} м² с монолитом"
             )
         placed[key] = GroupPlacement(
             "none",
@@ -1706,6 +1752,17 @@ async def collect_sheets(
         key=lambda item: (revisions[item[1]][0].created_at, item[0].created_at),
         reverse=True,
     )
+    sheet_ids = {
+        (row.revision_id, row.page_index): row.id
+        for row in (
+            await session.execute(
+                select(Sheet.id, Sheet.revision_id, Sheet.page_index).where(
+                    Sheet.revision_id.in_(list(revisions))
+                )
+            )
+        ).all()
+    }
+    stamp_titles = await documents_service.sheet_titles(session, sheet_ids=list(sheet_ids.values()))
     taken: set[tuple[uuid.UUID, int]] = set()
     sheets: list[SheetRef] = []
     for job, revision_id in ordered:
@@ -1748,6 +1805,9 @@ async def collect_sheets(
                         ),
                         scale_key=_parent_key(job, revision_id, f"{folder}/scale.json"),
                         checks_key=_parent_key(job, revision_id, f"{folder}/cad_checks.json"),
+                        stamp_title=stamp_titles.get(sheet_id)
+                        if (sheet_id := sheet_ids.get((revision_id, page_index))) is not None
+                        else None,
                     )
                 )
     return sheets, [], project_slab
@@ -1898,6 +1958,7 @@ def _sheet_key(sheet: SheetRef, project_slab: ProjectSlab | None, include_walls:
         sheet.walls_key,
         sheet.scale_key,
         sheet.checks_key,
+        sheet.stamp_title,
         sheet.overrides.model_dump_json(),
         project_slab,
         include_walls,
@@ -1924,7 +1985,9 @@ def _sheet_floor(
             message=f"{sheet.label}: walls.json вне контракта или без геометрии, лист пропущен.",
         )
         return _SheetFloor(None, (warning,), NO_AXES)
-    axes = NO_AXES if frame is None else axes_in_mm(raw, frame)
+    # Оси сводного листа не связывают здания: планы секций на нём разложены не как на объекте.
+    summary = is_summary_sheet(sheet.stamp_title)
+    axes = NO_AXES if frame is None or summary else axes_in_mm(raw, frame)
     cores = core_rings(document)
     cost = (
         1

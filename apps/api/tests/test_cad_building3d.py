@@ -1072,6 +1072,7 @@ def test_tower_follows_its_core_anchor_with_rotation() -> None:
             corps=None, section="1-2", order=1, axes=axes_block(*section_axes("1", 3000.0, 2000.0))
         ),
         CORE,
+        bbox=[0.0, 0.0, 60000.0, 40000.0],
     )
     tower = built(corps="1", section="1", order=2, axes=axes_block(*section_axes("1")))
     placements, _ = placed([under, wing, tower])
@@ -1088,3 +1089,43 @@ def test_tower_follows_its_core_anchor_with_rotation() -> None:
     assert follower.offset_mm == pytest.approx(
         (anchor.offset_mm[0] + sx, anchor.offset_mm[1] + sy), abs=100.0
     )
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("Секции 8, 9, 10, 15-16, 17, 18, 19, 20. План тех. пространств и тех. этажа", True),
+        ("Секции 1, 2, 3. План кровли", True),
+        ("Секции 7-14. План 1 этажа на отм. +0.500 - +1,050.", False),
+        ("Секции 19-20. План 1 этажа", False),
+        ("Корпус 12. Секции 8-10. План кровли на отм. +30,450", False),
+        ("Секция 17. План 10 этажа", False),
+        (None, False),
+    ],
+)
+def test_summary_sheet_is_recognised_by_stamp_title(title: str | None, expected: bool) -> None:
+    assert b3d.is_summary_sheet(title) is expected
+
+
+def test_summary_sheet_gets_own_group_and_no_axes() -> None:
+    """Сводный лист техпространств секций: своя группа, оси в связях не участвуют."""
+    title = {"corps": None, "section": "17", "floors": [], "text": "секции 17", "kind": "technical"}
+    raw = raw_document(title=title)
+    raw["axes"] = axes_block(*section_axes("17"))
+    ref = b3d.SheetRef(
+        job_id=uuid.uuid4(),
+        revision_id=uuid.uuid4(),
+        document_id=uuid.uuid4(),
+        page_index=7,
+        view=1,
+        label="АР1.2 · лист 8",
+        order=(0.0, 0.0, 7, 1),
+        overrides=NO_LEVELS,
+        walls_key="k",
+        stamp_title="Секции 8, 9, 10, 15-16, 17, 18, 19, 20. План тех. пространств",
+    )
+    item = b3d._sheet_floor(ref, raw, FRAME, None, False)
+    assert item.floor is not None
+    assert item.floor.group_key.startswith("summary-")
+    assert item.floor.group_label == "Сводный лист · АР1.2 · лист 8"
+    assert not item.axes.usable
