@@ -9,12 +9,8 @@ import { Splitter } from '@/components/workspace/Splitter';
 import { filterFloorsByGroup, floorKey, resolveGroupKey, splitFloors } from '@/lib/cad/building3d-geometry';
 import { useCadBuilding3dWalls } from '@/lib/cad/building3d-queries';
 import { ALL_GROUPS_KEY } from '@/lib/cad/building-viewer-layout';
-import { useCadConstructions } from '@/lib/cad/constructions-queries';
-import { doorsOf } from '@/lib/cad/constructions';
 import { cadErrorText } from '@/lib/cad/errors';
-import { findConstruction } from '@/lib/cad/floor3d-volume';
 
-import { BuildingConstructionPanel } from './BuildingConstructionPanel';
 import { BuildingFloorList } from './BuildingFloorList';
 import { BuildingFloorPanel } from './BuildingFloorPanel';
 import { BuildingViewerCanvas } from './BuildingViewerCanvas';
@@ -29,8 +25,6 @@ export interface IBuildingViewerSelection {
   readonly floor: string | null;
   /** Детальный 3D этажа на этой же странице. */
   readonly detail: boolean;
-  /** Выбранная конструкция выбранного этажа (`id` из walls.json); `null` - не выбрана. */
-  readonly construction: string | null;
 }
 
 /** Правая панель: ширину меняют разделителем, хранится в `localStorage`. */
@@ -62,9 +56,9 @@ const Message: FC<{ children: ReactNode; alert?: boolean }> = ({ children, alert
  * Просмотрщик объекта: здание из настоящих стен всех этажей (вращение, наклон, зум), клик по этажу -
  * параметры этажа справа или под холстом, двойной клик или «Этаж подробно» - детальный 3D этажа на этой
  * же странице (только чтение). Корпус и секция выбираются переключателем; «Разнести этажи» раздвигает
- * этажи по вертикали. «Весь объект» ставит все корпуса в один ряд (раскладка условная). Клик по стене
- * выбранного этажа выбирает конструкцию: её параметры - над панелью этажа. Правая панель тянется
- * разделителем.
+ * этажи по вертикали. «Весь объект» ставит все корпуса в один ряд (раскладка условная). Повторный клик
+ * по выбранному этажу, клик в пустоту или Esc снимают выбор. Конструкции выбираются только в детальном
+ * 3D этажа. Правая панель тянется разделителем.
  */
 export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection, onSelectionChange, onOpenSheet }) => {
   const query = useCadBuilding3dWalls(projectId);
@@ -97,50 +91,31 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
   const hasKnown = useMemo(() => splitFloors(floors).known.length > 0, [floors]);
   const view = useFloorViewParams(projectId, selected);
   const detail = selection.detail && selected !== null;
-  // Тот же запрос и ключ, что у итогов этажа: кеш общий, лишнего чтения нет.
-  const constructions = useCadConstructions(view.params, true);
   const groupFloorCount = useMemo(
     () => (selected === null ? 0 : floors.filter((item) => item.group_key === selected.group_key).length),
     [floors, selected],
   );
 
-  const select = (key: string): void =>
-    onSelectionChange({ ...selection, floor: key, detail, construction: key === selection.floor ? selection.construction : null });
-  const selectConstruction = (id: string | null): void => onSelectionChange({ ...selection, construction: id });
+  // `null` - выбор снят (повторный щелчок по этажу, щелчок в пустоту).
+  const select = (key: string | null): void =>
+    onSelectionChange({ ...selection, floor: key, detail: key !== null && detail });
   const openDetail = (key: string): void => {
     setHoverKey(null);
-    onSelectionChange({ ...selection, floor: key, detail: true, construction: null });
+    onSelectionChange({ ...selection, floor: key, detail: true });
   };
 
-  // Esc: сначала конструкция, вторым нажатием - этаж. Детальный вид Esc обрабатывает сам.
+  // Esc снимает выбор этажа. Детальный вид Esc обрабатывает сам. Фокус на переключателе здания Esc не
+  // мешает: открытый список закрывается браузером и до страницы нажатие не доходит.
   useEffect(() => {
     if (detail || selection.floor === null) return undefined;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
-      if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) return;
-      onSelectionChange(
-        selection.construction !== null
-          ? { ...selection, construction: null }
-          : { ...selection, floor: null, detail: false, construction: null },
-      );
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      onSelectionChange({ ...selection, floor: null, detail: false });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [detail, selection, onSelectionChange]);
-
-  const construction =
-    selection.construction === null ? null : findConstruction(constructions.data, selection.construction);
-  const doors =
-    construction === null || constructions.data === undefined
-      ? 0
-      : doorsOf(constructions.data.openings, construction).length;
-  let constructionNote: string | null = null;
-  if (construction === null) {
-    if (view.params === null) constructionNote = view.pending ? 'Читаем лист этажа…' : 'У листа этажа нет готового результата CAD.';
-    else if (constructions.isPending) constructionNote = 'Читаем конструкцию…';
-    else if (constructions.isError) constructionNote = cadErrorText(constructions.error);
-    else constructionNote = 'Конструкции нет в расчёте листа: пересчитайте конструкции или снимите выбор.';
-  }
 
   const sideStyle: Record<string, string> = { '--bv-side': `${sideWidth}px` };
 
@@ -164,12 +139,10 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
           allGroups={isAll ? groups : null}
           selectedKey={selection.floor}
           hoverKey={hoverKey}
-          constructionId={selection.construction}
           exploded={exploded}
           fitSeq={fitSeq}
           onHover={setHoverKey}
           onSelect={select}
-          onSelectConstruction={selectConstruction}
           onOpenDetail={openDetail}
           onError={setCanvasError}
         />
@@ -234,14 +207,6 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
           />
         </div>
         <aside aria-label="Этаж и список этажей" className={SIDE}>
-          {selection.construction !== null && selected !== null && (
-            <BuildingConstructionPanel
-              construction={construction}
-              doors={doors}
-              note={constructionNote}
-              onClear={() => selectConstruction(null)}
-            />
-          )}
           <BuildingFloorPanel
             floor={selected}
             groupFloorCount={groupFloorCount}
@@ -272,7 +237,7 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
         disabled={!hasKnown || canvasError !== null}
         onGroupChange={(key) => {
           setHoverKey(null);
-          onSelectionChange({ group: key, floor: null, detail: false, construction: null });
+          onSelectionChange({ group: key, floor: null, detail: false });
         }}
         onToggleExploded={() => setExploded((value) => !value)}
         onFit={() => setFitSeq((value) => value + 1)}

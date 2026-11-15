@@ -159,6 +159,9 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   } | null>(null);
   // Выбранный элемент подсвечивается, пока не снят: клик в пустоту, Esc, закрытие плашки.
   const [selected, setSelected] = useState<IFloor3dPick | null>(null);
+  // Конструкция, выбранная кликом здесь, в 3D: повторный клик по ней снимает выбор. Движение камеры
+  // закрывает плашку, но не этот признак; выбор из плана его не ставит - первый клик открывает плашку.
+  const [chosenId, setChosenId] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   // Выбор ВИС - по тем же данным, что в сцене: механика и ЭОМ/СС одним списком.
@@ -169,6 +172,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const closeLocal = () => {
     setPicked(null);
     setSelected(null);
+    setChosenId(null);
     mep.clear();
     setPopoverError(null);
   };
@@ -195,6 +199,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
       }
       setPicked(null);
       setSelected(null);
+      setChosenId(null);
       clearMep();
       setPopoverError(null);
       onSelectConstruction?.(null);
@@ -213,21 +218,22 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
     if (readOnly && pick?.kind === 'hole') return;
     setPopoverError(null);
     mep.clear();
-    // Повторный клик по уже выбранному элементу снимает выбор и в 3D, и в плане.
-    // Признак - открытая плашка этого же элемента (выбор из плана плашку не открывает).
+    // Стена и плита выбираются общим выбором (его подсвечивает холст), остальное - локально. Без общего
+    // выбора (страница объекта) и стена подсвечивается локально.
+    const construction = pick !== null && onSelectConstruction !== undefined && isConstructionPick(pick);
+    // Повторный клик по уже выбранному элементу снимает выбор и в 3D, и в плане. Признак - сам выбор, а не
+    // плашка: движение камеры плашку закрывает, а выделение оставляет.
     const again =
       pick !== null &&
-      picked !== null &&
-      picked.pick.kind === pick.kind &&
-      picked.pick.id === pick.id &&
-      (onSelectConstruction === undefined || !isConstructionPick(pick) || selectedIds.has(pick.id));
+      (construction
+        ? chosenId === pick.id && selectedIds.has(pick.id)
+        : selected !== null && selected.kind === pick.kind && selected.id === pick.id);
     if (again) {
       closePick();
       return;
     }
-    // Стена и плита выбираются общим выбором (его подсвечивает холст), остальное - локально.
-    const construction = pick !== null && isConstructionPick(pick);
     setSelected(pick !== null && !construction ? pick : null);
+    setChosenId(pick !== null && construction ? pick.id : null);
     if (pick === null || construction) onSelectConstruction?.(pick === null ? null : pick.id);
     const rect = stage.current?.getBoundingClientRect();
     setPicked(
@@ -245,6 +251,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
     }
     setPicked(null);
     setSelected(null);
+    setChosenId(null);
     setPopoverError(null);
     onSelectConstruction?.(null);
     mep.select(pick, anchor);
@@ -257,6 +264,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
       (item) => item.id === id && item.category !== 'lintel' && item.category !== 'door',
     );
     setSelected(null);
+    setChosenId(prism === undefined ? null : id);
     setPopoverError(null);
     setPicked((current) =>
       prism === undefined || current === null

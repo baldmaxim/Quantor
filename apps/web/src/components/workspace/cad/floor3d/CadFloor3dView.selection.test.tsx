@@ -20,11 +20,13 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
 vi.mock('./CadFloor3dCanvas', () => ({
   CadFloor3dCanvas: ({
     onPick,
+    onMove,
     selectedIds,
     selected,
     hiddenCategories,
   }: {
     onPick: (pick: unknown, anchor: unknown) => void;
+    onMove: () => void;
     selectedIds: ReadonlySet<string>;
     selected: { id: string } | null;
     hiddenCategories?: ReadonlySet<string>;
@@ -52,6 +54,9 @@ vi.mock('./CadFloor3dCanvas', () => ({
       </button>
       <button type="button" onClick={() => onPick(null, { x: 1, y: 1 })}>
         пустота
+      </button>
+      <button type="button" onClick={onMove}>
+        камера
       </button>
     </div>
   ),
@@ -130,6 +135,41 @@ describe('3D-вид: общий выбор конструкций', () => {
     expect(screen.getByTestId('canvas')).toHaveAttribute('data-ids', 'w1');
     fireEvent.click(screen.getByRole('button', { name: 'пустота' }));
     expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+
+  it('повторный клик по выбранной стене снимает выбор, и после движения камеры тоже', async () => {
+    const onSelect = vi.fn();
+    const view = mount({ onSelectConstruction: onSelect });
+    fireEvent.click(await button('стена'));
+    expect(onSelect).toHaveBeenLastCalledWith('w1');
+    // Родитель применил общий выбор.
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <CadFloor3dView params={params} onSelectConstruction={onSelect} selectedIds={new Set(['w1'])} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'камера' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'стена' }));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+    expect(onSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it('стена, выбранная в плане: первый клик в 3D открывает плашку, а не снимает выбор', async () => {
+    const onSelect = vi.fn();
+    mount({ onSelectConstruction: onSelect, selectedIds: new Set(['w1']) });
+    fireEvent.click(await button('стена'));
+    expect(onSelect).toHaveBeenLastCalledWith('w1');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('без общего выбора (страница объекта) стена подсвечивается локально, повторный клик снимает', async () => {
+    mount({ readOnly: true });
+    fireEvent.click(await button('стена'));
+    expect(screen.getByTestId('canvas')).toHaveAttribute('data-local', 'w1');
+    fireEvent.click(screen.getByRole('button', { name: 'камера' }));
+    fireEvent.click(screen.getByRole('button', { name: 'стена' }));
+    expect(screen.getByTestId('canvas')).toHaveAttribute('data-local', '');
   });
 
   it('Esc и закрытие плашки очищают общий выбор', async () => {

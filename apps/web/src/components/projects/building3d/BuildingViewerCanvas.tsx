@@ -17,15 +17,12 @@ interface IBuildingViewerCanvasProps {
   readonly selectedKey: string | null;
   /** Наведённый этаж (мышь или список): подсвечивается. */
   readonly hoverKey: string | null;
-  /** Выбранная конструкция выбранного этажа (`id` из walls.json). */
-  readonly constructionId: string | null;
   readonly exploded: boolean;
   /** Команда «Вписать»: счётчик, чтобы повторное нажатие не терялось. */
   readonly fitSeq: number;
   readonly onHover: (key: string | null) => void;
-  readonly onSelect: (key: string) => void;
-  /** Конструкция выбрана щелчком по стене; `null` - выбор снят щелчком в пустоту. */
-  readonly onSelectConstruction: (id: string | null) => void;
+  /** Щелчок по этажу - выбрать его; `null` - выбор снят (повторный щелчок по нему или щелчок в пустоту). */
+  readonly onSelect: (key: string | null) => void;
   readonly onOpenDetail: (key: string) => void;
   /** Холст создать не удалось (нет WebGL). */
   readonly onError: (message: string) => void;
@@ -44,12 +41,10 @@ export const BuildingViewerCanvas: FC<IBuildingViewerCanvasProps> = ({
   allGroups,
   selectedKey,
   hoverKey,
-  constructionId,
   exploded,
   fitSeq,
   onHover,
   onSelect,
-  onSelectConstruction,
   onOpenDetail,
   onError,
 }) => {
@@ -64,11 +59,11 @@ export const BuildingViewerCanvas: FC<IBuildingViewerCanvasProps> = ({
   const [tip, setTip] = useState<{ key: string; x: number; y: number } | null>(null);
 
   // Колбэки читаются в момент события: смена пропсов движок не пересоздаёт.
-  const handlers = useRef({ onHover, onSelect, onSelectConstruction, onOpenDetail, onError });
-  const state = useRef({ selectedKey, hoverKey, constructionId, exploded });
+  const handlers = useRef({ onHover, onSelect, onOpenDetail, onError });
+  const state = useRef({ selectedKey, hoverKey, exploded });
   useEffect(() => {
-    handlers.current = { onHover, onSelect, onSelectConstruction, onOpenDetail, onError };
-    state.current = { selectedKey, hoverKey, constructionId, exploded };
+    handlers.current = { onHover, onSelect, onOpenDetail, onError };
+    state.current = { selectedKey, hoverKey, exploded };
   });
 
   useEffect(() => {
@@ -82,7 +77,6 @@ export const BuildingViewerCanvas: FC<IBuildingViewerCanvasProps> = ({
           setTip(key !== null && anchor !== null ? { key, ...anchor } : null);
         },
         onSelect: (key) => handlers.current.onSelect(key),
-        onSelectConstruction: (id) => handlers.current.onSelectConstruction(id),
         onOpenDetail: (key) => handlers.current.onOpenDetail(key),
       });
     } catch {
@@ -100,7 +94,7 @@ export const BuildingViewerCanvas: FC<IBuildingViewerCanvasProps> = ({
     const current = view.current;
     if (current === null) return;
     current.setPlan(plan, readBuildingViewerColors());
-    current.setStyle(state.current.selectedKey, state.current.hoverKey, state.current.constructionId);
+    current.setStyle(state.current.selectedKey, state.current.hoverKey);
     current.setExploded(state.current.exploded);
   }, [plan]);
 
@@ -109,8 +103,8 @@ export const BuildingViewerCanvas: FC<IBuildingViewerCanvasProps> = ({
   }, [theme]);
 
   useEffect(() => {
-    view.current?.setStyle(selectedKey, hoverKey, constructionId);
-  }, [selectedKey, hoverKey, constructionId]);
+    view.current?.setStyle(selectedKey, hoverKey);
+  }, [selectedKey, hoverKey]);
 
   useEffect(() => {
     view.current?.setExploded(exploded);
@@ -127,7 +121,7 @@ export const BuildingViewerCanvas: FC<IBuildingViewerCanvasProps> = ({
       <div
         ref={host}
         role="img"
-        aria-label="Здание: этажи в объёме. Вращение - перетаскиванием, масштаб - колесом или щипком. Щелчок по этажу выбирает его, по стене выбранного этажа - конструкцию"
+        aria-label="Здание: этажи в объёме. Вращение - перетаскиванием, масштаб - колесом или щипком. Щелчок по этажу выбирает его, повторный щелчок или Esc снимает выбор"
         className="relative h-full w-full cursor-grab overflow-hidden active:cursor-grabbing"
       />
       {tipFloor && tip && (

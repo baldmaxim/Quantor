@@ -1,19 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-import {
-  explodeOffsets,
-  fitDistance,
-  viewerBounds,
-  wallIdAtFace,
-  type IViewerFloorSpec,
-  type IViewerPlan,
-  type IViewerWall,
-} from './building-viewer-geometry';
-import { buildFloor, wallRanges, type IFloorEntry } from './building-viewer-floor';
+import { explodeOffsets, fitDistance, viewerBounds, type IViewerPlan } from './building-viewer-geometry';
+import { buildFloor, type IFloorEntry } from './building-viewer-floor';
 import { readBuildingViewerColors, type IBuildingViewerColors } from './building-viewer-colors';
 import { createGroupLabels } from './building-viewer-labels';
-import { createWallOverlay, disposeWallOverlay, type OverlayKind } from './building-viewer-overlay';
 import { attachPivotOrbit } from './pivot-orbit';
 
 /**
@@ -23,21 +14,19 @@ import { attachPivotOrbit } from './pivot-orbit';
  * Все ресурсы освобождаются в `dispose`. Модуль грузится вместе с просмотрщиком: `three` не попадает
  * в чанк страницы.
  *
- * Выбор конструкции: слитый меш стен хранит диапазоны треугольников по конструкциям, луч по
- * `faceIndex` находит конструкцию; выбранная и наведённая конструкции подсвечиваются отдельными мешами.
+ * Выбор - только этаж целиком: щелчок по другому этажу выбирает его, по уже выбранному или в пустоту -
+ * снимает выбор. Конструкции выбираются в детальном 3D этажа.
  */
 
 export interface IBuildingViewerOptions {
   readonly reducedMotion: boolean;
   /** Наведение (только мышь): ключ этажа или `null`; точка - от угла холста. */
   readonly onHover: (key: string | null, anchor: { x: number; y: number } | null) => void;
-  /** Щелчок или касание (не перетаскивание) по этажу. */
-  readonly onSelect: (key: string) => void;
   /**
-   * Щелчок по стене уже выбранного этажа - конструкция; `null` - выбор конструкции снят: щелчок в
-   * пустоту или повторный щелчок по уже выбранной конструкции.
+   * Щелчок или касание (не перетаскивание): ключ другого этажа - выбрать его; `null` - выбор снят
+   * повторным щелчком по выбранному этажу или щелчком в пустоту.
    */
-  readonly onSelectConstruction: (id: string | null) => void;
+  readonly onSelect: (key: string | null) => void;
   /** Двойной щелчок или двойное касание по этажу. */
   readonly onOpenDetail: (key: string) => void;
 }
@@ -47,11 +36,8 @@ export interface IBuildingViewer {
   setPlan: (plan: IViewerPlan | null, colors: IBuildingViewerColors) => void;
   /** Новые цвета темы без пересборки модели и без сдвига камеры. */
   setColors: (colors: IBuildingViewerColors) => void;
-  /**
-   * Выбранный этаж (акцент), наведённый (подсветка) и выбранная конструкция этого этажа; остальные
-   * этажи при выборе приглушаются.
-   */
-  setStyle: (selectedKey: string | null, hoverKey: string | null, constructionId?: string | null) => void;
+  /** Выбранный этаж (акцент) и наведённый (подсветка); остальные этажи при выборе приглушаются. */
+  setStyle: (selectedKey: string | null, hoverKey: string | null) => void;
   setExploded: (exploded: boolean) => void;
   /** Здание целиком в кадре, направление взгляда сохраняется. */
   fit: () => void;
@@ -110,11 +96,6 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
   let colors: IBuildingViewerColors = readBuildingViewerColors();
   let selectedKey: string | null = null;
   let hoverKey: string | null = null;
-  let constructionId: string | null = null;
-  let hoverWallId: string | null = null;
-  /** Стены этажей для подсветки: ключ `этаж|конструкция`. */
-  let wallIndex = new Map<string, { spec: IViewerFloorSpec; wall: IViewerWall }>();
-  const overlays: Record<OverlayKind, THREE.Group | null> = { selected: null, hover: null };
   let exploded = false;
   let factor = 0;
   let anim: IExplodeAnim | null = null;
@@ -214,34 +195,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
   observer.observe(host);
   resize();
 
-  const syncOverlay = (kind: OverlayKind, wallId: string | null): void => {
-    const previous = overlays[kind];
-    if (previous !== null) disposeWallOverlay(previous);
-    overlays[kind] = null;
-    const item = wallId !== null && selectedKey !== null ? wallIndex.get(`${selectedKey}|${wallId}`) : undefined;
-    const entry = item === undefined ? undefined : entries.find((candidate) => candidate.key === item.spec.key);
-    if (item === undefined || entry === undefined) return;
-    const group = createWallOverlay(
-      { shell: item.wall.shell, yBottom: item.spec.slabTop, yTop: item.wall.top ?? item.spec.wallTop },
-      kind,
-      colors.accent,
-    );
-    if (group === null) return;
-    entry.group.add(group);
-    overlays[kind] = group;
-  };
-  const syncOverlays = (): void => {
-    syncOverlay('selected', constructionId);
-    syncOverlay('hover', hoverWallId === constructionId ? null : hoverWallId);
-    requestRender();
-  };
-
   const disposeFloors = (): void => {
-    for (const kind of ['selected', 'hover'] as const) {
-      const overlay = overlays[kind];
-      if (overlay !== null) disposeWallOverlay(overlay);
-      overlays[kind] = null;
-    }
     for (const entry of entries) {
       root.remove(entry.group);
       for (const mesh of entry.meshes.values()) {
@@ -263,10 +217,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       for (const [part, mesh] of entry.meshes) {
         const base = part === 'volume' ? colors.muted : colors[part];
         scratch.set(base);
-        // Выбрана конструкция: стены этажа остаются своего цвета, чтобы подсветка конструкции была видна.
-        const quiet = selected && constructionId !== null && (part === 'monolith' || part === 'masonry');
-        if (quiet) scratch.lerp(accentColor, 0.15);
-        else if (selected) scratch.copy(accentColor);
+        if (selected) scratch.copy(accentColor);
         else if (hovered) scratch.lerp(accentColor, 0.55);
         mesh.material.color.copy(scratch);
         let opacity = 1;
@@ -281,10 +232,10 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
         mesh.material.depthWrite = part === 'volume' ? false : opacity >= 1;
       }
     }
-    syncOverlays();
+    requestRender();
   };
 
-  // Выбор мышью: луч по мешам этажей -> ключ этажа и, если попали в стену, её конструкция.
+  // Выбор мышью: луч по мешам этажей -> ключ этажа.
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const rayHit = (clientX: number, clientY: number): THREE.Intersection | null => {
@@ -304,18 +255,9 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
     markerColor: () => colors.accent,
     onChange: requestRender,
   });
-  const pickAt = (clientX: number, clientY: number): { key: string; wallId: string | null } | null => {
-    const hit = rayHit(clientX, clientY);
-    const key: unknown = hit?.object.userData.floorKey;
-    if (hit === null || typeof key !== 'string') return null;
-    const ranges = wallRanges.get(hit.object);
-    return { key, wallId: ranges === undefined ? null : wallIdAtFace(ranges, hit.faceIndex) };
-  };
-  const setHoverWall = (id: string | null): void => {
-    if (id === hoverWallId) return;
-    hoverWallId = id;
-    syncOverlay('hover', hoverWallId === constructionId ? null : hoverWallId);
-    requestRender();
+  const pickAt = (clientX: number, clientY: number): string | null => {
+    const key: unknown = rayHit(clientX, clientY)?.object.userData.floorKey;
+    return typeof key === 'string' ? key : null;
   };
 
   let down: { x: number; y: number; moved: boolean } | null = null;
@@ -326,15 +268,12 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
     hoverFrame = 0;
     const point = hoverPoint;
     if (disposed || point === null || down !== null) return;
-    const hit = pickAt(point.x, point.y);
+    const key = pickAt(point.x, point.y);
     const rect = dom.getBoundingClientRect();
-    // Лёгкая подсветка конструкции - только у стен уже выбранного этажа.
-    setHoverWall(hit !== null && hit.key === selectedKey ? hit.wallId : null);
-    options.onHover(hit?.key ?? null, hit === null ? null : { x: point.x - rect.left, y: point.y - rect.top });
+    options.onHover(key, key === null ? null : { x: point.x - rect.left, y: point.y - rect.top });
   };
   const onDown = (event: PointerEvent): void => {
     options.onHover(null, null);
-    setHoverWall(null);
     down = event.button === 0 ? { x: event.clientX, y: event.clientY, moved: false } : null;
   };
   const onMove = (event: PointerEvent): void => {
@@ -350,32 +289,28 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
     const start = down;
     down = null;
     if (start === null || start.moved) return;
-    const hit = pickAt(event.clientX, event.clientY);
-    if (hit === null) {
-      // Клик в пустоту снимает выбор конструкции; этаж остаётся.
-      if (constructionId !== null) options.onSelectConstruction(null);
-      return;
-    }
-    // Стена выбранного этажа - выбор конструкции, всё остальное - выбор этажа.
-    const wallId = hit.key === selectedKey ? hit.wallId : null;
-    const target = wallId === null ? hit.key : `${hit.key}|${wallId}`;
-    const now = performance.now();
-    if (lastTap !== null && lastTap.target === target && now - lastTap.at < DOUBLE_TAP_MS) {
+    const key = pickAt(event.clientX, event.clientY);
+    if (key === null) {
+      // Щелчок в пустоту снимает выбор этажа.
       lastTap = null;
-      options.onOpenDetail(hit.key);
+      if (selectedKey !== null) options.onSelect(null);
       return;
     }
-    lastTap = { target, at: now };
-    if (wallId === null) options.onSelect(hit.key);
-    // Повторный щелчок по уже выбранной конструкции снимает выбор.
-    else options.onSelectConstruction(wallId === constructionId ? null : wallId);
+    const now = performance.now();
+    if (lastTap !== null && lastTap.target === key && now - lastTap.at < DOUBLE_TAP_MS) {
+      lastTap = null;
+      options.onOpenDetail(key);
+      return;
+    }
+    lastTap = { target: key, at: now };
+    // Повторный щелчок по уже выбранному этажу снимает выбор.
+    options.onSelect(key === selectedKey ? null : key);
   };
   const onCancel = (): void => {
     down = null;
   };
   const onLeave = (): void => {
     hoverPoint = null;
-    setHoverWall(null);
     options.onHover(null, null);
   };
   dom.addEventListener('pointerdown', onDown);
@@ -389,8 +324,6 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       disposeFloors();
       colors = nextColors;
       plan = nextPlan;
-      wallIndex = new Map();
-      hoverWallId = null;
       labels.set(nextPlan?.labels ?? []);
       if (nextPlan === null) {
         signature = '';
@@ -403,7 +336,6 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
         if (entry === null) continue;
         root.add(entry.group);
         entries.push(entry);
-        for (const wall of spec.walls) wallIndex.set(`${spec.key}|${wall.id}`, { spec, wall });
         pickTargets.push(...entry.meshes.values());
       }
       groundY = Math.min(...nextPlan.floors.map((spec) => spec.slabBottom));
@@ -420,10 +352,9 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       colors = nextColors;
       applyStyle();
     },
-    setStyle: (nextSelected, nextHover, nextConstruction = null) => {
+    setStyle: (nextSelected, nextHover) => {
       selectedKey = nextSelected;
       hoverKey = nextHover;
-      constructionId = nextSelected === null ? null : nextConstruction;
       applyStyle();
     },
     setExploded: (next) => {

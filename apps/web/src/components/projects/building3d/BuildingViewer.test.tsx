@@ -18,30 +18,25 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
 vi.mock('./BuildingViewerCanvas', () => ({
   BuildingViewerCanvas: ({
     selectedKey,
-    constructionId,
     allGroups,
     exploded,
     onSelect,
-    onSelectConstruction,
     onOpenDetail,
   }: {
     selectedKey: string | null;
-    constructionId: string | null;
     allGroups: unknown[] | null;
     exploded: boolean;
-    onSelect: (key: string) => void;
-    onSelectConstruction: (id: string | null) => void;
+    onSelect: (key: string | null) => void;
     onOpenDetail: (key: string) => void;
   }) => (
     <div
       data-testid="canvas"
       data-selected={selectedKey ?? ''}
-      data-construction={constructionId ?? ''}
       data-all={String(allGroups !== null)}
       data-exploded={String(exploded)}
     >
-      <button type="button" onClick={() => onSelectConstruction('w2')}>
-        щелчок по стене
+      <button type="button" onClick={() => onSelect(null)}>
+        снять выбор этажа
       </button>
       <button type="button" onClick={() => onSelect('j1:0:0')}>
         щелчок по этажу
@@ -103,7 +98,7 @@ const mount = (selection: IBuildingViewerSelection, onSelectionChange = vi.fn())
   return onSelectionChange;
 };
 
-const NOTHING: IBuildingViewerSelection = { group: null, floor: null, detail: false, construction: null };
+const NOTHING: IBuildingViewerSelection = { group: null, floor: null, detail: false };
 
 beforeEach(() => {
   vi.mocked(client.readCadBuilding3D).mockResolvedValue({
@@ -183,73 +178,41 @@ describe('Просмотрщик объекта', () => {
     expect(screen.queryByRole('option', { name: 'Весь объект' })).toBeNull();
   });
 
-  it('щелчок по стене выбранного этажа уходит в адрес как конструкция', async () => {
+  it('холст снял выбор (повторный щелчок по этажу или в пустоту) - этаж уходит из адреса', async () => {
     const change = mount({ ...NOTHING, floor: 'j1:0:0' });
-    fireEvent.click(await screen.findByRole('button', { name: 'щелчок по стене' }));
-    expect(change).toHaveBeenCalledWith({ ...NOTHING, floor: 'j1:0:0', construction: 'w2' });
+    fireEvent.click(await screen.findByRole('button', { name: 'снять выбор этажа' }));
+    expect(change).toHaveBeenCalledWith(NOTHING);
   });
 
-  it('Esc: сначала снимает конструкцию, вторым нажатием - этаж', async () => {
-    const change = mount({ ...NOTHING, floor: 'j1:0:0', construction: 'w2' });
-    await screen.findByTestId('canvas');
-    fireEvent.keyDown(window, { key: 'Escape' });
-    expect(change).toHaveBeenLastCalledWith({ ...NOTHING, floor: 'j1:0:0', construction: null });
-  });
-
-  it('Esc без выбранной конструкции снимает этаж', async () => {
+  it('Esc снимает выбор этажа', async () => {
     const change = mount({ ...NOTHING, floor: 'j1:0:0' });
     await screen.findByTestId('canvas');
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(change).toHaveBeenLastCalledWith(NOTHING);
   });
 
-  it('панель конструкции: параметры из расчёта листа и «Снять выбор»', async () => {
-    vi.mocked(client.readCadConstructions).mockResolvedValue({
+  it('Esc снимает выбор, даже когда фокус остался на переключателе корпуса', async () => {
+    vi.mocked(client.readCadBuilding3D).mockResolvedValue({
       data: {
-        constructions: [
-          {
-            id: 'w2',
-            kind: 'monolith_wall',
-            thickness_nominal_mm: 200,
-            thickness_measured_mm: 198,
-            accepted: true,
-            material: { value: null, source: null, evidence: [] },
-            computed: {
-              status: 'ok',
-              warnings: [],
-              sources: { height: null, thickness: null },
-              thickness_mm: 200,
-              length_m: 4.5,
-              height_mm: 2800,
-              wall_area_m2: 12.6,
-              volume_m3: 2.52,
-              area_m2: null,
-            },
-          },
+        floors: [floor(), floor({ job_id: 'k2', group_key: 'k2', group_label: 'К2 · С1' })],
+        groups: [
+          { key: 'k9s3', label: 'К9 · С3', floor_count: 1 },
+          { key: 'k2', label: 'К2 · С1', floor_count: 1 },
         ],
-        openings: [{ id: 'o1', kind: 'door', host_id: 'w2' }],
-        totals: [],
-        summary: { door_openings_without_host: 0, height_missing_count: 0, lintels_without_volume: 0, thickness_check_count: 0, unaccounted_gap_openings: 0 },
+        warnings: [],
       },
     } as never);
-    const change = mount({ ...NOTHING, floor: 'j1:0:0', construction: 'w2' });
-    expect(await screen.findByRole('heading', { name: /Монолит — стена, 200 мм/ })).toBeInTheDocument();
-    expect(screen.getByText('Двери в стене').nextSibling).toHaveTextContent('1');
-    fireEvent.click(screen.getByRole('button', { name: 'Снять выбор' }));
-    expect(change).toHaveBeenCalledWith({ ...NOTHING, floor: 'j1:0:0', construction: null });
+    const change = mount({ ...NOTHING, group: 'all', floor: 'j1:0:0' });
+    const select = await screen.findByLabelText('Корпус');
+    select.focus();
+    fireEvent.keyDown(select, { key: 'Escape' });
+    expect(change).toHaveBeenLastCalledWith({ ...NOTHING, group: 'all' });
   });
 
-  it('конструкции нет в расчёте - пояснение вместо карточки', async () => {
-    vi.mocked(client.readCadConstructions).mockResolvedValue({
-      data: {
-        constructions: [],
-        openings: [],
-        totals: [],
-        summary: { door_openings_without_host: 0, height_missing_count: 0, lintels_without_volume: 0, thickness_check_count: 0, unaccounted_gap_openings: 0 },
-      },
-    } as never);
-    mount({ ...NOTHING, floor: 'j1:0:0', construction: 'nope' });
-    expect(await screen.findByText(/Конструкции нет в расчёте листа/)).toBeInTheDocument();
+  it('на общем виде нет выбора конструкций: панели конструкции нет', async () => {
+    mount({ ...NOTHING, floor: 'j1:0:0' });
+    await screen.findByTestId('canvas');
+    expect(screen.queryByRole('button', { name: 'Снять выбор' })).toBeNull();
   });
 });
 
@@ -285,7 +248,7 @@ describe('Просмотрщик объекта: весь объект', () => {
     const select = await screen.findByLabelText('Корпус');
     expect(screen.getByRole('option', { name: 'Весь объект' })).toBeInTheDocument();
     fireEvent.change(select, { target: { value: 'k2' } });
-    expect(change).toHaveBeenCalledWith({ group: 'k2', floor: null, detail: false, construction: null });
+    expect(change).toHaveBeenCalledWith({ group: 'k2', floor: null, detail: false });
   });
 
   it('режим «Весь объект»: холст получает группы, пометка про условное расположение, список по зданиям', async () => {

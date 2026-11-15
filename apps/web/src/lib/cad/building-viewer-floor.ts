@@ -1,12 +1,6 @@
 import * as THREE from 'three';
 
-import {
-  extrudeLevels,
-  extrudeShell,
-  mergeWalls,
-  type IViewerFloorSpec,
-  type IWallRange,
-} from './building-viewer-geometry';
+import { extrudeLevels, extrudeShell, mergeWalls, type IViewerFloorSpec } from './building-viewer-geometry';
 
 /** Меши одного этажа просмотрщика объекта: плита, слитые стены по материалам, объём. */
 
@@ -21,9 +15,6 @@ export interface IFloorEntry {
 }
 
 type FloorMesh = THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>;
-
-/** Диапазоны треугольников слитых стен по мешам: по ним `faceIndex` луча находит конструкцию. */
-export const wallRanges = new WeakMap<THREE.Object3D, readonly IWallRange[]>();
 
 const makeMesh = (geometry: THREE.BufferGeometry, key: string): FloorMesh => {
   const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ transparent: true }));
@@ -47,9 +38,7 @@ export const buildFloor = (spec: IViewerFloorSpec, offset: number): IFloorEntry 
       spec.wallTop,
     );
     if (merged === null) continue;
-    const mesh = makeMesh(merged.geometry, spec.key);
-    wallRanges.set(mesh, merged.ranges);
-    meshes.set(material, mesh);
+    meshes.set(material, makeMesh(merged.geometry, spec.key));
   }
   if (!meshes.has('monolith') && !meshes.has('masonry')) {
     const volume = extrudeShell(spec.shell, spec.slabTop, spec.volumeTop);

@@ -65,23 +65,22 @@ const FLOOR: CadBuilding3dFloorRead = {
   walls: [{ id: 'w1', kind: 'masonry', shell: rect(0, 0, 10000, 6000) }],
 };
 
-describe('просмотрщик объекта: щелчок по конструкции', () => {
+describe('просмотрщик объекта: щелчок по этажу', () => {
   let host: HTMLDivElement;
   let viewer: IBuildingViewer;
   let canvas: HTMLCanvasElement;
   let now = 0;
   const onSelect = vi.fn<IBuildingViewerOptions['onSelect']>();
-  const onSelectConstruction = vi.fn<IBuildingViewerOptions['onSelectConstruction']>();
   const onOpenDetail = vi.fn<IBuildingViewerOptions['onOpenDetail']>();
 
-  const click = (): void => {
-    canvas.dispatchEvent(pointer('pointerdown', 400, 300, 1));
-    canvas.dispatchEvent(pointer('pointerup', 400, 300));
+  // Центр холста - в стену этажа; угол - мимо здания.
+  const click = (x = 400, y = 300): void => {
+    canvas.dispatchEvent(pointer('pointerdown', x, y, 1));
+    canvas.dispatchEvent(pointer('pointerup', x, y));
   };
 
   beforeEach(() => {
     onSelect.mockReset();
-    onSelectConstruction.mockReset();
     onOpenDetail.mockReset();
     now = 1000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
@@ -91,7 +90,6 @@ describe('просмотрщик объекта: щелчок по констр�
       reducedMotion: true,
       onHover: () => undefined,
       onSelect,
-      onSelectConstruction,
       onOpenDetail,
     });
     canvas = host.querySelector('canvas') as HTMLCanvasElement;
@@ -102,7 +100,7 @@ describe('просмотрщик объекта: щелчок по констр�
     const plan = buildViewerPlan([FLOOR]);
     if (plan === null) throw new Error('план не построен');
     viewer.setPlan(plan, readBuildingViewerColors());
-    viewer.setStyle(FLOOR_KEY, null, null);
+    viewer.setStyle(null, null);
   });
 
   afterEach(() => {
@@ -111,24 +109,32 @@ describe('просмотрщик объекта: щелчок по констр�
     vi.restoreAllMocks();
   });
 
-  it('щелчок по стене выбранного этажа выбирает конструкцию, повторный - снимает выбор', () => {
+  it('щелчок по этажу выбирает его, повторный - снимает выбор', () => {
     click();
-    expect(onSelectConstruction).toHaveBeenLastCalledWith('w1');
-    // Родитель применил выбор: сцена знает выбранную конструкцию.
-    viewer.setStyle(FLOOR_KEY, null, 'w1');
+    expect(onSelect).toHaveBeenLastCalledWith(FLOOR_KEY);
+    // Родитель применил выбор: сцена знает выбранный этаж.
+    viewer.setStyle(FLOOR_KEY, null);
     now += 2000;
     click();
-    expect(onSelectConstruction).toHaveBeenLastCalledWith(null);
-    expect(onSelectConstruction).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+    expect(onSelect).toHaveBeenCalledTimes(2);
     expect(onOpenDetail).not.toHaveBeenCalled();
   });
 
-  it('быстрый второй щелчок по той же конструкции - двойной, открывает этаж, а не снимает выбор', () => {
+  it('щелчок в пустоту снимает выбор этажа; без выбора ничего не шлёт', () => {
+    click(2, 2);
+    expect(onSelect).not.toHaveBeenCalled();
+    viewer.setStyle(FLOOR_KEY, null);
+    click(2, 2);
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it('быстрый второй щелчок по тому же этажу - двойной, открывает этаж, а не снимает выбор', () => {
     click();
-    viewer.setStyle(FLOOR_KEY, null, 'w1');
+    viewer.setStyle(FLOOR_KEY, null);
     now += 100;
     click();
-    expect(onOpenDetail).toHaveBeenCalledTimes(1);
-    expect(onSelectConstruction).toHaveBeenCalledTimes(1);
+    expect(onOpenDetail).toHaveBeenCalledExactlyOnceWith(FLOOR_KEY);
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 });

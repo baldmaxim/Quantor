@@ -17,8 +17,8 @@ import { useFeatures, useMeta, useProject } from '@/lib/queries';
 /**
  * «3D: общий вид объекта» — просмотрщик здания из стен всех этажей. Закрыта флагом `cad.export`
  * (как и вкладка CAD): при выключенном флаге страницы нет, пока мета не пришла — заглушка.
- * Здание (`group`, `all` - весь объект), выбранный этаж, детальный вид и конструкция живут в адресе
- * (`?group=…&floor=<ключ этажа>&detail=1&construction=<id>`), ссылку можно переслать; лист этажа в рабочей области открывает отдельная кнопка.
+ * Здание (`group`, `all` - весь объект), выбранный этаж и детальный вид живут в адресе
+ * (`?group=…&floor=<ключ этажа>&detail=1`), ссылку можно переслать; лист этажа в рабочей области открывает отдельная кнопка.
  */
 
 interface IPageProps {
@@ -43,7 +43,6 @@ const Building3dPage = ({ params }: IPageProps) => {
     group: searchParams.get('group'),
     floor: searchParams.get('floor'),
     detail: searchParams.get('detail') === '1',
-    construction: searchParams.get('construction'),
   };
 
   const changeSelection = (next: IBuildingViewerSelection): void => {
@@ -54,8 +53,8 @@ const Building3dPage = ({ params }: IPageProps) => {
     else params.set('floor', next.floor);
     if (next.floor !== null && next.detail) params.set('detail', '1');
     else params.delete('detail');
-    if (next.floor !== null && next.construction !== null) params.set('construction', next.construction);
-    else params.delete('construction');
+    // Выбора конструкций на общем виде больше нет: старая ссылка с `construction` его не тянет.
+    params.delete('construction');
     const query = params.toString();
     router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
   };
