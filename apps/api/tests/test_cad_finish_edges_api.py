@@ -37,7 +37,7 @@ STUB = """
 import argparse, hashlib, json, pathlib
 
 parser = argparse.ArgumentParser()
-for name in ("dxf", "params", "out", "pdf", "page", "zones", "control"):
+for name in ("dxf", "params", "out", "pdf", "page", "zones", "view-zone", "frame", "control"):
     parser.add_argument("--" + name)
 args = parser.parse_args()
 here = pathlib.Path(__file__).parent
