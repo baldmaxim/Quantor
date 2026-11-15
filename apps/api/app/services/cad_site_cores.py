@@ -42,7 +42,8 @@ TOP_CANDIDATES: Final = 15
 COARSE_SAMPLES: Final = 600
 FULL_CANDIDATES: Final = 8
 FINE_SAMPLES: Final = 2000
-MIN_SHARE: Final = 0.6
+# Доля совпадения: верные совмещения ЖК Знаки 0,60–0,89; лист с неверным масштабом 0,31.
+MIN_SHARE: Final = 0.5
 MIN_RATIO: Final = 2.0
 MIN_SAMPLES: Final = 200
 DISTINCT_MM: Final = 3000.0

@@ -94,7 +94,7 @@ CORE_KINDS: Final = frozenset({"monolith_wall", "monolith_pylon"})
 CORE_TRY_FLOORS: Final = 6
 CORE_MIN_RINGS: Final = 4
 # Опора по ядрам: этажи здания площадью от этого (м², сводный план секций), не больше трёх.
-CORE_PIN_MIN_AREA_M2: Final = 2000
+CORE_PIN_MIN_AREA_M2: Final = 1200
 CORE_PIN_FLOORS: Final = 3
 
 Point = tuple[float, float]
