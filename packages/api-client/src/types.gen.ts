@@ -14180,7 +14180,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'model_ifc_import' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
 
 /**
  * LengthUnit
@@ -14802,6 +14802,191 @@ export type MetaResponse = {
 };
 
 /**
+ * ModelApprove
+ */
+export type ModelApprove = {
+    /**
+     * Comment
+     */
+    comment?: string | null;
+};
+
+/**
+ * ModelElementRead
+ */
+export type ModelElementRead = {
+    /**
+     * Bbox Mm
+     */
+    bbox_mm?: Array<number> | null;
+    /**
+     * Category
+     */
+    category: string;
+    /**
+     * Discipline
+     */
+    discipline: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Ifc Class
+     */
+    ifc_class?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Part
+     */
+    part?: string | null;
+    /**
+     * Props
+     */
+    props?: {
+        [key: string]: string | number | number | boolean | null;
+    };
+    /**
+     * Type
+     */
+    type?: string | null;
+};
+
+/**
+ * ModelElementsPage
+ */
+export type ModelElementsPage = {
+    /**
+     * Items
+     */
+    items: Array<ModelElementRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * ModelImportCreate
+ *
+ * Постановка импорта: выбранные ревизии IFC; пусто - последние ревизии всех IFC проекта.
+ */
+export type ModelImportCreate = {
+    /**
+     * Revision Ids
+     */
+    revision_ids?: Array<string> | null;
+};
+
+/**
+ * ModelImportRead
+ *
+ * Состояние задания «Модель из IFC»; `version_id` - версия модели, когда задание готово.
+ */
+export type ModelImportRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Generator Version
+     */
+    generator_version: string | null;
+    /**
+     * Inputs
+     */
+    inputs: number;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    status: JobStatus;
+    /**
+     * Version Id
+     */
+    version_id: string | null;
+};
+
+/**
+ * ModelIssueRead
+ */
+export type ModelIssueRead = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Where
+     */
+    where: string;
+};
+
+/**
+ * ModelPartRead
+ */
+export type ModelPartRead = {
+    /**
+     * Discipline
+     */
+    discipline?: string | null;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Size Bytes
+     */
+    size_bytes: number;
+    /**
+     * Storey Key
+     */
+    storey_key?: string | null;
+};
+
+/**
  * ModelProviderProbeRead
  *
  * Результат явной проверки связи. Задержка появляется только здесь и только по кнопке.
@@ -14913,6 +15098,254 @@ export type ModelSpecRead = {
      */
     model_id: string;
 };
+
+/**
+ * ModelStoreyRead
+ */
+export type ModelStoreyRead = {
+    /**
+     * Bbox Mm
+     */
+    bbox_mm?: Array<number> | null;
+    /**
+     * Element Count
+     */
+    element_count?: number;
+    /**
+     * Elevation Mm
+     */
+    elevation_mm: number;
+    /**
+     * Height Mm
+     */
+    height_mm?: number | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Storey Key
+     */
+    storey_key: string;
+};
+
+/**
+ * ModelVersionDetail
+ */
+export type ModelVersionDetail = {
+    /**
+     * Approved At
+     */
+    approved_at?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Committed At
+     */
+    committed_at?: string | null;
+    /**
+     * Counts
+     */
+    counts?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Generator
+     */
+    generator?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Parts
+     */
+    parts?: Array<ModelPartRead>;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Source Kind
+     */
+    source_kind: string;
+    status: ModelVersionStatus;
+    /**
+     * Storeys
+     */
+    storeys?: Array<ModelStoreyRead>;
+    /**
+     * Tender Version Id
+     */
+    tender_version_id?: string | null;
+    /**
+     * Warnings
+     */
+    warnings?: Array<ModelIssueRead>;
+};
+
+/**
+ * ModelVersionList
+ */
+export type ModelVersionList = {
+    /**
+     * Items
+     */
+    items: Array<ModelVersionRead>;
+};
+
+/**
+ * ModelVersionRead
+ */
+export type ModelVersionRead = {
+    /**
+     * Approved At
+     */
+    approved_at?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Committed At
+     */
+    committed_at?: string | null;
+    /**
+     * Counts
+     */
+    counts?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Generator
+     */
+    generator?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Source Kind
+     */
+    source_kind: string;
+    status: ModelVersionStatus;
+    /**
+     * Tender Version Id
+     */
+    tender_version_id?: string | null;
+    /**
+     * Warnings
+     */
+    warnings?: Array<ModelIssueRead>;
+};
+
+/**
+ * ModelVersionStarted
+ *
+ * Ответ на начало выгрузки: что ещё надо загрузить (повторная выгрузка возобновляется).
+ */
+export type ModelVersionStarted = {
+    /**
+     * Approved At
+     */
+    approved_at?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Committed At
+     */
+    committed_at?: string | null;
+    /**
+     * Counts
+     */
+    counts?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created
+     */
+    created: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Generator
+     */
+    generator?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string;
+    /**
+     * Missing Parts
+     */
+    missing_parts?: Array<string>;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Source Kind
+     */
+    source_kind: string;
+    status: ModelVersionStatus;
+    /**
+     * Tender Version Id
+     */
+    tender_version_id?: string | null;
+    /**
+     * Warnings
+     */
+    warnings?: Array<ModelIssueRead>;
+};
+
+/**
+ * ModelVersionStatus
+ *
+ * Версия модели здания (ADR-0053): загрузка, кандидат, утверждена, заменена.
+ */
+export type ModelVersionStatus = 'uploading' | 'candidate' | 'approved' | 'superseded';
 
 /**
  * NetworkGraphRef
@@ -25826,6 +26259,404 @@ export type ListProjectJobsResponses = {
 };
 
 export type ListProjectJobsResponse = ListProjectJobsResponses[keyof ListProjectJobsResponses];
+
+export type StartModelImportData = {
+    body: ModelImportCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/imports';
+};
+
+export type StartModelImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartModelImportError = StartModelImportErrors[keyof StartModelImportErrors];
+
+export type StartModelImportResponses = {
+    /**
+     * Successful Response
+     */
+    202: ModelImportRead;
+};
+
+export type StartModelImportResponse = StartModelImportResponses[keyof StartModelImportResponses];
+
+export type ReadLatestModelImportData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/imports/latest';
+};
+
+export type ReadLatestModelImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadLatestModelImportError = ReadLatestModelImportErrors[keyof ReadLatestModelImportErrors];
+
+export type ReadLatestModelImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelImportRead;
+};
+
+export type ReadLatestModelImportResponse = ReadLatestModelImportResponses[keyof ReadLatestModelImportResponses];
+
+export type ListModelVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions';
+};
+
+export type ListModelVersionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListModelVersionsError = ListModelVersionsErrors[keyof ListModelVersionsErrors];
+
+export type ListModelVersionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelVersionList;
+};
+
+export type ListModelVersionsResponse = ListModelVersionsResponses[keyof ListModelVersionsResponses];
+
+export type StartModelVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Tender Version Id
+         */
+        tender_version_id?: string | null;
+        /**
+         * Comment
+         */
+        comment?: string | null;
+    };
+    url: '/api/v1/projects/{project_id}/model/versions';
+};
+
+export type StartModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartModelVersionError = StartModelVersionErrors[keyof StartModelVersionErrors];
+
+export type StartModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    201: ModelVersionStarted;
+};
+
+export type StartModelVersionResponse = StartModelVersionResponses[keyof StartModelVersionResponses];
+
+export type DeleteModelVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}';
+};
+
+export type DeleteModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteModelVersionError = DeleteModelVersionErrors[keyof DeleteModelVersionErrors];
+
+export type DeleteModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteModelVersionResponse = DeleteModelVersionResponses[keyof DeleteModelVersionResponses];
+
+export type ReadModelVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}';
+};
+
+export type ReadModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadModelVersionError = ReadModelVersionErrors[keyof ReadModelVersionErrors];
+
+export type ReadModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelVersionDetail;
+};
+
+export type ReadModelVersionResponse = ReadModelVersionResponses[keyof ReadModelVersionResponses];
+
+export type ApproveModelVersionData = {
+    body: ModelApprove;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/approve';
+};
+
+export type ApproveModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ApproveModelVersionError = ApproveModelVersionErrors[keyof ApproveModelVersionErrors];
+
+export type ApproveModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelVersionDetail;
+};
+
+export type ApproveModelVersionResponse = ApproveModelVersionResponses[keyof ApproveModelVersionResponses];
+
+export type CommitModelVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/commit';
+};
+
+export type CommitModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommitModelVersionError = CommitModelVersionErrors[keyof CommitModelVersionErrors];
+
+export type CommitModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelVersionDetail;
+};
+
+export type CommitModelVersionResponse = CommitModelVersionResponses[keyof CommitModelVersionResponses];
+
+export type ReadModelPartData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Path
+         */
+        path: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/parts/{path}';
+};
+
+export type ReadModelPartErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadModelPartError = ReadModelPartErrors[keyof ReadModelPartErrors];
+
+export type ReadModelPartResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type PutModelPartData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Path
+         */
+        path: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/parts/{path}';
+};
+
+export type PutModelPartErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutModelPartError = PutModelPartErrors[keyof PutModelPartErrors];
+
+export type PutModelPartResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelPartRead;
+};
+
+export type PutModelPartResponse = PutModelPartResponses[keyof PutModelPartResponses];
+
+export type ListModelElementsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Storey Key
+         */
+        storey_key: string;
+    };
+    query?: {
+        /**
+         * Category
+         */
+        category?: string | null;
+        /**
+         * Discipline
+         */
+        discipline?: string | null;
+        /**
+         * Q
+         */
+        q?: string | null;
+        /**
+         * Offset
+         */
+        offset?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/storeys/{storey_key}/elements';
+};
+
+export type ListModelElementsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListModelElementsError = ListModelElementsErrors[keyof ListModelElementsErrors];
+
+export type ListModelElementsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelElementsPage;
+};
+
+export type ListModelElementsResponse = ListModelElementsResponses[keyof ListModelElementsResponses];
 
 export type GetPlanAlignmentsData = {
     body?: never;
