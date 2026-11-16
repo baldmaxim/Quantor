@@ -113,6 +113,9 @@ export const useWorkspaceCadConstructions = ({
   const [selected, setSelected] = useState<ReadonlySet<string>>(NO_IDS);
   const [groupKey, setGroupKey] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Конструкция, выбранная щелчком по плану: повторный щелчок по ней снимает выбор. Карточка тут не
+  // признак - она закрывается уже на нажатии по холсту и при движении камеры, а выделение остаётся.
+  const [chosenId, setChosenId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [actionError, setActionError] = useState<string | null>(null);
   const [popoverError, setPopoverError] = useState<string | null>(null);
@@ -125,6 +128,7 @@ export const useWorkspaceCadConstructions = ({
     setSelected(NO_IDS);
     setGroupKey(null);
     setActiveId(null);
+    setChosenId(null);
     setActionError(null);
     setPopoverError(null);
   }
@@ -235,10 +239,11 @@ export const useWorkspaceCadConstructions = ({
           onPick: (id, point) => {
             setPopoverError(null);
             setGroupKey(null);
-            // Повторный клик по конструкции с открытой карточкой снимает выбор.
-            const next = id !== null && activeId === id && selected.has(id) ? null : id;
+            // Повторный щелчок по выбранной на плане конструкции снимает выбор.
+            const next = id !== null && chosenId === id && selected.has(id) ? null : id;
             setSelected(next === null ? NO_IDS : new Set([next]));
             setActiveId(next);
+            setChosenId(next);
             setAnchor(point);
           },
           onDismiss: closePopover,
@@ -290,6 +295,7 @@ export const useWorkspaceCadConstructions = ({
         activeGroup: groupKey,
         onSelectGroup: (key, ids) => {
           setActiveId(null);
+          setChosenId(null);
           if (key === groupKey || ids.length === 0) {
             setGroupKey(null);
             setSelected(NO_IDS);
@@ -307,6 +313,7 @@ export const useWorkspaceCadConstructions = ({
     setPopoverError(null);
     setGroupKey(null);
     setActiveId(null);
+    setChosenId(null);
     setSelected(id === null ? NO_IDS : new Set([id]));
   };
 

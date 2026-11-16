@@ -151,6 +151,38 @@ describe('useWorkspaceCadConstructions', () => {
     expect(result.current.paintData?.selected.size).toBe(0);
   });
 
+  it('повторный щелчок по выбранной конструкции снимает выбор, даже если карточка уже закрыта', async () => {
+    const { result } = mount();
+    await waitFor(() => expect(result.current.picker).not.toBeNull());
+    act(() => result.current.picker?.onPick('a', { x: 0, y: 0 }));
+    expect(result.current.picker?.popover).not.toBeNull();
+    // Нажатие по холсту закрывает карточку раньше, чем дойдёт щелчок.
+    act(() => result.current.picker?.onDismiss());
+    act(() => result.current.picker?.onPick('a', { x: 0, y: 0 }));
+    expect(result.current.paintData?.selected.size).toBe(0);
+    expect(result.current.picker?.popover).toBeNull();
+    // Третий щелчок выбирает снова.
+    act(() => result.current.picker?.onPick('a', { x: 0, y: 0 }));
+    expect([...(result.current.paintData?.selected ?? [])]).toEqual(['a']);
+  });
+
+  it('щелчок по другой конструкции переключает выбор', async () => {
+    const { result } = mount();
+    await waitFor(() => expect(result.current.picker).not.toBeNull());
+    act(() => result.current.picker?.onPick('a', { x: 0, y: 0 }));
+    act(() => result.current.picker?.onPick('b', { x: 0, y: 0 }));
+    expect([...(result.current.paintData?.selected ?? [])]).toEqual(['b']);
+  });
+
+  it('конструкция, выбранная в 3D или сводом: первый щелчок на плане открывает карточку', async () => {
+    const { result } = mount();
+    await waitFor(() => expect(result.current.picker).not.toBeNull());
+    act(() => result.current.selection.onSelectConstruction('a'));
+    act(() => result.current.picker?.onPick('a', { x: 0, y: 0 }));
+    expect([...(result.current.paintData?.selected ?? [])]).toEqual(['a']);
+    expect(result.current.picker?.popover?.construction.id).toBe('a');
+  });
+
   it('строка свода выделяет набор, повторный выбор той же строки снимает его', async () => {
     const { result } = mount();
     await waitFor(() => expect(result.current.side?.status).toBe('ready'));
