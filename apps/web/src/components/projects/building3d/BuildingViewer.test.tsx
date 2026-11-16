@@ -148,6 +148,45 @@ describe('Просмотрщик объекта', () => {
     expect(await screen.findByText('Конструкции листа ещё не посчитаны.')).toBeInTheDocument();
   });
 
+  it('панель копии типового листа: пометка, качество совмещения, высота по стопке, без итогов листа', async () => {
+    vi.mocked(client.readCadBuilding3D).mockResolvedValue({
+      data: {
+        floors: [
+          floor({ label: 'К9 · С3 · 5 эт. (по листу «5, 7 эт.»)' }),
+          floor({
+            label: 'К9 · С3 · 7 эт. (по листу «5, 7 эт.»)',
+            base_z_mm: 6600,
+            typical_of: 'К9 · С3 · 5, 7 эт.',
+            alignment: 'axes',
+            alignment_axes: ['3.1', '3.2', 'А'],
+            alignment_rms_mm: 2.1,
+            alignment_max_mm: 6,
+            alignment_axes_common: 4,
+            alignment_scale_permille: 0.4,
+            floor_height_known: false,
+            floor_height_source: 'derived_stack',
+            floor_height_mm: 3300,
+          }),
+          floor({ job_id: 'j2', label: '8 эт.', base_z_mm: 9900 }),
+        ],
+        groups: [{ key: 'k9s3', label: 'К9 · С3', floor_count: 3 }],
+        warnings: [],
+      },
+    } as never);
+    mount({ ...NOTHING, floor: 'j1:0:0@6600' });
+    expect(await screen.findByText(/Этаж показан по типовому листу «К9 · С3 · 5, 7 эт.»/)).toBeInTheDocument();
+    expect(screen.getByText('Качество совмещения').nextSibling).toHaveTextContent(
+      'остаток 2,1 мм (до 6,0), согласных осей 3 из 4, наклон шкалы 0,40 ‰',
+    );
+    expect(screen.getByText('Высота этажа').nextSibling).toHaveTextContent(
+      'не определена, показана по отметке следующего этажа (3,3 м)',
+    );
+    // Объёмы листа у копии не показываются: она в них не входит.
+    expect(screen.queryByText('Конструкции листа ещё не посчитаны.')).toBeNull();
+    // В списке у копии светофор: три оси - жёлтый.
+    expect(screen.getByRole('img', { name: 'совмещение приблизительное' })).toBeInTheDocument();
+  });
+
   it('«Разнести этажи» переключает режим холста', async () => {
     mount(NOTHING);
     await screen.findByTestId('canvas');
@@ -225,10 +264,29 @@ describe('Просмотрщик объекта: весь объект', () => {
           floor({ job_id: 'k2', label: '1 этаж К2', group_key: 'k2', group_label: 'К2 · С1', corps: '2', section: '1' }),
         ],
         groups: [
-          { key: 'k9s3', label: 'К9 · С3', floor_count: 1, aligned_count: 1 },
-          { key: 'k2', label: 'К2 · С1', floor_count: 1, aligned_count: 1 },
+          { key: 'k9s3', label: 'К9 · С3', floor_count: 1, aligned_count: 1, placement: 'reference' },
+          {
+            key: 'k2',
+            label: 'К2 · С1',
+            floor_count: 1,
+            aligned_count: 1,
+            placement: 'none',
+            placement_message: 'нет общих осей с поставленными зданиями',
+          },
         ],
-        warnings: [],
+        warnings: [{ code: 'floor_missing', message: 'АР · лист 4 «План 4 этажа»: плана этажа нет в 3D.' }],
+        service_sheets: [
+          {
+            job_id: 's1',
+            revision_id: 'r1',
+            document_id: 'd1',
+            page_index: 143,
+            view: 1,
+            label: 'АР · лист 144',
+            reason: 'not_plan',
+            message: 'АР · лист 144: не план этажа: по паспорту листа - разрез.',
+          },
+        ],
       },
     } as never);
   });
@@ -251,18 +309,28 @@ describe('Просмотрщик объекта: весь объект', () => {
     expect(change).toHaveBeenCalledWith({ group: 'k2', floor: null, detail: false });
   });
 
-  it('режим «Весь объект»: холст получает группы, пометка про условное расположение, список по зданиям', async () => {
+  it('режим «Весь объект»: холст получает группы, не поставленный корпус назван с причиной', async () => {
     mount({ ...NOTHING, group: 'all' });
-    expect(await screen.findByText('Взаимное расположение корпусов условное')).toBeInTheDocument();
+    expect(await screen.findByText(/Полупрозрачные корпуса не поставлены на объект/)).toBeInTheDocument();
     expect(screen.getByTestId('canvas')).toHaveAttribute('data-all', 'true');
     expect(screen.getByRole('list', { name: 'Этажи: К9 · С3' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Этажи: К2 · С1' })).toBeInTheDocument();
+    const lost = screen.getByRole('region', { name: 'К2 · С1' });
+    expect(lost).toHaveTextContent('Не поставлен на объект: нет общих осей с поставленными зданиями');
+    expect(screen.getByRole('region', { name: 'К9 · С3' })).not.toHaveTextContent('Не поставлен');
   });
 
   it('обычный режим: пометки нет, холст без групп', async () => {
     mount({ ...NOTHING, group: 'k2' });
     expect(await screen.findByTestId('canvas')).toHaveAttribute('data-all', 'false');
-    expect(screen.queryByText('Взаимное расположение корпусов условное')).toBeNull();
+    expect(screen.queryByText(/Полупрозрачные корпуса/)).toBeNull();
+  });
+
+  it('замечания сборки: чего нет в 3D и служебные листы', async () => {
+    mount({ ...NOTHING, group: 'all' });
+    expect(await screen.findByText('Замечания сборки: 1, служебных листов: 1')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Замечания сборки' })).toHaveTextContent('плана этажа нет в 3D');
+    expect(screen.getByRole('list', { name: 'Служебные листы' })).toHaveTextContent('по паспорту листа - разрез');
   });
 
   it('выбор этажа в режиме сохраняет «all»', async () => {

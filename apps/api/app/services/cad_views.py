@@ -27,6 +27,9 @@ from app.storage.base import ObjectStorage
 SCALE_PASSED: Final = "dimension_checks_passed"
 SCALE_PASSED_STATUSES: Final = frozenset({"passed", SCALE_PASSED})
 OPERATOR_SOURCE: Final = "operator_calibration"
+# Масштаб оператора без подтверждения размерами (`needs_review`) расходится с подбором движка
+# больше этой доли - кадр вида не принимается: по такому листу нельзя ни мерить, ни совмещать.
+OPERATOR_SCALE_LIMIT: Final = 0.02
 
 
 def _tolerances(value: Any) -> dict[str, float]:
@@ -186,6 +189,7 @@ def scale_from(raw: Any) -> CadScaleRead | None:
         mm_per_pdf_point=operator_factor
         if source == OPERATOR_SOURCE and operator_factor is not None
         else _num(raw.get("mm_per_pdf_point_fitted")),
+        fitted_mm_per_pdf_point=_num(raw.get("mm_per_pdf_point_fitted")),
         scale_denominator=_num(raw.get("scale_denominator_fitted")),
         printed_scale_labels=[v for v in (_num(x) for x in labels) if v is not None]
         if isinstance(labels, list)
@@ -208,17 +212,40 @@ def scale_from(raw: Any) -> CadScaleRead | None:
     )
 
 
+def operator_scale_mismatch(scale: CadScaleRead | None) -> float | None:
+    """Доля расхождения масштаба оператора `needs_review` с подбором движка сверх допуска.
+
+    `None` - масштаб не оператора, подтверждён размерами, подбора нет или расхождение в допуске
+    `OPERATOR_SCALE_LIMIT`.
+    """
+    if scale is None or scale.status != "needs_review" or scale.source != OPERATOR_SOURCE:
+        return None
+    used, fitted = scale.mm_per_pdf_point, scale.fitted_mm_per_pdf_point
+    if used is None or fitted is None or used <= 0 or fitted <= 0:
+        return None
+    share = abs(used - fitted) / fitted
+    return share if share > OPERATOR_SCALE_LIMIT else None
+
+
+def _percent(share: float) -> str:
+    value = share * 100
+    return f"{value:.0f}" if value >= 10 else f"{value:.1f}".replace(".", ",")
+
+
 def frame_from(scale: CadScaleRead | None, cad_checks: Any) -> CadFrameRead:
     """Кадр DXF -> PDF. Без пригодного масштаба и начала координат — не подтверждён.
 
     Пригоден масштаб, прошедший проверку (`passed`), и масштаб оператора со статусом
     `needs_review`: DXF построен по калибровке человека, расхождение показывается отдельно.
+    Масштаб оператора `needs_review`, разошедшийся с подбором движка больше чем на
+    `OPERATOR_SCALE_LIMIT`, кадра не даёт: геометрия листа построена в неверном масштабе.
     """
     origin = (
         _point(cad_checks.get("origin_pdf_display_pt")) if isinstance(cad_checks, dict) else None
     )
     units = cad_checks.get("units") if isinstance(cad_checks, dict) else None
     factor = scale.mm_per_pdf_point if scale else None
+    mismatch = operator_scale_mismatch(scale)
     reason: str | None = None
     if cad_checks is None:
         reason = "DXF в этой попытке нет: сравнивать с PDF нечего."
@@ -226,6 +253,11 @@ def frame_from(scale: CadScaleRead | None, cad_checks: Any) -> CadFrameRead:
         scale.passed or (scale.status == "needs_review" and scale.source == OPERATOR_SOURCE)
     ):
         reason = "Масштаб не подтверждён размерной проверкой: кадр координат не установлен."
+    elif mismatch is not None:
+        reason = (
+            f"Масштаб оператора расходится с подобранным на {_percent(mismatch)} %: "
+            "кадр координат не установлен."
+        )
     elif units != "mm":
         reason = "Единицы DXF не указаны как мм."
     elif origin is None:

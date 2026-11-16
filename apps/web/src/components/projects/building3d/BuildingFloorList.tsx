@@ -4,7 +4,8 @@ import type { CadBuilding3dFloorRead, CadBuilding3dGroupRead } from '@quantor/ap
 import { cx } from '@quantor/ui';
 import type { FC } from 'react';
 
-import { alignmentNote, floorKey, formatElevation, splitFloors } from '@/lib/cad/building3d-geometry';
+import { AlignmentMark } from '@/components/workspace/cad/building3d/AlignmentMark';
+import { alignmentNote, floorKey, formatElevation, sheetCountOf, splitFloors } from '@/lib/cad/building3d-geometry';
 
 interface IBuildingFloorListProps {
   /** Этажи выбранного здания (в режиме «Весь объект» - всех зданий). */
@@ -27,7 +28,7 @@ export const BuildingFloorList: FC<IBuildingFloorListProps> = ({ floors, groups,
   const renderRow = (floor: CadBuilding3dFloorRead, groupFloors: readonly CadBuilding3dFloorRead[]) => {
     const key = floorKey(floor);
     const selected = key === selectedKey;
-    const note = alignmentNote(floor, groupFloors.length);
+    const note = alignmentNote(floor, sheetCountOf(groupFloors));
     return (
       <li key={key}>
         <button
@@ -43,9 +44,7 @@ export const BuildingFloorList: FC<IBuildingFloorListProps> = ({ floors, groups,
         >
           <span className="min-w-0 [overflow-wrap:anywhere]">
             {floor.label}
-            {note && (
-              <span className={cx('block text-xs', note.warn ? 'text-warning' : 'text-muted')}>{note.text}</span>
-            )}
+            {note && <AlignmentMark note={note} />}
           </span>
           <span className="flex-none text-xs text-muted">
             {floor.elevation_known ? formatElevation(floor.base_z_mm) : 'отметка не определена, в 3D нет'}
@@ -75,6 +74,11 @@ export const BuildingFloorList: FC<IBuildingFloorListProps> = ({ floors, groups,
             <h3 className="px-[var(--s-4)] pt-[var(--s-3)] pb-[var(--s-2)] text-xs font-medium text-muted [overflow-wrap:anywhere]">
               {group.label}
             </h3>
+            {group.placement === 'none' && (
+              <p className="px-[var(--s-4)] pb-[var(--s-2)] text-xs text-warning [overflow-wrap:anywhere]">
+                Не поставлен на объект{group.placement_message ? `: ${group.placement_message}` : ''}
+              </p>
+            )}
             {renderList(items, `Этажи: ${group.label}`)}
           </section>
         );

@@ -44,9 +44,17 @@ export interface IBuildingList {
   readonly unknown: readonly CadBuilding3dFloorRead[];
 }
 
-/** Адрес листа этажа: то же, что открывает его на холсте. */
-export const floorKey = (floor: Pick<CadBuilding3dFloorRead, 'job_id' | 'page_index' | 'view'>): string =>
-  `${floor.job_id}:${floor.page_index}:${floor.view}`;
+/**
+ * Ключ этажа: адрес его листа (то же, что открывает лист на холсте). У копии типового листа
+ * (`typical_of`) лист общий с другими его этажами, поэтому к адресу добавлена отметка.
+ */
+export const floorKey = (
+  floor: Pick<CadBuilding3dFloorRead, 'job_id' | 'page_index' | 'view'> &
+    Partial<Pick<CadBuilding3dFloorRead, 'typical_of' | 'base_z_mm'>>,
+): string => {
+  const sheet = `${floor.job_id}:${floor.page_index}:${floor.view}`;
+  return floor.typical_of === undefined || floor.typical_of === null ? sheet : `${sheet}@${floor.base_z_mm ?? 0}`;
+};
 
 /** Отметка в метрах: «+3.000», «-3.200», «0.000». */
 export const formatElevation = (baseZMm: number): string => {
@@ -55,11 +63,17 @@ export const formatElevation = (baseZMm: number): string => {
   return meters > 0 ? `+${text}` : meters === 0 ? '0.000' : text;
 };
 
-/** Подпись этажа: отметка и пометка «типовая», если высота этажа не прочитана, а принята типовой. */
+/** Откуда высота этажа, когда она не определена: по отметке следующего этажа или типовая. */
+export const heightNote = (floor: CadBuilding3dFloorRead): string | null => {
+  if (floor.floor_height_known) return null;
+  return floor.floor_height_source === 'derived_stack' ? 'высота по отметке следующего этажа' : 'высота типовая';
+};
+
+/** Подпись этажа: отметка и пометка, если высота этажа не прочитана, а принята для отрисовки. */
 export const describeFloor = (floor: CadBuilding3dFloorRead): string => {
   if (!floor.elevation_known) return `${floor.label}, отметка не определена`;
-  const typical = floor.floor_height_known ? '' : ', высота типовая';
-  return `${floor.label}, ${formatElevation(floor.base_z_mm)}${typical}`;
+  const height = heightNote(floor);
+  return `${floor.label}, ${formatElevation(floor.base_z_mm)}${height === null ? '' : `, ${height}`}`;
 };
 
 /** Этажи выбранного здания; ключа нет (старый ответ без групп) - все этажи. */
@@ -86,6 +100,9 @@ export const resolveGroupKey = (
   return first.key;
 };
 
+/** Светофор качества совмещения этажа с эталоном здания. */
+export type AlignmentGrade = 'green' | 'yellow' | 'red';
+
 export interface IAlignmentNote {
   /** Короткий текст для строки списка. */
   readonly text: string;
@@ -93,34 +110,88 @@ export interface IAlignmentNote {
   readonly title: string | null;
   /** Этаж не совмещён: пометка предупреждением. */
   readonly warn: boolean;
+  /** Светофор; `null` - оценивать нечего (эталон, один лист). */
+  readonly grade: AlignmentGrade | null;
 }
 
 const AXES_SHOWN = 4;
 
+/** Пороги светофора: остаток осей (СКО, мм), число согласных осей, наклон шкалы (промилле). */
+export const ALIGNMENT_LIMITS = {
+  green: { rmsMm: 5, axes: 6, scalePermille: 0.5 },
+  yellow: { rmsMm: 25, axes: 3, scalePermille: 2 },
+} as const;
+
 /**
- * Пометка совмещения этажа. «Не совмещён» - только если в здании больше одного этажа; этаж, совмещённый
- * по осям, - короткий список осей; эталон пометки не получает.
+ * Светофор совмещения: зелёный - остаток до 5 мм, осей от 6, наклон шкалы до 0,5 ‰; жёлтый - остаток до
+ * 25 мм, осей от 3, наклон до 2 ‰; красный - хуже и не совмещённый этаж. Показателя нет (старый ответ,
+ * мало осей для наклона) - он не ухудшает оценку. Эталон не оценивается.
+ */
+export const alignmentGrade = (floor: CadBuilding3dFloorRead): AlignmentGrade | null => {
+  if (floor.alignment === 'reference') return null;
+  if (floor.alignment === 'none') return 'red';
+  const rms = floor.alignment_rms_mm ?? 0;
+  const scale = Math.abs(floor.alignment_scale_permille ?? 0);
+  const axes = floor.alignment_axes.length;
+  const within = (limit: { rmsMm: number; axes: number; scalePermille: number }): boolean =>
+    rms <= limit.rmsMm && axes >= limit.axes && scale <= limit.scalePermille;
+  if (within(ALIGNMENT_LIMITS.green)) return 'green';
+  return within(ALIGNMENT_LIMITS.yellow) ? 'yellow' : 'red';
+};
+
+const decimal = (value: number, digits: number): string => value.toFixed(digits).replace('.', ',');
+
+/** Показатели совмещения одной строкой: остаток, оси, наклон шкалы; чего нет в ответе - пропущено. */
+export const alignmentQuality = (floor: CadBuilding3dFloorRead): string => {
+  const parts: string[] = [];
+  const rms = floor.alignment_rms_mm;
+  const max = floor.alignment_max_mm;
+  if (rms !== undefined && rms !== null) {
+    parts.push(`остаток ${decimal(rms, 1)} мм${max !== undefined && max !== null ? ` (до ${decimal(max, 1)})` : ''}`);
+  }
+  const common = floor.alignment_axes_common;
+  parts.push(
+    common !== undefined && common !== null
+      ? `согласных осей ${floor.alignment_axes.length} из ${common}`
+      : `осей ${floor.alignment_axes.length}`,
+  );
+  const scale = floor.alignment_scale_permille;
+  if (scale !== undefined && scale !== null) parts.push(`наклон шкалы ${decimal(scale, 2)} ‰`);
+  return parts.join(', ');
+};
+
+/**
+ * Пометка совмещения этажа. `sheetCount` - число листов здания (без копий типовых листов): здание из
+ * одного листа совмещать не с чем - «один лист», а не «совмещён». Этаж, совмещённый по осям, - короткий
+ * список осей и светофор; эталон здания из нескольких листов - «эталон».
  */
 export const alignmentNote = (
   floor: CadBuilding3dFloorRead,
-  groupFloorCount: number,
+  sheetCount: number,
 ): IAlignmentNote | null => {
+  if (sheetCount <= 1) return { text: 'один лист', title: 'В здании один лист: совмещать не с чем', warn: false, grade: null };
   if (floor.alignment === 'none') {
-    return groupFloorCount > 1
-      ? { text: 'не совмещён по осям', title: floor.alignment_message, warn: true }
-      : null;
+    return { text: 'не совмещён по осям', title: floor.alignment_message, warn: true, grade: 'red' };
   }
-  if (floor.alignment === 'axes' && floor.alignment_axes.length > 0) {
+  if (floor.alignment === 'reference') {
+    return { text: 'эталон', title: 'Эталонный этаж: остальные совмещены с ним', warn: false, grade: null };
+  }
+  if (floor.alignment_axes.length > 0) {
     const shown = floor.alignment_axes.slice(0, AXES_SHOWN).join(', ');
     const rest = floor.alignment_axes.length - AXES_SHOWN;
     return {
       text: `по осям ${shown}${rest > 0 ? ` +${rest}` : ''}`,
-      title: `Совмещён по осям: ${floor.alignment_axes.join(', ')}`,
+      title: `Совмещён по осям: ${floor.alignment_axes.join(', ')}. ${alignmentQuality(floor)}`,
       warn: false,
+      grade: alignmentGrade(floor),
     };
   }
   return null;
 };
+
+/** Число листов здания: копии типовых листов (`typical_of`) листами не считаются. */
+export const sheetCountOf = (floors: readonly CadBuilding3dFloorRead[]): number =>
+  floors.filter((floor) => floor.typical_of === undefined || floor.typical_of === null).length;
 
 const byElevationDesc = (a: CadBuilding3dFloorRead, b: CadBuilding3dFloorRead): number =>
   b.base_z_mm - a.base_z_mm || a.label.localeCompare(b.label, 'ru') || a.page_index - b.page_index;

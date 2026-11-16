@@ -12,11 +12,13 @@ import {
   floorKey,
   formatElevation,
   resolveGroupKey,
+  sheetCountOf,
   splitFloors,
 } from '@/lib/cad/building3d-geometry';
 import { useCadBuilding3d } from '@/lib/cad/building3d-queries';
 import { cadErrorText } from '@/lib/cad/errors';
 
+import { AlignmentMark } from './AlignmentMark';
 import { CadBuilding3dCanvas } from './CadBuilding3dCanvas';
 import { CadBuilding3dGroupSelect } from './CadBuilding3dGroupSelect';
 
@@ -79,7 +81,8 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({
   const list = useMemo(() => splitFloors(floors), [floors]);
   const byKey = useMemo(() => new Map(floors.map((floor) => [floorKey(floor), floor])), [floors]);
   const hovered = hover ? (byKey.get(hover.key) ?? null) : null;
-  const hoveredNote = hovered ? alignmentNote(hovered, floors.length) : null;
+  const sheetCount = useMemo(() => sheetCountOf(floors), [floors]);
+  const hoveredNote = hovered ? alignmentNote(hovered, sheetCount) : null;
   const hasFloors = list.known.length + list.unknown.length > 0;
 
   const select = (key: string) => {
@@ -90,7 +93,7 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({
   const renderRow = (floor: CadBuilding3dFloorRead) => {
     const key = floorKey(floor);
     const isCurrent = key === currentKey;
-    const note = alignmentNote(floor, floors.length);
+    const note = alignmentNote(floor, sheetCount);
     return (
       <li key={key}>
         <button
@@ -106,11 +109,7 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({
         >
           <span className="min-w-0 [overflow-wrap:anywhere]">
             {floor.label}
-            {note && (
-              <span className={cx('block text-xs', note.warn ? 'text-warning' : 'text-muted')}>
-                {note.text}
-              </span>
-            )}
+            {note && <AlignmentMark note={note} />}
           </span>
           <span className="flex-none text-xs text-muted">
             {floor.elevation_known ? formatElevation(floor.base_z_mm) : 'отметка не определена'}

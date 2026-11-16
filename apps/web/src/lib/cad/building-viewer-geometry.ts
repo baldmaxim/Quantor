@@ -48,6 +48,8 @@ export interface IViewerFloorSpec extends IBuildingFloorSpec {
   readonly levels: readonly IViewerLevel[];
   /** Верх стен, м, от общего центра по высоте (низ стен = верх плиты). */
   readonly wallTop: number;
+  /** Этаж здания, не поставленного на объект («Весь объект»): рисуется полупрозрачным. */
+  readonly ghost?: boolean;
 }
 
 /** Подпись группы (корпус, секция) над зданием в режиме «Весь объект»; координаты сцены, м. */
@@ -59,6 +61,8 @@ export interface IViewerGroupLabel {
   readonly z: number;
   /** Верхний этаж группы: при разнесении подпись поднимается вместе с ним. */
   readonly floorKey: string;
+  /** Вторая строка подписи: здание не поставлено на объект. */
+  readonly note?: string;
 }
 
 export interface IViewerPlan {

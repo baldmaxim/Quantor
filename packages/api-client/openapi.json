@@ -1415,6 +1415,28 @@
             "title": "Alignment Axes",
             "type": "array"
           },
+          "alignment_axes_common": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Axes Common"
+          },
+          "alignment_max_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Max Mm"
+          },
           "alignment_message": {
             "anyOf": [
               {
@@ -1425,6 +1447,28 @@
               }
             ],
             "title": "Alignment Message"
+          },
+          "alignment_rms_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Rms Mm"
+          },
+          "alignment_scale_permille": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Scale Permille"
           },
           "base_z_mm": {
             "title": "Base Z Mm",
@@ -1478,6 +1522,21 @@
           "floor_height_mm": {
             "title": "Floor Height Mm",
             "type": "integer"
+          },
+          "floor_height_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "derived_stack",
+                  "default"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Source"
           },
           "group_key": {
             "title": "Group Key",
@@ -1579,6 +1638,17 @@
           "slab_thickness_mm": {
             "title": "Slab Thickness Mm",
             "type": "integer"
+          },
+          "typical_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typical Of"
           },
           "view": {
             "title": "View",
@@ -1818,6 +1888,14 @@
             "title": "Groups",
             "type": "array"
           },
+          "service_sheets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CadBuilding3dServiceSheetRead"
+            },
+            "title": "Service Sheets",
+            "type": "array"
+          },
           "units": {
             "const": "mm",
             "title": "Units",
@@ -1838,6 +1916,69 @@
           "warnings"
         ],
         "title": "CadBuilding3dRead",
+        "type": "object"
+      },
+      "CadBuilding3dServiceSheetRead": {
+        "description": "Служебный лист: конструкции посчитаны, но в стопку этажей здания лист не входит.",
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "reason": {
+            "enum": [
+              "not_plan",
+              "superseded"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "revision_id",
+          "page_index",
+          "view",
+          "document_id",
+          "label",
+          "reason",
+          "message"
+        ],
+        "title": "CadBuilding3dServiceSheetRead",
         "type": "object"
       },
       "CadBuilding3dWallRead": {
@@ -9628,6 +9769,17 @@
           "fit_controls": {
             "title": "Fit Controls",
             "type": "integer"
+          },
+          "fitted_mm_per_pdf_point": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fitted Mm Per Pdf Point"
           },
           "heldout_chains": {
             "anyOf": [

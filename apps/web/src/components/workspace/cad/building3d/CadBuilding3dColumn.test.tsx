@@ -103,10 +103,11 @@ describe('колонка «Здание»', () => {
     ]);
     mount();
     const rows = within(await screen.findByRole('list')).getAllByRole('button');
+    // Пометка совмещения - в каждой строке: у эталона здания из нескольких листов - «эталон».
     expect(rows.map((row) => row.textContent)).toEqual([
-      '2 этаж+3.000',
-      '1 этаж0.000',
-      'Кровляотметка не определена',
+      '2 этажэталон+3.000',
+      '1 этажэталон0.000',
+      'Кровляэталонотметка не определена',
     ]);
     expect(rows[1]).toHaveAttribute('aria-current', 'true');
     expect(screen.getByRole('button', { name: 'щелчок по холсту' })).toHaveAttribute(
@@ -170,11 +171,12 @@ describe('колонка «Здание»', () => {
       expect(select).toHaveValue('k2');
       expect(
         within(screen.getByRole('list')).getAllByRole('button').map((row) => row.textContent),
-      ).toEqual(['К2 этаж 2по осям 3.1, 3.2, А+3.000', 'К2 этаж 10.000']);
+      ).toEqual(['К2 этаж 2по осям 3.1, 3.2, А+3.000', 'К2 этаж 1эталон0.000']);
       fireEvent.change(select, { target: { value: 'k10' } });
+      // Здание из одного листа совмещать не с чем: «один лист», а не «совмещён».
       expect(
         within(screen.getByRole('list')).getAllByRole('button').map((row) => row.textContent),
-      ).toEqual(['К10 этаж 10.000']);
+      ).toEqual(['К10 этаж 1один лист0.000']);
     });
 
     it('показывает здание открытого листа, а не первое', async () => {
@@ -184,7 +186,7 @@ describe('колонка «Здание»', () => {
       expect(select).toHaveValue('k10');
       expect(
         within(screen.getByRole('list')).getAllByRole('button').map((row) => row.textContent),
-      ).toEqual(['К10 этаж 10.000']);
+      ).toEqual(['К10 этаж 1один лист0.000']);
     });
 
     it('ручной выбор действует до смены листа, затем - здание нового листа', async () => {

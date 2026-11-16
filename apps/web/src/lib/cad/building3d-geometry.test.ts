@@ -2,7 +2,9 @@ import type { CadBuilding3dFloorRead, CadBuilding3dGroupRead } from '@quantor/ap
 import { describe, expect, it } from 'vitest';
 
 import {
+  alignmentGrade,
   alignmentNote,
+  alignmentQuality,
   buildBuildingPlan,
   cleanOutline,
   describeFloor,
@@ -10,6 +12,7 @@ import {
   floorKey,
   formatElevation,
   resolveGroupKey,
+  sheetCountOf,
   splitFloors,
 } from './building3d-geometry';
 
@@ -60,6 +63,9 @@ describe('отметка и подпись этажа', () => {
       '1 этаж, +3.000, высота типовая',
     );
     expect(describeFloor(floor({ elevation_known: false }))).toBe('1 этаж, отметка не определена');
+    expect(
+      describeFloor(floor({ base_z_mm: 3000, floor_height_known: false, floor_height_source: 'derived_stack' })),
+    ).toBe('1 этаж, +3.000, высота по отметке следующего этажа');
   });
 });
 
@@ -120,6 +126,10 @@ describe('план здания', () => {
 
   it('ключ этажа - задание, страница и вид', () => {
     expect(floorKey(floor({ job_id: 'x', page_index: 3, view: 2 }))).toBe('x:3:2');
+    // Копия типового листа делит лист с другими его этажами: ключ различает их отметкой.
+    expect(floorKey(floor({ job_id: 'x', page_index: 3, view: 2, typical_of: 'К10 · 5, 7 эт.', base_z_mm: 24200 }))).toBe(
+      'x:3:2@24200',
+    );
   });
 });
 
@@ -169,23 +179,60 @@ describe('здания и совмещение', () => {
     expect(resolveGroupKey(groups, null, 'нет')).toBe('k2');
   });
 
-  it('пометка совмещения: «не совмещён» только в здании из нескольких этажей', () => {
+  it('пометка совмещения: здание из одного листа - «один лист», а не «совмещён»', () => {
     const none = floor({ alignment: 'none', alignment_message: 'оси не распознаны' });
     expect(alignmentNote(none, 2)).toEqual({
       text: 'не совмещён по осям',
       title: 'оси не распознаны',
       warn: true,
+      grade: 'red',
     });
-    expect(alignmentNote(none, 1)).toBeNull();
-    expect(alignmentNote(floor({ alignment: 'reference' }), 3)).toBeNull();
+    expect(alignmentNote(none, 1)).toMatchObject({ text: 'один лист', warn: false, grade: null });
+    expect(alignmentNote(floor({ alignment: 'reference' }), 1)).toMatchObject({ text: 'один лист', grade: null });
+    expect(alignmentNote(floor({ alignment: 'reference' }), 3)).toMatchObject({ text: 'эталон', grade: null });
   });
 
-  it('пометка совмещения по осям сокращает длинный список', () => {
+  it('пометка совмещения по осям сокращает длинный список и несёт светофор', () => {
     const axes = floor({ alignment: 'axes', alignment_axes: ['1', '2', '3', '4', '5', '6'] });
     expect(alignmentNote(axes, 2)).toEqual({
       text: 'по осям 1, 2, 3, 4 +2',
-      title: 'Совмещён по осям: 1, 2, 3, 4, 5, 6',
+      title: 'Совмещён по осям: 1, 2, 3, 4, 5, 6. осей 6',
       warn: false,
+      grade: 'green',
     });
+  });
+
+  it('светофор: худший из остатка, числа осей и наклона шкалы', () => {
+    const six = ['1', '2', '3', 'А', 'Б', 'В'];
+    const axes = (patch: Partial<CadBuilding3dFloorRead>): CadBuilding3dFloorRead =>
+      floor({ alignment: 'axes', alignment_axes: six, alignment_rms_mm: 1, alignment_scale_permille: 0.05, ...patch });
+    expect(alignmentGrade(axes({}))).toBe('green');
+    expect(alignmentGrade(axes({ alignment_rms_mm: 5 }))).toBe('green');
+    expect(alignmentGrade(axes({ alignment_rms_mm: 24 }))).toBe('yellow');
+    expect(alignmentGrade(axes({ alignment_rms_mm: 26 }))).toBe('red');
+    expect(alignmentGrade(axes({ alignment_axes: ['1', '2', 'А'] }))).toBe('yellow');
+    expect(alignmentGrade(axes({ alignment_axes: ['1', 'А'] }))).toBe('red');
+    expect(alignmentGrade(axes({ alignment_scale_permille: -1.9 }))).toBe('yellow');
+    expect(alignmentGrade(axes({ alignment_scale_permille: 2.5 }))).toBe('red');
+    // Наклон не оценён (мало осей) - оценку не ухудшает.
+    expect(alignmentGrade(axes({ alignment_scale_permille: null }))).toBe('green');
+    expect(alignmentGrade(floor({ alignment: 'none' }))).toBe('red');
+    expect(alignmentGrade(floor({ alignment: 'reference' }))).toBeNull();
+  });
+
+  it('показатели совмещения одной строкой', () => {
+    const axes = floor({
+      alignment: 'axes',
+      alignment_axes: ['1', '2', 'А'],
+      alignment_rms_mm: 2.1,
+      alignment_max_mm: 6,
+      alignment_axes_common: 4,
+      alignment_scale_permille: -1.92,
+    });
+    expect(alignmentQuality(axes)).toBe('остаток 2,1 мм (до 6,0), согласных осей 3 из 4, наклон шкалы -1,92 ‰');
+  });
+
+  it('копии типовых листов листами здания не считаются', () => {
+    expect(sheetCountOf([floor(), floor({ typical_of: '5, 7 эт.' }), floor({ typical_of: null })])).toBe(2);
   });
 });

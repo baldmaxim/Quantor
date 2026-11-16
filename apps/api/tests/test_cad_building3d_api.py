@@ -11,9 +11,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import Role
+from app.domain import JobStatus, JobType, Role
 from app.main import create_app
-from app.models import Workspace
+from app.models import DocumentRevision, Job, SheetPassport, Workspace
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
 from tests.test_cad_constructions_api import PARAMS, _ready_sheet, walls_settings
 from tests.test_cad_floor3d_api import BASE, FLOOR_STUB, SECTION
@@ -98,13 +98,14 @@ async def test_floor_of_a_ready_sheet_follows_project_levels_for_viewer(
         response = await reader.get(_url(project_id))
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["units"] == "mm" and body["warnings"] == []
+    assert body["units"] == "mm" and body["warnings"] == [] and body["service_sheets"] == []
     (floor,) = body["floors"]
     assert (floor["job_id"], floor["revision_id"]) == (job_id, revision_id)
     assert (floor["page_index"], floor["view"]) == (0, 1)
     assert floor["document_id"] is not None and "лист 1" in floor["label"]
     assert (floor["elevation_known"], floor["base_z_mm"]) == (True, BASE)
     assert (floor["floor_height_mm"], floor["slab_thickness_mm"]) == (3000, 250)
+    assert (floor["floor_height_source"], floor["typical_of"]) == (None, None)
     assert floor["outline_source"] == "slab"
     assert floor["outline"] == [[0.0, 0.0], [6000.0, 0.0], [6000.0, 4000.0], [0.0, 4000.0]]
     assert floor["bbox"] == [0.0, 0.0, 6000.0, 4000.0]
@@ -237,3 +238,96 @@ async def test_walls_query_adds_construction_rings_and_default_stays_light(
     assert all(w["kind"] != "floor_slab" and len(w["shell"]) >= 3 for w in floor["walls"])
     assert all(isinstance(w["id"], str) and w["id"] for w in floor["walls"])
     assert all(isinstance(v, int) for w in floor["walls"] for p in w["shell"] for v in p)
+
+
+async def test_plans_by_passports_without_cad_are_named_in_warnings(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    """План по паспорту листа без DXF: название листа и код последней конвертации."""
+    settings = walls_settings(floor_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        revision = await db_session.get(DocumentRevision, uuid.UUID(revision_id))
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert revision is not None and parent is not None
+        rows = (
+            (0, "floor_plan", "План 1 этажа", "candidate"),  # лист в 3D есть
+            (3, "floor_plan", "План 4 этажа", "candidate"),
+            (4, "section", "Разрез 1-1", "candidate"),
+            (5, "floor_plan", "План 6 этажа", "rejected"),
+            (6, "floor_plan", None, "confirmed"),
+        )
+        for page, kind, title, status in rows:
+            db_session.add(
+                SheetPassport(
+                    project_id=uuid.UUID(project_id),
+                    revision_id=revision.id,
+                    page_index=page,
+                    file_name=revision.source_filename,
+                    sheet_kind=kind,
+                    title=title,
+                    status=status,
+                )
+            )
+        views = [{"view": 1, "status": "needs_review", "scale_status": "needs_review"}]
+        db_session.add(
+            Job(
+                job_type=JobType.CAD_PDF_CONVERT,
+                workspace_id=parent.workspace_id,
+                project_id=parent.project_id,
+                status=JobStatus.FAILED,
+                error_code="CAD_ENGINE_FAILED",
+                payload={
+                    "revision_id": revision_id,
+                    "params": {"pages": [3]},
+                    "cad_result": {"attempt": 1, "pages": [{"index": 3, "views": views}]},
+                },
+            )
+        )
+        await db_session.commit()
+        body = (await api.get(_url(project_id))).json()
+    name = revision.source_filename
+    assert [w["message"] for w in body["warnings"] if w["code"] == "floor_missing"] == [
+        f"{name} · лист 4 «План 4 этажа»: плана этажа нет в 3D - последняя конвертация листа "
+        "в DXF: needs_review.",
+        f"{name} · лист 7: плана этажа нет в 3D - конвертация листа в DXF не запускалась.",
+    ]
+    assert len(body["floors"]) == 1 and body["service_sheets"] == []
+
+
+async def test_section_sheet_by_passport_is_a_service_sheet(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        revision = await db_session.get(DocumentRevision, uuid.UUID(revision_id))
+        assert revision is not None
+        db_session.add(
+            SheetPassport(
+                project_id=uuid.UUID(project_id),
+                revision_id=revision.id,
+                page_index=0,
+                file_name=revision.source_filename,
+                sheet_kind="section",
+                status="candidate",
+            )
+        )
+        await db_session.commit()
+        body = (await api.get(_url(project_id))).json()
+    assert body["floors"] == [] and body["groups"] == []
+    (service,) = body["service_sheets"]
+    assert (service["job_id"], service["page_index"], service["reason"]) == (job_id, 0, "not_plan")
+    assert service["message"].endswith("не план этажа: по паспорту листа - разрез.")

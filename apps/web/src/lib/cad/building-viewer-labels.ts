@@ -11,6 +11,9 @@ import type { IViewerGroupLabel } from './building-viewer-geometry';
 const LABEL_CLASS =
   'pointer-events-none absolute top-0 left-0 z-10 max-w-[200px] truncate rounded-[var(--radius-sm)] border border-border bg-surface/90 px-[var(--s-3)] py-[var(--s-1)] text-xs font-medium whitespace-nowrap text-text';
 
+/** Плашка здания, не поставленного на объект: пунктирная рамка, вторая строка - пометка. */
+const NOTE_CLASS = 'border-dashed';
+
 export interface IGroupLabels {
   /** Новый набор подписей; прежние убираются. */
   set: (labels: readonly IViewerGroupLabel[]) => void;
@@ -33,9 +36,15 @@ export const createGroupLabels = (host: HTMLElement): IGroupLabels => {
       clear();
       items = labels.map((label) => {
         const element = document.createElement('div');
-        element.className = LABEL_CLASS;
+        element.className = label.note === undefined ? LABEL_CLASS : `${LABEL_CLASS} ${NOTE_CLASS}`;
         element.textContent = label.text;
         element.title = label.text;
+        if (label.note !== undefined) {
+          const note = document.createElement('span');
+          note.className = 'block font-normal text-warning';
+          note.textContent = label.note;
+          element.appendChild(note);
+        }
         host.appendChild(element);
         return { label, element };
       });
