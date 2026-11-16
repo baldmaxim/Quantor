@@ -81,6 +81,26 @@ describe('слой «Расчёты» в 3D здания', () => {
     expect(built.groups.size).toBe(0);
   });
 
+  it('повёрнутый этаж: геометрия встаёт как R(rotation_deg) · вид + offset_mm', () => {
+    const turned = floor({ rotation_deg: 90 });
+    const plan = buildBuildingPlan([turned]);
+    if (!plan) throw new Error('нет плана');
+    const line = polyline({ shape: null, dn_mm: null, pts: [[1000, 2000, 300], [3000, 2000, 300]] });
+    const built = buildBuildingCalcGroups(plan, [
+      { floorKey: floorKey(turned), layer: layer({ polylines: [line], elements: [] }) },
+    ]);
+    const group = built.groups.get(floorKey(turned));
+    if (!group) throw new Error('нет группы этажа');
+    const box = new THREE.Box3().setFromObject(group);
+    // Вид (1000..3000, 2000) -> R(90): (-2000, 1000..3000) + (5000, 7000) = (3000, 8000..10000) мм
+    // здания; центр (10000, 10000): X сцены = -7, Z сцены = -(y - cy) / 1000 = 2..0.
+    expect(box.min.x).toBeCloseTo(-7);
+    expect(box.max.x).toBeCloseTo(-7);
+    expect(box.min.z).toBeCloseTo(0);
+    expect(box.max.z).toBeCloseTo(2);
+    built.dispose();
+  });
+
   it('этаж без расчёта группы не получает', () => {
     const plan = buildBuildingPlan([floor(), floor({ page_index: 1, base_z_mm: 6000 })]);
     if (!plan) throw new Error('нет плана');

@@ -1083,3 +1083,39 @@ async def test_base_release_refuses_unknown_view_and_empty_project(
         assert bad_key.status_code == 422
         candidates = (await api.get(_url(project.id, "base/candidates"))).json()
         assert candidates["candidates"] == []
+
+
+def test_view_and_candidate_carry_floor_rotation_for_object_base() -> None:
+    """Размещение вида в базе несёт поворот: `p = R(rotation_deg) · p_вида + offset_mm`."""
+    from unittest.mock import MagicMock
+
+    from app.contracts.cad import CadFrameRead
+    from app.services import cad_building3d as b3d
+    from app.services import tender_base
+    from tests.test_cad_building3d import built, ref_axes, turned_view
+
+    reference = built(axes=ref_axes())
+    _ref, floor = b3d.align_floors([reference, turned_view(reference, 90, (1500, -700))])
+    assert floor.rotation_deg == 90.0
+    source = tender_base.ViewSource(
+        key=f"{uuid.uuid4()}:0:1",
+        dir="views/p0000-v1-aaaaaaaa",
+        floor=floor,
+        sheet=MagicMock(),
+        job=MagicMock(),
+        document_title="План",
+        dxf_sha256=None,
+        dxf_key=None,
+        frame=CadFrameRead(
+            confirmed=True,
+            reason=None,
+            units="mm",
+            origin_pt=(10.0, 20.0),
+            mm_per_pdf_point=1.0,
+        ),
+        page_size_pt=(1190.55, 841.89),
+    )
+    view = tender_base.build_view(source).model_dump(by_alias=True)
+    assert view["placement"]["rotation_deg"] == 90.0
+    assert view["placement"]["offset_mm"] == [round(floor.offset_mm[0]), round(floor.offset_mm[1])]
+    assert tender_base.candidate_read(source).rotation_deg == 90.0

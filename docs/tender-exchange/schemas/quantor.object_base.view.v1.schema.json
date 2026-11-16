@@ -114,6 +114,11 @@
           "minItems": 2,
           "title": "Offset Mm",
           "type": "array"
+        },
+        "rotation_deg": {
+          "default": 0.0,
+          "title": "Rotation Deg",
+          "type": "number"
         }
       },
       "required": [

@@ -168,6 +168,9 @@ class ObjectBasePlacement(_Strict):
     group_key: str
     group_label: str
     offset_mm: Point2
+    # Поворот вида в здании, градусы против часовой: `p = R(rotation_deg) · p_вида + offset_mm`
+    # (поворот вокруг начала кадра вида, затем сдвиг). Нет поля - 0.
+    rotation_deg: float = 0.0
     alignment: Literal["reference", "axes", "none"]
     alignment_axes: list[str]
 
@@ -260,6 +263,8 @@ class ObjectBaseBuildingFloor(_Strict):
     base_z_mm: int
     floor_height_mm: int
     offset_mm: Point2
+    # Поворот вида в здании (см. `ObjectBasePlacement.rotation_deg`).
+    rotation_deg: float = 0.0
     alignment: Literal["reference", "axes", "none"]
 
 
@@ -499,6 +504,8 @@ class TenderBaseCandidateRead(BaseModel):
     floors: list[str]
     base_z_mm: int
     offset_mm: tuple[float, float]
+    # Поворот вида в здании, градусы против часовой: `p = R(rotation_deg) · p_вида + offset_mm`.
+    rotation_deg: float = 0.0
     alignment: Literal["reference", "axes", "none"]
     dxf_sha256: str | None
     # Вид готов к выпуску: кадр подтверждён, DXF и конструкции есть.

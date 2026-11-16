@@ -65,7 +65,7 @@ STACK_HEIGHT_MAX_MM: Final = 6000
 
 def _site_rings(item: b3d.BuiltFloor, floor: CadBuilding3dFloorRead) -> list[b3d.CoreRing]:
     dx, dy = floor.offset_mm
-    return [b3d._moved_ring(ring, 0.0, dx, dy) for ring in item.cores]
+    return [b3d._moved_ring(ring, floor.rotation_deg, dx, dy) for ring in item.cores]
 
 
 def monolith_share(base: Sequence[b3d.CoreRing], other: Sequence[b3d.CoreRing]) -> float:

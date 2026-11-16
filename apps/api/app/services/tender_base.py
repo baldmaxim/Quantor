@@ -309,6 +309,7 @@ def candidate_read(source: ViewSource) -> TenderBaseCandidateRead:
         floors=[floor.label],
         base_z_mm=floor.base_z_mm,
         offset_mm=floor.offset_mm,
+        rotation_deg=floor.rotation_deg,
         alignment=floor.alignment,
         dxf_sha256=source.dxf_sha256,
         ready=source.ready,
@@ -571,6 +572,7 @@ def build_view(source: ViewSource) -> ObjectBaseView:
             group_key=floor.group_key,
             group_label=floor.group_label,
             offset_mm=[round(floor.offset_mm[0]), round(floor.offset_mm[1])],
+            rotation_deg=floor.rotation_deg,
             alignment=floor.alignment,
             alignment_axes=list(floor.alignment_axes),
         ),
@@ -846,6 +848,7 @@ async def create_release(
                         round(source.floor.offset_mm[0]),
                         round(source.floor.offset_mm[1]),
                     ],
+                    rotation_deg=source.floor.rotation_deg,
                     alignment=source.floor.alignment,
                 )
                 for source in chosen

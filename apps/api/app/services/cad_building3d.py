@@ -107,6 +107,9 @@ MESSAGE_FRAME_MISSING: Final = "кадр вида не установлен"
 MESSAGE_NO_REFERENCE: Final = "в группе нет этажа с осями в обоих направлениях"
 # Постановка зданий на объект: не меньше марок всего и доля согласованных среди общих.
 SITE_MIN_AXES: Final = 3
+# Поворот этажа кратно 90 градусам по осям: шаг и минимум согласных подписей.
+QUARTER_DEG: Final = 90.0
+TURN_MIN_AXES: Final = 3
 SITE_MIN_AGREEMENT: Final = 0.75
 # Этажи двух зданий «на одной отметке» и предел их перекрытия в плане (доля меньшего bbox).
 SITE_SAME_LEVEL_MM: Final = 300
@@ -1019,10 +1022,70 @@ def align_floors(items: Sequence[BuiltFloor]) -> list[CadBuilding3dFloorRead]:
     return [floor for floor in result if floor is not None]
 
 
+def _quarters(rotation_deg: float) -> int:
+    """Число четвертей оборота (0-3) для угла, кратного 90 градусам (поворот совмещения по осям)."""
+    return round(rotation_deg / QUARTER_DEG) % 4
+
+
+def _turn_axes(axes: FloorAxes, quarters: int) -> FloorAxes:
+    """Оси после поворота вида на `quarters` · 90 градусов против часовой вокруг начала кадра.
+
+    Поворот на 90 градусов: вертикальная ось `x = c` становится горизонтальной `y = c`, а
+    горизонтальная `y = c` - вертикальной `x = -c`; на 180 - знаки обеих координат меняются; на
+    270 - `x = c` становится `y = -c`, а `y = c` - `x = c`.
+    """
+    quarters %= 4
+    vertical, horizontal = axes.vertical, axes.horizontal
+    if quarters == 0:
+        return axes
+    if quarters == 1:
+        return FloorAxes({k: -v for k, v in horizontal.items()}, dict(vertical), axes.message)
+    if quarters == 2:
+        return FloorAxes(
+            {k: -v for k, v in vertical.items()},
+            {k: -v for k, v in horizontal.items()},
+            axes.message,
+        )
+    return FloorAxes(dict(horizontal), {k: -v for k, v in vertical.items()}, axes.message)
+
+
+_TurnedMatch = tuple[int, FloorAxes, _OrientMatch, _OrientMatch]
+
+
+def _turned_match(base: FloorAxes, ours: FloorAxes) -> _TurnedMatch | None:
+    """Поворот этажа на 90, 180 или 270 градусов, при котором оси сходятся с эталоном.
+
+    Подписи общих осей у повёрнутого листа меняют направление (вертикальные становятся
+    горизонтальными). Берётся поворот с наибольшим числом согласных подписей; нужно не меньше
+    `TURN_MIN_AXES` согласных подписей в сумме - случайное совпадение нескольких марок поворот не
+    даёт. Нет такого поворота - `None`.
+    """
+    best: _TurnedMatch | None = None
+    best_count = 0
+    for quarters in (1, 2, 3):
+        turned = _turn_axes(ours, quarters)
+        along_x = _match_orient(base.vertical, turned.vertical, "")
+        along_y = _match_orient(base.horizontal, turned.horizontal, "")
+        if isinstance(along_x, str) or isinstance(along_y, str):
+            continue
+        count = len(along_x.labels) + len(along_y.labels)
+        if count >= TURN_MIN_AXES and count > best_count:
+            best, best_count = (quarters, turned, along_x, along_y), count
+    return best
+
+
 def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead:
+    """Совмещение этажа с эталоном: сдвиг по осям, а у повёрнутого на 90, 180 или 270 градусов
+    листа - сначала поворот вокруг начала кадра (`rotation_deg`), потом сдвиг:
+    `p_эталона = R(rotation_deg) · p_вида + offset_mm`."""
     ours, base = item.axes, reference.axes
+    quarters = 0
     along_x = _match_orient(base.vertical, ours.vertical, "вертикальных")
     along_y = _match_orient(base.horizontal, ours.horizontal, "горизонтальных")
+    if isinstance(along_x, str) or isinstance(along_y, str):
+        turned = _turned_match(base, ours)
+        if turned is not None:
+            quarters, ours, along_x, along_y = turned
     if isinstance(along_x, str) or isinstance(along_y, str):
         wrong = _scale_explains(base, ours)
         if wrong is not None:
@@ -1034,7 +1097,11 @@ def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead
     permille = None if ratio is None else _permille(ratio)
     if ratio is not None and permille is not None and abs(permille) > SCALE_FAIL_PERMILLE:
         return _fallback(item, reference, _scale_message(ratio), permille)
-    shifted = _shifted(item.floor, along_x.shift, along_y.shift)
+    shifted = (
+        _shifted(item.floor, along_x.shift, along_y.shift)
+        if quarters == 0
+        else _rotated(item.floor, quarters * QUARTER_DEG, along_x.shift, along_y.shift)
+    )
     residuals = [*along_x.residuals, *along_y.residuals]
     if shifted.bbox is not None and reference.floor.bbox is not None:
         share = _overlap_share(shifted.bbox, reference.floor.bbox)
@@ -1114,9 +1181,10 @@ def _group_axes(
         if floor.alignment == "none" or not item.axes.usable:
             continue
         dx, dy = floor.offset_mm
-        for label, x in item.axes.vertical.items():
+        axes = _turn_axes(item.axes, _quarters(floor.rotation_deg))
+        for label, x in axes.vertical.items():
             values.setdefault(("vertical", label), []).append(x + dx)
-        for label, y in item.axes.horizontal.items():
+        for label, y in axes.horizontal.items():
             values.setdefault(("horizontal", label), []).append(y + dy)
     vertical: dict[str, float] = {}
     horizontal: dict[str, float] = {}
@@ -1393,7 +1461,12 @@ def _floor_core_sets(
     for *_rank, index in rows[:CORE_TRY_FLOORS]:
         fx, fy = aligned[index].offset_mm
         ox, oy = placements[aligned[index].group_key].offset_mm
-        out.append([_moved_ring(ring, 0.0, fx + ox, fy + oy) for ring in items[index].cores])
+        out.append(
+            [
+                _moved_ring(ring, aligned[index].rotation_deg, fx + ox, fy + oy)
+                for ring in items[index].cores
+            ]
+        )
     return out
 
 
@@ -1436,7 +1509,7 @@ def place_by_cores(
         base_root = placements[floor.group_key].cluster or floor.group_key
         fx, fy = floor.offset_mm
         ox, oy = placements[floor.group_key].offset_mm
-        site = [_moved_ring(r, 0.0, fx + ox, fy + oy) for r in items[biggest].cores]
+        site = [_moved_ring(r, floor.rotation_deg, fx + ox, fy + oy) for r in items[biggest].cores]
     placed: dict[str, cad_site_cores.CoreMatch] = {}
     tried: dict[str, cad_site_cores.CoreMatch | None] = {}
     sets = {
@@ -1582,7 +1655,8 @@ def _group_floor_cores(
     out: list[tuple[int, list[CoreRing]]] = []
     for *_rank, index in rows[:CORE_PIN_FLOORS]:
         fx, fy = aligned[index].offset_mm
-        out.append((index, [_moved_ring(ring, 0.0, fx, fy) for ring in items[index].cores]))
+        rotation = aligned[index].rotation_deg
+        out.append((index, [_moved_ring(ring, rotation, fx, fy) for ring in items[index].cores]))
     return out
 
 
@@ -1729,7 +1803,7 @@ def place_site(
         return place_by_cores(items, aligned, place_groups(items, aligned))
     base_key = aligned[biggest].group_key
     fx, fy = aligned[biggest].offset_mm
-    site = [_moved_ring(r, 0.0, fx, fy) for r in items[biggest].cores]
+    site = [_moved_ring(r, aligned[biggest].rotation_deg, fx, fy) for r in items[biggest].cores]
     pins: dict[str, cad_site_cores.CoreMatch] = {}
     tried: dict[str, cad_site_cores.CoreMatch | None] = {}
     for key in keys:
@@ -1912,9 +1986,16 @@ def apply_placements(
 def _rotated(
     floor: CadBuilding3dFloorRead, rotation: float, dx: float, dy: float
 ) -> CadBuilding3dFloorRead:
-    """Поворот на `rotation` градусов вокруг начала системы группы и сдвиг: постановка по ядрам."""
+    """Поворот на `rotation` градусов вокруг начала системы и сдвиг: постановка по ядрам и поворот
+    этажа по осям. К этажу применяется как `R(rotation) · p + (dx, dy)` поверх уже сделанного:
+    итоговые `rotation_deg` и `offset_mm` остаются в формуле
+    `R(rotation_deg) · p_вида + offset_mm`."""
 
     def point(x: float, y: float) -> Point:
+        if rotation % QUARTER_DEG == 0.0:
+            # Кратный 90 поворот точный: без остатка sin/cos в десятичных знаках.
+            rx, ry = ((x, y), (-y, x), (-x, -y), (y, -x))[_quarters(rotation)]
+            return rx + dx, ry + dy
         return cad_site_cores.transform_point(x, y, rotation, dx, dy)
 
     def ints(ring: Sequence[Sequence[int]]) -> list[list[int]]:
@@ -1954,7 +2035,7 @@ def _rotated(
             "levels": levels,
             "bbox": bbox,
             "offset_mm": (round(ox, 3), round(oy, 3)),
-            "rotation_deg": round(floor.rotation_deg + rotation, 3),
+            "rotation_deg": round(math.fmod(floor.rotation_deg + rotation, 360.0), 3),
         }
     )
 

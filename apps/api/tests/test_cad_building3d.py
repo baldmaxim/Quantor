@@ -341,6 +341,140 @@ def test_second_floor_is_aligned_by_common_axes_and_geometry_is_shifted() -> Non
     )
 
 
+def turn(x: float, y: float, deg: int) -> tuple[float, float]:
+    """Поворот точки на `deg` (кратно 90) градусов против часовой вокруг начала."""
+    return ((x, y), (-y, x), (-x, -y), (y, -x))[(deg // 90) % 4]
+
+
+def turned_view(
+    reference: b3d.BuiltFloor,
+    deg: int,
+    shift: tuple[int, int],
+    *,
+    skew: float = 0.0,
+    include_walls: bool = False,
+) -> b3d.BuiltFloor:
+    """Лист того же этажа, нарисованный повёрнутым: вид = R(-deg) · эталон + shift.
+
+    Оси вида считаются от осей эталона тем же преобразованием; `skew` смещает одну подпись.
+    """
+    sx, sy = shift
+
+    def to_view(x: float, y: float) -> tuple[float, float]:
+        tx, ty = turn(x, y, -deg)
+        return tx + sx, ty + sy
+
+    vertical: dict[str, float] = {}
+    horizontal: dict[str, float] = {}
+    for label, c in REF_X.items():
+        px, py = to_view(c, 0.0)
+        dx, dy = turn(0.0, 1.0, -deg)
+        if abs(dx) > 0.5:
+            horizontal[label] = py + (skew if label == "3.1" else 0.0)
+        else:
+            vertical[label] = px + (skew if label == "3.1" else 0.0)
+    for label, c in REF_Y.items():
+        px, py = to_view(0.0, c)
+        dx, dy = turn(1.0, 0.0, -deg)
+        if abs(dy) > 0.5:
+            vertical[label] = px
+        else:
+            horizontal[label] = py
+    item = built(elevation=BASE + 3000, order=1, axes=axes_block(vertical, horizontal))
+    ref_floor = reference.floor
+    box = ref_floor.bbox
+    assert box is not None
+    corners = [to_view(x, y) for x in (box[0], box[2]) for y in (box[1], box[3])]
+    walls = (
+        None
+        if ref_floor.walls is None
+        else [
+            w.model_copy(update={"shell": [[round(v) for v in to_view(x, y)] for x, y in w.shell]})
+            for w in ref_floor.walls
+        ]
+    )
+    view_floor = item.floor.model_copy(
+        update={
+            "outline": [list(to_view(x, y)) for x, y in ref_floor.outline],
+            "bbox": [
+                min(c[0] for c in corners),
+                min(c[1] for c in corners),
+                max(c[0] for c in corners),
+                max(c[1] for c in corners),
+            ],
+            "walls": walls,
+        }
+    )
+    return b3d.BuiltFloor(view_floor, item.order, item.axes)
+
+
+@pytest.mark.parametrize("deg", [90, 180, 270])
+def test_floor_drawn_turned_is_aligned_with_rotation_and_points_match_reference(deg: int) -> None:
+    reference = built(axes=ref_axes(), include_walls=True)
+    moved = turned_view(reference, deg, (1500, -700), include_walls=True)
+    ref_floor, floor = b3d.align_floors([reference, moved])
+    assert floor.alignment == "axes" and floor.alignment_message is None
+    assert floor.rotation_deg == pytest.approx(float(deg))
+    assert floor.alignment_axes == ["3.1", "3.2", "3.3", "А", "Б"]
+    # Качество совмещения считается после поворота: оси сошлись точно.
+    assert floor.alignment_rms_mm == 0.0 and floor.alignment_max_mm == 0.0
+    assert floor.alignment_axes_common == 5
+    assert [p for xy in floor.outline for p in xy] == pytest.approx(
+        [p for xy in ref_floor.outline for p in xy], abs=1e-6
+    )
+    assert floor.bbox == pytest.approx(ref_floor.bbox, abs=1e-6)
+    assert ref_floor.walls is not None and floor.walls is not None
+    assert [w.shell for w in floor.walls] == [w.shell for w in ref_floor.walls]
+    # Преобразование вида: p = R(rotation_deg) · p_вида + offset_mm.
+    view_floor = moved.floor
+    ox, oy = floor.offset_mm
+    for (vx, vy), (px, py) in zip(view_floor.outline, floor.outline, strict=True):
+        rx, ry = turn(vx, vy, deg)
+        assert (rx + ox, ry + oy) == pytest.approx((px, py), abs=1e-6)
+
+
+def test_turned_floor_quality_counts_the_axis_that_disagrees_after_rotation() -> None:
+    reference = built(axes=ref_axes())
+    moved = turned_view(reference, 90, (0, 0), skew=30.0)
+    _ref, floor = b3d.align_floors([reference, moved])
+    assert floor.alignment == "axes" and floor.rotation_deg == pytest.approx(90.0)
+    assert floor.alignment_rms_mm is not None and floor.alignment_rms_mm > 0
+    assert floor.alignment_max_mm is not None and floor.alignment_max_mm <= 30.0
+
+
+def test_floor_without_turn_keeps_zero_rotation() -> None:
+    reference = built(axes=ref_axes())
+    moved = built(elevation=BASE + 3000, order=1, axes=ref_axes())
+    ref_floor, floor = b3d.align_floors([reference, moved])
+    assert (ref_floor.rotation_deg, floor.rotation_deg) == (0.0, 0.0)
+
+
+def test_turned_axes_with_too_few_common_labels_do_not_turn_the_floor() -> None:
+    """Две общие марки - не повод повернуть этаж: он остаётся несовмещённым."""
+    reference = built(axes=ref_axes())
+    only_two = built(
+        elevation=BASE + 3000,
+        order=1,
+        axes=axes_block({"А": 1000.0, "Б": 2000.0}, {"3.1": 100.0, "3.2": 4100.0}),
+    )
+    _ref, floor = b3d.align_floors([reference, only_two])
+    assert floor.alignment == "none" and floor.rotation_deg == 0.0
+
+
+def test_group_placement_composes_with_the_floor_turn() -> None:
+    reference = built(axes=ref_axes())
+    moved = turned_view(reference, 90, (1500, -700))
+    _ref, floor = b3d.align_floors([reference, moved])
+    placement = b3d.GroupPlacement("cores", (1000.0, 2000.0), (), None, None, "k9-s3", 90.0)
+    (site_floor,) = b3d.apply_placements([floor], {floor.group_key: placement})
+    assert site_floor.rotation_deg == pytest.approx(180.0)
+    # p_объекта = R(90) · p_группы + (1000, 2000) = R(180) · p_вида + offset.
+    ox, oy = site_floor.offset_mm
+    for (vx, vy), (px, py) in zip(moved.floor.outline, site_floor.outline, strict=True):
+        rx, ry = turn(vx, vy, 180)
+        assert (rx + ox, ry + oy) == pytest.approx((px, py), abs=1e-6)
+
+
 def test_reference_is_the_lowest_floor_with_axes_in_both_directions() -> None:
     low_no_axes = built(elevation=BASE, order=0)
     low_axes = built(elevation=BASE + 3000, order=1, axes=ref_axes())

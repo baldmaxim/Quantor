@@ -38,6 +38,17 @@ describe('геометрия расчёта -> вход построителей
     expect(box.length_mm).toBe(1500);
   });
 
+  it('поворот идёт до сдвига: p = R(rotation_deg) · p_вида + offset_mm, z не меняется', () => {
+    const placement: ITenderPlacement = { offsetMm: [5000, 7000], rotationDeg: 90 };
+    const converted = polylineOf(polyline({ pts: [[1000, 2000, 300], [3000, 0, 50]] }), SOURCE, placement);
+    // R(90): (x, y) -> (-y, x); потом + (5000, 7000).
+    expect(converted.pts[0]?.[0]).toBeCloseTo(3000);
+    expect(converted.pts[0]?.[1]).toBeCloseTo(8000);
+    expect(converted.pts[0]?.[2]).toBe(300);
+    expect(converted.pts[1]?.[0]).toBeCloseTo(5000);
+    expect(converted.pts[1]?.[1]).toBeCloseTo(10000);
+  });
+
   it('элемент без оси получает ось по умолчанию, без подтипа - пустой подтип', () => {
     const converted = elementOf(element({ axis: null, subtype: null }), SOURCE, MOVED);
     expect(converted.axis).toEqual([1000, 0, 0]);
