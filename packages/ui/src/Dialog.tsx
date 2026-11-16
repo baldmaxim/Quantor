@@ -25,7 +25,7 @@ import {
  * складывается с ними, а не заменяет их.
  */
 
-export type DialogSize = 'md' | 'lg';
+export type DialogSize = 'md' | 'lg' | 'xl';
 
 interface IDialogProps {
   open: boolean;
@@ -50,6 +50,7 @@ interface IDialogProps {
 const SIZES: Record<DialogSize, string> = {
   md: 'max-w-[620px]',
   lg: 'max-w-[720px]',
+  xl: 'max-w-[1280px]',
 };
 
 export const Dialog = ({

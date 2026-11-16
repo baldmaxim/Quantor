@@ -10,7 +10,17 @@ import { SheetPassportEditDialog } from './SheetPassportEditDialog';
 vi.mock('@quantor/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof client>()),
   patchSheetPassport: vi.fn(),
+  readRevisionContentUrl: vi.fn(),
 }));
+
+const URL_OK = {
+  data: {
+    url: 'https://files.test/a.pdf?sig=1',
+    expires_in: 3600,
+    filename: 'АР.pdf',
+    content_type: 'application/pdf',
+  },
+};
 
 const mount = (onClose = vi.fn()) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -32,6 +42,24 @@ describe('Правка листа', () => {
     vi.mocked(client.patchSheetPassport)
       .mockReset()
       .mockImplementation((() => Promise.resolve({ data: passportRow() })) as never);
+    vi.mocked(client.readRevisionContentUrl)
+      .mockReset()
+      .mockImplementation((() => Promise.resolve(URL_OK)) as never);
+  });
+
+  it('показывает предпросмотр страницы', async () => {
+    mount();
+    const frame = await screen.findByTitle(/^Предпросмотр: /);
+    const row = passportRow();
+    expect(frame.getAttribute('src')).toMatch(new RegExp(`#page=${row.page_index + 1}$`));
+  });
+
+  it('ошибка ссылки показывается в role alert', async () => {
+    vi.mocked(client.readRevisionContentUrl).mockImplementation((() =>
+      Promise.reject(new Error('boom'))) as never);
+    mount();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByTitle(/^Предпросмотр: /)).toBeNull();
   });
 
   it('без изменений «Сохранить» недоступна', () => {

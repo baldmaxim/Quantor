@@ -15,6 +15,8 @@ import {
 import { usePatchPassport } from '@/lib/consistency/sheet-passport-queries';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 
+import { SheetPagePreview } from './SheetPagePreview';
+
 /**
  * Правка паспорта листа. Уходят только изменённые поля; правленое поле сервер помечает «вручную».
  * Раздел выбирается из марок, уже встреченных в комплекте: свободного ввода нет.
@@ -132,6 +134,7 @@ export const SheetPassportEditDialog: FC<IEditDialogProps> = ({
       open
       onClose={onClose}
       busy={patchPassport.isPending}
+      size="xl"
       title="Правка листа"
       description={`${row.file_name}, стр. ${row.page_index + 1}`}
       footer={
@@ -166,76 +169,83 @@ export const SheetPassportEditDialog: FC<IEditDialogProps> = ({
         </>
       }
     >
-      <div className="grid gap-[var(--s-4)] sm:grid-cols-2">
-        <label className={LABEL}>
-          Раздел
-          <select
-            className={SELECT}
-            value={form.section_mark}
-            onChange={(event) => set('section_mark', event.target.value)}
-          >
-            <option value="">—</option>
-            {markOptions.map((mark) => (
-              <option key={mark} value={mark}>
-                {mark}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={LABEL}>
-          Тип листа
-          <select
-            className={SELECT}
-            value={form.sheet_kind}
-            onChange={(event) => set('sheet_kind', event.target.value)}
-          >
-            <option value="">—</option>
-            {SHEET_KIND_VALUES.map((kind) => (
-              <option key={kind} value={kind}>
-                {SHEET_KIND_LABELS[kind]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={LABEL}>
-          Стадия
-          <select
-            className={SELECT}
-            value={form.stage}
-            onChange={(event) => set('stage', event.target.value)}
-          >
-            <option value="">—</option>
-            {STAGE_VALUES.map((stage) => (
-              <option key={stage} value={stage}>
-                {stage}
-              </option>
-            ))}
-          </select>
-        </label>
-        {TEXT_FIELDS.map(({ name, label }) => (
-          <div key={name} className={`${LABEL} ${name === 'title' ? 'sm:col-span-2' : ''}`}>
-            <span aria-hidden="true">{label}</span>
+      <div className="grid gap-[var(--s-6)] lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <SheetPagePreview
+          revisionId={row.revision_id}
+          pageIndex={row.page_index}
+          label={`${row.file_name}, стр. ${row.page_index + 1}`}
+        />
+        <div className="grid content-start gap-[var(--s-4)] sm:grid-cols-2">
+          <label className={LABEL}>
+            Раздел
+            <select
+              className={SELECT}
+              value={form.section_mark}
+              onChange={(event) => set('section_mark', event.target.value)}
+            >
+              <option value="">—</option>
+              {markOptions.map((mark) => (
+                <option key={mark} value={mark}>
+                  {mark}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={LABEL}>
+            Тип листа
+            <select
+              className={SELECT}
+              value={form.sheet_kind}
+              onChange={(event) => set('sheet_kind', event.target.value)}
+            >
+              <option value="">—</option>
+              {SHEET_KIND_VALUES.map((kind) => (
+                <option key={kind} value={kind}>
+                  {SHEET_KIND_LABELS[kind]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={LABEL}>
+            Стадия
+            <select
+              className={SELECT}
+              value={form.stage}
+              onChange={(event) => set('stage', event.target.value)}
+            >
+              <option value="">—</option>
+              {STAGE_VALUES.map((stage) => (
+                <option key={stage} value={stage}>
+                  {stage}
+                </option>
+              ))}
+            </select>
+          </label>
+          {TEXT_FIELDS.map(({ name, label }) => (
+            <div key={name} className={`${LABEL} ${name === 'title' ? 'sm:col-span-2' : ''}`}>
+              <span aria-hidden="true">{label}</span>
+              <ClearableInput
+                label={label}
+                value={form[name]}
+                wrapperClassName="w-full"
+                onChange={(event) => set(name, event.target.value)}
+                onClear={() => set(name, '')}
+              />
+            </div>
+          ))}
+          <div className={LABEL}>
+            <span aria-hidden="true">Отметка, м</span>
             <ClearableInput
-              label={label}
-              value={form[name]}
+              label="Отметка, м"
+              value={form.elevation_m}
+              inputMode="decimal"
               wrapperClassName="w-full"
-              onChange={(event) => set(name, event.target.value)}
-              onClear={() => set(name, '')}
+              aria-invalid={badElevation || undefined}
+              onChange={(event) => set('elevation_m', event.target.value)}
+              onClear={() => set('elevation_m', '')}
             />
+            {badElevation && <span className="text-danger">Отметка должна быть числом</span>}
           </div>
-        ))}
-        <div className={LABEL}>
-          <span aria-hidden="true">Отметка, м</span>
-          <ClearableInput
-            label="Отметка, м"
-            value={form.elevation_m}
-            inputMode="decimal"
-            wrapperClassName="w-full"
-            aria-invalid={badElevation || undefined}
-            onChange={(event) => set('elevation_m', event.target.value)}
-            onClear={() => set('elevation_m', '')}
-          />
-          {badElevation && <span className="text-danger">Отметка должна быть числом</span>}
         </div>
       </div>
     </Dialog>
