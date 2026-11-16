@@ -35,6 +35,7 @@ import type { CadJobRead } from '@quantor/api-client';
 
 import type {
   IWorkspaceCadConstructions,
+  IWorkspaceCadFacades,
   IWorkspaceCadSections,
   IWorkspaceCadSideProps,
   IWorkspaceCadZones,
@@ -128,7 +129,33 @@ const mount = (
     />,
   );
 
+const FACADES = {
+  status: 'ready',
+  data: null,
+  loadError: null,
+  onReload: vi.fn(),
+  starting: false,
+  onStart: vi.fn(),
+  deciding: false,
+  onDecide: vi.fn(),
+  actionError: null,
+  activeViewId: null,
+  onSelectView: vi.fn(),
+  onPanelShown: vi.fn(),
+  onOpenPage: vi.fn(),
+} as IWorkspaceCadFacades;
+
 describe('WorkspaceCadSide', () => {
+  it('«Фасады»: вкладка есть при переданном разделе и скрыта без него', () => {
+    mount({ facades: FACADES });
+    expect(screen.getByRole('tab', { name: 'Фасады' })).toBeInTheDocument();
+  });
+
+  it('без раздела (флаг cad.export выключен) вкладки «Фасады» нет', () => {
+    mount();
+    expect(screen.queryByRole('tab', { name: 'Фасады' })).toBeNull();
+  });
+
   it('лист плана: вкладки «Разрезы» нет', () => {
     mount({ sections: SECTIONS(false) });
     expect(screen.queryByRole('tab', { name: 'Разрезы' })).toBeNull();

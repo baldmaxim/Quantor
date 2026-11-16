@@ -4,6 +4,7 @@ from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
 from app.models.cad_construction import CadConstructionProps, CadSheetLevels
 from app.models.cad_decision import CadDecision
+from app.models.cad_facade_view import CadFacadeView
 from app.models.cad_finish_template import CadFinishTemplate
 from app.models.cad_project_levels import CadProjectLevels, CadSlabHoleDecision
 from app.models.cad_remark import CadRemark
@@ -52,6 +53,7 @@ __all__ = [
     "AuthSession",
     "CadConstructionProps",
     "CadDecision",
+    "CadFacadeView",
     "CadFinishTemplate",
     "CadProjectLevels",
     "CadRemark",

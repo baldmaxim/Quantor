@@ -11951,6 +11951,403 @@ export type EvidenceRelation = {
 export type EvidenceStatus = 'observed' | 'extraction_inferred' | 'human_confirmed';
 
 /**
+ * FacadeAxis
+ *
+ * Марка оси под видом; `u_mm` - мм вдоль фасада от марки `axis_from`, `None` без привязки.
+ */
+export type FacadeAxis = {
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Label Full
+     */
+    label_full?: string | null;
+    /**
+     * U Mm
+     */
+    u_mm?: number | null;
+    /**
+     * X
+     */
+    x: number;
+    /**
+     * Y
+     */
+    y: number;
+};
+
+/**
+ * FacadeFloor
+ *
+ * Подпись этажа («2 этаж», «тех. пространство»); `mark_mm` - отметка на той же высоте.
+ */
+export type FacadeFloor = {
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Floor
+     */
+    floor?: number | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Label Z Mm
+     */
+    label_z_mm?: number | null;
+    /**
+     * Mark Mm
+     */
+    mark_mm?: number | null;
+};
+
+/**
+ * FacadeIssueRead
+ */
+export type FacadeIssueRead = {
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ] | null;
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Page Index
+     */
+    page_index: number | null;
+};
+
+/**
+ * FacadeMark
+ *
+ * Отметка по тексту; `tip` - острие знака (доли страницы), `None` - знака в векторах нет.
+ */
+export type FacadeMark = {
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Fit Dev Mm
+     */
+    fit_dev_mm?: number | null;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Tip
+     */
+    tip?: [
+        number,
+        number
+    ] | null;
+    /**
+     * Used
+     */
+    used?: boolean;
+    /**
+     * Value Mm
+     */
+    value_mm: number;
+};
+
+/**
+ * FacadeViewRead
+ */
+export type FacadeViewRead = {
+    /**
+     * Axes
+     */
+    axes: Array<FacadeAxis>;
+    /**
+     * Axis From
+     */
+    axis_from: string | null;
+    /**
+     * Axis To
+     */
+    axis_to: string | null;
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Body
+     */
+    body: 'vector' | 'raster';
+    /**
+     * Corps
+     */
+    corps: string | null;
+    /**
+     * Decided At
+     */
+    decided_at: string | null;
+    /**
+     * Decided By
+     */
+    decided_by: string | null;
+    /**
+     * Floors
+     */
+    floors: Array<FacadeFloor>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Marks
+     */
+    marks: Array<FacadeMark>;
+    /**
+     * Mm Per Pt
+     */
+    mm_per_pt: number | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Residual Mm
+     */
+    residual_mm: number | null;
+    /**
+     * Scale Status
+     */
+    scale_status: 'fitted' | 'weak' | 'text_only' | 'none';
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Seq
+     */
+    seq: number;
+    /**
+     * Status
+     */
+    status: 'candidate' | 'accepted' | 'rejected';
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * View Key
+     */
+    view_key: string;
+    /**
+     * Window Count
+     */
+    window_count: number;
+    /**
+     * Windows
+     */
+    windows: Array<FacadeWindow>;
+};
+
+/**
+ * FacadeWindow
+ *
+ * Окно векторного вида: горизонталь - мм от оси `axis_from`, высоты - мм от ±0,000.
+ */
+export type FacadeWindow = {
+    /**
+     * Bbox
+     */
+    bbox: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Cells
+     */
+    cells?: number;
+    /**
+     * Hatch
+     */
+    hatch?: number;
+    /**
+     * Height Mm
+     */
+    height_mm: number;
+    /**
+     * Sash
+     */
+    sash?: number;
+    /**
+     * Source
+     */
+    source: 'observed';
+    /**
+     * U0 Mm
+     */
+    u0_mm?: number | null;
+    /**
+     * U1 Mm
+     */
+    u1_mm?: number | null;
+    /**
+     * Width Mm
+     */
+    width_mm: number;
+    /**
+     * Z Bottom Mm
+     */
+    z_bottom_mm: number;
+    /**
+     * Z Top Mm
+     */
+    z_top_mm: number;
+};
+
+/**
+ * FacadesDecide
+ *
+ * Решение человека по видам: принять, отклонить или вернуть в кандидаты.
+ */
+export type FacadesDecide = {
+    /**
+     * Decision
+     */
+    decision: 'accept' | 'reject' | 'reset';
+    /**
+     * View Ids
+     */
+    view_ids: Array<string>;
+};
+
+/**
+ * FacadesDecided
+ */
+export type FacadesDecided = {
+    /**
+     * Views
+     */
+    views: Array<FacadeViewRead>;
+};
+
+/**
+ * FacadesJobCreate
+ *
+ * Постановка задания: ревизия с PDF и, если нужно, подмножество страниц (индексы с 0).
+ */
+export type FacadesJobCreate = {
+    /**
+     * Page Indexes
+     */
+    page_indexes?: Array<number> | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+};
+
+/**
+ * FacadesJobRead
+ */
+export type FacadesJobRead = {
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Page Indexes
+     */
+    page_indexes: Array<number> | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Status
+     */
+    status: string;
+};
+
+/**
+ * FacadesRead
+ *
+ * Последнее задание ревизии, кандидаты видов и замечания артефакта выполненного задания.
+ */
+export type FacadesRead = {
+    /**
+     * Issues
+     */
+    issues: Array<FacadeIssueRead>;
+    job: FacadesJobRead | null;
+    /**
+     * Result Job Id
+     */
+    result_job_id: string | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Views
+     */
+    views: Array<FacadeViewRead>;
+};
+
+/**
  * FieldEvidenceOut
  */
 export type FieldEvidenceOut = {
@@ -12580,7 +12977,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
 
 /**
  * LengthUnit
@@ -20617,6 +21014,101 @@ export type ReadCadEomRoutes3dResponses = {
 };
 
 export type ReadCadEomRoutes3dResponse = ReadCadEomRoutes3dResponses[keyof ReadCadEomRoutes3dResponses];
+
+export type ReadCadFacadesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    url: '/api/v1/projects/{project_id}/cad/facades';
+};
+
+export type ReadCadFacadesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadFacadesError = ReadCadFacadesErrors[keyof ReadCadFacadesErrors];
+
+export type ReadCadFacadesResponses = {
+    /**
+     * Successful Response
+     */
+    200: FacadesRead;
+};
+
+export type ReadCadFacadesResponse = ReadCadFacadesResponses[keyof ReadCadFacadesResponses];
+
+export type CreateCadFacadesJobData = {
+    body: FacadesJobCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/facades/jobs';
+};
+
+export type CreateCadFacadesJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCadFacadesJobError = CreateCadFacadesJobErrors[keyof CreateCadFacadesJobErrors];
+
+export type CreateCadFacadesJobResponses = {
+    /**
+     * Successful Response
+     */
+    202: FacadesJobRead;
+};
+
+export type CreateCadFacadesJobResponse = CreateCadFacadesJobResponses[keyof CreateCadFacadesJobResponses];
+
+export type DecideCadFacadeViewsData = {
+    body: FacadesDecide;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/facades/views/decide';
+};
+
+export type DecideCadFacadeViewsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DecideCadFacadeViewsError = DecideCadFacadeViewsErrors[keyof DecideCadFacadeViewsErrors];
+
+export type DecideCadFacadeViewsResponses = {
+    /**
+     * Successful Response
+     */
+    200: FacadesDecided;
+};
+
+export type DecideCadFacadeViewsResponse = DecideCadFacadeViewsResponses[keyof DecideCadFacadeViewsResponses];
 
 export type ListCadFinishTemplatesData = {
     body?: never;

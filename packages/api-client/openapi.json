@@ -23963,6 +23963,797 @@
         "title": "EvidenceStatus",
         "type": "string"
       },
+      "FacadeAxis": {
+        "description": "Марка оси под видом; `u_mm` - мм вдоль фасада от марки `axis_from`, `None` без привязки.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "label_full": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Full"
+          },
+          "u_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "U Mm"
+          },
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "x",
+          "y"
+        ],
+        "title": "FacadeAxis",
+        "type": "object"
+      },
+      "FacadeFloor": {
+        "description": "Подпись этажа («2 этаж», «тех. пространство»); `mark_mm` - отметка на той же высоте.",
+        "properties": {
+          "bbox": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Bbox",
+            "type": "array"
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "label_z_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Z Mm"
+          },
+          "mark_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Mm"
+          }
+        },
+        "required": [
+          "label",
+          "bbox"
+        ],
+        "title": "FacadeFloor",
+        "type": "object"
+      },
+      "FacadeIssueRead": {
+        "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "maxItems": 4,
+                "minItems": 4,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "page_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Index"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "page_index",
+          "bbox"
+        ],
+        "title": "FacadeIssueRead",
+        "type": "object"
+      },
+      "FacadeMark": {
+        "description": "Отметка по тексту; `tip` - острие знака (доли страницы), `None` - знака в векторах нет.",
+        "properties": {
+          "bbox": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Bbox",
+            "type": "array"
+          },
+          "fit_dev_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Dev Mm"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "tip": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tip"
+          },
+          "used": {
+            "default": false,
+            "title": "Used",
+            "type": "boolean"
+          },
+          "value_mm": {
+            "title": "Value Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value_mm",
+          "text",
+          "bbox"
+        ],
+        "title": "FacadeMark",
+        "type": "object"
+      },
+      "FacadeViewRead": {
+        "properties": {
+          "axes": {
+            "items": {
+              "$ref": "#/components/schemas/FacadeAxis"
+            },
+            "title": "Axes",
+            "type": "array"
+          },
+          "axis_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axis From"
+          },
+          "axis_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axis To"
+          },
+          "bbox": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Bbox",
+            "type": "array"
+          },
+          "body": {
+            "enum": [
+              "vector",
+              "raster"
+            ],
+            "title": "Body",
+            "type": "string"
+          },
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "floors": {
+            "items": {
+              "$ref": "#/components/schemas/FacadeFloor"
+            },
+            "title": "Floors",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/FacadeMark"
+            },
+            "title": "Marks",
+            "type": "array"
+          },
+          "mm_per_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mm Per Pt"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "residual_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Mm"
+          },
+          "scale_status": {
+            "enum": [
+              "fitted",
+              "weak",
+              "text_only",
+              "none"
+            ],
+            "title": "Scale Status",
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "candidate",
+              "accepted",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "view_key": {
+            "title": "View Key",
+            "type": "string"
+          },
+          "window_count": {
+            "title": "Window Count",
+            "type": "integer"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/FacadeWindow"
+            },
+            "title": "Windows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "seq",
+          "page_index",
+          "view_key",
+          "title",
+          "axis_from",
+          "axis_to",
+          "corps",
+          "section",
+          "body",
+          "scale_status",
+          "mm_per_pt",
+          "residual_mm",
+          "bbox",
+          "axes",
+          "marks",
+          "floors",
+          "windows",
+          "window_count",
+          "status",
+          "decided_by",
+          "decided_at"
+        ],
+        "title": "FacadeViewRead",
+        "type": "object"
+      },
+      "FacadeWindow": {
+        "description": "Окно векторного вида: горизонталь - мм от оси `axis_from`, высоты - мм от ±0,000.",
+        "properties": {
+          "bbox": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Bbox",
+            "type": "array"
+          },
+          "cells": {
+            "default": 0,
+            "title": "Cells",
+            "type": "integer"
+          },
+          "hatch": {
+            "default": 0,
+            "title": "Hatch",
+            "type": "integer"
+          },
+          "height_mm": {
+            "title": "Height Mm",
+            "type": "integer"
+          },
+          "sash": {
+            "default": 0,
+            "title": "Sash",
+            "type": "integer"
+          },
+          "source": {
+            "const": "observed",
+            "title": "Source",
+            "type": "string"
+          },
+          "u0_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "U0 Mm"
+          },
+          "u1_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "U1 Mm"
+          },
+          "width_mm": {
+            "title": "Width Mm",
+            "type": "integer"
+          },
+          "z_bottom_mm": {
+            "title": "Z Bottom Mm",
+            "type": "integer"
+          },
+          "z_top_mm": {
+            "title": "Z Top Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bbox",
+          "width_mm",
+          "z_bottom_mm",
+          "z_top_mm",
+          "height_mm",
+          "source"
+        ],
+        "title": "FacadeWindow",
+        "type": "object"
+      },
+      "FacadesDecide": {
+        "additionalProperties": false,
+        "description": "Решение человека по видам: принять, отклонить или вернуть в кандидаты.",
+        "properties": {
+          "decision": {
+            "enum": [
+              "accept",
+              "reject",
+              "reset"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "view_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "View Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "view_ids",
+          "decision"
+        ],
+        "title": "FacadesDecide",
+        "type": "object"
+      },
+      "FacadesDecided": {
+        "properties": {
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/FacadeViewRead"
+            },
+            "title": "Views",
+            "type": "array"
+          }
+        },
+        "required": [
+          "views"
+        ],
+        "title": "FacadesDecided",
+        "type": "object"
+      },
+      "FacadesJobCreate": {
+        "additionalProperties": false,
+        "description": "Постановка задания: ревизия с PDF и, если нужно, подмножество страниц (индексы с 0).",
+        "properties": {
+          "page_indexes": {
+            "anyOf": [
+              {
+                "items": {
+                  "minimum": 0.0,
+                  "type": "integer"
+                },
+                "maxItems": 1000,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Indexes"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_id"
+        ],
+        "title": "FacadesJobCreate",
+        "type": "object"
+      },
+      "FacadesJobRead": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "page_indexes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Indexes"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "revision_id",
+          "status",
+          "attempt",
+          "error_code",
+          "error_message",
+          "page_indexes",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "FacadesJobRead",
+        "type": "object"
+      },
+      "FacadesRead": {
+        "description": "Последнее задание ревизии, кандидаты видов и замечания артефакта выполненного задания.",
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/FacadeIssueRead"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FacadesJobRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Job Id"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/FacadeViewRead"
+            },
+            "title": "Views",
+            "type": "array"
+          }
+        },
+        "required": [
+          "revision_id",
+          "job",
+          "result_job_id",
+          "views",
+          "issues"
+        ],
+        "title": "FacadesRead",
+        "type": "object"
+      },
       "FieldEvidenceOut": {
         "properties": {
           "snippet": {
@@ -25166,6 +25957,7 @@
           "cad_floor3d_dxf",
           "cad_zones",
           "cad_sections",
+          "cad_facades",
           "cad_eom_route",
           "sheet_passport_extract",
           "doc_questions_search",
@@ -39597,6 +40389,165 @@
         "summary": "ЭОМ и СС листа в 3D: сети и приборы (мм DXF вида, Z от отметки этажа) и ведомость",
         "tags": [
           "cad-eom"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/facades": {
+      "get": {
+        "operationId": "read_cad_facades",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacadesRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Фасады ревизии: последнее задание, кандидаты видов, замечания генератора",
+        "tags": [
+          "cad-facades"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/facades/jobs": {
+      "post": {
+        "operationId": "create_cad_facades_job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FacadesJobCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacadesJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Поставить распознавание видов фасадов АР по исходному PDF ревизии",
+        "tags": [
+          "cad-facades"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/facades/views/decide": {
+      "post": {
+        "operationId": "decide_cad_facade_views",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FacadesDecide"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacadesDecided"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Принять, отклонить или вернуть в кандидаты виды фасадов (решение человека)",
+        "tags": [
+          "cad-facades"
         ]
       }
     },

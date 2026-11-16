@@ -157,6 +157,9 @@ class Settings(BaseSettings):
     # ЭОМ и СС этажа (`cad_eom`): как `cad_mep` — скрипт и параметры из каталога генераторов.
     cad_eom_runner: str = ""
     cad_eom_params: str = ""
+    # Фасады АР (`cad_facades`, ADR-0048): так же, скрипт и параметры из каталога генераторов.
+    cad_facades_runner: str = ""
+    cad_facades_params: str = ""
 
     # --- вход в портал ---
     #

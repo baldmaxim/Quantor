@@ -49,6 +49,11 @@ vi.mock('@/lib/cad/sections-queries', () => ({
   useStartCadSections: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
   useDecideCadSectionLevels: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
 }));
+vi.mock('@/lib/cad/facades-queries', () => ({
+  useCadFacades: () => ({ data: undefined, isError: false, error: null, refetch: vi.fn() }),
+  useStartCadFacades: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+  useDecideCadFacadeViews: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+}));
 vi.mock('@/lib/cad/finishes-queries', () => ({
   useCadFinishTemplates: () => ({ data: undefined }),
   useAssignCadFinishTemplate: () => ({ mutateAsync: vi.fn(), isPending: false }),

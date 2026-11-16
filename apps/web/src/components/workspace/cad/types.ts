@@ -12,6 +12,7 @@ import type {
   CadVorCoverageRead,
   CadVorDocumentRead,
   CadZoneRead,
+  FacadesRead,
   JobStatus,
   SectionsRead,
 } from '@quantor/api-client';
@@ -414,6 +415,31 @@ export interface IWorkspaceCadSideProps {
   readonly finishes?: IWorkspaceCadFinishes | null;
   /** Раздел «Разрезы»; `null` или нет - раздела нет. */
   readonly sections?: IWorkspaceCadSections | null;
+  /** Раздел «Фасады» (флаг `cad.export`); `null` или нет - раздела нет. */
+  readonly facades?: IWorkspaceCadFacades | null;
+}
+
+/** Раздел «Фасады»: разбор фасадов ревизии, виды с окнами и решения человека по видам. */
+export interface IWorkspaceCadFacades {
+  readonly status: 'loading' | 'ready' | 'error';
+  readonly data: FacadesRead | null;
+  readonly loadError: string | null;
+  readonly onReload: () => void;
+  /** Постановка задания идёт. */
+  readonly starting: boolean;
+  readonly onStart: () => void;
+  /** Решение по видам отправлено и не завершено. */
+  readonly deciding: boolean;
+  readonly onDecide: (viewIds: readonly string[], decision: 'accept' | 'reject' | 'reset') => void;
+  /** Отказ последнего действия (постановка, решение). */
+  readonly actionError: string | null;
+  /** Выбранный вид (выделен на листе); `null` - нет. */
+  readonly activeViewId: string | null;
+  readonly onSelectView: (id: string | null) => void;
+  /** Вкладка «Фасады» открыта или закрыта: разметка на листе рисуется только при открытой. */
+  readonly onPanelShown: (shown: boolean) => void;
+  /** Перейти на страницу вида в рабочей области. */
+  readonly onOpenPage: (pageIndex: number) => void;
 }
 
 /** Раздел «Разрезы»: распознавание разрезов ревизии, кандидаты уровней и их принятие. */

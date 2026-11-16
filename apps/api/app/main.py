@@ -22,6 +22,7 @@ from app.api.v1.cad import qa_router as cad_qa_router
 from app.api.v1.cad_building3d import qa_router as cad_building3d_qa_router
 from app.api.v1.cad_constructions import qa_router as cad_constructions_qa_router
 from app.api.v1.cad_eom import qa_router as cad_eom_qa_router
+from app.api.v1.cad_facades import qa_router as cad_facades_qa_router
 from app.api.v1.cad_finishes import qa_router as cad_finishes_qa_router
 from app.api.v1.cad_floor3d import qa_router as cad_floor3d_qa_router
 from app.api.v1.cad_mep import qa_router as cad_mep_qa_router
@@ -122,6 +123,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cad_risers_qa_router)
     # Разрезы АР: кандидаты уровней и принятая высота для трасс.
     app.include_router(cad_sections_qa_router)
+    # Виды фасадов АР: кандидаты и решения человека (ADR-0048).
+    app.include_router(cad_facades_qa_router)
     app.include_router(cad_constructions_qa_router)
     # ВОР Заказчика как объект сверки конструкций CAD (ADR-0038 п. 5).
     app.include_router(cad_vor_qa_router)

@@ -18,6 +18,7 @@ import { composePainters, createRemarksPainter } from '@/lib/cad/remarks-painter
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import { useStoredNumber } from '@/lib/cad/useStoredNumber';
 import { createConstructionsPainter } from '@/lib/cad/constructions-painter';
+import { createFacadesPainter } from '@/lib/cad/facades-painter';
 import { createSectionsPainter } from '@/lib/cad/sections-painter';
 import { createZonesPainter } from '@/lib/cad/zones-painter';
 import { formatNumber } from '@/lib/cad/view-format';
@@ -59,6 +60,7 @@ import { useWorkspaceCadConstructions } from './useWorkspaceCadConstructions';
 import { useWorkspaceCadJob } from './useWorkspaceCadJob';
 import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
 import { useWorkspaceCadRoutes } from './useWorkspaceCadRoutes';
+import { useWorkspaceCadFacades } from './useWorkspaceCadFacades';
 import { useWorkspaceCadSections } from './useWorkspaceCadSections';
 import { useWorkspaceCadZones, type IWorkspaceCadZonesState } from './useWorkspaceCadZones';
 
@@ -344,6 +346,16 @@ export const useWorkspaceCad = ({
     viewportSize,
   });
 
+  // --- фасады ревизии (ADR-0048): виды, окна, решения человека, разметка на листе ---
+  const facadesState = useWorkspaceCadFacades({
+    projectId,
+    revisionId,
+    pageIndex,
+    load: enabled && opened && revisionId !== null,
+    active,
+    onOpenPage: (target) => goToSheet(target, { job: null, view: null }),
+  });
+
   const paintData = useMemo(() => {
     const base = overlayPaintData(preview, frame, pageSize, colors.ink, colors.layers, {
       dxfVisible: render.dxfVisible,
@@ -412,6 +424,28 @@ export const useWorkspaceCad = ({
     [sectionsState.paintData, cadPainter, constructionsPainter, zonesPainter, remarks.marks.length],
   );
 
+  const facadesPainter = useMemo(
+    () =>
+      facadesState.paintData
+        ? createFacadesPainter(facadesState.paintData, {
+            clear:
+              cadPainter === null &&
+              constructionsPainter === null &&
+              zonesPainter === null &&
+              remarks.marks.length === 0 &&
+              sectionsPainter === null,
+          })
+        : null,
+    [
+      facadesState.paintData,
+      cadPainter,
+      constructionsPainter,
+      zonesPainter,
+      sectionsPainter,
+      remarks.marks.length,
+    ],
+  );
+
   const painter = useMemo<LayerPainter | null>(
     () =>
       composePainters(
@@ -428,12 +462,14 @@ export const useWorkspaceCad = ({
             )
           : null,
         sectionsPainter,
+        facadesPainter,
       ),
     [
       cadPainter,
       constructionsPainter,
       zonesPainter,
       sectionsPainter,
+      facadesPainter,
       remarks.marks,
       remarks.activeId,
       colors.remarks,
@@ -622,6 +658,7 @@ export const useWorkspaceCad = ({
     zones: zonesState.zones,
     constructions: constructionsState.side,
     sections: sectionsState.side,
+    facades: enabled ? facadesState.side : null,
     finishes: {
       projectId,
       revisionId,

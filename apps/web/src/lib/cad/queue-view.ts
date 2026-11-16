@@ -27,6 +27,7 @@ const STEP_OF_JOB: Readonly<Partial<Record<JobType, PipelineStepKey>>> = {
 /** Метка задания: те же слова, что у шагов конвейера листа; разрезы - своя вкладка. */
 export const queueJobLabel = (jobType: JobType): string => {
   if (jobType === 'cad_sections') return 'Разрезы';
+  if (jobType === 'cad_facades') return 'Фасады';
   const key = STEP_OF_JOB[jobType];
   return key === undefined ? jobType : PIPELINE_STEP_LABELS[key];
 };

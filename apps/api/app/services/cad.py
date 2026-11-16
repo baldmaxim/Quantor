@@ -60,6 +60,8 @@ FLOOR3D_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/floor3d\.dxf$")
 ZONES_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/zones\.json$")
 # Артефакт задания «Разрезы» (`cad_sections`): один файл в корне артефактов задания.
 SECTIONS_ARTIFACT_NAME: Final = re.compile(r"^sections\.json$")
+# Артефакт задания «Фасады» (`cad_facades`, ADR-0048): один файл в корне артефактов задания.
+FACADES_ARTIFACT_NAME: Final = re.compile(r"^facades\.json$")
 # Артефакты задания ЭОМ и СС (`cad_eom_route`): отчёт, манифест и файлы в каталоге вида.
 EOM_ARTIFACT_NAME: Final = re.compile(
     r"^(?:report\.json|manifest\.json|"
@@ -184,6 +186,7 @@ def artifact_storage_key(revision_id: uuid.UUID, job_id: uuid.UUID, attempt: int
         or FLOOR3D_ARTIFACT_NAME.fullmatch(name)
         or ZONES_ARTIFACT_NAME.fullmatch(name)
         or SECTIONS_ARTIFACT_NAME.fullmatch(name)
+        or FACADES_ARTIFACT_NAME.fullmatch(name)
         or EOM_ARTIFACT_NAME.fullmatch(name)
     ):
         raise ValueError("недопустимое имя артефакта или номер попытки CAD")

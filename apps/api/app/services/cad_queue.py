@@ -27,6 +27,7 @@ QUEUE_JOB_TYPES: Final = (
     JobType.CAD_FLOOR3D_DXF,
     JobType.CAD_ZONES,
     JobType.CAD_SECTIONS,
+    JobType.CAD_FACADES,
     JobType.CAD_EOM_ROUTE,
 )
 RECENT_FINISHED_WINDOW: Final = timedelta(hours=1)
@@ -39,11 +40,11 @@ def _ints(raw: object) -> list[int]:
 
 
 def pages_of(job: Job) -> list[int]:
-    """Страницы задания (с 0): у конвертации - `params.pages`, у разрезов - `page_indexes`."""
+    """Страницы задания (с 0): конвертация - `params.pages`, разрезы и фасады - `page_indexes`."""
     if job.job_type is JobType.CAD_PDF_CONVERT:
         params = job.payload.get("params")
         return _ints(params.get("pages")) if isinstance(params, dict) else []
-    if job.job_type is JobType.CAD_SECTIONS:
+    if job.job_type in (JobType.CAD_SECTIONS, JobType.CAD_FACADES):
         return _ints(job.payload.get("page_indexes"))
     page_index = job.payload.get("page_index")
     return [page_index] if type(page_index) is int else []
