@@ -1,6 +1,8 @@
 import type { BadgeTone } from '@quantor/ui';
 import type { SheetPassportOut, SheetPassportStatus } from '@quantor/api-client';
 
+import { sheetWorkspaceHref } from '@/lib/cad/sheets';
+
 /**
  * Паспорт листа (ADR-0043, С1): подписи словарей и чистые помощники таблицы «Листы комплекта».
  * Сами значения (марки разделов, типы листов) — словарь сервера: здесь только русские подписи.
@@ -47,6 +49,13 @@ export const EVIDENCE_LABELS: Readonly<Record<string, string>> = {
   file_name: 'имя файла',
   manual: 'вручную',
 };
+
+/**
+ * Лист паспорта в рабочей области (просмотрщик). Листы PDF-ревизии идут по страницам один к одному,
+ * поэтому позиция листа в ревизии - номер страницы.
+ */
+export const passportSheetHref = (row: SheetPassportOut): string =>
+  sheetWorkspaceHref(row.project_id, row.revision_id, row.page_index);
 
 /** Подпись типа листа; незнакомое значение показывается как есть, пустое — прочерком. */
 export const sheetKindLabel = (kind: string | null): string =>

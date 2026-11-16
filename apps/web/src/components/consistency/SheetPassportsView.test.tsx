@@ -189,6 +189,14 @@ describe('Листы комплекта', () => {
     });
   });
 
+  it('«Лист» открывает страницу паспорта в рабочей области в новой вкладке', async () => {
+    mount();
+    await screen.findAllByTestId('passport-row');
+    const link = screen.getByRole('link', { name: 'Открыть лист в новой вкладке: АР.pdf, стр. 3' });
+    expect(link).toHaveAttribute('href', '/projects/p-1/workspace?revision=r-1&page=3');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
   it('поиск по шифру и заголовку работает на клиенте и очищается крестиком', async () => {
     mount();
     await screen.findAllByTestId('passport-row');

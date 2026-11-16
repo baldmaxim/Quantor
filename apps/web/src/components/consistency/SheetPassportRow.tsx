@@ -1,12 +1,13 @@
 import type { SheetPassportOut } from '@quantor/api-client';
 import type { FC } from 'react';
 
-import { Button, StatusBadge, cx } from '@/components/ui';
+import { Button, ButtonLink, StatusBadge, cx } from '@/components/ui';
 import {
   STATUS_LABELS,
   STATUS_TONES,
   cellText,
   levelsText,
+  passportSheetHref,
   sheetKindLabel,
 } from '@/lib/consistency/sheet-passports';
 
@@ -68,9 +69,20 @@ export const SheetPassportRow: FC<IRowProps> = ({ row, selected, onToggle, onEdi
         <StatusBadge tone={STATUS_TONES[row.status]}>{STATUS_LABELS[row.status]}</StatusBadge>
       </td>
       <td className="px-[var(--s-4)] py-[var(--s-3)] align-top">
-        <Button compact onClick={() => onEdit(row)} aria-label={`Править: ${label}`}>
-          Править
-        </Button>
+        <div className="flex gap-[var(--s-2)]">
+          <ButtonLink
+            compact
+            href={passportSheetHref(row)}
+            target="_blank"
+            rel="noopener"
+            aria-label={`Открыть лист в новой вкладке: ${label}`}
+          >
+            Лист
+          </ButtonLink>
+          <Button compact onClick={() => onEdit(row)} aria-label={`Править: ${label}`}>
+            Править
+          </Button>
+        </div>
       </td>
     </tr>
   );

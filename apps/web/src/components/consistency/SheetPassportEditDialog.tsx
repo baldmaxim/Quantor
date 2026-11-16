@@ -1,6 +1,7 @@
 'use client';
 
 import type { SheetPassportOut, SheetPassportPatch } from '@quantor/api-client';
+import Link from 'next/link';
 import { useState, type FC } from 'react';
 
 import { Button, Dialog, DialogActions } from '@/components/ui';
@@ -9,6 +10,7 @@ import {
   SHEET_KIND_LABELS,
   SHEET_KIND_VALUES,
   STAGE_VALUES,
+  passportSheetHref,
 } from '@/lib/consistency/sheet-passports';
 import { usePatchPassport } from '@/lib/consistency/sheet-passport-queries';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
@@ -134,8 +136,16 @@ export const SheetPassportEditDialog: FC<IEditDialogProps> = ({
       description={`${row.file_name}, стр. ${row.page_index + 1}`}
       footer={
         <>
+          <Link
+            href={passportSheetHref(row)}
+            target="_blank"
+            rel="noopener"
+            className="mr-auto inline-flex min-h-[44px] items-center text-sm text-accent underline underline-offset-4"
+          >
+            Открыть лист в новой вкладке
+          </Link>
           {patchPassport.isError && (
-            <p role="alert" className="mr-auto text-sm text-danger">
+            <p role="alert" className="text-sm text-danger">
               {extractMessage(patchPassport.error) ??
                 errorMessage(extractCode(patchPassport.error))}
             </p>
