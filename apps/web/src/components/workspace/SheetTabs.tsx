@@ -133,15 +133,16 @@ export const SheetTabs: FC<ISheetTabsProps> = ({ tabs, active, onActivate, onClo
             : `Масштаб чертежа не задан; масштаб вида ${scale.zoomPercent} %`
         }
       >
-        <span className="text-muted">Масштаб</span>
-        <span className={cx('tabular font-medium', !scale.text && 'text-muted')}>
-          {scale.text ?? 'не задан'}
+        {/* Один кегль и одна базовая линия: подпись источника мельче кегля съезжала вверх. */}
+        <span className="flex items-baseline gap-[var(--s-3)] leading-none">
+          <span className="text-muted">Масштаб</span>
+          <span className={cx('tabular font-medium', !scale.text && 'text-muted')}>
+            {scale.text ?? 'не задан'}
+          </span>
+          {scale.source && <span className="text-muted">{scale.source}</span>}
         </span>
-        {scale.source && <span className="text-micro text-muted">{scale.source}</span>}
-        <span aria-hidden="true" className="opacity-40">
-          ·
-        </span>
-        <span className="tabular text-muted">вид {scale.zoomPercent} %</span>
+        <span aria-hidden="true" className="h-[12px] w-px flex-none bg-border-strong" />
+        <span className="tabular leading-none text-muted">вид {scale.zoomPercent} %</span>
       </div>
 
       <div aria-hidden="true" />
