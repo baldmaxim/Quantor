@@ -59,7 +59,7 @@ def add_job(
 
 
 def test_queue_types_match_the_cad_worker() -> None:
-    # Проверка контуров (пилот) идёт фоном после расчёта конструкций и в очередь пользователя не входит.
+    # Проверка контуров (пилот) запускается вручную из панели и в очередь пользователя не входит.
     assert set(QUEUE_JOB_TYPES) == set(HANDLERS) - {JobType.CAD_OUTLINE_REVIEW}
 
 

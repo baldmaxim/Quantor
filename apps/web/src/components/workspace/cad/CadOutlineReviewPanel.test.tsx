@@ -1,24 +1,37 @@
-import { readCadOutlineReviews, type OutlineReviewRead } from '@quantor/api-client';
+import {
+  readCadOutlineReviews,
+  startCadOutlineReview,
+  type OutlineReviewState,
+} from '@quantor/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
-import { expect, it, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 import { CadOutlineReviewPanel } from './CadOutlineReviewPanel';
 
-vi.mock('@quantor/api-client', () => ({ readCadOutlineReviews: vi.fn() }));
-vi.mock('@/lib/queries', () => ({
-  unwrap: (response: { data: OutlineReviewRead[] }) => response.data,
+vi.mock('@quantor/api-client', () => ({
+  readCadOutlineReviews: vi.fn(),
+  startCadOutlineReview: vi.fn(),
 }));
+vi.mock('@/lib/queries', () => ({
+  unwrap: (response: { data: unknown }) => response.data,
+}));
+
+const transport = () => ({ request: new Request('http://localhost'), response: new Response() });
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 it('shows the report and source links for the walls job of the selected view', async () => {
   vi.mocked(readCadOutlineReviews).mockImplementation(async (
     options,
-  ): Promise<{ data: OutlineReviewRead[]; request: Request; response: Response }> => {
-    const transport = { request: new Request('http://localhost'), response: new Response() };
+  ): Promise<{ data: OutlineReviewState; request: Request; response: Response }> => {
     if (options.path.job_id === 'job-14') {
       return {
-        ...transport,
-        data: [{
+        ...transport(),
+        data: { available: true, reviews: [{
           job_id: 'review-14',
           status: 'succeeded',
           error_message: null,
@@ -56,10 +69,16 @@ it('shows the report and source links for the walls job of the selected view', a
               limitations: [],
             },
           },
-        }],
+        }] },
       };
     }
-    return { ...transport, data: [{ job_id: 'review-15', status: 'running', error_message: null }] };
+    return {
+      ...transport(),
+      data: {
+        available: true,
+        reviews: [{ job_id: 'review-15', status: 'running', error_message: null }],
+      },
+    };
   });
   const client = new QueryClient();
   const panel = (wallsJobId: string) => (
@@ -78,6 +97,45 @@ it('shows the report and source links for the walls job of the selected view', a
   rerender(panel('job-15'));
   expect(await screen.findByText('Проверка идёт')).toBeInTheDocument();
   expect(screen.queryByText(/Ось 3/)).toBeNull();
+  expect(screen.queryByRole('button')).toBeNull();
   unmount();
   client.clear();
+});
+
+const renderPanel = () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <CadOutlineReviewPanel wallsJobId="job-1" />
+    </QueryClientProvider>,
+  );
+};
+
+it('offers a manual start when available and no review exists', async () => {
+  vi.mocked(readCadOutlineReviews).mockResolvedValue({
+    ...transport(),
+    data: { available: true, reviews: [] },
+  } as Awaited<ReturnType<typeof readCadOutlineReviews>>);
+  vi.mocked(startCadOutlineReview).mockResolvedValue({
+    ...transport(),
+    data: { job_id: 'review-1', status: 'queued', error_message: null },
+  } as Awaited<ReturnType<typeof startCadOutlineReview>>);
+  renderPanel();
+  const button = await screen.findByRole('button', { name: 'Запустить проверку' });
+  expect(button).toHaveAttribute('type', 'button');
+  await userEvent.click(button);
+  await waitFor(() => expect(startCadOutlineReview).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(startCadOutlineReview).mock.calls[0]?.[0]).toMatchObject({
+    path: { job_id: 'job-1' },
+  });
+});
+
+it('renders nothing when unavailable and there are no reviews', async () => {
+  vi.mocked(readCadOutlineReviews).mockResolvedValue({
+    ...transport(),
+    data: { available: false, reviews: [] },
+  } as Awaited<ReturnType<typeof readCadOutlineReviews>>);
+  const { container } = renderPanel();
+  await waitFor(() => expect(readCadOutlineReviews).toHaveBeenCalled());
+  expect(container).toBeEmptyDOMElement();
 });

@@ -10660,6 +10660,47 @@
         "title": "CadStageRead",
         "type": "object"
       },
+      "CadStyleHatchSignature": {
+        "additionalProperties": false,
+        "description": "Подпись штриховки монолита: цвет RGB (0..1), перо, угол и шаг в pt.",
+        "properties": {
+          "angle_deg": {
+            "exclusiveMaximum": 180.0,
+            "minimum": 0.0,
+            "title": "Angle Deg",
+            "type": "number"
+          },
+          "color": {
+            "items": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "title": "Color",
+            "type": "array"
+          },
+          "pen": {
+            "exclusiveMinimum": 0.0,
+            "title": "Pen",
+            "type": "number"
+          },
+          "pitch_pt": {
+            "exclusiveMinimum": 0.0,
+            "title": "Pitch Pt",
+            "type": "number"
+          }
+        },
+        "required": [
+          "color",
+          "pen",
+          "angle_deg",
+          "pitch_pt"
+        ],
+        "title": "CadStyleHatchSignature",
+        "type": "object"
+      },
       "CadStyleManualSource": {
         "additionalProperties": false,
         "description": "Профиль введён вручную: полей снятия по образцам нет (лишнее поле - 422).",
@@ -10956,6 +10997,14 @@
             },
             "maxItems": 16,
             "title": "Concrete Hatch Gray",
+            "type": "array"
+          },
+          "concrete_hatch_signatures": {
+            "items": {
+              "$ref": "#/components/schemas/CadStyleHatchSignature"
+            },
+            "maxItems": 8,
+            "title": "Concrete Hatch Signatures",
             "type": "array"
           },
           "door_grid_tolerance": {
@@ -30308,6 +30357,27 @@
         "title": "OutlineReviewResult",
         "type": "object"
       },
+      "OutlineReviewState": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/OutlineReviewRead"
+            },
+            "title": "Reviews",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "reviews"
+        ],
+        "title": "OutlineReviewState",
+        "type": "object"
+      },
       "OverrideScope": {
         "description": "Уровень, на котором переопределяется настройка или флаг.\n\n`PROJECT` объявлен, но ни одной настройке пока не разрешён: контракт готов к\nрасширению, а выдавать несуществующий уровень за работающий нельзя. Тест следит,\nчтобы уровень не появился в определениях раньше, чем в коде, который его читает.",
         "enum": [
@@ -43861,11 +43931,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OutlineReviewRead"
-                  },
-                  "title": "Response Read Cad Outline Reviews",
-                  "type": "array"
+                  "$ref": "#/components/schemas/OutlineReviewState"
                 }
               }
             },
@@ -43883,6 +43949,47 @@
           }
         },
         "summary": "Проверки качества обводки по заданию конструкций",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "operationId": "start_cad_outline_review",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutlineReviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить проверку обводки по заданию конструкций",
         "tags": [
           "jobs"
         ]

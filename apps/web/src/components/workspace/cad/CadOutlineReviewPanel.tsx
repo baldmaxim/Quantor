@@ -1,8 +1,13 @@
 'use client';
 
-import { readCadOutlineReviews, type OutlineReviewRead } from '@quantor/api-client';
-import { useQuery } from '@tanstack/react-query';
+import {
+  readCadOutlineReviews,
+  startCadOutlineReview,
+  type OutlineReviewRead,
+} from '@quantor/api-client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { cadErrorText } from '@/lib/cad/errors';
 import { env } from '@/lib/env';
 import { unwrap } from '@/lib/queries';
 
@@ -29,24 +34,52 @@ const status = {
 const label = (review: OutlineReviewRead): string =>
   review.result ? verdict[review.result.report.verdict] : status[review.status];
 
+const isActive = (review: OutlineReviewRead | undefined): boolean =>
+  review?.status === 'queued' || review?.status === 'running';
+
 export const CadOutlineReviewPanel = ({ wallsJobId }: { readonly wallsJobId: string }) => {
+  const client = useQueryClient();
+  const queryKey = ['cad-outline-review', wallsJobId];
   const query = useQuery({
-    queryKey: ['cad-outline-review', wallsJobId],
+    queryKey,
     queryFn: async () =>
       unwrap(await readCadOutlineReviews({ path: { job_id: wallsJobId }, throwOnError: true })),
     retry: false,
-    refetchInterval: ({ state }) =>
-      state.data?.[0]?.status === 'queued' || state.data?.[0]?.status === 'running' ? 5000 : false,
+    refetchInterval: ({ state }) => (isActive(state.data?.reviews[0]) ? 5000 : false),
   });
-  const review = query.data?.[0];
-  if (!review) return null;
-  const result = review.result;
+  const start = useMutation({
+    mutationFn: async () =>
+      unwrap(await startCadOutlineReview({ path: { job_id: wallsJobId }, throwOnError: true })),
+    onSuccess: () => client.invalidateQueries({ queryKey }),
+  });
+  const available = query.data?.available ?? false;
+  const review = query.data?.reviews[0];
+  if (!available && !review) return null;
+  const result = review?.result;
   return (
     <section aria-label="Проверка обводки Codex" className="min-w-0 rounded-md border border-border p-3">
       <h3 className="text-sm font-semibold text-text">Проверка обводки Codex</h3>
-      <p className="mt-1 text-xs text-muted" role="status">{label(review)}</p>
-      {review.error_message && <p className="mt-2 text-xs text-danger">{review.error_message}</p>}
-      {result && (
+      <p className="mt-1 text-xs text-muted">Ручной этап после движка: проверка по SSH, 5–8 минут</p>
+      {available && !isActive(review) && (
+        <button
+          type="button"
+          disabled={start.isPending}
+          onClick={() => start.mutate()}
+          className="mt-2 min-h-11 rounded-md border border-border px-3 text-sm text-text disabled:opacity-60"
+        >
+          {review ? 'Проверить заново' : 'Запустить проверку'}
+        </button>
+      )}
+      {start.isError && (
+        <p role="alert" className="mt-2 text-xs text-danger [overflow-wrap:anywhere]">
+          {cadErrorText(start.error)}
+        </p>
+      )}
+      {review && (
+        <p className="mt-1 text-xs text-muted" role="status">{label(review)}</p>
+      )}
+      {review?.error_message && <p className="mt-2 text-xs text-danger">{review.error_message}</p>}
+      {review && result && (
         <>
           <p className="mt-1 text-xs text-muted">{result.floor}-й этаж · стр. {result.pdf_page} PDF</p>
           <div className="mt-3 space-y-3 text-xs">

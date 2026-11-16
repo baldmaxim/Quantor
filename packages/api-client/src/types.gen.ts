@@ -5075,6 +5075,34 @@ export type CadStageRead = {
 };
 
 /**
+ * CadStyleHatchSignature
+ *
+ * Подпись штриховки монолита: цвет RGB (0..1), перо, угол и шаг в pt.
+ */
+export type CadStyleHatchSignature = {
+    /**
+     * Angle Deg
+     */
+    angle_deg: number;
+    /**
+     * Color
+     */
+    color: [
+        number,
+        number,
+        number
+    ];
+    /**
+     * Pen
+     */
+    pen: number;
+    /**
+     * Pitch Pt
+     */
+    pitch_pt: number;
+};
+
+/**
  * CadStyleManualSource
  *
  * Профиль введён вручную: полей снятия по образцам нет (лишнее поле - 422).
@@ -5228,6 +5256,10 @@ export type CadStyleProfileBody = {
      * Concrete Hatch Gray
      */
     concrete_hatch_gray: Array<number>;
+    /**
+     * Concrete Hatch Signatures
+     */
+    concrete_hatch_signatures?: Array<CadStyleHatchSignature>;
     /**
      * Door Grid Tolerance
      */
@@ -15258,6 +15290,20 @@ export type OutlineReviewResult = {
 };
 
 /**
+ * OutlineReviewState
+ */
+export type OutlineReviewState = {
+    /**
+     * Available
+     */
+    available: boolean;
+    /**
+     * Reviews
+     */
+    reviews: Array<OutlineReviewRead>;
+};
+
+/**
  * OverrideScope
  *
  * Уровень, на котором переопределяется настройка или флаг.
@@ -22897,14 +22943,42 @@ export type ReadCadOutlineReviewsError = ReadCadOutlineReviewsErrors[keyof ReadC
 
 export type ReadCadOutlineReviewsResponses = {
     /**
-     * Response Read Cad Outline Reviews
-     *
      * Successful Response
      */
-    200: Array<OutlineReviewRead>;
+    200: OutlineReviewState;
 };
 
 export type ReadCadOutlineReviewsResponse = ReadCadOutlineReviewsResponses[keyof ReadCadOutlineReviewsResponses];
+
+export type StartCadOutlineReviewData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/jobs/{job_id}/cad-outline-review';
+};
+
+export type StartCadOutlineReviewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartCadOutlineReviewError = StartCadOutlineReviewErrors[keyof StartCadOutlineReviewErrors];
+
+export type StartCadOutlineReviewResponses = {
+    /**
+     * Successful Response
+     */
+    202: OutlineReviewRead;
+};
+
+export type StartCadOutlineReviewResponse = StartCadOutlineReviewResponses[keyof StartCadOutlineReviewResponses];
 
 export type ReadCadOutlineSourceData = {
     body?: never;

@@ -1,4 +1,4 @@
-"""Автоматическая проверка результата CAD на выбранных этажах пилота."""
+"""Проверка результата CAD на этажах пилота - ручной запуск после движка."""
 
 import hashlib
 import json
@@ -9,15 +9,16 @@ from typing import Any
 
 import structlog
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cad_worker.handler import CadError, _download, _run_while_owned, _still_owned
 from app.cad_worker.mep_handler import _download_artifact
 from app.cad_worker.walls_handler import _view_frame_of, _view_zone_of
-from app.contracts.cad_outline_review import OutlinePilot, OutlineReport
+from app.contracts.cad_outline_review import OutlinePilot, OutlineReport, PilotFloor
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
-from app.errors import ErrorCode
+from app.errors import DomainError, ErrorCode
 from app.models import DocumentRevision, Job
 from app.services import cad, jobs
 from app.services.cad_walls import WALLS_JSON
@@ -27,40 +28,77 @@ log = structlog.get_logger(__name__)
 _CLI = Path(__file__).with_name("outline_review_cli.py")
 
 
-async def enqueue_after_walls(session: AsyncSession, walls: Job, settings: Settings) -> None:
+def pilot_floor_for(walls: Job, settings: Settings) -> tuple[OutlinePilot, PilotFloor] | None:
+    """Этаж пилота, которому соответствует задание конструкций; None - не пилот или не совпало."""
     if not settings.cad_review_pilot:
-        return
+        return None
     try:
         pilot = OutlinePilot.model_validate_json(settings.cad_review_pilot)
     except ValidationError:
         log.error("cad_outline_review_pilot_invalid")
-        return
+        return None
     if walls.project_id != pilot.project_id or walls.payload.get("revision_id") != str(
         pilot.revision_id
     ):
-        return
+        return None
     result = cad.result_of(walls)
     for floor in pilot.floors:
-        if (result.get("page_index"), result.get("view")) != (floor.pdf_page - 1, floor.view):
-            continue
-        payload = {
-            "walls_job_id": str(walls.id),
-            "walls_attempt": walls.attempt,
-            "revision_id": str(pilot.revision_id),
-            "section": pilot.section,
-            **floor.model_dump(),
-            "sources": pilot.sources,
-        }
-        digest = hashlib.sha256(cad.params_bytes(payload)).hexdigest()
-        await jobs.enqueue(
-            session,
-            job_type=JobType.CAD_OUTLINE_REVIEW,
-            project_id=walls.project_id,
-            workspace_id=walls.workspace_id,
-            idempotency_key=f"cad-outline-review:v1:{digest}",
-            payload=payload,
+        if (result.get("page_index"), result.get("view")) == (floor.pdf_page - 1, floor.view):
+            return pilot, floor
+    return None
+
+
+def review_available(walls: Job, settings: Settings) -> bool:
+    return (
+        walls.job_type == JobType.CAD_WALLS
+        and walls.status == JobStatus.SUCCEEDED
+        and pilot_floor_for(walls, settings) is not None
+    )
+
+
+async def reviews_of(session: AsyncSession, walls: Job) -> list[Job]:
+    """Проверки обводки этого задания конструкций: новые первыми."""
+    rows = await session.scalars(
+        select(Job)
+        .where(
+            Job.job_type == JobType.CAD_OUTLINE_REVIEW,
+            Job.workspace_id == walls.workspace_id,
+            Job.project_id == walls.project_id,
+            Job.payload["walls_job_id"].astext == str(walls.id),
         )
-        return
+        .order_by(Job.created_at.desc(), Job.id.desc())
+    )
+    return list(rows)
+
+
+async def enqueue_for_walls(session: AsyncSession, walls: Job, settings: Settings) -> Job:
+    """Ручной запуск проверки; идущую проверку не дублирует."""
+    matched = pilot_floor_for(walls, settings)
+    if matched is None or not review_available(walls, settings):
+        raise DomainError(
+            ErrorCode.CAD_RESULT_NOT_READY, "Проверка обводки для этого листа недоступна"
+        )
+    pilot, floor = matched
+    existing = await reviews_of(session, walls)
+    if existing and existing[0].status in (JobStatus.QUEUED, JobStatus.RUNNING):
+        return existing[0]
+    payload = {
+        "walls_job_id": str(walls.id),
+        "walls_attempt": walls.attempt,
+        "revision_id": str(pilot.revision_id),
+        "section": pilot.section,
+        **floor.model_dump(),
+        "sources": pilot.sources,
+    }
+    digest = hashlib.sha256(cad.params_bytes(payload)).hexdigest()
+    return await jobs.enqueue(
+        session,
+        job_type=JobType.CAD_OUTLINE_REVIEW,
+        project_id=walls.project_id,
+        workspace_id=walls.workspace_id,
+        idempotency_key=f"cad-outline-review:v2:{digest}:{len(existing) + 1}",
+        payload=payload,
+    )
 
 
 async def _prepare(

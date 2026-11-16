@@ -6,13 +6,20 @@ import re
 import uuid
 from urllib.parse import quote
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
 
-from app.api.v1.deps import SessionDep, StorageDep, WorkspaceDep, require, require_feature
+from app.api.v1.deps import (
+    SessionDep,
+    SettingsDep,
+    StorageDep,
+    WorkspaceDep,
+    require,
+    require_feature,
+)
 from app.auth.permissions import Permission
-from app.contracts.cad_outline_review import OutlineReviewRead, SourceRole
+from app.cad_worker.outline_review import enqueue_for_walls, review_available, reviews_of
+from app.contracts.cad_outline_review import OutlineReviewRead, OutlineReviewState, SourceRole
 from app.domain import JobType
 from app.errors import not_found
 from app.models import Job
@@ -36,37 +43,52 @@ async def read_job(job_id: uuid.UUID, session: SessionDep, workspace: WorkspaceD
     return JobRead.model_validate(job)
 
 
+async def _walls_of(session: SessionDep, workspace: WorkspaceDep, job_id: uuid.UUID) -> Job:
+    walls = await jobs_service.get_job(session, workspace_id=workspace.tenant, job_id=job_id)
+    if walls is None or walls.job_type != JobType.CAD_WALLS:
+        raise not_found("Задание конструкций")
+    return walls
+
+
+def _review_read(job: Job) -> OutlineReviewRead:
+    return OutlineReviewRead(
+        job_id=job.id,
+        status=job.status,
+        error_message=job.error_message,
+        result=job.payload.get("outline_review"),
+    )
+
+
 @router.get(
     "/{job_id}/cad-outline-review",
-    response_model=list[OutlineReviewRead],
+    response_model=OutlineReviewState,
     summary="Проверки качества обводки по заданию конструкций",
     dependencies=[require(Permission.JOBS_READ), require_feature("cad.export")],
 )
 async def read_cad_outline_reviews(
-    job_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep
-) -> list[OutlineReviewRead]:
-    walls = await jobs_service.get_job(session, workspace_id=workspace.tenant, job_id=job_id)
-    if walls is None or walls.job_type != JobType.CAD_WALLS:
-        raise not_found("Задание конструкций")
-    reviews = await session.scalars(
-        select(Job)
-        .where(
-            Job.job_type == JobType.CAD_OUTLINE_REVIEW,
-            Job.workspace_id == workspace.tenant,
-            Job.project_id == walls.project_id,
-            Job.payload["walls_job_id"].astext == str(walls.id),
-        )
-        .order_by(Job.created_at.desc(), Job.id.desc())
+    job_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep, settings: SettingsDep
+) -> OutlineReviewState:
+    walls = await _walls_of(session, workspace, job_id)
+    return OutlineReviewState(
+        available=review_available(walls, settings),
+        reviews=[_review_read(job) for job in await reviews_of(session, walls)],
     )
-    return [
-        OutlineReviewRead(
-            job_id=job.id,
-            status=job.status,
-            error_message=job.error_message,
-            result=job.payload.get("outline_review"),
-        )
-        for job in reviews
-    ]
+
+
+@router.post(
+    "/{job_id}/cad-outline-review",
+    response_model=OutlineReviewRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Запустить проверку обводки по заданию конструкций",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD), require_feature("cad.export")],
+)
+async def start_cad_outline_review(
+    job_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep, settings: SettingsDep
+) -> OutlineReviewRead:
+    walls = await _walls_of(session, workspace, job_id)
+    review = await enqueue_for_walls(session, walls, settings)
+    await session.commit()
+    return _review_read(review)
 
 
 @router.get(

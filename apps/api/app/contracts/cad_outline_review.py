@@ -106,3 +106,8 @@ class OutlineReviewRead(BaseModel):
     status: JobStatus
     error_message: str | None
     result: OutlineReviewResult | None = None
+
+
+class OutlineReviewState(BaseModel):
+    available: bool
+    reviews: list[OutlineReviewRead]

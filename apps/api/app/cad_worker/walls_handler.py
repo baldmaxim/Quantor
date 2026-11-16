@@ -31,7 +31,6 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cad_worker import znaki_corner_door
@@ -440,12 +439,4 @@ async def execute_cad_walls(
         job.payload, attempt, cad_progress.now(), outcome="succeeded", result_status=RESULT_READY
     )
     done = await jobs_service.succeed(session, job=job, payload={"cad_result": result})
-    if settings.cad_review_pilot:
-        from app.cad_worker.outline_review import enqueue_after_walls
-
-        try:
-            async with session.begin_nested():
-                await enqueue_after_walls(session, done, settings)
-        except SQLAlchemyError:
-            log.warning("cad_outline_review_enqueue_failed", job_id=str(done.id))
     return done
