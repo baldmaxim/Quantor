@@ -284,6 +284,8 @@ class SheetRef:
     passport_kind: str | None = None
     passport_building: str | None = None
     passport_section: str | None = None
+    # Показан прежний прогон листа (у нового конструкций ещё нет): текст предупреждения.
+    previous_run_note: str | None = None
 
 
 # «Секции 8, 9, 10, 15-16, 17, …»: перечень секций через запятую в названии листа.
@@ -2664,19 +2666,24 @@ async def collect_sheets(
     )
     revisions = {revision.id: (revision, document) for revision, document in rows.all()}
     walls_by_view: dict[tuple[str, int, int], Job] = {}
+    # Самое новое задание конструкций вида любого статуса: по нему называется причина,
+    # почему у нового прогона листа конструкций ещё нет.
+    walls_latest: dict[tuple[str, int, int], Job] = {}
     for walls in await session.scalars(
         select(Job)
         .where(
             Job.workspace_id == workspace_id,
             Job.project_id == project_id,
             Job.job_type == JobType.CAD_WALLS,
-            Job.status == JobStatus.SUCCEEDED,
         )
         .order_by(Job.created_at.desc(), Job.id)
     ):
         page, view = walls.payload.get("page_index"), walls.payload.get("view")
         if type(page) is int and type(view) is int:
-            walls_by_view.setdefault((str(walls.payload.get("parent_job_id")), page, view), walls)
+            wkey = (str(walls.payload.get("parent_job_id")), page, view)
+            walls_latest.setdefault(wkey, walls)
+            if walls.status == JobStatus.SUCCEEDED:
+                walls_by_view.setdefault(wkey, walls)
     project_slab = await cad_construction_store.load_project_slab(session, project_id=project_id)
     # Высоты всех листов - одним запросом, а не запросом на каждый вид.
     levels = await cad_construction_store.load_levels_many(session, revision_ids=list(revisions))
@@ -2724,6 +2731,9 @@ async def collect_sheets(
             )
         ).all()
     }
+    older_by_revision: dict[uuid.UUID, list[Job]] = {}
+    for job, rid in ordered:
+        older_by_revision.setdefault(rid, []).append(job)
     taken: set[tuple[uuid.UUID, int]] = set()
     sheets: list[SheetRef] = []
     for job, revision_id in ordered:
@@ -2743,10 +2753,22 @@ async def collect_sheets(
                 overrides = levels.get(
                     (revision_id, page_index, view), cad_construction_store.EMPTY_LEVELS
                 )
+                # Вид берётся из самого нового прогона, у которого есть успешные конструкции
+                # (та же ревизия): конвертация и конструкции - согласованная пара.
+                source, walls_key, note = _pick_run(
+                    job,
+                    older_by_revision.get(revision_id, []),
+                    revision_id,
+                    page_index,
+                    view,
+                    walls_by_view,
+                    walls_latest,
+                    label,
+                )
                 folder = cad_service.view_folder(page_index, view)
                 sheets.append(
                     SheetRef(
-                        job_id=job.id,
+                        job_id=source.id,
                         revision_id=revision_id,
                         document_id=document.id,
                         page_index=page_index,
@@ -2759,23 +2781,71 @@ async def collect_sheets(
                             view,
                         ),
                         overrides=overrides,
-                        walls_key=_walls_key(
-                            walls_by_view.get((str(job.id), page_index, view)),
-                            revision_id,
-                            page_index,
-                            view,
-                        ),
-                        scale_key=_parent_key(job, revision_id, f"{folder}/scale.json"),
-                        checks_key=_parent_key(job, revision_id, f"{folder}/cad_checks.json"),
+                        walls_key=walls_key,
+                        scale_key=_parent_key(source, revision_id, f"{folder}/scale.json"),
+                        checks_key=_parent_key(source, revision_id, f"{folder}/cad_checks.json"),
                         stamp_title=stamp_titles.get(sheet_id)
                         if (sheet_id := sheet_ids.get((revision_id, page_index))) is not None
                         else None,
                         passport_kind=None if passport is None else passport.sheet_kind,
                         passport_building=None if passport is None else _clean(passport.building),
                         passport_section=None if passport is None else _clean(passport.section),
+                        previous_run_note=note,
                     )
                 )
     return sheets, [], project_slab
+
+
+def _walls_state(walls: Job | None) -> str:
+    """Почему у нового прогона вида нет готовых конструкций."""
+    if walls is None or walls.status == JobStatus.QUEUED:
+        return "ещё не посчитаны"
+    if walls.status == JobStatus.RUNNING:
+        return "считаются"
+    if walls.status == JobStatus.FAILED:
+        return f"завершились ошибкой: {walls.error_code or 'без кода'}"
+    if walls.status == JobStatus.CANCELLED:
+        return "отменены"
+    return "не читаются"
+
+
+def _pick_run(
+    head: Job,
+    revision_jobs: Sequence[Job],
+    revision_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    walls_by_view: dict[tuple[str, int, int], Job],
+    walls_latest: dict[tuple[str, int, int], Job],
+    label: str,
+) -> tuple[Job, str | None, str | None]:
+    """Прогон вида для сборки: самый новый с успешными конструкциями, иначе самый новый.
+
+    Возвращает конвертацию-источник, ключ walls.json и предупреждение о прежнем результате.
+    Прежний прогон ищется в той же ревизии: новая ревизия - другой чертёж, а не пересчёт.
+    """
+    head_key = _walls_key(
+        walls_by_view.get((str(head.id), page_index, view)), revision_id, page_index, view
+    )
+    if head_key is not None:
+        return head, head_key, None
+    for older in revision_jobs:
+        if older.id == head.id or older.created_at >= head.created_at:
+            continue
+        if view not in _view_numbers(older, page_index):
+            continue
+        key = _walls_key(
+            walls_by_view.get((str(older.id), page_index, view)), revision_id, page_index, view
+        )
+        if key is None:
+            continue
+        state = _walls_state(walls_latest.get((str(head.id), page_index, view)))
+        note = (
+            f"{label}: конструкции нового прогона {state}, "
+            f"показан прежний результат от {older.created_at:%d.%m.%Y}."
+        )
+        return older, key, note
+    return head, None, None
 
 
 # --------------------------------------------------------------------------- хранилище
@@ -3004,6 +3074,24 @@ def core_rings(document: WallsDocument) -> tuple[CoreRing, ...]:
 
 
 async def _load_sheet_floor(
+    storage: ObjectStorage,
+    sheet: SheetRef,
+    project_slab: ProjectSlab | None,
+    include_walls: bool,
+    gate: asyncio.Semaphore,
+    generation: int,
+) -> _SheetFloor:
+    """Этаж листа; если взят прежний прогон - с предупреждением `floor_previous_run`."""
+    item = await _load_sheet_floor_cached(
+        storage, sheet, project_slab, include_walls, gate, generation
+    )
+    if sheet.previous_run_note is None or item.floor is None:
+        return item
+    warning = CadBuilding3dWarningRead(code="floor_previous_run", message=sheet.previous_run_note)
+    return dataclasses.replace(item, warnings=(*item.warnings, warning))
+
+
+async def _load_sheet_floor_cached(
     storage: ObjectStorage,
     sheet: SheetRef,
     project_slab: ProjectSlab | None,
