@@ -119,9 +119,14 @@ async def test_every_cad_route_is_closed_when_the_flag_is_off(
     from fastapi.routing import APIRoute
 
     from app.api.v1.cad import router
+    from app.api.v1.cad_style_profiles import router as style_profiles_router
 
     routes = [route for route in router.routes if isinstance(route, APIRoute)]
     assert len(routes) >= 12
+    # Профиль оформления проектировщика (ADR-0049) закрыт тем же флагом.
+    style_routes = [route for route in style_profiles_router.routes if isinstance(route, APIRoute)]
+    assert len(style_routes) == 3
+    routes += style_routes
     fill = {
         "project_id": str(uuid.uuid4()),
         "revision_id": str(uuid.uuid4()),
@@ -130,6 +135,8 @@ async def test_every_cad_route_is_closed_when_the_flag_is_off(
         "view": "1",
         "name": "report.json",
         "remark_key": "r1",
+        "document_id": str(uuid.uuid4()),
+        "version": "1",
     }
     async with build_api(make_context(), settings=cad_settings(tmp_path, flag=False)) as api:
         for route in routes:

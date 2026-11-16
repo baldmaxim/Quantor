@@ -10030,6 +10030,449 @@
         "title": "CadStageRead",
         "type": "object"
       },
+      "CadStyleManualSource": {
+        "additionalProperties": false,
+        "description": "Профиль введён вручную: полей снятия по образцам нет (лишнее поле - 422).",
+        "properties": {
+          "kind": {
+            "const": "manual",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "CadStyleManualSource",
+        "type": "object"
+      },
+      "CadStyleMasonryAcceptance": {
+        "additionalProperties": false,
+        "properties": {
+          "max_effective_width_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Effective Width Mm"
+          },
+          "min_area_mm2": {
+            "maximum": 1000000000.0,
+            "minimum": 0.0,
+            "title": "Min Area Mm2",
+            "type": "number"
+          },
+          "min_boundary_fraction": {
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min Boundary Fraction",
+            "type": "number"
+          },
+          "min_effective_width_mm": {
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min Effective Width Mm",
+            "type": "number"
+          },
+          "min_hatch_density": {
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Min Hatch Density",
+            "type": "number"
+          },
+          "min_hatch_lines": {
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Min Hatch Lines",
+            "type": "number"
+          }
+        },
+        "required": [
+          "min_area_mm2",
+          "min_effective_width_mm",
+          "min_hatch_lines",
+          "min_hatch_density",
+          "min_boundary_fraction",
+          "max_effective_width_mm"
+        ],
+        "title": "CadStyleMasonryAcceptance",
+        "type": "object"
+      },
+      "CadStyleProfileBody": {
+        "additionalProperties": false,
+        "properties": {
+          "alternate_boundary_gray": {
+            "items": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "maxItems": 16,
+            "title": "Alternate Boundary Gray",
+            "type": "array"
+          },
+          "concrete_hatch_gray": {
+            "items": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "maxItems": 16,
+            "title": "Concrete Hatch Gray",
+            "type": "array"
+          },
+          "door_grid_tolerance": {
+            "title": "Door Grid Tolerance",
+            "type": "boolean"
+          },
+          "door_pen_max_width": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 5.0,
+            "title": "Door Pen Max Width",
+            "type": "number"
+          },
+          "door_stitch_segments": {
+            "title": "Door Stitch Segments",
+            "type": "boolean"
+          },
+          "masonry_acceptance": {
+            "$ref": "#/components/schemas/CadStyleMasonryAcceptance"
+          },
+          "masonry_hatch_gray": {
+            "items": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "maxItems": 16,
+            "title": "Masonry Hatch Gray",
+            "type": "array"
+          },
+          "monolith_fill_gray": {
+            "items": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "maxItems": 16,
+            "title": "Monolith Fill Gray",
+            "type": "array"
+          },
+          "shaft_fill_gray": {
+            "items": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "maxItems": 16,
+            "title": "Shaft Fill Gray",
+            "type": "array"
+          },
+          "shaft_labels": {
+            "items": {
+              "maxLength": 32,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Shaft Labels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "monolith_fill_gray",
+          "shaft_fill_gray",
+          "masonry_hatch_gray",
+          "concrete_hatch_gray",
+          "alternate_boundary_gray",
+          "door_pen_max_width",
+          "door_stitch_segments",
+          "door_grid_tolerance",
+          "masonry_acceptance",
+          "shaft_labels"
+        ],
+        "title": "CadStyleProfileBody",
+        "type": "object"
+      },
+      "CadStyleProfileRead": {
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/CadStyleVersionRead"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "profile_key": {
+            "title": "Profile Key",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/CadStyleVersionBrief"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "document_id",
+          "profile_key",
+          "current",
+          "versions"
+        ],
+        "title": "CadStyleProfileRead",
+        "type": "object"
+      },
+      "CadStyleSample": {
+        "additionalProperties": false,
+        "description": "Подпись человека на странице: класс, положение (доли страницы) и «это не он».",
+        "properties": {
+          "class": {
+            "enum": [
+              "monolith",
+              "shaft",
+              "masonry",
+              "door",
+              "insulation",
+              "dimension_tick"
+            ],
+            "title": "Class",
+            "type": "string"
+          },
+          "negative": {
+            "title": "Negative",
+            "type": "boolean"
+          },
+          "x": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "class",
+          "x",
+          "y",
+          "negative"
+        ],
+        "title": "CadStyleSample",
+        "type": "object"
+      },
+      "CadStyleSamplesSource": {
+        "additionalProperties": false,
+        "description": "Профиль снят по подписям человека: ревизия, лист, подписи и масштаб обязательны.",
+        "properties": {
+          "kind": {
+            "const": "samples",
+            "title": "Kind",
+            "type": "string"
+          },
+          "mm_per_pt": {
+            "exclusiveMinimum": 0.0,
+            "title": "Mm Per Pt",
+            "type": "number"
+          },
+          "page_index": {
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/CadStyleSample"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Samples",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "revision_id",
+          "page_index",
+          "samples",
+          "mm_per_pt"
+        ],
+        "title": "CadStyleSamplesSource",
+        "type": "object"
+      },
+      "CadStyleVersionBrief": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "title",
+          "created_at"
+        ],
+        "title": "CadStyleVersionBrief",
+        "type": "object"
+      },
+      "CadStyleVersionRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "source": {
+            "additionalProperties": true,
+            "title": "Source",
+            "type": "object"
+          },
+          "style": {
+            "additionalProperties": true,
+            "title": "Style",
+            "type": "object"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "title",
+          "style",
+          "sha256",
+          "source",
+          "created_at",
+          "created_by"
+        ],
+        "title": "CadStyleVersionRead",
+        "type": "object"
+      },
+      "CadStyleVersionWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_current_version": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Current Version"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/CadStyleProfileBody"
+          },
+          "source": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/components/schemas/CadStyleManualSource",
+                "samples": "#/components/schemas/CadStyleSamplesSource"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CadStyleSamplesSource"
+              },
+              {
+                "$ref": "#/components/schemas/CadStyleManualSource"
+              }
+            ],
+            "title": "Source"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "profile",
+          "source",
+          "expected_current_version"
+        ],
+        "title": "CadStyleVersionWrite",
+        "type": "object"
+      },
       "CadViewDiagnosticsRead": {
         "properties": {
           "acceptance": {
@@ -43636,6 +44079,186 @@
         "summary": "Документы проекта",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile": {
+      "get": {
+        "operationId": "get_style_profile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadStyleProfileRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Профиль оформления тома: текущая версия и список версий",
+        "tags": [
+          "cad-style-profile"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/versions": {
+      "post": {
+        "operationId": "create_style_profile_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadStyleVersionWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadStyleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Создать следующую версию профиля оформления (профиль создаётся при первой)",
+        "tags": [
+          "cad-style-profile"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/versions/{version}": {
+      "get": {
+        "operationId": "get_style_profile_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadStyleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версия профиля оформления: объект для движка, хеш, происхождение",
+        "tags": [
+          "cad-style-profile"
         ]
       }
     },

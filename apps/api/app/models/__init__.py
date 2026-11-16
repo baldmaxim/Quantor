@@ -10,6 +10,7 @@ from app.models.cad_project_levels import CadProjectLevels, CadSlabHoleDecision
 from app.models.cad_remark import CadRemark
 from app.models.cad_riser import CadSheetRisers
 from app.models.cad_section_level import CadSectionLevel
+from app.models.cad_style_profiles import CadStyleProfile, CadStyleProfileVersion
 from app.models.cad_vor import CadVorDocument, CadVorItem, CadVorLink
 from app.models.cad_zone import CadZone
 from app.models.calc import (
@@ -61,6 +62,8 @@ __all__ = [
     "CadSheetLevels",
     "CadSheetRisers",
     "CadSlabHoleDecision",
+    "CadStyleProfile",
+    "CadStyleProfileVersion",
     "CadVorDocument",
     "CadVorItem",
     "CadVorLink",

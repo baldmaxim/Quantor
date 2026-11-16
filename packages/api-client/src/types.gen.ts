@@ -4763,6 +4763,245 @@ export type CadStageRead = {
 };
 
 /**
+ * CadStyleManualSource
+ *
+ * Профиль введён вручную: полей снятия по образцам нет (лишнее поле - 422).
+ */
+export type CadStyleManualSource = {
+    /**
+     * Kind
+     */
+    kind: 'manual';
+};
+
+/**
+ * CadStyleMasonryAcceptance
+ */
+export type CadStyleMasonryAcceptance = {
+    /**
+     * Max Effective Width Mm
+     */
+    max_effective_width_mm: number | null;
+    /**
+     * Min Area Mm2
+     */
+    min_area_mm2: number;
+    /**
+     * Min Boundary Fraction
+     */
+    min_boundary_fraction: number;
+    /**
+     * Min Effective Width Mm
+     */
+    min_effective_width_mm: number;
+    /**
+     * Min Hatch Density
+     */
+    min_hatch_density: number;
+    /**
+     * Min Hatch Lines
+     */
+    min_hatch_lines: number;
+};
+
+/**
+ * CadStyleProfileBody
+ */
+export type CadStyleProfileBody = {
+    /**
+     * Alternate Boundary Gray
+     */
+    alternate_boundary_gray: Array<number>;
+    /**
+     * Concrete Hatch Gray
+     */
+    concrete_hatch_gray: Array<number>;
+    /**
+     * Door Grid Tolerance
+     */
+    door_grid_tolerance: boolean;
+    /**
+     * Door Pen Max Width
+     */
+    door_pen_max_width: number;
+    /**
+     * Door Stitch Segments
+     */
+    door_stitch_segments: boolean;
+    masonry_acceptance: CadStyleMasonryAcceptance;
+    /**
+     * Masonry Hatch Gray
+     */
+    masonry_hatch_gray: Array<number>;
+    /**
+     * Monolith Fill Gray
+     */
+    monolith_fill_gray: Array<number>;
+    /**
+     * Shaft Fill Gray
+     */
+    shaft_fill_gray: Array<number>;
+    /**
+     * Shaft Labels
+     */
+    shaft_labels: Array<string>;
+};
+
+/**
+ * CadStyleProfileRead
+ */
+export type CadStyleProfileRead = {
+    current: CadStyleVersionRead;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Profile Key
+     */
+    profile_key: string;
+    /**
+     * Versions
+     */
+    versions: Array<CadStyleVersionBrief>;
+};
+
+/**
+ * CadStyleSample
+ *
+ * Подпись человека на странице: класс, положение (доли страницы) и «это не он».
+ */
+export type CadStyleSample = {
+    /**
+     * Class
+     */
+    class: 'monolith' | 'shaft' | 'masonry' | 'door' | 'insulation' | 'dimension_tick';
+    /**
+     * Negative
+     */
+    negative: boolean;
+    /**
+     * X
+     */
+    x: number;
+    /**
+     * Y
+     */
+    y: number;
+};
+
+/**
+ * CadStyleSamplesSource
+ *
+ * Профиль снят по подписям человека: ревизия, лист, подписи и масштаб обязательны.
+ */
+export type CadStyleSamplesSource = {
+    /**
+     * Kind
+     */
+    kind: 'samples';
+    /**
+     * Mm Per Pt
+     */
+    mm_per_pt: number;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Samples
+     */
+    samples: Array<CadStyleSample>;
+};
+
+/**
+ * CadStyleVersionBrief
+ */
+export type CadStyleVersionBrief = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * CadStyleVersionRead
+ */
+export type CadStyleVersionRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Source
+     */
+    source: {
+        [key: string]: unknown;
+    };
+    /**
+     * Style
+     */
+    style: {
+        [key: string]: unknown;
+    };
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * CadStyleVersionWrite
+ */
+export type CadStyleVersionWrite = {
+    /**
+     * Expected Current Version
+     */
+    expected_current_version: number | null;
+    profile: CadStyleProfileBody;
+    /**
+     * Source
+     */
+    source: ({
+        kind: 'samples';
+    } & CadStyleSamplesSource) | ({
+        kind: 'manual';
+    } & CadStyleManualSource);
+    /**
+     * Title
+     */
+    title?: string | null;
+};
+
+/**
  * CadViewDiagnosticsRead
  */
 export type CadViewDiagnosticsRead = {
@@ -22927,6 +23166,112 @@ export type ListProjectDocumentsResponses = {
 };
 
 export type ListProjectDocumentsResponse = ListProjectDocumentsResponses[keyof ListProjectDocumentsResponses];
+
+export type GetStyleProfileData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile';
+};
+
+export type GetStyleProfileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetStyleProfileError = GetStyleProfileErrors[keyof GetStyleProfileErrors];
+
+export type GetStyleProfileResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadStyleProfileRead;
+};
+
+export type GetStyleProfileResponse = GetStyleProfileResponses[keyof GetStyleProfileResponses];
+
+export type CreateStyleProfileVersionData = {
+    body: CadStyleVersionWrite;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/versions';
+};
+
+export type CreateStyleProfileVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateStyleProfileVersionError = CreateStyleProfileVersionErrors[keyof CreateStyleProfileVersionErrors];
+
+export type CreateStyleProfileVersionResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadStyleVersionRead;
+};
+
+export type CreateStyleProfileVersionResponse = CreateStyleProfileVersionResponses[keyof CreateStyleProfileVersionResponses];
+
+export type GetStyleProfileVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/versions/{version}';
+};
+
+export type GetStyleProfileVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetStyleProfileVersionError = GetStyleProfileVersionErrors[keyof GetStyleProfileVersionErrors];
+
+export type GetStyleProfileVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadStyleVersionRead;
+};
+
+export type GetStyleProfileVersionResponse = GetStyleProfileVersionResponses[keyof GetStyleProfileVersionResponses];
 
 export type GetBuildingFrameData = {
     body?: never;

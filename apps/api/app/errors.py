@@ -193,6 +193,8 @@ class ErrorCode(StrEnum):
     # Шаблоны отделки помещений (ADR-0042): название занято / тип помещения уже у другого шаблона.
     CAD_FINISH_TEMPLATE_NAME_TAKEN = "CAD_FINISH_TEMPLATE_NAME_TAKEN"
     CAD_FINISH_ROOM_TYPE_TAKEN = "CAD_FINISH_ROOM_TYPE_TAKEN"
+    # Профиль оформления проектировщика (ADR-0049): запись поверх устаревшей версии.
+    CAD_STYLE_PROFILE_VERSION_CONFLICT = "CAD_STYLE_PROFILE_VERSION_CONFLICT"
 
     # --- поставщики моделей ---
     MODEL_PROVIDER_NOT_CONFIGURED = "MODEL_PROVIDER_NOT_CONFIGURED"
@@ -363,6 +365,9 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_EOM_NOT_BUILT: "Генератор не построил ЭОМ и СС этажа",
     ErrorCode.CAD_EOM_NOT_FOUND: "Для листа нет построенных ЭОМ и СС",
     ErrorCode.CAD_VOR_PARSE_FAILED: "Файл не удалось разобрать как ВОР",
+    ErrorCode.CAD_STYLE_PROFILE_VERSION_CONFLICT: (
+        "Профиль оформления изменён другим пользователем: обновите и повторите"
+    ),
     ErrorCode.CAD_FINISH_TEMPLATE_NAME_TAKEN: "Шаблон отделки с таким названием уже есть в проекте",
     ErrorCode.CAD_FINISH_ROOM_TYPE_TAKEN: (
         "Тип помещения уже назначен другому шаблону отделки проекта"
@@ -530,6 +535,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_VOR_PARSE_FAILED: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_FINISH_TEMPLATE_NAME_TAKEN: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_FINISH_ROOM_TYPE_TAKEN: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_STYLE_PROFILE_VERSION_CONFLICT: status.HTTP_409_CONFLICT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: status.HTTP_409_CONFLICT,
