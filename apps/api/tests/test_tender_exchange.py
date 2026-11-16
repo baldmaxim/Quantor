@@ -67,7 +67,11 @@ def _url(project_id: object, tail: str) -> str:
 
 
 async def _project_with_release(
-    session: AsyncSession, *, dxf_sha: str = DXF_SHA, current_dxf: str | None = DXF_SHA
+    session: AsyncSession,
+    *,
+    dxf_sha: str = DXF_SHA,
+    current_dxf: str | None = DXF_SHA,
+    bbox: list[int] | None = None,
 ) -> tuple[Project, TenderBaseRelease]:
     """Проект, выпуск базы с одним видом и (если `current_dxf`) задание с текущим DXF вида."""
     project = await projects_service.create_project(
@@ -94,6 +98,7 @@ async def _project_with_release(
                 "corps": "9",
                 "section": "3",
                 "floors": ["К9 · С3 · 4 эт."],
+                **({"bbox": bbox} if bbox is not None else {}),
             }
         ],
         package_key=f"projects/{project.id}/tender/base/x.zip",
@@ -577,6 +582,43 @@ async def test_stale_base_is_accepted_with_warning_and_flagged(
             _url(project.id, f"view-layers?revision_id={REVISION}&page_index=0&view=1")
         )
         assert layers.json()["layers"][0]["base_stale"] is True
+
+
+async def test_objects_outside_view_bbox_are_a_warning(
+    db_session: AsyncSession, build_api: Callable[..., AsyncClient]
+) -> None:
+    """Объект дальше рамки вида базы на 1 м - предупреждение; в рамке - нет."""
+    project, release = await _project_with_release(db_session, bbox=[0, 0, 2000, 2000])
+    far_view = _view_file()
+    far_view["elements"][0]["pos"] = [50000, 0, 100]
+    far_view["polylines"][0]["pts"] = [[0, 0, 100], [0, 9000, 100]]
+    async with build_api(make_context(), settings=_settings()) as api:
+        inside = await _upload(api, project, build_package(project, release))
+        outside = await _upload(
+            api, project, build_package(project, release, label="v2", view=far_view)
+        )
+        inside_detail = (
+            await api.get(_url(project.id, f"calc-versions/{inside.json()['id']}"))
+        ).json()
+        outside_detail = (
+            await api.get(_url(project.id, f"calc-versions/{outside.json()['id']}"))
+        ).json()
+    assert inside_detail["warnings"] == []
+    assert [w["code"] for w in outside_detail["warnings"]] == ["out_of_bbox"]
+    assert outside_detail["warnings"][0]["view_key"] == VIEW_KEY
+    assert outside_detail["warnings"][0]["message"].startswith("views/p0000.json: 2 объектов")
+
+
+async def test_release_without_bbox_skips_out_of_bbox_check(
+    db_session: AsyncSession, build_api: Callable[..., AsyncClient]
+) -> None:
+    project, release = await _project_with_release(db_session)
+    far_view = _view_file()
+    far_view["elements"][0]["pos"] = [50000, 0, 100]
+    async with build_api(make_context(), settings=_settings()) as api:
+        created = await _upload(api, project, build_package(project, release, view=far_view))
+        detail = (await api.get(_url(project.id, f"calc-versions/{created.json()['id']}"))).json()
+    assert detail["warnings"] == []
 
 
 async def test_assumption_without_question_is_a_warning(

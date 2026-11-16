@@ -950,6 +950,9 @@ async def create_release(
                 "corps": source.floor.corps,
                 "section": source.floor.section,
                 "floors": [source.floor.label],
+                "bbox": _bbox_in_view(
+                    source.floor.bbox, source.floor.offset_mm, source.floor.rotation_deg
+                ),
             }
             for source in chosen
         ],

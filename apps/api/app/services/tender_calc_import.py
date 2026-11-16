@@ -67,6 +67,7 @@ QUESTIONS_NAME: Final = "questions.json"
 _VIEW_NAME: Final = re.compile(r"^views/[^/]+\.json$")
 MAX_VIOLATIONS: Final = 100
 MAX_ERRORS_PER_FILE: Final = 10
+OUT_OF_BBOX_MARGIN_MM: Final = 1000
 RECEIVE_CHUNK: Final = 1024 * 1024
 _SPOOL_BYTES: Final = 8 * 1024 * 1024
 
@@ -504,8 +505,39 @@ async def _cross_checks(
                     view_key=view.view_key,
                 )
             )
+        warning = _out_of_bbox_warning(name, view, in_release[view.view_key.lower()].get("bbox"))
+        if warning is not None:
+            warnings.append(warning)
     warnings.extend(_assumption_warnings(parsed))
     return release, violations, warnings
+
+
+def _out_of_bbox_warning(name: str, view: CalcViewFile, bbox: Any) -> TenderWarningRead | None:
+    """Объекты вида за рамкой вида базы больше чем на `OUT_OF_BBOX_MARGIN_MM`.
+
+    Рамка есть только у выпусков, где портал её сохранил; без неё проверка молча пропускается.
+    """
+    if (
+        not isinstance(bbox, list)
+        or len(bbox) != 4
+        or not all(isinstance(value, int | float) for value in bbox)
+    ):
+        return None
+    x_min, y_min = bbox[0] - OUT_OF_BBOX_MARGIN_MM, bbox[1] - OUT_OF_BBOX_MARGIN_MM
+    x_max, y_max = bbox[2] + OUT_OF_BBOX_MARGIN_MM, bbox[3] + OUT_OF_BBOX_MARGIN_MM
+
+    def outside(point: list[int]) -> bool:
+        return not (x_min <= point[0] <= x_max and y_min <= point[1] <= y_max)
+
+    count = sum(1 for item in view.polylines if any(outside(point) for point in item.pts))
+    count += sum(1 for item in view.elements if outside(item.pos))
+    if count == 0:
+        return None
+    return TenderWarningRead(
+        code="out_of_bbox",
+        message=f"{name}: {count} объектов за рамкой вида (bbox ±1 м) — проверь привязку",
+        view_key=view.view_key,
+    )
 
 
 def _assumption_warnings(parsed: ParsedPackage) -> list[TenderWarningRead]:

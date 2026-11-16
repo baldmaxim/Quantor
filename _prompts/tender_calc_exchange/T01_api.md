@@ -1,6 +1,6 @@
 # T01. API обмена с TENDER
 
-Прочитай: `docs/adr/0047-…md`, `docs/tender-exchange/01-format.md` (поля — только оттуда), `CLAUDE.md` проекта.
+Прочитай: `docs/adr/0051-quantor-kak-repozitorij-tendernyh-raschyotov.md`, `docs/tender-exchange/01-format.md` (поля — только оттуда), `CLAUDE.md` проекта.
 
 ## 1. Права и флаги
 
@@ -28,7 +28,7 @@
 - Эндпоинты (только сеанс cookie, токеном нельзя): `GET /me/api-tokens`, `POST /me/api-tokens`
   `{name, expires_in_days?: 1..365}`, `DELETE /me/api-tokens/{id}` (отзыв). Под флагом `tender.exchange`.
 
-## 3. Таблицы (миграция `0043_tender_exchange`, down — текущая голова (0040_cad_facade_views или 0041 соседней сессии, если она уже в main), файл `20261116_0043_tender_exchange.py`)
+## 3. Таблицы (миграция `0043_tender_exchange`, down — `0042_sheet_window_levels`, файл `20261116_0043_tender_exchange.py`)
 
 - `tender_base_releases`: `id`, `workspace_id`, `project_id`, `number` (по проекту с 1, unique с project_id),
   `comment`, `released_by`, `released_at`, `include_dxf`, `views` (JSONB: `key, dir, revision_id, page_index,
