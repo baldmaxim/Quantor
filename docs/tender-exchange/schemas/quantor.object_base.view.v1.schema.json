@@ -1,0 +1,180 @@
+{
+  "$defs": {
+    "ObjectBaseFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "mm_per_pdf_point": {
+          "exclusiveMinimum": 0,
+          "title": "Mm Per Pdf Point",
+          "type": "number"
+        },
+        "origin_pt": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Origin Pt",
+          "type": "array"
+        },
+        "page_size_pt": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Page Size Pt",
+          "type": "array"
+        }
+      },
+      "required": [
+        "mm_per_pdf_point",
+        "origin_pt",
+        "page_size_pt",
+        "confirmed"
+      ],
+      "title": "ObjectBaseFrame",
+      "type": "object"
+    },
+    "ObjectBaseLevel": {
+      "additionalProperties": false,
+      "properties": {
+        "elevation_known": {
+          "title": "Elevation Known",
+          "type": "boolean"
+        },
+        "floor_elevation_mm": {
+          "title": "Floor Elevation Mm",
+          "type": "integer"
+        },
+        "floor_height_known": {
+          "title": "Floor Height Known",
+          "type": "boolean"
+        },
+        "floor_height_mm": {
+          "title": "Floor Height Mm",
+          "type": "integer"
+        },
+        "slab_thickness_known": {
+          "title": "Slab Thickness Known",
+          "type": "boolean"
+        },
+        "slab_thickness_mm": {
+          "title": "Slab Thickness Mm",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "floor_elevation_mm",
+        "floor_height_mm",
+        "slab_thickness_mm",
+        "elevation_known",
+        "floor_height_known",
+        "slab_thickness_known"
+      ],
+      "title": "ObjectBaseLevel",
+      "type": "object"
+    },
+    "ObjectBasePlacement": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "enum": [
+            "reference",
+            "axes",
+            "none"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "alignment_axes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Alignment Axes",
+          "type": "array"
+        },
+        "group_key": {
+          "title": "Group Key",
+          "type": "string"
+        },
+        "group_label": {
+          "title": "Group Label",
+          "type": "string"
+        },
+        "offset_mm": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Offset Mm",
+          "type": "array"
+        }
+      },
+      "required": [
+        "group_key",
+        "group_label",
+        "offset_mm",
+        "alignment",
+        "alignment_axes"
+      ],
+      "title": "ObjectBasePlacement",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.object_base.view.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bbox": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bbox"
+    },
+    "frame": {
+      "$ref": "#/$defs/ObjectBaseFrame"
+    },
+    "key": {
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}:\\d{1,4}:\\d{1,3}$",
+      "title": "Key",
+      "type": "string"
+    },
+    "level": {
+      "$ref": "#/$defs/ObjectBaseLevel"
+    },
+    "placement": {
+      "$ref": "#/$defs/ObjectBasePlacement"
+    },
+    "schema": {
+      "const": "quantor.object_base.view.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "key",
+    "frame",
+    "level",
+    "placement"
+  ],
+  "title": "ObjectBaseView",
+  "type": "object"
+}

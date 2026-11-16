@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "ObjectBaseZone": {
+      "additionalProperties": false,
+      "properties": {
+        "apartment_no": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Apartment No"
+        },
+        "area_m2": {
+          "title": "Area M2",
+          "type": "number"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "room_apartment",
+            "room_mop",
+            "parking_space"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "points": {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "maxItems": 100000,
+          "minItems": 3,
+          "title": "Points",
+          "type": "array"
+        },
+        "room_mark": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Room Mark"
+        },
+        "room_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Room Type"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "area_m2",
+        "points"
+      ],
+      "title": "ObjectBaseZone",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.object_base.zones.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "quantor.object_base.zones.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "zones": {
+      "items": {
+        "$ref": "#/$defs/ObjectBaseZone"
+      },
+      "title": "Zones",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "zones"
+  ],
+  "title": "ObjectBaseZones",
+  "type": "object"
+}

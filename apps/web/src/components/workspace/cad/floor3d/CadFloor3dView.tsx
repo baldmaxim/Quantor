@@ -26,7 +26,10 @@ import { useCadEomRoutes3d } from '@/lib/cad/eom-queries';
 import { useCadMepRoutes3d } from '@/lib/cad/mep-routes3d-queries';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
+import { tenderFloor3dInput } from '@/lib/tender/floor3d';
+import { useMepEngineEnabled, useTenderViewLayers } from '@/lib/tender/layers';
 
+import { layerVisibilityKey, readLayerVisibility } from '../useCadLayerVisibility';
 import { CadFloor3dCanvas, type ICadFloor3dRoutes, type IFloor3dViewRequest } from './CadFloor3dCanvas';
 import { CadFloor3dDxfButton } from './CadFloor3dDxfButton';
 import { CadFloor3dHeights } from './CadFloor3dHeights';
@@ -56,12 +59,17 @@ export interface ICadFloor3dViewProps {
    * Не задано (страница объекта) - автовыбор плана по заданию листа.
    */
   readonly routeJobId?: string | null;
+  /**
+   * Скрытые слои листа по именам (вкладка «Слои»): среди них расчёты TENDER (`tender:<calc_id>`).
+   * Не задано (страница объекта) - читается из браузерного хранилища листа.
+   */
+  readonly hiddenLayerNames?: ReadonlySet<string>;
 }
 
 /** Связь 3D-вида с общим выбором, слоями и трассами рабочей области: всё, кроме листа. */
 export type ICadFloor3dLink = Pick<
   ICadFloor3dViewProps,
-  'selectedIds' | 'onSelectConstruction' | 'hiddenCategories' | 'hiddenConstructionIds' | 'routeJobId'
+  'selectedIds' | 'onSelectConstruction' | 'hiddenCategories' | 'hiddenConstructionIds' | 'routeJobId' | 'hiddenLayerNames'
 >;
 
 const NO_IDS: ReadonlySet<string> = new Set<string>();
@@ -94,6 +102,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   hiddenConstructionIds,
   readOnly = false,
   routeJobId,
+  hiddenLayerNames,
 }) => {
   const query = useCadFloor3d(params, true);
   const projectLevels = useCadProjectLevels(params.projectId, true);
@@ -115,6 +124,8 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const model = query.data ?? null;
   const plan = useMemo(() => (model ? buildFloor3dPlan(model) : null), [model]);
 
+  // Трассы ВИС движка закрыты флагом `cad.mep_engine` (ADR-0051): выключен - ни запросов, ни трасс.
+  const mepEngine = useMepEngineEnabled();
   // Трассы механики листа: сбой чтения или их отсутствие 3D-вид не ломают. Задание трасс - то же,
   // что рисует план, слои скрываются той же маской (общее хранилище): одна истина на плане и в 3D.
   const routesState = useCadMepRoutes3d({
@@ -124,7 +135,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
     view: params.view,
     parentJobId: params.jobId,
     routeJobId,
-    enabled: model !== null,
+    enabled: model !== null && mepEngine,
   });
   // ЭОМ и СС этажа (генератор cad_eom) - теми же слоями и маской, что трассы механики.
   const eomState = useCadEomRoutes3d(
@@ -134,20 +145,49 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
       pageIndex: params.pageIndex,
       view: params.view,
     },
-    model !== null,
+    model !== null && mepEngine,
   );
   const routesMask = useMepLayerVisibility().mask;
-  const routesData = routesState.status === 'ready' ? routesState.data : null;
-  const eomData = eomState.status === 'ready' ? eomState.data : null;
+  const routesData = mepEngine && routesState.status === 'ready' ? routesState.data : null;
+  const eomData = mepEngine && eomState.status === 'ready' ? eomState.data : null;
+  // Расчёты TENDER (ADR-0051): геометрия вида в системе вида, как трассы движка; слой сцены -
+  // `tender:<calc_id>`, он же имя в хранилище видимости слоёв листа.
+  const tenderLayers = useTenderViewLayers({
+    projectId: params.projectId,
+    revisionId: params.revisionId,
+    pageIndex: params.pageIndex,
+    view: params.view,
+  });
+  const tenderInput = useMemo(
+    () => (tenderLayers.data ? tenderFloor3dInput(tenderLayers.data.layers) : null),
+    [tenderLayers.data],
+  );
+  const storedHidden = useMemo(
+    () =>
+      hiddenLayerNames ??
+      new Set(readLayerVisibility(layerVisibilityKey(params.revisionId, params.pageIndex)).layers),
+    [hiddenLayerNames, params.revisionId, params.pageIndex],
+  );
   const routes = useMemo<ICadFloor3dRoutes | null>(
-    () => (model && (routesData || eomData)
-        ? {
-            polylines: [...(routesData?.polylines ?? []), ...(eomData?.polylines ?? [])],
-            elements: [...(routesData?.elements ?? []), ...(eomData?.elements ?? [])],
-            baseZMm: routesBaseZMm(model),
-          }
-        : null),
-    [routesData, eomData, model],
+    () => {
+      const polylines = [
+        ...(routesData?.polylines ?? []),
+        ...(eomData?.polylines ?? []),
+        ...(tenderInput?.polylines ?? []),
+      ];
+      if (!model || polylines.length === 0) return null;
+      return {
+        polylines,
+        elements: [
+          ...(routesData?.elements ?? []),
+          ...(eomData?.elements ?? []),
+          ...(tenderInput?.elements ?? []),
+        ],
+        baseZMm: routesBaseZMm(model),
+        layerTokens: tenderInput?.layerTokens,
+      };
+    },
+    [routesData, eomData, tenderInput, model],
   );
 
   const [showSlabCap, setShowSlabCap] = useState(false);
@@ -337,6 +377,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
           plan={plan}
           routes={routes}
           hiddenRoutesMask={routesMask}
+          hiddenLayerNames={storedHidden}
           showSlabCap={showSlabCap}
           viewRequest={viewRequest}
           selected={selected}

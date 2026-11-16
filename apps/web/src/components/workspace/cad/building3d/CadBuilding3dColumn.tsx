@@ -17,6 +17,9 @@ import {
 import { useCadBuilding3d } from '@/lib/cad/building3d-queries';
 import { cadErrorText } from '@/lib/cad/errors';
 
+import { BuildingCalcPanel } from '@/components/projects/building3d/BuildingCalcPanel';
+import { useBuildingCalc } from '@/components/projects/building3d/useBuildingCalc';
+
 import { CadBuilding3dCanvas } from './CadBuilding3dCanvas';
 import { CadBuilding3dGroupSelect } from './CadBuilding3dGroupSelect';
 
@@ -81,6 +84,7 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({
   const hovered = hover ? (byKey.get(hover.key) ?? null) : null;
   const hoveredNote = hovered ? alignmentNote(hovered, floors.length) : null;
   const hasFloors = list.known.length + list.unknown.length > 0;
+  const calc = useBuildingCalc(projectId, floors);
 
   const select = (key: string) => {
     const floor = byKey.get(key);
@@ -153,10 +157,14 @@ export const CadBuilding3dColumn: FC<ICadBuilding3dColumnProps> = ({
               floors={floors}
               currentKey={currentKey}
               hoverKey={hover?.key ?? null}
+              calcItems={calc.items}
               onHover={(key, anchor) => setHover(key === null ? null : { key, anchor })}
               onSelect={select}
               onError={setCanvasError}
             />
+          )}
+          {calc.available && list.known.length > 0 && canvasError === null && (
+            <BuildingCalcPanel rows={calc.rows} onToggle={calc.onToggle} />
           )}
           {canvasError !== null && (
             <p role="alert" className="p-[var(--s-4)] text-xs text-danger">

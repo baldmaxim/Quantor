@@ -497,6 +497,18 @@ export type BodyUploadFile = {
 };
 
 /**
+ * Body_upload_tender_calc
+ */
+export type BodyUploadTenderCalc = {
+    /**
+     * File
+     *
+     * ZIP пакета quantor.tender_calc.v1
+     */
+    file: Blob | File;
+};
+
+/**
  * BoqLine
  *
  * Строка ВОР: правило, группа по ключам профиля, количество и все элементы-источники.
@@ -6570,6 +6582,72 @@ export type CalcDocumentFragmentEvidence = {
 export type CalcDocumentStage = 'P' | 'RD' | 'UNKNOWN';
 
 /**
+ * CalcElement
+ */
+export type CalcElement = {
+    /**
+     * Apt
+     */
+    apt?: string | null;
+    /**
+     * Axis
+     */
+    axis?: [
+        number,
+        number,
+        number
+    ] | null;
+    /**
+     * Dn Mm
+     */
+    dn_mm?: number | null;
+    /**
+     * H Mm
+     */
+    h_mm?: number | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Length Mm
+     */
+    length_mm?: number | null;
+    /**
+     * Mark
+     */
+    mark?: string | null;
+    /**
+     * Pos
+     */
+    pos: [
+        number,
+        number,
+        number
+    ];
+    /**
+     * Subtype
+     */
+    subtype?: string | null;
+    /**
+     * System
+     */
+    system: string;
+    /**
+     * Type
+     */
+    type: 'fitting' | 'valve' | 'sleeve' | 'terminal' | 'equipment';
+    /**
+     * W Mm
+     */
+    w_mm?: number | null;
+};
+
+/**
  * CalcElementDiff
  */
 export type CalcElementDiff = {
@@ -8462,6 +8540,86 @@ export type CalcPassportSummaryRead = {
      * System Title
      */
     system_title: string;
+};
+
+/**
+ * CalcPerFloor
+ */
+export type CalcPerFloor = {
+    /**
+     * Floor
+     */
+    floor: string;
+    /**
+     * Qty
+     */
+    qty: number;
+};
+
+/**
+ * CalcPolyline
+ */
+export type CalcPolyline = {
+    /**
+     * Apt
+     */
+    apt?: string | null;
+    /**
+     * Dn Mm
+     */
+    dn_mm?: number | null;
+    /**
+     * H Mm
+     */
+    h_mm?: number | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Insulation Mm
+     */
+    insulation_mm?: number | null;
+    /**
+     * Kind
+     */
+    kind: 'route' | 'jumper' | 'riser' | 'leadin' | 'cable' | 'tray' | 'duct';
+    /**
+     * Layer
+     */
+    layer: string;
+    /**
+     * Mark
+     */
+    mark?: string | null;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Pts
+     */
+    pts: Array<[
+        number,
+        number,
+        number
+    ]>;
+    /**
+     * Shape
+     */
+    shape?: 'round' | 'rect' | null;
+    /**
+     * Slope
+     */
+    slope?: number | null;
+    /**
+     * System
+     */
+    system: string;
+    /**
+     * W Mm
+     */
+    w_mm?: number | null;
 };
 
 /**
@@ -14896,6 +15054,110 @@ export type PasswordLoginResponse = {
 };
 
 /**
+ * PersonalTokenCreate
+ */
+export type PersonalTokenCreate = {
+    /**
+     * Expires In Days
+     */
+    expires_in_days?: number | null;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * PersonalTokenCreated
+ *
+ * Ответ создания: полный токен показывается один раз, в базе его нет.
+ */
+export type PersonalTokenCreated = {
+    /**
+     * Active
+     */
+    active: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Expires At
+     */
+    expires_at: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Prefix
+     */
+    prefix: string;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Scopes
+     */
+    scopes: Array<string>;
+    /**
+     * Token
+     */
+    token: string;
+};
+
+/**
+ * PersonalTokenRead
+ */
+export type PersonalTokenRead = {
+    /**
+     * Active
+     */
+    active: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Expires At
+     */
+    expires_at: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Prefix
+     */
+    prefix: string;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Scopes
+     */
+    scopes: Array<string>;
+};
+
+/**
  * PlanAlignmentBulkOut
  */
 export type PlanAlignmentBulkOut = {
@@ -17228,6 +17490,243 @@ export type TakeoffItemUpdate = {
 };
 
 /**
+ * TenderBaseCandidateRead
+ *
+ * Этаж здания, который можно включить в выпуск базы.
+ */
+export type TenderBaseCandidateRead = {
+    /**
+     * Alignment
+     */
+    alignment: 'reference' | 'axes' | 'none';
+    /**
+     * Base Z Mm
+     */
+    base_z_mm: number;
+    /**
+     * Corps
+     */
+    corps: string | null;
+    /**
+     * Dir
+     */
+    dir: string;
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Document Title
+     */
+    document_title: string;
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256: string | null;
+    /**
+     * Floors
+     */
+    floors: Array<string>;
+    /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Group Label
+     */
+    group_label: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Offset Mm
+     */
+    offset_mm: [
+        number,
+        number
+    ];
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Problems
+     */
+    problems: Array<string>;
+    /**
+     * Ready
+     */
+    ready: boolean;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * View
+     */
+    view: number;
+    /**
+     * View Key
+     */
+    view_key: string;
+};
+
+/**
+ * TenderBaseCandidatesRead
+ */
+export type TenderBaseCandidatesRead = {
+    /**
+     * Candidates
+     */
+    candidates: Array<TenderBaseCandidateRead>;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * TenderBaseReleaseCreate
+ */
+export type TenderBaseReleaseCreate = {
+    /**
+     * Comment
+     */
+    comment?: string;
+    /**
+     * Include Dxf
+     *
+     * Положить в пакет DXF каждого вида
+     */
+    include_dxf?: boolean;
+    /**
+     * View Keys
+     *
+     * Виды выпуска; не заданы — все готовые виды проекта
+     */
+    view_keys?: Array<string> | null;
+};
+
+/**
+ * TenderBaseReleaseRead
+ */
+export type TenderBaseReleaseRead = {
+    /**
+     * Comment
+     */
+    comment: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Include Dxf
+     */
+    include_dxf: boolean;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Package Sha256
+     */
+    package_sha256: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Released At
+     */
+    released_at: string;
+    /**
+     * Released By Name
+     */
+    released_by_name: string | null;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Revoked By Name
+     */
+    revoked_by_name: string | null;
+    /**
+     * Size Bytes
+     */
+    size_bytes: number;
+    /**
+     * Views
+     */
+    views: Array<TenderBaseViewRead>;
+};
+
+/**
+ * TenderBaseViewRead
+ *
+ * Вид в выпуске базы.
+ */
+export type TenderBaseViewRead = {
+    /**
+     * Corps
+     */
+    corps: string | null;
+    /**
+     * Dir
+     */
+    dir: string;
+    /**
+     * Document Title
+     */
+    document_title: string;
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256: string;
+    /**
+     * Floors
+     */
+    floors: Array<string>;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
  * TenderBindingPreviewRead
  *
  * Предпросмотр перепривязки: что было, что станет и что мешает.
@@ -17327,6 +17826,327 @@ export type TenderBriefRead = {
 };
 
 /**
+ * TenderBuildingLayerRead
+ */
+export type TenderBuildingLayerRead = {
+    /**
+     * Calc Id
+     */
+    calc_id: string;
+    /**
+     * Discipline
+     */
+    discipline: 'mech' | 'eom' | 'ss';
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * System
+     */
+    system: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Version Id
+     */
+    version_id: string;
+    /**
+     * View Keys
+     */
+    view_keys: Array<string>;
+};
+
+/**
+ * TenderBuildingLayersRead
+ */
+export type TenderBuildingLayersRead = {
+    /**
+     * Layers
+     */
+    layers: Array<TenderBuildingLayerRead>;
+};
+
+/**
+ * TenderCalcRead
+ *
+ * Репозиторий расчёта и его последняя действующая версия (`null` — действующей нет).
+ */
+export type TenderCalcRead = {
+    active_version: TenderCalcVersionSummaryRead | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Discipline
+     */
+    discipline: 'mech' | 'eom' | 'ss';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * System
+     */
+    system: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Version Count
+     */
+    version_count: number;
+};
+
+/**
+ * TenderCalcVersionRead
+ */
+export type TenderCalcVersionRead = {
+    /**
+     * Author
+     */
+    author: string;
+    /**
+     * Base Release Id
+     */
+    base_release_id: string;
+    /**
+     * Base Release Number
+     */
+    base_release_number: number;
+    /**
+     * Calc Id
+     */
+    calc_id: string;
+    /**
+     * Diff
+     */
+    diff: Array<TenderQuantityDiffRead>;
+    /**
+     * Discipline
+     */
+    discipline: 'mech' | 'eom' | 'ss';
+    /**
+     * Fit
+     */
+    fit: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Package Sha256
+     */
+    package_sha256: string;
+    /**
+     * Prev Version Id
+     */
+    prev_version_id: string | null;
+    /**
+     * Producer
+     */
+    producer: {
+        [key: string]: string;
+    };
+    /**
+     * Quantities
+     */
+    quantities: Array<TenderQuantityRowRead>;
+    /**
+     * Quantity Rows
+     */
+    quantity_rows: number;
+    /**
+     * Question Count
+     */
+    question_count: number;
+    /**
+     * Questions
+     */
+    questions: Array<TenderQuestionRead>;
+    /**
+     * Status
+     */
+    status: 'active' | 'superseded' | 'withdrawn';
+    /**
+     * System
+     */
+    system: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Uploaded At
+     */
+    uploaded_at: string;
+    /**
+     * Uploaded By Name
+     */
+    uploaded_by_name: string | null;
+    /**
+     * View Count
+     */
+    view_count: number;
+    /**
+     * Views
+     */
+    views: Array<TenderViewInfoRead>;
+    /**
+     * Warning Count
+     */
+    warning_count: number;
+    /**
+     * Warnings
+     */
+    warnings: Array<TenderWarningRead>;
+};
+
+/**
+ * TenderCalcVersionSummaryRead
+ */
+export type TenderCalcVersionSummaryRead = {
+    /**
+     * Author
+     */
+    author: string;
+    /**
+     * Base Release Id
+     */
+    base_release_id: string;
+    /**
+     * Base Release Number
+     */
+    base_release_number: number;
+    /**
+     * Calc Id
+     */
+    calc_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Quantity Rows
+     */
+    quantity_rows: number;
+    /**
+     * Question Count
+     */
+    question_count: number;
+    /**
+     * Status
+     */
+    status: 'active' | 'superseded' | 'withdrawn';
+    /**
+     * Uploaded At
+     */
+    uploaded_at: string;
+    /**
+     * Uploaded By Name
+     */
+    uploaded_by_name: string | null;
+    /**
+     * View Count
+     */
+    view_count: number;
+    /**
+     * Warning Count
+     */
+    warning_count: number;
+};
+
+/**
+ * TenderCalcVersionsRead
+ */
+export type TenderCalcVersionsRead = {
+    /**
+     * Versions
+     */
+    versions: Array<TenderCalcVersionSummaryRead>;
+};
+
+/**
+ * TenderCalcViewRead
+ *
+ * Геометрия расчёта на одном виде (файл версии из хранилища).
+ */
+export type TenderCalcViewRead = {
+    /**
+     * Base Stale
+     */
+    base_stale: boolean;
+    /**
+     * Elements
+     */
+    elements: Array<CalcElement>;
+    /**
+     * Floors
+     */
+    floors: Array<string>;
+    /**
+     * Polylines
+     */
+    polylines: Array<CalcPolyline>;
+    /**
+     * Version Id
+     */
+    version_id: string;
+    /**
+     * View Key
+     */
+    view_key: string;
+};
+
+/**
+ * TenderCalcsRead
+ */
+export type TenderCalcsRead = {
+    /**
+     * Calcs
+     */
+    calcs: Array<TenderCalcRead>;
+};
+
+/**
  * TenderHubCandidateRead
  *
  * Строка HUBTender того же номера, с которой можно связать версию.
@@ -17412,6 +18232,102 @@ export type TenderImport = {
      * Tender Id
      */
     tender_id: string;
+};
+
+/**
+ * TenderQuantityDiffRead
+ *
+ * Разница объёмов версии с прошлой по `code`.
+ */
+export type TenderQuantityDiffRead = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Delta
+     */
+    delta: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Qty
+     */
+    qty: number | null;
+    /**
+     * Qty Prev
+     */
+    qty_prev: number | null;
+    /**
+     * Status
+     */
+    status: 'added' | 'removed' | 'changed' | 'same';
+    /**
+     * Unit
+     */
+    unit: string;
+};
+
+/**
+ * TenderQuantityRowRead
+ */
+export type TenderQuantityRowRead = {
+    /**
+     * Basis
+     */
+    basis: 'geometry' | 'schedule' | 'rule' | 'assumption';
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Group
+     */
+    group: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Per Floor
+     */
+    per_floor: Array<CalcPerFloor>;
+    /**
+     * Qty
+     */
+    qty: number;
+    /**
+     * Unit
+     */
+    unit: string;
+    /**
+     * View Keys
+     */
+    view_keys: Array<string>;
+};
+
+/**
+ * TenderQuestionRead
+ */
+export type TenderQuestionRead = {
+    /**
+     * Ids
+     */
+    ids: Array<string>;
+    /**
+     * Ref
+     */
+    ref: string | null;
+    /**
+     * Text
+     */
+    text: string;
 };
 
 /**
@@ -17638,6 +18554,130 @@ export type TenderVersionUpdate = {
      * Label
      */
     label?: string | null;
+};
+
+/**
+ * TenderViewInfoRead
+ *
+ * Вид в версии расчёта: адрес, этажи, объём геометрии и признак устаревшей базы.
+ */
+export type TenderViewInfoRead = {
+    /**
+     * Base Stale
+     */
+    base_stale: boolean;
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256: string;
+    /**
+     * Elements
+     */
+    elements: number;
+    /**
+     * Floors
+     */
+    floors: Array<string>;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Polylines
+     */
+    polylines: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * View
+     */
+    view: number;
+    /**
+     * View Key
+     */
+    view_key: string;
+};
+
+/**
+ * TenderViewLayerRead
+ *
+ * Слой «Расчёты»: действующая версия расчёта на заданном виде.
+ */
+export type TenderViewLayerRead = {
+    /**
+     * Base Stale
+     */
+    base_stale: boolean;
+    /**
+     * Calc Id
+     */
+    calc_id: string;
+    /**
+     * Discipline
+     */
+    discipline: 'mech' | 'eom' | 'ss';
+    /**
+     * Elements
+     */
+    elements: Array<CalcElement>;
+    /**
+     * Floors
+     */
+    floors: Array<string>;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Polylines
+     */
+    polylines: Array<CalcPolyline>;
+    /**
+     * System
+     */
+    system: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Version Id
+     */
+    version_id: string;
+};
+
+/**
+ * TenderViewLayersRead
+ */
+export type TenderViewLayersRead = {
+    /**
+     * Layers
+     */
+    layers: Array<TenderViewLayerRead>;
+};
+
+/**
+ * TenderWarningRead
+ */
+export type TenderWarningRead = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * View Key
+     */
+    view_key?: string | null;
 };
 
 /**
@@ -21235,6 +22275,79 @@ export type ReadJobResponses = {
 };
 
 export type ReadJobResponse = ReadJobResponses[keyof ReadJobResponses];
+
+export type ListPersonalTokensData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/api-tokens';
+};
+
+export type ListPersonalTokensResponses = {
+    /**
+     * Response List Personal Tokens
+     *
+     * Successful Response
+     */
+    200: Array<PersonalTokenRead>;
+};
+
+export type ListPersonalTokensResponse = ListPersonalTokensResponses[keyof ListPersonalTokensResponses];
+
+export type CreatePersonalTokenData = {
+    body: PersonalTokenCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/api-tokens';
+};
+
+export type CreatePersonalTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreatePersonalTokenError = CreatePersonalTokenErrors[keyof CreatePersonalTokenErrors];
+
+export type CreatePersonalTokenResponses = {
+    /**
+     * Successful Response
+     */
+    201: PersonalTokenCreated;
+};
+
+export type CreatePersonalTokenResponse = CreatePersonalTokenResponses[keyof CreatePersonalTokenResponses];
+
+export type RevokePersonalTokenData = {
+    body?: never;
+    path: {
+        /**
+         * Token Id
+         */
+        token_id: string;
+    };
+    query?: never;
+    url: '/api/v1/me/api-tokens/{token_id}';
+};
+
+export type RevokePersonalTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RevokePersonalTokenError = RevokePersonalTokenErrors[keyof RevokePersonalTokenErrors];
+
+export type RevokePersonalTokenResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RevokePersonalTokenResponse = RevokePersonalTokenResponses[keyof RevokePersonalTokenResponses];
 
 export type DeleteMeasurementData = {
     body?: never;
@@ -25588,6 +26701,515 @@ export type FreezeTenderVersionResponses = {
 };
 
 export type FreezeTenderVersionResponse = FreezeTenderVersionResponses[keyof FreezeTenderVersionResponses];
+
+export type ListTenderBaseCandidatesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/base/candidates';
+};
+
+export type ListTenderBaseCandidatesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTenderBaseCandidatesError = ListTenderBaseCandidatesErrors[keyof ListTenderBaseCandidatesErrors];
+
+export type ListTenderBaseCandidatesResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderBaseCandidatesRead;
+};
+
+export type ListTenderBaseCandidatesResponse = ListTenderBaseCandidatesResponses[keyof ListTenderBaseCandidatesResponses];
+
+export type ListTenderBaseReleasesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/base/releases';
+};
+
+export type ListTenderBaseReleasesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTenderBaseReleasesError = ListTenderBaseReleasesErrors[keyof ListTenderBaseReleasesErrors];
+
+export type ListTenderBaseReleasesResponses = {
+    /**
+     * Response List Tender Base Releases
+     *
+     * Successful Response
+     */
+    200: Array<TenderBaseReleaseRead>;
+};
+
+export type ListTenderBaseReleasesResponse = ListTenderBaseReleasesResponses[keyof ListTenderBaseReleasesResponses];
+
+export type CreateTenderBaseReleaseData = {
+    body: TenderBaseReleaseCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/base/releases';
+};
+
+export type CreateTenderBaseReleaseErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateTenderBaseReleaseError = CreateTenderBaseReleaseErrors[keyof CreateTenderBaseReleaseErrors];
+
+export type CreateTenderBaseReleaseResponses = {
+    /**
+     * Successful Response
+     */
+    201: TenderBaseReleaseRead;
+};
+
+export type CreateTenderBaseReleaseResponse = CreateTenderBaseReleaseResponses[keyof CreateTenderBaseReleaseResponses];
+
+export type ReadTenderBaseReleaseData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Release Id
+         */
+        release_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/base/releases/{release_id}';
+};
+
+export type ReadTenderBaseReleaseErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadTenderBaseReleaseError = ReadTenderBaseReleaseErrors[keyof ReadTenderBaseReleaseErrors];
+
+export type ReadTenderBaseReleaseResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderBaseReleaseRead;
+};
+
+export type ReadTenderBaseReleaseResponse = ReadTenderBaseReleaseResponses[keyof ReadTenderBaseReleaseResponses];
+
+export type DownloadTenderBaseReleaseData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Release Id
+         */
+        release_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/base/releases/{release_id}/download';
+};
+
+export type DownloadTenderBaseReleaseErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadTenderBaseReleaseError = DownloadTenderBaseReleaseErrors[keyof DownloadTenderBaseReleaseErrors];
+
+export type DownloadTenderBaseReleaseResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type RevokeTenderBaseReleaseData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Release Id
+         */
+        release_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/base/releases/{release_id}/revoke';
+};
+
+export type RevokeTenderBaseReleaseErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RevokeTenderBaseReleaseError = RevokeTenderBaseReleaseErrors[keyof RevokeTenderBaseReleaseErrors];
+
+export type RevokeTenderBaseReleaseResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderBaseReleaseRead;
+};
+
+export type RevokeTenderBaseReleaseResponse = RevokeTenderBaseReleaseResponses[keyof RevokeTenderBaseReleaseResponses];
+
+export type ReadTenderBuildingLayersData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/building-layers';
+};
+
+export type ReadTenderBuildingLayersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadTenderBuildingLayersError = ReadTenderBuildingLayersErrors[keyof ReadTenderBuildingLayersErrors];
+
+export type ReadTenderBuildingLayersResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderBuildingLayersRead;
+};
+
+export type ReadTenderBuildingLayersResponse = ReadTenderBuildingLayersResponses[keyof ReadTenderBuildingLayersResponses];
+
+export type ReadTenderCalcVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/calc-versions/{version_id}';
+};
+
+export type ReadTenderCalcVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadTenderCalcVersionError = ReadTenderCalcVersionErrors[keyof ReadTenderCalcVersionErrors];
+
+export type ReadTenderCalcVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderCalcVersionRead;
+};
+
+export type ReadTenderCalcVersionResponse = ReadTenderCalcVersionResponses[keyof ReadTenderCalcVersionResponses];
+
+export type DownloadTenderCalcPackageData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/calc-versions/{version_id}/package';
+};
+
+export type DownloadTenderCalcPackageErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadTenderCalcPackageError = DownloadTenderCalcPackageErrors[keyof DownloadTenderCalcPackageErrors];
+
+export type DownloadTenderCalcPackageResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ReadTenderCalcViewData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/calc-versions/{version_id}/views/{revision_id}/{page_index}/{view}';
+};
+
+export type ReadTenderCalcViewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadTenderCalcViewError = ReadTenderCalcViewErrors[keyof ReadTenderCalcViewErrors];
+
+export type ReadTenderCalcViewResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderCalcViewRead;
+};
+
+export type ReadTenderCalcViewResponse = ReadTenderCalcViewResponses[keyof ReadTenderCalcViewResponses];
+
+export type WithdrawTenderCalcVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/calc-versions/{version_id}/withdraw';
+};
+
+export type WithdrawTenderCalcVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type WithdrawTenderCalcVersionError = WithdrawTenderCalcVersionErrors[keyof WithdrawTenderCalcVersionErrors];
+
+export type WithdrawTenderCalcVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderCalcVersionSummaryRead;
+};
+
+export type WithdrawTenderCalcVersionResponse = WithdrawTenderCalcVersionResponses[keyof WithdrawTenderCalcVersionResponses];
+
+export type ListTenderCalcsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/calcs';
+};
+
+export type ListTenderCalcsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTenderCalcsError = ListTenderCalcsErrors[keyof ListTenderCalcsErrors];
+
+export type ListTenderCalcsResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderCalcsRead;
+};
+
+export type ListTenderCalcsResponse = ListTenderCalcsResponses[keyof ListTenderCalcsResponses];
+
+export type UploadTenderCalcData = {
+    body: BodyUploadTenderCalc;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/calcs/upload';
+};
+
+export type UploadTenderCalcErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadTenderCalcError = UploadTenderCalcErrors[keyof UploadTenderCalcErrors];
+
+export type UploadTenderCalcResponses = {
+    /**
+     * OK
+     */
+    200: TenderCalcVersionSummaryRead;
+    /**
+     * Successful Response
+     */
+    201: TenderCalcVersionSummaryRead;
+};
+
+export type UploadTenderCalcResponse = UploadTenderCalcResponses[keyof UploadTenderCalcResponses];
+
+export type ListTenderCalcVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Calc Id
+         */
+        calc_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/calcs/{calc_id}/versions';
+};
+
+export type ListTenderCalcVersionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTenderCalcVersionsError = ListTenderCalcVersionsErrors[keyof ListTenderCalcVersionsErrors];
+
+export type ListTenderCalcVersionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderCalcVersionsRead;
+};
+
+export type ListTenderCalcVersionsResponse = ListTenderCalcVersionsResponses[keyof ListTenderCalcVersionsResponses];
+
+export type ReadTenderViewLayersData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    url: '/api/v1/projects/{project_id}/tender/view-layers';
+};
+
+export type ReadTenderViewLayersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadTenderViewLayersError = ReadTenderViewLayersErrors[keyof ReadTenderViewLayersErrors];
+
+export type ReadTenderViewLayersResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderViewLayersRead;
+};
+
+export type ReadTenderViewLayersResponse = ReadTenderViewLayersResponses[keyof ReadTenderViewLayersResponses];
 
 export type ReadUploadCapabilitiesData = {
     body?: never;

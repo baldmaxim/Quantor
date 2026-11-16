@@ -39,7 +39,7 @@ interface IInput {
   load: boolean;
   /** Индекс страницы листа в рабочей области. */
   pageIndex: number | null;
-  /** Задание и вид из адреса. */
+  /** Задание и вид из адреса; вид без задания - вид самого нового готового задания листа. */
   jobParam: string | null;
   viewParam: number | null;
 }
@@ -140,10 +140,10 @@ export const useWorkspaceCadJob = ({
         ? pickWorkspaceView(
             job,
             pageIndex,
-            routeSummary !== null ? routeSummary.view : explicit !== null ? viewParam : null,
+            routeSummary !== null ? routeSummary.view : viewParam,
           )
         : null,
-    [job, pageIndex, explicit, viewParam, routeSummary],
+    [job, pageIndex, viewParam, routeSummary],
   );
   const view = pick?.view ?? null;
 
@@ -173,10 +173,10 @@ export const useWorkspaceCadJob = ({
             revisionId,
             summary,
             pageIndex,
-            routeSummary !== null ? routeSummary.view : explicit !== null ? viewParam : null,
+            routeSummary !== null ? routeSummary.view : viewParam,
           )
         : null,
-    [load, job, summary, pageIndex, revisionId, projectId, routeSummary, explicit, viewParam],
+    [load, job, summary, pageIndex, revisionId, projectId, routeSummary, viewParam],
   );
   const readParams = params ?? earlyParams;
 

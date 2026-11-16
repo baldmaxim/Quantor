@@ -59,6 +59,8 @@ interface IMepInput {
   readonly parentJobId: string | null;
   /** Разрезы ревизии; `null` - ревизия не открыта. */
   readonly sections?: IWorkspaceCadSectionsLink | null;
+  /** Трассы ВИС движка открыты (`cad.mep_engine`); нет - открыты. */
+  readonly engineRoutes?: boolean;
 }
 
 /** Вкладка «Трассы»; `null` - параметры вида не получены. */
@@ -72,6 +74,7 @@ export const mepOf = ({
   navigate,
   parentJobId,
   sections = null,
+  engineRoutes = true,
 }: IMepInput): IWorkspaceCadMep | null => {
   if (parent === null) return null;
   return {
@@ -93,5 +96,6 @@ export const mepOf = ({
     onSelectRoute: (jobId) =>
       navigate({ job: jobId ?? parentJobId, view: view !== null ? String(view) : null }),
     sections,
+    engineRoutes,
   };
 };

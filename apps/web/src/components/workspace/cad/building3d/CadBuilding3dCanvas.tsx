@@ -5,12 +5,15 @@ import { useEffect, useMemo, useRef, type FC } from 'react';
 
 import { buildBuildingPlan } from '@/lib/cad/building3d-geometry';
 import { createBuilding3dView, readBuilding3dColors, type IBuilding3dView } from '@/lib/cad/building3d-scene';
+import { buildBuildingCalcGroups, type IBuildingCalcItem } from '@/lib/tender/building-calc-layer';
 import { useTheme } from '@/lib/theme';
 
 interface ICadBuilding3dCanvasProps {
   readonly floors: readonly CadBuilding3dFloorRead[];
   readonly currentKey: string | null;
   readonly hoverKey: string | null;
+  /** Геометрия расчётов TENDER по этажам (слой «Расчёты», ADR-0051); нет - слоя нет. */
+  readonly calcItems?: readonly IBuildingCalcItem[];
   readonly onHover: (key: string | null, anchor: { x: number; y: number } | null) => void;
   readonly onSelect: (key: string) => void;
   /** Холст создать не удалось (нет WebGL). */
@@ -25,6 +28,7 @@ export const CadBuilding3dCanvas: FC<ICadBuilding3dCanvasProps> = ({
   floors,
   currentKey,
   hoverKey,
+  calcItems,
   onHover,
   onSelect,
   onError,
@@ -68,6 +72,17 @@ export const CadBuilding3dCanvas: FC<ICadBuilding3dCanvasProps> = ({
   useEffect(() => {
     view.current?.setHighlight(currentKey, hoverKey);
   }, [currentKey, hoverKey]);
+
+  // Расчёты TENDER: после модели (эффект выше), пересобираются вместе с ней и с темой.
+  useEffect(() => {
+    if (plan === null || calcItems === undefined || calcItems.length === 0) return undefined;
+    const built = buildBuildingCalcGroups(plan, calcItems);
+    view.current?.setCalcGroups(built.groups);
+    return () => {
+      view.current?.setCalcGroups(null);
+      built.dispose();
+    };
+  }, [plan, calcItems, theme]);
 
   return (
     <div

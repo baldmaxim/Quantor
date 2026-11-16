@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FC } from 'react';
 
-import { cx } from '@/components/ui';
+import { StatusBadge, cx } from '@/components/ui';
 import { layerColorVar } from '@/lib/cad/layer-colors';
 import type { ILayerGroup } from '@/lib/cad/layer-groups';
 import { formatInt } from '@/lib/cad/view-format';
@@ -25,6 +25,8 @@ interface ICadLayerGroupProps {
   countOf?: (index: number) => number | null;
   /** Число у заголовка группы; `null` или нет - без числа. */
   groupCount?: number | null;
+  /** Пометка-предупреждение у пункта («база устарела»); `null` или нет функции - без пометки. */
+  noteOf?: (index: number) => string | null;
 }
 
 const CHECK = 'flex min-h-[44px] items-center gap-[var(--s-3)] text-sm';
@@ -41,6 +43,7 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
   disabledNote = '',
   countOf,
   groupCount = null,
+  noteOf,
 }) => {
   const [expanded, setExpanded] = useState(true);
   const master = useRef<HTMLInputElement>(null);
@@ -143,6 +146,9 @@ export const CadLayerGroup: FC<ICadLayerGroupProps> = ({
               >
                 {name}
               </span>
+              {noteOf?.(index) != null && (
+                <StatusBadge tone="warning">{noteOf(index)}</StatusBadge>
+              )}
               {unavailable && disabledNote !== '' && (
                 <span className="ml-auto text-xs text-muted">{disabledNote}</span>
               )}

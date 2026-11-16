@@ -1,0 +1,209 @@
+{
+  "$defs": {
+    "ObjectBaseConstruction": {
+      "additionalProperties": false,
+      "properties": {
+        "holes": {
+          "items": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "maxItems": 100000,
+            "minItems": 3,
+            "type": "array"
+          },
+          "title": "Holes",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Material"
+        },
+        "shell": {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "maxItems": 100000,
+          "minItems": 3,
+          "title": "Shell",
+          "type": "array"
+        },
+        "thickness_mm": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thickness Mm"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "shell",
+        "holes"
+      ],
+      "title": "ObjectBaseConstruction",
+      "type": "object"
+    },
+    "ObjectBaseOpening": {
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Center",
+          "type": "array"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Direction"
+        },
+        "host_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "width_mm": {
+          "title": "Width Mm",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "width_mm",
+        "center"
+      ],
+      "title": "ObjectBaseOpening",
+      "type": "object"
+    },
+    "ObjectBaseSlab": {
+      "additionalProperties": false,
+      "properties": {
+        "shell": {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "maxItems": 100000,
+          "minItems": 3,
+          "title": "Shell",
+          "type": "array"
+        }
+      },
+      "required": [
+        "shell"
+      ],
+      "title": "ObjectBaseSlab",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.object_base.constructions.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "constructions": {
+      "items": {
+        "$ref": "#/$defs/ObjectBaseConstruction"
+      },
+      "title": "Constructions",
+      "type": "array"
+    },
+    "openings": {
+      "items": {
+        "$ref": "#/$defs/ObjectBaseOpening"
+      },
+      "title": "Openings",
+      "type": "array"
+    },
+    "schema": {
+      "const": "quantor.object_base.constructions.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "slab": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ObjectBaseSlab"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "schema",
+    "constructions",
+    "openings"
+  ],
+  "title": "ObjectBaseConstructions",
+  "type": "object"
+}

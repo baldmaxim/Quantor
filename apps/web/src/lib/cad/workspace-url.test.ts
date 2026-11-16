@@ -91,9 +91,13 @@ describe('задание и вид из адреса рабочей област
     expect(parseWorkspaceJob(params(`job=${JOB}&view=2`))).toEqual({ job: JOB, view: 2 });
   });
 
-  it('невалидное задание отбрасывается вместе с видом', () => {
-    expect(parseWorkspaceJob(params('job=abc&view=2'))).toEqual({ job: null, view: null });
-    expect(parseWorkspaceJob(params('view=2'))).toEqual({ job: null, view: null });
+  it('невалидное задание отбрасывается, вид остаётся', () => {
+    expect(parseWorkspaceJob(params('job=abc&view=2'))).toEqual({ job: null, view: 2 });
+  });
+
+  it('вид без задания читается: выбор вида у последнего готового задания листа', () => {
+    expect(parseWorkspaceJob(params('view=2'))).toEqual({ job: null, view: 2 });
+    expect(parseWorkspaceJob(params(''))).toEqual({ job: null, view: null });
   });
 
   it('невалидный вид отбрасывается', () => {

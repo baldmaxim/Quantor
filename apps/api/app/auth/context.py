@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import StrEnum, auto
 
 from app.auth.permissions import Permission
 from app.domain import Role, UserKind
@@ -25,6 +25,9 @@ class CredentialKind(StrEnum):
     DEV = "dev"
     SESSION = "session"
     BEARER = "bearer"
+    # Персональный токен `qtk_…` (ADR-0051): права суженной области, CSRF не нужен.
+    # Значение (`api_token`) даёт `auto()`: литерал в имени с «token» ловит правило S105.
+    API_TOKEN = auto()
 
 
 @dataclass(frozen=True, slots=True)

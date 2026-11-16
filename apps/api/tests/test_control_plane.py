@@ -225,6 +225,8 @@ def test_every_stage1_flag_key_survived() -> None:
         "calc.portal",
         "cad.export",
         "project.consistency",
+        "tender.exchange",
+        "cad.mep_engine",
     }
     assert set(FLAG_REGISTRY) == expected
 

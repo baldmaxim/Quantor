@@ -102,6 +102,13 @@ vi.mock('@/lib/cad/eom-queries', async (importOriginal) => ({
   useCadEomPreview: () => null,
 }));
 
+// Флаги и слой «Расчёты»: трассы движка открыты (`cad.mep_engine`), расчётов TENDER на виде нет.
+vi.mock('@/lib/tender/layers', () => ({
+  useMepEngineEnabled: () => true,
+  useTenderExchangeEnabled: () => false,
+  useTenderViewLayers: () => ({ data: undefined }),
+}));
+
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof ViewQueries>()),
   useCadView: (...args: unknown[]) => {
@@ -359,9 +366,12 @@ describe('useWorkspaceCad: задание и вид в адресе', () => {
     expect(mount({ jobParam: JOB_ID, viewParam: 9 }).result.current.bar?.view).toBe(1);
   });
 
-  it('вид без явного задания игнорируется', () => {
+  it('вид без явного задания выбирается у самого нового готового задания листа (ссылка из «Расчётов»)', () => {
     recognized();
-    expect(mount({ viewParam: 2 }).result.current.bar?.view).toBe(1);
+    const hook = mount({ viewParam: 2 });
+    expect(hook.result.current.bar?.view).toBe(2);
+    expect(hook.result.current.side.job?.jobId).toBe(JOB_ID);
+    expect(mount({ viewParam: 9 }).result.current.bar?.view).toBe(1);
   });
 
   it('переключение вида пишет задание и вид в адрес', () => {
@@ -499,6 +509,23 @@ describe('useWorkspaceCad: наложение и непрозрачность PD
     expect(window.localStorage.getItem('quantor.cad.view-3d')).toBe('1');
     act(() => result.current.bar?.floor3d?.onModeChange('plan'));
     expect(result.current.floor3d).toBeNull();
+  });
+
+  it('?mode=3d открывает 3D этажа и приоритетнее сохранённого «План»; ?mode=plan - наоборот', () => {
+    recognized();
+    window.localStorage.setItem('quantor.cad.view-3d', '0');
+    const { result, rerender } = mount({ modeParam: '3d' });
+    expect(result.current.bar?.floor3d?.mode).toBe('3d');
+    expect(result.current.floor3d).not.toBeNull();
+    rerender(inputs({ modeParam: 'plan' }));
+    expect(result.current.bar?.floor3d?.mode).toBe('plan');
+    expect(result.current.floor3d).toBeNull();
+  });
+
+  it('без ?mode режим берётся из сохранённого выбора', () => {
+    recognized();
+    window.localStorage.setItem('quantor.cad.view-3d', '1');
+    expect(mount().result.current.bar?.floor3d?.mode).toBe('3d');
   });
 
   it('лист-разрез: 3D не строится - переключателя нет, вид закрыт, в строке пояснение', () => {

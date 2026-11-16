@@ -1,3 +1,5 @@
+import { tenderInfo } from '@/lib/tender/info';
+
 import { formatMeters } from './floor3d-geometry';
 import type { IFloor3dMepElement } from './floor3d-mep-elements';
 import {
@@ -52,6 +54,7 @@ const rowOf = (label: string, value: string): IMepInfoRow => ({ label, value });
  * Линия ЭОМ и СС (есть изделие `item`) озаглавлена изделием; источника сечения и изоляции у неё нет.
  */
 export const routeInfo = (polyline: IFloor3dRoutePolyline): IMepInfo => {
+  if (polyline.tender) return tenderInfo(polyline.tender);
   const item = polyline.item ? polyline.item : null;
   const rows: IMepInfoRow[] = [rowOf('Система', systemLabel(polyline.layer))];
   const kind = polyline.kind == null ? undefined : ROUTE_KIND_LABELS[polyline.kind];
@@ -126,6 +129,7 @@ const sizeRows = (element: IFloor3dMepElement): IMepInfoRow[] => {
  * (`name`, у ЭОМ и СС) главнее подписи по подтипу.
  */
 export const elementInfo = (element: IFloor3dMepElement): IMepInfo => {
+  if (element.tender) return tenderInfo(element.tender);
   const rows: IMepInfoRow[] = [rowOf('Система', systemLabel(element.layer)), ...sizeRows(element)];
   if (element.apt) rows.push(rowOf('Квартира', element.apt));
   if (element.mark) rows.push(rowOf('Марка', element.mark));

@@ -3,6 +3,7 @@
 import type { CadSheetFloorTitle, SheetRead } from '@quantor/api-client';
 import { useEffect, useMemo, useState } from 'react';
 
+import type { ICadTenderPicker } from '@/components/cad/tender/CadTenderPicker';
 import type { ViewportSheet } from '@/components/viewer/DrawingViewport';
 import { createCadPainter } from '@/lib/cad/cad-painter';
 import { cadCodeText } from '@/lib/cad/errors';
@@ -32,6 +33,7 @@ import {
 } from '@/lib/cad/view-mode';
 import { matchingPreview, overlayPaintData, remarkBindingOf } from '@/lib/cad/workspace-cad';
 import { pageForJob, sheetPosition } from '@/lib/cad/workspace-url';
+import { useMepEngineEnabled } from '@/lib/tender/layers';
 import { useTheme } from '@/lib/theme';
 import { hiddenConstructionIdsOf, paintHiddenLayerIndices } from '@/lib/cad/layer-categories';
 import { layerCountsOf } from '@/lib/cad/layer-counts';
@@ -63,6 +65,7 @@ import { useWorkspaceCadRoutes } from './useWorkspaceCadRoutes';
 import { useWorkspaceCadFacades } from './useWorkspaceCadFacades';
 import { useWorkspaceCadStyle, type IStyleCaptureData } from './useWorkspaceCadStyle';
 import { useWorkspaceCadSections } from './useWorkspaceCadSections';
+import { useWorkspaceCadTender } from './useWorkspaceCadTender';
 import { useWorkspaceCadZones, type IWorkspaceCadZonesState } from './useWorkspaceCadZones';
 
 interface IUseWorkspaceCadInput {
@@ -87,6 +90,10 @@ interface IUseWorkspaceCadInput {
   tabParam: string | null;
   jobParam: string | null;
   viewParam: number | null;
+  /** Расчёт TENDER из адреса («Открыть на листе»): его слой включается при открытии вида. */
+  tenderParam?: string | null;
+  /** Режим из адреса: `3d` открывает 3D этажа, `plan` - план; приоритетнее сохранённого выбора. */
+  modeParam?: string | null;
   /** Изменить адрес рабочей области: `null` убирает параметр. */
   navigate: (changes: Record<string, string | null>) => void;
 }
@@ -120,6 +127,8 @@ export interface IWorkspaceCad {
   constructionPicker: IWorkspaceCadConstructionPicker | null;
   /** Вид «3D» открыт поверх холста (ADR-0039): параметры листа и вида; `null` - режим «План». */
   floor3d: { readonly params: ICadViewParams; readonly link: ICadFloor3dLink } | null;
+  /** Выбор объекта расчёта TENDER щелчком по плану и его плашка; `null` - слоя на виде нет. */
+  tenderPicker: ICadTenderPicker | null;
   /** Режим «3D» включён, но лист или вид ещё грузится: оверлей держится, план не мелькает. */
   floor3dPending: { readonly onExit: () => void } | null;
 }
@@ -148,6 +157,8 @@ export const useWorkspaceCad = ({
   tabParam,
   jobParam,
   viewParam,
+  tenderParam = null,
+  modeParam = null,
   navigate,
 }: IUseWorkspaceCadInput): IWorkspaceCad => {
   const theme = useTheme();
@@ -159,6 +170,11 @@ export const useWorkspaceCad = ({
   const setLeftTab = useWorkspaceStore((state) => state.setLeftTab);
   const [sliderOpacity, setSliderOpacity] = useStoredNumber(PDF_OPACITY_KEY, DEFAULT_PDF_OPACITY);
   const [view3d, setView3d] = useStoredBoolean(FLOOR3D_MODE_KEY, false);
+
+  // `?mode=3d|plan` (ссылка со страницы «Расчёты») приоритетнее сохранённого выбора; один раз на значение адреса.
+  useEffect(() => {
+    if (modeParam === '3d' || modeParam === 'plan') setView3d(modeParam === '3d');
+  }, [modeParam, setView3d]);
 
   // `?tab=cad` открывает вкладку один раз на значение адреса. Вкладку закрывает флаг в странице,
   // поэтому выбор можно сохранить и до прихода меты.
@@ -188,10 +204,12 @@ export const useWorkspaceCad = ({
   // Трассы механики: выбранное (явно или автоматически) route-задание рисуется поверх DXF вида его
   // родителя. Это же задание - источник итогов и 3D этажа: одни трассы во всех видах.
   const shownRoute = data.routeSummary ?? data.autoRoute;
+  // Трассы ВИС движка закрыты флагом `cad.mep_engine` (ADR-0051): выключен - ни запросов, ни слоёв.
+  const mepEngine = useMepEngineEnabled();
   const routes = useWorkspaceCadRoutes({
     projectId,
     revisionId,
-    load: loadOverlay,
+    load: loadOverlay && mepEngine,
     pageIndex,
     route: shownRoute,
   });
@@ -204,15 +222,19 @@ export const useWorkspaceCad = ({
       pageIndex: pageIndex ?? 0,
       view: params?.view ?? 0,
     },
-    loadOverlay && revisionId !== null && pageIndex !== null && params !== null,
+    loadOverlay && mepEngine && revisionId !== null && pageIndex !== null && params !== null,
   );
   const routePreview = useMemo(
     () =>
-      withEomPreview(
-        routes.diagnostics ? matchingPreview(routes.diagnostics, routes.preview ?? undefined) : null,
-        eomPreview,
-      ),
-    [routes.diagnostics, routes.preview, eomPreview],
+      mepEngine
+        ? withEomPreview(
+            routes.diagnostics
+              ? matchingPreview(routes.diagnostics, routes.preview ?? undefined)
+              : null,
+            eomPreview,
+          )
+        : null,
+    [mepEngine, routes.diagnostics, routes.preview, eomPreview],
   );
 
   // DXF накладывается на PDF, только когда его уже можно нарисовать; иначе виден один PDF.
@@ -242,6 +264,19 @@ export const useWorkspaceCad = ({
     params ? legacyLayerVisibilityKey(params.jobId, params.pageIndex) : null,
   );
   const { hiddenLayers } = visibility;
+  // Расчёты TENDER (ADR-0051): слой поверх DXF, видимость - в том же хранилище, что слои листа.
+  const tender = useWorkspaceCadTender({
+    projectId,
+    revisionId,
+    pageIndex,
+    view: params?.view ?? null,
+    frame,
+    pageSize,
+    camera,
+    visibility,
+    shown: render.dxfVisible,
+    tenderParam,
+  });
   const visibleLayers = useMemo<ReadonlySet<number>>(
     () => new Set(layerNames.map((_, index) => index).filter((index) => !hiddenLayers.has(index))),
     [layerNames, hiddenLayers],
@@ -470,6 +505,27 @@ export const useWorkspaceCad = ({
     ],
   );
 
+  const tenderPainter = useMemo(
+    () =>
+      tender.painter(
+        cadPainter === null &&
+          constructionsPainter === null &&
+          zonesPainter === null &&
+          remarks.marks.length === 0 &&
+          sectionsPainter === null &&
+          facadesPainter === null,
+      ),
+    [
+      tender,
+      cadPainter,
+      constructionsPainter,
+      zonesPainter,
+      sectionsPainter,
+      facadesPainter,
+      remarks.marks.length,
+    ],
+  );
+
   const painter = useMemo<LayerPainter | null>(
     () =>
       composePainters(
@@ -487,6 +543,7 @@ export const useWorkspaceCad = ({
           : null,
         sectionsPainter,
         facadesPainter,
+        tenderPainter,
       ),
     [
       cadPainter,
@@ -494,6 +551,7 @@ export const useWorkspaceCad = ({
       zonesPainter,
       sectionsPainter,
       facadesPainter,
+      tenderPainter,
       remarks.marks,
       remarks.activeId,
       colors.remarks,
@@ -589,7 +647,7 @@ export const useWorkspaceCad = ({
   const layers: IWorkspaceCadLayers = {
     mep: mepLayersOf(
       // 3D рисует трассы по той же маске: слои трасс переключаются и в 3D, даже при режиме «PDF».
-      (render.dxfVisible || view3d) && routePreview ? routePreview.layers : null,
+      mepEngine && (render.dxfVisible || view3d) && routePreview ? routePreview.layers : null,
       mepVisibility.mask,
       mepVisibility.setHidden,
       routePreview,
@@ -613,6 +671,7 @@ export const useWorkspaceCad = ({
     constructions: constructionsState.layers,
     zones: zonesState.layers,
     sections: sectionsState.layers,
+    tender: tender.layers,
   };
 
   const side: IWorkspaceCadSideProps = {
@@ -675,6 +734,7 @@ export const useWorkspaceCad = ({
             navigate,
             parentJobId: data.jobId,
             sections: sectionsState.side,
+            engineRoutes: mepEngine,
           }),
           remarks: remarks.remarks,
         }
@@ -706,6 +766,7 @@ export const useWorkspaceCad = ({
     ...constructionsState.selection,
     hiddenCategories: visibility.hiddenCategories,
     hiddenConstructionIds,
+    hiddenLayerNames: visibility.hiddenLayerNames,
     routeJobId: shownRoute?.job_id ?? null,
   };
   const floor3d =
@@ -725,6 +786,7 @@ export const useWorkspaceCad = ({
     zoneEdit: zonesState.edit,
     zoneSplit: zonesState.split,
     constructionPicker: constructionsState.picker,
+    tenderPicker: tender.picker,
     floor3d,
     floor3dPending:
       active &&

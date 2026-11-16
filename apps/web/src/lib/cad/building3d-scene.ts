@@ -43,6 +43,11 @@ export interface IBuilding3dView {
   setPlan: (plan: IBuildingPlan | null, colors: IBuilding3dColors) => void;
   /** Текущий этаж (акцент) и наведённый (подсветка). */
   setHighlight: (currentKey: string | null, hoverKey: string | null) => void;
+  /**
+   * Группы расчётов TENDER по ключу этажа (ADR-0051): добавляются в сцену здания; владелец групп
+   * освобождает их сам. `null` - слоя нет.
+   */
+  setCalcGroups: (groups: ReadonlyMap<string, THREE.Object3D> | null) => void;
   dispose: () => void;
 }
 
@@ -148,6 +153,12 @@ export const createBuilding3dView = (host: HTMLElement, options: IBuilding3dOpti
   let colors: IBuilding3dColors = readBuilding3dColors();
   let currentKey: string | null = null;
   let hoverKey: string | null = null;
+  let calcGroups: ReadonlyMap<string, THREE.Object3D> | null = null;
+
+  const attachCalc = (): void => {
+    if (group === null) return;
+    for (const item of calcGroups?.values() ?? []) group.add(item);
+  };
 
   const disposeGroup = (): void => {
     if (group === null) return;
@@ -276,12 +287,19 @@ export const createBuilding3dView = (host: HTMLElement, options: IBuilding3dOpti
       group = next;
       floors = built;
       scene.add(next);
+      attachCalc();
       // Вписывание: описанная сфера габарита не зависит от поворота камеры.
       const { width, depth, height } = plan.size;
       radius = Math.max(0.5, Math.sqrt(width * width + depth * depth + height * height) / 2);
       placeCamera();
       fitFrustum();
       applyStyle();
+    },
+    setCalcGroups: (next) => {
+      for (const item of calcGroups?.values() ?? []) item.removeFromParent();
+      calcGroups = next;
+      attachCalc();
+      requestRender();
     },
     setHighlight: (current, hover) => {
       currentKey = current;

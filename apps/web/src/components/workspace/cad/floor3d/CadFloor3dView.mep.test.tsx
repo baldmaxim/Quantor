@@ -19,6 +19,13 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
   listCadJobs: vi.fn(),
 }));
 
+// Флаги и слой «Расчёты»: трассы движка открыты (`cad.mep_engine`), расчётов TENDER на виде нет.
+vi.mock('@/lib/tender/layers', () => ({
+  useMepEngineEnabled: () => true,
+  useTenderExchangeEnabled: () => false,
+  useTenderViewLayers: () => ({ data: undefined }),
+}));
+
 // Холст three.js в jsdom не нужен: подставка отдаёт щелчки по трассе, прибору, стене и пустоте.
 vi.mock('./CadFloor3dCanvas', () => ({
   CadFloor3dCanvas: ({

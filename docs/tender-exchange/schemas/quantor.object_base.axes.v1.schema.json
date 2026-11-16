@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "ObjectBaseAxis": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "orient": {
+          "enum": [
+            "vertical",
+            "horizontal"
+          ],
+          "title": "Orient",
+          "type": "string"
+        },
+        "pos_mm": {
+          "title": "Pos Mm",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "label",
+        "orient",
+        "pos_mm"
+      ],
+      "title": "ObjectBaseAxis",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.object_base.axes.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "axes": {
+      "items": {
+        "$ref": "#/$defs/ObjectBaseAxis"
+      },
+      "title": "Axes",
+      "type": "array"
+    },
+    "schema": {
+      "const": "quantor.object_base.axes.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "axes"
+  ],
+  "title": "ObjectBaseAxes",
+  "type": "object"
+}

@@ -106,6 +106,31 @@ def require_feature(key: str) -> params.Depends:
     return params.Depends(dependency=FeatureCheck(key))
 
 
+class MepEngineCheck:
+    """Построение трасс ВИС движка открыто флагом `cad.mep_engine` (ADR-0051).
+
+    Выключенный флаг - 409 `CAD_MEP_ENGINE_DISABLED`, а не 403 `FEATURE_DISABLED`: возможность
+    не скрыта, а заменена расчётами из TENDER, и интерфейсу нужен свой код. Чтение прежних трасс
+    флагом не закрывается. Объект, а не замыкание, - по той же причине, что и `FeatureCheck`.
+    """
+
+    __slots__ = ()
+
+    async def __call__(self, session: SessionDep, settings: SettingsDep, context: AuthDep) -> None:
+        evaluated = await flags_service.evaluate_all(
+            session,
+            settings,
+            flags_service.EvaluationContext(workspace_id=context.workspace_id),
+        )
+        if not evaluated["cad.mep_engine"].value:
+            raise DomainError(ErrorCode.CAD_MEP_ENGINE_DISABLED)
+
+
+def require_mep_engine() -> params.Depends:
+    """Маршрут построения трасс ВИС движка: доступен, пока включён `cad.mep_engine`."""
+    return params.Depends(dependency=MepEngineCheck())
+
+
 LimitDep = Annotated[
     int,
     Query(ge=1, le=MAX_PAGE_SIZE, description="Сколько записей вернуть"),
@@ -126,4 +151,5 @@ __all__ = [
     "WorkspaceDep",
     "require",
     "require_feature",
+    "require_mep_engine",
 ]

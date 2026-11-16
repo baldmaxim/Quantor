@@ -22,6 +22,7 @@ import { MeasurementInspector } from '@/components/workspace/MeasurementInspecto
 import { RegionInspector } from '@/components/workspace/RegionInspector';
 import { WorkspaceModeSwitch } from '@/components/workspace/WorkspaceModeSwitch';
 import { resolveLeftTab, resolveMode } from '@/components/workspace/cad/left-tab';
+import { CadTenderPicker } from '@/components/cad/tender/CadTenderPicker';
 import { CadConstructionPicker } from '@/components/workspace/cad/CadConstructionPicker';
 import { CadFloor3dOverlay } from '@/components/workspace/cad/floor3d/CadFloor3dOverlay';
 import { useWorkspaceCad } from '@/components/workspace/cad/useWorkspaceCad';
@@ -579,6 +580,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
     tabParam: searchParams.get('tab'),
     jobParam: cadSelection.job,
     viewParam: cadSelection.view,
+    tenderParam: searchParams.get('tender'),
+    modeParam: searchParams.get('mode'),
     navigate: setQuery,
   });
 
@@ -1026,6 +1029,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
                   {...cad.constructionPicker}
                   disabled={activeTool === 'scale'}
                 />
+              )}
+              {cad.tenderPicker && (
+                <CadTenderPicker {...cad.tenderPicker} disabled={activeTool === 'scale'} />
               )}
               {mode === 'cad' && (cad.floor3d || cad.floor3dPending) && (
                 <CadFloor3dOverlay

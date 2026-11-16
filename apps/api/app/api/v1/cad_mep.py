@@ -22,6 +22,7 @@ from app.api.v1.deps import (
     StorageDep,
     require,
     require_feature,
+    require_mep_engine,
 )
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
@@ -111,7 +112,7 @@ async def approve_cad_view(
     response_model=CadJobRead,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Поставить построение трасс механики по одобренному виду",
-    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+    dependencies=[require(Permission.DOCUMENT_UPLOAD), require_mep_engine()],
 )
 async def create_cad_mep_routes(
     project_id: uuid.UUID,
@@ -188,7 +189,7 @@ async def create_cad_mep_routes(
     response_model=CadJobRead,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Пересчитать трассы: новая попытка того же задания с другими отметкой и высотой",
-    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+    dependencies=[require(Permission.DOCUMENT_UPLOAD), require_mep_engine()],
 )
 async def recompute_cad_mep_routes(
     project_id: uuid.UUID,

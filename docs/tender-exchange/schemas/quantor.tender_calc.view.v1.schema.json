@@ -1,0 +1,397 @@
+{
+  "$defs": {
+    "CalcElement": {
+      "additionalProperties": false,
+      "properties": {
+        "apt": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Apt"
+        },
+        "axis": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Axis"
+        },
+        "dn_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dn Mm"
+        },
+        "h_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "H Mm"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "maxLength": 64,
+          "pattern": "^T-[A-Z0-9_]+(-[A-Z0-9_]+)+$",
+          "title": "Layer",
+          "type": "string"
+        },
+        "length_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Length Mm"
+        },
+        "mark": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mark"
+        },
+        "pos": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Pos",
+          "type": "array"
+        },
+        "subtype": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subtype"
+        },
+        "system": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "System",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "fitting",
+            "valve",
+            "sleeve",
+            "terminal",
+            "equipment"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "w_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "W Mm"
+        }
+      },
+      "required": [
+        "id",
+        "system",
+        "type",
+        "layer",
+        "pos"
+      ],
+      "title": "CalcElement",
+      "type": "object"
+    },
+    "CalcPolyline": {
+      "additionalProperties": false,
+      "properties": {
+        "apt": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Apt"
+        },
+        "dn_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dn Mm"
+        },
+        "h_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "H Mm"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "insulation_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Insulation Mm"
+        },
+        "kind": {
+          "enum": [
+            "route",
+            "jumper",
+            "riser",
+            "leadin",
+            "cable",
+            "tray",
+            "duct"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "layer": {
+          "maxLength": 64,
+          "pattern": "^T-[A-Z0-9_]+(-[A-Z0-9_]+)+$",
+          "title": "Layer",
+          "type": "string"
+        },
+        "mark": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mark"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "pts": {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "maxItems": 20000,
+          "minItems": 2,
+          "title": "Pts",
+          "type": "array"
+        },
+        "shape": {
+          "anyOf": [
+            {
+              "enum": [
+                "round",
+                "rect"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shape"
+        },
+        "slope": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Slope"
+        },
+        "system": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "System",
+          "type": "string"
+        },
+        "w_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "W Mm"
+        }
+      },
+      "required": [
+        "id",
+        "system",
+        "layer",
+        "kind",
+        "pts"
+      ],
+      "title": "CalcPolyline",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.tender_calc.view.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Геометрия одного вида: надмножество `routes3d.v2` движка (портал рисует тем же кодом).",
+  "properties": {
+    "dxf_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dxf Sha256",
+      "type": "string"
+    },
+    "elements": {
+      "items": {
+        "$ref": "#/$defs/CalcElement"
+      },
+      "maxItems": 100000,
+      "title": "Elements",
+      "type": "array"
+    },
+    "floors": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 500,
+      "title": "Floors",
+      "type": "array"
+    },
+    "polylines": {
+      "items": {
+        "$ref": "#/$defs/CalcPolyline"
+      },
+      "maxItems": 100000,
+      "title": "Polylines",
+      "type": "array"
+    },
+    "schema": {
+      "const": "quantor.tender_calc.view.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "view_key": {
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}:\\d{1,4}:\\d{1,3}$",
+      "title": "View Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "view_key",
+    "dxf_sha256",
+    "floors",
+    "polylines",
+    "elements"
+  ],
+  "title": "CalcViewFile",
+  "type": "object"
+}

@@ -965,6 +965,21 @@
         "title": "Body_upload_file",
         "type": "object"
       },
+      "Body_upload_tender_calc": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "ZIP пакета quantor.tender_calc.v1",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_tender_calc",
+        "type": "object"
+      },
       "BoqLine": {
         "additionalProperties": false,
         "description": "Строка ВОР: правило, группа по ключам профиля, количество и все элементы-источники.",
@@ -13624,6 +13639,158 @@
         "title": "CalcDocumentStage",
         "type": "string"
       },
+      "CalcElement": {
+        "additionalProperties": false,
+        "properties": {
+          "apt": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apt"
+          },
+          "axis": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 3,
+                "minItems": 3,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axis"
+          },
+          "dn_mm": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dn Mm"
+          },
+          "h_mm": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H Mm"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "layer": {
+            "maxLength": 64,
+            "pattern": "^T-[A-Z0-9_]+(-[A-Z0-9_]+)+$",
+            "title": "Layer",
+            "type": "string"
+          },
+          "length_mm": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length Mm"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark"
+          },
+          "pos": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "title": "Pos",
+            "type": "array"
+          },
+          "subtype": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtype"
+          },
+          "system": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "System",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "fitting",
+              "valve",
+              "sleeve",
+              "terminal",
+              "equipment"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "w_mm": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "W Mm"
+          }
+        },
+        "required": [
+          "id",
+          "system",
+          "type",
+          "layer",
+          "pos"
+        ],
+        "title": "CalcElement",
+        "type": "object"
+      },
       "CalcElementDiff": {
         "properties": {
           "change": {
@@ -17257,6 +17424,195 @@
           "created_at"
         ],
         "title": "CalcPassportSummaryRead",
+        "type": "object"
+      },
+      "CalcPerFloor": {
+        "additionalProperties": false,
+        "properties": {
+          "floor": {
+            "maxLength": 64,
+            "title": "Floor",
+            "type": "string"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "number"
+          }
+        },
+        "required": [
+          "floor",
+          "qty"
+        ],
+        "title": "CalcPerFloor",
+        "type": "object"
+      },
+      "CalcPolyline": {
+        "additionalProperties": false,
+        "properties": {
+          "apt": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apt"
+          },
+          "dn_mm": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dn Mm"
+          },
+          "h_mm": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H Mm"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "insulation_mm": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insulation Mm"
+          },
+          "kind": {
+            "enum": [
+              "route",
+              "jumper",
+              "riser",
+              "leadin",
+              "cable",
+              "tray",
+              "duct"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "layer": {
+            "maxLength": 64,
+            "pattern": "^T-[A-Z0-9_]+(-[A-Z0-9_]+)+$",
+            "title": "Layer",
+            "type": "string"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "pts": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "maxItems": 20000,
+            "minItems": 2,
+            "title": "Pts",
+            "type": "array"
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "enum": [
+                  "round",
+                  "rect"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shape"
+          },
+          "slope": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope"
+          },
+          "system": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "System",
+            "type": "string"
+          },
+          "w_mm": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "W Mm"
+          }
+        },
+        "required": [
+          "id",
+          "system",
+          "layer",
+          "kind",
+          "pts"
+        ],
+        "title": "CalcPolyline",
         "type": "object"
       },
       "CalcPrimitiveRef": {
@@ -29485,6 +29841,205 @@
         "title": "PasswordLoginResponse",
         "type": "object"
       },
+      "PersonalTokenCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_days": {
+            "anyOf": [
+              {
+                "maximum": 365.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Days"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PersonalTokenCreate",
+        "type": "object"
+      },
+      "PersonalTokenCreated": {
+        "description": "Ответ создания: полный токен показывается один раз, в базе его нет.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prefix": {
+            "title": "Prefix",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "scopes",
+          "created_at",
+          "last_used_at",
+          "expires_at",
+          "revoked_at",
+          "active",
+          "token"
+        ],
+        "title": "PersonalTokenCreated",
+        "type": "object"
+      },
+      "PersonalTokenRead": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prefix": {
+            "title": "Prefix",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "scopes",
+          "created_at",
+          "last_used_at",
+          "expires_at",
+          "revoked_at",
+          "active"
+        ],
+        "title": "PersonalTokenRead",
+        "type": "object"
+      },
       "PlanAlignmentBulkOut": {
         "properties": {
           "updated": {
@@ -34144,6 +34699,410 @@
         "title": "TakeoffItemUpdate",
         "type": "object"
       },
+      "TenderBaseCandidateRead": {
+        "description": "Этаж здания, который можно включить в выпуск базы.",
+        "properties": {
+          "alignment": {
+            "enum": [
+              "reference",
+              "axes",
+              "none"
+            ],
+            "title": "Alignment",
+            "type": "string"
+          },
+          "base_z_mm": {
+            "title": "Base Z Mm",
+            "type": "integer"
+          },
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "dir": {
+            "title": "Dir",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "document_title": {
+            "title": "Document Title",
+            "type": "string"
+          },
+          "dxf_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dxf Sha256"
+          },
+          "floors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Floors",
+            "type": "array"
+          },
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "group_label": {
+            "title": "Group Label",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "offset_mm": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Offset Mm",
+            "type": "array"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "view_key": {
+            "title": "View Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "view_key",
+          "dir",
+          "revision_id",
+          "document_id",
+          "document_title",
+          "page_index",
+          "view",
+          "label",
+          "corps",
+          "section",
+          "group_key",
+          "group_label",
+          "floors",
+          "base_z_mm",
+          "offset_mm",
+          "alignment",
+          "dxf_sha256",
+          "ready",
+          "problems"
+        ],
+        "title": "TenderBaseCandidateRead",
+        "type": "object"
+      },
+      "TenderBaseCandidatesRead": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/TenderBaseCandidateRead"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "candidates",
+          "warnings"
+        ],
+        "title": "TenderBaseCandidatesRead",
+        "type": "object"
+      },
+      "TenderBaseReleaseCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Comment",
+            "type": "string"
+          },
+          "include_dxf": {
+            "default": false,
+            "description": "Положить в пакет DXF каждого вида",
+            "title": "Include Dxf",
+            "type": "boolean"
+          },
+          "view_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}:\\d{1,4}:\\d{1,3}$",
+                  "type": "string"
+                },
+                "maxItems": 400,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Виды выпуска; не заданы — все готовые виды проекта",
+            "title": "View Keys"
+          }
+        },
+        "title": "TenderBaseReleaseCreate",
+        "type": "object"
+      },
+      "TenderBaseReleaseRead": {
+        "properties": {
+          "comment": {
+            "title": "Comment",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "include_dxf": {
+            "title": "Include Dxf",
+            "type": "boolean"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "package_sha256": {
+            "title": "Package Sha256",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "released_at": {
+            "format": "date-time",
+            "title": "Released At",
+            "type": "string"
+          },
+          "released_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released By Name"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By Name"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/TenderBaseViewRead"
+            },
+            "title": "Views",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "number",
+          "comment",
+          "released_by_name",
+          "released_at",
+          "include_dxf",
+          "views",
+          "package_sha256",
+          "manifest_sha256",
+          "size_bytes",
+          "revoked_at",
+          "revoked_by_name"
+        ],
+        "title": "TenderBaseReleaseRead",
+        "type": "object"
+      },
+      "TenderBaseViewRead": {
+        "description": "Вид в выпуске базы.",
+        "properties": {
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "dir": {
+            "title": "Dir",
+            "type": "string"
+          },
+          "document_title": {
+            "title": "Document Title",
+            "type": "string"
+          },
+          "dxf_sha256": {
+            "title": "Dxf Sha256",
+            "type": "string"
+          },
+          "floors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Floors",
+            "type": "array"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "dir",
+          "revision_id",
+          "page_index",
+          "view",
+          "job_id",
+          "dxf_sha256",
+          "document_title",
+          "label",
+          "corps",
+          "section",
+          "floors"
+        ],
+        "title": "TenderBaseViewRead",
+        "type": "object"
+      },
       "TenderBindingPreviewRead": {
         "description": "Предпросмотр перепривязки: что было, что станет и что мешает.",
         "properties": {
@@ -34364,6 +35323,517 @@
         "title": "TenderBriefRead",
         "type": "object"
       },
+      "TenderBuildingLayerRead": {
+        "properties": {
+          "calc_id": {
+            "format": "uuid",
+            "title": "Calc Id",
+            "type": "string"
+          },
+          "discipline": {
+            "enum": [
+              "mech",
+              "eom",
+              "ss"
+            ],
+            "title": "Discipline",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "system": {
+            "title": "System",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          },
+          "view_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "View Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "version_id",
+          "calc_id",
+          "discipline",
+          "system",
+          "title",
+          "number",
+          "label",
+          "view_keys"
+        ],
+        "title": "TenderBuildingLayerRead",
+        "type": "object"
+      },
+      "TenderBuildingLayersRead": {
+        "properties": {
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/TenderBuildingLayerRead"
+            },
+            "title": "Layers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layers"
+        ],
+        "title": "TenderBuildingLayersRead",
+        "type": "object"
+      },
+      "TenderCalcRead": {
+        "description": "Репозиторий расчёта и его последняя действующая версия (`null` — действующей нет).",
+        "properties": {
+          "active_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenderCalcVersionSummaryRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "discipline": {
+            "enum": [
+              "mech",
+              "eom",
+              "ss"
+            ],
+            "title": "Discipline",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "system": {
+            "title": "System",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version_count": {
+            "title": "Version Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "discipline",
+          "system",
+          "title",
+          "created_at",
+          "version_count",
+          "active_version"
+        ],
+        "title": "TenderCalcRead",
+        "type": "object"
+      },
+      "TenderCalcVersionRead": {
+        "properties": {
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "base_release_id": {
+            "format": "uuid",
+            "title": "Base Release Id",
+            "type": "string"
+          },
+          "base_release_number": {
+            "title": "Base Release Number",
+            "type": "integer"
+          },
+          "calc_id": {
+            "format": "uuid",
+            "title": "Calc Id",
+            "type": "string"
+          },
+          "diff": {
+            "items": {
+              "$ref": "#/components/schemas/TenderQuantityDiffRead"
+            },
+            "title": "Diff",
+            "type": "array"
+          },
+          "discipline": {
+            "enum": [
+              "mech",
+              "eom",
+              "ss"
+            ],
+            "title": "Discipline",
+            "type": "string"
+          },
+          "fit": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Fit",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "package_sha256": {
+            "title": "Package Sha256",
+            "type": "string"
+          },
+          "prev_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Version Id"
+          },
+          "producer": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Producer",
+            "type": "object"
+          },
+          "quantities": {
+            "items": {
+              "$ref": "#/components/schemas/TenderQuantityRowRead"
+            },
+            "title": "Quantities",
+            "type": "array"
+          },
+          "quantity_rows": {
+            "title": "Quantity Rows",
+            "type": "integer"
+          },
+          "question_count": {
+            "title": "Question Count",
+            "type": "integer"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/TenderQuestionRead"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "superseded",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "system": {
+            "title": "System",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "uploaded_at": {
+            "format": "date-time",
+            "title": "Uploaded At",
+            "type": "string"
+          },
+          "uploaded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uploaded By Name"
+          },
+          "view_count": {
+            "title": "View Count",
+            "type": "integer"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/TenderViewInfoRead"
+            },
+            "title": "Views",
+            "type": "array"
+          },
+          "warning_count": {
+            "title": "Warning Count",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/TenderWarningRead"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "calc_id",
+          "number",
+          "label",
+          "message",
+          "author",
+          "uploaded_by_name",
+          "uploaded_at",
+          "status",
+          "base_release_id",
+          "base_release_number",
+          "quantity_rows",
+          "question_count",
+          "warning_count",
+          "view_count",
+          "discipline",
+          "system",
+          "title",
+          "producer",
+          "fit",
+          "quantities",
+          "questions",
+          "views",
+          "warnings",
+          "package_sha256",
+          "prev_version_id",
+          "diff"
+        ],
+        "title": "TenderCalcVersionRead",
+        "type": "object"
+      },
+      "TenderCalcVersionSummaryRead": {
+        "properties": {
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "base_release_id": {
+            "format": "uuid",
+            "title": "Base Release Id",
+            "type": "string"
+          },
+          "base_release_number": {
+            "title": "Base Release Number",
+            "type": "integer"
+          },
+          "calc_id": {
+            "format": "uuid",
+            "title": "Calc Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "quantity_rows": {
+            "title": "Quantity Rows",
+            "type": "integer"
+          },
+          "question_count": {
+            "title": "Question Count",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "superseded",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "uploaded_at": {
+            "format": "date-time",
+            "title": "Uploaded At",
+            "type": "string"
+          },
+          "uploaded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uploaded By Name"
+          },
+          "view_count": {
+            "title": "View Count",
+            "type": "integer"
+          },
+          "warning_count": {
+            "title": "Warning Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "calc_id",
+          "number",
+          "label",
+          "message",
+          "author",
+          "uploaded_by_name",
+          "uploaded_at",
+          "status",
+          "base_release_id",
+          "base_release_number",
+          "quantity_rows",
+          "question_count",
+          "warning_count",
+          "view_count"
+        ],
+        "title": "TenderCalcVersionSummaryRead",
+        "type": "object"
+      },
+      "TenderCalcVersionsRead": {
+        "properties": {
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/TenderCalcVersionSummaryRead"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "versions"
+        ],
+        "title": "TenderCalcVersionsRead",
+        "type": "object"
+      },
+      "TenderCalcViewRead": {
+        "description": "Геометрия расчёта на одном виде (файл версии из хранилища).",
+        "properties": {
+          "base_stale": {
+            "title": "Base Stale",
+            "type": "boolean"
+          },
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/CalcElement"
+            },
+            "title": "Elements",
+            "type": "array"
+          },
+          "floors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Floors",
+            "type": "array"
+          },
+          "polylines": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPolyline"
+            },
+            "title": "Polylines",
+            "type": "array"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          },
+          "view_key": {
+            "title": "View Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_id",
+          "view_key",
+          "floors",
+          "polylines",
+          "elements",
+          "base_stale"
+        ],
+        "title": "TenderCalcViewRead",
+        "type": "object"
+      },
+      "TenderCalcsRead": {
+        "properties": {
+          "calcs": {
+            "items": {
+              "$ref": "#/components/schemas/TenderCalcRead"
+            },
+            "title": "Calcs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "calcs"
+        ],
+        "title": "TenderCalcsRead",
+        "type": "object"
+      },
       "TenderHubCandidateRead": {
         "description": "Строка HUBTender того же номера, с которой можно связать версию.",
         "properties": {
@@ -34509,6 +35979,182 @@
           "tender_id"
         ],
         "title": "TenderImport",
+        "type": "object"
+      },
+      "TenderQuantityDiffRead": {
+        "description": "Разница объёмов версии с прошлой по `code`.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "qty_prev": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty Prev"
+          },
+          "status": {
+            "enum": [
+              "added",
+              "removed",
+              "changed",
+              "same"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "unit",
+          "qty_prev",
+          "qty",
+          "delta",
+          "status"
+        ],
+        "title": "TenderQuantityDiffRead",
+        "type": "object"
+      },
+      "TenderQuantityRowRead": {
+        "properties": {
+          "basis": {
+            "enum": [
+              "geometry",
+              "schedule",
+              "rule",
+              "assumption"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "per_floor": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPerFloor"
+            },
+            "title": "Per Floor",
+            "type": "array"
+          },
+          "qty": {
+            "title": "Qty",
+            "type": "number"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "view_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "View Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "group",
+          "name",
+          "unit",
+          "qty",
+          "basis",
+          "per_floor",
+          "view_keys",
+          "note"
+        ],
+        "title": "TenderQuantityRowRead",
+        "type": "object"
+      },
+      "TenderQuestionRead": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ids",
+            "type": "array"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "ref",
+          "ids"
+        ],
+        "title": "TenderQuestionRead",
         "type": "object"
       },
       "TenderRebindRequest": {
@@ -34963,6 +36609,189 @@
           }
         },
         "title": "TenderVersionUpdate",
+        "type": "object"
+      },
+      "TenderViewInfoRead": {
+        "description": "Вид в версии расчёта: адрес, этажи, объём геометрии и признак устаревшей базы.",
+        "properties": {
+          "base_stale": {
+            "title": "Base Stale",
+            "type": "boolean"
+          },
+          "dxf_sha256": {
+            "title": "Dxf Sha256",
+            "type": "string"
+          },
+          "elements": {
+            "title": "Elements",
+            "type": "integer"
+          },
+          "floors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Floors",
+            "type": "array"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "polylines": {
+            "title": "Polylines",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "view_key": {
+            "title": "View Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "view_key",
+          "revision_id",
+          "page_index",
+          "view",
+          "floors",
+          "dxf_sha256",
+          "polylines",
+          "elements",
+          "base_stale"
+        ],
+        "title": "TenderViewInfoRead",
+        "type": "object"
+      },
+      "TenderViewLayerRead": {
+        "description": "Слой «Расчёты»: действующая версия расчёта на заданном виде.",
+        "properties": {
+          "base_stale": {
+            "title": "Base Stale",
+            "type": "boolean"
+          },
+          "calc_id": {
+            "format": "uuid",
+            "title": "Calc Id",
+            "type": "string"
+          },
+          "discipline": {
+            "enum": [
+              "mech",
+              "eom",
+              "ss"
+            ],
+            "title": "Discipline",
+            "type": "string"
+          },
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/CalcElement"
+            },
+            "title": "Elements",
+            "type": "array"
+          },
+          "floors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Floors",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "polylines": {
+            "items": {
+              "$ref": "#/components/schemas/CalcPolyline"
+            },
+            "title": "Polylines",
+            "type": "array"
+          },
+          "system": {
+            "title": "System",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_id",
+          "calc_id",
+          "discipline",
+          "system",
+          "title",
+          "number",
+          "label",
+          "floors",
+          "polylines",
+          "elements",
+          "base_stale"
+        ],
+        "title": "TenderViewLayerRead",
+        "type": "object"
+      },
+      "TenderViewLayersRead": {
+        "properties": {
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/TenderViewLayerRead"
+            },
+            "title": "Layers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layers"
+        ],
+        "title": "TenderViewLayersRead",
+        "type": "object"
+      },
+      "TenderWarningRead": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "view_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View Key"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "TenderWarningRead",
         "type": "object"
       },
       "Tool": {
@@ -40905,6 +42734,106 @@
         "summary": "Состояние задания",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/v1/me/api-tokens": {
+      "get": {
+        "operationId": "list_personal_tokens",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PersonalTokenRead"
+                  },
+                  "title": "Response List Personal Tokens",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Мои персональные токены в этом пространстве",
+        "tags": [
+          "api-tokens"
+        ]
+      },
+      "post": {
+        "operationId": "create_personal_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonalTokenCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalTokenCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выпустить персональный токен; значение виден один раз",
+        "tags": [
+          "api-tokens"
+        ]
+      }
+    },
+    "/api/v1/me/api-tokens/{token_id}": {
+      "delete": {
+        "operationId": "revoke_personal_token",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отозвать персональный токен",
+        "tags": [
+          "api-tokens"
         ]
       }
     },
@@ -48380,6 +50309,807 @@
         "summary": "Заморозить версию",
         "tags": [
           "tender-versions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/base/candidates": {
+      "get": {
+        "operationId": "list_tender_base_candidates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderBaseCandidatesRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Виды проекта, которые можно включить в выпуск базы (этажи «Здания»)",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/base/releases": {
+      "get": {
+        "operationId": "list_tender_base_releases",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TenderBaseReleaseRead"
+                  },
+                  "title": "Response List Tender Base Releases",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выпуски базы объекта проекта, новые сверху",
+        "tags": [
+          "tender-exchange"
+        ]
+      },
+      "post": {
+        "operationId": "create_tender_base_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenderBaseReleaseCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderBaseReleaseRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выпустить базу объекта: неизменяемый ZIP для TENDER",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/base/releases/{release_id}": {
+      "get": {
+        "operationId": "read_tender_base_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Release Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderBaseReleaseRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выпуск базы объекта",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/base/releases/{release_id}/download": {
+      "get": {
+        "operationId": "download_tender_base_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Release Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Скачать ZIP выпуска базы объекта",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/base/releases/{release_id}/revoke": {
+      "post": {
+        "operationId": "revoke_tender_base_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Release Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderBaseReleaseRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отозвать выпуск базы: новые расчёты по нему не принимаются",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/building-layers": {
+      "get": {
+        "operationId": "read_tender_building_layers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderBuildingLayersRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Действующие версии расчётов проекта и их виды (слой в 3D здания)",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/calc-versions/{version_id}": {
+      "get": {
+        "operationId": "read_tender_calc_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderCalcVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версия расчёта: манифест, объёмы, вопросы, виды, предупреждения, разница с прошлой",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/calc-versions/{version_id}/package": {
+      "get": {
+        "operationId": "download_tender_calc_package",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Скачать ZIP загруженного пакета расчёта",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/calc-versions/{version_id}/views/{revision_id}/{page_index}/{view}": {
+      "get": {
+        "operationId": "read_tender_calc_view",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderCalcViewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Геометрия версии расчёта на одном виде",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/calc-versions/{version_id}/withdraw": {
+      "post": {
+        "operationId": "withdraw_tender_calc_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderCalcVersionSummaryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отозвать версию расчёта: она уходит из показа, запись остаётся",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/calcs": {
+      "get": {
+        "operationId": "list_tender_calcs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderCalcsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Репозитории расчётов проекта и их действующие версии",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/calcs/upload": {
+      "post": {
+        "operationId": "upload_tender_calc",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_tender_calc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderCalcVersionSummaryRead"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderCalcVersionSummaryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Загрузить пакет расчёта: новая версия репозитория или существующая (тот же пакет)",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/calcs/{calc_id}/versions": {
+      "get": {
+        "operationId": "list_tender_calc_versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "calc_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderCalcVersionsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версии репозитория расчёта, новые сверху",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/view-layers": {
+      "get": {
+        "operationId": "read_tender_view_layers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderViewLayersRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Слой «Расчёты» вида: геометрия действующих версий с этим видом",
+        "tags": [
+          "tender-exchange"
         ]
       }
     },

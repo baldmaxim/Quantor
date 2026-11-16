@@ -140,6 +140,13 @@ vi.mock('@/lib/cad/eom-queries', async (importOriginal) => ({
   useCadEomPreview: () => null,
 }));
 
+// Флаги и слой «Расчёты»: трассы движка открыты (`cad.mep_engine`), расчётов TENDER на виде нет.
+vi.mock('@/lib/tender/layers', () => ({
+  useMepEngineEnabled: () => true,
+  useTenderExchangeEnabled: () => false,
+  useTenderViewLayers: () => ({ data: undefined }),
+}));
+
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({
   ...(await importOriginal<typeof ViewQueries>()),
   useCadView: (params: { jobId: string; attempt: number; view: number }, enabled: boolean) => {

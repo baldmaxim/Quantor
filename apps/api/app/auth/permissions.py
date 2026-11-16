@@ -69,6 +69,14 @@ class Permission(StrEnum):
     CALC_EDIT = "calc.edit"
     CALC_VERIFY = "calc.verify"
 
+    # Обмен расчётами с TENDER (ADR-0051). Чтение и загрузка расчётов — рабочие действия;
+    # выпуск базы объекта и отзыв версии расчёта — решения координатора (администратора
+    # пространства): выпуск неизменяем, а отзыв убирает расчёт из показа.
+    TENDER_CALC_READ = "tender.calc.read"
+    TENDER_CALC_UPLOAD = "tender.calc.upload"
+    TENDER_BASE_RELEASE = "tender.base.release"
+    TENDER_CALC_WITHDRAW = "tender.calc.withdraw"
+
 
 # Читатель: видит проекты и документы своего пространства, не меняет ничего.
 _VIEWER: Final[frozenset[Permission]] = frozenset(
@@ -81,6 +89,7 @@ _VIEWER: Final[frozenset[Permission]] = frozenset(
         # основание — это и есть калибровка с измерениями.
         Permission.TAKEOFF_READ,
         Permission.CALC_READ,
+        Permission.TENDER_CALC_READ,
     }
 )
 
@@ -105,6 +114,7 @@ _ENGINEER: Final[frozenset[Permission]] = _REVIEWER | {
     Permission.DOCUMENT_UPLOAD,
     Permission.TAKEOFF_EDIT,
     Permission.CALC_EDIT,
+    Permission.TENDER_CALC_UPLOAD,
 }
 
 # Администратор пространства: управляет своим пространством целиком, но не платформой.
@@ -119,6 +129,8 @@ _WORKSPACE_ADMIN: Final[frozenset[Permission]] = _ENGINEER | {
     Permission.SETTINGS_MANAGE,
     Permission.JOBS_MANAGE,
     Permission.AUDIT_READ,
+    Permission.TENDER_BASE_RELEASE,
+    Permission.TENDER_CALC_WITHDRAW,
 }
 
 # Машинная личность: только чтение. Ключ, умеющий писать, рано или поздно окажется
@@ -143,6 +155,20 @@ ROLE_PERMISSIONS: Final[MappingProxyType[Role, frozenset[Permission]]] = Mapping
         Role.REVIEWER: _REVIEWER,
         Role.VIEWER: _VIEWER,
         Role.SERVICE: _SERVICE,
+    }
+)
+
+
+# Область персонального токена `qtk_…` (ADR-0051): права токена — права роли владельца,
+# суженные до этого набора. Токен читает проекты и документы, читает выпуски базы и расчёты
+# и загружает расчёты; выпуск базы, отзыв, администрирование и выпуск токенов ему недоступны.
+API_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
+    {
+        Permission.WORKSPACE_READ,
+        Permission.PROJECT_READ,
+        Permission.DOCUMENT_READ,
+        Permission.TENDER_CALC_READ,
+        Permission.TENDER_CALC_UPLOAD,
     }
 )
 

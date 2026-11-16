@@ -21,6 +21,7 @@ import {
 } from '@/lib/openability';
 import { CAD_FEATURE } from '@/lib/cad/access';
 import { CONSISTENCY_FEATURE } from '@/lib/consistency/access';
+import { TENDER_EXCHANGE_FEATURE } from '@/lib/tender/access';
 import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 import { useFeatures, useProject, useProjectDocuments, useProjectRevisions } from '@/lib/queries';
 
@@ -135,6 +136,11 @@ const ProjectPage = ({ params }: IPageProps) => {
             {features[CONSISTENCY_FEATURE] === true && (
               <ButtonLink href={`/projects/${projectId}/frame`} transitionTypes={['nav-forward']}>
                 Каркас здания
+              </ButtonLink>
+            )}
+            {features[TENDER_EXCHANGE_FEATURE] === true && (
+              <ButtonLink href={`/projects/${projectId}/calcs`} transitionTypes={['nav-forward']}>
+                Расчёты
               </ButtonLink>
             )}
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>

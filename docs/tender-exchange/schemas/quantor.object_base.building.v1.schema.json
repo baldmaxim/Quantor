@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "ObjectBaseBuildingFloor": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "enum": [
+            "reference",
+            "axes",
+            "none"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "base_z_mm": {
+          "title": "Base Z Mm",
+          "type": "integer"
+        },
+        "floor_height_mm": {
+          "title": "Floor Height Mm",
+          "type": "integer"
+        },
+        "group_key": {
+          "title": "Group Key",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "offset_mm": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Offset Mm",
+          "type": "array"
+        },
+        "view_key": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}:\\d{1,4}:\\d{1,3}$",
+          "title": "View Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "view_key",
+        "label",
+        "group_key",
+        "base_z_mm",
+        "floor_height_mm",
+        "offset_mm",
+        "alignment"
+      ],
+      "title": "ObjectBaseBuildingFloor",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.object_base.building.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "floors": {
+      "items": {
+        "$ref": "#/$defs/ObjectBaseBuildingFloor"
+      },
+      "title": "Floors",
+      "type": "array"
+    },
+    "schema": {
+      "const": "quantor.object_base.building.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "floors"
+  ],
+  "title": "ObjectBaseBuilding",
+  "type": "object"
+}

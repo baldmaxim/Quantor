@@ -222,6 +222,16 @@ class ErrorCode(StrEnum):
     TENDER_VERSION_NUMBER_MISMATCH = "TENDER_VERSION_NUMBER_MISMATCH"
     TENDER_VERSION_LINK_FORBIDDEN = "TENDER_VERSION_LINK_FORBIDDEN"
 
+    # --- обмен расчётами с TENDER (ADR-0051) ---
+    TENDER_PACKAGE_INVALID = "TENDER_PACKAGE_INVALID"
+    TENDER_PRICE_FORBIDDEN = "TENDER_PRICE_FORBIDDEN"
+    TENDER_BASE_UNKNOWN = "TENDER_BASE_UNKNOWN"
+    TENDER_VIEW_UNKNOWN = "TENDER_VIEW_UNKNOWN"
+    TENDER_FIT_TOO_LARGE = "TENDER_FIT_TOO_LARGE"
+    TENDER_PROJECT_MISMATCH = "TENDER_PROJECT_MISMATCH"
+    # Построение и показ трасс ВИС движка закрыты флагом `cad.mep_engine`.
+    CAD_MEP_ENGINE_DISABLED = "CAD_MEP_ENGINE_DISABLED"
+
 
 MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.NOT_FOUND: "Объект не найден",
@@ -405,6 +415,15 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.TENDER_VERSION_LINK_FORBIDDEN: (
         "Проект заведён вручную: связывать его версию с тендером HUBTender нельзя"
     ),
+    ErrorCode.TENDER_PACKAGE_INVALID: "Пакет расчёта не прошёл проверку",
+    ErrorCode.TENDER_PRICE_FORBIDDEN: "В пакете расчёта есть стоимость: цены в Quantor не хранятся",
+    ErrorCode.TENDER_BASE_UNKNOWN: "Выпуск базы из пакета не найден в этом проекте или отозван",
+    ErrorCode.TENDER_VIEW_UNKNOWN: "Вид из пакета не входит в выпуск базы",
+    ErrorCode.TENDER_FIT_TOO_LARGE: "Привязка к осям хуже допустимой: отклонение больше 500 мм",
+    ErrorCode.TENDER_PROJECT_MISMATCH: "Пакет расчёта составлен для другого проекта",
+    ErrorCode.CAD_MEP_ENGINE_DISABLED: (
+        "Трассы ВИС движка отключены: расчёты систем приходят из TENDER"
+    ),
 }
 
 # HTTP-статус зависит от кода: клиенту важно отличать свою ошибку от отказа инфраструктуры.
@@ -562,6 +581,13 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.TENDER_VERSION_REVISION_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.TENDER_VERSION_NUMBER_MISMATCH: status.HTTP_409_CONFLICT,
     ErrorCode.TENDER_VERSION_LINK_FORBIDDEN: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDER_PACKAGE_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_PRICE_FORBIDDEN: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_BASE_UNKNOWN: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_VIEW_UNKNOWN: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_FIT_TOO_LARGE: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_PROJECT_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_MEP_ENGINE_DISABLED: status.HTTP_409_CONFLICT,
 }
 
 

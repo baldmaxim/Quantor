@@ -39,6 +39,11 @@ export interface IBuildingViewer {
   /** Выбранный этаж (акцент) и наведённый (подсветка); остальные этажи при выборе приглушаются. */
   setStyle: (selectedKey: string | null, hoverKey: string | null) => void;
   setExploded: (exploded: boolean) => void;
+  /**
+   * Группы расчётов TENDER по ключу этажа (ADR-0051): становятся дочерними группе этажа и двигаются с ним
+   * при разнесении; владелец групп освобождает их сам. `null` - слоя нет.
+   */
+  setCalcGroups: (groups: ReadonlyMap<string, THREE.Object3D> | null) => void;
   /** Здание целиком в кадре, направление взгляда сохраняется. */
   fit: () => void;
   dispose: () => void;
@@ -101,6 +106,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
   let anim: IExplodeAnim | null = null;
   let signature = '';
   let groundY = -Infinity;
+  let calcGroups: ReadonlyMap<string, THREE.Object3D> | null = null;
 
   let disposed = false;
   let frame = 0;
@@ -194,6 +200,13 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
   const observer = new ResizeObserver(resize);
   observer.observe(host);
   resize();
+
+  const attachCalc = (): void => {
+    for (const entry of entries) {
+      const group = calcGroups?.get(entry.key);
+      if (group !== undefined) entry.group.add(group);
+    }
+  };
 
   const disposeFloors = (): void => {
     for (const entry of entries) {
@@ -339,6 +352,7 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
         pickTargets.push(...entry.meshes.values());
       }
       groundY = Math.min(...nextPlan.floors.map((spec) => spec.slabBottom));
+      attachCalc();
       applyOffsets();
       applyStyle();
       // Камера вписывается только при смене набора этажей: обновление данных вид не сбрасывает.
@@ -356,6 +370,12 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       selectedKey = nextSelected;
       hoverKey = nextHover;
       applyStyle();
+    },
+    setCalcGroups: (next) => {
+      for (const group of calcGroups?.values() ?? []) group.removeFromParent();
+      calcGroups = next;
+      attachCalc();
+      requestRender();
     },
     setExploded: (next) => {
       if (next === exploded) return;

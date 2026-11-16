@@ -1,0 +1,65 @@
+{
+  "$defs": {
+    "CalcQuestionRow": {
+      "additionalProperties": false,
+      "properties": {
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Ids",
+          "type": "array"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "text": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "CalcQuestionRow",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.tender_calc.questions.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/CalcQuestionRow"
+      },
+      "maxItems": 2000,
+      "title": "Rows",
+      "type": "array"
+    },
+    "schema": {
+      "const": "quantor.tender_calc.questions.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "rows"
+  ],
+  "title": "CalcQuestionsFile",
+  "type": "object"
+}

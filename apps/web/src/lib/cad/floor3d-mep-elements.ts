@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import type { ITenderRef } from '@/lib/tender/info';
+
 import { toScenePoint, type IFloor3dCenter } from './floor3d-geometry';
 import {
   JOINT_HEIGHT_SEGMENTS,
@@ -21,7 +23,7 @@ import { MEP_PICK_KEY, type IMepElementPickData } from './floor3d-mep-pick';
 
 export interface IFloor3dMepElement {
   /** `device` и `box` - щиты, приборы и коробки ЭОМ и СС (`cad_eom`): короб w×h×d, ось - нормаль. */
-  readonly type: 'fitting' | 'valve' | 'sleeve' | 'terminal' | 'device' | 'box';
+  readonly type: 'fitting' | 'valve' | 'sleeve' | 'terminal' | 'device' | 'box' | 'equipment';
   readonly subtype: string;
   readonly layer: string;
   readonly pos: readonly number[];
@@ -38,6 +40,8 @@ export interface IFloor3dMepElement {
   readonly d_mm?: number | null;
   /** Название прибора по-русски от генератора ЭОМ и СС («ЩМк», «Светильник временный (Кухня)»). */
   readonly name?: string | null;
+  /** Объект расчёта TENDER (ADR-0051): источник и исходная запись для плашки; у элементов движка нет. */
+  readonly tender?: ITenderRef | null;
 }
 
 export interface IMepElementColors {
@@ -150,7 +154,7 @@ export const planMepElement = (
   const dn = positive(element.dn_mm) ? element.dn_mm / MM_IN_M : null;
   const layer = element.layer;
 
-  if (element.type === 'terminal') {
+  if (element.type === 'terminal' || element.type === 'equipment') {
     // Корпус по осям вида (X сцены = x DXF, Z сцены = -y DXF, Y = высота): ось элемента не нужна.
     if (element.subtype === 'sprinkler') {
       if (dn === null || !positive(element.h_mm)) return null;

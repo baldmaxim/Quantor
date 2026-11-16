@@ -20,6 +20,7 @@ import type {
 } from '@quantor/api-client';
 
 import type { IFinishAssignOutcome } from '@/components/cad/finishes/CadZoneFinishBar';
+import type { ICadTenderLayers } from '@/components/cad/tender/CadTenderLayers';
 import type { ICadZoneLayers } from '@/components/cad/viewer/CadZoneLayers';
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { IConstructionIndex } from '@/lib/cad/constructions';
@@ -295,6 +296,8 @@ export interface IWorkspaceCadLayers {
     readonly visible: boolean;
     readonly onVisibleChange: (visible: boolean) => void;
   } | null;
+  /** Группа «Расчёты» (TENDER): версии расчётов на виде; `null` или нет - расчётов на виде нет. */
+  readonly tender?: ICadTenderLayers | null;
 }
 
 /** Выбранное route-задание: то, что нужно блоку «Принять трассы». */
@@ -328,6 +331,11 @@ export interface IWorkspaceCadMep {
   readonly onSelectRoute: (jobId: string | null) => void;
   /** Разрезы ревизии для блока «Высота из разрезов»; `null` или нет - блока нет. */
   readonly sections?: IWorkspaceCadSectionsLink | null;
+  /**
+   * Трассы ВИС движка открыты флагом `cad.mep_engine`; нет - открыты. Выключен: остаётся только
+   * одобрение вида, построение, список трасс и спецификация скрыты.
+   */
+  readonly engineRoutes?: boolean;
 }
 
 /** Вид листа с диагностикой: слои, замечания, масштаб и файлы. */

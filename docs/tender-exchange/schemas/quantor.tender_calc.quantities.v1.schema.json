@@ -1,0 +1,145 @@
+{
+  "$defs": {
+    "CalcPerFloor": {
+      "additionalProperties": false,
+      "properties": {
+        "floor": {
+          "maxLength": 64,
+          "title": "Floor",
+          "type": "string"
+        },
+        "qty": {
+          "title": "Qty",
+          "type": "number"
+        }
+      },
+      "required": [
+        "floor",
+        "qty"
+      ],
+      "title": "CalcPerFloor",
+      "type": "object"
+    },
+    "CalcQuantityRow": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "enum": [
+            "geometry",
+            "schedule",
+            "rule",
+            "assumption"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "code": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "name": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "per_floor": {
+          "items": {
+            "$ref": "#/$defs/CalcPerFloor"
+          },
+          "maxItems": 500,
+          "title": "Per Floor",
+          "type": "array"
+        },
+        "qty": {
+          "title": "Qty",
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "м",
+            "м2",
+            "м3",
+            "шт",
+            "компл",
+            "т",
+            "кг",
+            "точка"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "view_keys": {
+          "items": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}:\\d{1,4}:\\d{1,3}$",
+            "type": "string"
+          },
+          "maxItems": 500,
+          "title": "View Keys",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "unit",
+        "qty",
+        "basis"
+      ],
+      "title": "CalcQuantityRow",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.tender_calc.quantities.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/CalcQuantityRow"
+      },
+      "maxItems": 5000,
+      "title": "Rows",
+      "type": "array"
+    },
+    "schema": {
+      "const": "quantor.tender_calc.quantities.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "rows"
+  ],
+  "title": "CalcQuantitiesFile",
+  "type": "object"
+}

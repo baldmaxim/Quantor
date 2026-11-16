@@ -94,6 +94,11 @@ export interface ICadLayerVisibility {
   readonly hiddenLayerNames: ReadonlySet<string>;
   readonly toggleLayer: (index: number) => void;
   readonly setLayersHidden: (indices: readonly number[], hidden: boolean) => void;
+  /**
+   * Скрыть или показать слои по именам: для слоёв вне списка DXF - расчёты TENDER (`tender:<calc_id>`),
+   * у них нет индекса в `layerNames`. Отсутствие записи - слой показан.
+   */
+  readonly setNamesHidden: (names: readonly string[], hidden: boolean) => void;
   readonly setExtraHidden: (category: CadExtraCategory, hidden: boolean) => void;
   /** Строки без слоя DXF вкладки «Слои»: показаны ли и как переключить. */
   readonly categories: {
@@ -156,6 +161,15 @@ export const useCadLayerVisibility = (
     commit({ layers: [...names], extra: current.extra });
   };
 
+  const setNamesHidden = (names: readonly string[], hidden: boolean) => {
+    const next = new Set(current.layers);
+    for (const name of names) {
+      if (hidden) next.add(name);
+      else next.delete(name);
+    }
+    commit({ layers: [...next], extra: current.extra });
+  };
+
   const setExtraHidden = (category: CadExtraCategory, hidden: boolean) => {
     const extra = new Set(current.extra);
     if (hidden) extra.add(category);
@@ -169,6 +183,7 @@ export const useCadLayerVisibility = (
     hiddenLayerNames: hiddenNames,
     toggleLayer: (index) => setLayersHidden([index], !hiddenLayers.has(index)),
     setLayersHidden,
+    setNamesHidden,
     setExtraHidden,
     categories: {
       monolithVertical: !hiddenExtra.has('monolith_vertical'),
