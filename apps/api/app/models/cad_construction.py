@@ -97,6 +97,9 @@ class CadSheetLevels(Base):
     door_height_mm: Mapped[int | None] = mapped_column(Integer)
     # Отметка этажа = верх плиты, мм (ADR-0039).
     floor_elevation_mm: Mapped[int | None] = mapped_column(Integer)
+    # Подоконник и верх окна от чистого пола листа, мм: ручной ввод (ADR-0048 п. 5), оба или нет.
+    window_sill_mm: Mapped[int | None] = mapped_column(Integer)
+    window_head_mm: Mapped[int | None] = mapped_column(Integer)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -121,5 +124,12 @@ class CadSheetLevels(Base):
         CheckConstraint(
             "floor_elevation_mm is null or floor_elevation_mm between -100000 and 500000",
             name="floor_elevation_range",
+        ),
+        CheckConstraint(
+            "(window_sill_mm is null and window_head_mm is null)"
+            " or (window_sill_mm is not null and window_head_mm is not null"
+            " and window_sill_mm >= 0 and window_sill_mm < window_head_mm"
+            " and window_head_mm <= 6000)",
+            name="window_levels_range",
         ),
     )

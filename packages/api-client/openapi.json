@@ -5822,7 +5822,7 @@
         "type": "object"
       },
       "CadFloor3dWindowRead": {
-        "description": "Окно с высотой по виду фасада (ADR-0048 п. 6): подоконная часть, стекло, перемычка.\n\nПодоконная часть - призма по контуру проёма от `sill_z_bottom_mm` до `sill_z_top_mm`; стекло -\nот `sill_z_top_mm` (низ стекла) до `glass_z_top_mm`; перемычка над окном - в `lintels`. Нет\nподоконной части - `sill_z_bottom_mm` равен `sill_z_top_mm`. `accepted = false` - вид фасада\nне принят человеком, окно показывается как кандидат и в объём кладки не входит.",
+        "description": "Окно с высотой по виду фасада или ручному вводу листа (ADR-0048 п. 5-6).\n\nПодоконная часть - призма по контуру проёма от `sill_z_bottom_mm` до `sill_z_top_mm`; стекло -\nот `sill_z_top_mm` (низ стекла) до `glass_z_top_mm`; перемычка над окном - в `lintels`. Нет\nподоконной части - `sill_z_bottom_mm` равен `sill_z_top_mm`. `accepted = false` - вид фасада\nне принят человеком, окно показывается как кандидат и в объём кладки не входит. Окно по\nручному вводу листа (`source = manual`) принято человеком; полей вида фасада у него нет.",
         "properties": {
           "accepted": {
             "title": "Accepted",
@@ -5833,21 +5833,49 @@
             "type": "boolean"
           },
           "facade_page_index": {
-            "title": "Facade Page Index",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facade Page Index"
           },
           "facade_revision_id": {
-            "format": "uuid",
-            "title": "Facade Revision Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facade Revision Id"
           },
           "facade_title": {
-            "title": "Facade Title",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facade Title"
           },
           "facade_view_key": {
-            "title": "Facade View Key",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facade View Key"
           },
           "glass_z_top_mm": {
             "title": "Glass Z Top Mm",
@@ -5893,6 +5921,14 @@
           "sill_z_top_mm": {
             "title": "Sill Z Top Mm",
             "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "facade",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
           }
         },
         "required": [
@@ -5901,14 +5937,11 @@
           "sill_z_bottom_mm",
           "sill_z_top_mm",
           "glass_z_top_mm",
+          "source",
           "sill_mm",
           "head_mm",
           "accepted",
-          "axes_checked",
-          "facade_view_key",
-          "facade_page_index",
-          "facade_revision_id",
-          "facade_title"
+          "axes_checked"
         ],
         "title": "CadFloor3dWindowRead",
         "type": "object"
@@ -6095,6 +6128,12 @@
               }
             ],
             "title": "Wall Height Source"
+          },
+          "window_head": {
+            "$ref": "#/components/schemas/CadLevelValueRead"
+          },
+          "window_sill": {
+            "$ref": "#/components/schemas/CadLevelValueRead"
           }
         },
         "required": [
@@ -6103,6 +6142,8 @@
           "floor_height",
           "slab_thickness",
           "door_height",
+          "window_sill",
+          "window_head",
           "wall_height_mm",
           "wall_height_source",
           "evidence",
@@ -9816,6 +9857,28 @@
               }
             ],
             "title": "Slab Thickness Mm"
+          },
+          "window_head_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Head Mm"
+          },
+          "window_sill_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Sill Mm"
           }
         },
         "required": [
@@ -9885,6 +9948,34 @@
             ],
             "description": "Толщина плиты перекрытия, мм",
             "title": "Slab Thickness Mm"
+          },
+          "window_head_mm": {
+            "anyOf": [
+              {
+                "maximum": 6000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Верх окон листа от чистого пола, мм (ADR-0048 п. 5); вместе с подоконником",
+            "title": "Window Head Mm"
+          },
+          "window_sill_mm": {
+            "anyOf": [
+              {
+                "maximum": 5999.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Подоконник окон листа от чистого пола, мм (ADR-0048 п. 5); вместе с верхом",
+            "title": "Window Sill Mm"
           }
         },
         "title": "CadSheetLevelsWrite",
@@ -11305,6 +11396,80 @@
           "message"
         ],
         "title": "CadWallsWarningRead",
+        "type": "object"
+      },
+      "CadWindowLevelsApplyRead": {
+        "description": "Итог «применить подоконник и высоту окна ко всей секции» (ADR-0048 п. 5).",
+        "properties": {
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "group_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Label"
+          },
+          "head_mm": {
+            "title": "Head Mm",
+            "type": "integer"
+          },
+          "sill_mm": {
+            "title": "Sill Mm",
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/CadWindowLevelsSkippedRead"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sill_mm",
+          "head_mm",
+          "dry_run",
+          "group_label",
+          "updated",
+          "skipped"
+        ],
+        "title": "CadWindowLevelsApplyRead",
+        "type": "object"
+      },
+      "CadWindowLevelsSkippedRead": {
+        "description": "Лист проекта, которому подоконник и высота окна не достались.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "no_walls",
+              "walls_unreadable",
+              "summary_sheet",
+              "other_group"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "reason"
+        ],
+        "title": "CadWindowLevelsSkippedRead",
         "type": "object"
       },
       "CadZoneCreate": {
@@ -43623,6 +43788,89 @@
           }
         },
         "summary": "Пересчитать конструкции вида: поставить задание cad_walls",
+        "tags": [
+          "cad-constructions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/window-levels/apply-to-section": {
+      "post": {
+        "operationId": "apply_cad_window_levels_to_section",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Только посчитать листы секции, ничего не записывая",
+            "in": "query",
+            "name": "dry_run",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Только посчитать листы секции, ничего не записывая",
+              "title": "Dry Run",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadWindowLevelsApplyRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Применить подоконник и высоту окна листа ко всем листам его корпуса и секции",
         "tags": [
           "cad-constructions"
         ]

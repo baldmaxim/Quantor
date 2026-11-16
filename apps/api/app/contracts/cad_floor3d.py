@@ -214,12 +214,13 @@ class CadFloor3dDoorRead(BaseModel):
 
 
 class CadFloor3dWindowRead(BaseModel):
-    """Окно с высотой по виду фасада (ADR-0048 п. 6): подоконная часть, стекло, перемычка.
+    """Окно с высотой по виду фасада или ручному вводу листа (ADR-0048 п. 5-6).
 
     Подоконная часть - призма по контуру проёма от `sill_z_bottom_mm` до `sill_z_top_mm`; стекло -
     от `sill_z_top_mm` (низ стекла) до `glass_z_top_mm`; перемычка над окном - в `lintels`. Нет
     подоконной части - `sill_z_bottom_mm` равен `sill_z_top_mm`. `accepted = false` - вид фасада
-    не принят человеком, окно показывается как кандидат и в объём кладки не входит.
+    не принят человеком, окно показывается как кандидат и в объём кладки не входит. Окно по
+    ручному вводу листа (`source = manual`) принято человеком; полей вида фасада у него нет.
     """
 
     opening_id: str
@@ -228,16 +229,18 @@ class CadFloor3dWindowRead(BaseModel):
     sill_z_bottom_mm: int
     sill_z_top_mm: int
     glass_z_top_mm: int
-    # Подоконник и верх окна от чистого пола листа, мм; источник высоты - вид фасада (`observed`).
+    # Подоконник и верх окна от чистого пола листа, мм; источник - вид фасада или ручной ввод.
+    source: Literal["facade", "manual"]
     sill_mm: int
     head_mm: int
     accepted: bool
     # Привязка вида к осям плана проверена (три и более оси или сверка `u_mm`).
     axes_checked: bool
-    facade_view_key: str
-    facade_page_index: int
-    facade_revision_id: UUID
-    facade_title: str
+    # Поля вида фасада; у окна по ручному вводу - `None`.
+    facade_view_key: str | None = None
+    facade_page_index: int | None = None
+    facade_revision_id: UUID | None = None
+    facade_title: str | None = None
 
 
 class CadFloor3dWarningRead(BaseModel):

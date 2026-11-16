@@ -15,7 +15,7 @@ from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import ValidationError
 
 from app.api.v1.cad import _job, _read_artifact_json
@@ -44,6 +44,7 @@ from app.contracts.cad_constructions import (
     CadSheetLevelsWrite,
     CadWallsJobRead,
     CadWallsWarningRead,
+    CadWindowLevelsApplyRead,
     WallsDocument,
 )
 from app.contracts.cad_floor3d import WallsFloorExtras
@@ -62,6 +63,7 @@ from app.services import (
     cad_slab,
     cad_views,
     cad_walls,
+    cad_window_levels,
 )
 from app.services import cad_construction_store as store
 from app.services import cad_floor3d_store as floor3d_store
@@ -280,7 +282,26 @@ async def facade_window_heights(
     overrides: CadSheetLevelsRead,
     project_slab: cad_constructions.ProjectSlab | None,
 ) -> cad_facade_windows.FacadeMatch:
-    """Высоты окон листа без высоты по видам фасадов проекта (ADR-0048); кадр и оси - листа.
+    """Высоты окон листа без `opening_height_mm` (ADR-0048): общие для 3D и объёма кладки.
+
+    Приоритет: принятый вид фасада, затем ручной ввод листа (проверен человеком), затем вид-кандидат
+    фасада (только 3D, в объём не идёт), затем высоты нет.
+    """
+    match = await _facade_match(session, storage, sheet, walls, overrides, project_slab)
+    return cad_facade_windows.merge_manual_heights(
+        match, walls.document.openings, overrides.window_sill_mm, overrides.window_head_mm
+    )
+
+
+async def _facade_match(
+    session: SessionDep,
+    storage: StorageDep,
+    sheet: _Sheet,
+    walls: _Walls,
+    overrides: CadSheetLevelsRead,
+    project_slab: cad_constructions.ProjectSlab | None,
+) -> cad_facade_windows.FacadeMatch:
+    """Высоты окон листа без высоты по видам фасадов проекта; кадр и оси - листа.
 
     Нет окон без высоты или нет видов - пусто без замечаний. Кадр листа не подтверждён или осей
     нет - карта пустая и замечание.
@@ -609,6 +630,56 @@ async def put_cad_sheet_levels(
     )
     result, levels = await _totals(session, storage, sheet, walls)
     response = _totals_read(result, levels)
+    await session.commit()
+    return response
+
+
+@router.post(
+    "/window-levels/apply-to-section",
+    response_model=CadWindowLevelsApplyRead,
+    summary="Применить подоконник и высоту окна листа ко всем листам его корпуса и секции",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def apply_cad_window_levels_to_section(
+    project_id: uuid.UUID,
+    job_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+    dry_run: Annotated[
+        bool, Query(description="Только посчитать листы секции, ничего не записывая")
+    ] = False,
+) -> CadWindowLevelsApplyRead:
+    sheet = await _sheet(session, context, project_id, job_id, page_index, view)
+    walls = await _load_walls(session, storage, sheet)
+    levels = await store.load_levels(
+        session, revision_id=sheet.revision_id, page_index=page_index, view=view
+    )
+    if levels.window_sill_mm is None or levels.window_head_mm is None:
+        raise DomainError(
+            ErrorCode.VALIDATION_FAILED,
+            "На листе не заданы подоконник и высота окна: сохраните их и повторите",
+        )
+    source = cad_window_levels.SectionSheet(
+        revision_id=sheet.revision_id,
+        page_index=page_index,
+        view=view,
+        label=f"Лист {page_index + 1}",
+        title=walls.document.heights.title,
+    )
+    response = await cad_window_levels.apply_to_section(
+        session,
+        storage,
+        workspace_id=context.tenant,
+        project_id=project_id,
+        source=source,
+        sill_mm=levels.window_sill_mm,
+        head_mm=levels.window_head_mm,
+        user_id=context.principal.user_id,
+        dry_run=dry_run,
+    )
     await session.commit()
     return response
 

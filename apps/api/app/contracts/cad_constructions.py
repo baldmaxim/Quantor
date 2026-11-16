@@ -14,10 +14,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Final, Literal
+from typing import Final, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.domain import JobStatus
 
@@ -344,6 +344,27 @@ class CadSheetLevelsWrite(BaseModel):
     floor_elevation_mm: int | None = Field(
         default=None, ge=-100000, le=500000, description="Отметка этажа = верх плиты, мм"
     )
+    window_sill_mm: int | None = Field(
+        default=None,
+        ge=0,
+        le=5999,
+        description="Подоконник окон листа от чистого пола, мм (ADR-0048 п. 5); вместе с верхом",
+    )
+    window_head_mm: int | None = Field(
+        default=None,
+        ge=1,
+        le=6000,
+        description="Верх окон листа от чистого пола, мм (ADR-0048 п. 5); вместе с подоконником",
+    )
+
+    @model_validator(mode="after")
+    def _window_levels_are_consistent(self) -> Self:
+        sill, head = self.window_sill_mm, self.window_head_mm
+        if (sill is None) != (head is None):
+            raise ValueError("Подоконник и высота окна задаются вместе: заполните оба поля")
+        if sill is not None and head is not None and sill >= head:
+            raise ValueError("Подоконник должен быть ниже верха окна")
+        return self
 
 
 class CadConstructionPropsPut(BaseModel):
@@ -405,6 +426,9 @@ class CadHeightsRead(BaseModel):
     floor_height: CadLevelValueRead
     slab_thickness: CadLevelValueRead
     door_height: CadLevelValueRead
+    # Ручные подоконник и верх окна от чистого пола (ADR-0048 п. 5): `manual` или не задано.
+    window_sill: CadLevelValueRead
+    window_head: CadLevelValueRead
     # Лист разреза, если толщина плиты взята из уровня проекта (ADR-0039 п. 4).
     slab_thickness_sheet_ref: str | None = None
     # Высота стены = высота этажа - толщина плиты; None, если высота этажа не определена.
@@ -423,6 +447,8 @@ class CadSheetLevelsRead(BaseModel):
     slab_thickness_mm: int | None
     door_height_mm: int | None
     floor_elevation_mm: int | None = None
+    window_sill_mm: int | None = None
+    window_head_mm: int | None = None
 
 
 class CadComputedSourcesRead(BaseModel):
@@ -557,6 +583,29 @@ class CadConstructionsTotalsRead(BaseModel):
     sheet_levels: CadSheetLevelsRead
     totals: list[CadConstructionGroupRead]
     summary: CadConstructionsSummaryRead
+
+
+class CadWindowLevelsSkippedRead(BaseModel):
+    """Лист проекта, которому подоконник и высота окна не достались."""
+
+    label: str
+    # no_walls - конструкции листа не посчитаны; walls_unreadable - walls.json не прочитан;
+    # summary_sheet - сводный лист (отдельная группа); other_group - другой корпус или секция.
+    reason: Literal["no_walls", "walls_unreadable", "summary_sheet", "other_group"]
+
+
+class CadWindowLevelsApplyRead(BaseModel):
+    """Итог «применить подоконник и высоту окна ко всей секции» (ADR-0048 п. 5)."""
+
+    sill_mm: int
+    head_mm: int
+    # `true` - пробный расчёт: листы сосчитаны, запись не выполнялась.
+    dry_run: bool
+    # Подпись секции; `None` - у листа нет корпуса или секции, значения только ему самому.
+    group_label: str | None
+    # Листов секции со значениями после операции, включая сам лист.
+    updated: int
+    skipped: list[CadWindowLevelsSkippedRead]
 
 
 class CadConstructionsBulkRead(CadConstructionsTotalsRead):

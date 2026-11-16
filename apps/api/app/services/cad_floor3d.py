@@ -468,7 +468,8 @@ def build_floor3d(
             wall_height_missing = True
             continue
         if facade is not None:
-            # окно с высотой по виду фасада: подоконная часть + стекло + перемычка (ADR-0048 п. 6)
+            # окно с высотой по фасаду или ручному вводу: подоконная часть, стекло, перемычка
+            # (ADR-0048 п. 5-6)
             glass_bottom = opening_floor + facade.sill_mm
             glass_top = min(opening_floor + facade.head_mm, top)
             if glass_bottom >= top:
@@ -485,6 +486,7 @@ def build_floor3d(
                     glass_z_top_mm=glass_top,
                     sill_mm=facade.sill_mm,
                     head_mm=facade.head_mm,
+                    source=facade.source,
                     accepted=facade.accepted,
                     axes_checked=facade.axes_checked,
                     facade_view_key=facade.view_key,
@@ -506,7 +508,7 @@ def build_floor3d(
                     z_bottom_mm=opening_floor + facade.head_mm,
                     z_top_mm=top,
                     door_height_mm=facade.head_mm,
-                    door_height_source="observed",
+                    door_height_source="manual" if facade.source == "manual" else "observed",
                     material=lintel_material_by_id.get(opening.id),
                 )
             )
@@ -582,10 +584,7 @@ def build_floor3d(
         warnings.append(
             CadFloor3dWarningRead(
                 code=FACADE_WINDOW_ABOVE_WALL,
-                message=(
-                    f"Окно по фасаду выше верха стены этажа: {windows_above_wall}; "
-                    "окно не построено."
-                ),
+                message=(f"Окно выше верха стены этажа: {windows_above_wall}; окно не построено."),
             )
         )
     unaccepted = sum(1 for window in window_reads if not window.accepted)

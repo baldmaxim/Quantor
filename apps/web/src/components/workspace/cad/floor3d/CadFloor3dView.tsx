@@ -8,7 +8,9 @@ import { WALLS_NOT_READY, isWallsActive, useCadConstructions, wallsJobStatus } f
 import { cadErrorText } from '@/lib/cad/errors';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import { buildFloor3dPlan, isWindowPart } from '@/lib/cad/floor3d-geometry';
+import { sectionLabelOf } from '@/lib/cad/floor3d-heights';
 import {
+  useApplyCadWindowLevelsToSection,
   useCadFloor3d,
   useCadProjectLevels,
   useSaveCadProjectLevels,
@@ -97,6 +99,7 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   const projectLevels = useCadProjectLevels(params.projectId, true);
   const setHole = useSetFloor3dHole(params);
   const saveSheet = useSaveFloor3dSheetLevels(params);
+  const applySection = useApplyCadWindowLevelsToSection(params);
   const saveProject = useSaveCadProjectLevels(params.projectId);
   // Тот же запрос и ключ, что у вкладки «Конструкции»: кеш общий. Из него - длина, площадь, объём стены.
   const constructions = useCadConstructions(params, true);
@@ -460,6 +463,9 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
                 sheetSaving={saveSheet.isPending}
                 projectSaving={saveProject.isPending}
                 error={panelError}
+                sectionLabel={sectionLabelOf(model.title)}
+                onPreviewSection={() => applySection.mutateAsync({ dryRun: true })}
+                onApplySection={() => applySection.mutateAsync({ dryRun: false })}
                 onSaveSheet={(write) => {
                   setPanelError(null);
                   saveSheet.mutate(write, { onError: (error) => setPanelError(cadErrorText(error)) });

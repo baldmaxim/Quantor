@@ -2774,12 +2774,13 @@ export type CadFloor3dWarningRead = {
 /**
  * CadFloor3dWindowRead
  *
- * Окно с высотой по виду фасада (ADR-0048 п. 6): подоконная часть, стекло, перемычка.
+ * Окно с высотой по виду фасада или ручному вводу листа (ADR-0048 п. 5-6).
  *
  * Подоконная часть - призма по контуру проёма от `sill_z_bottom_mm` до `sill_z_top_mm`; стекло -
  * от `sill_z_top_mm` (низ стекла) до `glass_z_top_mm`; перемычка над окном - в `lintels`. Нет
  * подоконной части - `sill_z_bottom_mm` равен `sill_z_top_mm`. `accepted = false` - вид фасада
- * не принят человеком, окно показывается как кандидат и в объём кладки не входит.
+ * не принят человеком, окно показывается как кандидат и в объём кладки не входит. Окно по
+ * ручному вводу листа (`source = manual`) принято человеком; полей вида фасада у него нет.
  */
 export type CadFloor3dWindowRead = {
     /**
@@ -2793,19 +2794,19 @@ export type CadFloor3dWindowRead = {
     /**
      * Facade Page Index
      */
-    facade_page_index: number;
+    facade_page_index?: number | null;
     /**
      * Facade Revision Id
      */
-    facade_revision_id: string;
+    facade_revision_id?: string | null;
     /**
      * Facade Title
      */
-    facade_title: string;
+    facade_title?: string | null;
     /**
      * Facade View Key
      */
-    facade_view_key: string;
+    facade_view_key?: string | null;
     /**
      * Glass Z Top Mm
      */
@@ -2838,6 +2839,10 @@ export type CadFloor3dWindowRead = {
      * Sill Z Top Mm
      */
     sill_z_top_mm: number;
+    /**
+     * Source
+     */
+    source: 'facade' | 'manual';
 };
 
 /**
@@ -2912,6 +2917,8 @@ export type CadHeightsRead = {
      * Wall Height Source
      */
     wall_height_source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
+    window_head: CadLevelValueRead;
+    window_sill: CadLevelValueRead;
 };
 
 /**
@@ -4658,6 +4665,14 @@ export type CadSheetLevelsRead = {
      * Slab Thickness Mm
      */
     slab_thickness_mm: number | null;
+    /**
+     * Window Head Mm
+     */
+    window_head_mm?: number | null;
+    /**
+     * Window Sill Mm
+     */
+    window_sill_mm?: number | null;
 };
 
 /**
@@ -4690,6 +4705,18 @@ export type CadSheetLevelsWrite = {
      * Толщина плиты перекрытия, мм
      */
     slab_thickness_mm?: number | null;
+    /**
+     * Window Head Mm
+     *
+     * Верх окон листа от чистого пола, мм (ADR-0048 п. 5); вместе с подоконником
+     */
+    window_head_mm?: number | null;
+    /**
+     * Window Sill Mm
+     *
+     * Подоконник окон листа от чистого пола, мм (ADR-0048 п. 5); вместе с верхом
+     */
+    window_sill_mm?: number | null;
 };
 
 /**
@@ -5446,6 +5473,54 @@ export type CadWallsWarningRead = {
      * Message
      */
     message: string;
+};
+
+/**
+ * CadWindowLevelsApplyRead
+ *
+ * Итог «применить подоконник и высоту окна ко всей секции» (ADR-0048 п. 5).
+ */
+export type CadWindowLevelsApplyRead = {
+    /**
+     * Dry Run
+     */
+    dry_run: boolean;
+    /**
+     * Group Label
+     */
+    group_label: string | null;
+    /**
+     * Head Mm
+     */
+    head_mm: number;
+    /**
+     * Sill Mm
+     */
+    sill_mm: number;
+    /**
+     * Skipped
+     */
+    skipped: Array<CadWindowLevelsSkippedRead>;
+    /**
+     * Updated
+     */
+    updated: number;
+};
+
+/**
+ * CadWindowLevelsSkippedRead
+ *
+ * Лист проекта, которому подоконник и высота окна не достались.
+ */
+export type CadWindowLevelsSkippedRead = {
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Reason
+     */
+    reason: 'no_walls' | 'walls_unreadable' | 'summary_sheet' | 'other_group';
 };
 
 /**
@@ -22881,6 +22956,55 @@ export type RecomputeCadWallsResponses = {
 };
 
 export type RecomputeCadWallsResponse = RecomputeCadWallsResponses[keyof RecomputeCadWallsResponses];
+
+export type ApplyCadWindowLevelsToSectionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: {
+        /**
+         * Dry Run
+         *
+         * Только посчитать листы секции, ничего не записывая
+         */
+        dry_run?: boolean;
+    };
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/window-levels/apply-to-section';
+};
+
+export type ApplyCadWindowLevelsToSectionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ApplyCadWindowLevelsToSectionError = ApplyCadWindowLevelsToSectionErrors[keyof ApplyCadWindowLevelsToSectionErrors];
+
+export type ApplyCadWindowLevelsToSectionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadWindowLevelsApplyRead;
+};
+
+export type ApplyCadWindowLevelsToSectionResponse = ApplyCadWindowLevelsToSectionResponses[keyof ApplyCadWindowLevelsToSectionResponses];
 
 export type StartCadZonesAutoData = {
     body?: never;

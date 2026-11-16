@@ -190,6 +190,30 @@ describe('ConstructionsPanel: высоты листа', () => {
     });
   });
 
+  it('запись высот несёт отметку этажа и пару окна как сохранены, а не сбрасывает их', () => {
+    const data = constructionsRead({
+      sheet_levels: {
+        floor_height_mm: null,
+        slab_thickness_mm: null,
+        door_height_mm: null,
+        floor_elevation_mm: 47600,
+        window_sill_mm: 900,
+        window_head_mm: 2400,
+      },
+    });
+    const p = props({ data });
+    render(<ConstructionsPanel {...p} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить высоты' }));
+    expect(p.onSaveLevels).toHaveBeenCalledWith({
+      floor_elevation_mm: 47600,
+      window_sill_mm: 900,
+      window_head_mm: 2400,
+      floor_height_mm: null,
+      slab_thickness_mm: null,
+      door_height_mm: null,
+    });
+  });
+
   it('значение вне диапазона не отправляется', () => {
     const p = props();
     render(<ConstructionsPanel {...p} />);

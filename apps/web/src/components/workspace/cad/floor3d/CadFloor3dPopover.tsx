@@ -170,7 +170,8 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
   } else if (pick.kind === 'prism' && (pick.category === 'sill' || pick.category === 'glass')) {
     const win = (model.windows ?? []).find((item) => item.opening_id === pick.id);
     if (!win) return null;
-    title = 'Окно по фасаду';
+    const manual = win.source === 'manual';
+    title = manual ? 'Окно по ручному вводу листа' : 'Окно по фасаду';
     const mm = (value: number | null | undefined): string =>
       value === null || value === undefined || !Number.isFinite(value) ? '—' : `${value} мм`;
     const height = Number.isFinite(win.head_mm) && Number.isFinite(win.sill_mm) ? win.head_mm - win.sill_mm : null;
@@ -181,8 +182,27 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
         <Row label="Высота окна" value={mm(height)} />
         <Row label="Низ, м" value={formatMeters(win.sill_z_top_mm)} />
         <Row label="Верх, м" value={formatMeters(win.glass_z_top_mm)} />
-        <Row label="Фасад" value={`${win.facade_title || '—'} (стр. ${win.facade_page_index + 1})`} />
-        <Row label="Статус" value={win.accepted ? 'вид фасада принят' : 'кандидат: вид фасада не принят'} />
+        {manual ? (
+          <>
+            <Row
+              label="Источник"
+              value={`Окно по ручному вводу листа: подоконник ${mm(win.sill_mm)}, верх ${mm(win.head_mm)}`}
+            />
+            <Row label="Статус" value="принято человеком (ввод листа)" />
+          </>
+        ) : (
+          <>
+            <Row
+              label="Фасад"
+              value={`${win.facade_title || '—'} (стр. ${
+                win.facade_page_index === null || win.facade_page_index === undefined
+                  ? '—'
+                  : win.facade_page_index + 1
+              })`}
+            />
+            <Row label="Статус" value={win.accepted ? 'вид фасада принят' : 'кандидат: вид фасада не принят'} />
+          </>
+        )}
         {hostBlock(win.host_id)}
       </>
     );

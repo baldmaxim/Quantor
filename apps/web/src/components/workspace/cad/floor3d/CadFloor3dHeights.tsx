@@ -5,11 +5,13 @@ import type {
   CadProjectLevelsRead,
   CadProjectLevelsWrite,
   CadSheetLevelsWrite,
+  CadWindowLevelsApplyRead,
 } from '@quantor/api-client';
 import { useState, type FC } from 'react';
 
 import { Button } from '@/components/ui';
 import { ClearableInput } from '@/components/ui/ClearableInput';
+import { cadErrorText } from '@/lib/cad/errors';
 import {
   SHEET_LEVEL_SPECS,
   draftOf,
@@ -34,6 +36,10 @@ const valueOf = (heights: CadHeightsRead, key: SheetLevelKey) => {
       return { value: heights.slab_thickness.value_mm, source: heights.slab_thickness.source };
     case 'door_height_mm':
       return { value: heights.door_height.value_mm, source: heights.door_height.source };
+    case 'window_sill_mm':
+      return { value: heights.window_sill.value_mm, source: heights.window_sill.source };
+    case 'window_head_mm':
+      return { value: heights.window_head.value_mm, source: heights.window_head.source };
   }
 };
 
@@ -46,6 +52,7 @@ const placeholderOf = (heights: CadHeightsRead, key: SheetLevelKey): string => {
         : key === 'door_height_mm'
           ? heights.door_height.default_mm
           : null;
+  if (key === 'window_sill_mm' || key === 'window_head_mm') return 'не задано';
   return base === null ? 'не определено' : String(base);
 };
 
@@ -120,14 +127,110 @@ const ProjectSlabView: FC<{ readonly levels: CadProjectLevelsRead }> = ({ levels
   </dl>
 );
 
+interface IWindowSectionProps {
+  /** Подпись секции листа; `null` - у листа нет корпуса или секции. */
+  readonly sectionLabel: string | null;
+  /** Подоконник и высота окна листа сохранены (источник - ввод). */
+  readonly saved: boolean;
+  readonly onPreview: () => Promise<CadWindowLevelsApplyRead>;
+  readonly onApply: () => Promise<CadWindowLevelsApplyRead>;
+}
+
+const skippedText = (result: CadWindowLevelsApplyRead): string =>
+  result.skipped.length > 0 ? ` Пропущено листов: ${result.skipped.length}.` : '';
+
+/**
+ * «Применить ко всей секции»: сервер берёт сохранённые подоконник и высоту окна листа и пишет их
+ * листам того же корпуса и секции. Сначала пробный расчёт - число листов в подтверждении.
+ */
+const WindowSectionApply: FC<IWindowSectionProps> = ({ sectionLabel, saved, onPreview, onApply }) => {
+  const [preview, setPreview] = useState<CadWindowLevelsApplyRead | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const hint =
+    sectionLabel === null
+      ? 'У листа нет корпуса или секции в заголовке плана: значения остаются только на этом листе.'
+      : !saved
+        ? 'Сначала сохраните подоконник и высоту окна листа: к секции применяются сохранённые значения.'
+        : `Секция: ${sectionLabel}. Применяются сохранённые значения листа.`;
+
+  const run = (
+    action: () => Promise<CadWindowLevelsApplyRead>,
+    done: (result: CadWindowLevelsApplyRead) => void,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    action()
+      .then(done)
+      .catch((cause: unknown) => setError(cadErrorText(cause)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="flex min-w-0 flex-col gap-[var(--s-2)]" data-testid="floor3d-window-section">
+      <Button
+        disabled={busy || sectionLabel === null || !saved}
+        aria-describedby="floor3d-window-section-hint"
+        onClick={() => run(onPreview, setPreview)}
+        className="self-start max-md:h-[44px]"
+      >
+        Применить ко всей секции
+      </Button>
+      <p id="floor3d-window-section-hint" className="text-xs text-muted [overflow-wrap:anywhere]">
+        {hint}
+      </p>
+      {preview !== null && (
+        <div role="group" aria-label="Подтверждение" className="flex min-w-0 flex-col gap-[var(--s-2)]">
+          <p className="text-xs [overflow-wrap:anywhere]">
+            Подоконник {preview.sill_mm} мм и высота окна {preview.head_mm} мм будут записаны листам
+            секции ({preview.group_label ?? sectionLabel}). Листов: {preview.updated}.
+            {skippedText(preview)}
+          </p>
+          <div className="flex flex-wrap gap-[var(--s-3)]">
+            <Button
+              disabled={busy}
+              className="max-md:h-[44px]"
+              onClick={() =>
+                run(onApply, (result) => {
+                  setPreview(null);
+                  setMessage(`Применено: листов секции - ${result.updated}.${skippedText(result)}`);
+                })
+              }
+            >
+              Применить к листам: {preview.updated}
+            </Button>
+            <Button disabled={busy} className="max-md:h-[44px]" onClick={() => setPreview(null)}>
+              Отмена
+            </Button>
+          </div>
+        </div>
+      )}
+      {message !== null && (
+        <p role="status" className="text-xs text-success [overflow-wrap:anywhere]">
+          {message}
+        </p>
+      )}
+      {error !== null && (
+        <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+};
+
 interface ISheetFormProps {
   readonly heights: CadHeightsRead;
   readonly saving: boolean;
   readonly onSave: (write: CadSheetLevelsWrite) => void;
+  readonly section?: IWindowSectionProps;
 }
 
 /** Переопределения листа. Пустое поле снимает переопределение; запись несёт все четыре поля. */
-const SheetLevelsForm: FC<ISheetFormProps> = ({ heights, saving, onSave }) => {
+const SheetLevelsForm: FC<ISheetFormProps> = ({ heights, saving, onSave, section }) => {
   const [draft, setDraft] = useState<LevelsDraft>(() => draftOf(sheetOverridesOf(heights)));
   const [error, setError] = useState<string | null>(null);
 
@@ -187,6 +290,7 @@ const SheetLevelsForm: FC<ISheetFormProps> = ({ heights, saving, onSave }) => {
       <Button type="submit" disabled={saving} className="self-start max-md:h-[44px]">
         Сохранить высоты листа
       </Button>
+      {section !== undefined && <WindowSectionApply {...section} />}
     </form>
   );
 };
@@ -279,6 +383,10 @@ interface ICadFloor3dHeightsProps {
   readonly projectSaving: boolean;
   /** Отказ последней записи. */
   readonly error: string | null;
+  /** Подпись секции листа (`null` - корпуса или секции нет); без обработчиков блок секции скрыт. */
+  readonly sectionLabel?: string | null;
+  readonly onPreviewSection?: () => Promise<CadWindowLevelsApplyRead>;
+  readonly onApplySection?: () => Promise<CadWindowLevelsApplyRead>;
   readonly onSaveSheet: (write: CadSheetLevelsWrite) => void;
   readonly onSaveProject: (write: CadProjectLevelsWrite) => void;
 }
@@ -297,6 +405,9 @@ export const CadFloor3dHeights: FC<ICadFloor3dHeightsProps> = ({
   sheetSaving,
   projectSaving,
   error,
+  sectionLabel = null,
+  onPreviewSection,
+  onApplySection,
   onSaveSheet,
   onSaveProject,
 }) => {
@@ -344,6 +455,18 @@ export const CadFloor3dHeights: FC<ICadFloor3dHeightsProps> = ({
             heights={heights}
             saving={sheetSaving}
             onSave={onSaveSheet}
+            section={
+              onPreviewSection !== undefined && onApplySection !== undefined
+                ? {
+                    sectionLabel,
+                    saved:
+                      heights.window_sill.source === 'manual' &&
+                      heights.window_head.source === 'manual',
+                    onPreview: onPreviewSection,
+                    onApply: onApplySection,
+                  }
+                : undefined
+            }
           />
         ) : (
           <SheetLevelsView heights={heights} />

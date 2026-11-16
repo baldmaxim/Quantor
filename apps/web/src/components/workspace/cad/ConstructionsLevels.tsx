@@ -60,7 +60,13 @@ export const ConstructionsLevels: FC<IConstructionsLevelsProps> = ({ data, savin
   const missing = heights.floor_height.value_mm === null;
 
   const submit = () => {
-    const write: CadSheetLevelsWrite = {};
+    // Сервер заменяет высоты листа целиком: поля, которых нет в этой форме (отметка этажа,
+    // подоконник и высота окна), несём как сохранены, иначе запись молча их сбросит.
+    const write: CadSheetLevelsWrite = {
+      floor_elevation_mm: data.sheet_levels.floor_elevation_mm,
+      window_sill_mm: data.sheet_levels.window_sill_mm,
+      window_head_mm: data.sheet_levels.window_head_mm,
+    };
     for (const spec of LEVELS) {
       const value = parse(draft[spec.key], spec.range);
       if (value === undefined) {

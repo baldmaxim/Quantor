@@ -254,6 +254,40 @@ describe('плашка окна по фасаду', () => {
     expect(dialog).toHaveTextContent('вид фасада принят');
   });
 
+  it('окно по ручному вводу: подпись и высоты без строк фасада', () => {
+    mountWindow(
+      floor3dFixture({
+        windows: [
+          windowFixture({
+            source: 'manual',
+            facade_view_key: null,
+            facade_page_index: null,
+            facade_revision_id: null,
+            facade_title: null,
+            axes_checked: false,
+          }),
+        ],
+      }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Окно по ручному вводу листа' });
+    expect(dialog).toHaveTextContent(
+      'Окно по ручному вводу листа: подоконник 900 мм, верх 2000 мм',
+    );
+    expect(dialog).toHaveTextContent('Высота окна: 1100 мм');
+    expect(dialog).toHaveTextContent('принято человеком');
+    expect(dialog).not.toHaveTextContent('Фасад');
+    expect(dialog).not.toHaveTextContent('вид фасада');
+  });
+
+  it('окно по фасаду без номера страницы: «—», не «стр. 1»', () => {
+    mountWindow(
+      floor3dFixture({ windows: [windowFixture({ facade_page_index: null })] }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Окно по фасаду' });
+    expect(dialog).toHaveTextContent('Фасад 1-12 (стр. —)');
+    expect(dialog).not.toHaveTextContent('стр. 1)');
+  });
+
   it('кандидат помечен; неопределённая высота - «—», не 0', () => {
     mountWindow(
       floor3dFixture({
