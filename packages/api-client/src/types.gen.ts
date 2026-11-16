@@ -15479,12 +15479,18 @@ export type SheetPassportExtractSummary = {
 
 /**
  * SheetPassportListOut
+ *
+ * Страница паспортов; `section_marks` - все разделы проекта, а не этой страницы или фильтра.
  */
 export type SheetPassportListOut = {
     /**
      * Items
      */
     items: Array<SheetPassportOut>;
+    /**
+     * Section Marks
+     */
+    section_marks: Array<string>;
     /**
      * Total
      */

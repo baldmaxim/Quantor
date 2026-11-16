@@ -80,8 +80,11 @@ class SheetPassportOut(BaseModel):
 
 
 class SheetPassportListOut(BaseModel):
+    """Страница паспортов; `section_marks` - все разделы проекта, а не этой страницы или фильтра."""
+
     items: list[SheetPassportOut]
     total: int
+    section_marks: list[str]
 
 
 class SheetPassportPatch(BaseModel):

@@ -9,12 +9,7 @@ import {
   useConfirmedCount,
   useSheetPassports,
 } from '@/lib/consistency/sheet-passport-queries';
-import {
-  EMPTY_CELL,
-  PASSPORT_PAGE_SIZE,
-  matchesSearch,
-  sectionMarksOf,
-} from '@/lib/consistency/sheet-passports';
+import { EMPTY_CELL, PASSPORT_PAGE_SIZE, matchesSearch } from '@/lib/consistency/sheet-passports';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 
 import { SheetPassportBulkBar } from './SheetPassportBulkBar';
@@ -44,7 +39,8 @@ export const SheetPassportsView: FC<IViewProps> = ({ projectId }) => {
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<SheetPassportOut | null>(null);
-  // Марки копятся по мере загрузки: после фильтра по разделу список не должен схлопнуться.
+  // Разделы всего проекта отдаёт сервер: страница листов их не ограничивает. Копятся, чтобы
+  // список не пропадал, пока грузится страница с новым фильтром.
   const [knownMarks, setKnownMarks] = useState<readonly string[]>([]);
 
   const list = useSheetPassports(
@@ -56,7 +52,7 @@ export const SheetPassportsView: FC<IViewProps> = ({ projectId }) => {
   const bulk = useBulkPassportStatus(projectId);
 
   const items = list.data?.items ?? noRows;
-  const found = sectionMarksOf(items);
+  const found = list.data?.section_marks ?? [];
   const merged = [...new Set([...knownMarks, ...found, ...(sectionMark ? [sectionMark] : [])])];
   if (merged.length !== knownMarks.length) {
     setKnownMarks(merged);

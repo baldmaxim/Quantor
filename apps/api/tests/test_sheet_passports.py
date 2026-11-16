@@ -430,6 +430,8 @@ async def test_bulk_status_and_filters(
         paged = (await api.get(_url(project_id, "?limit=1&offset=1"))).json()
         assert paged["total"] == 3 and len(paged["items"]) == 1
         assert paged["items"][0]["id"] == items[1]["id"]
+        # Разделы - все разделы проекта, а не только загруженной страницы или фильтра.
+        assert paged["section_marks"] == plans["section_marks"] == ["АР", "ИОС2"]
         assert (await api.get(_url(project_id, "?limit=1001"))).status_code == 422
 
         ids = [i["id"] for i in plans["items"]]
@@ -488,7 +490,11 @@ async def test_foreign_workspace_and_foreign_project_ids_get_404(
                 json={"ids": [item["id"]], "status": "confirmed"},
             )
         ).status_code == 404
-        assert (await api.get(_url(other_project))).json() == {"items": [], "total": 0}
+        assert (await api.get(_url(other_project))).json() == {
+            "items": [],
+            "total": 0,
+            "section_marks": [],
+        }
         # Итог разбора чужого проекта через свой не виден.
         assert (await api.get(_url(other_project, "/extract-summary"))).json() is None
 

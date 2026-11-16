@@ -30725,12 +30725,20 @@
         "type": "object"
       },
       "SheetPassportListOut": {
+        "description": "Страница паспортов; `section_marks` - все разделы проекта, а не этой страницы или фильтра.",
         "properties": {
           "items": {
             "items": {
               "$ref": "#/components/schemas/SheetPassportOut"
             },
             "title": "Items",
+            "type": "array"
+          },
+          "section_marks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Section Marks",
             "type": "array"
           },
           "total": {
@@ -30740,7 +30748,8 @@
         },
         "required": [
           "items",
-          "total"
+          "total",
+          "section_marks"
         ],
         "title": "SheetPassportListOut",
         "type": "object"

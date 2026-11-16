@@ -571,6 +571,17 @@ async def list_passports(
     return items, int(total or 0)
 
 
+async def section_marks(session: AsyncSession, *, project_id: uuid.UUID) -> list[str]:
+    """Разделы всех паспортов проекта: фильтр по разделу не зависит от загруженной страницы."""
+    result = await session.scalars(
+        select(SheetPassport.section_mark)
+        .where(SheetPassport.project_id == project_id, SheetPassport.section_mark.is_not(None))
+        .distinct()
+        .order_by(SheetPassport.section_mark)
+    )
+    return [mark for mark in result.all() if mark]
+
+
 async def get_passport_out(
     session: AsyncSession, *, project_id: uuid.UUID, passport_id: uuid.UUID
 ) -> SheetPassportOut:

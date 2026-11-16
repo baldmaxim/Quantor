@@ -103,7 +103,8 @@ async def list_sheet_passports(
         limit=limit,
         offset=offset,
     )
-    return SheetPassportListOut(items=items, total=total)
+    marks = await sheet_passports.section_marks(session, project_id=project_id)
+    return SheetPassportListOut(items=items, total=total, section_marks=marks)
 
 
 @router.post(

@@ -92,16 +92,5 @@ export const matchesSearch = (row: SheetPassportOut, query: string): boolean => 
   return [row.code, row.title].some((value) => value?.toLowerCase().includes(needle));
 };
 
-/** Марки разделов из строк в порядке появления, без повторов. */
-export const sectionMarksOf = (rows: readonly SheetPassportOut[]): string[] => {
-  const marks = new Set<string>();
-  for (const row of rows) {
-    if (row.section_mark) {
-      marks.add(row.section_mark);
-    }
-  }
-  return [...marks];
-};
-
 export const confirmedCount = (rows: readonly SheetPassportOut[]): number =>
   rows.filter((row) => row.status === 'confirmed').length;

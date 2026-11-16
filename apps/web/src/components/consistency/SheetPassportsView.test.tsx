@@ -38,6 +38,9 @@ const ROWS = [
   }),
 ];
 
+// Разделы всего проекта: КР нет среди строк загруженной страницы.
+const MARKS = ['АР', 'КР'];
+
 const mount = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -57,8 +60,8 @@ describe('Листы комплекта', () => {
       .mockReset()
       .mockImplementation(((options: { query?: { status?: string } }) =>
         options.query?.status === 'confirmed'
-          ? ok({ items: [], total: 4 })
-          : ok({ items: ROWS, total: 2 })) as never);
+          ? ok({ items: [], total: 4, section_marks: MARKS })
+          : ok({ items: ROWS, total: 2, section_marks: MARKS })) as never);
   });
 
   it('пустые значения — прочерк, не 0; у значения метка источника с цитатой', async () => {
@@ -75,6 +78,16 @@ describe('Листы комплекта', () => {
     expect(first.getByText('1–14')).toBeInTheDocument();
     expect(first.getByText('штамп')).toHaveAttribute('title', 'Раздел АР');
     expect(screen.getByText('2 листов, подтверждено 4')).toBeInTheDocument();
+  });
+
+  it('в фильтре «Раздел» все разделы проекта, а не только загруженной страницы', async () => {
+    mount();
+    await screen.findAllByTestId('passport-row');
+    const select = screen.getByRole('combobox', { name: 'Раздел' });
+    const options = within(select)
+      .getAllByRole('option')
+      .map((option) => option.textContent);
+    expect(options).toEqual(['Все', 'АР', 'КР']);
   });
 
   it('поиск по шифру и заголовку работает на клиенте и очищается крестиком', async () => {
