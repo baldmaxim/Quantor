@@ -89,11 +89,26 @@ python -m model_package register-all --package probe_341/qmp_arch --pdf AR2.pdf
 Результат (`placement.json`):
 
 ```json
-{"pdf": "AR2.pdf", "page": 8, "method": "grid_labels",
- "sx": [0.028345, 405.89], "sy": [-0.028347, 890.08], "scale_ratio": 100.0,
- "matched_u": ["1", "3", "…"], "matched_v": ["А", "…"], "resid_mm_max": 3.32, "resid_mm_rms": 1.48,
- "orientation": 0, "ok": true, "reasons": [],
- "affine": [[0.028345, 0.0, 405.89], [0.0, -0.028347, 890.08]], "page_size_pt": [2383.9, 1683.7]}
+{
+  "pdf": "AR2.pdf",
+  "page": 8,
+  "method": "grid_labels",
+  "sx": [0.028345, 405.89],
+  "sy": [-0.028347, 890.08],
+  "scale_ratio": 100.0,
+  "matched_u": ["1", "3", "…"],
+  "matched_v": ["А", "…"],
+  "resid_mm_max": 3.32,
+  "resid_mm_rms": 1.48,
+  "orientation": 0,
+  "ok": true,
+  "reasons": [],
+  "affine": [
+    [0.028345, 0.0, 405.89],
+    [0.0, -0.028347, 890.08]
+  ],
+  "page_size_pt": [2383.9, 1683.7]
+}
 ```
 
 - `лист_pt = a · модель_мм + b`: `sx` — для X модели, `sy` — для Y. При повороте 0/180° X ложится на

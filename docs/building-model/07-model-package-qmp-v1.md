@@ -26,26 +26,38 @@ footprints/<этаж>.json              горизонтальный разре�
 {
   "schema": "quantor.model_package.v1",
   "generated_at": "2026-11-16T09:12:00Z",
-  "generator": {"name": "quantor-model-package", "version": "0.1.0"},
+  "generator": { "name": "quantor-model-package", "version": "0.1.0" },
   "source": {
     "kind": "ifc",
     "authoring": "Autodesk Revit 26.0.10.8 (RUS) - IFC 26.0.10.8",
     "ifc_schema": "IFC2X3",
     "files": [
-      {"name": "KPLSK_UD_PD_R22_ARCH_1 (20260901).ifc", "bytes": 180994048, "sha256": "…", "discipline": "ARCH"}
+      {
+        "name": "KPLSK_UD_PD_R22_ARCH_1 (20260901).ifc",
+        "bytes": 180994048,
+        "sha256": "…",
+        "discipline": "ARCH"
+      }
     ]
   },
-  "units": {"length": "mm"},
+  "units": { "length": "mm" },
   "frame": {
     "axes": "X на восток, Y на север, Z вверх",
     "origin_offset_mm": [0, 0, 159400]
   },
-  "disciplines": [{"code": "ARCH", "name": "Архитектура", "elements": 7106}],
+  "disciplines": [{ "code": "ARCH", "name": "Архитектура", "elements": 7106 }],
   "parts": [
-    {"path": "storeys.json", "kind": "storeys", "bytes": 1200, "sha256": "…"},
-    {"path": "geometry/3k9Jx…__ARCH.glb", "kind": "geometry", "storey_key": "3k9Jx…", "discipline": "ARCH", "bytes": 1490000, "sha256": "…"}
+    { "path": "storeys.json", "kind": "storeys", "bytes": 1200, "sha256": "…" },
+    {
+      "path": "geometry/3k9Jx…__ARCH.glb",
+      "kind": "geometry",
+      "storey_key": "3k9Jx…",
+      "discipline": "ARCH",
+      "bytes": 1490000,
+      "sha256": "…"
+    }
   ],
-  "counts": {"storeys": 12, "elements": 7106, "triangles": 410000, "parts": 38},
+  "counts": { "storeys": 12, "elements": 7106, "triangles": 410000, "parts": 38 },
   "manifest_sha256": "…"
 }
 ```
@@ -75,8 +87,16 @@ footprints/<этаж>.json              горизонтальный разре�
 ## 4. storeys.json
 
 ```json
-[{"storey_key": "3k9Jx…", "name": "C00_3_этаж_основной", "elevation_mm": 10540.0,
-  "height_mm": 4080.0, "elevation_source": "ifc_storey_elevation", "bbox_mm": [-6000, -3400, 52000, 28400]}]
+[
+  {
+    "storey_key": "3k9Jx…",
+    "name": "C00_3_этаж_основной",
+    "elevation_mm": 10540.0,
+    "height_mm": 4080.0,
+    "elevation_source": "ifc_storey_elevation",
+    "bbox_mm": [-6000, -3400, 52000, 28400]
+  }
+]
 ```
 
 - `storey_key` — устойчивый ключ этажа: IfcGlobalId этажа с заменой `$` на `-` (алфавит GlobalId содержит `$`,
@@ -90,8 +110,13 @@ footprints/<этаж>.json              горизонтальный разре�
 ## 5. grids.json
 
 ```json
-{"source": "IfcGrid", "axes": [{"tag": "1", "dir": "U", "p0": [300.0, -3360.0], "p1": [300.0, 27900.0]},
-                              {"tag": "А", "dir": "V", "p0": [-5690.0, 0.0], "p1": [51770.0, 0.0]}]}
+{
+  "source": "IfcGrid",
+  "axes": [
+    { "tag": "1", "dir": "U", "p0": [300.0, -3360.0], "p1": [300.0, 27900.0] },
+    { "tag": "А", "dir": "V", "p0": [-5690.0, 0.0], "p1": [51770.0, 0.0] }
+  ]
+}
 ```
 
 `dir`: `U` — оси, идущие вдоль Y (имеют постоянную X), `V` — вдоль X. Повторяющиеся по этажам сетки сводятся в одну по
@@ -102,9 +127,18 @@ footprints/<этаж>.json              горизонтальный разре�
 Строка — один элемент:
 
 ```json
-{"id": "2Fk…", "category": "wall", "ifc_class": "IfcWallStandardCase", "name": "Стена_200", "type": "Монолит 200",
- "discipline": "ARCH", "storey_key": "3k9Jx…", "bbox_mm": [0, 0, 10540, 6000, 200, 13540],
- "part": "geometry/3k9Jx…__ARCH.glb", "props": {"Pset_WallCommon.FireRating": "EI60"}}
+{
+  "id": "2Fk…",
+  "category": "wall",
+  "ifc_class": "IfcWallStandardCase",
+  "name": "Стена_200",
+  "type": "Монолит 200",
+  "discipline": "ARCH",
+  "storey_key": "3k9Jx…",
+  "bbox_mm": [0, 0, 10540, 6000, 200, 13540],
+  "part": "geometry/3k9Jx…__ARCH.glb",
+  "props": { "Pset_WallCommon.FireRating": "EI60" }
+}
 ```
 
 - `id` — устойчивый ключ элемента (IfcGlobalId как есть, `$` допустим; иначе Revit UniqueId; иначе `файл:ElementId`;
@@ -143,6 +177,7 @@ footprints/<этаж>.json              горизонтальный разре�
 Ошибка отклоняет пакет, предупреждение сохраняется в версии.
 
 Ошибки:
+
 - схема, лишние и пропущенные поля, пути, повторы;
 - размер части, число частей (не больше 2 000), элементов (не больше 500 000), общий размер (не больше 1 ГиБ);
 - sha256 и размер каждой части не совпали с манифестом; `manifest_sha256` не совпал;
@@ -151,6 +186,7 @@ footprints/<этаж>.json              горизонтальный разре�
 - отметки этажей не возрастают.
 
 Предупреждения:
+
 - высота этажа вне 1,5–12 м; габарит этажа вне 5 м–2 км;
 - сетка осей отсутствует или оси расходятся между этажами больше 10 мм;
 - элементов без категории `other` больше половины;
