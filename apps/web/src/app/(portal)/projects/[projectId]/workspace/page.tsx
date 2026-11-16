@@ -32,7 +32,8 @@ import { openablePanels } from '@/components/workspace/cad/WorkspaceCadPipeline'
 import { WorkspacePipelineBadge } from '@/components/workspace/cad/WorkspacePipelineBadge';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
 import { SheetList } from '@/components/workspace/SheetList';
-import { SheetTabs, type ISheetScale, type ISheetTab } from '@/components/workspace/SheetTabs';
+import { DrawingScaleBadge, type IDrawingScale } from '@/components/workspace/DrawingScaleBadge';
+import { SheetTabs, type ISheetTab } from '@/components/workspace/SheetTabs';
 import { TakeoffPanel, type TakeoffGeometry } from '@/components/workspace/TakeoffPanel';
 import { takeoffAccess, type ITakeoffAccess } from '@/components/workspace/takeoff-access';
 import type { NormalizedPoint } from '@/lib/viewer/coordinates';
@@ -607,7 +608,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
     ];
   });
 
-  // Масштаб чертежа над листом. Первым - калибровка человека для обмера; без неё - масштаб вида CAD
+  // Масштаб чертежа в углу листа. Первым - калибровка человека для обмера; без неё - масштаб вида CAD
   // этого листа (калибровка CAD или подбор движком по размерным цепочкам, ADR-0045). Надпись
   // «М 1:100» на чертеже портал не читает (ADR-0018).
   const cadScale =
@@ -615,7 +616,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
       ? cad.side.view.diagnostics.scale
       : null;
   const cadScaleText = cadScale ? formatCadScale(cadScale) : NO_VALUE;
-  const drawingScale: ISheetScale = defaultCalibration
+  const drawingScale: IDrawingScale = defaultCalibration
     ? {
         text: formatScaleFromMmPerPt(Number(defaultCalibration.mm_per_pt)),
         source: 'калибровка листа',
@@ -691,7 +692,6 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 active={activePosition}
                 onActivate={activateTab}
                 onClose={closeTab}
-                scale={drawingScale}
               />
 
               {/* CAD без флага `cad.export` не показывается вовсе (ADR-0036). */}
@@ -1013,6 +1013,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 onViewChange={(state) => setZoomPercent(Math.round(state.scale * 100))}
                 onError={setRenderError}
               />
+              {viewportSheet && <DrawingScaleBadge scale={drawingScale} />}
               {cad.capture && <CadRemarkCapture {...cad.capture} />}
               {cad.zoneCapture && <CadZoneCapture {...cad.zoneCapture} />}
               {cad.zoneEdit && <CadZoneEdit key={cad.zoneEdit.zoneId} {...cad.zoneEdit} />}
