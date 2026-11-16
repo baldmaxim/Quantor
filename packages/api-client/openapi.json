@@ -8754,6 +8754,67 @@
         "title": "CadRevokeCreate",
         "type": "object"
       },
+      "CadRiserCopyRow": {
+        "description": "Итог переноса одной записи источника; порядок строк - порядок записей.",
+        "properties": {
+          "distance_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Mm"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "shaft_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shaft Id"
+          },
+          "source_shaft_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Shaft Id"
+          },
+          "status": {
+            "enum": [
+              "matched",
+              "not_found",
+              "no_shaft",
+              "unverified"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "source_shaft_id",
+          "shaft_id",
+          "status",
+          "distance_mm"
+        ],
+        "title": "CadRiserCopyRow",
+        "type": "object"
+      },
       "CadRiserEntry": {
         "additionalProperties": false,
         "description": "Одна запись реестра; поля - как в файле `risers.json`, который читает генератор.",
@@ -8928,6 +8989,140 @@
           "role"
         ],
         "title": "CadRiserEntry",
+        "type": "object"
+      },
+      "CadRisersCopyOut": {
+        "description": "Черновик копирования реестра с другого листа; ничего не записывается.",
+        "properties": {
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "risers": {
+            "items": {
+              "$ref": "#/components/schemas/CadRiserEntry"
+            },
+            "title": "Risers",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CadRiserCopyRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "shafts": {
+            "enum": [
+              "matched",
+              "unknown"
+            ],
+            "title": "Shafts",
+            "type": "string"
+          },
+          "shift_mm": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shift Mm"
+          },
+          "source_page_index": {
+            "title": "Source Page Index",
+            "type": "integer"
+          },
+          "source_view": {
+            "title": "Source View",
+            "type": "integer"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision_id",
+          "page_index",
+          "view",
+          "source_page_index",
+          "source_view",
+          "risers",
+          "shafts",
+          "shift_mm",
+          "rows"
+        ],
+        "title": "CadRisersCopyOut",
+        "type": "object"
+      },
+      "CadRisersSheetOut": {
+        "description": "Лист ревизии, у которого в реестре есть хотя бы одна запись.",
+        "properties": {
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "risers_count": {
+            "title": "Risers Count",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page_index",
+          "view",
+          "risers_count",
+          "updated_at"
+        ],
+        "title": "CadRisersSheetOut",
+        "type": "object"
+      },
+      "CadRisersSheetsOut": {
+        "properties": {
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "sheets": {
+            "items": {
+              "$ref": "#/components/schemas/CadRisersSheetOut"
+            },
+            "title": "Sheets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "revision_id",
+          "sheets"
+        ],
+        "title": "CadRisersSheetsOut",
         "type": "object"
       },
       "CadRouteJobRead": {
@@ -41132,6 +41327,152 @@
           }
         },
         "summary": "Сохранить реестр стояков листа (заменяется целиком; пустой список - реестра нет)",
+        "tags": [
+          "cad-risers"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/risers/copy": {
+      "get": {
+        "operationId": "draft_cad_risers_copy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "View",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Source Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_view",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Source View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadRisersCopyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Черновик копирования реестра с другого листа: shaft_id переносится по шахтам",
+        "tags": [
+          "cad-risers"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/risers/sheets": {
+      "get": {
+        "operationId": "list_cad_risers_sheets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadRisersSheetsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Листы ревизии с непустым реестром стояков (источники копирования)",
         "tags": [
           "cad-risers"
         ]

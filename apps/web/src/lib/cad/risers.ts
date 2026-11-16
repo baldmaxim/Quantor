@@ -1,5 +1,6 @@
 import type {
   CadRiserEntry,
+  CadRisersCopyOut,
   RiserRole,
   RiserServes,
   RiserSystem,
@@ -352,4 +353,26 @@ export const systemPatch = (draft: IRiserDraft, system: RiserSystem): Partial<IR
   return isAirSystem(system)
     ? { system, dn: '' }
     : { system, channelShape: 'section', sectionA: '', sectionB: '', channelD: '' };
+};
+
+/** Сообщение после копирования реестра с другого листа: что совпало и что проверить. */
+export const copyResultText = (out: CadRisersCopyOut, sourceLabel: string): string => {
+  const head = `Скопировано ${out.risers.length} строк с листа ${sourceLabel}.`;
+  if (out.shafts === 'unknown') {
+    return `${head} Шахты листов не сопоставлены: на одном из листов не построены трассы. Номера шахт оставлены как на листе-источнике — проверьте их. Проверьте и сохраните.`;
+  }
+  const matched = out.rows.filter((row) => row.status === 'matched').length;
+  const [dx, dy] = out.shift_mm ?? [0, 0];
+  const lost = out.rows
+    .filter((row) => row.status === 'not_found')
+    .map((row) => out.risers[row.index]?.mark ?? `строка ${row.index + 1}`);
+  const parts = [
+    head,
+    `Шахты перенесены по положению (сдвиг ${Math.round(dx)}, ${Math.round(dy)} мм): совпало ${matched}.`,
+  ];
+  if (lost.length > 0) {
+    parts.push(`Не найдены на этом листе: ${lost.join(', ')} — шахта очищена, укажите вручную.`);
+  }
+  parts.push('Проверьте и сохраните.');
+  return parts.join(' ');
 };

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Final
+from typing import Annotated, Final, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -183,3 +183,41 @@ class CadSheetRisersOut(BaseModel):
     risers: list[CadRiserEntry]
     # `null` - реестр не вводился.
     updated_at: datetime | None
+
+
+class CadRisersSheetOut(BaseModel):
+    """Лист ревизии, у которого в реестре есть хотя бы одна запись."""
+
+    page_index: int
+    view: int
+    risers_count: int
+    updated_at: datetime
+
+
+class CadRisersSheetsOut(BaseModel):
+    revision_id: UUID
+    sheets: list[CadRisersSheetOut]
+
+
+class CadRiserCopyRow(BaseModel):
+    """Итог переноса одной записи источника; порядок строк - порядок записей."""
+
+    index: int
+    source_shaft_id: str | None
+    shaft_id: str | None
+    status: Literal["matched", "not_found", "no_shaft", "unverified"]
+    distance_mm: int | None
+
+
+class CadRisersCopyOut(BaseModel):
+    """Черновик копирования реестра с другого листа; ничего не записывается."""
+
+    revision_id: UUID
+    page_index: int
+    view: int
+    source_page_index: int
+    source_view: int
+    risers: list[CadRiserEntry]
+    shafts: Literal["matched", "unknown"]
+    shift_mm: tuple[int, int] | None
+    rows: list[CadRiserCopyRow]

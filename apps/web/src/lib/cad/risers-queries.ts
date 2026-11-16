@@ -1,9 +1,13 @@
 'use client';
 
 import {
+  draftCadRisersCopy,
+  listCadRisersSheets,
   putCadSheetRisers,
   readCadSheetRisers,
   type CadRiserEntry,
+  type CadRisersCopyOut,
+  type CadRisersSheetsOut,
   type CadSheetRisersOut,
 } from '@quantor/api-client';
 import {
@@ -34,6 +38,9 @@ export const risersKeys = {
   sheet: (sheet: IRisersSheet) =>
     ['cad', sheet.projectId, sheet.revisionId, 'risers', sheet.pageIndex, sheet.view] as const,
 };
+
+export const risersSheetsKey = (projectId: string, revisionId: string) =>
+  ['cad', projectId, revisionId, 'risers', 'sheets'] as const;
 
 export const sheetOf = (params: ICadViewParams): IRisersSheet => ({
   projectId: params.projectId,
@@ -77,6 +84,51 @@ export const useSaveCadRisers = (
       ),
     onSuccess: (saved) => {
       client.setQueryData(risersKeys.sheet(sheet), saved);
+      // У листа мог появиться реестр: список листов-источников копирования устарел.
+      void client.invalidateQueries({
+        queryKey: risersSheetsKey(sheet.projectId, sheet.revisionId),
+      });
     },
   });
 };
+
+/** Листы ревизии с непустым реестром: источники «Скопировать с другого листа». */
+export const useCadRisersSheets = (
+  projectId: string,
+  revisionId: string,
+): UseQueryResult<CadRisersSheetsOut> =>
+  useQuery({
+    queryKey: risersSheetsKey(projectId, revisionId),
+    queryFn: async () =>
+      unwrap(
+        await listCadRisersSheets({
+          throwOnError: true,
+          path: { project_id: projectId },
+          query: { revision_id: revisionId },
+        }),
+      ),
+  });
+
+export interface IRisersCopySource {
+  readonly pageIndex: number;
+  readonly view: number;
+}
+
+/** Черновик копии реестра с другого листа: ничего не пишет, строки уходят в форму. */
+export const useDraftCadRisersCopy = (
+  sheet: IRisersSheet,
+): UseMutationResult<CadRisersCopyOut, unknown, IRisersCopySource> =>
+  useMutation({
+    mutationFn: async (source) =>
+      unwrap(
+        await draftCadRisersCopy({
+          throwOnError: true,
+          path: { project_id: sheet.projectId },
+          query: {
+            ...queryOf(sheet),
+            source_page_index: source.pageIndex,
+            source_view: source.view,
+          },
+        }),
+      ),
+  });

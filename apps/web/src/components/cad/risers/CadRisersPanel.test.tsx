@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   readCadSheetRisers: vi.fn(),
   putCadSheetRisers: vi.fn(),
+  listCadRisersSheets: vi.fn(async () => ({ data: { revision_id: 'r1', sheets: [] } })),
+  readCadPipeline: vi.fn(async () => ({ data: { revision_id: 'r1', sheets: [] } })),
 }));
 
 vi.mock('@quantor/api-client', async (importOriginal) => ({

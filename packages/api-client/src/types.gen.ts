@@ -4147,6 +4147,34 @@ export type CadRevokeCreate = {
 };
 
 /**
+ * CadRiserCopyRow
+ *
+ * Итог переноса одной записи источника; порядок строк - порядок записей.
+ */
+export type CadRiserCopyRow = {
+    /**
+     * Distance Mm
+     */
+    distance_mm: number | null;
+    /**
+     * Index
+     */
+    index: number;
+    /**
+     * Shaft Id
+     */
+    shaft_id: string | null;
+    /**
+     * Source Shaft Id
+     */
+    source_shaft_id: string | null;
+    /**
+     * Status
+     */
+    status: 'matched' | 'not_found' | 'no_shaft' | 'unverified';
+};
+
+/**
  * CadRiserEntry
  *
  * Одна запись реестра; поля - как в файле `risers.json`, который читает генератор.
@@ -4202,6 +4230,91 @@ export type CadRiserEntry = {
     source?: string | null;
     system: RiserSystem;
     valve?: RiserValve | null;
+};
+
+/**
+ * CadRisersCopyOut
+ *
+ * Черновик копирования реестра с другого листа; ничего не записывается.
+ */
+export type CadRisersCopyOut = {
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Risers
+     */
+    risers: Array<CadRiserEntry>;
+    /**
+     * Rows
+     */
+    rows: Array<CadRiserCopyRow>;
+    /**
+     * Shafts
+     */
+    shafts: 'matched' | 'unknown';
+    /**
+     * Shift Mm
+     */
+    shift_mm: [
+        number,
+        number
+    ] | null;
+    /**
+     * Source Page Index
+     */
+    source_page_index: number;
+    /**
+     * Source View
+     */
+    source_view: number;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadRisersSheetOut
+ *
+ * Лист ревизии, у которого в реестре есть хотя бы одна запись.
+ */
+export type CadRisersSheetOut = {
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Risers Count
+     */
+    risers_count: number;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * CadRisersSheetsOut
+ */
+export type CadRisersSheetsOut = {
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Sheets
+     */
+    sheets: Array<CadRisersSheetOut>;
 };
 
 /**
@@ -21462,6 +21575,92 @@ export type PutCadSheetRisersResponses = {
 };
 
 export type PutCadSheetRisersResponse = PutCadSheetRisersResponses[keyof PutCadSheetRisersResponses];
+
+export type DraftCadRisersCopyData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+        /**
+         * Source Page Index
+         */
+        source_page_index: number;
+        /**
+         * Source View
+         */
+        source_view: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/risers/copy';
+};
+
+export type DraftCadRisersCopyErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DraftCadRisersCopyError = DraftCadRisersCopyErrors[keyof DraftCadRisersCopyErrors];
+
+export type DraftCadRisersCopyResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadRisersCopyOut;
+};
+
+export type DraftCadRisersCopyResponse = DraftCadRisersCopyResponses[keyof DraftCadRisersCopyResponses];
+
+export type ListCadRisersSheetsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+    };
+    url: '/api/v1/projects/{project_id}/cad/risers/sheets';
+};
+
+export type ListCadRisersSheetsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCadRisersSheetsError = ListCadRisersSheetsErrors[keyof ListCadRisersSheetsErrors];
+
+export type ListCadRisersSheetsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadRisersSheetsOut;
+};
+
+export type ListCadRisersSheetsResponse = ListCadRisersSheetsResponses[keyof ListCadRisersSheetsResponses];
 
 export type ReadCadSectionsData = {
     body?: never;
