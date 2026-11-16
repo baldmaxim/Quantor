@@ -1,6 +1,6 @@
 """Обмен расчётами с TENDER: токены, выпуски базы объекта, репозитории расчётов и версии
 
-Revision ID: 0042_tender_exchange
+Revision ID: 0043_tender_exchange
 Revises: 0040_cad_facade_views
 Create Date: 2026-11-16
 
@@ -21,8 +21,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pg
 
-revision: str = "0042_tender_exchange"
-down_revision: str | None = "0040_cad_facade_views"
+revision: str = "0043_tender_exchange"
+down_revision: str | None = "0042_sheet_window_levels"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

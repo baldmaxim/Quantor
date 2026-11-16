@@ -52,7 +52,7 @@
 ## Последствия
 
 - Новые таблицы: `api_tokens`, `tender_base_releases`, `tender_calcs`, `tender_calc_versions`
-  (миграция `0042_tender_exchange`).
+  (миграция `0043_tender_exchange`).
 - TENDER: папка `Работа/Quantor/` (базы, образцы, навык `quantor-obmen`), в навыки `raschet-*` и
   `raschet-eom` — раздел «Выгрузка в Quantor».
 - Пакет промтов — `_prompts/tender_calc_exchange/`.
