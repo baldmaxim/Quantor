@@ -85,6 +85,36 @@ describe('WorkspaceCadPipeline', () => {
     expect(stub).toHaveTextContent('заново conv-7');
   });
 
+  it('идёт новый прогон CAD: под шагом «обновляется», второго «заново» нет', () => {
+    mount(
+      pipelineOfSheet(
+        pipelineSheet({
+          convert: stage({ job_id: 'conv-7' }),
+          update: stage({ job_id: 'conv-8', status: 'running', progress: 0.2, finished_at: null }),
+        }),
+      ),
+    );
+    const item = screen.getAllByRole('listitem')[1];
+    expect(item).toContainElement(screen.getByTestId('pipeline-convert-update'));
+    expect(item).toHaveTextContent('обновляется');
+    expect(screen.queryByTestId('convert-stub')).toBeNull();
+  });
+
+  it('новый прогон CAD упал: причина под шагом, «заново» остаётся', () => {
+    mount(
+      pipelineOfSheet(
+        pipelineSheet({
+          convert: stage({ job_id: 'conv-7' }),
+          update: stage({ job_id: 'conv-8', status: 'failed', error_code: 'CAD_ENGINE_FAILED' }),
+        }),
+      ),
+    );
+    const item = screen.getAllByRole('listitem')[1];
+    expect(item).toHaveTextContent('обновление не удалось');
+    expect(item).toHaveTextContent('Движок CAD не выдал проверенный результат.');
+    expect(screen.getByTestId('convert-stub')).toHaveTextContent('заново conv-7');
+  });
+
   it('преобразования не было: обычный запуск, режима «заново» нет', () => {
     mount(pipelineOfSheet(pipelineSheet({ convert: null, views: [] })));
     expect(screen.getByTestId('convert-stub')).toHaveTextContent('запуск листа 2');

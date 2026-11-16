@@ -62,6 +62,25 @@ describe('useWorkspaceCadPipeline', () => {
     expect(hook.result.current.steps[0]).toMatchObject({ key: 'calibration', state: 'todo' });
   });
 
+  it('новый прогон CAD: бейдж «CAD обновляется», его конец сбрасывает холст и задания', async () => {
+    const updating = pipelineSheet({
+      convert: stage({ job_id: 'c1' }),
+      update: stage({ job_id: 'c2', status: 'running', progress: 0.1, finished_at: null }),
+    });
+    mocks.pipeline.mockResolvedValueOnce({ data: read([updating]) });
+    const { hook, invalidate } = setup();
+    await waitFor(() => expect(hook.result.current.sheet).not.toBeNull());
+    expect(hook.result.current.summary).toEqual({ tone: 'accent', label: 'CAD обновляется' });
+    expect(keysOf(invalidate)).not.toContainEqual(['cad-view']);
+
+    mocks.pipeline.mockResolvedValueOnce({ data: read([pipelineSheet({ convert: stage({ job_id: 'c2' }) })]) });
+    await act(async () => {
+      await hook.result.current.refetch();
+    });
+    await waitFor(() => expect(keysOf(invalidate)).toContainEqual(['cad-view']));
+    expect(hook.result.current.summary?.label).not.toBe('CAD обновляется');
+  });
+
   it('конструкции закончились: сбрасываются конструкции, 3D и конвейер', async () => {
     mocks.pipeline.mockResolvedValueOnce({ data: read([running]) });
     const { hook, invalidate } = setup();

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { building3dKeys } from '@/lib/cad/building3d-queries';
 import { cadErrorText } from '@/lib/cad/errors';
 import {
+  isUpdateActive,
   sheetSteps,
   sheetSummary,
   type IPipelineStep,
@@ -63,6 +64,9 @@ interface IStageSnapshot {
 
 const NO_SHEETS: readonly CadPipelineSheetRead[] = [];
 
+/** Итог листа, пока идёт новый прогон CAD поверх готового результата. */
+export const UPDATING_SUMMARY: IPipelineSummary = { tone: 'accent', label: 'CAD обновляется' };
+
 const isActive = (stage: CadPipelineStageRead): boolean =>
   stage.status === 'queued' || stage.status === 'running';
 
@@ -75,6 +79,8 @@ const snapshotOf = (sheet: CadPipelineSheetRead): Map<string, IStageSnapshot> =>
     }
   };
   put('convert', 'convert', sheet.convert);
+  // Конец нового прогона CAD сбрасывает холст и задания так же, как конец первого.
+  put('update', 'convert', sheet.update ?? null);
   for (const view of sheet.views) {
     const at = `${view.page}:${view.view}`;
     put(`walls:${at}`, 'walls', view.walls);
@@ -163,7 +169,11 @@ export const useWorkspaceCadPipeline = ({
       views: [],
     });
   }, [sheet, pageIndex, data]);
-  const summary = useMemo(() => (sheet ? sheetSummary(sheet) : null), [sheet]);
+  // Новый прогон CAD поверх готового листа виден в бейдже сразу, а не только по его окончании.
+  const summary = useMemo<IPipelineSummary | null>(() => {
+    if (sheet === null) return null;
+    return isUpdateActive(sheet) ? UPDATING_SUMMARY : sheetSummary(sheet);
+  }, [sheet]);
 
   // Предыдущий снимок этапов листа: переход «идёт -> закончился» сбрасывает связанные запросы.
   const previous = useRef<{ page: number | null; stages: Map<string, IStageSnapshot> } | null>(null);

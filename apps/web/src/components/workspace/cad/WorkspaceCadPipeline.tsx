@@ -5,7 +5,12 @@ import type { FC } from 'react';
 
 import { Button, Skeleton } from '@/components/ui';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
-import type { IPipelineStep, PipelineStepKey } from '@/lib/cad/pipeline';
+import {
+  isUpdateActive,
+  sheetUpdateBadge,
+  type IPipelineStep,
+  type PipelineStepKey,
+} from '@/lib/cad/pipeline';
 import {
   PIPELINE_STATE_GLYPHS,
   PIPELINE_STATE_TONES,
@@ -123,7 +128,9 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
 
   const action = (key: PipelineStepKey, state: IPipelineStep['state']) => {
     // Лист уже преобразован: повторный запуск (после обновления движка) - вторичное действие.
+    // Пока новый прогон идёт, второй не предлагается.
     if (key === 'convert' && state === 'done' && next?.key !== 'convert' && convert) {
+      if (sheet && isUpdateActive(sheet)) return null;
       return (
         <WorkspaceCadConvert
           key={convert.pageIndex}
@@ -199,6 +206,8 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
   };
 
   const floorTitle = formatFloorTitle(sheet?.floor_title, '');
+  // Новый прогон CAD поверх готового листа: шаг остаётся «готово» по прежнему результату.
+  const update = sheet ? sheetUpdateBadge(sheet) : null;
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-5)]" data-testid="workspace-cad-pipeline">
@@ -231,6 +240,15 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
                 <span className="text-sm font-medium">{step.label}</span>
                 <span className={`text-xs ${tone}`}>{PIPELINE_STATE_WORDS[step.state]}</span>
               </div>
+              {step.key === 'convert' && update && (
+                <p
+                  role="status"
+                  data-testid="pipeline-convert-update"
+                  className={`m-0 pl-[calc(1.25em+var(--s-3))] text-xs [overflow-wrap:anywhere] ${TONE_TEXT[update.tone]}`}
+                >
+                  {update.label}: {update.hint}
+                </p>
+              )}
               {position && (
                 <p
                   data-testid="pipeline-queue-position"
