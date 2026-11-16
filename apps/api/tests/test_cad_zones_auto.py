@@ -749,6 +749,8 @@ async def test_pipeline_gives_floor_title_from_the_last_successful_walls(
             "section": "3",
             "floors": ["14"],
             "text": "Корпус 9. Секция 3. План 14 этажа",
+            "kind": None,
+            "marks_mm": [],
         }
 
         # Итог без заголовка (старое задание или заголовок не найден) - null, не ошибка.
