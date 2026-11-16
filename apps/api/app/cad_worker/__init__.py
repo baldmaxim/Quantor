@@ -24,8 +24,8 @@ from app.cad_worker.facades_handler import execute_cad_facades
 from app.cad_worker.floor3d_dxf_handler import execute_cad_floor3d_dxf
 from app.cad_worker.handler import execute_cad_pdf_convert
 from app.cad_worker.mep_handler import execute_cad_mep_route
-from app.cad_worker.outline_review import execute_outline_review
 from app.cad_worker.model_handler import execute_model_ifc_import
+from app.cad_worker.outline_review import execute_outline_review
 from app.cad_worker.sections_handler import execute_cad_sections
 from app.cad_worker.style_preview_handler import execute_cad_style_preview
 from app.cad_worker.walls_handler import execute_cad_walls
