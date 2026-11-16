@@ -127,6 +127,14 @@ CORE_PIN_FLOORS: Final = 3
 # контура основы (доля вершин, с допуском у границы) и здание не ложится на поставленные.
 CORE_RESERVE_INSIDE: Final = 0.9
 CORE_RESERVE_EDGE_MM: Final = 2000.0
+# Отсев мест перед сравнением с вторым вариантом (резерв по ядрам): место отбрасывается, если контур
+# здания там ложится на этажи поставленных зданий на одной отметке или выходит за контур плиты
+# основы больше чем на пятую часть своей площади. Пятая часть - допуск на неточность контуров
+# листов и на выступы (лоджии, входные группы), которые у соседних зданий заходят друг на друга;
+# ложное место ядер обычно занимает чужое здание целиком или лежит вне подземки. Башня на
+# стилобате (контур внутри контура стилобата) - не наложение: у них разные отметки этажей.
+CORE_VARIANT_MAX_OVERLAP: Final = 0.2
+CORE_VARIANT_MAX_OUTSIDE: Final = 0.2
 
 Point = tuple[float, float]
 
@@ -1688,12 +1696,212 @@ def _site_clash(first: Sequence[SiteLevel], second: Sequence[SiteLevel]) -> bool
 
 @dataclass(frozen=True, slots=True)
 class _Reserve:
-    """Итог резерва по ядрам: принятая опора (`key`, `pin`) и причины отказа по зданиям."""
+    """Итог резерва по ядрам: принятая опора (`key`, `pin`) и причины отказа по зданиям.
+
+    `review` - пометка «на проверку» для посадки по согласию этажей или после отсева мест; у
+    обычного резерва - `None`.
+    """
 
     key: str | None
     pin: cad_site_cores.CoreMatch | None
     notes: dict[str, str]
     tried: dict[str, cad_site_cores.CoreMatch]
+    review: str | None = None
+
+
+# Этаж здания для отсева мест: отметка и контур (в системе здания либо объекта).
+_LevelOutline = tuple[int, list[Point]]
+
+
+@dataclass(frozen=True, slots=True)
+class _Footprint:
+    """Контур здания для отсева мест (в системе здания): выборка точек площади самого большого
+    этажа, её центр и выборки точек этажей с известной отметкой."""
+
+    samples: tuple[Point, ...]
+    centre: Point
+    levels: tuple[tuple[int, tuple[Point, ...]], ...]
+
+
+def _group_outlines(
+    aligned: Sequence[CadBuilding3dFloorRead], key: str
+) -> list[CadBuilding3dFloorRead]:
+    """Этажи здания с контуром; совмещённые по осям в приоритете (остальные лежат где попало)."""
+    floors = [f for f in aligned if f.group_key == key and len(f.outline) >= 3]
+    return [f for f in floors if f.alignment != "none"] or floors
+
+
+def _footprint(aligned: Sequence[CadBuilding3dFloorRead], key: str) -> _Footprint | None:
+    floors = _group_outlines(aligned, key)
+    if not floors:
+        return None
+    biggest = max(floors, key=lambda f: (_polygon_area(f.outline), f.label))
+    samples = cad_site_cores.area_samples(biggest.outline)
+    if not samples:
+        return None
+    centre = (
+        sum(x for x, _ in samples) / len(samples),
+        sum(y for _, y in samples) / len(samples),
+    )
+    levels: dict[int, tuple[Point, ...]] = {}
+    for floor in sorted(floors, key=lambda f: (f.base_z_mm, f.label)):
+        if floor.elevation_known and floor.base_z_mm not in levels:
+            own = cad_site_cores.area_samples(floor.outline)
+            levels[floor.base_z_mm] = tuple(own[:: max(1, len(own) // 250)])
+    return _Footprint(tuple(samples), centre, tuple(levels.items()))
+
+
+def _polygon_area(outline: Sequence[Sequence[float]]) -> float:
+    total = 0.0
+    for i, (x0, y0) in enumerate(outline):
+        x1, y1 = outline[(i + 1) % len(outline)]
+        total += x0 * y1 - x1 * y0
+    return abs(total) / 2
+
+
+def _placed_outlines(
+    aligned: Sequence[CadBuilding3dFloorRead], placed: dict[str, GroupPlacement]
+) -> list[_LevelOutline]:
+    """Контуры этажей поставленных зданий (кроме основы) в системе объекта, по ключу здания."""
+    outlines: list[_LevelOutline] = []
+    for key in sorted(placed):
+        p = placed[key]
+        if p.placement == "reference":
+            continue
+        for floor in _group_outlines(aligned, key):
+            if floor.elevation_known:
+                outlines.append(
+                    (
+                        floor.base_z_mm,
+                        [
+                            cad_site_cores.transform_point(x, y, p.rotation_deg, *p.offset_mm)
+                            for x, y in floor.outline
+                        ],
+                    )
+                )
+    return outlines
+
+
+def _variant_verdict(
+    variant: cad_site_cores.CoreVariant,
+    footprint: _Footprint,
+    taken: Sequence[_LevelOutline],
+    base_outline: Sequence[Sequence[float]],
+) -> str | None:
+    """Почему место отсеивается; годится - `None`.
+
+    `outside` - контур вне плиты основы больше `CORE_VARIANT_MAX_OUTSIDE`; `taken` - на какой-то
+    отметке контур ложится на этажи поставленных зданий больше `CORE_VARIANT_MAX_OVERLAP`
+    (на разных отметках здания делят место: башня на стилобате).
+    """
+
+    def moved(samples: Sequence[Point]) -> list[Point]:
+        return [
+            cad_site_cores.transform_point(x, y, variant.rotation_deg, variant.tx, variant.ty)
+            for x, y in samples
+        ]
+
+    outside = 1.0 - cad_site_cores.covered_share(moved(footprint.samples), [base_outline])
+    if outside > CORE_VARIANT_MAX_OUTSIDE:
+        return "outside"
+    for z, samples in footprint.levels:
+        same = [o for zz, o in taken if abs(zz - z) <= SITE_SAME_LEVEL_MM]
+        if same and cad_site_cores.covered_share(moved(samples), same) > CORE_VARIANT_MAX_OVERLAP:
+            return "taken"
+    return None
+
+
+def _floor_choice(
+    floor: int,
+    match: cad_site_cores.CoreMatch,
+    footprint: _Footprint,
+    taken: Sequence[_LevelOutline],
+    base_outline: Sequence[Sequence[float]],
+    verdicts: dict[tuple[float, float, float], str | None],
+) -> tuple[cad_site_cores.FloorChoice | None, dict[str, int]]:
+    """Лучшее место этажа среди не отсеянных и сколько мест отсеяно по причинам."""
+    dropped = {"taken": 0, "outside": 0}
+    kept: list[cad_site_cores.CoreVariant] = []
+    for variant in sorted(match.variants, key=lambda v: -v.share):
+        mark = (variant.rotation_deg, variant.tx, variant.ty)
+        if mark not in verdicts:
+            verdicts[mark] = _variant_verdict(variant, footprint, taken, base_outline)
+        reason = verdicts[mark]
+        if reason is None:
+            kept.append(variant)
+        else:
+            dropped[reason] += 1
+    if not kept:
+        return None, dropped
+    best = kept[0]
+    second = cad_site_cores.second_share(best, kept)
+    return (
+        cad_site_cores.FloorChoice(floor, match, best, second, sum(dropped.values())),
+        dropped,
+    )
+
+
+def _review_note(decision: cad_site_cores.Decision, dropped: dict[str, int]) -> str:
+    """Пометка «на проверку» с числами: сколько этажей согласны, доля, отрыв до и после отсева."""
+    choice = decision.choice
+    before = choice.match.second_share
+    gap = (
+        f"у другого места {choice.second:.0%} (до отсева {before:.0%}; отсеяно мест: "
+        f"{dropped['taken']} на занятых зданиями, {dropped['outside']} вне плиты подземки)"
+    )
+    if decision.kind == "agreement":
+        return (
+            f"на проверку: посадка по согласию этажей, {decision.agreed} из {decision.floors} "
+            f"этажей независимо дали одно место; совпадение {choice.best.share:.0%}, {gap}"
+        )
+    return (
+        f"на проверку: посадка после отсева конкурентов; совпадение {choice.best.share:.0%}, {gap}"
+    )
+
+
+def _reserve_place_note(
+    key: str,
+    best: cad_site_cores.CoreVariant,
+    matched: int,
+    second: float,
+    aligned: Sequence[CadBuilding3dFloorRead],
+    infos: dict[str, _GroupInfo],
+    placed: dict[str, GroupPlacement],
+    base_outline: Sequence[Sequence[float]],
+) -> str | None:
+    """Проверки резерва по месту: контур в пределах основы и нет наложения на поставленные здания
+    на той же отметке. Прошло - `None`, иначе причина отказа."""
+    # Контур здания: этаж, давший совмещение, и совмещённые с ним по осям этажи группы.
+    together = aligned[matched].alignment != "none"
+    points = [
+        cad_site_cores.transform_point(x, y, best.rotation_deg, best.tx, best.ty)
+        for i, floor in enumerate(aligned)
+        if i == matched or (together and floor.group_key == key and floor.alignment != "none")
+        for x, y in floor.outline
+    ]
+    inside = cad_site_cores.inside_share(points, base_outline, CORE_RESERVE_EDGE_MM)
+    if inside < CORE_RESERVE_INSIDE:
+        return (
+            f"совпадение по ядрам {best.share:.0%} (у другого варианта "
+            f"{second:.0%}) не принято: контур здания выходит за контур основы "
+            f"({inside:.0%} внутри)"
+        )
+    levels = _site_levels(infos[key], best.rotation_deg, (best.tx, best.ty))
+    clash = next(
+        (
+            k
+            for k, p in sorted(placed.items())
+            if _site_clash(_site_levels(infos[k], p.rotation_deg, p.offset_mm), levels)
+        ),
+        None,
+    )
+    if clash is not None:
+        return (
+            f"совпадение по ядрам {best.share:.0%} (у другого варианта "
+            f"{second:.0%}) не принято: здание ложится на «{infos[clash].label}» "
+            "на той же отметке"
+        )
+    return None
 
 
 def _reserve_pin(
@@ -1711,9 +1919,15 @@ def _reserve_pin(
     с большим отрывом от второго варианта), контур совмещённых этажей здания лежит в пределах
     контура основы и здание не ложится на уже поставленные на той же отметке. Одна доля ядер для
     башни ничего не значит: её ядро похоже на многие места подземки.
+
+    Если так не встало ни одно здание, остальные пробуются по убыванию доли (`_reserve_choose`):
+    места, занятые поставленными зданиями или лежащие вне плиты основы, отсеиваются, и здание
+    встаёт, когда его этажи независимо дали одно место либо после отсева появился отрыв. Такая
+    посадка принимается с пометкой «на проверку».
     """
     notes: dict[str, str] = {}
     tried: dict[str, cad_site_cores.CoreMatch] = {}
+    matches: dict[str, list[tuple[int, cad_site_cores.CoreMatch]]] = {}
     sizes = {
         key: max((_floor_area_m2(f) for f in aligned if f.group_key == key), default=0)
         for key in infos
@@ -1725,45 +1939,83 @@ def _reserve_pin(
             found = _register_cached(site, rings)
             if found is None:
                 continue
+            matches.setdefault(key, []).append((index, found))
             if key not in tried or found.share > tried[key].share:
                 tried[key] = found
             if found.reserve and (best is None or found.share > best.share):
                 best, matched = found, index
         if best is None:
             continue
-        # Контур здания: этаж, давший совмещение, и совмещённые с ним по осям этажи группы.
-        together = aligned[matched].alignment != "none"
-        points = [
-            cad_site_cores.transform_point(x, y, best.rotation_deg, best.tx, best.ty)
-            for i, floor in enumerate(aligned)
-            if i == matched or (together and floor.group_key == key and floor.alignment != "none")
-            for x, y in floor.outline
-        ]
-        inside = cad_site_cores.inside_share(points, base_outline, CORE_RESERVE_EDGE_MM)
-        if inside < CORE_RESERVE_INSIDE:
-            notes[key] = (
-                f"совпадение по ядрам {best.share:.0%} (у другого варианта "
-                f"{best.second_share:.0%}) не принято: контур здания выходит за контур основы "
-                f"({inside:.0%} внутри)"
-            )
-            continue
-        levels = _site_levels(infos[key], best.rotation_deg, (best.tx, best.ty))
-        clash = next(
-            (
-                k
-                for k, p in placed.items()
-                if _site_clash(_site_levels(infos[k], p.rotation_deg, p.offset_mm), levels)
-            ),
-            None,
+        note = _reserve_place_note(
+            key,
+            cad_site_cores.CoreVariant(best.rotation_deg, best.tx, best.ty, best.share),
+            matched,
+            best.second_share,
+            aligned,
+            infos,
+            placed,
+            base_outline,
         )
-        if clash is not None:
-            notes[key] = (
-                f"совпадение по ядрам {best.share:.0%} (у другого варианта "
-                f"{best.second_share:.0%}) не принято: здание ложится на «{infos[clash].label}» "
-                "на той же отметке"
-            )
+        if note is not None:
+            notes[key] = note
             continue
         return _Reserve(key, best, notes, tried)
+    return _reserve_choose(aligned, infos, placed, base_outline, matches, notes, tried)
+
+
+def _reserve_choose(
+    aligned: Sequence[CadBuilding3dFloorRead],
+    infos: dict[str, _GroupInfo],
+    placed: dict[str, GroupPlacement],
+    base_outline: Sequence[Sequence[float]],
+    matches: dict[str, list[tuple[int, cad_site_cores.CoreMatch]]],
+    notes: dict[str, str],
+    tried: dict[str, cad_site_cores.CoreMatch],
+) -> _Reserve:
+    """Вторая очередь резерва: согласие этажей и отсев мест (`cad_site_cores.choose`)."""
+    taken = _placed_outlines(aligned, placed)
+    rows: list[tuple[float, str, cad_site_cores.Decision, dict[str, int]]] = []
+    for key in sorted(matches):
+        footprint = _footprint(aligned, key)
+        if footprint is None:
+            continue
+        verdicts: dict[tuple[float, float, float], str | None] = {}
+        choices: list[cad_site_cores.FloorChoice] = []
+        dropped: dict[int, dict[str, int]] = {}
+        for index, match in matches[key]:
+            choice, lost = _floor_choice(index, match, footprint, taken, base_outline, verdicts)
+            if choice is not None:
+                choices.append(choice)
+                dropped[index] = lost
+        decision = cad_site_cores.choose(choices, footprint.centre)
+        if decision is not None:
+            rows.append((decision.choice.best.share, key, decision, dropped[decision.choice.floor]))
+    # Порядок посадки не зависит от обхода словарей: по убыванию доли, затем по ключу.
+    for _share, key, decision, lost in sorted(rows, key=lambda r: (-r[0], r[1])):
+        choice = decision.choice
+        note = _reserve_place_note(
+            key,
+            choice.best,
+            choice.floor,
+            choice.second,
+            aligned,
+            infos,
+            placed,
+            base_outline,
+        )
+        if note is not None:
+            notes[key] = note
+            continue
+        pin = cad_site_cores.CoreMatch(
+            choice.best.rotation_deg,
+            choice.best.tx,
+            choice.best.ty,
+            choice.best.share,
+            choice.second,
+            False,
+            choice.match.variants,
+        )
+        return _Reserve(key, pin, notes, tried, _review_note(decision, lost))
     return _Reserve(None, None, notes, tried)
 
 
@@ -1826,13 +2078,13 @@ def place_site(
     }
     hops: dict[str, int] = {base_key: 0}
 
-    def pin_group(key: str, pin: cad_site_cores.CoreMatch) -> None:
+    def pin_group(key: str, pin: cad_site_cores.CoreMatch, review: str | None = None) -> None:
         placed[key] = GroupPlacement(
             "cores",
             (pin.tx, pin.ty),
             (),
             base_key,
-            None,
+            review,
             key,
             pin.rotation_deg,
             round(pin.share, 3),
@@ -1841,14 +2093,17 @@ def place_site(
 
     base_outline = aligned[biggest].outline
     reserve_notes: dict[str, str] = {}
+    reviews: dict[str, str] = {}
     if not pins:
         first = _reserve_pin(items, aligned, infos, placed, site, base_outline)
         if first.key is None or first.pin is None:
             return place_by_cores(items, aligned, place_groups(items, aligned))
         pins[first.key] = first.pin
+        if first.review is not None:
+            reviews[first.key] = first.review
     links = _axis_links(infos)
     for key, pin in pins.items():
-        pin_group(key, pin)
+        pin_group(key, pin, reviews.get(key))
     rejected: dict[str, str] = {}
     while True:
         if _attach_by_axes(infos, keys, links, placed, hops, rejected):
@@ -1861,7 +2116,7 @@ def place_site(
                 tried[key] = found
         if reserve.key is None or reserve.pin is None:
             break
-        pin_group(reserve.key, reserve.pin)
+        pin_group(reserve.key, reserve.pin, reserve.review)
     base_label = infos[base_key].label
     for key in keys:
         if key in placed:

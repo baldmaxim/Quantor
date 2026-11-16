@@ -422,6 +422,17 @@ def build_stack(built: Sequence[b3d.BuiltFloor]) -> Stack:
     return Stack(floors, b3d.build_groups(floors, placements), kept, real, superseded)
 
 
+def review_warnings(groups: Sequence[CadBuilding3dGroupRead]) -> list[CadBuilding3dWarningRead]:
+    """Предупреждения о посадке по ядрам «на проверку» (согласие этажей, отсев мест)."""
+    return [
+        CadBuilding3dWarningRead(
+            code="group_placement_review", message=f"{g.label}: {g.placement_message}"
+        )
+        for g in groups
+        if g.placement == "cores" and g.placement_message
+    ]
+
+
 # --------------------------------------------------------------------------- планов нет в 3D
 
 
@@ -630,6 +641,7 @@ async def build_building3d(
                 f"{', '.join(lost)}. В виде «Весь объект» они показаны отдельным блоком.",
             )
         )
+    warnings.extend(review_warnings(stack.groups))
     warnings.extend(missing)
     return CadBuilding3dRead(
         units="mm",

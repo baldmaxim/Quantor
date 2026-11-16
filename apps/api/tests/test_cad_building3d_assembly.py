@@ -10,6 +10,7 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contracts.cad_building3d import CadBuilding3dGroupRead
 from app.contracts.cad_constructions import WallsDocument
 from app.domain import JobStatus, JobType
 from app.models import Job
@@ -497,3 +498,34 @@ def test_convert_failure_code_comes_from_the_view_then_from_the_job() -> None:
     assert assembly._convert_failure(convert_job([{"view": 1, "status": "passed"}]), 9) == (
         "succeeded"
     )
+
+
+def test_review_placement_gets_its_own_warning_and_sure_placement_does_not() -> None:
+    def group(key: str, placement: str, message: str | None) -> CadBuilding3dGroupRead:
+        return CadBuilding3dGroupRead.model_validate(
+            {
+                "key": key,
+                "label": f"Корп. {key}",
+                "floor_count": 3,
+                "aligned_count": 3,
+                "placement": placement,
+                "site_offset_mm": (0.0, 0.0),
+                "placement_axes": [],
+                "placement_anchor": None,
+                "placement_message": message,
+            }
+        )
+
+    warnings = assembly.review_warnings(
+        [
+            group("1", "cores", "на проверку: посадка по согласию этажей, 2 из 3 этажей"),
+            group("2", "cores", None),
+            group("3", "none", "по ядрам не совмещено"),
+        ]
+    )
+    assert [(w.code, w.message) for w in warnings] == [
+        (
+            "group_placement_review",
+            "Корп. 1: на проверку: посадка по согласию этажей, 2 из 3 этажей",
+        )
+    ]
