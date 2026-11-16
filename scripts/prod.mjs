@@ -107,21 +107,30 @@ async function bundle(rawArgs) {
   const cliArgs = ['cad-bundle', jobId];
   if (attempt) cliArgs.push('--attempt', attempt);
   if (noPdf) cliArgs.push('--no-pdf');
-  const archive = join(PROD_DIR, `bundle-${process.pid}.tar.gz`);
-  const status = await new Promise((done) => {
-    const child = spawn('ssh', [SSH_HOST, remoteCli(cliArgs)], {
-      stdio: ['ignore', 'pipe', 'inherit'],
-    });
-    const sink = createWriteStream(archive);
-    child.stdout.pipe(sink);
-    child.on('error', (error) => fail(`ssh не запустился: ${error.message}`));
-    child.on('close', (code) => sink.on('close', () => done(code ?? 1)).end());
+  const archiveName = `.bundle-${process.pid}.tar.gz`;
+  const archive = join(target, archiveName);
+  // Поток файла закрывается сам по концу stdout ssh — иногда раньше, чем ssh сообщит код
+  // выхода: ждём оба события независимо, иначе подписка на уже прошедшее закрытие не сработает.
+  const child = spawn('ssh', [SSH_HOST, remoteCli(cliArgs)], {
+    stdio: ['ignore', 'pipe', 'inherit'],
   });
+  const sink = createWriteStream(archive);
+  child.stdout.pipe(sink);
+  const [status] = await Promise.all([
+    new Promise((done) => {
+      child.on('error', (error) => fail(`ssh не запустился: ${error.message}`));
+      child.on('close', (code) => done(code ?? 1));
+    }),
+    new Promise((done) => sink.on('close', done)),
+  ]);
   if (status !== 0) {
     rmSync(archive, { force: true });
     fail(`Выгрузка не удалась (код ${status})`);
   }
-  const untar = spawnSync('tar', ['-xzf', archive, '-C', target], { stdio: 'inherit' });
+  // Архив лежит в самом каталоге выгрузки и распаковывается оттуда по относительному имени:
+  // GNU tar из Git Bash портит пути Windows (`C:\...` в -f — удалённая машина, `\` в -C —
+  // экранирование), а bsdtar Windows не знает `--force-local`.
+  const untar = spawnSync('tar', ['-xzf', archiveName], { cwd: target, stdio: 'inherit' });
   rmSync(archive, { force: true });
   if (untar.status !== 0) fail('Не удалось распаковать архив выгрузки');
   console.log(`Выгрузка: ${target}`);
