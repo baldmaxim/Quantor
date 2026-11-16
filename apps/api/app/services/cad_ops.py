@@ -36,6 +36,7 @@ MANUAL_FLAGS: Final = (
     ("--floor-height-mm", "floor_height_mm"),
     ("--clear-height-mm", "clear_height_mm"),
     ("--slab-thickness-mm", "slab_thickness_mm"),
+    ("--ceiling-height-mm", "ceiling_height_mm"),
 )
 REMARK_STATUSES: Final = ("open", "resolved")
 

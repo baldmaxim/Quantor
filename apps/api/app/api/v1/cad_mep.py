@@ -42,8 +42,8 @@ from app.domain import JobType
 from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
+from app.services import cad_ceiling, cad_constructions, cad_sections
 from app.services import cad_construction_store as construction_store
-from app.services import cad_constructions, cad_sections
 from app.services import cad_mep as cad_mep_service
 
 router = APIRouter(
@@ -151,6 +151,14 @@ async def create_cad_mep_routes(
         plan_revision_id=revision_id,
         plan_page_index=page_index,
     )
+    ceiling = await cad_ceiling.resolve_ceiling_height(
+        session,
+        settings=settings,
+        workspace_id=project.workspace_id,
+        project_id=project_id,
+        plan_revision_id=revision_id,
+        plan_page_index=page_index,
+    )
     route = await cad_mep_service.schedule_routes(
         session,
         project=project,
@@ -166,8 +174,10 @@ async def create_cad_mep_routes(
         slab_thickness_mm=levels.slab_thickness_mm,
         levels_source=levels.source,
         section_level_ids=[str(level_id) for level_id in levels.section_level_ids],
-        levels_warnings=list(levels.warnings),
+        levels_warnings=[*levels.warnings, *ceiling.warnings],
         levels_doc_answer=levels.doc_answer.to_payload() if levels.doc_answer else None,
+        ceiling_height_mm=ceiling.ceiling_height_mm,
+        ceiling_doc_answer=ceiling.doc_answer.to_payload() if ceiling.doc_answer else None,
     )
     await session.commit()
     return CadJobRead.of(route, await cad_mep_service.load_state(session, [route]))

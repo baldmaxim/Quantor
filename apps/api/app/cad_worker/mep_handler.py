@@ -5,12 +5,13 @@
 
     <python> -I run_mep.py --pdf --page-index --view-dxf --scale --preview --params --out
         --view-folder [--floor-elevation-mm] [--floor-height-mm] [--clear-height-mm]
-        [--slab-thickness-mm] [--risers]
+        [--slab-thickness-mm] [--ceiling-height-mm] [--risers]
 
 Отметка пола и высота этажа в аргументы попадают только если их задал человек (запрос или
 пересчёт); иначе генератор определяет их по тексту документации. Так же необязательны
 `--clear-height-mm` (принятые разрезы) и `--slab-thickness-mm` (плита проекта): оба сразу не
-передаются никогда.
+передаются никогда. `--ceiling-height-mm` - подвесной потолок коридора из подтверждённого ответа
+к документации (2000..4500 мм); нет ответа - флага нет, движок берёт допущение сам.
 
 Реестр стояков листа (ADR-0041) лежит в задании списком `risers` с `risers_sha256`; обработчик
 пишет его файлом `in/risers.json` (канонический JSON контракта `cad_risers.v1`), сверяет sha256 и
@@ -95,6 +96,7 @@ def _generator_argv(
         ("--floor-height-mm", "floor_height_mm"),
         ("--clear-height-mm", "clear_height_mm"),
         ("--slab-thickness-mm", "slab_thickness_mm"),
+        ("--ceiling-height-mm", "ceiling_height_mm"),
     ):
         value = cad_mep_service.payload_int(job, key)
         if value is not None:
@@ -167,6 +169,14 @@ def _check_levels(payload: dict[str, Any]) -> None:
         value = payload.get(key)
         if value is not None and (type(value) is not int or not low <= value <= high):
             raise CadError(ErrorCode.CAD_PARAMS_INVALID, "уровни для трасс заданы неверно")
+    ceiling = payload.get("ceiling_height_mm")
+    if ceiling is not None and (
+        type(ceiling) is not int
+        or not cad_mep_service.CEILING_HEIGHT_MIN_MM
+        <= ceiling
+        <= cad_mep_service.CEILING_HEIGHT_MAX_MM
+    ):
+        raise CadError(ErrorCode.CAD_PARAMS_INVALID, "высота потолка коридора задана неверно")
     if payload.get("clear_height_mm") is not None and payload.get("slab_thickness_mm") is not None:
         raise CadError(ErrorCode.CAD_PARAMS_INVALID, "высота в свету и толщина плиты заданы вместе")
 

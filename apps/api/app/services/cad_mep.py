@@ -56,6 +56,9 @@ CLEAR_HEIGHT_MIN_MM: Final = 1500
 CLEAR_HEIGHT_MAX_MM: Final = 6000
 SLAB_THICKNESS_MIN_MM: Final = 100
 SLAB_THICKNESS_MAX_MM: Final = 600
+# Подвесной потолок коридора от чистого пола: ответ к документации, пределы `--ceiling-height-mm`.
+CEILING_HEIGHT_MIN_MM: Final = 2000
+CEILING_HEIGHT_MAX_MM: Final = 4500
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,13 +104,17 @@ def route_idempotency_key(
     clear_height_mm: int | None = None,
     slab_thickness_mm: int | None = None,
     doc_answer_id: uuid.UUID | None = None,
+    ceiling_height_mm: int | None = None,
+    ceiling_doc_answer_id: uuid.UUID | None = None,
 ) -> str:
     """То же одобрение, параметры, версия генератора, реестр стояков и уровни - то же задание.
 
     Реестр стояков (ADR-0041) входит в ключ своим sha256 (пустая строка - реестра нет): другой
     реестр - новое задание, а не пересчёт старого. Так же входят высота в свету из принятых
     разрезов и толщина плиты проекта, если они переданы генератору: другая высота - новое задание.
-    Не переданные значения ключ не меняют (ключи прежних заданий остаются прежними).
+    Подвесной потолок коридора входит значением и id ответа к документации: другой ответ с тем же
+    числом - тоже новое задание (происхождение в payload не устаревает). Не переданные значения
+    ключ не меняют (ключи прежних заданий остаются прежними).
 
     Отметка пола и высота этажа в ключ не входят: это параметры попытки, и их правят пересчётом
     (`recompute_routes`) - новой попыткой того же задания, а не новым заданием.
@@ -122,6 +129,8 @@ def route_idempotency_key(
                 *((f"clear={clear_height_mm}",) if clear_height_mm is not None else ()),
                 *((f"slab={slab_thickness_mm}",) if slab_thickness_mm is not None else ()),
                 *((f"doc={doc_answer_id}",) if doc_answer_id is not None else ()),
+                *((f"ceil={ceiling_height_mm}",) if ceiling_height_mm is not None else ()),
+                *((f"ceildoc={ceiling_doc_answer_id}",) if ceiling_doc_answer_id else ()),
             )
         ).encode()
     ).hexdigest()
@@ -456,6 +465,8 @@ async def schedule_routes(
     section_level_ids: list[str] | None = None,
     levels_warnings: list[str] | None = None,
     levels_doc_answer: dict[str, str | int | None] | None = None,
+    ceiling_height_mm: int | None = None,
+    ceiling_doc_answer: dict[str, str | int | None] | None = None,
 ) -> Job:
     """Задание `cad_mep_route` по одобренному виду.
 
@@ -532,6 +543,8 @@ async def schedule_routes(
             clear_height_mm=clear_height_mm,
             slab_thickness_mm=slab_thickness_mm,
             doc_answer_id=_doc_answer_uuid(levels_doc_answer),
+            ceiling_height_mm=ceiling_height_mm,
+            ceiling_doc_answer_id=_doc_answer_uuid(ceiling_doc_answer),
         ),
         payload={
             "revision_id": job.payload["revision_id"],
@@ -547,6 +560,9 @@ async def schedule_routes(
             # Уровни для генератора: `section` - принятые разрезы, `project_slab` - плита проекта.
             "clear_height_mm": clear_height_mm,
             "slab_thickness_mm": slab_thickness_mm,
+            # Подвесной потолок коридора из ответа к документации; нет - допущение движка.
+            **({"ceiling_height_mm": ceiling_height_mm} if ceiling_height_mm is not None else {}),
+            **({"ceiling_doc_answer": ceiling_doc_answer} if ceiling_doc_answer else {}),
             "levels_source": levels_source,
             **({"section_level_ids": section_level_ids} if section_level_ids else {}),
             # Ответ к документации (`doc_answer`): откуда взята высота; для manual файла нет.

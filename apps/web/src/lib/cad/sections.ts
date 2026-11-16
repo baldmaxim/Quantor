@@ -30,6 +30,9 @@ export const SECTION_AMBIGUOUS_WARNING = 'section_level_ambiguous';
 export const DOC_ANSWER_AMBIGUOUS_WARNING = 'doc_answer_ambiguous';
 export const DOC_ANSWER_OUT_OF_RANGE_WARNING = 'doc_answer_out_of_range';
 export const SECTION_FLOOR_ELEVATION_UNKNOWN_WARNING = 'section_floor_elevation_unknown';
+/** Предупреждения подвесного потолка коридора из ответа к документации (сервер: cad_ceiling). */
+export const CEILING_DOC_AMBIGUOUS_WARNING = 'ceiling_doc_ambiguous';
+export const CEILING_DOC_OUT_OF_RANGE_WARNING = 'ceiling_doc_out_of_range';
 
 const WARNING_TEXTS: Readonly<Record<string, string>> = {
   [SECTION_AMBIGUOUS_WARNING]:
@@ -40,6 +43,10 @@ const WARNING_TEXTS: Readonly<Record<string, string>> = {
     'Подтверждённый ответ к документации вне пределов трасс (высота в свету 1500–6000 мм, плита 100–600 мм) — не применён, взята плита проекта / допущение.',
   [SECTION_FLOOR_ELEVATION_UNKNOWN_WARNING]:
     'Отметка этажа листа неизвестна — принятые уровни разрезов не применены; укажите отметку вручную.',
+  [CEILING_DOC_AMBIGUOUS_WARNING]:
+    'Подтверждённые ответы о высоте подвесного потолка коридора для этого листа расходятся — взято допущение 2700 мм.',
+  [CEILING_DOC_OUT_OF_RANGE_WARNING]:
+    'Подтверждённый ответ о высоте подвесного потолка коридора вне 2000–4500 мм — не применён, взято допущение 2700 мм.',
 };
 
 /** Текст предупреждения запуска трасс; незнакомый код показывается как есть. */
