@@ -143,6 +143,49 @@ def test_job_json_carries_operator_scales_with_legacy_page_numbers(runner: Modul
     }
 
 
+def _style_profile(**patch: Any) -> dict[str, Any]:
+    profile: dict[str, Any] = {
+        "schema": "cad_engine.style_profile.v1",
+        "id": "tom-ar1.1",
+        "version": 1,
+        "profile": {"monolith_fill_gray": [0.42]},
+    }
+    profile.update(patch)
+    return profile
+
+
+def test_style_profile_goes_to_job_json_as_is(runner: ModuleType) -> None:
+    profile = _style_profile()
+    params = runner.parse_params(_params(style_profile=profile))
+    job = runner.job_document([1, 3], params)
+    assert job["operator_style_profile"] == profile
+
+
+def test_job_json_has_no_style_profile_without_it(runner: ModuleType) -> None:
+    params = runner.parse_params(_params())
+    assert "operator_style_profile" not in runner.job_document([1, 3], params)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        [],
+        "profile",
+        _style_profile(schema="other"),
+        _style_profile(id=""),
+        _style_profile(id=5),
+        _style_profile(version="1"),
+        _style_profile(version=True),
+        _style_profile(profile=[]),
+    ],
+)
+def test_parse_params_rejects_bad_style_profile_shape(runner: ModuleType, bad: Any) -> None:
+    with pytest.raises(runner.RunnerError) as error:
+        runner.parse_params(_params(style_profile=bad))
+    assert error.value.exit_code == runner.EXIT_PARAMS
+    assert error.value.code == "params_invalid"
+
+
 def test_parse_params_accepts_auto_pages_and_job_json_skips_them(runner: ModuleType) -> None:
     """Лист без калибровки (ADR-0045): `{"auto": true}`, движку масштаб оператора не передаётся."""
     scales = {"0": {"auto": True}, "2": {"mm_per_pt": 35.2778, "calibration_id": "cal-2"}}

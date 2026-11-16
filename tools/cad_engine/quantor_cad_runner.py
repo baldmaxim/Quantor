@@ -256,6 +256,20 @@ def _parse_scales(raw: Any, pages: list[int]) -> dict[str, dict[str, Any]]:
     return scales
 
 
+STYLE_PROFILE_SCHEMA = "cad_engine.style_profile.v1"
+
+
+def _check_style_profile_shape(raw: Any) -> None:
+    """style_profile (необязательно): только форма, полная проверка полей профиля — в движке."""
+    if raw is None:
+        return
+    if (not isinstance(raw, dict) or raw.get("schema") != STYLE_PROFILE_SCHEMA
+            or not isinstance(raw.get("id"), str) or not raw["id"]
+            or type(raw.get("version")) is not int or not isinstance(raw.get("profile"), dict)):
+        raise RunnerError(EXIT_PARAMS, "params_invalid",
+                          "style_profile: объект схемы cad_engine.style_profile.v1")
+
+
 def parse_params(raw: bytes) -> dict[str, Any]:
     """Схема quantor.cad_engine.params.v2: лист и масштаб задаёт человек.
 
@@ -268,7 +282,7 @@ def parse_params(raw: bytes) -> dict[str, Any]:
     if not isinstance(params, dict):
         raise RunnerError(EXIT_PARAMS, "params_invalid", "params.json не объект")
     allowed = {"schema", "mode", "pages", "page_selection", "scales", "finishes", "schedules",
-               "limits"}
+               "limits", "style_profile"}
     if set(params) - allowed or params.get("schema") != PARAMS_SCHEMA:
         raise RunnerError(EXIT_PARAMS, "params_invalid", "неизвестная схема или поле параметров")
     if params.get("mode") != "architecture":
@@ -282,6 +296,7 @@ def parse_params(raw: bytes) -> dict[str, Any]:
             or len(set(pages)) != len(pages)):
         raise RunnerError(EXIT_PARAMS, "params_invalid", "pages: непустой список индексов с 0")
     scales = _parse_scales(params.get("scales"), pages)
+    _check_style_profile_shape(params.get("style_profile"))
     limits = dict(DEFAULT_LIMITS)
     given = params.get("limits", {})
     if not isinstance(given, dict) or set(given) - set(LIMIT_KEYS):
@@ -307,8 +322,11 @@ def operator_scales_for_job(params: dict[str, Any]) -> dict[str, dict[str, Any]]
 
 def job_document(pages: list[int], params: dict[str, Any]) -> dict[str, Any]:
     """job.json для worker'а движка: страницы и масштабы выбирает оператор."""
-    return {"id": "job", "status": "running", "attempt": 1, "pages": pages,
-            "operator_pages": True, "operator_scales": operator_scales_for_job(params)}
+    job: dict[str, Any] = {"id": "job", "status": "running", "attempt": 1, "pages": pages,
+                           "operator_pages": True, "operator_scales": operator_scales_for_job(params)}
+    if params.get("style_profile") is not None:
+        job["operator_style_profile"] = params["style_profile"]
+    return job
 
 
 def legacy_page(index: int) -> int:

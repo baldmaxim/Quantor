@@ -1,7 +1,7 @@
 # ADR-0049. Профиль оформления проектировщика в пилоте CAD: образцы на листе вместо подстройки движка
 
 Дата: 2026-11-16
-Статус: черновик (предложено владельцем 2026-11-16; решения 1–9 ждут утверждения)
+Статус: принято владельцем 2026-11-16
 Дополняет: [ADR-0036](0036-pilot-cad-v-boyu-i-3d-dxf.md), [ADR-0038](0038-podschyot-kladki-i-monolita-v-pilote-cad.md),
 [ADR-0040](0040-material-konstrukcij-iz-uslovnyh-oboznachenij.md), [ADR-0044](0044-cad-dvizhok-otdelnym-repozitoriem.md),
 [ADR-0045](0045-avtomasshtab-cad-po-razmernym-cepochkam.md)
