@@ -92,6 +92,8 @@ export const CadSidePanel: FC<ICadSidePanelProps> = ({
         })}
       </div>
 
+      {/* `relative` - граница для `absolute`-потомков (подписи `sr-only` у fieldset): без неё они не
+          обрезаются прокруткой раздела, а растягивают документ, и вся страница начинает прокручиваться. */}
       {tabs.map((tab) => (
         <div
           key={tab.id}
@@ -99,7 +101,7 @@ export const CadSidePanel: FC<ICadSidePanelProps> = ({
           id={`cad-side-panel-${tab.id}`}
           aria-labelledby={`cad-side-tab-${tab.id}`}
           hidden={tab.id !== current}
-          className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain p-[var(--s-5)]"
+          className="relative min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain p-[var(--s-5)]"
         >
           {tab.content}
         </div>
