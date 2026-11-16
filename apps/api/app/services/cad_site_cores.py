@@ -19,6 +19,9 @@
 5. Резерв (`CoreMatch.reserve`): доля от `RESERVE_SHARE` при отрыве от второго варианта в
    `RESERVE_RATIO` раз. Одной доли здесь мало - вызывающий принимает такое совмещение только с
    проверками по месту (контур в пределах основы, нет наложения на поставленные здания).
+6. Варианты (`CoreMatch.variants`): все различимые места, найденные для скопления, лучшими
+   сверху. По ним вызывающий отсеивает места, занятые другими зданиями или лежащие вне основы, и
+   сверяет посадки по нескольким этажам здания (`agree`): этажи независимо дают одно место.
 
 Колонны в счёт не идут: сетка колонн паркинга периодична и даёт ложные совпадения со сдвигом на
 шаг. Масштаб не подбирается: геометрия листа - по его калибровке (лист с неверным масштабом не
@@ -53,6 +56,15 @@ MIN_RATIO: Final = 2.0
 # от второго варианта не больше 1,5.
 RESERVE_SHARE: Final = 0.35
 RESERVE_RATIO: Final = 2.5
+# Согласие этажей: посадки по нескольким этажам здания, независимо давшие одно место (поворот в
+# пределах 1,5° - шаг уточнения 0,1° плюс разброс листов, центр в пределах 1 м - клетка 250 мм и
+# погрешность вычерчивания ядер на разных листах), принимаются при доле от `RESERVE_SHARE` и
+# при отрыве от второго места ниже обычного: один этаж так не принимается никогда.
+AGREE_ROTATION_DEG: Final = 1.5
+AGREE_SHIFT_MM: Final = 1000.0
+AGREE_MIN_FLOORS: Final = 2
+# Не больше стольких вариантов на скопление (лучшие по доле): остальные в кеше не нужны.
+MAX_VARIANTS: Final = 40
 MIN_SAMPLES: Final = 200
 DISTINCT_MM: Final = 3000.0
 FINE_STEP_DEG: Final = 0.1
@@ -67,8 +79,21 @@ ANGLE_PEAK_GAP_DEG: Final = 3.0
 
 
 @dataclass(frozen=True, slots=True)
+class CoreVariant:
+    """Одно место скопления на основе: перевод `p' = R(rotation) p + (tx, ty)` и доля совпадения."""
+
+    rotation_deg: float
+    tx: float
+    ty: float
+    share: float
+
+
+@dataclass(frozen=True, slots=True)
 class CoreMatch:
-    """Перевод из системы скопления в систему основы: `p' = R(rotation) p + (tx, ty)`."""
+    """Перевод из системы скопления в систему основы: `p' = R(rotation) p + (tx, ty)`.
+
+    `variants` - все найденные места (лучшее первым, не больше `MAX_VARIANTS`); по умолчанию пусто.
+    """
 
     rotation_deg: float
     tx: float
@@ -76,6 +101,7 @@ class CoreMatch:
     share: float
     second_share: float
     accepted: bool
+    variants: tuple[CoreVariant, ...] = ()
 
     @property
     def reserve(self) -> bool:
@@ -303,6 +329,43 @@ def _turn_gap(a: float, b: float) -> float:
     return min(diff, 360.0 - diff)
 
 
+def distinct(a: CoreVariant, b: CoreVariant) -> bool:
+    """Разные места: дальше `DISTINCT_MM` или другой поворот (больше `ANGLE_PEAK_GAP_DEG`)."""
+    return (
+        math.hypot(a.tx - b.tx, a.ty - b.ty) > DISTINCT_MM
+        or _turn_gap(a.rotation_deg, b.rotation_deg) > ANGLE_PEAK_GAP_DEG
+    )
+
+
+def second_share(best: CoreVariant, variants: Sequence[CoreVariant]) -> float:
+    """Наибольшая доля среди мест, отличных от `best`; других нет - 0."""
+    return max((v.share for v in variants if distinct(v, best)), default=0.0)
+
+
+def passes(share: float, second: float) -> bool:
+    """Обычный порог (`MIN_SHARE`, `MIN_RATIO`) или порог резерва (`RESERVE_*`)."""
+    return (share >= MIN_SHARE and share >= MIN_RATIO * second) or (
+        share >= RESERVE_SHARE and share >= RESERVE_RATIO * second
+    )
+
+
+def same_place(a: CoreVariant, b: CoreVariant, centre: Point) -> bool:
+    """Одно место для согласия этажей: поворот в `AGREE_ROTATION_DEG`, центр здания `centre` (в
+    системе скопления) - в `AGREE_SHIFT_MM`. Сдвиги `tx, ty` сравнивать нельзя: начало системы
+    скопления может быть далеко от здания, и поворот на градус уводит его на метры."""
+    ax, ay = transform_point(centre[0], centre[1], a.rotation_deg, a.tx, a.ty)
+    bx, by = transform_point(centre[0], centre[1], b.rotation_deg, b.tx, b.ty)
+    return (
+        _turn_gap(a.rotation_deg, b.rotation_deg) <= AGREE_ROTATION_DEG
+        and math.hypot(ax - bx, ay - by) <= AGREE_SHIFT_MM
+    )
+
+
+def _wrap(deg: float) -> float:
+    """Поворот в пределах -180…180°."""
+    return (deg + 180.0) % 360.0 - 180.0
+
+
 def _thin(samples: list[Point], limit: int = MAX_SAMPLES) -> list[Point]:
     if len(samples) <= limit:
         return samples
@@ -346,13 +409,11 @@ def register(base: Sequence[Ring] | BaseIndex, other: Sequence[Ring]) -> CoreMat
         key=lambda c: -c[0],
     )
     share, deg, tx, ty = candidates[0]
-    distinct = [
-        c[0]
+    others = [
+        CoreVariant(_wrap(c[1]), c[2], c[3], c[0])
         for c in candidates[1:] + [(r[0], r[1], r[2], r[3]) for r in rough[FULL_CANDIDATES:]]
-        if math.hypot(c[2] - tx, c[3] - ty) > DISTINCT_MM
-        or _turn_gap(c[1], deg) > ANGLE_PEAK_GAP_DEG
     ]
-    second = max(distinct, default=0.0)
+    second = second_share(CoreVariant(_wrap(deg), tx, ty, share), others)
     # Уточнение по нерасширенной основе: расширенная прощает градус поворота и полклетки сдвига.
     fine_samples = _thin(samples, FINE_SAMPLES)
     steps = round(FINE_RANGE_DEG / FINE_STEP_DEG)
@@ -368,8 +429,12 @@ def register(base: Sequence[Ring] | BaseIndex, other: Sequence[Ring]) -> CoreMat
     _strict, _i, deg, tx, ty = fine
     share = _score(samples, index.cells, deg, tx, ty)
     accepted = share >= MIN_SHARE and share >= MIN_RATIO * second
-    rotation = (deg + 180.0) % 360.0 - 180.0
-    return CoreMatch(round(rotation, 3), round(tx, 1), round(ty, 1), share, second, accepted)
+    rotation = _wrap(deg)
+    winner = CoreVariant(round(rotation, 3), round(tx, 1), round(ty, 1), share)
+    ranked = sorted(others, key=lambda v: -v.share)[: MAX_VARIANTS - 1]
+    return CoreMatch(
+        winner.rotation_deg, winner.tx, winner.ty, share, second, accepted, (winner, *ranked)
+    )
 
 
 def transform_point(x: float, y: float, rotation_deg: float, tx: float, ty: float) -> Point:
@@ -397,3 +462,107 @@ def inside_share(points: Sequence[Point], outline: Ring, tolerance_mm: float) ->
         1 for x, y in points if _inside(x, y, pts) or _edge_distance(x, y, pts) <= tolerance_mm
     )
     return hits / len(points)
+
+
+# ------------------------------------------------------- отсев мест и согласие этажей
+
+AREA_CELL_MM: Final = 1000.0
+MAX_AREA_SAMPLES: Final = 1500
+
+
+def area_samples(outline: Ring) -> list[Point]:
+    """Точки сетки `AREA_CELL_MM` внутри контура (не больше `MAX_AREA_SAMPLES`): выборка для
+    долей площади без Shapely."""
+    pts = _ring(outline)
+    if len(pts) < 3:
+        return []
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    step = AREA_CELL_MM
+    out: list[Point] = []
+    for ix in range(math.floor(min(xs) / step), math.floor(max(xs) / step) + 1):
+        x = (ix + 0.5) * step
+        for iy in range(math.floor(min(ys) / step), math.floor(max(ys) / step) + 1):
+            y = (iy + 0.5) * step
+            if _inside(x, y, pts):
+                out.append((x, y))
+    return _thin(out, MAX_AREA_SAMPLES)
+
+
+def covered_share(points: Sequence[Point], outlines: Sequence[Ring]) -> float:
+    """Доля точек, лежащих внутри хотя бы одного из контуров; нет точек или контуров - 0."""
+    polygons = [(pts, *_extent(pts)) for pts in (_ring(o) for o in outlines) if len(pts) >= 3]
+    if not points or not polygons:
+        return 0.0
+    hits = 0
+    for x, y in points:
+        for pts, x0, y0, x1, y1 in polygons:
+            if x0 <= x <= x1 and y0 <= y <= y1 and _inside(x, y, pts):
+                hits += 1
+                break
+    return hits / len(points)
+
+
+def _extent(pts: Sequence[Point]) -> tuple[float, float, float, float]:
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+@dataclass(frozen=True, slots=True)
+class FloorChoice:
+    """Лучшее допустимое место, найденное по одному этажу здания, и отрыв от следующего места."""
+
+    floor: int
+    match: CoreMatch
+    best: CoreVariant
+    second: float
+    dropped: int
+
+
+@dataclass(frozen=True, slots=True)
+class Decision:
+    """Принятое место: `kind` - `agreement` (этажи сошлись) или `filtered` (отрыв после отсева)."""
+
+    kind: str
+    choice: FloorChoice
+    agreed: int
+    floors: int
+
+
+def choose(choices: Sequence[FloorChoice], centre: Point) -> Decision | None:
+    """Место здания по выбору этажей (`choices` - по одному на этаж, отсеянное уже убрано).
+
+    1. Согласие: не меньше `AGREE_MIN_FLOORS` этажей независимо дали одно место (`same_place`),
+       их строго больше, чем у любого другого места, доля лучшего из них не ниже `RESERVE_SHARE`.
+       Положение - лучшего по доле из согласных: сдвиги разных этажей усреднять нельзя (разный
+       поворот при общей точке отсчёта), а лучший этаж даёт одну согласованную пару поворот и сдвиг.
+       Два места с равным числом согласных этажей - отказ.
+    2. Отсев: лучший по доле этаж проходит порог (`passes`) после отсева конкурентов, хотя до отсева
+       не проходил, и ни один другой этаж не проходит порог в другом месте.
+    """
+    if not choices:
+        return None
+    support = [sum(same_place(c.best, d.best, centre) for d in choices) for c in choices]
+    ranked = sorted(range(len(choices)), key=lambda i: (-support[i], -choices[i].best.share, i))
+    lead = ranked[0]
+    leader = choices[lead]
+    rivals = [
+        support[i] for i, c in enumerate(choices) if not same_place(c.best, leader.best, centre)
+    ]
+    rival = max(rivals, default=0)
+    if support[lead] >= AGREE_MIN_FLOORS:
+        if support[lead] <= rival:
+            return None  # два места с равным числом согласных: не принимать
+        if leader.best.share >= RESERVE_SHARE:
+            return Decision("agreement", leader, support[lead], len(choices))
+        # Слабое согласие (доля ниже порога резерва) места не даёт; решает отсев.
+    top = max(choices, key=lambda c: (c.best.share, -c.floor))
+    if (
+        passes(top.best.share, top.second)
+        and not passes(top.match.share, top.match.second_share)
+        and not any(
+            passes(c.best.share, c.second) and not same_place(c.best, top.best, centre)
+            for c in choices
+        )
+    ):
+        return Decision("filtered", top, 1, len(choices))
+    return None

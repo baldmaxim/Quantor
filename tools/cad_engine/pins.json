@@ -6,7 +6,7 @@
     "version": "2026.11.16+fc0ec1d95a55",
     "archive_name": "Quantor_CAD_source_2026.11.16_fc0ec1d95a55.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "14ea1f91d6df62120008e36b2e1b2e7d641fab20",
+    "repo_ref": "df914a1e2530bb75431dcf40e8ae8f4abd14b138",
     "archive_path": "engine/dist/Quantor_CAD_source_2026.11.16_fc0ec1d95a55.zip",
     "archive_sha256": "3ff65bbfa0d6447aba575dbaf723e31c12f4cd8ce8229688f21a735684062381",
     "manifest_sha256": "60be79d286e66ae50346ed425295f5fdf63c9f6e9e599b110216e5b461aba274",
@@ -30,16 +30,16 @@
   "generators": {
     "path": "generators",
     "cad_mep": {
-      "generator_version": "cad_mep.v16.6",
+      "generator_version": "cad_mep.v16.7",
       "params_path": "generators/cad_mep/params/v1.json",
       "params_sha256": "4a56e4675452b8458b5ce0425a8973ac069e021daac931d88ed7cbf6f00badcb",
       "params_canonical_sha256": "55e73b9e71939264d05b1c3d164d6decee33580da143af623e8590c043009f35"
     },
     "cad_walls": {
-      "generator_version": "cad_walls.v1.15",
+      "generator_version": "cad_walls.v1.16",
       "params_path": "generators/cad_walls/params/v1.json",
-      "params_sha256": "165df9edacfb29d1837ed444b3b158390b8f594b6331db95da45027c457c33fe",
-      "params_canonical_sha256": "c37a4f4a3235e663e8d4a6ef1df59222417377d25450620ec3c66b4f807d8954",
+      "params_sha256": "2de071b93569de1bd981b3529740c81e546d527fdb72e0e4a0948d349c2fefb7",
+      "params_canonical_sha256": "a13088978af8cd5d3fe90d8931f3839ec50c92d6412aea4a24588522b30bc2da",
       "floor3d_dxf_version": "cad_floor3d_dxf.v2"
     },
     "cad_eom": {

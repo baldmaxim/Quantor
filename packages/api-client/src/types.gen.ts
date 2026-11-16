@@ -883,7 +883,7 @@ export type CadBuilding3dGroupRead = {
     /**
      * Placement
      */
-    placement: 'reference' | 'axes' | 'cores' | 'none';
+    placement: 'reference' | 'axes' | 'cores' | 'manual' | 'none';
     /**
      * Placement Anchor
      */
@@ -907,6 +907,10 @@ export type CadBuilding3dGroupRead = {
         number,
         number
     ];
+    /**
+     * Site Pin Id
+     */
+    site_pin_id?: string | null;
     /**
      * Site Rotation Deg
      */
@@ -4886,6 +4890,156 @@ export type CadSheetRisersPut = {
      * Risers
      */
     risers: Array<CadRiserEntry>;
+};
+
+/**
+ * CadSitePinCreate
+ *
+ * Две точки листа корпуса (`source`) и те же две точки листа площадки (`target`).
+ */
+export type CadSitePinCreate = {
+    /**
+     * Note
+     */
+    note?: string | null;
+    source: CadSiteSheetRef;
+    /**
+     * Source Points
+     */
+    source_points: [
+        CadSitePoint,
+        CadSitePoint
+    ];
+    target: CadSiteSheetRef;
+    /**
+     * Target Points
+     */
+    target_points: [
+        CadSitePoint,
+        CadSitePoint
+    ];
+};
+
+/**
+ * CadSitePinRead
+ */
+export type CadSitePinRead = {
+    /**
+     * Baseline Mm
+     */
+    baseline_mm: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string;
+    /**
+     * Created By Name
+     */
+    created_by_name: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Offset X Mm
+     */
+    offset_x_mm: number;
+    /**
+     * Offset Y Mm
+     */
+    offset_y_mm: number;
+    /**
+     * Residual Mm
+     */
+    residual_mm: number;
+    /**
+     * Revoke Reason
+     */
+    revoke_reason?: string | null;
+    /**
+     * Revoked At
+     */
+    revoked_at?: string | null;
+    /**
+     * Rotation Deg
+     */
+    rotation_deg: number;
+    source: CadSiteSheetRef;
+    /**
+     * Source Points
+     */
+    source_points: Array<CadSitePoint>;
+    target: CadSiteSheetRef;
+    /**
+     * Target Points
+     */
+    target_points: Array<CadSitePoint>;
+};
+
+/**
+ * CadSitePinRevoke
+ *
+ * Отзыв привязки; причина необязательна.
+ */
+export type CadSitePinRevoke = {
+    /**
+     * Reason
+     */
+    reason?: string | null;
+};
+
+/**
+ * CadSitePinsRead
+ *
+ * Действующие привязки проекта (отозванные в список не входят).
+ */
+export type CadSitePinsRead = {
+    /**
+     * Items
+     */
+    items: Array<CadSitePinRead>;
+};
+
+/**
+ * CadSitePoint
+ */
+export type CadSitePoint = {
+    /**
+     * X Mm
+     */
+    x_mm: number;
+    /**
+     * Y Mm
+     */
+    y_mm: number;
+};
+
+/**
+ * CadSiteSheetRef
+ *
+ * Лист в сборке 3D: ревизия документа, страница, вид (как в `CadBuilding3dFloorRead`).
+ */
+export type CadSiteSheetRef = {
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * View
+     */
+    view: number;
 };
 
 /**
@@ -23145,6 +23299,103 @@ export type ReadCadBuilding3dResponses = {
 };
 
 export type ReadCadBuilding3dResponse = ReadCadBuilding3dResponses[keyof ReadCadBuilding3dResponses];
+
+export type ListSitePinsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/building3d/site-pins';
+};
+
+export type ListSitePinsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSitePinsError = ListSitePinsErrors[keyof ListSitePinsErrors];
+
+export type ListSitePinsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadSitePinsRead;
+};
+
+export type ListSitePinsResponse = ListSitePinsResponses[keyof ListSitePinsResponses];
+
+export type CreateSitePinData = {
+    body: CadSitePinCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/building3d/site-pins';
+};
+
+export type CreateSitePinErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateSitePinError = CreateSitePinErrors[keyof CreateSitePinErrors];
+
+export type CreateSitePinResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadSitePinRead;
+};
+
+export type CreateSitePinResponse = CreateSitePinResponses[keyof CreateSitePinResponses];
+
+export type RevokeSitePinData = {
+    /**
+     * Body
+     */
+    body?: CadSitePinRevoke | null;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Pin Id
+         */
+        pin_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/building3d/site-pins/{pin_id}';
+};
+
+export type RevokeSitePinErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RevokeSitePinError = RevokeSitePinErrors[keyof RevokeSitePinErrors];
+
+export type RevokeSitePinResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadSitePinRead;
+};
+
+export type RevokeSitePinResponse = RevokeSitePinResponses[keyof RevokeSitePinResponses];
 
 export type ReadCadEomJobData = {
     body?: never;

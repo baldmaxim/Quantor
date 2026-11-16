@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import tempfile
 import uuid
 import zipfile
@@ -576,8 +577,29 @@ def build_view(source: ViewSource) -> ObjectBaseView:
             alignment=floor.alignment,
             alignment_axes=list(floor.alignment_axes),
         ),
-        bbox=[round(value) for value in floor.bbox] if floor.bbox is not None else None,
+        bbox=_bbox_in_view(floor.bbox, floor.offset_mm, floor.rotation_deg),
     )
+
+
+def _bbox_in_view(
+    bbox: Sequence[float] | None, offset_mm: Sequence[float], rotation_deg: float
+) -> list[int] | None:
+    """Рамка этажа здания -> рамка в мм кадра вида (формат: `view_dxf_mm`).
+
+    Этаж здания уже поставлен преобразованием `p = R(rotation_deg) * v + offset_mm`; обратное -
+    `v = R(-rotation_deg) * (p - offset_mm)`, рамка - по четырём углам.
+    """
+    if bbox is None:
+        return None
+    angle = math.radians(-rotation_deg)
+    cos_a, sin_a = math.cos(angle), math.sin(angle)
+    xs: list[float] = []
+    ys: list[float] = []
+    for px, py in ((bbox[0], bbox[1]), (bbox[2], bbox[1]), (bbox[2], bbox[3]), (bbox[0], bbox[3])):
+        dx, dy = px - offset_mm[0], py - offset_mm[1]
+        xs.append(dx * cos_a - dy * sin_a)
+        ys.append(dx * sin_a + dy * cos_a)
+    return [round(min(xs)), round(min(ys)), round(max(xs)), round(max(ys))]
 
 
 def build_risers(entries: Sequence[Any]) -> ObjectBaseRisers:

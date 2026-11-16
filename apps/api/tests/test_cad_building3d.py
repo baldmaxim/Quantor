@@ -1227,6 +1227,120 @@ def test_reserve_is_not_taken_over_a_placed_building_on_the_same_level() -> None
     assert lost.message is not None and "ложится на «Корп. 1 · сек. 1»" in lost.message
 
 
+def whole_core() -> list[list[tuple[float, float]]]:
+    from tests.test_cad_site_cores import CORE
+
+    return [*CORE, *second_core()]
+
+
+def site_parking_with(
+    copies: list[tuple[list[list[tuple[float, float]]], tuple[float, float]]],
+) -> b3d.BuiltFloor:
+    """Подземка `site_parking`, где ядро здания стоит ещё в других местах (части ядра) - второй
+    вариант посадки с долей 0,56: доля первого 1,0, отрыв 1,8 - ни обычный порог, ни резервный."""
+    from tests.test_cad_site_cores import moved
+
+    under = site_parking()
+    rings = list(under.cores)
+    for part, (x, y) in copies:
+        rings += [
+            tuple((round(px), round(py)) for px, py in ring) for ring in moved(part, 27.0, x, y)
+        ]
+    return b3d.BuiltFloor(under.floor, under.order, under.axes, tuple(rings))
+
+
+def core_part() -> list[list[tuple[float, float]]]:
+    whole = whole_core()
+    return [*whole[:7], *whole[12:16]]
+
+
+def core_extra() -> list[list[tuple[float, float]]]:
+    """Стены, которых нет в ядре здания: вместе с частью ядра дают своё место другого здания."""
+    from tests.test_cad_site_cores import wall
+
+    return [
+        wall(-5000, -3000, 15000, 3000),
+        wall(-5000, 0, 3000, 12000, 90),
+        wall(9000, 6000, 8000, 3000),
+        wall(-9000, 14000, 14000, 2500),
+    ]
+
+
+def tower_floors(
+    count: int, cores: list[list[tuple[float, float]]] | None = None
+) -> list[b3d.BuiltFloor]:
+    return [
+        with_cores(
+            built(corps="1", section="1", order=1 + i, elevation=BASE + 3000 * i),
+            cores or whole_core(),
+        )
+        for i in range(count)
+    ]
+
+
+@pytest.mark.parametrize("floors", [2, 3])
+def test_floors_agreeing_on_one_place_are_placed_for_review_below_the_ratio_threshold(
+    floors: int,
+) -> None:
+    parking = site_parking_with([(core_part(), (30000.0, 110000.0))])
+    placements, _ = placed([parking, *tower_floors(floors)])
+    root = placements["k1-s1"]
+    assert root.placement == "cores"
+    assert root.rotation_deg == pytest.approx(27.0, abs=0.5)
+    assert root.offset_mm == pytest.approx((120000.0, 45000.0), abs=500.0)
+    assert root.share is not None and root.share >= 0.9
+    assert root.message is not None
+    assert root.message.startswith("на проверку: посадка по согласию этажей")
+    assert f"{floors} из {floors} этажей" in root.message
+
+
+def test_one_floor_with_a_close_second_place_stays_aside() -> None:
+    parking = site_parking_with([(core_part(), (30000.0, 110000.0))])
+    placements, _ = placed([parking, *tower_floors(1)])
+    root = placements["k1-s1"]
+    assert root.placement == "none"
+    assert root.message is not None and "по ядрам не совмещено" in root.message
+
+
+def test_competitor_on_a_taken_place_is_removed_and_the_building_is_placed_for_review() -> None:
+    """Второе место совпадает с уже поставленным зданием на той же отметке: отсеивается."""
+    near = [*core_part(), *core_extra()]
+    parking = site_parking_with([(near, (30000.0, 110000.0))])
+    neighbour = with_cores(
+        built(corps="2", section="2", order=5), near, bbox=[0.0, 0.0, 60000.0, 40000.0]
+    )
+    placements, _ = placed([parking, neighbour, *tower_floors(1)])
+    assert placements["k2-s2"].placement == "cores" and placements["k2-s2"].message is None
+    root = placements["k1-s1"]
+    assert root.placement == "cores"
+    assert root.offset_mm == pytest.approx((120000.0, 45000.0), abs=500.0)
+    assert root.message is not None
+    assert root.message.startswith("на проверку: посадка после отсева конкурентов")
+    assert "до отсева 56%" in root.message
+
+
+def test_competitor_outside_the_base_outline_is_removed() -> None:
+    parking = site_parking_with([(core_part(), (219000.0, 176000.0))])
+    placements, _ = placed([parking, *tower_floors(1)])
+    root = placements["k1-s1"]
+    assert root.placement == "cores"
+    assert root.message is not None and "вне плиты подземки" in root.message
+
+
+def test_competitor_on_another_level_is_not_taken_by_the_building_on_it() -> None:
+    """Башня на стилобате: контуры накладываются, но этажи на разных отметках - место свободно."""
+    outline = [[0.0, 0.0], [6000.0, 0.0], [6000.0, 4000.0], [0.0, 4000.0]]
+    sample = tuple(cad_site_cores.area_samples(outline))
+    footprint = b3d._Footprint(sample, (3000.0, 2000.0), ((BASE, sample),))
+    variant = cad_site_cores.CoreVariant(0.0, 1000.0, 1000.0, 0.5)
+    base = [[0.0, 0.0], [20000.0, 0.0], [20000.0, 20000.0], [0.0, 20000.0]]
+    podium = [(float(x) + 1000.0, float(y) + 1000.0) for x, y in outline]
+    assert b3d._variant_verdict(variant, footprint, [(BASE, podium)], base) == "taken"
+    assert b3d._variant_verdict(variant, footprint, [(BASE + 3000, podium)], base) is None
+    far = cad_site_cores.CoreVariant(0.0, 30000.0, 1000.0, 0.5)
+    assert b3d._variant_verdict(far, footprint, [], base) == "outside"
+
+
 def test_without_core_match_the_larger_axes_cluster_stays_the_reference() -> None:
     """Паркинг ни с чем не совпал по ядрам - секции, связанные осями, остаются вместе."""
     from tests.test_cad_site_cores import parking

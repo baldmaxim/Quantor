@@ -10,11 +10,13 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contracts.cad_building3d import CadBuilding3dGroupRead
 from app.contracts.cad_constructions import WallsDocument
 from app.domain import JobStatus, JobType
 from app.models import Job
 from app.services import cad_building3d as b3d
 from app.services import cad_building3d_assembly as assembly
+from app.services import cad_site_pins
 from tests.conftest import FakeObjectStorage
 from tests.test_cad_building3d import axes_block, built, sheet, with_cores
 from tests.test_cad_floor3d import BASE, heights, raw_document, raw_extras
@@ -23,6 +25,10 @@ from tests.test_cad_site_cores import CORE, wall
 # Сетка одной секции: оси с номером секции, пролёты от 6 м (по ним оценивается наклон шкалы).
 GRID_X = {"1.1": 0.0, "1.2": 6000.0, "1.3": 12000.0, "1.4": 18000.0, "1.5": 24000.0}
 GRID_Y = {"1.А": 0.0, "1.Б": 7000.0, "1.В": 14000.0, "1.Г": 21000.0}
+
+
+async def _no_pins(_session: AsyncSession, **_kwargs: object) -> list[object]:
+    return []
 
 
 def scaled(axes: dict[str, float], factor: float, shift: float = 0.0) -> dict[str, float]:
@@ -456,6 +462,8 @@ async def test_response_lists_service_sheets_and_follows_the_stack_height(
 
     monkeypatch.setattr(b3d, "collect_sheets", collect)
     monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
+    # Ручные привязки корпусов (ADR-0052) читаются из базы: в этом тесте базы нет.
+    monkeypatch.setattr(cad_site_pins, "active_site_pins", _no_pins)
     body = await assembly.build_building3d(
         cast(AsyncSession, object()), storage, workspace_id=uuid.uuid4(), project_id=uuid.uuid4()
     )
@@ -497,3 +505,34 @@ def test_convert_failure_code_comes_from_the_view_then_from_the_job() -> None:
     assert assembly._convert_failure(convert_job([{"view": 1, "status": "passed"}]), 9) == (
         "succeeded"
     )
+
+
+def test_review_placement_gets_its_own_warning_and_sure_placement_does_not() -> None:
+    def group(key: str, placement: str, message: str | None) -> CadBuilding3dGroupRead:
+        return CadBuilding3dGroupRead.model_validate(
+            {
+                "key": key,
+                "label": f"Корп. {key}",
+                "floor_count": 3,
+                "aligned_count": 3,
+                "placement": placement,
+                "site_offset_mm": (0.0, 0.0),
+                "placement_axes": [],
+                "placement_anchor": None,
+                "placement_message": message,
+            }
+        )
+
+    warnings = assembly.review_warnings(
+        [
+            group("1", "cores", "на проверку: посадка по согласию этажей, 2 из 3 этажей"),
+            group("2", "cores", None),
+            group("3", "none", "по ядрам не совмещено"),
+        ]
+    )
+    assert [(w.code, w.message) for w in warnings] == [
+        (
+            "group_placement_review",
+            "Корп. 1: на проверку: посадка по согласию этажей, 2 из 3 этажей",
+        )
+    ]

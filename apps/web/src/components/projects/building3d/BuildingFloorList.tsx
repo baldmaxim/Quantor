@@ -7,7 +7,13 @@ import type { FC } from 'react';
 import { AlignmentMark } from '@/components/workspace/cad/building3d/AlignmentMark';
 import { alignmentNote, floorKey, formatElevation, sheetCountOf, splitFloors } from '@/lib/cad/building3d-geometry';
 
+import { BuildingGroupPlacement } from './BuildingGroupPlacement';
+
 interface IBuildingFloorListProps {
+  readonly projectId: string;
+  /** Есть право записи в CAD при включённом `cad.export`: показывать «Привязать вручную» и «Снять привязку». */
+  readonly canEditPins: boolean;
+  readonly onPin: (group: CadBuilding3dGroupRead) => void;
   /** Этажи выбранного здания (в режиме «Весь объект» - всех зданий). */
   readonly floors: readonly CadBuilding3dFloorRead[];
   /** Режим «Весь объект»: список разбит по зданиям в порядке групп. */
@@ -24,7 +30,16 @@ const ROW =
  * Список этажей здания: с отметкой сверху вниз, без отметки - внизу (в 3D они не строятся). Выбор и
  * наведение синхронны с холстом.
  */
-export const BuildingFloorList: FC<IBuildingFloorListProps> = ({ floors, groups, selectedKey, onSelect, onHover }) => {
+export const BuildingFloorList: FC<IBuildingFloorListProps> = ({
+  projectId,
+  canEditPins,
+  onPin,
+  floors,
+  groups,
+  selectedKey,
+  onSelect,
+  onHover,
+}) => {
   const renderRow = (floor: CadBuilding3dFloorRead, groupFloors: readonly CadBuilding3dFloorRead[]) => {
     const key = floorKey(floor);
     const selected = key === selectedKey;
@@ -74,11 +89,7 @@ export const BuildingFloorList: FC<IBuildingFloorListProps> = ({ floors, groups,
             <h3 className="px-[var(--s-4)] pt-[var(--s-3)] pb-[var(--s-2)] text-xs font-medium text-muted [overflow-wrap:anywhere]">
               {group.label}
             </h3>
-            {group.placement === 'none' && (
-              <p className="px-[var(--s-4)] pb-[var(--s-2)] text-xs text-warning [overflow-wrap:anywhere]">
-                Не поставлен на объект{group.placement_message ? `: ${group.placement_message}` : ''}
-              </p>
-            )}
+            <BuildingGroupPlacement projectId={projectId} group={group} canEdit={canEditPins} onPin={onPin} />
             {renderList(items, `Этажи: ${group.label}`)}
           </section>
         );

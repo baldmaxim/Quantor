@@ -134,6 +134,7 @@ async def test_floor_of_a_ready_sheet_follows_project_levels_for_viewer(
             "placement_axes": [],
             "placement_anchor": None,
             "placement_message": None,
+            "site_pin_id": None,
         }
     ]
 
@@ -215,6 +216,7 @@ async def test_axes_in_walls_file_make_the_single_floor_a_reference(
             "placement_axes": [],
             "placement_anchor": None,
             "placement_message": None,
+            "site_pin_id": None,
         }
     ]
 

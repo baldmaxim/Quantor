@@ -30,6 +30,7 @@ from app.api.v1.cad_pipeline import qa_router as cad_pipeline_qa_router
 from app.api.v1.cad_queue import qa_router as cad_queue_qa_router
 from app.api.v1.cad_risers import qa_router as cad_risers_qa_router
 from app.api.v1.cad_sections import qa_router as cad_sections_qa_router
+from app.api.v1.cad_site_pins import qa_router as cad_site_pins_qa_router
 from app.api.v1.cad_style_profiles import qa_router as cad_style_profiles_qa_router
 from app.api.v1.cad_vor import qa_router as cad_vor_qa_router
 from app.api.v1.cad_zones import qa_router as cad_zones_qa_router
@@ -134,6 +135,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cad_floor3d_qa_router)
     # Общий вид здания для 3D (ADR-0039).
     app.include_router(cad_building3d_qa_router)
+    # Ручная привязка корпуса к площадке (ADR-0052).
+    app.include_router(cad_site_pins_qa_router)
     # Паспорт листа (ADR-0043, С1): маршруты закрыты флагом пространства `project.consistency`.
     app.include_router(sheet_passports_qa_router)
     app.include_router(doc_questions_qa_router)
