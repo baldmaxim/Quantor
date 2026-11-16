@@ -17,6 +17,7 @@ export const JOB_TYPE_LABELS: Readonly<Record<JobType, string>> = {
   cad_facades: 'CAD: фасады',
   cad_eom_route: 'CAD: ЭОМ и СС',
   cad_style_preview: 'CAD: профиль оформления',
+  model_ifc_import: 'Модель из IFC',
   sheet_passport_extract: 'Паспорт листа',
   doc_questions_search: 'Вопросы к документации',
   sheet_register_extract: 'Ведомости листов',

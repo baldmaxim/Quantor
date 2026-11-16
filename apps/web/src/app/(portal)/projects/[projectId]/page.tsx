@@ -22,6 +22,7 @@ import {
 import { CAD_FEATURE } from '@/lib/cad/access';
 import { CONSISTENCY_FEATURE } from '@/lib/consistency/access';
 import { TENDER_EXCHANGE_FEATURE } from '@/lib/tender/access';
+import { MODEL_FEATURE } from '@/lib/model/model-access';
 import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 import { useFeatures, useProject, useProjectDocuments, useProjectRevisions } from '@/lib/queries';
 
@@ -110,6 +111,11 @@ const ProjectPage = ({ params }: IPageProps) => {
               >
                 <IconBim />
                 3D-модель объекта
+              </ButtonLink>
+            )}
+            {features[MODEL_FEATURE] === true && (
+              <ButtonLink href={`/projects/${projectId}/model`} transitionTypes={['nav-forward']}>
+                Модель здания
               </ButtonLink>
             )}
             {features[TENDER_VERSIONS_FEATURE] === true && (

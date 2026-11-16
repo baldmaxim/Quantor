@@ -18,6 +18,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from app import API_VERSION
 from app.api import health
 from app.api.v1.building_frame import qa_router as building_frame_qa_router
+from app.api.v1.building_models import qa_router as building_models_qa_router
 from app.api.v1.cad import qa_router as cad_qa_router
 from app.api.v1.cad_building3d import qa_router as cad_building3d_qa_router
 from app.api.v1.cad_constructions import qa_router as cad_constructions_qa_router
@@ -134,6 +135,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # 3D-вид этажа (ADR-0039).
     app.include_router(cad_floor3d_qa_router)
     # Общий вид здания для 3D (ADR-0039).
+    app.include_router(building_models_qa_router)
     app.include_router(cad_building3d_qa_router)
     # Ручная привязка корпуса к площадке (ADR-0052).
     app.include_router(cad_site_pins_qa_router)

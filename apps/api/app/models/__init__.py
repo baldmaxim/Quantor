@@ -3,6 +3,7 @@
 from app.models.api_token import ApiToken
 from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
+from app.models.building_model import BuildingModelVersion, ModelPart, ModelStorey
 from app.models.cad_construction import CadConstructionProps, CadSheetLevels
 from app.models.cad_decision import CadDecision
 from app.models.cad_facade_view import CadFacadeView
@@ -56,6 +57,7 @@ __all__ = [
     "ApiToken",
     "AuditEvent",
     "AuthSession",
+    "BuildingModelVersion",
     "CadConstructionProps",
     "CadDecision",
     "CadFacadeView",
@@ -98,6 +100,8 @@ __all__ = [
     "Job",
     "LocalCredential",
     "Measurement",
+    "ModelPart",
+    "ModelStorey",
     "PageGeometry",
     "PlanAlignment",
     "Project",

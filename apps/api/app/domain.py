@@ -176,6 +176,9 @@ class AuditAction(StrEnum):
     TENDER_VERSION_DOCUMENT_SET = "tender_version_document_set"
     TENDER_VERSION_DOCUMENT_REMOVED = "tender_version_document_removed"
     TENDER_VERSION_FROZEN = "tender_version_frozen"
+    MODEL_VERSION_COMMITTED = "model_version_committed"
+    MODEL_VERSION_APPROVED = "model_version_approved"
+    MODEL_VERSION_DELETED = "model_version_deleted"
 
     API_ACCESS_CREATED = "api_token_created"
     API_ACCESS_REVOKED = "api_token_revoked"
@@ -202,6 +205,15 @@ class TenderVersionStatus(StrEnum):
 
     DRAFT = "draft"
     FROZEN = "frozen"
+
+
+class ModelVersionStatus(StrEnum):
+    """Версия модели здания (ADR-0053): загрузка, кандидат, утверждена, заменена."""
+
+    UPLOADING = "uploading"
+    CANDIDATE = "candidate"
+    APPROVED = "approved"
+    SUPERSEDED = "superseded"
 
 
 class ProjectSource(StrEnum):
@@ -452,6 +464,9 @@ class JobType(StrEnum):
     # ЭОМ и СС этажа по одобренному виду (тот же вид и уровни, что у трасс механики): генератор
     # cad_eom из репозитория движка подпроцессом в cad-worker. Основной исполнитель его не берёт.
     CAD_EOM_ROUTE = "cad_eom_route"
+    # Модель здания из загруженных IFC проекта (ADR-0053): генератор cad_model из репозитория
+    # движка подпроцессом в cad-worker; результат - версия модели (кандидат), её утверждает человек.
+    MODEL_IFC_IMPORT = "model_ifc_import"
     # Паспорт листа по текстовому слою PDF проекта (ADR-0043, С1): разбор pypdf в основном
     # исполнителе, результат - кандидаты `sheet_passports`; подтверждает человек.
     SHEET_PASSPORT_EXTRACT = "sheet_passport_extract"

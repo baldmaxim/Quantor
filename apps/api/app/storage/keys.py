@@ -38,6 +38,11 @@ def artifact_key(revision_id: uuid.UUID, artifact_id: uuid.UUID, filename: str) 
     return f"revisions/{revision_id}/artifacts/{artifact_id}{suffix}"
 
 
+def model_part_key(project_id: uuid.UUID, version_id: uuid.UUID, path: str) -> str:
+    """Ключ части пакета модели (ADR-0053); путь уже проверен `model_package.part_path_ok`."""
+    return f"models/{project_id}/{version_id}/{path}"
+
+
 def display_filename(filename: str) -> str:
     """Имя для показа и для заголовка скачивания.
 
