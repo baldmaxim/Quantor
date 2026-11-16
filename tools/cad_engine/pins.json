@@ -47,6 +47,12 @@
       "params_path": "generators/cad_eom/params/v1.json",
       "params_sha256": "2080e08f01bd55af3a12d0e49494a1223f30b4a55d720ee2c435bde41dfbb807",
       "params_canonical_sha256": "f1d47e6c3d69835a8512b5e8f8807a953a161e1b96af814842a2dbb530006937"
+    },
+    "cad_facades": {
+      "generator_version": "cad_facades.v1",
+      "params_path": "generators/cad_facades/params/v1.json",
+      "params_sha256": "aa168a184a6ba6cfb882ab76a1dfcbde53a733e7a9f66e42743e16f07c0be06b",
+      "params_canonical_sha256": "ea103961485296a1072cc677941b25270cd7b8bb8afefe2bcb79c7fdc4b11b06"
     }
   }
 }
