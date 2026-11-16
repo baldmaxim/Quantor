@@ -99,6 +99,7 @@ _MESSAGES: Final = {
     CODE_CONFLICT: "Виды фасадов дают окну разную высоту: высота не назначена.",
     CODE_INVALID: "Окно фасада с некорректной высотой (верх не выше низа): высота не назначена.",
 }
+_KEPT_WITH_MANUAL: Final = (CODE_VIEW_INVALID, CODE_CONFLICT)
 _WINDOW_CODES: Final = (CODE_AMBIGUOUS, CODE_HIDDEN, CODE_CONFLICT, CODE_INVALID, CODE_NOT_OUTER)
 
 Point = tuple[float, float]
@@ -124,18 +125,20 @@ class FacadeViewInput:
 
 @dataclass(frozen=True, slots=True)
 class FacadeWindowHeight:
-    """Высота окна плана с вида фасада: от чистого пола листа, мм; источник - `observed`."""
+    """Высота окна плана: от чистого пола листа, мм; с вида фасада (`observed`) или ручная."""
 
     sill_mm: int
     head_mm: int
     accepted: bool
-    view_id: uuid.UUID
-    view_key: str
-    page_index: int
-    revision_id: uuid.UUID
-    title: str
+    view_id: uuid.UUID | None
+    view_key: str | None
+    page_index: int | None
+    revision_id: uuid.UUID | None
+    title: str | None
     overlap: float
     axes_checked: bool
+    # `facade` - вид фасада; `manual` - ручной ввод листа (ADR-0048 п. 5), поля вида пусты.
+    source: Literal["facade", "manual"] = "facade"
 
 
 @dataclass(frozen=True, slots=True)
@@ -550,6 +553,50 @@ def match_sheet_windows(
             if code in reasons.get(window.opening_id, ()):
                 issues.append(MatchIssue(code, _MESSAGES[code]))
     return FacadeMatch(heights, tuple(issues))
+
+
+def merge_manual_heights(
+    match: FacadeMatch,
+    openings: Sequence[WallsOpening],
+    sill_mm: int | None,
+    head_mm: int | None,
+) -> FacadeMatch:
+    """Высоты окон без `opening_height_mm`: принятый вид фасада > ручной ввод листа > кандидат.
+
+    Ручной ввод (`sill_mm`, `head_mm` - оба или ни одного) считается проверенным человеком:
+    `accepted = true`. Окно, у которого уже есть принятая высота фасада, её сохраняет; кандидат
+    фасада уступает ручному вводу. Ручной ввод покрывает все окна без высоты листа, поэтому
+    оконные замечания сопоставления снимаются; `facade_view_invalid` и конфликт высот принятых
+    видов остаются. Без ручного ввода результат - `match` как есть.
+    """
+    if sill_mm is None or head_mm is None:
+        return match
+    pending = [o.id for o in openings if o.kind == "window" and o.opening_height_mm is None]
+    if not pending:
+        return match
+    manual = FacadeWindowHeight(
+        sill_mm=sill_mm,
+        head_mm=head_mm,
+        accepted=True,
+        view_id=None,
+        view_key=None,
+        page_index=None,
+        revision_id=None,
+        title=None,
+        overlap=0.0,
+        axes_checked=False,
+        source="manual",
+    )
+    heights: dict[str, FacadeWindowHeight] = dict(match.heights)
+    for opening_id in pending:
+        found = heights.get(opening_id)
+        if found is None or not found.accepted:
+            heights[opening_id] = manual
+    # Каждое окно без высоты теперь имеет принятую (фасад или ручной ввод): оконным замечаниям
+    # сопоставления нечего сообщать. Данные видов вне контракта и конфликт высот принятых видов
+    # остаются: это сведения о самих видах, ручной ввод их не отменяет.
+    kept = tuple(i for i in match.issues if i.code in _KEPT_WITH_MANUAL)
+    return FacadeMatch(heights, kept)
 
 
 def grouped_warnings(issues: Sequence[MatchIssue]) -> list[tuple[str, str]]:

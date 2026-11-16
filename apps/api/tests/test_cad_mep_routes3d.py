@@ -63,7 +63,7 @@ def both_settings(
     mep = mep_settings(mep_tools, tmp_path, flag=flag)
     return clean_settings(
         environment="test",
-        feature_flags="cad.export=true" if flag else "",
+        feature_flags="cad.export=true,cad.mep_engine=true" if flag else "",
         cad_engine_python=sys.executable,
         cad_mep_runner=mep.cad_mep_runner,
         cad_mep_params=mep.cad_mep_params,

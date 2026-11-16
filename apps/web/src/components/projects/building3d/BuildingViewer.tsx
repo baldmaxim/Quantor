@@ -17,11 +17,13 @@ import { useCadBuilding3dWalls } from '@/lib/cad/building3d-queries';
 import { ALL_GROUPS_KEY } from '@/lib/cad/building-viewer-layout';
 import { cadErrorText } from '@/lib/cad/errors';
 
+import { BuildingCalcPanel } from './BuildingCalcPanel';
 import { BuildingFloorList } from './BuildingFloorList';
 import { BuildingFloorPanel } from './BuildingFloorPanel';
 import { BuildingViewerCanvas } from './BuildingViewerCanvas';
 import { BuildingViewerNotes } from './BuildingViewerNotes';
 import { BuildingViewerToolbar } from './BuildingViewerToolbar';
+import { useBuildingCalc } from './useBuildingCalc';
 import { useFloorViewParams } from './useFloorViewParams';
 import { useResizableWidth } from './useResizableWidth';
 
@@ -97,6 +99,7 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
     [floors, selection.floor],
   );
   const hasKnown = useMemo(() => splitFloors(floors).known.length > 0, [floors]);
+  const calc = useBuildingCalc(projectId, floors);
   const view = useFloorViewParams(projectId, selected);
   const detail = selection.detail && selected !== null;
   const groupSheetCount = useMemo(
@@ -150,11 +153,13 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
           hoverKey={hoverKey}
           exploded={exploded}
           fitSeq={fitSeq}
+          calcItems={calc.items}
           onHover={setHoverKey}
           onSelect={select}
           onOpenDetail={openDetail}
           onError={setCanvasError}
         />
+        {calc.available && <BuildingCalcPanel rows={calc.rows} onToggle={calc.onToggle} />}
         {isAll && hasLost && (
           <p className="pointer-events-none absolute top-[var(--s-3)] left-[var(--s-3)] max-w-[calc(100%-24px)] rounded-[var(--radius-sm)] border border-border bg-surface/90 px-[var(--s-3)] py-[var(--s-1)] text-xs text-muted">
             Полупрозрачные корпуса не поставлены на объект: их место условное

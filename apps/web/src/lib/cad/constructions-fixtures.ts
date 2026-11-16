@@ -69,6 +69,8 @@ export const constructionsRead = (
   generator: 'cad_walls',
   heights: {
     door_height: { default_mm: 2100, source: 'assumption', value_mm: 2100 },
+    window_sill: { default_mm: null, source: null, value_mm: null },
+    window_head: { default_mm: null, source: null, value_mm: null },
     evidence: null,
     floor_elevation_mm: 0,
     floor_elevation_source: 'observed',

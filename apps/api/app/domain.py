@@ -177,6 +177,13 @@ class AuditAction(StrEnum):
     TENDER_VERSION_DOCUMENT_REMOVED = "tender_version_document_removed"
     TENDER_VERSION_FROZEN = "tender_version_frozen"
 
+    API_ACCESS_CREATED = "api_token_created"
+    API_ACCESS_REVOKED = "api_token_revoked"
+    TENDER_BASE_RELEASED = "tender_base_released"
+    TENDER_BASE_REVOKED = "tender_base_revoked"
+    TENDER_CALC_UPLOADED = "tender_calc_uploaded"
+    TENDER_CALC_WITHDRAWN = "tender_calc_withdrawn"
+
     JOB_RETRIED = "job_retried"
     JOB_CANCELLED = "job_cancelled"
 
@@ -436,6 +443,11 @@ class JobType(StrEnum):
     # движка подпроцессом в cad-worker по исходному PDF ревизии; результат - кандидаты
     # `cad_facade_views`, принимает человек. Основной исполнитель этот тип не берёт.
     CAD_FACADES = "cad_facades"
+    # Предпросмотр профиля оформления тома по образцам человека (ADR-0049): скрипт движка
+    # `style_samples.py` через runner `style` подпроцессом в cad-worker по исходному PDF ревизии;
+    # результат - в payload задания, профиль появляется только после принятия человеком.
+    # Основной исполнитель этот тип не берёт.
+    CAD_STYLE_PREVIEW = "cad_style_preview"
     # ЭОМ и СС этажа по одобренному виду (тот же вид и уровни, что у трасс механики): генератор
     # cad_eom из репозитория движка подпроцессом в cad-worker. Основной исполнитель его не берёт.
     CAD_EOM_ROUTE = "cad_eom_route"

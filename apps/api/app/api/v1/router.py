@@ -22,6 +22,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.api.v1 import (
+    api_tokens,
     auth,
     calc,
     calc_inputs,
@@ -37,6 +38,7 @@ from app.api.v1 import (
     projects,
     scale,
     takeoff,
+    tender_exchange,
     tender_versions,
     uploads,
 )
@@ -69,6 +71,9 @@ protected_router.include_router(calc_synthesis.router)
 protected_router.include_router(calc_vk.router)
 # Версии тендера: замороженные комплекты ревизий, закрыты флагом tender.versions (ADR-0035).
 protected_router.include_router(tender_versions.router)
+# Обмен расчётами с TENDER и персональные токены: закрыты флагом tender.exchange (ADR-0051).
+protected_router.include_router(tender_exchange.router)
+protected_router.include_router(api_tokens.router)
 
 api_v1_router.include_router(protected_router)
 

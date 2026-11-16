@@ -256,6 +256,7 @@ async def test_routes_are_closed_when_the_flag_is_off(
         ("put", "constructions/abc/props", {"props": {}}),
         ("put", "constructions/props:bulk", {"keys": ["a"], "props_patch": {}}),
         ("put", "levels", {}),
+        ("post", "window-levels/apply-to-section", None),
         ("post", "walls", None),
     ]
     async with build_api(
@@ -288,6 +289,7 @@ async def test_foreign_workspace_sees_and_changes_nothing(
             ("put", "constructions/aaaaaaaaaaaa/props", {"props": {}}),
             ("put", "constructions/props:bulk", {"keys": ["aaaaaaaaaaaa"], "props_patch": {}}),
             ("put", "levels", {}),
+            ("post", "window-levels/apply-to-section", None),
             ("post", "walls", None),
         ):
             response = await foreign.request(method, _url(project_id, job_id, tail), json=body)
@@ -564,6 +566,8 @@ async def test_read_constructions_computes_values_and_sources(
             "slab_thickness_mm": None,
             "door_height_mm": None,
             "floor_elevation_mm": None,
+            "window_sill_mm": None,
+            "window_head_mm": None,
         }
 
         wall = _construction(body, "aaaaaaaaaaaa")["computed"]
@@ -798,6 +802,8 @@ async def test_levels_put_changes_heights_and_totals_and_null_resets(
             "slab_thickness_mm": None,
             "door_height_mm": 2000,
             "floor_elevation_mm": None,
+            "window_sill_mm": None,
+            "window_head_mm": None,
         }
         assert body["heights"]["floor_height"] == {
             "value_mm": 3200,

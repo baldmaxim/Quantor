@@ -2,7 +2,7 @@ import type { CadHeightsRead, CadSheetLevelsWrite } from '@quantor/api-client';
 
 /**
  * Высоты 3D-вида: подписи источников и переопределения листа (ADR-0039 п. 5).
- * Сервер заменяет высоты листа целиком, поэтому запись всегда несёт все четыре поля.
+ * Сервер заменяет высоты листа целиком, поэтому запись всегда несёт все шесть полей.
  */
 
 type Source = CadHeightsRead['floor_elevation_source'];
@@ -30,6 +30,12 @@ export const SHEET_LEVEL_SPECS: readonly ISheetLevelSpec[] = [
   { key: 'floor_height_mm', label: 'Высота этажа, мм', range: [2000, 6000] },
   { key: 'slab_thickness_mm', label: 'Толщина плиты листа, мм', range: [100, 1000] },
   { key: 'door_height_mm', label: 'Высота двери, мм', range: [1500, 3500] },
+  { key: 'window_sill_mm', label: 'Подоконник, мм', range: [0, 5999] },
+  {
+    key: 'window_head_mm',
+    label: 'Высота окна (верх от чистого пола), мм',
+    range: [1, 6000],
+  },
 ];
 
 /**
@@ -48,6 +54,8 @@ export const sheetOverridesOf = (heights: CadHeightsRead): Record<SheetLevelKey,
       ? null
       : manual(heights.slab_thickness.value_mm, heights.slab_thickness.source),
     door_height_mm: manual(heights.door_height.value_mm, heights.door_height.source),
+    window_sill_mm: manual(heights.window_sill.value_mm, heights.window_sill.source),
+    window_head_mm: manual(heights.window_head.value_mm, heights.window_head.source),
   };
 };
 
@@ -66,6 +74,8 @@ export const draftOf = (overrides: Record<SheetLevelKey, number | null>): Levels
   floor_height_mm: overrides.floor_height_mm === null ? '' : String(overrides.floor_height_mm),
   slab_thickness_mm: overrides.slab_thickness_mm === null ? '' : String(overrides.slab_thickness_mm),
   door_height_mm: overrides.door_height_mm === null ? '' : String(overrides.door_height_mm),
+  window_sill_mm: overrides.window_sill_mm === null ? '' : String(overrides.window_sill_mm),
+  window_head_mm: overrides.window_head_mm === null ? '' : String(overrides.window_head_mm),
 });
 
 /** Тело PUT высот листа из черновика; ошибка - текст для пользователя. */
@@ -80,5 +90,23 @@ export const writeOfDraft = (
     }
     write[spec.key] = value;
   }
+  // Подоконник и верх окна - пара: оба или ни одного, подоконник ниже верха (как на сервере).
+  const sill = write.window_sill_mm ?? null;
+  const head = write.window_head_mm ?? null;
+  if ((sill === null) !== (head === null)) {
+    return { error: 'Подоконник и высота окна задаются вместе: заполните оба поля.' };
+  }
+  if (sill !== null && head !== null && sill >= head) {
+    return { error: 'Подоконник должен быть ниже верха окна.' };
+  }
   return { write };
+};
+
+/** Секция листа по заголовку плана: корпус и секция обе заданы; иначе `null` (кнопка недоступна). */
+export const sectionLabelOf = (
+  title: { readonly corps?: string | null; readonly section?: string | null } | null | undefined,
+): string | null => {
+  const corps = title?.corps?.trim() ?? '';
+  const section = title?.section?.trim() ?? '';
+  return corps !== '' && section !== '' ? `корп. ${corps}, сек. ${section}` : null;
 };

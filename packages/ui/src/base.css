@@ -165,6 +165,31 @@
   --cad-construction-slab: #5f7f8c;
   --cad-construction-not-in-vor: #c4182c;
 
+  /* Системы расчётов TENDER (lib/tender/systems.ts): цвет слоя «Расчёты» и значков систем */
+  --tender-sys-heating: #c0261f;
+  --tender-sys-water-supply: #0b78b0;
+  --tender-sys-sewage: #7a4a1d;
+  --tender-sys-storm-drain: #567a8e;
+  --tender-sys-fire-sprinkler: #a21caf;
+  --tender-sys-fire-hydrant: #b45309;
+  --tender-sys-dry-pipe: #dc4a16;
+  --tender-sys-ventilation: #0a8f9c;
+  --tender-sys-smoke-control: #6d3fd1;
+  --tender-sys-conditioning: #1d5bb3;
+  --tender-sys-cooling: #0891b2;
+  --tender-sys-itp: #4d7c0f;
+  --tender-sys-mech-other: #5b6573;
+  --tender-sys-power: #c2410c;
+  --tender-sys-lighting: #d97706;
+  --tender-sys-grounding: #15803d;
+  --tender-sys-lightning: #7c2d12;
+  --tender-sys-eom-other: #b91c1c;
+  --tender-sys-ss-network: #2563eb;
+  --tender-sys-ss-security: #6d28d9;
+  --tender-sys-ss-fire-alarm: #db2777;
+  --tender-sys-ss-dispatch: #4c1d95;
+  --tender-sys-ss-other: #7e22ce;
+
   /* --- вспомогательное --- */
   --tooltip-bg: #2b323b;
   --tooltip-text: #ffffff;
@@ -369,6 +394,31 @@
     --cad-construction-slab: #7f9ca8;
     --cad-construction-not-in-vor: #ff6b7a;
 
+    /* Системы расчётов TENDER (lib/tender/systems.ts): цвет слоя «Расчёты» и значков систем */
+    --tender-sys-heating: #d53631;
+    --tender-sys-water-supply: #1b86bd;
+    --tender-sys-sewage: #9a6234;
+    --tender-sys-storm-drain: #6f93a8;
+    --tender-sys-fire-sprinkler: #b83fc4;
+    --tender-sys-fire-hydrant: #c26a14;
+    --tender-sys-dry-pipe: #e8602c;
+    --tender-sys-ventilation: #1fb0bd;
+    --tender-sys-smoke-control: #8a62e0;
+    --tender-sys-conditioning: #2b71d3;
+    --tender-sys-cooling: #22b6d6;
+    --tender-sys-itp: #6aa11f;
+    --tender-sys-mech-other: #7a8594;
+    --tender-sys-power: #fb923c;
+    --tender-sys-lighting: #fbbf24;
+    --tender-sys-grounding: #4ade80;
+    --tender-sys-lightning: #fdba74;
+    --tender-sys-eom-other: #f87171;
+    --tender-sys-ss-network: #60a5fa;
+    --tender-sys-ss-security: #a78bfa;
+    --tender-sys-ss-fire-alarm: #f472b6;
+    --tender-sys-ss-dispatch: #c4b5fd;
+    --tender-sys-ss-other: #c084fc;
+
     --tooltip-bg: #c8d2de;
     --tooltip-text: #0f141a;
     --skeleton: #232932;
@@ -501,6 +551,31 @@
   --cad-construction-check: #d99a14;
   --cad-construction-slab: #7f9ca8;
   --cad-construction-not-in-vor: #ff6b7a;
+
+  /* Системы расчётов TENDER (lib/tender/systems.ts): цвет слоя «Расчёты» и значков систем */
+  --tender-sys-heating: #d53631;
+  --tender-sys-water-supply: #1b86bd;
+  --tender-sys-sewage: #9a6234;
+  --tender-sys-storm-drain: #6f93a8;
+  --tender-sys-fire-sprinkler: #b83fc4;
+  --tender-sys-fire-hydrant: #c26a14;
+  --tender-sys-dry-pipe: #e8602c;
+  --tender-sys-ventilation: #1fb0bd;
+  --tender-sys-smoke-control: #8a62e0;
+  --tender-sys-conditioning: #2b71d3;
+  --tender-sys-cooling: #22b6d6;
+  --tender-sys-itp: #6aa11f;
+  --tender-sys-mech-other: #7a8594;
+  --tender-sys-power: #fb923c;
+  --tender-sys-lighting: #fbbf24;
+  --tender-sys-grounding: #4ade80;
+  --tender-sys-lightning: #fdba74;
+  --tender-sys-eom-other: #f87171;
+  --tender-sys-ss-network: #60a5fa;
+  --tender-sys-ss-security: #a78bfa;
+  --tender-sys-ss-fire-alarm: #f472b6;
+  --tender-sys-ss-dispatch: #c4b5fd;
+  --tender-sys-ss-other: #c084fc;
 
   --tooltip-bg: #c8d2de;
   --tooltip-text: #0f141a;

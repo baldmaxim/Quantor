@@ -1,7 +1,7 @@
 """Зоны CAD: происхождение и сверка с экспликацией
 
-Revision ID: 0041_cad_zone_quality
-Revises: 0040_cad_facade_views
+Revision ID: 0044_cad_zone_quality
+Revises: 0043_tender_exchange
 Create Date: 2026-11-16
 
 Ревью движка 2026-11-16 (ЖК Знаки): зона с отклонением от экспликации в разы писалась как рабочая,
@@ -29,8 +29,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pg
 
-revision: str = "0041_cad_zone_quality"
-down_revision: str | None = "0040_cad_facade_views"
+revision: str = "0044_cad_zone_quality"
+down_revision: str | None = "0043_tender_exchange"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -94,6 +94,14 @@ vi.mock('@/lib/cad/facades-queries', () => ({
   useStartCadFacades: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
   useDecideCadFacadeViews: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
 }));
+vi.mock('@/lib/cad/style-profile-queries', () => ({
+  useStyleProfile: () => {
+    return { data: undefined, isError: false, error: null, refetch: vi.fn() };
+  },
+  useCreateStylePreview: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+  useStylePreviewJob: () => ({ data: undefined, isError: false, error: null }),
+  useAcceptStylePreview: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+}));
 vi.mock('@/lib/cad/finishes-queries', () => ({
   useCadFinishTemplates: () => ({ data: undefined }),
   useAssignCadFinishTemplate: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -130,6 +138,13 @@ vi.mock('@/lib/cad/vor-queries', async (importOriginal) => ({
 vi.mock('@/lib/cad/eom-queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useCadEomPreview: () => null,
+}));
+
+// Флаги и слой «Расчёты»: трассы движка открыты (`cad.mep_engine`), расчётов TENDER на виде нет.
+vi.mock('@/lib/tender/layers', () => ({
+  useMepEngineEnabled: () => true,
+  useTenderExchangeEnabled: () => false,
+  useTenderViewLayers: () => ({ data: undefined }),
 }));
 
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({

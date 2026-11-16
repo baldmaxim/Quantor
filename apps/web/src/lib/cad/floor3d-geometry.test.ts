@@ -215,6 +215,22 @@ describe('окна по фасаду', () => {
     expect(sill.hostId).toBe('w1');
   });
 
+  it('окно по ручному вводу строится как принятое: тот же признак, что у принятого по фасаду', () => {
+    const plan = buildFloor3dPlan(
+      floor3dFixture({
+        windows: [
+          windowFixture({ source: 'manual', facade_view_key: null, facade_title: null }),
+          windowFixture({ opening_id: 'win2', accepted: false }),
+        ],
+      }),
+    );
+    const accepted = (id: string) =>
+      plan.prisms.filter((item) => item.id === id).map((item) => item.accepted);
+    expect(accepted('win1')).toEqual([true, true]);
+    // кандидат отличается от ручного ввода
+    expect(accepted('win2')).toEqual([false, false]);
+  });
+
   it('низ стекла равен низу окна - подоконной части нет', () => {
     const plan = buildFloor3dPlan(
       floor3dFixture({ windows: [windowFixture({ sill_z_top_mm: 3000, accepted: false })] }),

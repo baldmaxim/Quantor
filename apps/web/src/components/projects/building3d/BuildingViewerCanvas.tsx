@@ -8,6 +8,7 @@ import { buildViewerPlan } from '@/lib/cad/building-viewer-geometry';
 import { readBuildingViewerColors } from '@/lib/cad/building-viewer-colors';
 import { buildAllGroupsPlan } from '@/lib/cad/building-viewer-layout';
 import { createBuildingViewer, type IBuildingViewer } from '@/lib/cad/building-viewer-scene';
+import { buildBuildingCalcGroups, type IBuildingCalcItem } from '@/lib/tender/building-calc-layer';
 import { useTheme } from '@/lib/theme';
 
 interface IBuildingViewerCanvasProps {
@@ -20,6 +21,8 @@ interface IBuildingViewerCanvasProps {
   readonly exploded: boolean;
   /** Команда «Вписать»: счётчик, чтобы повторное нажатие не терялось. */
   readonly fitSeq: number;
+  /** Геометрия расчётов TENDER по этажам (слой «Расчёты», ADR-0051); нет - слоя нет. */
+  readonly calcItems?: readonly IBuildingCalcItem[];
   readonly onHover: (key: string | null) => void;
   /** Щелчок по этажу - выбрать его; `null` - выбор снят (повторный щелчок по нему или щелчок в пустоту). */
   readonly onSelect: (key: string | null) => void;
@@ -43,6 +46,7 @@ export const BuildingViewerCanvas: FC<IBuildingViewerCanvasProps> = ({
   hoverKey,
   exploded,
   fitSeq,
+  calcItems,
   onHover,
   onSelect,
   onOpenDetail,
@@ -101,6 +105,17 @@ export const BuildingViewerCanvas: FC<IBuildingViewerCanvasProps> = ({
   useEffect(() => {
     view.current?.setColors(readBuildingViewerColors());
   }, [theme]);
+
+  // Расчёты TENDER: после модели (эффект выше), разнос этажей двигает их вместе с этажом.
+  useEffect(() => {
+    if (plan === null || calcItems === undefined || calcItems.length === 0) return undefined;
+    const built = buildBuildingCalcGroups(plan, calcItems);
+    view.current?.setCalcGroups(built.groups);
+    return () => {
+      view.current?.setCalcGroups(null);
+      built.dispose();
+    };
+  }, [plan, calcItems, theme]);
 
   useEffect(() => {
     view.current?.setStyle(selectedKey, hoverKey);

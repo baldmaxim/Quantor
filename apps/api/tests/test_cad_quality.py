@@ -694,7 +694,7 @@ async def test_pipeline_marks_stages_done_by_another_version_as_stale(
         assert sheet["views"][0]["zones_recreatable"] is False
 
 
-# ------------------------------------------------------------------ миграция 0041
+# ------------------------------------------------------------------ миграция 0044
 
 
 def _migration() -> Any:
@@ -702,9 +702,9 @@ def _migration() -> Any:
         Path(__file__).resolve().parents[1]
         / "alembic"
         / "versions"
-        / "20261116_0041_cad_zone_quality.py"
+        / "20261116_0044_cad_zone_quality.py"
     )
-    spec = importlib.util.spec_from_file_location("migration_0041", path)
+    spec = importlib.util.spec_from_file_location("migration_0044", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

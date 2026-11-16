@@ -1,0 +1,260 @@
+{
+  "$defs": {
+    "ObjectBaseEngine": {
+      "additionalProperties": false,
+      "properties": {
+        "cad_mep": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cad Mep"
+        },
+        "cad_walls": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cad Walls"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "title": "ObjectBaseEngine",
+      "type": "object"
+    },
+    "ObjectBaseManifestView": {
+      "additionalProperties": false,
+      "properties": {
+        "corps": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corps"
+        },
+        "dir": {
+          "title": "Dir",
+          "type": "string"
+        },
+        "document_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Id"
+        },
+        "document_title": {
+          "title": "Document Title",
+          "type": "string"
+        },
+        "dxf_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Dxf Sha256",
+          "type": "string"
+        },
+        "floors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Floors",
+          "type": "array"
+        },
+        "key": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}:\\d{1,4}:\\d{1,3}$",
+          "title": "Key",
+          "type": "string"
+        },
+        "page_index": {
+          "minimum": 0,
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "revision_id": {
+          "format": "uuid",
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section"
+        },
+        "sheet_label": {
+          "title": "Sheet Label",
+          "type": "string"
+        },
+        "view": {
+          "minimum": 0,
+          "title": "View",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "key",
+        "dir",
+        "revision_id",
+        "document_title",
+        "page_index",
+        "view",
+        "sheet_label",
+        "dxf_sha256",
+        "floors"
+      ],
+      "title": "ObjectBaseManifestView",
+      "type": "object"
+    },
+    "ObjectBaseProject": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "ObjectBaseProject",
+      "type": "object"
+    },
+    "ObjectBaseRelease": {
+      "additionalProperties": false,
+      "properties": {
+        "comment": {
+          "title": "Comment",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "number": {
+          "minimum": 1,
+          "title": "Number",
+          "type": "integer"
+        },
+        "released_at": {
+          "format": "date-time",
+          "title": "Released At",
+          "type": "string"
+        },
+        "released_by": {
+          "title": "Released By",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "number",
+        "released_at",
+        "released_by",
+        "comment"
+      ],
+      "title": "ObjectBaseRelease",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.object_base.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "engine": {
+      "$ref": "#/$defs/ObjectBaseEngine"
+    },
+    "files": {
+      "additionalProperties": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Files",
+      "type": "object"
+    },
+    "frame": {
+      "const": "view_dxf_mm",
+      "title": "Frame",
+      "type": "string"
+    },
+    "project": {
+      "$ref": "#/$defs/ObjectBaseProject"
+    },
+    "release": {
+      "$ref": "#/$defs/ObjectBaseRelease"
+    },
+    "schema": {
+      "const": "quantor.object_base.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "units": {
+      "const": "mm",
+      "title": "Units",
+      "type": "string"
+    },
+    "views": {
+      "items": {
+        "$ref": "#/$defs/ObjectBaseManifestView"
+      },
+      "title": "Views",
+      "type": "array"
+    },
+    "z_reference": {
+      "const": "finished_floor",
+      "title": "Z Reference",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "release",
+    "project",
+    "engine",
+    "units",
+    "frame",
+    "z_reference",
+    "views",
+    "files"
+  ],
+  "title": "ObjectBaseManifest",
+  "type": "object"
+}

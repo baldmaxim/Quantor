@@ -207,6 +207,27 @@ async def save_props(
     )
 
 
+EMPTY_LEVELS = CadSheetLevelsRead(
+    floor_height_mm=None,
+    slab_thickness_mm=None,
+    door_height_mm=None,
+    floor_elevation_mm=None,
+    window_sill_mm=None,
+    window_head_mm=None,
+)
+
+
+def _levels_read(row: CadSheetLevels) -> CadSheetLevelsRead:
+    return CadSheetLevelsRead(
+        floor_height_mm=row.floor_height_mm,
+        slab_thickness_mm=row.slab_thickness_mm,
+        door_height_mm=row.door_height_mm,
+        floor_elevation_mm=row.floor_elevation_mm,
+        window_sill_mm=row.window_sill_mm,
+        window_head_mm=row.window_head_mm,
+    )
+
+
 async def load_levels(
     session: AsyncSession, *, revision_id: uuid.UUID, page_index: int, view: int
 ) -> CadSheetLevelsRead:
@@ -220,23 +241,8 @@ async def load_levels(
         .execution_options(populate_existing=True)
     )
     if row is None:
-        return CadSheetLevelsRead(
-            floor_height_mm=None,
-            slab_thickness_mm=None,
-            door_height_mm=None,
-            floor_elevation_mm=None,
-        )
-    return CadSheetLevelsRead(
-        floor_height_mm=row.floor_height_mm,
-        slab_thickness_mm=row.slab_thickness_mm,
-        door_height_mm=row.door_height_mm,
-        floor_elevation_mm=row.floor_elevation_mm,
-    )
-
-
-EMPTY_LEVELS = CadSheetLevelsRead(
-    floor_height_mm=None, slab_thickness_mm=None, door_height_mm=None, floor_elevation_mm=None
-)
+        return EMPTY_LEVELS
+    return _levels_read(row)
 
 
 async def load_levels_many(
@@ -253,15 +259,7 @@ async def load_levels_many(
         .where(CadSheetLevels.revision_id.in_(set(revision_ids)))
         .execution_options(populate_existing=True)
     )
-    return {
-        (row.revision_id, row.page_index, row.view): CadSheetLevelsRead(
-            floor_height_mm=row.floor_height_mm,
-            slab_thickness_mm=row.slab_thickness_mm,
-            door_height_mm=row.door_height_mm,
-            floor_elevation_mm=row.floor_elevation_mm,
-        )
-        for row in rows
-    }
+    return {(row.revision_id, row.page_index, row.view): _levels_read(row) for row in rows}
 
 
 async def load_project_slab(session: AsyncSession, *, project_id: uuid.UUID) -> ProjectSlab | None:
@@ -292,6 +290,8 @@ async def save_levels(
         "slab_thickness_mm": levels.slab_thickness_mm,
         "door_height_mm": levels.door_height_mm,
         "floor_elevation_mm": levels.floor_elevation_mm,
+        "window_sill_mm": levels.window_sill_mm,
+        "window_head_mm": levels.window_head_mm,
         "updated_by": user_id,
     }
     statement = insert(CadSheetLevels).values(
@@ -312,4 +312,34 @@ async def save_levels(
         slab_thickness_mm=levels.slab_thickness_mm,
         door_height_mm=levels.door_height_mm,
         floor_elevation_mm=levels.floor_elevation_mm,
+        window_sill_mm=levels.window_sill_mm,
+        window_head_mm=levels.window_head_mm,
+    )
+
+
+async def save_window_levels(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    sill_mm: int,
+    head_mm: int,
+    user_id: uuid.UUID | None,
+) -> None:
+    """Записывает только подоконник и верх окна листа; остальные высоты листа не трогает."""
+    values = {"window_sill_mm": sill_mm, "window_head_mm": head_mm, "updated_by": user_id}
+    statement = insert(CadSheetLevels).values(
+        id=uuid.uuid4(),
+        workspace_id=workspace_id,
+        revision_id=revision_id,
+        page_index=page_index,
+        view=view,
+        **values,
+    )
+    await session.execute(
+        statement.on_conflict_do_update(
+            constraint="uq_cad_sheet_levels_sheet", set_={**values, "updated_at": func.now()}
+        )
     )

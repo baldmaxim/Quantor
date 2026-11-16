@@ -24,7 +24,7 @@ from app.auth import cache as auth_cache
 from app.auth import csrf, oidc, sessions
 from app.auth.context import AuthContext, CredentialKind, Principal
 from app.auth.dev import DEV_ROLE_HEADER, dev_context
-from app.auth.permissions import Permission, permissions_for
+from app.auth.permissions import API_TOKEN_PERMISSIONS, Permission, permissions_for
 from app.auth.session_cookie import STATE_KEY, SessionCookieRefresh
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
@@ -32,6 +32,7 @@ from app.db.session import get_session
 from app.domain import Role
 from app.errors import DomainError, ErrorCode, http_error
 from app.models import UserIdentity
+from app.services import api_tokens as api_tokens_service
 from app.services import identity as identity_service
 
 log = get_logger(__name__)
@@ -53,6 +54,9 @@ class _Identity:
     # Хеш токена сеанса — ключ кэша (`auth/cache.py`); у bearer-токена кэша нет.
     token_hash: str | None = None
     memberships: tuple[identity_service.MembershipView, ...] | None = None
+    # Персональный токен: пространство и область берутся из него, а не из членства по умолчанию.
+    token_workspace_id: uuid.UUID | None = None
+    token_scopes: tuple[str, ...] = ()
 
 
 def _unauthenticated(code: ErrorCode = ErrorCode.UNAUTHENTICATED) -> Exception:
@@ -81,13 +85,24 @@ async def get_auth_context(
             request.headers.get(csrf.CSRF_HEADER),
         )
 
-    workspace_id, role = await _resolve_workspace(request, session, identity)
+    workspace_id: uuid.UUID | None
+    if credential is CredentialKind.API_TOKEN:
+        workspace_id, role = await _resolve_token_workspace(request, session, identity)
+        # Права токена - права роли владельца, суженные областью токена (ADR-0051).
+        granted = (
+            permissions_for(role) & API_TOKEN_PERMISSIONS
+            if api_tokens_service.SCOPE_TENDER in identity.token_scopes
+            else frozenset[Permission]()
+        )
+    else:
+        workspace_id, role = await _resolve_workspace(request, session, identity)
+        granted = permissions_for(role)
 
     return AuthContext(
         principal=principal,
         workspace_id=workspace_id,
         role=role,
-        permissions=permissions_for(role),
+        permissions=granted,
         credential=credential,
         is_dev_mode=False,
         session_id=identity.session_id,
@@ -98,11 +113,15 @@ async def _authenticate(request: Request, settings: Settings, session: AsyncSess
     """Опознаёт личность по cookie или заголовку."""
     header = request.headers.get("Authorization", "")
     if header.lower().startswith(_BEARER_PREFIX):
+        raw_token = header[len(_BEARER_PREFIX) :].strip()
+        if raw_token.startswith(api_tokens_service.QTK_PREFIX):
+            # Персональный токен проверяется в любом режиме входа: его выдал сам портал.
+            return await _authenticate_api_token(session, raw_token)
         if settings.auth_mode != "oidc":
             # Токен в заголовке выдаёт только провайдер. При локальном входе его нет, и
             # проверять подпись нечем — это отказ в учётных данных, а не сбой настройки.
             raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
-        claims = await oidc.verify_access_token(settings, header[len(_BEARER_PREFIX) :].strip())
+        claims = await oidc.verify_access_token(settings, raw_token)
         user = await identity_service.get_user_by_subject(
             session, issuer=str(claims.get("iss", "")), subject=str(claims.get("sub", ""))
         )
@@ -159,6 +178,58 @@ async def _authenticate(request: Request, settings: Settings, session: AsyncSess
         session_expires_at=row.expires_at,
     )
     return _Identity(principal, CredentialKind.SESSION, row.id, token_hash)
+
+
+async def _authenticate_api_token(session: AsyncSession, raw_token: str) -> _Identity:
+    """Опознаёт личность по персональному токену `qtk_…`.
+
+    Неизвестный, отозванный и истёкший токены неотличимы снаружи: один код отказа. Метка
+    `last_used_at` обновляется не чаще раза в минуту, поэтому коммит случается редко и только
+    после того, как сессия лишь читала.
+    """
+    row = await api_tokens_service.find_active(session, raw_token)
+    if row is None:
+        raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
+    user = await identity_service.get_user(session, row.user_id)
+    if user is None or not identity_service.can_sign_in(user):
+        raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
+    workspace_id, scopes = row.workspace_id, tuple(row.scopes)
+    if api_tokens_service.needs_touch(row):
+        await api_tokens_service.touch(session, row)
+        await session.commit()
+    return _Identity(
+        _principal(user),
+        CredentialKind.API_TOKEN,
+        None,
+        token_workspace_id=workspace_id,
+        token_scopes=scopes,
+    )
+
+
+async def _resolve_token_workspace(
+    request: Request, session: AsyncSession, identity: _Identity
+) -> tuple[uuid.UUID, Role]:
+    """Пространство и роль токена: пространство одно, заданное при выпуске.
+
+    Заголовок `X-Workspace-Id` не переключает пространство, а лишь обязан совпасть с ним:
+    расхождение — отказ, а не молчаливая подмена. Владелец токена должен по-прежнему состоять
+    в пространстве (или быть администратором платформы): вышедший из него токеном не пользуется.
+    """
+    workspace_id = identity.token_workspace_id
+    if workspace_id is None:  # pragma: no cover - токен без пространства не создаётся
+        raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
+    requested = _requested_workspace(request)
+    if requested is not None and requested != workspace_id:
+        raise DomainError(ErrorCode.WORKSPACE_FORBIDDEN)
+    principal = identity.principal
+    if principal.is_platform_admin:
+        if not await identity_service.workspace_exists(session, workspace_id):
+            raise DomainError(ErrorCode.WORKSPACE_FORBIDDEN)
+        return workspace_id, Role.PLATFORM_ADMIN
+    for membership in await identity_service.list_memberships(session, principal.user_id):
+        if membership.workspace_id == workspace_id:
+            return workspace_id, membership.role
+    raise DomainError(ErrorCode.WORKSPACE_FORBIDDEN)
 
 
 def _principal(user: UserIdentity) -> Principal:

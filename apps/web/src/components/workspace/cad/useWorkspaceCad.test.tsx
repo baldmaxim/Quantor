@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   view: vi.fn(),
   preview: vi.fn(),
   remarks: vi.fn(),
+  styleProfile: vi.fn(),
   jobsData: { current: undefined as unknown },
   jobData: { current: undefined as unknown },
   diagnosticsPatch: { current: {} as Parameters<typeof diagnostics>[0] },
@@ -54,6 +55,15 @@ vi.mock('@/lib/cad/facades-queries', () => ({
   useStartCadFacades: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
   useDecideCadFacadeViews: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
 }));
+vi.mock('@/lib/cad/style-profile-queries', () => ({
+  useStyleProfile: (...args: unknown[]) => {
+    mocks.styleProfile(...args);
+    return { data: undefined, isError: false, error: null, refetch: vi.fn() };
+  },
+  useCreateStylePreview: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+  useStylePreviewJob: () => ({ data: undefined, isError: false, error: null }),
+  useAcceptStylePreview: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+}));
 vi.mock('@/lib/cad/finishes-queries', () => ({
   useCadFinishTemplates: () => ({ data: undefined }),
   useAssignCadFinishTemplate: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -90,6 +100,13 @@ vi.mock('@/lib/cad/vor-queries', async (importOriginal) => ({
 vi.mock('@/lib/cad/eom-queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useCadEomPreview: () => null,
+}));
+
+// Флаги и слой «Расчёты»: трассы движка открыты (`cad.mep_engine`), расчётов TENDER на виде нет.
+vi.mock('@/lib/tender/layers', () => ({
+  useMepEngineEnabled: () => true,
+  useTenderExchangeEnabled: () => false,
+  useTenderViewLayers: () => ({ data: undefined }),
 }));
 
 vi.mock('@/lib/cad/view-queries', async (importOriginal) => ({
@@ -192,6 +209,20 @@ describe('useWorkspaceCad: запросы', () => {
     mount({ enabled: false });
     expect(mocks.jobs).toHaveBeenCalledWith('p1', null, 0);
     expect(mocks.job).toHaveBeenCalledWith('p1', null, null);
+  });
+
+  it('профиль оформления: без флага запросов нет, с флагом и документом - читается', () => {
+    const off = mount({ enabled: false, documentId: 'd1' });
+    expect(mocks.styleProfile).toHaveBeenLastCalledWith('p1', 'd1', false);
+    expect(off.result.current.side.style).toBeNull();
+
+    const on = mount({ documentId: 'd1' });
+    expect(mocks.styleProfile).toHaveBeenLastCalledWith('p1', 'd1', true);
+    expect(on.result.current.side.style).not.toBeNull();
+    expect(on.result.current.styleCapture).toBeNull();
+
+    mount({ documentId: null });
+    expect(mocks.styleProfile).toHaveBeenLastCalledWith('p1', null, true);
   });
 
   it('режим «Листы»: задания и вид читаются сразу, без захода в CAD; открытие CAD их не перезапускает', () => {
@@ -335,9 +366,12 @@ describe('useWorkspaceCad: задание и вид в адресе', () => {
     expect(mount({ jobParam: JOB_ID, viewParam: 9 }).result.current.bar?.view).toBe(1);
   });
 
-  it('вид без явного задания игнорируется', () => {
+  it('вид без явного задания выбирается у самого нового готового задания листа (ссылка из «Расчётов»)', () => {
     recognized();
-    expect(mount({ viewParam: 2 }).result.current.bar?.view).toBe(1);
+    const hook = mount({ viewParam: 2 });
+    expect(hook.result.current.bar?.view).toBe(2);
+    expect(hook.result.current.side.job?.jobId).toBe(JOB_ID);
+    expect(mount({ viewParam: 9 }).result.current.bar?.view).toBe(1);
   });
 
   it('переключение вида пишет задание и вид в адрес', () => {
@@ -475,6 +509,23 @@ describe('useWorkspaceCad: наложение и непрозрачность PD
     expect(window.localStorage.getItem('quantor.cad.view-3d')).toBe('1');
     act(() => result.current.bar?.floor3d?.onModeChange('plan'));
     expect(result.current.floor3d).toBeNull();
+  });
+
+  it('?mode=3d открывает 3D этажа и приоритетнее сохранённого «План»; ?mode=plan - наоборот', () => {
+    recognized();
+    window.localStorage.setItem('quantor.cad.view-3d', '0');
+    const { result, rerender } = mount({ modeParam: '3d' });
+    expect(result.current.bar?.floor3d?.mode).toBe('3d');
+    expect(result.current.floor3d).not.toBeNull();
+    rerender(inputs({ modeParam: 'plan' }));
+    expect(result.current.bar?.floor3d?.mode).toBe('plan');
+    expect(result.current.floor3d).toBeNull();
+  });
+
+  it('без ?mode режим берётся из сохранённого выбора', () => {
+    recognized();
+    window.localStorage.setItem('quantor.cad.view-3d', '1');
+    expect(mount().result.current.bar?.floor3d?.mode).toBe('3d');
   });
 
   it('лист-разрез: 3D не строится - переключателя нет, вид закрыт, в строке пояснение', () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  applyCadWindowLevelsToSection,
   putCadFloor3dHole,
   putCadProjectLevels,
   putCadSheetLevels,
@@ -10,6 +11,7 @@ import {
   type CadProjectLevelsRead,
   type CadProjectLevelsWrite,
   type CadSheetLevelsWrite,
+  type CadWindowLevelsApplyRead,
 } from '@quantor/api-client';
 import {
   useMutation,
@@ -115,6 +117,33 @@ export const useSaveFloor3dSheetLevels = (
       void client.invalidateQueries({
         queryKey: ['cad-constructions', params.projectId, params.revisionId, params.jobId, params.pageIndex, params.view],
       });
+    },
+  });
+};
+
+/**
+ * «Применить подоконник и высоту окна ко всей секции» (ADR-0048 п. 5): сервер берёт сохранённые
+ * значения листа и пишет их листам того же корпуса и секции. `dryRun` - только сосчитать листы для
+ * подтверждения. После записи перечитываются модели этажей, общий вид и конструкции проекта.
+ */
+export const useApplyCadWindowLevelsToSection = (
+  params: ICadViewParams | null,
+): UseMutationResult<CadWindowLevelsApplyRead, unknown, { readonly dryRun: boolean }> => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dryRun }) =>
+      unwrap(
+        await applyCadWindowLevelsToSection({
+          throwOnError: true,
+          path: pathOf(need(params)),
+          query: { dry_run: dryRun },
+        }),
+      ),
+    onSuccess: (result) => {
+      if (!params || result.dry_run) return;
+      void client.invalidateQueries({ queryKey: floor3dKeys.project(params.projectId) });
+      void client.invalidateQueries({ queryKey: building3dKeys.project(params.projectId) });
+      void client.invalidateQueries({ queryKey: ['cad-constructions', params.projectId] });
     },
   });
 };

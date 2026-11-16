@@ -8,6 +8,8 @@ import type {
   CadRouteJobRead,
   CadSheetFloorTitle,
   CadSheetLevelsWrite,
+  CadStylePreviewResult,
+  CadStyleVersionRead,
   CadViewDiagnosticsRead,
   CadVorCoverageRead,
   CadVorDocumentRead,
@@ -18,6 +20,7 @@ import type {
 } from '@quantor/api-client';
 
 import type { IFinishAssignOutcome } from '@/components/cad/finishes/CadZoneFinishBar';
+import type { ICadTenderLayers } from '@/components/cad/tender/CadTenderLayers';
 import type { ICadZoneLayers } from '@/components/cad/viewer/CadZoneLayers';
 import type { ICadRemarks, IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { IConstructionIndex } from '@/lib/cad/constructions';
@@ -27,6 +30,7 @@ import type { BboxPt, IPageSizePt, IRemarkBinding } from '@/lib/cad/remarks';
 import type { RoomType } from '@/lib/cad/room-types';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import type { IVorSource } from '@/lib/cad/vor-queries';
+import type { StyleClass, StyleSample } from '@/lib/cad/style-profile';
 import type { ParkingType, ZoneKind } from '@/lib/cad/zones';
 import type { Camera, CameraState, Viewport } from '@/lib/viewer/camera';
 
@@ -292,6 +296,8 @@ export interface IWorkspaceCadLayers {
     readonly visible: boolean;
     readonly onVisibleChange: (visible: boolean) => void;
   } | null;
+  /** Группа «Расчёты» (TENDER): версии расчётов на виде; `null` или нет - расчётов на виде нет. */
+  readonly tender?: ICadTenderLayers | null;
 }
 
 /** Выбранное route-задание: то, что нужно блоку «Принять трассы». */
@@ -325,6 +331,11 @@ export interface IWorkspaceCadMep {
   readonly onSelectRoute: (jobId: string | null) => void;
   /** Разрезы ревизии для блока «Высота из разрезов»; `null` или нет - блока нет. */
   readonly sections?: IWorkspaceCadSectionsLink | null;
+  /**
+   * Трассы ВИС движка открыты флагом `cad.mep_engine`; нет - открыты. Выключен: остаётся только
+   * одобрение вида, построение, список трасс и спецификация скрыты.
+   */
+  readonly engineRoutes?: boolean;
 }
 
 /** Вид листа с диагностикой: слои, замечания, масштаб и файлы. */
@@ -417,6 +428,52 @@ export interface IWorkspaceCadSideProps {
   readonly sections?: IWorkspaceCadSections | null;
   /** Раздел «Фасады» (флаг `cad.export`); `null` или нет - раздела нет. */
   readonly facades?: IWorkspaceCadFacades | null;
+  /** Раздел «Профиль оформления» (флаг `cad.export`); `null` или нет - раздела нет. */
+  readonly style?: IWorkspaceCadStyle | null;
+}
+
+/** Предпросмотр профиля: ход задания и его итог. */
+export interface IWorkspaceCadStylePreview {
+  /** Задание идёт (постановка или опрос). */
+  readonly running: boolean;
+  /** Итог готового предпросмотра; `null` - задание ещё идёт или упало. */
+  readonly result: CadStylePreviewResult | null;
+  /** Отказ задания или чтения; `null` - нет. */
+  readonly error: string | null;
+}
+
+/** Раздел «Профиль оформления»: текущая версия, образцы на листе, предпросмотр и принятие (ADR-0049). */
+export interface IWorkspaceCadStyle {
+  readonly status: 'loading' | 'ready' | 'error';
+  /** Текущая версия профиля тома; `null` - профиля нет. */
+  readonly current: CadStyleVersionRead | null;
+  readonly loadError: string | null;
+  /** Ошибка фонового перечитывания при уже загруженном профиле; `null` - нет. */
+  readonly refreshError: string | null;
+  readonly onReload: () => void;
+  /** Режим образцов включён: щелчки по листу ставят образцы. */
+  readonly sampling: boolean;
+  /** Почему режим включить нельзя; `null` - можно. */
+  readonly startDisabledReason: string | null;
+  readonly onStartSampling: () => void;
+  /** Выйти из режима: образцы и предпросмотр сохраняются до повторного входа. */
+  readonly onStopSampling: () => void;
+  readonly activeClass: StyleClass;
+  readonly onClassChange: (value: StyleClass) => void;
+  readonly negative: boolean;
+  readonly onNegativeChange: (value: boolean) => void;
+  readonly samples: readonly StyleSample[];
+  readonly onRemoveSample: (index: number) => void;
+  readonly onClearSamples: () => void;
+  /** Предпросмотр по текущим образцам; `null` - не запрашивался или образцы изменились. */
+  readonly preview: IWorkspaceCadStylePreview | null;
+  readonly onPreview: () => void;
+  readonly accepting: boolean;
+  readonly onAccept: (title: string) => void;
+  /** Отказ принятия (в том числе конфликт версий). */
+  readonly acceptError: string | null;
+  /** Версия, только что сохранённая принятием; `null` - нет. */
+  readonly savedVersion: number | null;
 }
 
 /** Раздел «Фасады»: разбор фасадов ревизии, виды с окнами и решения человека по видам. */

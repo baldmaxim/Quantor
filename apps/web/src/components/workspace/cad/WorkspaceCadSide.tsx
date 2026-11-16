@@ -21,6 +21,7 @@ import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 
 import { CadFacadesPanel } from './CadFacadesPanel';
 import { CadSectionsPanel } from './CadSectionsPanel';
+import { CadStylePanel } from './CadStylePanel';
 import { CadUpdateBanner } from './CadUpdateBanner';
 import { ConstructionsPanel } from './ConstructionsPanel';
 import type { IWorkspaceCadLeftProps, IWorkspaceCadSideProps } from './types';
@@ -73,6 +74,7 @@ export const WorkspaceCadSide: FC<
   finishes = null,
   sections = null,
   facades = null,
+  style = null,
   jobs = null,
   sideTab: sideTabProp = null,
   onSideTabChange,
@@ -178,6 +180,11 @@ export const WorkspaceCadSide: FC<
     ? { id: 'facades', label: 'Фасады', content: <CadFacadesPanel {...facades} /> }
     : null;
 
+  // Раздел «Профиль оформления» (ADR-0049) относится к тому и работает по PDF ревизии; при `cad.export`.
+  const styleTab: ICadSideTab | null = style
+    ? { id: 'style', label: 'Профиль оформления', content: <CadStylePanel {...style} /> }
+    : null;
+
   // Раздел «Задания» - очередь и история заданий ревизии; всегда последний.
   const jobsTab: ICadSideTab | null = jobs
     ? {
@@ -230,7 +237,7 @@ export const WorkspaceCadSide: FC<
       </div>
     );
     // Зоны размечают и лист без задания: эталон для движка нужен до преобразования.
-    if (zonesTab === null && sectionsTab === null && facadesTab === null && jobsTab === null) {
+    if (zonesTab === null && sectionsTab === null && facadesTab === null && styleTab === null && jobsTab === null) {
       return none;
     }
     return withUpdate(
@@ -242,6 +249,7 @@ export const WorkspaceCadSide: FC<
           ...(zonesTab ? [zonesTab] : []),
           ...(finishTab ? [finishTab] : []),
           ...(facadesTab ? [facadesTab] : []),
+          ...(styleTab ? [styleTab] : []),
           ...(jobsTab ? [jobsTab] : []),
         ]}
         active={sideTab}
@@ -338,6 +346,7 @@ export const WorkspaceCadSide: FC<
         ...(zonesTab ? [zonesTab] : []),
         ...(finishTab ? [finishTab] : []),
         ...(facadesTab ? [facadesTab] : []),
+        ...(styleTab ? [styleTab] : []),
         ...(constructions
           ? [
               {
@@ -355,6 +364,7 @@ export const WorkspaceCadSide: FC<
         ...(zonesTab ? [zonesTab] : []),
         ...(finishTab ? [finishTab] : []),
         ...(facadesTab ? [facadesTab] : []),
+        ...(styleTab ? [styleTab] : []),
         jobTab,
         ...(jobsTab ? [jobsTab] : []),
       ];

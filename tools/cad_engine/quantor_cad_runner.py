@@ -17,6 +17,11 @@ SHA архива, MANIFEST.json и каждого файла, распаковы
 Из результатов в `--out` попадают только опубликованные worker'ом файлы, раздельно по видам,
 с `report.json` и `manifest.json` (sha256 каждого файла).
 
+Подкоманда `style` (ADR-0049): `style --archive ZIP --input PDF --samples JSON --work DIR --out DIR
+[--base-profile JSON] [--expect-archive-sha256 HEX]` снимает профиль оформления по образцам скриптом
+архива `style_samples.py`; в `--out` — `preview.json`, `style_profile.json` (если есть подпись) и
+`result.json`.
+
 Коды возврата: 0 — работа выполнена (`completed_requires_review` или `no_cad_review_required`);
 1 — ошибка движка или нарушение гейта; 2 — некорректный вход; 3 — некорректные параметры;
 4 — превышен предел; 5 — не прошла проверка архива или окружения.
@@ -94,6 +99,14 @@ DXF_PROP_VALUE_MAX = 255
 MM_PER_PAPER_POINT = 25.4 / 72  # 1 pt PDF на бумаге, мм
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ID = re.compile(r"^[0-9A-Za-z._-]{1,64}$")
+# Снятие профиля по образцам (ADR-0049): скрипт архива, читающий векторы одного листа. Лист
+# разбирается за секунды; 120 с - запас на тяжёлый лист, дольше - признак зависания.
+STYLE_SCRIPT = "АР_Обработка/90_Пайплайн/style_samples.py"
+STYLE_TIMEOUT_S = 120
+# Префикс сообщения об отказе входа в самом скрипте (`print(f'Ошибка: ...')` в style_samples.py).
+STYLE_INPUT_PREFIX = "Ошибка: "
+STYLE_NO_SIGNATURE_EXIT = 2
+STYLE_INPUT_EXIT = 1
 
 
 class RunnerError(Exception):
@@ -951,6 +964,81 @@ def fixture(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def run_style_script(engine_root: Path, pdf: Path, samples: Path, out_dir: Path,
+                     base_profile: Path | None, log_path: Path,
+                     max_memory_mb: int = DEFAULT_LIMITS["max_memory_mb"]) -> int:
+    """`style_samples.py` подпроцессом, как штатный worker: минимальное окружение, cwd в каталоге скрипта."""
+    script = engine_root / STYLE_SCRIPT
+    if not script.is_file():
+        raise RunnerError(EXIT_INTEGRITY, "archive_invalid", "в архиве нет скрипта снятия профиля")
+    env = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "HOME": str(out_dir.parent),
+           "TMPDIR": str(out_dir.parent), "PYTHONUTF8": "1", "PYTHONDONTWRITEBYTECODE": "1"}
+    command = [sys.executable, "-B", "-s", str(script), "--pdf", str(pdf), "--samples", str(samples),
+               "--out", str(out_dir)]
+    if base_profile is not None:
+        command += ["--base-profile", str(base_profile)]
+    try:
+        with log_path.open("wb") as log:
+            completed = subprocess.run(
+                command, cwd=script.parent, env=env, stdin=subprocess.DEVNULL, stdout=log,
+                stderr=subprocess.STDOUT, timeout=STYLE_TIMEOUT_S,
+                preexec_fn=lambda: _limit_memory(max_memory_mb))
+    except subprocess.TimeoutExpired:
+        raise RunnerError(EXIT_LIMIT, "timeout", "превышено время снятия профиля") from None
+    return completed.returncode
+
+
+def style(args: argparse.Namespace) -> int:
+    """Снятие профиля оформления по образцам; результат - файлы в `--out` и строка JSON в stdout."""
+    out: Path = args.out
+    work: Path = args.work
+    for directory in (out, work):
+        if not directory.is_dir() or any(directory.iterdir()):
+            print(json.dumps({"error": {"code": "params_invalid",
+                                        "message": "out и work должны быть существующими пустыми каталогами"}}))
+            return EXIT_PARAMS
+    try:
+        pins = load_pins()
+        check_environment(pins)
+        engine = verify_archive(args.archive, pins, args.expect_archive_sha256)
+        engine_root = work / "engine"
+        extract_archive(args.archive, engine_root, pins)
+        produced = work / "style_out"
+        produced.mkdir(mode=0o700)
+        log_path = work / "style.log"
+        low, high = LIMIT_KEYS["max_memory_mb"]
+        if not low <= args.max_memory_mb <= high:
+            raise RunnerError(EXIT_PARAMS, "params_invalid", "предел памяти вне допустимого")
+        code = run_style_script(engine_root, args.input, args.samples, produced, args.base_profile,
+                                log_path, args.max_memory_mb)
+        if code == STYLE_INPUT_EXIT:
+            lines = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()
+            last = lines[-1] if lines else ""
+            # Отказ входа - только осознанная ошибка скрипта (его префикс); код 1 дают и
+            # необработанное исключение, и нехватка памяти: это сбой движка, повторяемый.
+            if not last.startswith(STYLE_INPUT_PREFIX):
+                raise RunnerError(EXIT_ENGINE, "engine_failed", "снятие профиля завершилось сбоем")
+            raise RunnerError(EXIT_INPUT, "input_invalid",
+                              _text(last[len(STYLE_INPUT_PREFIX):], 300) or "образцы или PDF отклонены")
+        if code not in (EXIT_OK, STYLE_NO_SIGNATURE_EXIT):
+            raise RunnerError(EXIT_ENGINE, "engine_failed", f"снятие профиля завершилось кодом {code}")
+        preview = produced / "preview.json"
+        profile = produced / "style_profile.json"
+        if not preview.is_file() or (code == EXIT_OK) != profile.is_file():
+            raise RunnerError(EXIT_ENGINE, "gate_violation", "скрипт выдал файлы вне контракта")
+        shutil.copyfile(preview, out / "preview.json")
+        if code == EXIT_OK:
+            shutil.copyfile(profile, out / "style_profile.json")
+        write_json(out / "result.json", {
+            "status": "profile" if code == EXIT_OK else "no_signature",
+            "engine_version": engine["version"], "archive_sha256": engine["archive_sha256"]})
+    except RunnerError as error:
+        print(json.dumps({"error": {"code": error.code, "message": error.message}}, ensure_ascii=False))
+        return error.exit_code
+    print(json.dumps({"status": "profile" if code == EXIT_OK else "no_signature", "exit": EXIT_OK}))
+    return EXIT_OK
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Quantor CAD engine runner")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -967,13 +1055,19 @@ def main(argv: list[str] | None = None) -> int:
     synth.add_argument("--archive", type=Path, required=True)
     synth.add_argument("--kind", choices=sorted(FIXTURES), required=True)
     synth.add_argument("--out", type=Path, required=True)
+    styler = commands.add_parser("style", help="профиль оформления по образцам на листе (ADR-0049)")
+    for name in ("--archive", "--input", "--samples", "--work", "--out"):
+        styler.add_argument(name, type=Path, required=True)
+    styler.add_argument("--expect-archive-sha256")
+    styler.add_argument("--base-profile", type=Path, default=None)
+    styler.add_argument("--max-memory-mb", type=int, default=DEFAULT_LIMITS["max_memory_mb"])
     args = parser.parse_args(argv)
     # Движок работает с cwd в своём каталоге: относительные пути вызывающего — к абсолютным.
-    for name in ("archive", "input", "params", "work", "out", "progress"):
+    for name in ("archive", "input", "params", "samples", "work", "out", "progress", "base_profile"):
         value = getattr(args, name, None)
         if isinstance(value, Path):
             setattr(args, name, value.absolute())
-    handlers = {"verify": verify, "run": run, "fixture": fixture}
+    handlers = {"verify": verify, "run": run, "fixture": fixture, "style": style}
     return handlers[args.command](args)
 
 

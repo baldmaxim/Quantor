@@ -150,9 +150,17 @@ def tools(tmp_path: Path) -> Path:
 
 
 def mep_settings(
-    tools: Path, tmp_path: Path, *, flag: bool = True, consistency: bool = False
+    tools: Path,
+    tmp_path: Path,
+    *,
+    flag: bool = True,
+    consistency: bool = False,
+    mep_engine: bool = True,
 ) -> Settings:
     flags = ["cad.export=true"] if flag else []
+    # Трассы ВИС движка закрыты флагом `cad.mep_engine` (ADR-0051): тесты трасс включают его.
+    if mep_engine:
+        flags.append("cad.mep_engine=true")
     if consistency:
         flags.append("project.consistency=true")
     return clean_settings(
@@ -305,6 +313,8 @@ def test_new_routes_are_in_openapi_and_job_type_is_registered() -> None:
         JobType.CAD_ZONES,
         JobType.CAD_SECTIONS,
         JobType.CAD_EOM_ROUTE,
+        JobType.CAD_FACADES,
+        JobType.CAD_STYLE_PREVIEW,
     }
     assert JobType.CAD_MEP_ROUTE.value == "cad_mep_route"
 

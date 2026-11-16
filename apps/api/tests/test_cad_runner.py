@@ -563,3 +563,300 @@ def test_embed_dxf_properties_roundtrip_keeps_version_and_geometry(
     assert [e.dxftype() for e in reread.modelspace()] == ["LINE", "LWPOLYLINE"]
     assert len(reread.audit().errors) == 0
     assert runner.sha256_file(path) == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+# ------------------------------------------------------------------ подкоманда style (ADR-0049)
+
+ENGINE_INFO = {"name": "engine", "version": "2026.11.16+x", "archive_sha256": "a" * 64}
+
+
+def _style_args(runner: ModuleType, tmp_path: Path) -> Any:
+    for name in ("work", "out"):
+        (tmp_path / name).mkdir()
+    return runner.argparse.Namespace(
+        archive=tmp_path / "engine.zip",
+        expect_archive_sha256=None,
+        input=tmp_path / "sheet.pdf",
+        samples=tmp_path / "samples.json",
+        work=tmp_path / "work",
+        out=tmp_path / "out",
+        base_profile=None,
+        max_memory_mb=3072,
+    )
+
+
+@pytest.fixture
+def style_runner(runner: ModuleType, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    monkeypatch.setattr(runner, "load_pins", lambda: {"engine": {}})
+    monkeypatch.setattr(runner, "check_environment", lambda pins: {})
+    monkeypatch.setattr(runner, "verify_archive", lambda archive, pins, sha=None: ENGINE_INFO)
+    monkeypatch.setattr(runner, "extract_archive", lambda archive, target, pins: target.mkdir())
+    return runner
+
+
+def _fake_script(
+    runner: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    code: int,
+    *,
+    profile: bool,
+    log_text: str = "",
+    preview: bool = True,
+) -> None:
+    def fake(
+        engine_root: Path,
+        pdf: Path,
+        samples: Path,
+        out_dir: Path,
+        base_profile: Path | None,
+        log_path: Path,
+        max_memory_mb: int,
+    ) -> int:
+        log_path.write_text(log_text, encoding="utf-8")
+        if preview:
+            (out_dir / "preview.json").write_text('{"p": 1}', encoding="utf-8")
+        if profile:
+            (out_dir / "style_profile.json").write_text('{"schema": "s"}', encoding="utf-8")
+        return code
+
+    monkeypatch.setattr(runner, "run_style_script", fake)
+
+
+def test_style_command_arguments_become_absolute_and_reach_the_handler(
+    runner: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[Any] = []
+
+    def capture(args: Any) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr(runner, "style", capture)
+    code = runner.main(
+        [
+            "style",
+            "--archive",
+            "a.zip",
+            "--input",
+            "s.pdf",
+            "--samples",
+            "s.json",
+            "--work",
+            "w",
+            "--out",
+            "o",
+            "--base-profile",
+            "b.json",
+            "--expect-archive-sha256",
+            "f" * 64,
+        ]
+    )
+    assert code == 0
+    [args] = seen
+    assert args.command == "style" and args.expect_archive_sha256 == "f" * 64
+    for name in ("archive", "input", "samples", "work", "out", "base_profile"):
+        assert getattr(args, name).is_absolute(), name
+
+
+def test_style_command_requires_its_own_arguments(runner: ModuleType) -> None:
+    with pytest.raises(SystemExit):
+        runner.main(["style", "--archive", "a.zip"])
+
+
+def test_style_profile_exit_copies_files_and_writes_result(
+    style_runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    args = _style_args(style_runner, tmp_path)
+    _fake_script(style_runner, monkeypatch, 0, profile=True)
+    assert style_runner.style(args) == 0
+    assert (args.out / "preview.json").read_text(encoding="utf-8") == '{"p": 1}'
+    assert (args.out / "style_profile.json").is_file()
+    result = json.loads((args.out / "result.json").read_text(encoding="utf-8"))
+    assert result == {
+        "status": "profile",
+        "engine_version": ENGINE_INFO["version"],
+        "archive_sha256": ENGINE_INFO["archive_sha256"],
+    }
+
+
+def test_style_no_signature_exit_keeps_only_the_preview(
+    style_runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    args = _style_args(style_runner, tmp_path)
+    _fake_script(style_runner, monkeypatch, 2, profile=False)
+    assert style_runner.style(args) == 0
+    assert (args.out / "preview.json").is_file()
+    assert not (args.out / "style_profile.json").exists()
+    result = json.loads((args.out / "result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "no_signature"
+
+
+def test_style_script_input_error_is_input_invalid(
+    style_runner: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    args = _style_args(style_runner, tmp_path)
+    _fake_script(
+        style_runner,
+        monkeypatch,
+        1,
+        profile=False,
+        preview=False,
+        log_text="Ошибка: Образцы: страницы 9 нет в PDF\n",
+    )
+    assert style_runner.style(args) == style_runner.EXIT_INPUT
+    error = json.loads(capsys.readouterr().out)["error"]
+    assert error["code"] == "input_invalid" and "страницы 9" in error["message"]
+    assert not any(args.out.iterdir())
+
+
+def test_style_script_crash_with_code_one_is_a_retryable_engine_failure(
+    style_runner: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Код 1 дают и необработанное исключение, и MemoryError: отказом входа это не считается."""
+    args = _style_args(style_runner, tmp_path)
+    _fake_script(
+        style_runner,
+        monkeypatch,
+        1,
+        profile=False,
+        preview=False,
+        log_text=(
+            "Traceback (most recent call last):\n"
+            '  File "/work/engine/style_samples.py", line 9, in <module>\n'
+            "MemoryError\n"
+        ),
+    )
+    assert style_runner.style(args) == style_runner.EXIT_ENGINE
+    error = json.loads(capsys.readouterr().out)["error"]
+    assert error["code"] == "engine_failed"
+    assert "Traceback" not in error["message"] and "/work" not in error["message"]
+
+
+def test_style_memory_limit_comes_from_the_arguments(
+    style_runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    args = _style_args(style_runner, tmp_path)
+    args.max_memory_mb = 4096
+    seen: list[int] = []
+
+    def fake(*call: Any) -> int:
+        seen.append(call[-1])
+        (call[3] / "preview.json").write_text("{}", encoding="utf-8")
+        return 2
+
+    monkeypatch.setattr(style_runner, "run_style_script", fake)
+    assert style_runner.style(args) == 0 and seen == [4096]
+
+
+def test_style_memory_limit_outside_the_range_is_rejected(
+    style_runner: ModuleType, tmp_path: Path
+) -> None:
+    args = _style_args(style_runner, tmp_path)
+    args.max_memory_mb = 64
+    assert style_runner.style(args) == style_runner.EXIT_PARAMS
+
+
+@pytest.mark.parametrize(
+    ("code", "profile", "preview"),
+    [
+        (7, False, True),  # неизвестный код скрипта
+        (0, False, True),  # профиль обещан, файла нет
+        (2, True, True),  # подписи нет, а файл профиля есть
+        (0, True, False),  # нет предпросмотра
+    ],
+)
+def test_style_script_outside_the_contract_is_an_engine_failure(
+    style_runner: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    code: int,
+    profile: bool,
+    preview: bool,
+) -> None:
+    args = _style_args(style_runner, tmp_path)
+    _fake_script(style_runner, monkeypatch, code, profile=profile, preview=preview)
+    assert style_runner.style(args) == style_runner.EXIT_ENGINE
+    assert not any(args.out.iterdir())
+
+
+def test_style_requires_empty_work_and_out(style_runner: ModuleType, tmp_path: Path) -> None:
+    args = _style_args(style_runner, tmp_path)
+    (args.out / "stale.txt").write_text("x")
+    assert style_runner.style(args) == style_runner.EXIT_PARAMS
+
+
+def _stub_run(
+    runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, base: Path | None
+) -> dict[str, Any]:
+    script = tmp_path / "engine" / runner.STYLE_SCRIPT
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text("")
+    seen: dict[str, Any] = {"script": script}
+
+    def fake_run(command: list[str], **kwargs: Any) -> Any:
+        seen.update(kwargs, command=command)
+        return runner.subprocess.CompletedProcess(command, 2)
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    seen["code"] = runner.run_style_script(
+        tmp_path / "engine",
+        tmp_path / "a.pdf",
+        tmp_path / "s.json",
+        tmp_path / "produced",
+        base,
+        tmp_path / "log",
+    )
+    return seen
+
+
+def test_run_style_script_command_with_and_without_base_profile(
+    runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    base = tmp_path / "base.json"
+    seen = _stub_run(runner, monkeypatch, tmp_path, base)
+    command: list[str] = seen["command"]
+    assert seen["code"] == 2
+    assert command[:3] == [sys.executable, "-B", "-s"] and command[3] == str(seen["script"])
+    assert command[command.index("--base-profile") + 1] == str(base)
+    assert seen["cwd"] == seen["script"].parent and seen["timeout"] == runner.STYLE_TIMEOUT_S
+    assert set(seen["env"]) >= {"PATH", "LANG", "HOME", "TMPDIR"}
+    assert "--base-profile" not in _stub_run(runner, monkeypatch, tmp_path, None)["command"]
+
+
+def test_run_style_script_timeout_is_a_limit_failure(
+    runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    script = tmp_path / "engine" / runner.STYLE_SCRIPT
+    script.parent.mkdir(parents=True)
+    script.write_text("")
+
+    def hang(command: list[str], **kwargs: Any) -> Any:
+        raise runner.subprocess.TimeoutExpired(command, 1)
+
+    monkeypatch.setattr(runner.subprocess, "run", hang)
+    with pytest.raises(runner.RunnerError) as error:
+        runner.run_style_script(
+            tmp_path / "engine",
+            tmp_path / "a.pdf",
+            tmp_path / "s.json",
+            tmp_path / "produced",
+            None,
+            tmp_path / "log",
+        )
+    assert error.value.exit_code == runner.EXIT_LIMIT and error.value.code == "timeout"
+
+
+def test_run_style_script_without_the_script_in_the_archive_is_an_integrity_failure(
+    runner: ModuleType, tmp_path: Path
+) -> None:
+    with pytest.raises(runner.RunnerError) as error:
+        runner.run_style_script(
+            tmp_path, tmp_path / "a.pdf", tmp_path / "s.json", tmp_path / "o", None, tmp_path / "l"
+        )
+    assert error.value.exit_code == runner.EXIT_INTEGRITY

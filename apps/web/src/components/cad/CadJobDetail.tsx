@@ -83,6 +83,12 @@ export const CadJobDetail: FC<ICadJobDetailProps> = ({
         onSelect={(number) => setChosenAttempt(number === latest?.attempt ? null : number)}
       />
 
+      {job.style_profile != null && (
+        <p className="text-xs text-muted" data-testid="job-style-profile">
+          Профиль оформления: версия {job.style_profile.version}
+        </p>
+      )}
+
       {attempt === null ? (
         <section className="flex flex-col gap-[var(--s-3)] rounded-[var(--radius-md)] border border-border-strong bg-surface p-[var(--s-6)]">
           <div className="flex items-center gap-[var(--s-4)]">

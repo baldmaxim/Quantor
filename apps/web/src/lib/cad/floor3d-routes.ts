@@ -1,6 +1,8 @@
 import type { CadFloor3dRead } from '@quantor/api-client';
 import * as THREE from 'three';
 
+import type { ITenderRef } from '@/lib/tender/info';
+
 import { toScenePoint, type IFloor3dCenter } from './floor3d-geometry';
 import {
   buildMepElements,
@@ -77,13 +79,15 @@ export interface IFloor3dRoutePolyline {
   readonly h_mm?: number | null;
   readonly insulation_mm?: number | null;
   /** С v15: вид полилинии, источник Ø, марка стояка, уклон, квартира; у старых файлов пусто. */
-  readonly kind?: 'route' | 'jumper' | 'riser' | 'leadin' | null;
+  readonly kind?: 'route' | 'jumper' | 'riser' | 'leadin' | 'cable' | 'tray' | 'duct' | null;
   readonly dn_source?: 'line' | 'registry' | 'rule' | null;
   readonly mark?: string | null;
   readonly slope?: number | null;
   readonly apt?: string | null;
   /** Изделие линии ЭОМ и СС (`cad_eom`): «Кабель ... в трубе Ø16»; у механики нет. */
   readonly item?: string | null;
+  /** Объект расчёта TENDER (ADR-0051): источник и исходная запись для плашки; у трасс движка нет. */
+  readonly tender?: ITenderRef | null;
 }
 
 export interface IFloor3dRoutes {
@@ -107,11 +111,19 @@ export const INSULATION_OPACITY = 0.35;
 
 const FALLBACK_COLOR = 'gray';
 
-/** Цвета слоёв трасс из токенов темы (те же `--cad-mep-*`, что у 2D); без цвета - `--text`. */
-export const readFloor3dRouteColors = (): IFloor3dRouteColors => {
+/**
+ * Цвета слоёв трасс из токенов темы (те же `--cad-mep-*`, что у 2D); без цвета - `--text`.
+ * `extraTokens` - слои вне списка трасс движка (расчёты TENDER): слой -> имя токена цвета.
+ */
+export const readFloor3dRouteColors = (
+  extraTokens: Readonly<Record<string, string>> = {},
+): IFloor3dRouteColors => {
   if (typeof document === 'undefined') {
     return {
-      layers: readMepColors(() => FALLBACK_COLOR),
+      layers: {
+        ...readMepColors(() => FALLBACK_COLOR),
+        ...Object.fromEntries(Object.keys(extraTokens).map((layer) => [layer, FALLBACK_COLOR])),
+      },
       fallback: FALLBACK_COLOR,
       insulation: FALLBACK_COLOR,
       sleeve: FALLBACK_COLOR,
@@ -121,7 +133,10 @@ export const readFloor3dRouteColors = (): IFloor3dRouteColors => {
   const style = getComputedStyle(document.documentElement);
   const token = (name: string): string => style.getPropertyValue(name).trim() || FALLBACK_COLOR;
   return {
-    layers: readMepColors(token),
+    layers: {
+      ...readMepColors(token),
+      ...Object.fromEntries(Object.entries(extraTokens).map(([layer, name]) => [layer, token(name)])),
+    },
     fallback: token('--text'),
     insulation: token('--cad-mep-insulation'),
     sleeve: token('--cad-mep-sleeve'),

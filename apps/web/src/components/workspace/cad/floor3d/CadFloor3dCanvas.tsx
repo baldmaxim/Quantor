@@ -45,6 +45,8 @@ export interface ICadFloor3dRoutes {
   readonly elements?: readonly IFloor3dMepElement[];
   /** Чистый пол модели (`routesBaseZMm`), мм: верх плиты ниже на пирог пола. */
   readonly baseZMm: number;
+  /** Слои вне списка трасс движка (расчёты TENDER): слой -> имя токена цвета. */
+  readonly layerTokens?: Readonly<Record<string, string>>;
 }
 
 interface ICadFloor3dCanvasProps {
@@ -53,6 +55,8 @@ interface ICadFloor3dCanvasProps {
   readonly routes?: ICadFloor3dRoutes | null;
   /** Маска слоёв трасс, скрытых человеком (общая с 2D). */
   readonly hiddenRoutesMask?: number;
+  /** Слои, скрытые человеком по имени (расчёты TENDER): общее хранилище видимости слоёв листа. */
+  readonly hiddenLayerNames?: ReadonlySet<string>;
   readonly showSlabCap: boolean;
   readonly viewRequest: IFloor3dViewRequest | null;
   /** Выбранный элемент: подсвечивается оверлеем. */
@@ -105,6 +109,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   plan,
   routes = null,
   hiddenRoutesMask = NO_ROUTES_MASK,
+  hiddenLayerNames = NO_IDS,
   showSlabCap,
   viewRequest,
   selected,
@@ -172,7 +177,7 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
     }
     const built = buildFloor3dRoutes(
       routes.polylines,
-      readFloor3dRouteColors(),
+      readFloor3dRouteColors(routes.layerTokens),
       { center: plan.center, baseZMm: routes.baseZMm },
       routes.elements,
     );
@@ -191,10 +196,13 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
     const built = routeScene.current;
     if (built === null) return;
     for (const layer of built.layers) {
-      built.setLayerVisible(layer, !isMepLayerHidden(hiddenRoutesMask, layer));
+      built.setLayerVisible(
+        layer,
+        !isMepLayerHidden(hiddenRoutesMask, layer) && !hiddenLayerNames.has(layer),
+      );
     }
     engine.current?.refresh();
-  }, [routes, plan.center, theme, hiddenRoutesMask]);
+  }, [routes, plan.center, theme, hiddenRoutesMask, hiddenLayerNames]);
 
   // Видимость категорий - после пересборки модели (эффект выше); сцена при этом не пересобирается.
   useEffect(() => {

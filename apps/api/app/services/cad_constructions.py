@@ -146,6 +146,9 @@ class EffectiveLevels:
     slab_top_mm: int | None = None
     # Пирог пола (чистый пол - верх плиты) из walls.json; нужен, пока база взята из `slab_top_mm`.
     floor_finish_mm: int | None = None
+    # Ручные подоконник и верх окна листа (ADR-0048 п. 5); не заданы - `value_mm = None`.
+    window_sill: LevelValue = LevelValue(None, None, None)
+    window_head: LevelValue = LevelValue(None, None, None)
 
     @property
     def base_z_mm(self) -> int:
@@ -183,6 +186,11 @@ def _level(default: int | None, default_source: str, override: int | None) -> Le
     if override is not None:
         return LevelValue(override, "manual", default)
     return LevelValue(default, source_of(default_source) if default is not None else None, default)
+
+
+def _manual_only(override: int | None) -> LevelValue:
+    """Величина без значения в walls.json: только ручной ввод листа или «не задано»."""
+    return LevelValue(override, "manual" if override is not None else None, None)
 
 
 def effective_levels(
@@ -231,6 +239,8 @@ def effective_levels(
         slab_ref,
         slab_top_mm=slab_top,
         floor_finish_mm=heights.floor_finish_mm,
+        window_sill=_manual_only(overrides.window_sill_mm),
+        window_head=_manual_only(overrides.window_head_mm),
     )
 
 
@@ -245,6 +255,8 @@ def heights_read(
         floor_height=levels.floor_height.read(),
         slab_thickness=levels.slab_thickness.read(),
         door_height=levels.door_height.read(),
+        window_sill=levels.window_sill.read(),
+        window_head=levels.window_head.read(),
         slab_thickness_sheet_ref=levels.slab_sheet_ref,
         wall_height_mm=levels.wall_height_mm,
         wall_height_source=levels.wall_height_source,
@@ -890,7 +902,8 @@ def _gap_height_source(
     sources: list[CadValueSource] = []
     for o in gaps:
         if o.opening_height_mm is None and spans is not None and o.id in spans:
-            sources.append("observed")  # высота с принятого вида фасада
+            # высота принятого вида фасада - `observed`; ручной ввод листа - `manual`
+            sources.append("manual" if spans[o.id].source == "manual" else "observed")
         else:
             sources.append(source_of(o.opening_height_status or "assumption") or "assumption")
     return min(sources, key=_SOURCE_RANK.index)

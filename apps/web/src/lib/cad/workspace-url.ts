@@ -61,13 +61,16 @@ export const cadRedirectHref = (
   });
 };
 
-/** Задание и вид из адреса рабочей области; невалидное отбрасывается. */
+/**
+ * Задание и вид из адреса рабочей области; невалидное отбрасывается. Вид читается и без задания
+ * (ссылка со страницы «Расчёты»): тогда он выбирается у самого нового готового задания листа.
+ */
 export const parseWorkspaceJob = (params: {
   get: (name: string) => string | null;
-}): { readonly job: string | null; readonly view: number | null } => {
-  const job = asUuid(params.get('job'));
-  return { job, view: job ? asIndex(params.get('view')) : null };
-};
+}): { readonly job: string | null; readonly view: number | null } => ({
+  job: asUuid(params.get('job')),
+  view: asIndex(params.get('view')),
+});
 
 /** Задание закрывает лист: страницы не названы («все плановые») либо среди них есть этот лист. */
 export const jobCoversPage = (

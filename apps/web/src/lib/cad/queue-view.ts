@@ -28,6 +28,7 @@ const STEP_OF_JOB: Readonly<Partial<Record<JobType, PipelineStepKey>>> = {
 export const queueJobLabel = (jobType: JobType): string => {
   if (jobType === 'cad_sections') return 'Разрезы';
   if (jobType === 'cad_facades') return 'Фасады';
+  if (jobType === 'cad_style_preview') return 'Профиль оформления';
   const key = STEP_OF_JOB[jobType];
   return key === undefined ? jobType : PIPELINE_STEP_LABELS[key];
 };

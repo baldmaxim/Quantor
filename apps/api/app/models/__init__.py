@@ -1,5 +1,6 @@
 """Модели SQLAlchemy. Импортируются пакетом, чтобы Alembic видел все таблицы."""
 
+from app.models.api_token import ApiToken
 from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
 from app.models.cad_construction import CadConstructionProps, CadSheetLevels
@@ -10,6 +11,7 @@ from app.models.cad_project_levels import CadProjectLevels, CadSlabHoleDecision
 from app.models.cad_remark import CadRemark
 from app.models.cad_riser import CadSheetRisers
 from app.models.cad_section_level import CadSectionLevel
+from app.models.cad_style_profiles import CadStyleProfile, CadStyleProfileVersion
 from app.models.cad_vor import CadVorDocument, CadVorItem, CadVorLink
 from app.models.cad_zone import CadZone
 from app.models.calc import (
@@ -45,10 +47,12 @@ from app.models.sheet import Region, Sheet
 from app.models.sheet_passport import SheetPassport
 from app.models.sheet_register import SheetRegister
 from app.models.takeoff import Measurement, TakeoffItem
+from app.models.tender_exchange import TenderBaseRelease, TenderCalc, TenderCalcVersion
 from app.models.tender_version import TenderVersion, TenderVersionDocument
 from app.models.worker import Worker
 
 __all__ = [
+    "ApiToken",
     "AuditEvent",
     "AuthSession",
     "CadConstructionProps",
@@ -61,6 +65,8 @@ __all__ = [
     "CadSheetLevels",
     "CadSheetRisers",
     "CadSlabHoleDecision",
+    "CadStyleProfile",
+    "CadStyleProfileVersion",
     "CadVorDocument",
     "CadVorItem",
     "CadVorLink",
@@ -102,6 +108,9 @@ __all__ = [
     "SheetPassport",
     "SheetRegister",
     "TakeoffItem",
+    "TenderBaseRelease",
+    "TenderCalc",
+    "TenderCalcVersion",
     "TenderVersion",
     "TenderVersionDocument",
     "UserIdentity",

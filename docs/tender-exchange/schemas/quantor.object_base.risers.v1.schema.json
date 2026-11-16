@@ -1,0 +1,104 @@
+{
+  "$defs": {
+    "ObjectBaseRiser": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "title": "Count",
+          "type": "integer"
+        },
+        "dn_mm": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dn Mm"
+        },
+        "mark": {
+          "title": "Mark",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "shaft_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shaft Id"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "system": {
+          "title": "System",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "mark",
+        "role",
+        "count"
+      ],
+      "title": "ObjectBaseRiser",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.object_base.risers.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "risers": {
+      "items": {
+        "$ref": "#/$defs/ObjectBaseRiser"
+      },
+      "title": "Risers",
+      "type": "array"
+    },
+    "schema": {
+      "const": "quantor.object_base.risers.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "risers"
+  ],
+  "title": "ObjectBaseRisers",
+  "type": "object"
+}

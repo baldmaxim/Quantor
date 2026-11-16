@@ -11,6 +11,8 @@ import { formatInt } from '@/lib/cad/view-format';
 import { MAX_PDF_OPACITY, MIN_PDF_OPACITY } from '@/lib/cad/view-mode';
 import { useWorkspaceStore } from '@/store/workspace';
 
+import { CadTenderLayers, type ICadTenderLayers } from '@/components/cad/tender/CadTenderLayers';
+
 import { CadLayerGroup } from './CadLayerGroup';
 import { CadZoneLayers, type ICadZoneLayers } from './CadZoneLayers';
 
@@ -54,6 +56,8 @@ interface ICadLayersPanelProps {
   zones?: ICadZoneLayers | null;
   /** Разметка разрезов на листе (вкл/выкл); нет - на листе разрезов нет. */
   sections?: { visible: boolean; onVisibleChange: (visible: boolean) => void } | null;
+  /** Группа «Расчёты» (TENDER): версии расчётов на виде; нет - группы нет. */
+  tender?: ICadTenderLayers | null;
   /** Трассы механики выбранного route-задания; нет - группы нет. */
   mep?: {
     /** Имена слоёв DXF трасс. */
@@ -106,6 +110,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   constructions = null,
   zones = null,
   sections = null,
+  tender = null,
   mep = null,
 }) => {
   const groups = useMemo(() => groupLayers(layers), [layers]);
@@ -271,6 +276,8 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
           {mode3d && <p className="text-xs text-muted">Зоны: только план</p>}
         </fieldset>
       )}
+
+      {tender && tender.items.length > 0 && <CadTenderLayers {...tender} />}
 
       {mep && (
         <fieldset className="min-w-0 border-0 p-0" data-testid="mep-layers">
