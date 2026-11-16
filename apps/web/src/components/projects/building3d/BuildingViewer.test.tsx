@@ -333,6 +333,35 @@ describe('Просмотрщик объекта: весь объект', () => {
     expect(screen.getByRole('list', { name: 'Служебные листы' })).toHaveTextContent('по паспорту листа - разрез');
   });
 
+  it('корпус, привязанный вручную, назван так в списке; без права записи кнопок привязки нет', async () => {
+    vi.mocked(client.readCadBuilding3D).mockResolvedValue({
+      data: {
+        floors: [
+          floor(),
+          floor({ job_id: 'k2', label: '1 этаж К2', group_key: 'k2', group_label: 'К2 · С1', corps: '2', section: '1' }),
+        ],
+        groups: [
+          { key: 'k9s3', label: 'К9 · С3', floor_count: 1, aligned_count: 1, placement: 'reference' },
+          {
+            key: 'k2',
+            label: 'К2 · С1',
+            floor_count: 1,
+            aligned_count: 1,
+            placement: 'manual',
+            site_pin_id: 'pin-1',
+            placement_message: 'невязка 3 мм',
+          },
+        ],
+        warnings: [],
+      },
+    } as never);
+    mount({ ...NOTHING, group: 'all' });
+    expect(await screen.findByText('Привязан вручную: невязка 3 мм')).toBeInTheDocument();
+    expect(screen.queryByText(/Полупрозрачные корпуса/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Снять привязку' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Привязать вручную' })).toBeNull();
+  });
+
   it('выбор этажа в режиме сохраняет «all»', async () => {
     const change = mount({ ...NOTHING, group: 'all' });
     fireEvent.click(await screen.findByRole('button', { name: /1 этаж К2/ }));

@@ -1,6 +1,6 @@
 'use client';
 
-import type { CadBuilding3dFloorRead } from '@quantor/api-client';
+import type { CadBuilding3dFloorRead, CadBuilding3dGroupRead, CadSitePinRead } from '@quantor/api-client';
 import { useEffect, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
@@ -16,10 +16,14 @@ import {
 import { useCadBuilding3dWalls } from '@/lib/cad/building3d-queries';
 import { ALL_GROUPS_KEY } from '@/lib/cad/building-viewer-layout';
 import { cadErrorText } from '@/lib/cad/errors';
+import { useCanEditSitePins } from '@/lib/cad/site-pin-queries';
 
 import { BuildingCalcPanel } from './BuildingCalcPanel';
 import { BuildingFloorList } from './BuildingFloorList';
 import { BuildingFloorPanel } from './BuildingFloorPanel';
+import { BuildingGroupPlacement } from './BuildingGroupPlacement';
+import { BuildingSitePinDialog } from './BuildingSitePinDialog';
+import { BuildingSitePinResult } from './BuildingSitePinResult';
 import { BuildingViewerCanvas } from './BuildingViewerCanvas';
 import { BuildingViewerNotes } from './BuildingViewerNotes';
 import { BuildingViewerToolbar } from './BuildingViewerToolbar';
@@ -77,6 +81,9 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
   const [fitSeq, setFitSeq] = useState(0);
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [sideWidth, setSideWidth] = useResizableWidth(SIDE_WIDTH_KEY, SIDE_WIDTH);
+  const [pinGroup, setPinGroup] = useState<CadBuilding3dGroupRead | null>(null);
+  const [createdPin, setCreatedPin] = useState<CadSitePinRead | null>(null);
+  const canEditPins = useCanEditSitePins();
   const container = useRef<HTMLDivElement>(null);
 
   const groups = useMemo(() => query.data?.groups ?? [], [query.data]);
@@ -106,6 +113,7 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
     () => (selected === null ? 0 : sheetCountOf(floors.filter((item) => item.group_key === selected.group_key))),
     [floors, selected],
   );
+  const currentGroup = groups.find((group) => group.key === groupKey) ?? null;
   const hasLost = groups.some((group) => group.placement === 'none');
 
   // `null` - выбор снят (повторный щелчок по этажу, щелчок в пустоту).
@@ -229,7 +237,19 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
             onOpenDetail={() => selected !== null && openDetail(floorKey(selected))}
             onOpenSheet={onOpenSheet}
           />
+          {createdPin !== null && <BuildingSitePinResult pin={createdPin} onDismiss={() => setCreatedPin(null)} />}
+          {!isAll && currentGroup !== null && (
+            <BuildingGroupPlacement
+              projectId={projectId}
+              group={currentGroup}
+              canEdit={canEditPins}
+              onPin={setPinGroup}
+            />
+          )}
           <BuildingFloorList
+            projectId={projectId}
+            canEditPins={canEditPins}
+            onPin={setPinGroup}
             floors={floors}
             groups={isAll ? groups : undefined}
             selectedKey={selection.floor}
@@ -262,6 +282,16 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
         onBack={() => onSelectionChange({ ...selection, detail: false })}
       />
       {body}
+      {pinGroup !== null && (
+        <BuildingSitePinDialog
+          projectId={projectId}
+          group={pinGroup}
+          groups={groups}
+          floors={allFloors ?? []}
+          onClose={() => setPinGroup(null)}
+          onCreated={setCreatedPin}
+        />
+      )}
     </section>
   );
 };
