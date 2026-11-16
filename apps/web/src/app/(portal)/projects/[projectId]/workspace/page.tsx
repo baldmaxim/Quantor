@@ -32,11 +32,20 @@ import { openablePanels } from '@/components/workspace/cad/WorkspaceCadPipeline'
 import { WorkspacePipelineBadge } from '@/components/workspace/cad/WorkspacePipelineBadge';
 import { ScaleDialog } from '@/components/workspace/ScaleDialog';
 import { SheetList } from '@/components/workspace/SheetList';
+import { SheetTabs, type ISheetScale, type ISheetTab } from '@/components/workspace/SheetTabs';
 import { TakeoffPanel, type TakeoffGeometry } from '@/components/workspace/TakeoffPanel';
 import { takeoffAccess, type ITakeoffAccess } from '@/components/workspace/takeoff-access';
 import type { NormalizedPoint } from '@/lib/viewer/coordinates';
 import type { OverlayMeasurement } from '@/lib/viewer/measurement-overlay';
 import { ScaleDraft, type ScaleDraftPhase } from '@/lib/viewer/scale-draft';
+import {
+  addSheetTab,
+  closeSheetTab,
+  openSheetTabs,
+  parseSheetTabs,
+  replaceSheetTab,
+  serializeSheetTabs,
+} from '@/lib/viewer/sheet-tabs';
 import { ToolController } from '@/lib/viewer/tool-controller';
 import type { ToolMode } from '@/lib/viewer/tool-machine';
 import { useDocumentBackend } from '@/components/viewer/useDocumentBackend';
@@ -59,6 +68,7 @@ import { env } from '@/lib/env';
 import { cadEnabled } from '@/lib/cad/access';
 import { resolveSheetPosition } from '@/lib/cad/building3d-queries';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
+import { formatCadScale, formatScaleFromMmPerPt, NO_VALUE } from '@/lib/cad/view-format';
 import { readyDxfPages } from '@/lib/cad/sheet-results';
 import { parseWorkspaceJob, sheetPosition } from '@/lib/cad/workspace-url';
 import { errorMessage } from '@/lib/errors';
@@ -166,6 +176,14 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const pages = sheets.data?.items ?? [];
   const pageIndex = Math.min(Math.max(pageParam - 1, 0), Math.max(pages.length - 1, 0));
   const sheet = pages[pageIndex] ?? null;
+
+  // Открытые вкладки листов - в адресе рядом с активным листом: ссылка открывает тот же набор.
+  const activePosition = pages.length > 0 ? pageIndex + 1 : null;
+  const tabsParam = searchParams.get('tabs');
+  const openTabs = useMemo(
+    () => openSheetTabs(parseSheetTabs(tabsParam, pages.length), activePosition),
+    [tabsParam, pages.length, activePosition],
+  );
 
   const geometry = usePageGeometry(backend, sheet ? sheet.page_index : null);
 
@@ -442,9 +460,47 @@ const WorkspacePage = ({ params }: IPageProps) => {
     router.replace(`/projects/${projectId}/workspace?${next.toString()}`, { scroll: false });
   };
 
-  const goToPage = (index: number, extra: Record<string, string | null> = {}) => {
+  // Обычный переход заменяет активную вкладку, `newTab` (Ctrl + щелчок, средняя кнопка) - открывает
+  // лист рядом с ней. Уже открытый лист только становится активным.
+  const goToPage = (
+    index: number,
+    extra: Record<string, string | null> = {},
+    newTab = false,
+  ) => {
     const clamped = Math.min(Math.max(index, 0), pages.length - 1);
-    setQuery({ page: String(clamped + 1), region: null, ...extra });
+    const next = clamped + 1;
+    const tabs =
+      activePosition === null
+        ? [next]
+        : newTab
+          ? addSheetTab(openTabs, activePosition, next)
+          : replaceSheetTab(openTabs, activePosition, next);
+    setQuery({ page: String(next), tabs: serializeSheetTabs(tabs), region: null, ...extra });
+  };
+
+  // В CAD смена листа сбрасывает выбранное задание и вид: задание принадлежит листу.
+  const sheetChangeReset = (): Record<string, string | null> =>
+    mode === 'cad' ? { job: null, view: null } : {};
+
+  const activateTab = (position: number) => {
+    if (position === activePosition) return;
+    setQuery({
+      page: String(position),
+      tabs: serializeSheetTabs(openTabs),
+      region: null,
+      ...sheetChangeReset(),
+    });
+  };
+
+  const closeTab = (position: number) => {
+    if (activePosition === null) return;
+    const next = closeSheetTab(openTabs, activePosition, position);
+    const changed = next.active !== activePosition;
+    setQuery({
+      page: String(next.active),
+      tabs: serializeSheetTabs(next.tabs),
+      ...(changed ? { region: null, ...sheetChangeReset() } : {}),
+    });
   };
 
   // Этаж из колонки «Здание»: открывается лист этажа (ревизия, позиция листа, задание, вид).
@@ -457,6 +513,8 @@ const WorkspacePage = ({ params }: IPageProps) => {
         : await resolveSheetPosition(queryClient, floor.revision_id, floor.page_index);
     setQuery({
       revision: floor.revision_id,
+      // Вкладки - позиции листов своей ревизии: на чужой ревизии они значили бы другие листы.
+      ...(floor.revision_id === revisionId ? {} : { tabs: null }),
       page: String(position),
       job: floor.job_id,
       view: String(floor.view),
@@ -502,7 +560,6 @@ const WorkspacePage = ({ params }: IPageProps) => {
   );
   // Ярлык «CAD» в списке листов - из того же ответа конвейера: в нём все листы ревизии.
   const cadReadyPages = useMemo(() => readyDxfPages(pipeline.sheets), [pipeline.sheets]);
-  const floorTitle = formatFloorTitle(pipeline.sheet?.floor_title, '');
 
   const cadSelection = parseWorkspaceJob(searchParams);
   const cad = useWorkspaceCad({
@@ -535,6 +592,46 @@ const WorkspacePage = ({ params }: IPageProps) => {
   );
 
   const failure = renderError ?? errorCode ?? null;
+
+  const sheetTabs: ISheetTab[] = openTabs.flatMap((position) => {
+    const item = pages[position - 1];
+    if (!item) return [];
+    const title = floorTitleByPage.get(item.page_index);
+    return [
+      {
+        position,
+        floorTitle: formatFloorTitle(title, ''),
+        fullTitle: formatFloorTitleFull(title) ?? null,
+        sheetLabel: `Лист ${item.page_label ?? item.page_index + 1}`,
+      },
+    ];
+  });
+
+  // Масштаб чертежа над листом. Первым - калибровка человека для обмера; без неё - масштаб вида CAD
+  // этого листа (калибровка CAD или подбор движком по размерным цепочкам, ADR-0045). Надпись
+  // «М 1:100» на чертеже портал не читает (ADR-0018).
+  const cadScale =
+    cad.side.view && cad.side.view.diagnostics.page_index === sheet?.page_index
+      ? cad.side.view.diagnostics.scale
+      : null;
+  const cadScaleText = cadScale ? formatCadScale(cadScale) : NO_VALUE;
+  const drawingScale: ISheetScale = defaultCalibration
+    ? {
+        text: formatScaleFromMmPerPt(Number(defaultCalibration.mm_per_pt)),
+        source: 'калибровка листа',
+        zoomPercent,
+      }
+    : cadScale && cadScaleText !== NO_VALUE
+      ? {
+          text: cadScaleText,
+          source: cadScale.source
+            ? 'калибровка CAD'
+            : cadScale.passed && cadScale.hold_reasons.length === 0
+              ? 'CAD по размерам'
+              : 'CAD по размерам, не подтверждён',
+          zoomPercent,
+        }
+      : { text: null, source: null, zoomPercent };
 
   return (
     <>
@@ -589,25 +686,13 @@ const WorkspacePage = ({ params }: IPageProps) => {
                 )}
               </div>
 
-              <div className="flex min-w-0 flex-1 items-stretch overflow-hidden">
-                <span className="flex min-w-0 items-center gap-[var(--s-3)] whitespace-nowrap border-r border-border bg-surface-muted px-[var(--s-5)] text-xs shadow-[inset_0_-2px_0_var(--accent)]">
-                  {sheet && floorTitle !== '' ? (
-                    <>
-                      <span
-                        className="min-w-0 truncate font-medium"
-                        title={formatFloorTitleFull(pipeline.sheet?.floor_title) ?? undefined}
-                      >
-                        {floorTitle}
-                      </span>
-                      <span className="flex-none text-muted">Лист {sheet.page_label ?? sheet.page_index + 1}</span>
-                    </>
-                  ) : sheet ? (
-                    `Лист ${sheet.page_label ?? sheet.page_index + 1}`
-                  ) : (
-                    'Лист не выбран'
-                  )}
-                </span>
-              </div>
+              <SheetTabs
+                tabs={sheetTabs}
+                active={activePosition}
+                onActivate={activateTab}
+                onClose={closeTab}
+                scale={drawingScale}
+              />
 
               {/* CAD без флага `cad.export` не показывается вовсе (ADR-0036). */}
               {cadOn && (
@@ -837,10 +922,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
                       cad: cadReadyPages.has(item.page_index),
                     }))}
                     activeIndex={pageIndex}
-                    onSelect={(index) =>
-                      // В CAD открытие листа сбрасывает выбранное задание и вид: задание принадлежит листу.
-                      goToPage(index, mode === 'cad' ? { job: null, view: null } : {})
-                    }
+                    onSelect={(index, newTab) => goToPage(index, sheetChangeReset(), newTab)}
                   />
                 )}
 

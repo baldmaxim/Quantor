@@ -36,6 +36,23 @@ export const scaleDenominatorFromMmPerPt = (mmPerPt: number | null | undefined):
 export const formatScaleFromMmPerPt = (mmPerPt: number | null | undefined): string =>
   formatScaleDenominator(scaleDenominatorFromMmPerPt(mmPerPt));
 
+/** Поля проверки масштаба движком (`CadScaleRead`), нужные подписи «1:N». */
+interface ICadScaleValues {
+  readonly source?: string | null;
+  readonly operator_mm_per_pt?: number | null;
+  readonly mm_per_pdf_point: number | null;
+  readonly scale_denominator: number | null;
+}
+
+/** «1:N» вида CAD: при калибровке человека - из неё, иначе - масштаб, подобранный движком. */
+export const formatCadScale = (scale: ICadScaleValues): string => {
+  const fromCalibration = formatScaleFromMmPerPt(scale.operator_mm_per_pt ?? scale.mm_per_pdf_point);
+  const fromEngine = formatScaleDenominator(scale.scale_denominator);
+  const text = scale.source ? fromCalibration : fromEngine;
+  if (text !== NO_VALUE) return text;
+  return fromCalibration !== NO_VALUE ? fromCalibration : fromEngine;
+};
+
 /** Отклонение от размерных цепочек: движок отдаёт долю (0,023), показываем проценты. */
 export const formatDeviationPercent = (deviation: number | null | undefined): string =>
   deviation === null || deviation === undefined || !Number.isFinite(deviation)

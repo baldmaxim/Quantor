@@ -4,27 +4,13 @@ import type { CadScaleRead } from '@quantor/api-client';
 import type { FC } from 'react';
 
 import { InspectorSection, StatusBadge } from '@/components/ui';
-import {
-  formatDeviationPercent,
-  formatScaleDenominator,
-  formatScaleFromMmPerPt,
-  NO_VALUE,
-} from '@/lib/cad/view-format';
+import { formatCadScale, formatDeviationPercent } from '@/lib/cad/view-format';
 
 import { CadControlsTable } from './CadControlsTable';
 
 interface ICadScaleSectionProps {
   scale: CadScaleRead | null;
 }
-
-/** «1:N»: при калибровке человека - из неё, иначе - масштаб, подобранный движком. */
-const scaleText = (scale: CadScaleRead): string => {
-  const fromCalibration = formatScaleFromMmPerPt(scale.operator_mm_per_pt ?? scale.mm_per_pdf_point);
-  const fromEngine = formatScaleDenominator(scale.scale_denominator);
-  const text = scale.source ? fromCalibration : fromEngine;
-  if (text !== NO_VALUE) return text;
-  return fromCalibration !== NO_VALUE ? fromCalibration : fromEngine;
-};
 
 /** Причины, по которым масштаб не подтверждён: причины отказа, иначе общая причина. */
 const reasonsOf = (scale: CadScaleRead): readonly string[] => {
@@ -56,7 +42,7 @@ export const CadScaleSection: FC<ICadScaleSectionProps> = ({ scale }) => {
       }
     >
       <div className="flex min-w-0 flex-col gap-[var(--s-4)]" data-testid="cad-scale-summary">
-        <p className="text-sm font-medium">Масштаб {scaleText(scale)}</p>
+        <p className="text-sm font-medium">Масштаб {formatCadScale(scale)}</p>
         {hasDeviation && (
           <p className="text-sm">
             Отклонение от размерных цепочек: {formatDeviationPercent(scale.deviation)}

@@ -60,7 +60,29 @@ describe('SheetList', () => {
       />,
     );
     await userEvent.click(screen.getByRole('button', { name: /Лист 4/ }));
-    expect(onSelect).toHaveBeenCalledWith(3);
+    expect(onSelect).toHaveBeenCalledWith(3, false);
+  });
+
+  it('Ctrl + щелчок и средняя кнопка открывают лист в новой вкладке', async () => {
+    const onSelect = vi.fn();
+    render(
+      <SheetList
+        pages={[page({ id: 'a', index: 0 }), page({ id: 'b', index: 3 })]}
+        activeIndex={0}
+        onSelect={onSelect}
+      />,
+    );
+    const user = userEvent.setup();
+    const target = screen.getByRole('button', { name: /Лист 4/ });
+    await user.keyboard('{Control>}');
+    await user.click(target);
+    await user.keyboard('{/Control}');
+    expect(onSelect).toHaveBeenLastCalledWith(3, true);
+
+    onSelect.mockClear();
+    await user.pointer({ keys: '[MouseMiddle]', target });
+    expect(onSelect).toHaveBeenCalledWith(3, true);
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
   it('у листа с заголовком плана этаж идёт после номера листа', () => {

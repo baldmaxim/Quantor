@@ -5,6 +5,7 @@ import { useEffect, useRef, type FC } from 'react';
 
 import { StatusBadge, cx } from '@/components/ui';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
+import { opensInNewTab } from '@/lib/viewer/sheet-tabs';
 
 export interface ISheetListPage {
   id: string;
@@ -22,7 +23,8 @@ export interface ISheetListPage {
 interface ISheetListProps {
   pages: readonly ISheetListPage[];
   activeIndex: number;
-  onSelect: (index: number) => void;
+  /** `newTab` - Ctrl (Cmd) с щелчком или средняя кнопка: лист открывается в новой вкладке. */
+  onSelect: (index: number, newTab: boolean) => void;
 }
 
 /**
@@ -31,7 +33,7 @@ interface ISheetListProps {
  * Показываются только видимые строки: у документа их 77, и держать в разметке все
  * вместе с миниатюрами значило бы рисовать весь документ ради панели шириной 264 px.
  * Ярлыки справа независимы: «Распознан» — есть регионы, «CAD» — есть готовый DXF.
- * Нет признака — нет ярлыка.
+ * Нет признака — нет ярлыка. Ctrl + щелчок и средняя кнопка открывают лист в новой вкладке.
  */
 export const SheetList: FC<ISheetListProps> = ({ pages, activeIndex, onSelect }) => {
   const container = useRef<HTMLDivElement>(null);
@@ -56,7 +58,17 @@ export const SheetList: FC<ISheetListProps> = ({ pages, activeIndex, onSelect })
             key={page.id}
             type="button"
             aria-current={page.index === activeIndex}
-            onClick={() => onSelect(page.index)}
+            title="Ctrl + щелчок или средняя кнопка — открыть в новой вкладке"
+            onClick={(event) => onSelect(page.index, opensInNewTab(event))}
+            // Средняя кнопка: без этого браузер включает автопрокрутку вместо щелчка.
+            onMouseDown={(event) => {
+              if (event.button === 1) event.preventDefault();
+            }}
+            onAuxClick={(event) => {
+              if (event.button !== 1) return;
+              event.preventDefault();
+              onSelect(page.index, true);
+            }}
             className={cx(
               'flex min-h-[var(--h-row-tree)] items-center gap-[var(--s-3)] px-[var(--s-4)] py-[var(--s-1)] text-left text-xs transition-colors',
               page.index === activeIndex
