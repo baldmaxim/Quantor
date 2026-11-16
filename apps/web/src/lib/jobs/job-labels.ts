@@ -10,6 +10,7 @@ export const JOB_TYPE_LABELS: Readonly<Record<JobType, string>> = {
   cad_pdf_convert: 'CAD: конвертация',
   cad_mep_route: 'CAD: трассы',
   cad_walls: 'CAD: конструкции',
+  cad_outline_review: 'CAD: проверка обводки',
   cad_floor3d_dxf: 'CAD: 3D DXF',
   cad_zones: 'CAD: зоны',
   cad_sections: 'CAD: разрезы',

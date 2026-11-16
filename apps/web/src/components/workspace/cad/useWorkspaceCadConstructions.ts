@@ -261,6 +261,7 @@ export const useWorkspaceCadConstructions = ({
 
   const side: IWorkspaceCadConstructions | null = enabled
     ? {
+        showOutlineReview: true,
         status: data
           ? 'ready'
           : notReady

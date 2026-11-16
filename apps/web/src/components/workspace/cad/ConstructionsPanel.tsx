@@ -3,6 +3,7 @@
 import type { FC } from 'react';
 
 import { Button, Skeleton } from '@/components/ui';
+import { CadOutlineReviewPanel } from './CadOutlineReviewPanel';
 
 import { ConstructionsLevels } from './ConstructionsLevels';
 import { ConstructionsTotals } from './ConstructionsTotals';
@@ -29,6 +30,7 @@ export const ConstructionsPanel: FC<IWorkspaceCadConstructions> = ({
   activeGroup,
   onSelectGroup,
   vor,
+  showOutlineReview,
 }) => {
   if (status === 'loading') {
     return (
@@ -106,6 +108,7 @@ export const ConstructionsPanel: FC<IWorkspaceCadConstructions> = ({
         {failure}
         {action('Пересчитать', 'default')}
       </div>
+      {showOutlineReview && <CadOutlineReviewPanel wallsJobId={data.walls_job_id} />}
       <ConstructionsLevels
         // Значения высот пришли другими (сохранение, пересчёт): поля начинаются заново.
         key={JSON.stringify(data.sheet_levels)}

@@ -918,7 +918,8 @@ export type CadBuilding3dGroupRead = {
  *
  * Участок плиты этажа на своей отметке (кровля со скатами, ступенчатый первый этаж).
  *
- * Кольца - целые мм, уже преобразованные как этаж (`rotation_deg`, `offset_mm`), без повтора первой точки.
+ * Кольца - целые мм, уже преобразованные как этаж (`rotation_deg`, `offset_mm`), без повтора
+ * первой точки.
  * `top_mm` - верх плиты участка от 0.000 (действующие высоты листа: ручная отметка этажа
  * сдвигает все участки вместе); `mark_mm` / `max_mm` - отметки поверхности по знакам плана
  * (уклон), `source = base` - знаков на участке нет, основной уровень листа.
@@ -14025,7 +14026,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
 
 /**
  * LengthUnit
@@ -14964,6 +14965,142 @@ export type OriginalPrediction = {
      * Tool Id
      */
     tool_id: string;
+};
+
+/**
+ * OutlineFinding
+ */
+export type OutlineFinding = {
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Location
+     */
+    location: string;
+    /**
+     * Observation
+     */
+    observation: string;
+    /**
+     * Priority
+     */
+    priority: 'blocking' | 'major' | 'minor';
+    /**
+     * Suggested Fix
+     */
+    suggested_fix: string;
+};
+
+/**
+ * OutlineReport
+ */
+export type OutlineReport = {
+    /**
+     * Findings
+     */
+    findings: Array<OutlineFinding>;
+    /**
+     * Limitations
+     */
+    limitations: Array<string>;
+    /**
+     * Sources
+     */
+    sources: [
+        SourceEvidence,
+        SourceEvidence,
+        SourceEvidence,
+        SourceEvidence
+    ];
+    /**
+     * Verdict
+     */
+    verdict: 'ready_for_human_review' | 'needs_correction' | 'insufficient_evidence';
+};
+
+/**
+ * OutlineReviewRead
+ */
+export type OutlineReviewRead = {
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    result?: OutlineReviewResult | null;
+    status: JobStatus;
+};
+
+/**
+ * OutlineReviewResult
+ */
+export type OutlineReviewResult = {
+    /**
+     * Building
+     */
+    building: number;
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256: string;
+    /**
+     * Floor
+     */
+    floor: number;
+    /**
+     * Generator
+     */
+    generator: string;
+    /**
+     * Input Sha256
+     */
+    input_sha256: string;
+    /**
+     * Pdf Page
+     */
+    pdf_page: number;
+    report: OutlineReport;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Section
+     */
+    section: number;
+    /**
+     * Sources
+     */
+    sources: {
+        [key: string]: {
+            [key: string]: string;
+        };
+    };
+    /**
+     * View
+     */
+    view: number;
+    /**
+     * Walls Attempt
+     */
+    walls_attempt: number;
+    /**
+     * Walls Job Id
+     */
+    walls_job_id: string;
+    /**
+     * Walls Sha256
+     */
+    walls_sha256: string;
+    /**
+     * Zones Count
+     */
+    zones_count: number;
 };
 
 /**
@@ -17529,6 +17666,28 @@ export type SourceAvailability = {
      */
     sheet_id: string;
     source_type: SourceType;
+};
+
+/**
+ * SourceEvidence
+ */
+export type SourceEvidence = {
+    /**
+     * Applicability
+     */
+    applicability: 'applicable' | 'no_relevant_requirement' | 'unclear';
+    /**
+     * Observation
+     */
+    observation: string;
+    /**
+     * Reference
+     */
+    reference: string;
+    /**
+     * Role
+     */
+    role: 'project' | 'explanatory_note' | 'terms_of_reference' | 'contract';
 };
 
 /**
@@ -22560,6 +22719,70 @@ export type ReadJobResponses = {
 };
 
 export type ReadJobResponse = ReadJobResponses[keyof ReadJobResponses];
+
+export type ReadCadOutlineReviewsData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/jobs/{job_id}/cad-outline-review';
+};
+
+export type ReadCadOutlineReviewsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadOutlineReviewsError = ReadCadOutlineReviewsErrors[keyof ReadCadOutlineReviewsErrors];
+
+export type ReadCadOutlineReviewsResponses = {
+    /**
+     * Response Read Cad Outline Reviews
+     *
+     * Successful Response
+     */
+    200: Array<OutlineReviewRead>;
+};
+
+export type ReadCadOutlineReviewsResponse = ReadCadOutlineReviewsResponses[keyof ReadCadOutlineReviewsResponses];
+
+export type ReadCadOutlineSourceData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Role
+         */
+        role: 'project' | 'explanatory_note' | 'terms_of_reference' | 'contract';
+    };
+    query?: never;
+    url: '/api/v1/jobs/{job_id}/cad-outline-source/{role}';
+};
+
+export type ReadCadOutlineSourceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadOutlineSourceError = ReadCadOutlineSourceErrors[keyof ReadCadOutlineSourceErrors];
+
+export type ReadCadOutlineSourceResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type ListPersonalTokensData = {
     body?: never;

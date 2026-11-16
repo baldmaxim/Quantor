@@ -157,6 +157,8 @@ export interface IWorkspaceCadVor {
 
 /** Раздел «Конструкции»: свод кладки и монолита листа (ADR-0038). */
 export interface IWorkspaceCadConstructions {
+  /** Отчёт по опубликованному расчёту выбранного вида. */
+  readonly showOutlineReview?: boolean;
   /** `loading` - читается; `not-ready` - результата расчёта нет; `error` - отказ чтения. */
   readonly status: 'loading' | 'ready' | 'not-ready' | 'error';
   readonly data: CadConstructionsRead | null;

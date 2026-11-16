@@ -1816,7 +1816,7 @@
         "type": "object"
       },
       "CadBuilding3dLevelZoneRead": {
-        "description": "Участок плиты этажа на своей отметке (кровля со скатами, ступенчатый первый этаж).\n\nКольца - целые мм, уже преобразованные как этаж (`rotation_deg`, `offset_mm`), без повтора первой точки.\n`top_mm` - верх плиты участка от 0.000 (действующие высоты листа: ручная отметка этажа\nсдвигает все участки вместе); `mark_mm` / `max_mm` - отметки поверхности по знакам плана\n(уклон), `source = base` - знаков на участке нет, основной уровень листа.",
+        "description": "Участок плиты этажа на своей отметке (кровля со скатами, ступенчатый первый этаж).\n\nКольца - целые мм, уже преобразованные как этаж (`rotation_deg`, `offset_mm`), без повтора\nпервой точки.\n`top_mm` - верх плиты участка от 0.000 (действующие высоты листа: ручная отметка этажа\nсдвигает все участки вместе); `mark_mm` / `max_mm` - отметки поверхности по знакам плана\n(уклон), `source = base` - знаков на участке нет, основной уровень листа.",
         "properties": {
           "holes": {
             "items": {
@@ -27996,6 +27996,7 @@
           "cad_pdf_convert",
           "cad_mep_route",
           "cad_walls",
+          "cad_outline_review",
           "cad_floor3d_dxf",
           "cad_zones",
           "cad_sections",
@@ -29800,6 +29801,238 @@
           "sources"
         ],
         "title": "OriginalPrediction",
+        "type": "object"
+      },
+      "OutlineFinding": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "location": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Location",
+            "type": "string"
+          },
+          "observation": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Observation",
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "blocking",
+              "major",
+              "minor"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "suggested_fix": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Suggested Fix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "priority",
+          "location",
+          "observation",
+          "evidence",
+          "suggested_fix"
+        ],
+        "title": "OutlineFinding",
+        "type": "object"
+      },
+      "OutlineReport": {
+        "additionalProperties": false,
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/OutlineFinding"
+            },
+            "maxItems": 25,
+            "title": "Findings",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceEvidence"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Sources",
+            "type": "array"
+          },
+          "verdict": {
+            "enum": [
+              "ready_for_human_review",
+              "needs_correction",
+              "insufficient_evidence"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict",
+          "sources",
+          "findings",
+          "limitations"
+        ],
+        "title": "OutlineReport",
+        "type": "object"
+      },
+      "OutlineReviewRead": {
+        "properties": {
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutlineReviewResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "error_message"
+        ],
+        "title": "OutlineReviewRead",
+        "type": "object"
+      },
+      "OutlineReviewResult": {
+        "properties": {
+          "building": {
+            "title": "Building",
+            "type": "integer"
+          },
+          "dxf_sha256": {
+            "title": "Dxf Sha256",
+            "type": "string"
+          },
+          "floor": {
+            "title": "Floor",
+            "type": "integer"
+          },
+          "generator": {
+            "title": "Generator",
+            "type": "string"
+          },
+          "input_sha256": {
+            "title": "Input Sha256",
+            "type": "string"
+          },
+          "pdf_page": {
+            "title": "Pdf Page",
+            "type": "integer"
+          },
+          "report": {
+            "$ref": "#/components/schemas/OutlineReport"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "section": {
+            "title": "Section",
+            "type": "integer"
+          },
+          "sources": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "propertyNames": {
+              "enum": [
+                "project",
+                "explanatory_note",
+                "terms_of_reference",
+                "contract"
+              ]
+            },
+            "title": "Sources",
+            "type": "object"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "walls_attempt": {
+            "title": "Walls Attempt",
+            "type": "integer"
+          },
+          "walls_job_id": {
+            "format": "uuid",
+            "title": "Walls Job Id",
+            "type": "string"
+          },
+          "walls_sha256": {
+            "title": "Walls Sha256",
+            "type": "string"
+          },
+          "zones_count": {
+            "title": "Zones Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "walls_job_id",
+          "walls_attempt",
+          "revision_id",
+          "section",
+          "building",
+          "floor",
+          "pdf_page",
+          "view",
+          "input_sha256",
+          "walls_sha256",
+          "dxf_sha256",
+          "generator",
+          "zones_count",
+          "sources",
+          "report"
+        ],
+        "title": "OutlineReviewResult",
         "type": "object"
       },
       "OverrideScope": {
@@ -34814,6 +35047,50 @@
           "availability"
         ],
         "title": "SourceAvailability",
+        "type": "object"
+      },
+      "SourceEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "applicability": {
+            "enum": [
+              "applicable",
+              "no_relevant_requirement",
+              "unclear"
+            ],
+            "title": "Applicability",
+            "type": "string"
+          },
+          "observation": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Observation",
+            "type": "string"
+          },
+          "reference": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Reference",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "project",
+              "explanatory_note",
+              "terms_of_reference",
+              "contract"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "applicability",
+          "reference",
+          "observation"
+        ],
+        "title": "SourceEvidence",
         "type": "object"
       },
       "SourceRef": {
@@ -43286,6 +43563,109 @@
           }
         },
         "summary": "Состояние задания",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/cad-outline-review": {
+      "get": {
+        "operationId": "read_cad_outline_reviews",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OutlineReviewRead"
+                  },
+                  "title": "Response Read Cad Outline Reviews",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Проверки качества обводки по заданию конструкций",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/cad-outline-source/{role}": {
+      "get": {
+        "operationId": "read_cad_outline_source",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "project",
+                "explanatory_note",
+                "terms_of_reference",
+                "contract"
+              ],
+              "title": "Role",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Копия источника, использованного при проверке",
         "tags": [
           "jobs"
         ]

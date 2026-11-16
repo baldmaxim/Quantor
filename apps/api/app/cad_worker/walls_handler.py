@@ -31,8 +31,10 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cad_worker import znaki_corner_door
 from app.cad_worker.handler import (
     CadError,
     _discard,
@@ -358,7 +360,28 @@ async def execute_cad_walls(
         code, output = outcome
         if code != 0:
             raise _generator_failure(code, output)
-        files, document = _verified_output(out, source, job, params, _sha256(dxf))
+        dxf_sha256 = _sha256(dxf)
+        files, document = _verified_output(out, source, job, params, dxf_sha256)
+        if znaki_corner_door.applies(
+            str(job.project_id), revision.source_sha256, dxf_sha256, source.page_index, source.view
+        ):
+            corrected = await _run_while_owned(
+                session,
+                job,
+                owner,
+                attempt,
+                [settings.cad_engine_python, "-I", znaki_corner_door.__file__, str(walls_file), str(dxf)],
+                limit_seconds=30,
+                poll_interval=settings.worker_heartbeat_interval_seconds,
+                memory_limit_mb=settings.cad_max_memory_mb,
+            )
+            if corrected is None:
+                return job
+            if corrected[0] != 0:
+                raise CadError(
+                    ErrorCode.CAD_ENGINE_FAILED, "Не подтверждены откосы двери на листе 32"
+                )
+            files, document = _verified_output(out, source, job, params, dxf_sha256)
         if not await _still_owned(session, job, owner, attempt):
             log.warning("cad_lease_lost", job_id=str(job.id))
             return job
@@ -416,4 +439,13 @@ async def execute_cad_walls(
     job.payload = cad_progress.finish_attempt(
         job.payload, attempt, cad_progress.now(), outcome="succeeded", result_status=RESULT_READY
     )
-    return await jobs_service.succeed(session, job=job, payload={"cad_result": result})
+    done = await jobs_service.succeed(session, job=job, payload={"cad_result": result})
+    if settings.cad_review_pilot:
+        from app.cad_worker.outline_review import enqueue_after_walls
+
+        try:
+            async with session.begin_nested():
+                await enqueue_after_walls(session, done, settings)
+        except SQLAlchemyError:
+            log.warning("cad_outline_review_enqueue_failed", job_id=str(done.id))
+    return done

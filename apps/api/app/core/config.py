@@ -154,6 +154,9 @@ class Settings(BaseSettings):
     cad_mep_params: str = ""
     cad_walls_runner: str = ""
     cad_walls_params: str = ""
+    cad_review_pilot: str = ""
+    cad_review_ssh_config: str = ""
+    cad_review_timeout_seconds: int = Field(default=480, ge=30, le=1800)
     # ЭОМ и СС этажа (`cad_eom`): как `cad_mep` — скрипт и параметры из каталога генераторов.
     cad_eom_runner: str = ""
     cad_eom_params: str = ""
