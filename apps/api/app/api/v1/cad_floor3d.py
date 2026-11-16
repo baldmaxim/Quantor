@@ -43,6 +43,7 @@ from app.services import (
     cad_floor3d_dxf,
     cad_lift_openings,
     cad_partitions,
+    cad_sections,
     cad_views,
     cad_zones,
 )
@@ -130,6 +131,20 @@ async def _door_zones(
         mm_per_pdf_point=factor,
     )
     return mapped, []
+
+
+async def _refuse_section(session: SessionDep, sheet: _Sheet) -> None:
+    """Лист-разрез: 3D этажа не строится - контуры разреза не план (ADR-0050)."""
+    if await cad_sections.is_section_page(
+        session,
+        project_id=sheet.project_id,
+        revision_id=sheet.revision_id,
+        page_index=sheet.page_index,
+    ):
+        raise DomainError(
+            ErrorCode.CAD_SHEET_IS_SECTION,
+            "Лист - разрез: 3D этажа не строится, разрез даёт отметки и высоты этажей",
+        )
 
 
 async def _floor3d(
@@ -231,6 +246,7 @@ async def read_cad_floor3d(
     settings: SettingsDep,
 ) -> CadFloor3dRead:
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
+    await _refuse_section(session, sheet)
     walls = await _load_walls(session, storage, sheet)
     return await _floor3d(session, storage, settings, sheet, walls)
 
@@ -254,6 +270,7 @@ async def create_cad_floor3d_dxf(
 ) -> CadWallsJobRead:
     """Модель собирается тем же сервисом, что у GET floor3d; DXF - файл `floor3d.dxf` задания."""
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
+    await _refuse_section(session, sheet)
     walls = await _load_walls(session, storage, sheet)
     model = await _floor3d(session, storage, settings, sheet, walls)
     job = await cad_floor3d_dxf.schedule(

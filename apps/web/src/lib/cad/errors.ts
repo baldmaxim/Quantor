@@ -17,6 +17,7 @@ const CAD_MESSAGES: Readonly<Record<string, string>> = {
   CAD_OPEN_REMARKS: 'Есть открытые замечания: закройте их или отметьте проверенными.',
   CAD_ALREADY_DECIDED: 'Решение по этому виду уже принято.',
   CAD_VIEW_NOT_APPROVED: 'Вид не одобрен: сначала одобрите его.',
+  CAD_SHEET_IS_SECTION: 'Лист — разрез: 3D не строится. Разрез даёт отметки и высоты этажей.',
   CAD_ROUTES_NOT_ACCEPTED: 'Трассы не приняты: 3D DXF доступен после принятия.',
   CAD_MEP_NOT_BUILT: 'Трассы для этого вида не построены: генератор не нашёл решения.',
   CAD_ALREADY_REVOKED: 'Это решение уже отозвано.',

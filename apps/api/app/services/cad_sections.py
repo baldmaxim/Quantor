@@ -303,6 +303,25 @@ async def list_levels(
     return list(rows.all())
 
 
+async def is_section_page(
+    session: AsyncSession, *, project_id: uuid.UUID, revision_id: uuid.UUID, page_index: int
+) -> bool:
+    """Страница ревизии - разрез: на ней есть уровни разрезов (ADR-0050).
+
+    Разрез даёт только отметки и высоты этажей: конструкции этажа и 3D по нему не строятся.
+    """
+    found = await session.scalar(
+        select(CadSectionLevel.id)
+        .where(
+            CadSectionLevel.project_id == project_id,
+            CadSectionLevel.revision_id == revision_id,
+            CadSectionLevel.page_index == page_index,
+        )
+        .limit(1)
+    )
+    return found is not None
+
+
 def level_read(row: CadSectionLevel) -> SectionLevelRead:
     """Строка -> ответ API; статус и разметка проверяются моделью (`markup` - типизированная)."""
     return SectionLevelRead.model_validate(row, from_attributes=True)

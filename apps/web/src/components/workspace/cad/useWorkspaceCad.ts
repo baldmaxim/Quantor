@@ -488,6 +488,15 @@ export const useWorkspaceCad = ({
     });
   }
   if (data.previewError) notices.push({ tone: 'alert', text: data.previewError });
+  // Разрез даёт только отметки и высоты этажей: контуры разреза - не план, 3D по нему не строится
+  // (ADR-0050). Сервер отказывает в 3D такого листа тем же правилом.
+  const sectionSheet = sectionsState.side?.isSectionPage ?? false;
+  if (sectionSheet) {
+    notices.push({
+      tone: 'note',
+      text: 'Лист — разрез: 3D не строится. Разрез даёт отметки и высоты этажей — вкладка «Разрезы».',
+    });
+  }
 
   const bar: IWorkspaceCadBarProps | null =
     active && diagnostics
@@ -499,10 +508,12 @@ export const useWorkspaceCad = ({
           onFit: () => page && camera.fitPage(page, viewportSize()),
           notices,
           loading: diagnostics.preview_available && preview === null && data.previewPending,
-          floor3d: {
-            mode: view3d ? '3d' : 'plan',
-            onModeChange: (next) => setView3d(next === '3d'),
-          },
+          floor3d: sectionSheet
+            ? null
+            : {
+                mode: view3d ? '3d' : 'plan',
+                onModeChange: (next) => setView3d(next === '3d'),
+              },
         }
       : null;
 
@@ -635,7 +646,8 @@ export const useWorkspaceCad = ({
     hiddenConstructionIds,
     routeJobId: shownRoute?.job_id ?? null,
   };
-  const floor3d = bar !== null && view3d && params !== null ? { params, link } : null;
+  const floor3d =
+    bar !== null && view3d && !sectionSheet && params !== null ? { params, link } : null;
 
   return {
     opened,
@@ -652,7 +664,11 @@ export const useWorkspaceCad = ({
     constructionPicker: constructionsState.picker,
     floor3d,
     floor3dPending:
-      active && view3d && floor3d === null && (state === 'loading' || state === 'ready')
+      active &&
+      view3d &&
+      !sectionSheet &&
+      floor3d === null &&
+      (state === 'loading' || state === 'ready')
         ? { onExit: () => setView3d(false) }
         : null,
   };

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   jobsData: { current: undefined as unknown },
   jobData: { current: undefined as unknown },
   diagnosticsPatch: { current: {} as Parameters<typeof diagnostics>[0] },
+  sectionsData: { current: undefined as unknown },
 }));
 
 vi.mock('@/lib/cad/queries', () => ({
@@ -44,7 +45,7 @@ vi.mock('@/lib/cad/zones-queries', () => ({
   useDeleteCadZone: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/lib/cad/sections-queries', () => ({
-  useCadSections: () => ({ data: undefined, isError: false, error: null, refetch: vi.fn() }),
+  useCadSections: () => ({ data: mocks.sectionsData.current, isError: false, error: null, refetch: vi.fn() }),
   useStartCadSections: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
   useDecideCadSectionLevels: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
 }));
@@ -469,6 +470,30 @@ describe('useWorkspaceCad: наложение и непрозрачность PD
     expect(window.localStorage.getItem('quantor.cad.view-3d')).toBe('1');
     act(() => result.current.bar?.floor3d?.onModeChange('plan'));
     expect(result.current.floor3d).toBeNull();
+  });
+
+  it('лист-разрез: 3D не строится - переключателя нет, вид закрыт, в строке пояснение', () => {
+    recognized();
+    window.localStorage.setItem('quantor.cad.view-3d', '1');
+    mocks.sectionsData.current = {
+      revision_id: 'rev',
+      job: null,
+      result_job_id: 'sj',
+      levels: [],
+      issues: [],
+      pages: [
+        { page_index: 0, title: 'Разрез 1-1', corps: null, section: null, cuts: ['1-1'], page_size_pt: [842, 595], rotation: 0 },
+      ],
+    };
+    try {
+      const { result } = mount();
+      expect(result.current.bar?.floor3d).toBeNull();
+      expect(result.current.floor3d).toBeNull();
+      expect(result.current.floor3dPending).toBeNull();
+      expect(result.current.bar?.notices.map((n) => n.text).join(' ')).toContain('Лист — разрез: 3D не строится');
+    } finally {
+      mocks.sectionsData.current = undefined;
+    }
   });
 
   it('ползунок меняет прозрачность PDF и хранится в localStorage', () => {

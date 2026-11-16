@@ -165,6 +165,8 @@ class ErrorCode(StrEnum):
     CAD_OPEN_REMARKS = "CAD_OPEN_REMARKS"
     CAD_ALREADY_DECIDED = "CAD_ALREADY_DECIDED"
     CAD_VIEW_NOT_APPROVED = "CAD_VIEW_NOT_APPROVED"
+    # Лист - разрез АР: 3D этажа не строится, разрез даёт только отметки и высоты этажей (ADR-0050).
+    CAD_SHEET_IS_SECTION = "CAD_SHEET_IS_SECTION"
     CAD_ROUTES_NOT_ACCEPTED = "CAD_ROUTES_NOT_ACCEPTED"
     CAD_MEP_NOT_BUILT = "CAD_MEP_NOT_BUILT"
     # Отзыв решений и отметки этажа из документации (ADR-0036 п. 8).
@@ -337,6 +339,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_OPEN_REMARKS: "Есть неисправленные замечания к этому результату",
     ErrorCode.CAD_ALREADY_DECIDED: "Решение по этому результату уже принято",
     ErrorCode.CAD_VIEW_NOT_APPROVED: "Вид не одобрен для построения трасс",
+    ErrorCode.CAD_SHEET_IS_SECTION: "Лист - разрез: 3D этажа не строится",
     ErrorCode.CAD_ROUTES_NOT_ACCEPTED: "Трассы не приняты: DXF трасс недоступен",
     ErrorCode.CAD_MEP_NOT_BUILT: "Генератор не построил трассы",
     ErrorCode.CAD_ALREADY_REVOKED: "Решение уже отозвано",
@@ -507,6 +510,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_OPEN_REMARKS: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_ALREADY_DECIDED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_VIEW_NOT_APPROVED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_SHEET_IS_SECTION: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_ROUTES_NOT_ACCEPTED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_MEP_NOT_BUILT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_ALREADY_REVOKED: status.HTTP_409_CONFLICT,

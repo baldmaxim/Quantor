@@ -772,3 +772,27 @@ def test_auto_accept_skips_heights_outside_the_route_generator_range() -> None:
         }
     )
     assert cad_sections._auto_acceptable(document) == {(0, 0)}
+
+
+async def test_section_page_is_known_by_its_levels(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    sections_tools: Path,
+    tmp_path: Path,
+) -> None:
+    """Страница с уровнями разрезов - разрез: 3D этажа по ней не строится (ADR-0050)."""
+    settings = sections_settings(sections_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, _ = await _published(api, db_session, fake_storage, settings)
+
+        async def check(page_index: int) -> bool:
+            return await cad_sections.is_section_page(
+                db_session,
+                project_id=uuid.UUID(project_id),
+                revision_id=uuid.UUID(revision_id),
+                page_index=page_index,
+            )
+
+        assert await check(0) and await check(1)
+        assert not await check(2)
