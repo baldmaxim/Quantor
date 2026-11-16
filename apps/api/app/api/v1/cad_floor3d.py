@@ -14,7 +14,13 @@ from fastapi import APIRouter, Depends, Path, status
 from pydantic import ValidationError
 
 from app.api.v1.cad import _read_artifact_json
-from app.api.v1.cad_constructions import _load_walls, _Sheet, _sheet, _Walls
+from app.api.v1.cad_constructions import (
+    _load_walls,
+    _Sheet,
+    _sheet,
+    _Walls,
+    facade_window_heights,
+)
 from app.api.v1.deps import (
     AuthDep,
     SessionDep,
@@ -39,6 +45,7 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.services import cad as cad_service
 from app.services import cad_construction_store as construction_store
 from app.services import (
+    cad_facade_windows,
     cad_floor3d,
     cad_floor3d_dxf,
     cad_lift_openings,
@@ -181,6 +188,15 @@ async def _floor3d(
         *zone_warnings,
         *(CadFloor3dWarningRead(code=code, message=message) for code, message in lift.warnings),
     ]
+    # Высоты окон по видам фасадов проекта (принятые и кандидаты; кандидаты помечены в ответе).
+    facades = await facade_window_heights(session, storage, sheet, walls, overrides, project_slab)
+    zone_warnings = [
+        *zone_warnings,
+        *(
+            CadFloor3dWarningRead(code=code, message=message)
+            for code, message in cad_facade_windows.grouped_warnings(facades.issues)
+        ),
+    ]
     return cad_floor3d.build_floor3d(
         lift.document,
         extras,
@@ -192,6 +208,23 @@ async def _floor3d(
         extra_warnings=zone_warnings,
         current_generator=current_walls_generator(settings),
         partition=partition,
+        window_heights=facades.heights,
+    )
+
+
+def _without_unaccepted_windows(model: CadFloor3dRead) -> CadFloor3dRead:
+    """Модель для DXF без окон из непринятых видов фасадов и их перемычек (ADR-0048).
+
+    Окно из вида-кандидата в 3D показывается как кандидат, но в выгрузку для AutoCAD не идёт.
+    """
+    unaccepted = {window.opening_id for window in model.windows if not window.accepted}
+    if not unaccepted:
+        return model
+    return model.model_copy(
+        update={
+            "windows": [window for window in model.windows if window.accepted],
+            "lintels": [item for item in model.lintels if item.opening_id not in unaccepted],
+        }
     )
 
 
@@ -272,7 +305,7 @@ async def create_cad_floor3d_dxf(
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     await _refuse_section(session, sheet)
     walls = await _load_walls(session, storage, sheet)
-    model = await _floor3d(session, storage, settings, sheet, walls)
+    model = _without_unaccepted_windows(await _floor3d(session, storage, settings, sheet, walls))
     job = await cad_floor3d_dxf.schedule(
         session,
         storage,

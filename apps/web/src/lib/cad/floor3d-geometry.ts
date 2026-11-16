@@ -17,7 +17,19 @@ export const MM_IN_M = 1000;
 
 export type Point2 = readonly [number, number];
 
-export type PrismCategory = 'slab' | 'masonry' | 'monolith' | 'frame_partition' | 'lintel' | 'door';
+export type PrismCategory =
+  | 'slab'
+  | 'masonry'
+  | 'monolith'
+  | 'frame_partition'
+  | 'lintel'
+  | 'door'
+  | 'sill'
+  | 'glass';
+
+/** Части окна по фасаду (ADR-0048): подоконная часть и стекло; выбираются как одно окно. */
+export const isWindowPart = (category: PrismCategory | 'hole'): boolean =>
+  category === 'sill' || category === 'glass';
 
 /** Материал перемычки от движка; `null` - не определён или файл старый. */
 export type LintelMaterial = 'monolith' | 'masonry' | 'frame_partition';
@@ -34,6 +46,8 @@ export interface IPrismSpec {
   readonly material?: LintelMaterial | null;
   /** Только у перемычек и дверей: конструкция-владелец проёма (`construction_key` стены); `null` - не определена. */
   readonly hostId?: string | null;
+  /** Только у частей окна: вид фасада принят человеком (`false` - кандидат). */
+  readonly accepted?: boolean;
 }
 
 /** Категория слоя вкладки «Слои» конструкции-владельца проёма по её id; `undefined` - владелец не найден. */
@@ -48,6 +62,10 @@ export const visibilityOf = (
   spec: Pick<IPrismSpec, 'category' | 'material' | 'hostId'>,
   hostCategoryOf?: HostCategoryOf,
 ): CadLayerCategory => {
+  if (spec.category === 'sill' || spec.category === 'glass') {
+    const windowHost = spec.hostId == null ? undefined : hostCategoryOf?.(spec.hostId);
+    return windowHost ?? 'masonry';
+  }
   if (spec.category !== 'lintel') return spec.category;
   const host = spec.hostId == null ? undefined : hostCategoryOf?.(spec.hostId);
   return host ?? (spec.material === 'monolith' ? 'monolith_vertical' : 'masonry');
@@ -176,6 +194,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     zTop: number;
     material?: LintelMaterial | null;
     hostId?: string | null;
+    accepted?: boolean;
   }
   const raw: IRaw[] = [];
   let wallsWithoutTop = 0;
@@ -254,6 +273,35 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     });
   }
 
+  // Окна по фасаду: подоконная часть (нулевой высоты нет) и стекло. Поле необязательное (старый ответ).
+  for (const window of model.windows ?? []) {
+    const shell = ring(window.shell);
+    if (shell === null) continue;
+    const hostId = window.host_id ?? null;
+    if (window.sill_z_top_mm > window.sill_z_bottom_mm) {
+      raw.push({
+        id: window.opening_id,
+        category: 'sill',
+        shell,
+        holes: [],
+        zBottom: window.sill_z_bottom_mm,
+        zTop: window.sill_z_top_mm,
+        hostId,
+        accepted: window.accepted,
+      });
+    }
+    raw.push({
+      id: window.opening_id,
+      category: 'glass',
+      shell,
+      holes: [],
+      zBottom: window.sill_z_top_mm,
+      zTop: window.glass_z_top_mm,
+      hostId,
+      accepted: window.accepted,
+    });
+  }
+
   // Центр: габарит в плане - bbox сервера (иначе по контурам), по высоте - середина диапазона призм.
   const bbox =
     validBbox(model.bbox) ?? bboxOfRings(raw.map((item) => item.shell as unknown as Ring));
@@ -284,7 +332,10 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     yBottom: (item.zBottom - center.z) / MM_IN_M,
     yTop: (item.zTop - center.z) / MM_IN_M,
     ...(item.category === 'lintel' ? { material: item.material ?? null } : {}),
-    ...(item.category === 'lintel' || item.category === 'door' ? { hostId: item.hostId ?? null } : {}),
+    ...(item.category === 'lintel' || item.category === 'door' || isWindowPart(item.category)
+      ? { hostId: item.hostId ?? null }
+      : {}),
+    ...(isWindowPart(item.category) ? { accepted: item.accepted ?? false } : {}),
   }));
 
   const slab = prisms.find((item) => item.category === 'slab') ?? null;
@@ -378,6 +429,24 @@ export const highlightOf = (
 };
 
 /**
+ * Оверлеи локального выбора: окно выбирается целиком - подсвечиваются и подоконная часть, и стекло
+ * с одним `opening_id`; прочие элементы - как в `highlightOf`.
+ */
+export const highlightListOf = (
+  plan: IFloor3dPlan,
+  pick: { readonly kind: 'prism' | 'hole'; readonly category: string; readonly id: string } | null,
+): IFloor3dHighlight[] => {
+  if (pick === null) return [];
+  if (pick.kind === 'prism' && (pick.category === 'sill' || pick.category === 'glass')) {
+    return plan.prisms
+      .filter((item) => isWindowPart(item.category) && item.id === pick.id)
+      .map((spec) => ({ kind: 'prism' as const, spec }));
+  }
+  const single = highlightOf(plan, pick);
+  return single === null ? [] : [single];
+};
+
+/**
  * Оверлеи общего выбора: все призмы стен, перегородок и плиты, чей id входит в `ids` (группа из
  * панели - вся группа), и перемычки и двери этих стен (`hostId` в `ids`). Сами перемычки и двери
  * в общий выбор не входят: у них свои ключи, совпадение по `id` для них не берётся.
@@ -391,7 +460,7 @@ export const highlightsOf = (
     : plan.prisms
         .filter(
           (item) =>
-            item.category === 'lintel' || item.category === 'door'
+            item.category === 'lintel' || item.category === 'door' || isWindowPart(item.category)
               ? item.hostId != null && ids.has(item.hostId)
               : ids.has(item.id) && (item.category === 'slab' || isWallCategory(item.category)),
         )

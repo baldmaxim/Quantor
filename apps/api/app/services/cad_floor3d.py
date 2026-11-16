@@ -44,10 +44,12 @@ from app.contracts.cad_floor3d import (
     CadFloor3dSlabRead,
     CadFloor3dWallRead,
     CadFloor3dWarningRead,
+    CadFloor3dWindowRead,
     WallsFloorExtras,
 )
 from app.services import cad_constructions
 from app.services.cad_constructions import PartitionContext, ProjectSlab
+from app.services.cad_facade_windows import FacadeWindowHeight
 from app.services.cad_walls_version import walls_outdated
 
 _MM2_IN_M2: Final = 1e6
@@ -66,6 +68,10 @@ WINDOW_BAY_WITHOUT_HOST: Final = "window_bay_without_host"
 WINDOW_BAY_DOOR_OVERLAP: Final = "window_bay_door_overlap"
 # Код предупреждения API: отверстия плиты без решения человека вычтены по умолчанию.
 SLAB_HOLES_UNREVIEWED: Final = "slab_holes_unreviewed"
+# Код предупреждения API: окна построены по видам фасадов, не принятым человеком (кандидаты).
+FACADE_WINDOWS_UNACCEPTED: Final = "facade_windows_unaccepted"
+# Код предупреждения API: подоконник окна по фасаду не ниже верха стены этажа (окно не строится).
+FACADE_WINDOW_ABOVE_WALL: Final = "facade_window_above_wall"
 _PASSED_WARNING_CODES: Final = frozenset(
     {DOOR_WITHOUT_GAP, SLAB_WITHOUT_ZONES, WINDOW_BAY_WITHOUT_HOST, WINDOW_BAY_DOOR_OVERLAP}
 )
@@ -317,11 +323,13 @@ def build_floor3d(
     extra_warnings: Sequence[CadFloor3dWarningRead] = (),
     current_generator: str | None = None,
     partition: PartitionContext | None = None,
+    window_heights: Mapping[str, FacadeWindowHeight] | None = None,
 ) -> CadFloor3dRead:
     """Модель этажа: плита с отверстиями, стены, перемычки, высоты с источниками, предупреждения.
 
     `partition` - зоны помещений листа и принятая высота маячного ряда; без него перегородки
-    строятся на высоту стены листа.
+    строятся на высоту стены листа. `window_heights` - высоты окон без `opening_height_mm` по видам
+    фасадов (id проёма -> высота); без них такие окна не строятся.
     """
     levels = cad_constructions.effective_levels(document.heights, overrides, project_slab)
     warnings: list[CadFloor3dWarningRead] = list(extra_warnings)
@@ -432,12 +440,20 @@ def build_floor3d(
     no_contour = 0
     no_lintel_room = 0
     windows_without_height = 0
+    heights_by_window = {} if window_heights is None else window_heights
+    window_reads: list[CadFloor3dWindowRead] = []
+    windows_above_wall = 0
     for opening in document.openings:
         if outdated:
             break
         if opening.id in marker_gaps:
             continue
-        if opening.kind == "window" and opening.opening_height_mm is None:
+        facade = (
+            heights_by_window.get(opening.id)
+            if opening.kind == "window" and opening.opening_height_mm is None
+            else None
+        )
+        if opening.kind == "window" and opening.opening_height_mm is None and facade is None:
             # окно без высоты: проём не строится, стена сплошная; высоту двери не подставляем
             windows_without_height += 1
             continue
@@ -450,6 +466,50 @@ def build_floor3d(
         top = top_by_id.get(opening.host_id, sheet_top) if opening.host_id else sheet_top
         if top is None:
             wall_height_missing = True
+            continue
+        if facade is not None:
+            # окно с высотой по виду фасада: подоконная часть + стекло + перемычка (ADR-0048 п. 6)
+            glass_bottom = opening_floor + facade.sill_mm
+            glass_top = min(opening_floor + facade.head_mm, top)
+            if glass_bottom >= top:
+                windows_above_wall += 1
+                continue
+            has_sill = facade.sill_mm > 0 and glass_bottom > base
+            window_reads.append(
+                CadFloor3dWindowRead(
+                    opening_id=opening.id,
+                    host_id=opening.host_id,
+                    shell=shell,
+                    sill_z_bottom_mm=base if has_sill else glass_bottom,
+                    sill_z_top_mm=glass_bottom,
+                    glass_z_top_mm=glass_top,
+                    sill_mm=facade.sill_mm,
+                    head_mm=facade.head_mm,
+                    accepted=facade.accepted,
+                    axes_checked=facade.axes_checked,
+                    facade_view_key=facade.view_key,
+                    facade_page_index=facade.page_index,
+                    facade_revision_id=facade.revision_id,
+                    facade_title=facade.title,
+                )
+            )
+            if opening_floor + facade.head_mm >= top:
+                if opening.host_id not in beacon_row_ids:
+                    no_lintel_room += 1
+                continue
+            lintels.append(
+                CadFloor3dLintelRead(
+                    opening_id=opening.id,
+                    host_id=opening.host_id,
+                    kind="window",
+                    shell=shell,
+                    z_bottom_mm=opening_floor + facade.head_mm,
+                    z_top_mm=top,
+                    door_height_mm=facade.head_mm,
+                    door_height_source="observed",
+                    material=lintel_material_by_id.get(opening.id),
+                )
+            )
             continue
         # зона двери человека - только для дверей и разрывов; высота окна - из walls.json
         zone_height = (
@@ -512,7 +572,30 @@ def build_floor3d(
         warnings.append(
             CadFloor3dWarningRead(
                 code=cad_constructions.WINDOW_HEIGHT_UNKNOWN,
-                message="Высота окна неизвестна: окна не построены, стена сплошная.",
+                message=(
+                    "Высота окна неизвестна: окна не построены, стена сплошная. "
+                    f"Окон: {windows_without_height}."
+                ),
+            )
+        )
+    if windows_above_wall:
+        warnings.append(
+            CadFloor3dWarningRead(
+                code=FACADE_WINDOW_ABOVE_WALL,
+                message=(
+                    f"Окно по фасаду выше верха стены этажа: {windows_above_wall}; "
+                    "окно не построено."
+                ),
+            )
+        )
+    unaccepted = sum(1 for window in window_reads if not window.accepted)
+    if unaccepted:
+        warnings.append(
+            CadFloor3dWarningRead(
+                code=FACADE_WINDOWS_UNACCEPTED,
+                message=(
+                    f"Окна по непринятым видам фасадов: {unaccepted}, показаны как кандидаты."
+                ),
             )
         )
     if door_height_missing:
@@ -557,6 +640,7 @@ def build_floor3d(
         walls=walls,
         lintels=lintels,
         doors=doors,
+        windows=window_reads,
         bbox=_bbox(rings),
         warnings=warnings,
     )

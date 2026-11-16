@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { floor3dFixture } from './floor3d-fixtures';
-import { buildFloor3dPlan, highlightOf, itemAtTriangle, toScenePoint } from './floor3d-geometry';
+import { floor3dFixture, windowFixture } from './floor3d-fixtures';
+import { buildFloor3dPlan, highlightListOf, highlightOf, itemAtTriangle, toScenePoint } from './floor3d-geometry';
 
 describe('перевод координат', () => {
   const center = { x: 5000, y: 3000, z: 4000 };
@@ -200,5 +200,38 @@ describe('план оверлея выделения', () => {
     expect(highlightOf(plan, null)).toBeNull();
     expect(highlightOf(plan, { kind: 'prism', category: 'monolith', id: 'w2' })).toBeNull();
     expect(highlightOf(plan, { kind: 'prism', category: 'lintel', id: 'w1' })).toBeNull();
+  });
+});
+
+describe('окна по фасаду', () => {
+  it('подоконная часть и стекло с нужными высотами, в метрах от центра', () => {
+    const plan = buildFloor3dPlan(floor3dFixture({ windows: [windowFixture()] }));
+    const sill = plan.prisms.find((item) => item.category === 'sill')!;
+    const glass = plan.prisms.find((item) => item.category === 'glass')!;
+    expect(sill.yTop - sill.yBottom).toBeCloseTo(0.9);
+    expect(glass.yTop - glass.yBottom).toBeCloseTo(1.1);
+    expect(glass.yBottom).toBeCloseTo(sill.yTop);
+    expect(glass.accepted).toBe(true);
+    expect(sill.hostId).toBe('w1');
+  });
+
+  it('низ стекла равен низу окна - подоконной части нет', () => {
+    const plan = buildFloor3dPlan(
+      floor3dFixture({ windows: [windowFixture({ sill_z_top_mm: 3000, accepted: false })] }),
+    );
+    expect(plan.prisms.some((item) => item.category === 'sill')).toBe(false);
+    expect(plan.prisms.find((item) => item.category === 'glass')?.accepted).toBe(false);
+  });
+
+  it('нет поля windows - окон нет; выбор окна подсвечивает обе части', () => {
+    expect(
+      buildFloor3dPlan(floor3dFixture({ windows: undefined })).prisms.some((i) => i.category === 'glass'),
+    ).toBe(false);
+    const plan = buildFloor3dPlan(floor3dFixture({ windows: [windowFixture()] }));
+    const list = highlightListOf(plan, { kind: 'prism', category: 'glass', id: 'win1' });
+    expect(list.map((item) => (item.kind === 'prism' ? item.spec.category : '')).sort()).toEqual([
+      'glass',
+      'sill',
+    ]);
   });
 });

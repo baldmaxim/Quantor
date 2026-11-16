@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { construction, constructionsRead } from '@/lib/cad/constructions-fixtures';
-import { floor3dFixture } from '@/lib/cad/floor3d-fixtures';
+import { floor3dFixture, windowFixture } from '@/lib/cad/floor3d-fixtures';
 
 import { CadFloor3dPopover } from './CadFloor3dPopover';
 
@@ -224,5 +224,45 @@ describe('плашка перемычки и двери: стена-владел
     mountHosted('lintel', hostId, [...list]);
     expect(screen.getByRole('dialog')).not.toHaveTextContent('Стена');
     expect(screen.queryByRole('button', { name: 'Выбрать стену' })).toBeNull();
+  });
+});
+
+describe('плашка окна по фасаду', () => {
+  const mountWindow = (model: ReturnType<typeof floor3dFixture>) =>
+    render(
+      <CadFloor3dPopover
+        pick={{ kind: 'prism', category: 'glass', id: 'win1' }}
+        model={model}
+        anchor={{ x: 10, y: 10 }}
+        bounds={{ width: 600, height: 400 }}
+        saving={false}
+        error={null}
+        onDecide={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+  it('подоконник, верх, высота, фасад и статус', () => {
+    mountWindow(floor3dFixture({ windows: [windowFixture()] }));
+    const dialog = screen.getByRole('dialog', { name: 'Окно по фасаду' });
+    expect(dialog).toHaveTextContent('Подоконник от чистого пола: 900 мм');
+    expect(dialog).toHaveTextContent('Верх окна от чистого пола: 2000 мм');
+    expect(dialog).toHaveTextContent('Высота окна: 1100 мм');
+    expect(dialog).toHaveTextContent('Низ, м: 3,90');
+    expect(dialog).toHaveTextContent('Верх, м: 5,00');
+    expect(dialog).toHaveTextContent('Фасад 1-12 (стр. 3)');
+    expect(dialog).toHaveTextContent('вид фасада принят');
+  });
+
+  it('кандидат помечен; неопределённая высота - «—», не 0', () => {
+    mountWindow(
+      floor3dFixture({
+        windows: [windowFixture({ accepted: false, head_mm: Number.NaN })],
+      }),
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('кандидат: вид фасада не принят');
+    expect(dialog).toHaveTextContent('Верх окна от чистого пола: —');
+    expect(dialog).toHaveTextContent('Высота окна: —');
   });
 });

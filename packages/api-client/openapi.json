@@ -5633,6 +5633,13 @@
             },
             "title": "Warnings",
             "type": "array"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/CadFloor3dWindowRead"
+            },
+            "title": "Windows",
+            "type": "array"
           }
         },
         "required": [
@@ -5812,6 +5819,98 @@
           "message"
         ],
         "title": "CadFloor3dWarningRead",
+        "type": "object"
+      },
+      "CadFloor3dWindowRead": {
+        "description": "Окно с высотой по виду фасада (ADR-0048 п. 6): подоконная часть, стекло, перемычка.\n\nПодоконная часть - призма по контуру проёма от `sill_z_bottom_mm` до `sill_z_top_mm`; стекло -\nот `sill_z_top_mm` (низ стекла) до `glass_z_top_mm`; перемычка над окном - в `lintels`. Нет\nподоконной части - `sill_z_bottom_mm` равен `sill_z_top_mm`. `accepted = false` - вид фасада\nне принят человеком, окно показывается как кандидат и в объём кладки не входит.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "axes_checked": {
+            "title": "Axes Checked",
+            "type": "boolean"
+          },
+          "facade_page_index": {
+            "title": "Facade Page Index",
+            "type": "integer"
+          },
+          "facade_revision_id": {
+            "format": "uuid",
+            "title": "Facade Revision Id",
+            "type": "string"
+          },
+          "facade_title": {
+            "title": "Facade Title",
+            "type": "string"
+          },
+          "facade_view_key": {
+            "title": "Facade View Key",
+            "type": "string"
+          },
+          "glass_z_top_mm": {
+            "title": "Glass Z Top Mm",
+            "type": "integer"
+          },
+          "head_mm": {
+            "title": "Head Mm",
+            "type": "integer"
+          },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Id"
+          },
+          "opening_id": {
+            "title": "Opening Id",
+            "type": "string"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "sill_mm": {
+            "title": "Sill Mm",
+            "type": "integer"
+          },
+          "sill_z_bottom_mm": {
+            "title": "Sill Z Bottom Mm",
+            "type": "integer"
+          },
+          "sill_z_top_mm": {
+            "title": "Sill Z Top Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "opening_id",
+          "shell",
+          "sill_z_bottom_mm",
+          "sill_z_top_mm",
+          "glass_z_top_mm",
+          "sill_mm",
+          "head_mm",
+          "accepted",
+          "axes_checked",
+          "facade_view_key",
+          "facade_page_index",
+          "facade_revision_id",
+          "facade_title"
+        ],
+        "title": "CadFloor3dWindowRead",
         "type": "object"
       },
       "CadFrameRead": {

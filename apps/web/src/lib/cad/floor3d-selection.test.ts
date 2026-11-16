@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { floor3dFixture } from './floor3d-fixtures';
+import { floor3dFixture, windowFixture } from './floor3d-fixtures';
 import { buildFloor3dPlan, highlightOf, highlightsOf, visibilityOf } from './floor3d-geometry';
 import { buildFloor3dScene, pickOf, readFloor3dColors, type IFloor3dPickData } from './floor3d-scene';
 
@@ -133,5 +133,39 @@ describe('видимость категорий в сцене', () => {
     scene.setCategoryVisible('door', false);
     expect(categoryMeshes(scene, 'door').every((mesh) => !mesh.visible)).toBe(true);
     scene.dispose();
+  });
+});
+
+describe('сцена 3D: окна по фасаду', () => {
+  const plan = buildFloor3dPlan(
+    floor3dFixture({
+      windows: [
+        windowFixture(),
+        windowFixture({ opening_id: 'win2', shell: [[6000, 0], [7000, 0], [7000, 200], [6000, 200]], accepted: false }),
+      ],
+    }),
+  );
+  const scene = buildFloor3dScene(plan, readFloor3dColors(), { showSlabCap: false });
+  const meshesOf = (category: string) =>
+    scene.pickables.filter((mesh) => (mesh.userData.pick as IFloor3dPickData).category === category);
+  const opacityOf = (mesh: THREE.Mesh): number => (mesh.material as THREE.Material).opacity;
+
+  it('стекло принятого вида и кандидат - разные меши с разной прозрачностью', () => {
+    const glass = meshesOf('glass');
+    expect(glass).toHaveLength(2);
+    const byId = (id: string) => glass.find((mesh) => (mesh.userData.pick as IFloor3dPickData).ids.includes(id))!;
+    expect(opacityOf(byId('win2'))).toBeLessThan(opacityOf(byId('win1')));
+    expect(opacityOf(byId('win1'))).toBeLessThan(1);
+    expect(meshesOf('sill')).toHaveLength(1);
+  });
+
+  it('клик по стеклу выбирает окно по opening_id', () => {
+    const mesh = meshesOf('glass').find((item) => (item.userData.pick as IFloor3dPickData).ids.includes('win1'))!;
+    expect(pickOf(mesh, 0)).toEqual({ kind: 'prism', category: 'glass', id: 'win1' });
+  });
+
+  it('видимость части окна следует за категорией стены-хозяина или кладкой', () => {
+    expect(visibilityOf({ category: 'glass', hostId: 'nope' })).toBe('masonry');
+    expect(visibilityOf({ category: 'sill', hostId: 'h' }, () => 'monolith_vertical')).toBe('monolith_vertical');
   });
 });

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -212,6 +213,33 @@ class CadFloor3dDoorRead(BaseModel):
     door_height_source: CadValueSource | None
 
 
+class CadFloor3dWindowRead(BaseModel):
+    """Окно с высотой по виду фасада (ADR-0048 п. 6): подоконная часть, стекло, перемычка.
+
+    Подоконная часть - призма по контуру проёма от `sill_z_bottom_mm` до `sill_z_top_mm`; стекло -
+    от `sill_z_top_mm` (низ стекла) до `glass_z_top_mm`; перемычка над окном - в `lintels`. Нет
+    подоконной части - `sill_z_bottom_mm` равен `sill_z_top_mm`. `accepted = false` - вид фасада
+    не принят человеком, окно показывается как кандидат и в объём кладки не входит.
+    """
+
+    opening_id: str
+    host_id: str | None = None
+    shell: list[list[float]]
+    sill_z_bottom_mm: int
+    sill_z_top_mm: int
+    glass_z_top_mm: int
+    # Подоконник и верх окна от чистого пола листа, мм; источник высоты - вид фасада (`observed`).
+    sill_mm: int
+    head_mm: int
+    accepted: bool
+    # Привязка вида к осям плана проверена (три и более оси или сверка `u_mm`).
+    axes_checked: bool
+    facade_view_key: str
+    facade_page_index: int
+    facade_revision_id: UUID
+    facade_title: str
+
+
 class CadFloor3dWarningRead(BaseModel):
     code: str
     message: str
@@ -234,6 +262,8 @@ class CadFloor3dRead(BaseModel):
     lintels: list[CadFloor3dLintelRead]
     # Полотна дверей (cad_walls v1.4); нет разрыва или старый walls.json — пусто.
     doors: list[CadFloor3dDoorRead] = Field(default_factory=list)
+    # Окна с высотой по виду фасада (ADR-0048); нет видов или окон без высоты - пусто.
+    windows: list[CadFloor3dWindowRead] = Field(default_factory=list)
     # [minx, miny, maxx, maxy] по плите и стенам; геометрии нет — `None`.
     bbox: list[float] | None
     warnings: list[CadFloor3dWarningRead]

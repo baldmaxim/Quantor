@@ -174,17 +174,26 @@ def _decision_key(
     return (page_index, title, axis_from, axis_to, fingerprint)
 
 
+def _rounded(values: Any) -> list[float] | None:
+    """Доли страницы до 1e-6: отпечаток не зависит от шума записи."""
+    if not isinstance(values, list):
+        return None
+    return [round(v, 6) if isinstance(v, int | float) else 0.0 for v in values]
+
+
 def _fingerprint(
     scale_status: str,
     mm_per_pt: float | None,
     window_count: int,
     windows: list[dict[str, Any]],
     marks: list[dict[str, Any]],
+    axes: list[dict[str, Any]],
 ) -> str:
     """Отпечаток чисел вида: решение переносится, только если они не изменились.
 
     Привязка, масштаб (до 0,001), число окон, sha256 канонического JSON окон
-    `(z_bottom_mm, z_top_mm, u0_mm, u1_mm, width_mm)` и отметок `(value_mm, used)`.
+    `(z_bottom_mm, z_top_mm, u0_mm, u1_mm, width_mm, bbox)`, отметок `(value_mm, used)` и осей
+    вида `(label, label_full, x)`: окна `bbox` и оси - входы сопоставления с планом (ADR-0048).
     """
     scale = None if mm_per_pt is None else round(mm_per_pt, 3)
     payload = {
@@ -192,9 +201,13 @@ def _fingerprint(
         "mm_per_pt": scale,
         "window_count": window_count,
         "windows": [
-            [w.get(k) for k in ("z_bottom_mm", "z_top_mm", "u0_mm", "u1_mm", "width_mm")]
+            [
+                *(w.get(k) for k in ("z_bottom_mm", "z_top_mm", "u0_mm", "u1_mm", "width_mm")),
+                _rounded(w.get("bbox")),
+            ]
             for w in windows
         ],
+        "axes": [[a.get("label"), a.get("label_full"), _rounded([a.get("x")])] for a in axes],
         "marks": [[m.get("value_mm"), m.get("used")] for m in marks],
     }
     text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -247,7 +260,14 @@ async def publish_views(
             old.title,
             old.axis_from,
             old.axis_to,
-            _fingerprint(old.scale_status, old.mm_per_pt, old.window_count, old.windows, old.marks),
+            _fingerprint(
+                old.scale_status,
+                old.mm_per_pt,
+                old.window_count,
+                old.windows,
+                old.marks,
+                old.axes,
+            ),
         )
         for old in previous
     )
@@ -260,7 +280,12 @@ async def publish_views(
                 old.axis_from,
                 old.axis_to,
                 _fingerprint(
-                    old.scale_status, old.mm_per_pt, old.window_count, old.windows, old.marks
+                    old.scale_status,
+                    old.mm_per_pt,
+                    old.window_count,
+                    old.windows,
+                    old.marks,
+                    old.axes,
                 ),
             )
             carried[key] = (old.status, old.decided_by, old.decided_at)
@@ -271,6 +296,7 @@ async def publish_views(
         (
             [item.model_dump(mode="json") for item in view.windows],
             [item.model_dump(mode="json") for item in view.marks],
+            [item.model_dump(mode="json") for item in view.axes],
         )
         for view in document.views
     ]
@@ -286,6 +312,7 @@ async def publish_views(
                 len(view.windows),
                 new_dumps[number][0],
                 new_dumps[number][1],
+                new_dumps[number][2],
             ),
         )
         for number, view in enumerate(document.views)

@@ -583,6 +583,23 @@ async def test_rerun_does_not_carry_a_decision_to_a_view_with_other_numbers(
         assert views[0]["decided_by"] is None and views[0]["windows"][0]["z_bottom_mm"] == 7361
 
 
+def test_fingerprint_changes_with_view_axes_and_window_boxes() -> None:
+    """Оси вида и `bbox` окон - входы сопоставления: изменились - решение не переносится."""
+    windows = [{"z_bottom_mm": 900, "z_top_mm": 2400, "bbox": [0.5, 0.3, 0.63, 0.4]}]
+    axes = [
+        {"label": "1", "label_full": None, "x": 0.1},
+        {"label": "2", "label_full": None, "x": 0.9},
+    ]
+    base = cad_facades._fingerprint("fitted", 1.0, 1, windows, [], axes)
+    assert base == cad_facades._fingerprint("fitted", 1.0, 1, [dict(windows[0])], [], list(axes))
+    moved_axis = [axes[0], {**axes[1], "x": 0.91}]
+    assert base != cad_facades._fingerprint("fitted", 1.0, 1, windows, [], moved_axis)
+    renamed = [{**axes[0], "label": "A"}, axes[1]]
+    assert base != cad_facades._fingerprint("fitted", 1.0, 1, windows, [], renamed)
+    moved_box = [{**windows[0], "bbox": [0.5, 0.3, 0.64, 0.4]}]
+    assert base != cad_facades._fingerprint("fitted", 1.0, 1, moved_box, [], axes)
+
+
 async def test_partial_rerun_replaces_only_its_pages_and_keeps_other_decisions(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],

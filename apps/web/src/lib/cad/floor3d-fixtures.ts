@@ -1,4 +1,4 @@
-import type { CadFloor3dRead, CadHeightsRead } from '@quantor/api-client';
+import type { CadFloor3dRead, CadFloor3dWindowRead, CadHeightsRead } from '@quantor/api-client';
 
 /** Синтетические данные 3D-вида для тестов: этаж 10 x 6 м (мм DXF), отметка 3000, плита 200. */
 
@@ -88,5 +88,24 @@ export const floor3dFixture = (patch: Partial<CadFloor3dRead> = {}): CadFloor3dR
   ],
   bbox: [0, 0, 10000, 6000],
   warnings: [],
+  ...patch,
+});
+
+/** Окно по фасаду: подоконная часть 3000-3900, стекло 3900-5000 (мм), подоконник 900, верх 2000. */
+export const windowFixture = (patch: Partial<CadFloor3dWindowRead> = {}): CadFloor3dWindowRead => ({
+  opening_id: 'win1',
+  host_id: 'w1',
+  shell: rect(1000, 0, 2200, 200),
+  sill_z_bottom_mm: 3000,
+  sill_z_top_mm: 3900,
+  glass_z_top_mm: 5000,
+  sill_mm: 900,
+  head_mm: 2000,
+  accepted: true,
+  facade_view_key: 'north',
+  facade_page_index: 2,
+  facade_revision_id: 'rev1',
+  facade_title: 'Фасад 1-12',
+  axes_checked: true,
   ...patch,
 });

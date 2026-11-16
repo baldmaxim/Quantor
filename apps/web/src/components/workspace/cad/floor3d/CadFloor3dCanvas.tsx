@@ -10,7 +10,8 @@ import {
   type IFloor3dSnapState,
 } from '@/lib/cad/floor3d-engine';
 import {
-  highlightOf,
+  highlightListOf,
+  isWindowPart,
   highlightsOf,
   visibilityOf,
   type HostCategoryOf,
@@ -210,14 +211,13 @@ export const CadFloor3dCanvas: FC<ICadFloor3dCanvasProps> = ({
   // Выделение накладывается после пересборки модели (эффект выше) и при смене выбора: общий выбор
   // конструкций плюс локальный (перемычка, дверь, отверстие). Скрытое категорией не подсвечивается.
   useEffect(() => {
-    const local = highlightOf(plan, selected);
-    const targets = [...highlightsOf(plan, selectedIds), ...(local === null ? [] : [local])].filter(
+    const targets = [...highlightsOf(plan, selectedIds), ...highlightListOf(plan, selected)].filter(
       (target) => {
         if (target.kind === 'hole') return !hiddenCategories.has('slab');
         const category = visibilityOf(target.spec, hostCategoryOf);
         if (hiddenCategories.has(category)) return false;
         // Перемычка скрыта вместе со стеной-хозяином, когда скрыты все слои-источники стены.
-        if (target.spec.category === 'lintel') {
+        if (target.spec.category === 'lintel' || isWindowPart(target.spec.category)) {
           const hostId = target.spec.hostId;
           return !(hostId != null && hiddenConstructionIds.has(hostId));
         }

@@ -31,6 +31,10 @@ export interface IFloor3dColors {
   readonly framePartition: string;
   readonly lintel: string;
   readonly door: string;
+  /** Подоконная часть окна: тон кладки, светлее. */
+  readonly sill: string;
+  /** Стекло окна по фасаду. */
+  readonly glass: string;
   readonly candidate: string;
   readonly enabled: string;
   readonly edge: string;
@@ -45,6 +49,13 @@ const FALLBACK_COLOR = 'gray';
 /** Полотно двери слегка прозрачно: за ним видна планировка. */
 const DOOR_OPACITY = 0.8;
 
+/** Стекло окна с принятым видом фасада и стекло-кандидат (бледнее). */
+const GLASS_OPACITY = 0.5;
+const GLASS_CANDIDATE_OPACITY = 0.22;
+
+/** Доля белого в цвете подоконной части относительно кладки. */
+const SILL_LIGHTEN = 0.4;
+
 export const readFloor3dColors = (): IFloor3dColors => {
   if (typeof document === 'undefined') {
     return {
@@ -54,6 +65,8 @@ export const readFloor3dColors = (): IFloor3dColors => {
       framePartition: FALLBACK_COLOR,
       lintel: FALLBACK_COLOR,
       door: FALLBACK_COLOR,
+      sill: FALLBACK_COLOR,
+      glass: FALLBACK_COLOR,
       candidate: FALLBACK_COLOR,
       enabled: FALLBACK_COLOR,
       edge: FALLBACK_COLOR,
@@ -71,6 +84,8 @@ export const readFloor3dColors = (): IFloor3dColors => {
     framePartition: token('--cad-construction-masonry'),
     lintel: token('--cad-construction-check'),
     door: token('--cad-layer-6'),
+    sill: token('--cad-construction-masonry'),
+    glass: token('--cad-layer-9'),
     candidate: token('--danger'),
     enabled: token('--success'),
     edge: token('--text'),
@@ -254,6 +269,7 @@ export const buildFloor3dScene = (
   // цветом кладки, материал не определён - цветом перемычки. Категория видимости - стены-хозяина (см. `visibilityOf`).
   const isUndefinedMaterial = (item: IPrismSpec): boolean =>
     item.material !== 'monolith' && item.material !== 'masonry' && item.material !== 'frame_partition';
+  const sillColor = `#${new THREE.Color(colors.sill).lerp(new THREE.Color('white'), SILL_LIGHTEN).getHexString()}`;
   const groups: readonly {
     category: PrismCategory;
     color: string;
@@ -271,7 +287,18 @@ export const buildFloor3dScene = (
       include: (item) => item.material === 'masonry' || item.material === 'frame_partition',
     },
     { category: 'door', color: colors.door, include: () => true },
+    { category: 'sill', color: sillColor, include: () => true },
+    { category: 'glass', color: colors.glass, include: (item) => item.accepted === true },
+    { category: 'glass', color: colors.glass, include: (item) => item.accepted !== true },
   ];
+  const opacityOf = (category: PrismCategory, sample: IPrismSpec | undefined): number =>
+    category === 'door'
+      ? DOOR_OPACITY
+      : category === 'glass'
+        ? sample?.accepted === true
+          ? GLASS_OPACITY
+          : GLASS_CANDIDATE_OPACITY
+        : 1;
   const groupKeyOf = options.groupKeyOf;
   const hostCategoryOf = options.hostCategoryOf;
   for (const { category, color, include } of groups) {
@@ -290,7 +317,7 @@ export const buildFloor3dScene = (
       const visibility = visibilityOf(item, hostCategoryOf);
       const hostId = item.hostId ?? null;
       const lintelKey =
-        category === 'lintel' && hostId !== null && hostCategoryOf?.(hostId) !== undefined
+        (category === 'lintel' || category === 'sill' || category === 'glass') && hostId !== null && hostCategoryOf?.(hostId) !== undefined
           ? (groupKeyOf?.(hostId) ?? '')
           : '';
       const key = SPLIT_CATEGORIES.has(category) ? (groupKeyOf?.(item.id) ?? '') : lintelKey;
@@ -310,10 +337,10 @@ export const buildFloor3dScene = (
       const ids =
         !sub.byIds
           ? null
-          : category === 'lintel'
+          : category === 'lintel' || category === 'sill' || category === 'glass'
             ? [...new Set(sub.members.flatMap((item) => (item.hostId == null ? [] : [item.hostId])))]
             : merged.pick.ids;
-      const mesh = new THREE.Mesh(merged.geometry, solid(color, category === 'door' ? DOOR_OPACITY : 1));
+      const mesh = new THREE.Mesh(merged.geometry, solid(color, opacityOf(category, sub.members[0])));
       mesh.userData.pick = merged.pick;
       group.add(mesh);
       pickables.push(mesh);

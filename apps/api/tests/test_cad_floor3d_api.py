@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,10 +22,12 @@ from app.auth.dev import DEV_USER_ID
 from app.domain import Role
 from app.main import create_app
 from app.models import (
+    CadFacadeView,
     CadProjectLevels,
     CadSheetLevels,
     CadSlabHoleDecision,
     DocQuestionAnswer,
+    DocumentRevision,
     Job,
     Workspace,
 )
@@ -702,3 +705,199 @@ async def test_lift_door_gap_gets_its_height_in_3d_by_the_accepted_answer(
         assert (lift["door_height_mm"], lift["door_height_source"]) == (2400, "observed")
         # Дверь с блоком остаётся на высоте двери листа.
         assert lintels["door00000001"]["door_height_mm"] == 2100
+
+
+# ------------------------------------------------------------------ окна по фасадам (ADR-0048)
+
+# Окно плана на южной стене (y 0..200, x 3000..4000) и оси 1, 2 по x = 0 и 6000 мм кадра вида.
+FACADE_EXTRAS = """
+if mode != "old":
+    win = opening("win00000001", "window", "no_data", "aaaaaaaaaaaa")
+    win.update({
+        "width_source": "window_bay", "direction": [1.0, 0.0],
+        "lintel": [[3000.0, 0.0], [4000.0, 0.0], [4000.0, 200.0], [3000.0, 200.0]],
+        "lintel_material": None, "window": {"bay_id": "GLAZING_BAY_001"},
+        "opening_height_mm": None, "opening_height_status": "unknown"})
+    doc["openings"].append(win)
+    doc["axes"] = {"items": [
+        {"label": "1", "orient": "vertical", "pos_pt": 10.0},
+        {"label": "2", "orient": "vertical", "pos_pt": 10.0 + 6000.0 / 35.2778}]}
+"""
+FACADE_STUB = FLOOR_STUB.replace(
+    "out = pathlib.Path(args.out)\n", FACADE_EXTRAS + "out = pathlib.Path(args.out)\n"
+)
+assert FACADE_STUB != FLOOR_STUB
+
+
+@pytest.fixture
+def facade_tools(tmp_path: Path) -> Path:
+    root = tmp_path / "tools" / "cad_walls"
+    (root / "params").mkdir(parents=True)
+    (root / "cad_walls").mkdir()
+    (root / "params" / "v1.json").write_text(json.dumps(PARAMS), encoding="utf-8")
+    (root / "run_walls.py").write_text(FACADE_STUB, encoding="utf-8")
+    return root
+
+
+def _facade_view(
+    parent: Job, revision_id: str, project_id: str, *, status: str, seq: int = 0
+) -> CadFacadeView:
+    """Южный вид «в осях 1-2»: c = 7500 x - 750; окно 3000..4000, подоконник 900, верх 2400."""
+    decided = status != "candidate"
+    return CadFacadeView(
+        workspace_id=parent.workspace_id,
+        project_id=uuid.UUID(project_id),
+        job_id=parent.id,
+        revision_id=uuid.UUID(revision_id),
+        seq=seq,
+        page_index=7,
+        view_key="p8v1",
+        title="Фасад в осях 1-2",
+        body="vector",
+        scale_status="fitted",
+        mm_per_pt=1.0,
+        residual_mm=0.0,
+        bbox=[0.0, 0.0, 1.0, 1.0],
+        axes=[
+            {"label": "1", "x": 0.1, "y": 0.95},
+            {"label": "2", "x": 0.9, "y": 0.95},
+        ],
+        marks=[],
+        floors=[],
+        windows=[
+            {
+                "bbox": [3750.0 / 7500.0, 0.3, 4750.0 / 7500.0, 0.4],
+                "width_mm": 1000,
+                "z_bottom_mm": BASE + 900,
+                "z_top_mm": BASE + 2400,
+                "height_mm": 1500,
+                "source": "observed",
+            }
+        ],
+        window_count=1,
+        status=status,
+        decided_by=DEV_USER_ID if decided else None,
+        decided_at=datetime.now(UTC) if decided else None,
+    )
+
+
+async def test_facade_view_gives_window_heights_to_floor3d_and_accepted_ones_to_constructions(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    facade_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(facade_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        # Видов нет: окно без высоты не строится.
+        none = (await api.get(_floor(project_id, job_id))).json()
+        assert none["windows"] == [] and "window_height_unknown" in _codes(none)
+
+        view = _facade_view(parent, revision_id, project_id, status="candidate")
+        db_session.add(view)
+        await db_session.commit()
+
+        body = (await api.get(_floor(project_id, job_id))).json()
+        [window] = body["windows"]
+        assert window["opening_id"] == "win00000001" and window["accepted"] is False
+        assert (window["sill_mm"], window["head_mm"]) == (900, 2400)
+        assert (window["sill_z_bottom_mm"], window["sill_z_top_mm"]) == (BASE, BASE + 900)
+        assert window["glass_z_top_mm"] == BASE + 2400
+        assert window["facade_view_key"] == "p8v1" and window["facade_page_index"] == 7
+        assert window["facade_revision_id"] == revision_id
+        lintel = next(i for i in body["lintels"] if i["opening_id"] == "win00000001")
+        assert (lintel["z_bottom_mm"], lintel["z_top_mm"]) == (BASE + 2400, BASE + 2800)
+        assert "facade_windows_unaccepted" in _codes(body)
+        assert "window_height_unknown" not in _codes(body)
+
+        # Кандидат в объём кладки не входит и даёт предупреждение листа.
+        calc_url = _url(project_id, job_id, "constructions")
+        candidate = (await api.get(calc_url)).json()
+        host = next(c for c in candidate["constructions"] if c["id"] == "aaaaaaaaaaaa")
+        warning_codes = [w["code"] for w in candidate["warnings"]]
+        assert "facade_windows_candidate" in warning_codes
+
+        view.status, view.decided_by, view.decided_at = "accepted", DEV_USER_ID, datetime.now(UTC)
+        await db_session.commit()
+
+        accepted = (await api.get(_floor(project_id, job_id))).json()
+        assert accepted["windows"][0]["accepted"] is True
+        assert "facade_windows_unaccepted" not in _codes(accepted)
+        done = (await api.get(calc_url)).json()
+        host_done = next(c for c in done["constructions"] if c["id"] == "aaaaaaaaaaaa")
+        # Окно 1000 x 200 x (2800 - (2400 - 900)) = 0.26 м3 добавляется к объёму хозяина.
+        assert host_done["computed"]["volume_m3"] == pytest.approx(
+            host["computed"]["volume_m3"] + 0.26, abs=1e-4
+        )
+        assert "facade_windows_candidate" not in [w["code"] for w in done["warnings"]]
+
+
+async def test_only_the_latest_revision_of_a_document_gives_facade_views(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    facade_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(facade_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        old = await db_session.get(DocumentRevision, uuid.UUID(revision_id))
+        assert parent is not None and old is not None
+        new = DocumentRevision(
+            document_id=old.document_id,
+            source_filename="b.pdf",
+            source_mime="application/pdf",
+            source_size=1,
+            source_sha256="b" * 64,
+            storage_key=f"test/{uuid.uuid4()}",
+        )
+        db_session.add(new)
+        await db_session.flush()
+        db_session.add(_facade_view(parent, revision_id, project_id, status="accepted"))
+        await db_session.commit()
+        before = (await api.get(_floor(project_id, job_id))).json()
+        assert before["windows"][0]["accepted"] is True
+
+        # Новая ревизия с видом-кандидатом: виды старой не используются.
+        db_session.add(_facade_view(parent, str(new.id), project_id, status="candidate", seq=1))
+        await db_session.commit()
+        after = (await api.get(_floor(project_id, job_id))).json()
+        [window] = after["windows"]
+        assert window["accepted"] is False
+        assert window["facade_revision_id"] == str(new.id)
+
+
+async def test_unreadable_sheet_frame_does_not_break_floor3d_and_constructions(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    facade_tools: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(facade_tools, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _walls = await _ready_sheet(
+            api, db_session, fake_storage, settings
+        )
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        db_session.add(_facade_view(parent, revision_id, project_id, status="accepted"))
+        await db_session.commit()
+        for key in [k for k in fake_storage.objects if k.endswith("/scale.json")]:
+            del fake_storage.objects[key]
+        floor = await api.get(_floor(project_id, job_id))
+        assert floor.status_code == 200, floor.text
+        body = floor.json()
+        assert body["windows"] == [] and "facade_windows_no_frame" in _codes(body)
+        calc = await api.get(_url(project_id, job_id, "constructions"))
+        assert calc.status_code == 200, calc.text

@@ -7,7 +7,7 @@ import { ToolButton, ToolDivider } from '@/components/workspace/Toolbar';
 import { WALLS_NOT_READY, isWallsActive, useCadConstructions, wallsJobStatus } from '@/lib/cad/constructions-queries';
 import { cadErrorText } from '@/lib/cad/errors';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
-import { buildFloor3dPlan } from '@/lib/cad/floor3d-geometry';
+import { buildFloor3dPlan, isWindowPart } from '@/lib/cad/floor3d-geometry';
 import {
   useCadFloor3d,
   useCadProjectLevels,
@@ -261,7 +261,9 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
   // плашка переключается на неё в той же точке.
   const selectHost = (id: string) => {
     const prism = plan?.prisms.find(
-      (item) => item.id === id && item.category !== 'lintel' && item.category !== 'door',
+      (item) => item.id === id && item.category !== 'lintel' &&
+        item.category !== 'door' &&
+        !isWindowPart(item.category),
     );
     setSelected(null);
     setChosenId(prism === undefined ? null : id);
@@ -513,7 +515,12 @@ export const CadFloor3dView: FC<ICadFloor3dViewProps> = ({
               Измерение: укажите две точки. Esc - выход.
             </p>
           )}
-          {interactive && <CadFloor3dLegend />}
+          {interactive && (
+            <CadFloor3dLegend
+              hasWindows={(model?.windows ?? []).length > 0}
+              hasCandidateWindows={(model?.windows ?? []).some((item) => !item.accepted)}
+            />
+          )}
         </div>
       </div>
     </div>

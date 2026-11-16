@@ -2683,6 +2683,10 @@ export type CadFloor3dRead = {
      * Warnings
      */
     warnings: Array<CadFloor3dWarningRead>;
+    /**
+     * Windows
+     */
+    windows?: Array<CadFloor3dWindowRead>;
 };
 
 /**
@@ -2765,6 +2769,75 @@ export type CadFloor3dWarningRead = {
      * Message
      */
     message: string;
+};
+
+/**
+ * CadFloor3dWindowRead
+ *
+ * Окно с высотой по виду фасада (ADR-0048 п. 6): подоконная часть, стекло, перемычка.
+ *
+ * Подоконная часть - призма по контуру проёма от `sill_z_bottom_mm` до `sill_z_top_mm`; стекло -
+ * от `sill_z_top_mm` (низ стекла) до `glass_z_top_mm`; перемычка над окном - в `lintels`. Нет
+ * подоконной части - `sill_z_bottom_mm` равен `sill_z_top_mm`. `accepted = false` - вид фасада
+ * не принят человеком, окно показывается как кандидат и в объём кладки не входит.
+ */
+export type CadFloor3dWindowRead = {
+    /**
+     * Accepted
+     */
+    accepted: boolean;
+    /**
+     * Axes Checked
+     */
+    axes_checked: boolean;
+    /**
+     * Facade Page Index
+     */
+    facade_page_index: number;
+    /**
+     * Facade Revision Id
+     */
+    facade_revision_id: string;
+    /**
+     * Facade Title
+     */
+    facade_title: string;
+    /**
+     * Facade View Key
+     */
+    facade_view_key: string;
+    /**
+     * Glass Z Top Mm
+     */
+    glass_z_top_mm: number;
+    /**
+     * Head Mm
+     */
+    head_mm: number;
+    /**
+     * Host Id
+     */
+    host_id?: string | null;
+    /**
+     * Opening Id
+     */
+    opening_id: string;
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
+    /**
+     * Sill Mm
+     */
+    sill_mm: number;
+    /**
+     * Sill Z Bottom Mm
+     */
+    sill_z_bottom_mm: number;
+    /**
+     * Sill Z Top Mm
+     */
+    sill_z_top_mm: number;
 };
 
 /**

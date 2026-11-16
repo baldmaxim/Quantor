@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Final
 
@@ -30,6 +30,7 @@ from app.api.v1.deps import (
 from app.auth.context import AuthContext
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
+from app.contracts.cad import CadFrameRead
 from app.contracts.cad_constructions import (
     CadConstructionProps,
     CadConstructionPropsBulk,
@@ -51,15 +52,18 @@ from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
-from app.services import cad_construction_store as store
 from app.services import (
+    cad_building3d,
     cad_constructions,
+    cad_facade_windows,
     cad_floor3d,
     cad_lift_openings,
     cad_partitions,
     cad_slab,
+    cad_views,
     cad_walls,
 )
+from app.services import cad_construction_store as store
 from app.services import cad_floor3d_store as floor3d_store
 from app.services import jobs as jobs_service
 from app.services.cad_walls_cache import CachedWalls, walls_cache
@@ -247,6 +251,93 @@ def _known_keys(walls: _Walls) -> set[str]:
     return known
 
 
+async def _sheet_frame(storage: StorageDep, sheet: _Sheet) -> CadFrameRead | None:
+    """Кадр вида листа (мм DXF -> pt) по scale.json и cad_checks.json; нет попытки - None."""
+    attempt = cad_service.current_result(sheet.parent).get("attempt")
+    if type(attempt) is not int:
+        return None
+    folder = cad_service.view_folder(sheet.page_index, sheet.view)
+    scale = cad_views.scale_from(
+        await _read_artifact_json(
+            storage, sheet.parent, sheet.revision_id, attempt, f"{folder}/scale.json"
+        )
+    )
+    cad_checks = await _read_artifact_json(
+        storage, sheet.parent, sheet.revision_id, attempt, f"{folder}/cad_checks.json"
+    )
+    return cad_views.frame_from(scale, cad_checks)
+
+
+def _facade_issue(code: str, message: str) -> cad_facade_windows.FacadeMatch:
+    return cad_facade_windows.FacadeMatch(issues=(cad_facade_windows.MatchIssue(code, message),))
+
+
+async def facade_window_heights(
+    session: SessionDep,
+    storage: StorageDep,
+    sheet: _Sheet,
+    walls: _Walls,
+    overrides: CadSheetLevelsRead,
+    project_slab: cad_constructions.ProjectSlab | None,
+) -> cad_facade_windows.FacadeMatch:
+    """Высоты окон листа без высоты по видам фасадов проекта (ADR-0048); кадр и оси - листа.
+
+    Нет окон без высоты или нет видов - пусто без замечаний. Кадр листа не подтверждён или осей
+    нет - карта пустая и замечание.
+    """
+    if not any(o.kind == "window" and o.opening_height_mm is None for o in walls.document.openings):
+        return cad_facade_windows.FacadeMatch()
+    workspace_id = sheet.parent.workspace_id
+    if workspace_id is None:
+        return cad_facade_windows.FacadeMatch()
+    loaded = await cad_facade_windows.load_views(
+        session, workspace_id=workspace_id, project_id=sheet.project_id
+    )
+    axes_vertical: dict[str, float] = {}
+    axes_horizontal: dict[str, float] = {}
+    if loaded.views:
+        no_frame = "facade_windows_no_frame"
+        try:
+            frame = await _sheet_frame(storage, sheet)
+        except (HTTPException, DomainError, ValueError, ValidationError, OSError) as error:
+            log.warning("cad_facade_frame_unreadable", error=type(error).__name__)
+            return _facade_issue(
+                no_frame, "Окна по фасадам не сопоставлены: кадр вида листа не читается."
+            )
+        if frame is None or not frame.confirmed:
+            reason = (
+                frame.reason if frame is not None and frame.reason else "кадр вида не установлен"
+            )
+            return _facade_issue(no_frame, f"Окна по фасадам не сопоставлены: {reason}")
+        axes = cad_building3d.axes_in_mm(walls.raw, frame)
+        if not axes.vertical and not axes.horizontal:
+            return _facade_issue(
+                "facade_windows_no_axes",
+                "Окна по фасадам не сопоставлены: на плане нет осей "
+                f"({axes.message or 'нет осей'}).",
+            )
+        axes_vertical, axes_horizontal = axes.vertical, axes.horizontal
+    levels = cad_constructions.effective_levels(walls.document.heights, overrides, project_slab)
+    title = walls.document.heights.title
+    slab = walls.extras.slab
+    return cad_facade_windows.match_sheet_windows(
+        openings=walls.document.openings,
+        extras=walls.extras.openings,
+        slab_shell=None if slab is None else slab.shell,
+        vertical_axes=axes_vertical,
+        horizontal_axes=axes_horizontal,
+        corps=None if title is None else title.corps,
+        section=None if title is None else title.section,
+        level=cad_facade_windows.SheetLevel(
+            floor_z_mm=levels.opening_floor_z_mm,
+            floor_height_mm=levels.floor_height.value_mm,
+            elevation_known=levels.elevation_mm is not None,
+        ),
+        views=loaded.views,
+        invalid_views=loaded.invalid,
+    )
+
+
 async def _totals(
     session: SessionDep,
     storage: StorageDep,
@@ -280,10 +371,15 @@ async def _totals(
     )
     # Разрывы у лифтового холла получают высоту проёма из принятого ответа (один раз до расчёта).
     lift = cad_lift_openings.apply_lift_door_heights(walls.document, walls.extras, partition)
-    result = await _compute(lift.document, loaded, levels, project_slab, slab, partition)
-    if lift.warnings:
+    # Высоты окон по видам фасадов: в объём - только с принятым видом (считает compute_sheet).
+    facades = await facade_window_heights(session, storage, sheet, walls, levels, project_slab)
+    result = await _compute(
+        lift.document, loaded, levels, project_slab, slab, partition, facades.heights
+    )
+    extra = [*lift.warnings, *cad_facade_windows.grouped_warnings(facades.issues)]
+    if extra:
         result = dataclasses.replace(
-            result, partition_warnings=[*result.partition_warnings, *lift.warnings]
+            result, partition_warnings=[*result.partition_warnings, *extra]
         )
     return result, levels
 
@@ -295,6 +391,7 @@ async def _compute(
     project_slab: cad_constructions.ProjectSlab | None,
     slab: cad_constructions.SlabInput | None,
     partition: cad_constructions.PartitionContext | None,
+    window_heights: Mapping[str, cad_facade_windows.FacadeWindowHeight] | None = None,
 ) -> cad_constructions.SheetResult:
     # Аргументы — pydantic-модели и dataclass, не ORM: расчёт идёт в потоке, не на event loop.
     result = await asyncio.to_thread(
@@ -305,6 +402,7 @@ async def _compute(
         project_slab,
         slab,
         partition,
+        window_heights,
     )
     summary = result.summary.model_copy(
         update={"orphaned_props": loaded.orphaned, "props_carried_over": loaded.carried_over}
