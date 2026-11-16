@@ -1119,3 +1119,19 @@ def test_view_and_candidate_carry_floor_rotation_for_object_base() -> None:
     assert view["placement"]["rotation_deg"] == 90.0
     assert view["placement"]["offset_mm"] == [round(floor.offset_mm[0]), round(floor.offset_mm[1])]
     assert tender_base.candidate_read(source).rotation_deg == 90.0
+
+
+def test_view_bbox_is_in_view_frame_not_building() -> None:
+    """Рамка вида в базе - в мм кадра вида: снимаются сдвиг и поворот этажа здания."""
+    from app.services.tender_base import _bbox_in_view
+
+    # Только сдвиг: этаж стр. 82 (offset [5589, -248]).
+    assert _bbox_in_view([7134, 1941, 46809, 20248], (5589, -248), 0.0) == [
+        1545,
+        2189,
+        41220,
+        20496,
+    ]
+    # Поворот на 90°: вид [0,0]-[10,4] после R(90) = [-4,0]-[0,10], затем сдвиг (100, 200).
+    assert _bbox_in_view([96, 200, 100, 210], (100, 200), 90.0) == [0, 0, 10, 4]
+    assert _bbox_in_view(None, (0, 0), 0.0) is None
