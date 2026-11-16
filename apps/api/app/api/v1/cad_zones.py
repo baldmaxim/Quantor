@@ -16,12 +16,19 @@ from app.api.v1.cad_constructions import _sheet
 from app.api.v1.deps import AuthDep, SessionDep, SettingsDep, require, require_feature
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
-from app.contracts.cad_zones import CadZoneCreate, CadZoneRead, CadZoneUpdate
+from app.contracts.cad_zones import (
+    CadZoneCreate,
+    CadZoneRead,
+    CadZonesDeleteRead,
+    CadZonesDeleteScope,
+    CadZonesSheetSummaryRead,
+    CadZoneUpdate,
+)
 from app.contracts.cad_zones_auto import CadZonesJobRead
 from app.errors import not_found
 from app.models import CadZone
 from app.services import cad as cad_service
-from app.services import cad_zones, cad_zones_auto
+from app.services import cad_zones, cad_zones_auto, cad_zones_review
 from app.services import projects as projects_service
 
 router = APIRouter(
@@ -70,6 +77,48 @@ async def list_cad_zones(
     return await cad_zones.zones_read(session, zones)
 
 
+@router.get(
+    "/projects/{project_id}/cad/zones/summary",
+    response_model=CadZonesSheetSummaryRead,
+    summary="Сводка сверки зон листа с экспликацией: итоги, происхождение, сумма по квартирам",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_cad_zones_summary(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    revision_id: Annotated[uuid.UUID, Query()],
+    page_index: Annotated[int, Query(ge=0)],
+) -> CadZonesSheetSummaryRead:
+    await _revision_scope(session, context, project_id, revision_id)
+    return await cad_zones_review.sheet_summary(
+        session, workspace_id=context.tenant, revision_id=revision_id, page_index=page_index
+    )
+
+
+@router.delete(
+    "/projects/{project_id}/cad/zones",
+    response_model=CadZonesDeleteRead,
+    summary="Удалить зоны листа: только созданные авторазметкой либо все",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def delete_cad_zones_of_sheet(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    revision_id: Annotated[uuid.UUID, Query()],
+    page_index: Annotated[int, Query(ge=0)],
+    scope: Annotated[CadZonesDeleteScope, Query()],
+) -> CadZonesDeleteRead:
+    """`scope=auto` - только зоны авторазметки, не тронутые человеком; `scope=all` - все зоны."""
+    await _revision_scope(session, context, project_id, revision_id)
+    deleted = await cad_zones_review.delete_page_zones(
+        session, revision_id=revision_id, page_index=page_index, scope=scope
+    )
+    await session.commit()
+    return CadZonesDeleteRead(deleted=deleted)
+
+
 @router.post(
     "/projects/{project_id}/cad/zones",
     response_model=CadZoneRead,
@@ -115,6 +164,20 @@ async def update_cad_zone(
     return result
 
 
+@router.post(
+    "/cad/zones/{zone_id}/accept",
+    response_model=CadZoneRead,
+    summary="Принять зону вне допуска сверки с экспликацией: она снова участвует в расчётах",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def accept_cad_zone(zone_id: uuid.UUID, session: SessionDep, context: AuthDep) -> CadZoneRead:
+    zone = await _zone(session, context, zone_id)
+    zone = await cad_zones_review.accept_zone(session, zone=zone, user_id=context.principal.user_id)
+    result = (await cad_zones.zones_read(session, [zone]))[0]
+    await session.commit()
+    return result
+
+
 @router.delete(
     "/cad/zones/{zone_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -144,7 +207,11 @@ async def start_cad_zones_auto(
     context: AuthDep,
     settings: SettingsDep,
 ) -> CadZonesJobRead:
-    """409 `CAD_ZONES_NOT_EMPTY` - на листе уже есть зоны; 409 `CAD_ZONES_BUSY` - разметка идёт."""
+    """Лист без зон размечается, лист только с авто-зонами размечается заново.
+
+    409 `CAD_ZONES_NOT_EMPTY` - на листе есть зоны человека или неизвестного происхождения;
+    409 `CAD_ZONES_BUSY` - разметка идёт.
+    """
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     job = await cad_zones_auto.schedule_manual(
         session, parent=sheet.parent, page_index=page_index, view=view, settings=settings

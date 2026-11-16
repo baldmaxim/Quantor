@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cadErrorText } from '@/lib/cad/errors';
 import { sheetRows, type IPipelineAction } from '@/lib/cad/pipeline-actions';
-import { nextBatchStep } from '@/lib/cad/pipeline-batch';
+import { nextBatchStep, nextStaleStep } from '@/lib/cad/pipeline-batch';
 import { isUpdateActive } from '@/lib/cad/pipeline';
 import { cadPipelineKey } from '@/lib/cad/pipeline-queries';
 import { cadSummaryKey } from '@/lib/cad/queue-queries';
@@ -23,6 +23,9 @@ import { runPipelineAction } from '@/lib/cad/runPipelineAction';
 
 export const BULK_CAD_CONCURRENCY = 3;
 
+/** `pipeline` - не отработанные шаги конвейера; `stale` - пересчёт устаревших по версии этапов. */
+export type BulkRunMode = 'pipeline' | 'stale';
+
 export interface IBulkLaunchFailure {
   readonly pageIndex: number;
   readonly message: string;
@@ -30,7 +33,7 @@ export interface IBulkLaunchFailure {
 
 export interface IBulkPipelineRun {
   /** Запоминает партию листов и начинает работу; пока партия идёт, повторный вызов не действует. */
-  readonly start: (pageIndexes: readonly number[]) => void;
+  readonly start: (pageIndexes: readonly number[], mode?: BulkRunMode) => void;
   /** Прекращает новые запуски: партия завершится, когда вернутся уже отправленные запросы. */
   readonly stop: () => void;
   readonly running: boolean;
@@ -43,6 +46,7 @@ export interface IBulkPipelineRun {
 }
 
 interface IBatch {
+  readonly mode: BulkRunMode;
   readonly pages: readonly number[];
   readonly finished: Set<number>;
   /** Листы, по которым идёт запрос или обновление конвейера после него. */
@@ -169,7 +173,11 @@ export const useBulkPipelineRun = (
           // Идёт обновление CAD листа: ждём его завершения, повторно не запускаем.
           if (isUpdateActive(sheet)) continue;
           const rows = sheetRows(projectId, revisionId, positionRef.current(pageIndex), sheet);
-          const decision = nextBatchStep(rows, batch.launched.get(pageIndex) ?? new Set());
+          const launched = batch.launched.get(pageIndex) ?? new Set<string>();
+          const decision =
+            batch.mode === 'stale'
+              ? nextStaleStep(sheet, rows, launched)
+              : nextBatchStep(rows, launched);
           if (decision.kind === 'done') finish(pageIndex);
           else if (decision.kind === 'failed') finish(pageIndex, decision.message);
           else if (decision.kind === 'run' && batch.inflight.size < BULK_CAD_CONCURRENCY) {
@@ -196,9 +204,10 @@ export const useBulkPipelineRun = (
     [],
   );
 
-  const start = useCallback((pageIndexes: readonly number[]) => {
+  const start = useCallback((pageIndexes: readonly number[], mode: BulkRunMode = 'pipeline') => {
     if (batchRef.current !== null || pageIndexes.length === 0) return;
     batchRef.current = {
+      mode,
       pages: [...new Set(pageIndexes)],
       finished: new Set(),
       inflight: new Set(),

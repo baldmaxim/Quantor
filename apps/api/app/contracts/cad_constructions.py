@@ -231,6 +231,15 @@ class WallsChecks(BaseModel):
     warnings: list[WallsWarning]
 
 
+class WallsSlabBasis(BaseModel):
+    """Основа контура плиты из walls.json: нужна порогу качества задания конструкций."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    # cad_walls v1.9: `zones` - контур по зонам помещений, `walls_only` - только по стенам.
+    basis: str | None = None
+
+
 class WallsDocument(BaseModel):
     """walls.json целиком (схема `quantor.cad_walls.v1`)."""
 
@@ -248,6 +257,8 @@ class WallsDocument(BaseModel):
     frame_partitions: list[WallsConstruction] = []
     openings: list[WallsOpening]
     checks: WallsChecks
+    # Плита листа (cad_walls v1.7): здесь читается только основа контура; нет плиты - `None`.
+    slab: WallsSlabBasis | None = None
 
 
 # --------------------------------------------------------------------------- данные человека

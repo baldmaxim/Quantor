@@ -211,7 +211,8 @@ async def assign_template(
         await session.execute(
             update(CadZone)
             .where(CadZone.id.in_(assignable))
-            .values(finish_template_id=body.template_id)
+            # Назначение человеком делает зону его разметкой: авторазметка её не удалит.
+            .values(finish_template_id=body.template_id, source="human")
         )
     return CadFinishAssignResult(
         assigned=len(assignable), skipped_count=len(skipped), skipped=skipped

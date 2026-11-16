@@ -10,8 +10,18 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,6 +46,13 @@ PARKING_TYPE_VALUES: tuple[str, ...] = (
     "unknown",
 )
 
+# Происхождение зоны: `auto` - создана заданием `cad_zones` и человеком не правилась, `human` -
+# создана или правлена человеком, `unknown` - строка до миграции 0041, которую нельзя надёжно
+# отнести к авторазметке. `unknown` ведёт себя как `human`: автоматически не удаляется.
+ZONE_SOURCE_VALUES: tuple[str, ...] = ("auto", "human", "unknown")
+# Итог сверки с экспликацией: `failed` не участвует в плите, перегородках и отделке до принятия.
+ZONE_QUALITY_VALUES: tuple[str, ...] = ("ok", "review", "failed")
+
 DOOR_HEIGHT_MIN_MM = 1500
 DOOR_HEIGHT_MAX_MM = 3500
 
@@ -44,6 +61,10 @@ _ROOM_TYPE_CHECK = (
     "room_type is null or room_type in ("
     + ", ".join(f"'{value}'" for value in ROOM_TYPE_VALUES)
     + ")"
+)
+_SOURCE_CHECK = "source in (" + ", ".join(f"'{value}'" for value in ZONE_SOURCE_VALUES) + ")"
+_QUALITY_CHECK = (
+    "quality_status in (" + ", ".join(f"'{value}'" for value in ZONE_QUALITY_VALUES) + ")"
 )
 _PARKING_TYPE_CHECK = (
     "parking_type is null or parking_type in ("
@@ -87,6 +108,23 @@ class CadZone(TimestampMixin, Base):
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
 
+    # Происхождение и сверка с экспликацией (миграция 0041, ревью движка 2026-11-16).
+    source: Mapped[str] = mapped_column(String(16), nullable=False, server_default="unknown")
+    # Версия генератора авто-зоны (`cad_mep.vN`); у зоны человека - пусто.
+    generator_version: Mapped[str | None] = mapped_column(String(64))
+    # Площадь по экспликации листа из zones.json; пусто - экспликации нет.
+    expl_area_m2: Mapped[float | None] = mapped_column(Float)
+    # Площадь контура по zones.json (масштаб преобразования CAD): только для сверки с
+    # экспликацией, величиной зоны не является; после правки контура человеком - пусто.
+    generator_area_m2: Mapped[float | None] = mapped_column(Float)
+    # Заметки генератора о зоне: список строк.
+    notes: Mapped[list[str] | None] = mapped_column(pg.JSONB)
+    quality_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="ok")
+    quality_reason: Mapped[str | None] = mapped_column(Text)
+    # Кто и когда принял зону вне допуска (`review`/`failed` -> `ok`).
+    quality_accepted_by: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
+    quality_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     __table_args__ = (
         Index("ix_cad_zones_revision_page", "revision_id", "page_index"),
         Index("ix_cad_zones_finish_template_id", "finish_template_id"),
@@ -103,6 +141,8 @@ class CadZone(TimestampMixin, Base):
         ),
         CheckConstraint(_ROOM_TYPE_CHECK, name="room_type_known"),
         CheckConstraint(_PARKING_TYPE_CHECK, name="parking_type_known"),
+        CheckConstraint(_SOURCE_CHECK, name="source_known"),
+        CheckConstraint(_QUALITY_CHECK, name="quality_status_known"),
         CheckConstraint(
             "(kind = 'parking_space') = (parking_type is not null)",
             name="parking_type_matches_kind",

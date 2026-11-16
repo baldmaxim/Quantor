@@ -156,7 +156,8 @@ describe('useWorkspaceCadPipeline', () => {
       await hook.result.current.startAutoZones();
     });
     expect(hook.result.current.zonesError).toBe(
-      'На виде уже есть зоны — автоматическая разметка не запускается.',
+      'На листе есть зоны, созданные или правленные человеком либо неизвестного происхождения: ' +
+        'автоматическая разметка их не заменяет. Удалите зоны листа и запустите разметку снова.',
     );
     expect(hook.result.current.startingZones).toBe(false);
   });

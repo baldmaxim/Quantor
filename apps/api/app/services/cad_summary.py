@@ -21,7 +21,7 @@ from app.domain import DocumentKind, GeometryStatus, JobStatus
 from app.models import Document, DocumentRevision, Sheet
 from app.services import cad_pipeline
 
-SheetState = Literal["done", "running", "failed", "idle"]
+SheetState = Literal["done", "review", "running", "failed", "idle"]
 
 _NOT_READY: Final = (GeometryStatus.PENDING, GeometryStatus.EXTRACTING, GeometryStatus.FAILED)
 _ACTIVE: Final = (JobStatus.QUEUED, JobStatus.RUNNING)
@@ -45,6 +45,9 @@ def sheet_state(sheet: CadPipelineSheetRead) -> SheetState:
         return "running"
     if any(_is_failed(stage) for stage in stages):
         return "failed"
+    # Порог качества конструкций: лист с замечаниями готовым не считается.
+    if any(stage.quality_status == "review" for stage in stages):
+        return "review"
     return "done" if stages else "idle"
 
 
@@ -85,13 +88,14 @@ async def build_summary(
     pipelines = await cad_pipeline.build_pipelines(
         session, workspace_id=workspace_id, project_id=project_id, revision_ids=revision_ids
     )
-    counts: dict[SheetState, int] = {"done": 0, "running": 0, "failed": 0, "idle": 0}
+    counts: dict[SheetState, int] = {"done": 0, "review": 0, "running": 0, "failed": 0, "idle": 0}
     for pipeline in pipelines.values():
         for sheet in pipeline.sheets:
             counts[sheet_state(sheet)] += 1
     return CadProjectSummaryRead(
         sheets_total=sum(counts.values()),
         sheets_done=counts["done"],
+        sheets_review=counts["review"],
         sheets_running=counts["running"],
         sheets_failed=counts["failed"],
         sheets_idle=counts["idle"],

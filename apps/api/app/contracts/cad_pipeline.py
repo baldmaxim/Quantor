@@ -25,6 +25,21 @@ class CadPipelineStageRead(BaseModel):
     error_code: str | None
     created_at: datetime
     finished_at: datetime | None
+    # Порог качества итога (только `cad_walls`): `review` - результат есть и доступен, но требует
+    # проверки человеком, причины - в `quality_reasons`; `null` - итог не оценивался.
+    quality_status: Literal["ok", "review"] | None = None
+    quality_reasons: list[str] = []
+
+
+class CadPipelineStaleRead(BaseModel):
+    """Этап листа выполнен версией движка или генератора, отличной от закреплённой (pins.json)."""
+
+    stage: Literal["convert", "walls", "zones"]
+    # Вид этапа конструкций; у преобразования и зон (они по листу) - `null`.
+    view: int | None
+    # Версия, которой выполнен этап; `null` - версия неизвестна.
+    was: str | None
+    now: str
 
 
 class CadPipelineViewRead(BaseModel):
@@ -35,6 +50,9 @@ class CadPipelineViewRead(BaseModel):
     zones: CadPipelineStageRead | None
     # Зоны хранятся по листу, а не по виду: одно и то же число у всех видов страницы.
     zones_count: int
+    # Все зоны листа созданы авторазметкой и человеком не тронуты: ручной запуск разметки
+    # удалит их и создаст заново.
+    zones_recreatable: bool = False
     # Действующее одобрение вида (после проверки человеком).
     approved: bool
     routes: CadPipelineStageRead | None
@@ -63,6 +81,9 @@ class CadPipelineSheetRead(BaseModel):
     # Каким масштабом сделано это задание: калибровкой человека или движком по размерным цепочкам
     # (ADR-0045); `null` - задания нет.
     scale_source: Literal["calibration", "auto"] | None
+    # Устаревшие этапы листа: преобразование, конструкции и авто-зоны, выполненные не той версией,
+    # что закреплена сейчас. Трассы сюда не входят.
+    stale: list[CadPipelineStaleRead] = []
     views: list[CadPipelineViewRead]
 
 

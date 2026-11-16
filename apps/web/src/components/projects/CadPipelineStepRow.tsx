@@ -36,20 +36,29 @@ export const CadPipelineStepRow: FC<ICadPipelineStepRowProps> = ({
 }) => {
   const { step, stage } = row;
   const failed = step.state === 'failed';
+  // Порог качества: результат готов, но требует проверки - причины списком под шагом.
+  const review = step.review ?? [];
 
   return (
     <li className="flex flex-col gap-[var(--s-2)] border-b border-border py-[var(--s-3)] last:border-b-0">
       <div className="flex flex-wrap items-start justify-between gap-x-[var(--s-4)] gap-y-[var(--s-3)]">
         <div className="flex min-w-0 flex-1 flex-col gap-[var(--s-1)]">
           <div className="flex flex-wrap items-center gap-x-[var(--s-3)] gap-y-[var(--s-2)]">
-            <StatusBadge tone={PIPELINE_STATE_TONES[step.state]} wrap>
-              {PIPELINE_STATE_WORDS[step.state]}
+            <StatusBadge tone={review.length > 0 ? 'warning' : PIPELINE_STATE_TONES[step.state]} wrap>
+              {review.length > 0 ? 'на проверку' : PIPELINE_STATE_WORDS[step.state]}
             </StatusBadge>
             <span className="text-sm font-medium">{step.label}</span>
             {row.viewLabel && <span className="text-xs text-muted">{row.viewLabel}</span>}
           </div>
           {!failed && step.detail && (
             <p className="m-0 text-xs text-muted [overflow-wrap:anywhere]">{step.detail}</p>
+          )}
+          {review.length > 0 && (
+            <ul className="m-0 list-disc pl-[var(--s-5)] text-xs text-warning [overflow-wrap:anywhere]">
+              {review.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
           )}
         </div>
         {row.actions.length > 0 && (

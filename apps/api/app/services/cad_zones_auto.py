@@ -28,7 +28,7 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.models import CadZone, Job
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_walls
+from app.services import cad_requeue, cad_walls, cad_zones_review
 from app.services import jobs as jobs_service
 
 log = get_logger(__name__)
@@ -39,6 +39,8 @@ RESULT_READY: Final = "zones_ready"
 RESULT_SKIPPED_EXISTING: Final = "zones_skipped_existing"
 _ACTIVE: Final = (JobStatus.QUEUED, JobStatus.RUNNING)
 RUNNER_NAME: Final = "run_zones.py"
+# Ручной запуск на листе, где все зоны - авто: обработчик удалит их и создаст заново.
+RECREATE_AUTO: Final = "recreate_auto"
 
 
 def runner_path(settings: Settings) -> Path | None:
@@ -108,8 +110,9 @@ def _zones_payload(
     view: int,
     dxf_sha256: str,
     params: cad_mep_service.MepParams,
+    recreate_auto: bool = False,
 ) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "revision_id": parent.payload["revision_id"],
         "parent_job_id": str(parent.id),
         "parent_attempt": cad_service.result_of(parent).get("attempt"),
@@ -120,6 +123,9 @@ def _zones_payload(
         "generator_version": params.generator_version,
         "engine_version": params.generator_version,
     }
+    if recreate_auto:
+        payload[RECREATE_AUTO] = True
+    return payload
 
 
 async def _enqueue(
@@ -131,6 +137,7 @@ async def _enqueue(
     dxf: dict[str, Any],
     params: cad_mep_service.MepParams,
     sequence: int,
+    recreate_auto: bool = False,
 ) -> Job:
     attempt = cad_service.result_of(parent).get("attempt")
     return await jobs_service.enqueue(
@@ -148,8 +155,54 @@ async def _enqueue(
             sequence=sequence,
         ),
         payload=_zones_payload(
-            parent, page_index=page_index, view=view, dxf_sha256=str(dxf["sha256"]), params=params
+            parent,
+            page_index=page_index,
+            view=view,
+            dxf_sha256=str(dxf["sha256"]),
+            params=params,
+            recreate_auto=recreate_auto,
         ),
+    )
+
+
+async def requeue_with_current_params(
+    session: AsyncSession, *, job: Job, parent: Job, params: cad_mep_service.MepParams
+) -> Job:
+    """То же задание разметки с действующими параметрами: пин сменился после постановки.
+
+    Вид и DXF переносятся как есть, меняются версия генератора и параметры; ключ идемпотентности
+    новый, потому что включает их.
+    """
+    page_index, view = int(str(job.payload["page_index"])), int(str(job.payload["view"]))
+    attempt = job.payload.get("parent_attempt")
+    existing = await zones_jobs_of_view(session, parent=parent, page_index=page_index, view=view)
+    return await jobs_service.enqueue(
+        session,
+        job_type=JobType.CAD_ZONES,
+        workspace_id=job.workspace_id,
+        project_id=job.project_id,
+        idempotency_key=idempotency_key(
+            parent.id,
+            parent_attempt=attempt if type(attempt) is int else 0,
+            page_index=page_index,
+            view=view,
+            params_sha256=params.sha256,
+            generator_version=params.generator_version,
+            sequence=len(existing),
+        ),
+        payload={
+            **({RECREATE_AUTO: True} if job.payload.get(RECREATE_AUTO) is True else {}),
+            "revision_id": job.payload["revision_id"],
+            "parent_job_id": str(parent.id),
+            "parent_attempt": attempt,
+            "page_index": page_index,
+            "view": view,
+            "view_dxf_sha256": job.payload["view_dxf_sha256"],
+            "params_sha256": params.sha256,
+            "generator_version": params.generator_version,
+            "engine_version": params.generator_version,
+            cad_requeue.REQUEUED_FROM: str(job.id),
+        },
     )
 
 
@@ -214,9 +267,11 @@ async def schedule_manual(
 ) -> Job:
     """Ручной запуск разметки вида.
 
-    409 `CAD_ZONES_NOT_EMPTY` - на листе уже есть зоны; 409 `CAD_ZONES_BUSY` - задание этого вида
-    в очереди или выполняется. Строка родителя берётся под блокировкой: два нажатия подряд не
-    ставят задание дважды.
+    Лист без зон размечается; лист, где все зоны созданы авторазметкой и человеком не тронуты,
+    размечается заново - обработчик удалит их и вставит новые одной транзакцией. 409
+    `CAD_ZONES_NOT_EMPTY` - на листе есть зоны человека или неизвестного происхождения; 409
+    `CAD_ZONES_BUSY` - задание этого вида в очереди или выполняется. Строка родителя берётся под
+    блокировкой: два нажатия подряд не ставят задание дважды.
     """
     if parent.job_type is not JobType.CAD_PDF_CONVERT:
         raise not_found("Задание")
@@ -226,9 +281,10 @@ async def schedule_manual(
     dxf = cad_walls.view_has_dxf(parent, page_index, view)
     if dxf is None:
         raise not_found("Вид")
-    if await page_zone_count(
+    sources = await cad_zones_review.page_sources(
         session, revision_id=uuid.UUID(str(parent.payload["revision_id"])), page_index=page_index
-    ):
+    )
+    if sources and not cad_zones_review.only_auto(sources):
         raise DomainError(ErrorCode.CAD_ZONES_NOT_EMPTY)
     existing = await zones_jobs_of_view(session, parent=parent, page_index=page_index, view=view)
     if any(job.status in _ACTIVE for job in existing):
@@ -241,4 +297,5 @@ async def schedule_manual(
         dxf=dxf,
         params=cad_mep_service.load_params(settings),
         sequence=len(existing),
+        recreate_auto=bool(sources),
     )

@@ -25,6 +25,13 @@ CadParkingType = Literal[
     "unknown",
 ]
 
+# Происхождение зоны: `unknown` - строка до миграции 0041, ведёт себя как `human`.
+CadZoneSource = Literal["auto", "human", "unknown"]
+# Итог сверки с экспликацией; `failed` не участвует в плите, перегородках и отделке до принятия.
+CadZoneQualityStatus = Literal["ok", "review", "failed"]
+# Что удалять массово: только авто-зоны листа или все зоны листа.
+CadZonesDeleteScope = Literal["auto", "all"]
+
 MAX_TEXT = 200
 ZonePoint = tuple[float, float]
 
@@ -91,5 +98,54 @@ class CadZoneRead(BaseModel):
     width_m: float | None
     calibration_missing: bool
     geometry_issue: str | None
+    # Происхождение и сверка с экспликацией (ревью движка 2026-11-16).
+    source: CadZoneSource
+    generator_version: str | None
+    # Площадь по экспликации листа из zones.json; `null` - экспликации нет.
+    expl_area_m2: float | None
+    # Заметки генератора о зоне.
+    notes: list[str]
+    quality_status: CadZoneQualityStatus
+    quality_reason: str | None
+    quality_accepted_by: UUID | None
+    quality_accepted_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class CadZoneUnmatchedMarkRead(BaseModel):
+    """Марка экспликации без зоны: из итога последнего задания разметки листа."""
+
+    room_mark: str
+    name: str | None
+    expl_area_m2: float | None
+    reason: str | None
+
+
+class CadZonesSheetSummaryRead(BaseModel):
+    """Сводка сверки зон листа с экспликацией."""
+
+    revision_id: UUID
+    page_index: int
+    # Зоны-помещения (квартиры и МОП) по итогу сверки.
+    ok: int
+    review: int
+    failed: int
+    # Все зоны листа по происхождению.
+    auto: int
+    human: int
+    unknown: int
+    # Версии генератора авто-зон листа (обычно одна).
+    generator_versions: list[str]
+    # Комнаты квартир, у которых есть и площадь контура, и экспликация: сумма против экспликации.
+    apartments_compared: int
+    apartments_area_m2: float | None
+    apartments_expl_area_m2: float | None
+    apartments_delta_percent: float | None
+    unmatched_marks: list[CadZoneUnmatchedMarkRead]
+    # Все зоны листа - авто: ручной запуск разметки удалит их и создаст заново.
+    recreate_allowed: bool
+
+
+class CadZonesDeleteRead(BaseModel):
+    deleted: int

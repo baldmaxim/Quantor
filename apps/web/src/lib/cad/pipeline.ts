@@ -2,6 +2,7 @@ import type {
   CadPipelineRead,
   CadPipelineSheetRead,
   CadPipelineStageRead,
+  CadPipelineStaleRead,
   CadPipelineViewRead,
 } from '@quantor/api-client';
 
@@ -46,6 +47,11 @@ export interface IPipelineStep {
   readonly detail: string | null;
   /** Последнее задание шага (у шага из нескольких видов - худшего вида); `null` - задания нет. */
   readonly jobId: string | null;
+  /**
+   * Причины «на проверку» у готового шага конструкций (порог качества): результат есть и
+   * доступен, но лист готовым не считается. Замечаний нет - поля нет.
+   */
+  readonly review?: readonly string[];
 }
 
 export type PipelineTone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
@@ -126,6 +132,22 @@ const stageDetail = (stage: CadPipelineStageRead | null): string | null => {
 const stageStep = (key: PipelineStepKey, stage: CadPipelineStageRead | null): IPipelineStep =>
   make(key, stageState(stage), stageDetail(stage), stage?.job_id ?? null);
 
+const REVIEW_FALLBACK = 'результат требует проверки';
+
+/** Причины порога качества итога конструкций; итог не оценивался или замечаний нет - пусто. */
+const qualityReasons = (stage: CadPipelineStageRead | null): readonly string[] => {
+  if (stage === null || stage.quality_status !== 'review') return [];
+  const reasons = stage.quality_reasons ?? [];
+  return reasons.length > 0 ? reasons : [REVIEW_FALLBACK];
+};
+
+/** Конструкции вида: готовый результат с замечаниями порога качества несёт их причины. */
+const wallsStep = (view: CadPipelineViewRead): IPipelineStep => {
+  const step = stageStep('walls', view.walls);
+  const review = step.state === 'done' ? qualityReasons(view.walls) : [];
+  return review.length > 0 ? { ...step, review } : step;
+};
+
 const zonesWord = (count: number): string => {
   const tail = count % 100;
   const last = count % 10;
@@ -175,7 +197,7 @@ const floor3dStep = (view: CadPipelineViewRead): IPipelineStep => {
 
 /** Шаги одного вида (для управления конвейером по видам). */
 export const viewSteps = (view: CadPipelineViewRead): Record<ViewStepKey, IPipelineStep> => {
-  const walls = stageStep('walls', view.walls);
+  const walls = wallsStep(view);
   const zones = zonesStep(view);
   return {
     walls,
@@ -252,7 +274,12 @@ export const sheetSteps = (sheet: CadPipelineSheetRead): IPipelineStep[] => {
   }
 
   const perView = views.map(viewSteps);
-  const merged = VIEW_KEYS.map((key) => worst(perView.map((steps) => steps[key])));
+  const merged = VIEW_KEYS.map((key) => {
+    const step = worst(perView.map((steps) => steps[key]));
+    // Замечания порога качества собираются со всех видов: готовый шаг листа несёт их все.
+    const review = [...new Set(perView.flatMap((steps) => steps[key].review ?? []))];
+    return step.state === 'done' && review.length > 0 ? { ...step, review } : step;
+  });
   return [calibration, convert, ...merged];
 };
 
@@ -328,11 +355,43 @@ export const sheetSummary = (sheet: CadPipelineSheetRead): IPipelineSummary => {
       (step) => step.key === 'calibration' || step.state === 'done' || step.state === 'skipped',
     )
   ) {
+    // Порог качества: лист с замечаниями к конструкциям готовым не показывается.
+    const review = steps.find((step) => (step.review ?? []).length > 0);
+    if (review) return { tone: 'warning', label: `На проверку: ${review.label}` };
     return { tone: 'success', label: 'Готово' };
   }
 
   return { tone: 'neutral', label: 'В работе' };
 };
+
+/**
+ * Метка «на проверку» листа: причины порога качества конструкций. Показывается на любой стадии
+ * конвейера, а не только вместо «Готово»: результаты доступны, но требуют проверки человеком.
+ */
+export const sheetQualityBadge = (
+  sheet: CadPipelineSheetRead,
+): { label: string; reasons: readonly string[] } | null => {
+  const reasons = sheetSteps(sheet).find((step) => step.key === 'walls')?.review ?? [];
+  return reasons.length > 0 ? { label: 'на проверку', reasons } : null;
+};
+
+const STALE_STAGE_LABELS: Readonly<Record<CadPipelineStaleRead['stage'], string>> = {
+  convert: PIPELINE_STEP_LABELS.convert,
+  walls: PIPELINE_STEP_LABELS.walls,
+  zones: PIPELINE_STEP_LABELS.zones,
+};
+
+/** «Конструкции: было cad_walls.v1.14, стало cad_walls.v1.15»; версии нет - «версия неизвестна». */
+export const staleText = (item: CadPipelineStaleRead): string =>
+  `${STALE_STAGE_LABELS[item.stage]}: было ${item.was ?? 'версия неизвестна'}, стало ${item.now}`;
+
+/** Устаревшие этапы листа; одинаковые строки разных видов схлопываются. */
+export const sheetStaleTexts = (sheet: CadPipelineSheetRead): readonly string[] => [
+  ...new Set((sheet.stale ?? []).map(staleText)),
+];
+
+export const isSheetStale = (sheet: CadPipelineSheetRead): boolean =>
+  (sheet.stale ?? []).length > 0;
 
 /** Идёт или стоит в очереди обновление CAD листа (более новый прогон после показанного). */
 export const isUpdateActive = (sheet: CadPipelineSheetRead): boolean =>

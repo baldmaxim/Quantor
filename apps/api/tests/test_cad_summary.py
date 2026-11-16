@@ -169,6 +169,7 @@ async def test_empty_project_summary_is_zeros(build_api: Callable[..., AsyncClie
         assert (await api.get(summary_url(project_id))).json() == {
             "sheets_total": 0,
             "sheets_done": 0,
+            "sheets_review": 0,
             "sheets_running": 0,
             "sheets_failed": 0,
             "sheets_idle": 0,
@@ -277,6 +278,7 @@ async def test_summary_counts_sheets_of_the_latest_openable_revisions(
         assert body == {
             "sheets_total": 7,
             "sheets_done": 1,
+            "sheets_review": 0,
             "sheets_running": 2,
             "sheets_failed": 2,
             "sheets_idle": 2,

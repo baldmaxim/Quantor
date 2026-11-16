@@ -3653,6 +3653,10 @@ export type CadPipelineSheetRead = {
      */
     scale_source: 'calibration' | 'auto' | null;
     /**
+     * Stale
+     */
+    stale?: Array<CadPipelineStaleRead>;
+    /**
      * Title
      */
     title: string | null;
@@ -3694,6 +3698,14 @@ export type CadPipelineStageRead = {
      */
     progress: number | null;
     /**
+     * Quality Reasons
+     */
+    quality_reasons?: Array<string>;
+    /**
+     * Quality Status
+     */
+    quality_status?: 'ok' | 'review' | null;
+    /**
      * Result Status
      */
     result_status: string | null;
@@ -3702,6 +3714,30 @@ export type CadPipelineStageRead = {
      */
     stage: string | null;
     status: JobStatus;
+};
+
+/**
+ * CadPipelineStaleRead
+ *
+ * Этап листа выполнен версией движка или генератора, отличной от закреплённой (pins.json).
+ */
+export type CadPipelineStaleRead = {
+    /**
+     * Now
+     */
+    now: string;
+    /**
+     * Stage
+     */
+    stage: 'convert' | 'walls' | 'zones';
+    /**
+     * View
+     */
+    view: number | null;
+    /**
+     * Was
+     */
+    was: string | null;
 };
 
 /**
@@ -3736,6 +3772,10 @@ export type CadPipelineViewRead = {
      * Zones Count
      */
     zones_count: number;
+    /**
+     * Zones Recreatable
+     */
+    zones_recreatable?: boolean;
 };
 
 /**
@@ -3899,7 +3939,8 @@ export type CadProjectLevelsWrite = {
  *
  * Листы последних открываемых ревизий проекта по состоянию конвейера CAD.
  *
- * Инвариант: `sheets_total` = `sheets_done` + `sheets_running` + `sheets_failed` + `sheets_idle`.
+ * Инвариант: `sheets_total` = `sheets_done` + `sheets_review` + `sheets_running` +
+ * `sheets_failed` + `sheets_idle`.
  */
 export type CadProjectSummaryRead = {
     /**
@@ -3918,6 +3959,10 @@ export type CadProjectSummaryRead = {
      * Sheets Idle
      */
     sheets_idle: number;
+    /**
+     * Sheets Review
+     */
+    sheets_review?: number;
     /**
      * Sheets Running
      */
@@ -5289,9 +5334,17 @@ export type CadZoneRead = {
      */
     door_height_mm: number | null;
     /**
+     * Expl Area M2
+     */
+    expl_area_m2: number | null;
+    /**
      * Finish Template Id
      */
     finish_template_id: string | null;
+    /**
+     * Generator Version
+     */
+    generator_version: string | null;
     /**
      * Geometry Issue
      */
@@ -5308,6 +5361,10 @@ export type CadZoneRead = {
      * Name
      */
     name: string | null;
+    /**
+     * Notes
+     */
+    notes: Array<string>;
     /**
      * Page Index
      */
@@ -5328,6 +5385,22 @@ export type CadZoneRead = {
         number
     ]>;
     /**
+     * Quality Accepted At
+     */
+    quality_accepted_at: string | null;
+    /**
+     * Quality Accepted By
+     */
+    quality_accepted_by: string | null;
+    /**
+     * Quality Reason
+     */
+    quality_reason: string | null;
+    /**
+     * Quality Status
+     */
+    quality_status: 'ok' | 'review' | 'failed';
+    /**
      * Revision Id
      */
     revision_id: string;
@@ -5344,6 +5417,10 @@ export type CadZoneRead = {
      */
     room_type_source: 'manual' | 'derived' | null;
     /**
+     * Source
+     */
+    source: 'auto' | 'human' | 'unknown';
+    /**
      * Updated At
      */
     updated_at: string;
@@ -5351,6 +5428,30 @@ export type CadZoneRead = {
      * Width M
      */
     width_m: number | null;
+};
+
+/**
+ * CadZoneUnmatchedMarkRead
+ *
+ * Марка экспликации без зоны: из итога последнего задания разметки листа.
+ */
+export type CadZoneUnmatchedMarkRead = {
+    /**
+     * Expl Area M2
+     */
+    expl_area_m2: number | null;
+    /**
+     * Name
+     */
+    name: string | null;
+    /**
+     * Reason
+     */
+    reason: string | null;
+    /**
+     * Room Mark
+     */
+    room_mark: string;
 };
 
 /**
@@ -5401,6 +5502,16 @@ export type CadZoneUpdate = {
 };
 
 /**
+ * CadZonesDeleteRead
+ */
+export type CadZonesDeleteRead = {
+    /**
+     * Deleted
+     */
+    deleted: number;
+};
+
+/**
  * CadZonesJobRead
  *
  * Задание `cad_zones`, поставленное на автоматическую разметку вида.
@@ -5431,6 +5542,74 @@ export type CadZonesJobRead = {
      * View
      */
     view: number;
+};
+
+/**
+ * CadZonesSheetSummaryRead
+ *
+ * Сводка сверки зон листа с экспликацией.
+ */
+export type CadZonesSheetSummaryRead = {
+    /**
+     * Apartments Area M2
+     */
+    apartments_area_m2: number | null;
+    /**
+     * Apartments Compared
+     */
+    apartments_compared: number;
+    /**
+     * Apartments Delta Percent
+     */
+    apartments_delta_percent: number | null;
+    /**
+     * Apartments Expl Area M2
+     */
+    apartments_expl_area_m2: number | null;
+    /**
+     * Auto
+     */
+    auto: number;
+    /**
+     * Failed
+     */
+    failed: number;
+    /**
+     * Generator Versions
+     */
+    generator_versions: Array<string>;
+    /**
+     * Human
+     */
+    human: number;
+    /**
+     * Ok
+     */
+    ok: number;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Recreate Allowed
+     */
+    recreate_allowed: boolean;
+    /**
+     * Review
+     */
+    review: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Unknown
+     */
+    unknown: number;
+    /**
+     * Unmatched Marks
+     */
+    unmatched_marks: Array<CadZoneUnmatchedMarkRead>;
 };
 
 /**
@@ -18663,6 +18842,36 @@ export type UpdateCadZoneResponses = {
 
 export type UpdateCadZoneResponse = UpdateCadZoneResponses[keyof UpdateCadZoneResponses];
 
+export type AcceptCadZoneData = {
+    body?: never;
+    path: {
+        /**
+         * Zone Id
+         */
+        zone_id: string;
+    };
+    query?: never;
+    url: '/api/v1/cad/zones/{zone_id}/accept';
+};
+
+export type AcceptCadZoneErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AcceptCadZoneError = AcceptCadZoneErrors[keyof AcceptCadZoneErrors];
+
+export type AcceptCadZoneResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadZoneRead;
+};
+
+export type AcceptCadZoneResponse = AcceptCadZoneResponses[keyof AcceptCadZoneResponses];
+
 export type ListCalcCalculatorsData = {
     body?: never;
     path?: never;
@@ -22156,6 +22365,49 @@ export type ListCadVorItemsResponses = {
 
 export type ListCadVorItemsResponse = ListCadVorItemsResponses[keyof ListCadVorItemsResponses];
 
+export type DeleteCadZonesOfSheetData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * Scope
+         */
+        scope: 'auto' | 'all';
+    };
+    url: '/api/v1/projects/{project_id}/cad/zones';
+};
+
+export type DeleteCadZonesOfSheetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteCadZonesOfSheetError = DeleteCadZonesOfSheetErrors[keyof DeleteCadZonesOfSheetErrors];
+
+export type DeleteCadZonesOfSheetResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadZonesDeleteRead;
+};
+
+export type DeleteCadZonesOfSheetResponse = DeleteCadZonesOfSheetResponses[keyof DeleteCadZonesOfSheetResponses];
+
 export type ListCadZonesData = {
     body?: never;
     path: {
@@ -22256,6 +22508,45 @@ export type AssignCadFinishTemplateResponses = {
 };
 
 export type AssignCadFinishTemplateResponse = AssignCadFinishTemplateResponses[keyof AssignCadFinishTemplateResponses];
+
+export type ReadCadZonesSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+    };
+    url: '/api/v1/projects/{project_id}/cad/zones/summary';
+};
+
+export type ReadCadZonesSummaryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadZonesSummaryError = ReadCadZonesSummaryErrors[keyof ReadCadZonesSummaryErrors];
+
+export type ReadCadZonesSummaryResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadZonesSheetSummaryRead;
+};
+
+export type ReadCadZonesSummaryResponse = ReadCadZonesSummaryResponses[keyof ReadCadZonesSummaryResponses];
 
 export type ReadCadConstructionsData = {
     body?: never;

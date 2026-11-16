@@ -152,6 +152,7 @@ class ErrorCode(StrEnum):
     # --- PDF -> CAD, QA-контур (docs/building-model/cad-engine-integration-contract.md) ---
     CAD_INPUT_INVALID = "CAD_INPUT_INVALID"
     CAD_PARAMS_INVALID = "CAD_PARAMS_INVALID"
+    CAD_JOB_SUPERSEDED = "CAD_JOB_SUPERSEDED"
     CAD_INPUT_LIMIT_EXCEEDED = "CAD_INPUT_LIMIT_EXCEEDED"
     CAD_ENGINE_FAILED = "CAD_ENGINE_FAILED"
     CAD_ENGINE_UNAVAILABLE = "CAD_ENGINE_UNAVAILABLE"
@@ -327,6 +328,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.JOB_TIMEOUT: "Задание не уложилось в отведённое время",
     ErrorCode.CAD_INPUT_INVALID: "PDF не подходит для преобразования в CAD",
     ErrorCode.CAD_PARAMS_INVALID: "Параметры преобразования в CAD вне контракта",
+    ErrorCode.CAD_JOB_SUPERSEDED: "Задание заменено новым: сменилась версия генератора",
     ErrorCode.CAD_INPUT_LIMIT_EXCEEDED: "PDF превышает пределы преобразования в CAD",
     ErrorCode.CAD_ENGINE_FAILED: "Движок CAD не выдал проверенный результат",
     ErrorCode.CAD_ENGINE_UNAVAILABLE: "Движок CAD не установлен или не прошёл проверку",
@@ -356,7 +358,10 @@ MESSAGES: dict[ErrorCode, str] = {
     ),
     ErrorCode.CAD_WALLS_NOT_READY: "Конструкции вида ещё не посчитаны",
     ErrorCode.CAD_WALLS_BUSY: "Расчёт конструкций этого вида уже идёт",
-    ErrorCode.CAD_ZONES_NOT_EMPTY: "На виде уже есть зоны — автоматическая разметка не запускается",
+    ErrorCode.CAD_ZONES_NOT_EMPTY: (
+        "На листе есть зоны, созданные или правленные человеком либо неизвестного происхождения: "
+        "автоматическая разметка их не заменяет. Удалите зоны листа и запустите разметку снова"
+    ),
     ErrorCode.CAD_ZONES_BUSY: "Разметка зон уже идёт",
     ErrorCode.CAD_ROUTES_NOT_FOUND: "Для листа нет построенных трасс механики",
     ErrorCode.CAD_ROUTES3D_MISSING: "Трассы построены прежней версией: перестройте трассы",
@@ -500,6 +505,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.JOB_TIMEOUT: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_INPUT_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_PARAMS_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.CAD_JOB_SUPERSEDED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_INPUT_LIMIT_EXCEEDED: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_ENGINE_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.CAD_ENGINE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,

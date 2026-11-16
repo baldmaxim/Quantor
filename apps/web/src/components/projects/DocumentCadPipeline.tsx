@@ -2,10 +2,11 @@
 
 import { useCallback, useMemo, useState, type FC } from 'react';
 
-import { EmptyState, ErrorState, Skeleton } from '@/components/ui';
+import { Button, Dialog, DialogActions, EmptyState, ErrorState, Skeleton } from '@/components/ui';
 import { ClearableInput } from '@/components/ui/ClearableInput';
 import { sheetRows } from '@/lib/cad/pipeline-actions';
-import { isPipelineSelectable } from '@/lib/cad/pipeline-batch';
+import { isSheetStale } from '@/lib/cad/pipeline';
+import { isPipelineSelectable, isStaleRecomputable } from '@/lib/cad/pipeline-batch';
 import { useCadPipeline } from '@/lib/cad/pipeline-queries';
 import { matchesSheetQuery } from '@/lib/cad/pipeline-search';
 import { sheetPosition } from '@/lib/cad/workspace-url';
@@ -28,6 +29,8 @@ export const DocumentCadPipeline: FC<{
   const known = useMemo(() => sheets.data?.items ?? [], [sheets.data]);
   const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
   const [query, setQuery] = useState('');
+  const [staleOnly, setStaleOnly] = useState(false);
+  const [confirmingStale, setConfirmingStale] = useState(false);
 
   const ordered = useMemo(
     () => [...(pipeline.data?.sheets ?? [])].sort((a, b) => a.page_index - b.page_index),
@@ -59,8 +62,24 @@ export const DocumentCadPipeline: FC<{
   );
   const launchableSet = useMemo(() => new Set(launchable), [launchable]);
   const visible = useMemo(
-    () => ordered.filter((sheet) => matchesSheetQuery(sheet, query)),
-    [ordered, query],
+    () =>
+      ordered.filter(
+        (sheet) => matchesSheetQuery(sheet, query) && (!staleOnly || isSheetStale(sheet)),
+      ),
+    [ordered, query, staleOnly],
+  );
+  // Устаревшие по версии листы из показанных, которые можно пересчитать сейчас.
+  const staleRecomputable = useMemo(
+    () =>
+      visible
+        .filter((sheet) =>
+          isStaleRecomputable(
+            sheet,
+            sheetRows(projectId, revisionId, positionOf(sheet.page_index), sheet),
+          ),
+        )
+        .map((sheet) => sheet.page_index),
+    [visible, projectId, revisionId, positionOf],
   );
   // Выбор переживает обновления конвейера, но лист, ставший недоступным, из него выпадает.
   const effective = useMemo(
@@ -120,6 +139,12 @@ export const DocumentCadPipeline: FC<{
     setSelected(new Set());
   };
 
+  const recomputeStale = () => {
+    setConfirmingStale(false);
+    bulk.start(staleRecomputable, 'stale');
+    setSelected(new Set());
+  };
+
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-3)]">
       <CadBulkLaunchBar
@@ -131,6 +156,11 @@ export const DocumentCadPipeline: FC<{
         total={bulk.total}
         finished={bulk.finished}
         failures={failures}
+        staleCount={ordered.filter(isSheetStale).length}
+        staleRecomputableCount={staleRecomputable.length}
+        staleOnly={staleOnly}
+        onStaleOnlyChange={setStaleOnly}
+        onRecomputeStale={() => setConfirmingStale(true)}
         onToggleAll={toggleAll}
         onLaunch={launch}
         onStop={bulk.stop}
@@ -145,7 +175,9 @@ export const DocumentCadPipeline: FC<{
         wrapperClassName="w-full"
       />
       {visible.length === 0 && (
-        <p className="text-xs text-muted">Листов по запросу «{query.trim()}» нет</p>
+        <p className="text-xs text-muted">
+          {query.trim() === '' ? 'Устаревших листов нет' : `Листов по запросу «${query.trim()}» нет`}
+        </p>
       )}
       <ul className="m-0 list-none p-0" aria-label="Листы CAD">
         {visible.map((sheet) => (
@@ -161,6 +193,26 @@ export const DocumentCadPipeline: FC<{
           />
         ))}
       </ul>
+      <Dialog
+        open={confirmingStale}
+        onClose={() => setConfirmingStale(false)}
+        title="Пересчитать устаревшие листы?"
+        footer={
+          <DialogActions>
+            <Button onClick={() => setConfirmingStale(false)}>Отмена</Button>
+            <Button variant="primary" onClick={recomputeStale}>
+              {`Пересчитать (${staleRecomputable.length})`}
+            </Button>
+          </DialogActions>
+        }
+      >
+        <p className="text-sm">
+          Этапы, выполненные прежней версией, будут пересчитаны текущей. Устаревшее преобразование
+          запускается заново: конструкции пересчитаются сами, зоны листа сохранятся, а одобрение
+          вида и трассы потребуется сделать заново. Устаревшие конструкции пересчитываются по
+          готовому DXF, авто-зоны размечаются заново. Трассы не пересчитываются.
+        </p>
+      </Dialog>
     </div>
   );
 };

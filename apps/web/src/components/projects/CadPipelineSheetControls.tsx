@@ -28,6 +28,29 @@ export interface ICadPipelineSheetControlsProps {
   readonly position: number;
 }
 
+interface IConfirmText {
+  readonly title: string;
+  readonly action: string;
+  readonly body: string;
+}
+
+const CONFIRM_CONVERT: IConfirmText = {
+  title: 'Преобразовать лист заново?',
+  action: 'Преобразовать заново',
+  body:
+    'Лист будет преобразован текущей версией CAD-движка. Конструкции пересчитаются автоматически, ' +
+    'зоны листа сохранятся. Одобрение вида и трассы нужно будет сделать заново; ручные параметры ' +
+    'части конструкций могут сброситься.',
+};
+
+const CONFIRM_ZONES: IConfirmText = {
+  title: 'Разметить зоны листа заново?',
+  action: 'Разметить заново',
+  body:
+    'Все зоны листа созданы авторазметкой: они будут удалены и построены заново текущей версией ' +
+    'генератора. Назначенные типы помещений и шаблоны отделки на этом листе не сохранятся.',
+};
+
 export const CadPipelineSheetControls: FC<ICadPipelineSheetControlsProps> = ({
   projectId,
   revisionId,
@@ -51,6 +74,7 @@ export const CadPipelineSheetControls: FC<ICadPipelineSheetControlsProps> = ({
     if (confirming) actions.run(confirming);
     setConfirming(null);
   };
+  const confirmText = confirming?.kind === 'zones-auto' ? CONFIRM_ZONES : CONFIRM_CONVERT;
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-3)]">
@@ -94,21 +118,17 @@ export const CadPipelineSheetControls: FC<ICadPipelineSheetControlsProps> = ({
       <Dialog
         open={confirming !== null}
         onClose={() => setConfirming(null)}
-        title="Преобразовать лист заново?"
+        title={confirmText.title}
         footer={
           <DialogActions>
             <Button onClick={() => setConfirming(null)}>Отмена</Button>
             <Button variant="primary" onClick={confirm}>
-              Преобразовать заново
+              {confirmText.action}
             </Button>
           </DialogActions>
         }
       >
-        <p className="text-sm">
-          Лист будет преобразован текущей версией CAD-движка. Конструкции пересчитаются автоматически,
-          зоны листа сохранятся. Одобрение вида и трассы нужно будет сделать заново; ручные параметры
-          части конструкций могут сброситься.
-        </p>
+        <p className="text-sm">{confirmText.body}</p>
       </Dialog>
     </div>
   );

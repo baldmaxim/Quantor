@@ -23,7 +23,7 @@ from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
 from app.services import cad as cad_service
-from app.services import cad_pins, cad_walls_zones
+from app.services import cad_pins, cad_requeue, cad_walls_zones
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectStorage
 
@@ -209,6 +209,65 @@ async def _enqueue(
     )
 
 
+# Вход задания, который переносится в перепоставленное задание без изменений.
+_INPUT_KEYS: Final = (
+    "revision_id",
+    "parent_job_id",
+    "parent_attempt",
+    "page_index",
+    "view",
+    "view_dxf_sha256",
+    "zones_sha256",
+    "zones_size",
+    "zones_count",
+    "zones_warning",
+    "view_zone",
+    "view_frame",
+)
+
+
+async def requeue_with_current_params(
+    session: AsyncSession, *, job: Job, parent: Job, params: WallsParams
+) -> Job:
+    """То же задание конструкций с действующими параметрами: пин сменился после постановки.
+
+    Вход (вид, DXF, зоны) переносится как есть, меняются только версия скрипта и параметры;
+    ключ идемпотентности новый, потому что включает их.
+    """
+    payload: dict[str, object] = {
+        key: job.payload[key] for key in _INPUT_KEYS if key in job.payload
+    }
+    page_index, view = int(str(payload["page_index"])), int(str(payload["view"]))
+    attempt = payload.get("parent_attempt")
+    existing = await walls_jobs_of_view(session, parent=parent, page_index=page_index, view=view)
+    payload.update(
+        {
+            "params_sha256": params.sha256,
+            "params_version": params.params_version,
+            "generator_version": params.generator_version,
+            "engine_version": params.generator_version,
+            cad_requeue.REQUEUED_FROM: str(job.id),
+        }
+    )
+    return await jobs_service.enqueue(
+        session,
+        job_type=JobType.CAD_WALLS,
+        workspace_id=job.workspace_id,
+        project_id=job.project_id,
+        idempotency_key=idempotency_key(
+            parent.id,
+            parent_attempt=attempt if type(attempt) is int else 0,
+            page_index=page_index,
+            view=view,
+            params_sha256=params.sha256,
+            generator_version=params.generator_version,
+            sequence=len(existing),
+            zones_sha256=str(payload.get("zones_sha256") or ""),
+        ),
+        payload=payload,
+    )
+
+
 async def enqueue_after_convert(
     session: AsyncSession, storage: ObjectStorage, parent: Job, settings: Settings
 ) -> list[Job]:
@@ -265,8 +324,9 @@ async def schedule_after_auto_zones(
     Первое задание листа без разметки человека уходит до авторазметки, то есть без зон. Нет DXF,
     параметров или самих зон либо уже активно задание вида с теми же зонами — ничего не
     ставится, причина в логе; активное задание без этих зон пересчёт не блокирует. Цикла нет:
-    зоны авторазметка создаёт только на пустом листе, поэтому повторного успеха с новыми
-    зонами не бывает, а ключ идемпотентности включает хеш зон и номер пересчёта.
+    зоны авторазметка создаёт на пустом листе или при ручном пересоздании авто-зон, задание
+    конструкций разметку не ставит, а ключ идемпотентности включает хеш зон и номер пересчёта.
+    Зоны, отклонённые сверкой с экспликацией, во вход не идут (`cad_zones_review.usable`).
     """
     try:
         params = load_params(settings)

@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.errors import ErrorCode, http_error
 from app.models import DocQuestionAnswer, Job
 from app.services import cad as cad_service
-from app.services import cad_floor3d, cad_views, cad_zones
+from app.services import cad_floor3d, cad_views, cad_zones, cad_zones_review
 from app.services.cad_constructions import (
     FINISHING_WITH,
     FINISHING_WITHOUT,
@@ -168,10 +168,11 @@ async def sheet_partition_zones(
     view: int,
 ) -> list[PartitionZone]:
     """Зоны квартир и МОП листа в мм DXF вида; нет зон, кадра или геометрии страницы - пусто."""
+    # Зоны, отклонённые сверкой с экспликацией, перегородки не классифицируют до принятия.
     rows = [
         zone
-        for zone in await cad_zones.list_zones(
-            session, revision_id=revision_id, page_index=page_index
+        for zone in cad_zones_review.usable(
+            await cad_zones.list_zones(session, revision_id=revision_id, page_index=page_index)
         )
         if zone.kind in ROOM_KINDS and len(zone.points) >= 3
     ]

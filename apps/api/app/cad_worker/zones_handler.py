@@ -11,8 +11,17 @@ CLI не импортируется: он работает подпроцесс�
 из `handler`.
 
 Разметка человека неприкосновенна: если на листе есть зоны (до запуска или перед записью), зоны не
-создаются, задание завершается успешно со статусом `zones_skipped_existing`. Зоны пишутся через
+создаются, задание завершается успешно со статусом `zones_skipped_existing`. Исключение - ручной
+запуск (`recreate_auto`) на листе, где все зоны созданы авторазметкой и человеком не тронуты: они
+удаляются и вставляются заново одной транзакцией под блокировкой страницы. Зоны пишутся через
 общий сервис зон: площадь и периметр считает сервер по калибровке листа, как у ручных зон.
+
+Каждая зона-помещение получает происхождение `auto`, версию генератора и итог сверки с
+экспликацией (`cad_quality`): отклонённая сверкой зона сохраняется, но в плиту, перегородки и
+отделку не идёт, пока её не примет человек.
+
+Задание, поставленное до смены пина генератора, не отказывает: исполнитель ставит его заново с
+действующими параметрами (`cad_requeue`), один раз.
 """
 
 from __future__ import annotations
@@ -51,12 +60,18 @@ from app.models import DocumentRevision, Job
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
 from app.services import cad_progress, cad_walls
+from app.services import cad_requeue as requeue
 from app.services import cad_zones as cad_zones_service
 from app.services import cad_zones_auto as auto
+from app.services import cad_zones_review as review
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectStorage
 
 log = get_logger(__name__)
+
+
+class _NothingCreatedError(Exception):
+    """Пересоздание не дало ни одной зоны: прежние авто-зоны листа остаются на месте."""
 
 
 class _Input:
@@ -173,29 +188,40 @@ async def _insert_zones(
     project_id: uuid.UUID,
     revision: DocumentRevision,
     document: ZonesFile,
-) -> tuple[int, int, int]:
+    generator_version: str | None,
+) -> tuple[int, int, int, dict[str, int]]:
     """Зоны и машино-места файла -> зоны листа через сервис зон.
 
     Невалидная для сервера зона пропускается. Возвращает: создано всего, отклонено, из созданных -
-    помещений квартир и МОП (машино-места на стены и конструкции не влияют).
+    помещений квартир и МОП, пригодных для расчётов (машино-места и зоны, отклонённые сверкой, на
+    стены и конструкции не влияют), и число созданных помещений по итогу сверки.
     """
     created = rejected = rooms = 0
-    bodies: list[CadZoneCreate] = []
-    for zone in document.zones:
+    quality = {"ok": 0, "review": 0, "failed": 0}
+    bodies: list[tuple[CadZoneCreate, cad_zones_service.ZoneOrigin]] = []
+    parking_origin = cad_zones_service.ZoneOrigin(
+        source="auto", generator_version=generator_version
+    )
+    for zone, origin in zip(
+        document.zones, review.auto_origins(document, generator_version), strict=True
+    ):
         try:
             bodies.append(
-                CadZoneCreate(
-                    revision_id=revision.id,
-                    page_index=document.page_index,
-                    kind=zone.kind,
-                    apartment_no=(
-                        None
-                        if zone.kind == "room_mop" or zone.apartment_no is None
-                        else zone.apartment_no[:MAX_TEXT]
+                (
+                    CadZoneCreate(
+                        revision_id=revision.id,
+                        page_index=document.page_index,
+                        kind=zone.kind,
+                        apartment_no=(
+                            None
+                            if zone.kind == "room_mop" or zone.apartment_no is None
+                            else zone.apartment_no[:MAX_TEXT]
+                        ),
+                        room_mark=None if zone.room_mark is None else zone.room_mark[:MAX_TEXT],
+                        name=None if zone.name is None else zone.name[:MAX_TEXT],
+                        points=zone.points,
                     ),
-                    room_mark=None if zone.room_mark is None else zone.room_mark[:MAX_TEXT],
-                    name=None if zone.name is None else zone.name[:MAX_TEXT],
-                    points=zone.points,
+                    origin,
                 )
             )
         except ValidationError:
@@ -204,18 +230,21 @@ async def _insert_zones(
         label = None if space.label is None else space.label.strip()[:MAX_TEXT]
         try:
             bodies.append(
-                CadZoneCreate(
-                    revision_id=revision.id,
-                    page_index=document.page_index,
-                    kind="parking_space",
-                    name=label or PARKING_TYPE_LABELS[space.parking_type],
-                    parking_type=space.parking_type,
-                    points=space.points,
+                (
+                    CadZoneCreate(
+                        revision_id=revision.id,
+                        page_index=document.page_index,
+                        kind="parking_space",
+                        name=label or PARKING_TYPE_LABELS[space.parking_type],
+                        parking_type=space.parking_type,
+                        points=space.points,
+                    ),
+                    parking_origin,
                 )
             )
         except ValidationError:
             rejected += 1
-    for body in bodies:
+    for body, origin in bodies:
         try:
             await cad_zones_service.create_zone(
                 session,
@@ -223,14 +252,17 @@ async def _insert_zones(
                 project_id=project_id,
                 body=body,
                 user_id=None,
+                origin=origin,
             )
         except DomainError:
             rejected += 1
             continue
         created += 1
         if body.kind in ("room_apartment", "room_mop"):
-            rooms += 1
-    return created, rejected, rooms
+            quality[origin.quality_status] += 1
+            if origin.quality_status != review.QUALITY_FAILED:
+                rooms += 1
+    return created, rejected, rooms, quality
 
 
 async def execute_cad_zones(
@@ -246,6 +278,8 @@ async def execute_cad_zones(
         return await _fail(session, job, CadError(ErrorCode.CAD_PARAMS_INVALID, "нет ревизии"))
 
     owner, attempt = job.worker_id, job.attempt
+    # Ручное пересоздание листа, где все зоны созданы авторазметкой.
+    recreate = job.payload.get(auto.RECREATE_AUTO) is True
     await jobs_service.start(session, job=job, stage="cad_zones")
     job.payload = cad_progress.begin_attempt(job.payload, attempt, cad_progress.now())
     await session.commit()
@@ -253,10 +287,12 @@ async def execute_cad_zones(
     attempt_dir: Path | None = None
     try:
         source = await _checked_input(session, job)
-        # Зоны человека уже есть - генератор не запускается совсем.
-        if await auto.page_zone_count(
+        # Зоны уже есть - генератор не запускается совсем; исключение - ручное пересоздание
+        # листа, где все зоны созданы авторазметкой.
+        sources = await review.page_sources(
             session, revision_id=revision.id, page_index=source.page_index
-        ):
+        )
+        if sources and not (recreate and review.only_auto(sources)):
             if not await _still_owned(session, job, owner, attempt, lock=True):
                 return job
             return await _finish(session, job, revision, source, attempt, skipped=True)
@@ -290,12 +326,22 @@ async def execute_cad_zones(
 
         params = cad_mep_service.load_params(settings)
         raw_params = params.path.read_bytes()
-        if (
-            params.sha256 != job.payload.get("params_sha256")
-            or params.generator_version != job.payload.get("generator_version")
-            or cad_service.params_sha256(json.loads(raw_params)) != params.sha256
-        ):
-            raise CadError(ErrorCode.CAD_PARAMS_INVALID, "параметры или версия генератора изменены")
+        if cad_service.params_sha256(json.loads(raw_params)) != params.sha256:
+            raise CadError(ErrorCode.CAD_PARAMS_INVALID, "файл параметров не совпал с закреплением")
+        if params.sha256 != job.payload.get(
+            "params_sha256"
+        ) or params.generator_version != job.payload.get("generator_version"):
+            # Пин сменился после постановки: то же задание ставится с действующими параметрами.
+            if not requeue.can_requeue(job):
+                raise CadError(
+                    ErrorCode.CAD_PARAMS_INVALID, "параметры или версия генератора изменены"
+                )
+            if not await _still_owned(session, job, owner, attempt, lock=True):
+                return job
+            replacement = await auto.requeue_with_current_params(
+                session, job=job, parent=source.parent, params=params
+            )
+            return await requeue.supersede(session, job, replacement, attempt)
         params_file = attempt_dir / "in" / "params.json"
         params_file.write_bytes(raw_params)
 
@@ -355,21 +401,43 @@ async def execute_cad_zones(
     await cad_zones_service.lock_page_zones(
         session, revision_id=revision.id, page_index=source.page_index
     )
-    skipped = bool(
-        await auto.page_zone_count(session, revision_id=revision.id, page_index=source.page_index)
+    sources = await review.page_sources(
+        session, revision_id=revision.id, page_index=source.page_index
     )
-    created, rejected, rooms = (
-        (0, 0, 0)
-        if skipped
-        else await _insert_zones(
-            session,
-            workspace_id=source.workspace_id,
-            project_id=source.project_id,
-            revision=revision,
-            document=document,
-        )
-    )
-    if rooms:
+    replace = bool(sources) and recreate and review.only_auto(sources)
+    skipped = bool(sources) and not replace
+    replaced = created = rejected = rooms = 0
+    quality = {"ok": 0, "review": 0, "failed": 0}
+    if not skipped:
+        generator_version = job.payload.get("generator_version")
+        try:
+            # Все зоны листа - авто: удаление и вставка новых идут одной транзакцией. Если новая
+            # разметка не дала ни одной зоны, точка сохранения откатывается и прежние остаются.
+            async with session.begin_nested():
+                if replace:
+                    replaced = await review.delete_page_zones(
+                        session,
+                        revision_id=revision.id,
+                        page_index=source.page_index,
+                        scope="auto",
+                    )
+                created, rejected, rooms, quality = await _insert_zones(
+                    session,
+                    workspace_id=source.workspace_id,
+                    project_id=source.project_id,
+                    revision=revision,
+                    document=document,
+                    generator_version=(
+                        generator_version if isinstance(generator_version, str) else None
+                    ),
+                )
+                if replace and created == 0:
+                    raise _NothingCreatedError
+        except _NothingCreatedError:
+            skipped, replaced, rooms = True, 0, 0
+            quality = {"ok": 0, "review": 0, "failed": 0}
+    # После пересоздания пересчёт нужен и без пригодных зон: плита была посчитана по удалённым.
+    if rooms or replaced:
         await _recompute_walls(session, storage, source, settings)
     return await _finish(
         session,
@@ -385,6 +453,9 @@ async def execute_cad_zones(
             "rejected": rejected,
         },
         artifacts=artifacts,
+        replaced=replaced,
+        quality=quality,
+        unmatched_marks=[mark.model_dump(mode="json") for mark in document.unmatched_marks],
     )
 
 
@@ -425,6 +496,9 @@ async def _finish(
     files: list[dict[str, Any]] | None = None,
     counts: dict[str, int] | None = None,
     artifacts: list[dict[str, Any]] | None = None,
+    replaced: int = 0,
+    quality: dict[str, int] | None = None,
+    unmatched_marks: list[dict[str, Any]] | None = None,
 ) -> Job:
     """Итог попытки: `zones_ready` либо `zones_skipped_existing` (на листе уже есть зоны)."""
     status = auto.RESULT_SKIPPED_EXISTING if skipped else auto.RESULT_READY
@@ -440,6 +514,11 @@ async def _finish(
         "page_index": source.page_index,
         "view": source.view,
         "counts": counts or {"in_file": 0, "created": 0, "rejected": 0},
+        # Сколько прежних авто-зон листа удалено при ручном пересоздании.
+        "replaced": replaced,
+        # Итог сверки созданных помещений с экспликацией и марки экспликации без зоны.
+        "quality": quality or {"ok": 0, "review": 0, "failed": 0},
+        "unmatched_marks": unmatched_marks or [],
         "artifacts": artifacts or [],
     }
     log.info("cad_zones_finished", job_id=str(job.id), result_status=status)

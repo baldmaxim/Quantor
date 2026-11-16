@@ -15,6 +15,7 @@ import { CadScaleSection } from '@/components/cad/viewer/CadScaleSection';
 import { CadSidePanel, type ICadSideTab } from '@/components/cad/viewer/CadSidePanel';
 import { CadViewHeader } from '@/components/cad/viewer/CadViewHeader';
 import { CadZonesPanel } from '@/components/cad/viewer/CadZonesPanel';
+import { CadZonesQuality } from '@/components/cad/viewer/CadZonesQuality';
 import { Button, ErrorState, Skeleton, SkeletonRows } from '@/components/ui';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 
@@ -123,7 +124,27 @@ export const WorkspaceCadSide: FC<
   }
 
   const zonesTab: ICadSideTab | null = zones
-    ? { id: 'zones', label: 'Зоны', content: <CadZonesPanel {...zones} /> }
+    ? {
+        id: 'zones',
+        label: 'Зоны',
+        content: (
+          <div className="flex min-w-0 flex-col gap-[var(--s-4)]">
+            {finishes && finishes.revisionId !== null && finishes.pageIndex !== null && (
+              <CadZonesQuality
+                projectId={finishes.projectId}
+                revisionId={finishes.revisionId}
+                pageIndex={finishes.pageIndex}
+                load={finishes.load && sideTab === 'zones'}
+                zones={zones.zones}
+                activeId={zones.activeId}
+                onActivate={zones.onActivate}
+                recreate={zones.autoZones ?? null}
+              />
+            )}
+            <CadZonesPanel {...zones} />
+          </div>
+        ),
+      }
     : null;
 
   // Раздел «Отделка»: шаблоны проекта и ведомость листа; зону на листе выделяют через «Зоны».

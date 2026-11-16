@@ -233,9 +233,26 @@ const zonesActions = (
   context: IContext,
 ): IPipelineAction[] => {
   if (step.state === 'running' || step.state === 'queued') return [];
-  // Автоматическая разметка по уже размеченному листу отвечает 409: там только переход к зонам.
+  // Лист с зонами человека авторазметке не отдаётся (409): там только переход к зонам. Если все
+  // зоны листа созданы авторазметкой, её можно запустить заново - прежние авто-зоны удалятся.
   if (view.zones_count > 0) {
-    return [linkTo(context, `zones:${view.view}:link`, 'Открыть зоны', view.view, true)];
+    const link = linkTo(context, `zones:${view.view}:link`, 'Открыть зоны', view.view, true);
+    if (!view.zones_recreatable) return [link];
+    return [
+      link,
+      action(
+        {
+          id: `zones:${view.view}`,
+          kind: 'zones-auto',
+          intent: 'redo',
+          label: 'Разметить заново',
+          view: view.view,
+          jobId: context.sheet.convert?.job_id ?? null,
+          confirm: true,
+        },
+        context,
+      ),
+    ];
   }
   const intent = step.state === 'failed' ? 'fix' : step.state === 'todo' ? 'start' : 'redo';
   return [

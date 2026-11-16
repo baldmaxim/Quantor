@@ -12,6 +12,8 @@ vi.mock('@/components/cad/finishes/CadFinishPanel', () => ({
 vi.mock('@/components/cad/viewer/CadZonesPanel', () => ({
   CadZonesPanel: () => <p>панель зон</p>,
 }));
+// Сверка зон читает сервер: в тесте раздела «Отделка» она не нужна.
+vi.mock('@/components/cad/viewer/CadZonesQuality', () => ({ CadZonesQuality: () => null }));
 vi.mock('@/components/cad/CadJobDetail', () => ({ CadJobDetail: () => <p>ход задания</p> }));
 vi.mock('@/components/cad/CadResult', () => ({ CadResult: () => <p>результат</p> }));
 vi.mock('@/components/cad/viewer/CadFilesSection', () => ({ CadFilesSection: () => <p>файлы</p> }));

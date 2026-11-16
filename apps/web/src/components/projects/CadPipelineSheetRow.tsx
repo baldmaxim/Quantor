@@ -7,6 +7,8 @@ import { IconChevronRight } from '@/components/ui/icons';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import {
   sheetProgress,
+  sheetQualityBadge,
+  sheetStaleTexts,
   sheetSteps,
   sheetSummary,
   sheetUpdateBadge,
@@ -58,6 +60,8 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   const summary = sheetSummary(sheet);
   const progress = sheetProgress(sheet);
   const updateBadge = sheetUpdateBadge(sheet);
+  const qualityBadge = sheetQualityBadge(sheet);
+  const stale = sheetStaleTexts(sheet);
   const failed = steps.find((step) => step.state === 'failed' && step.key !== 'floor3d');
   const floor3d = steps.find((step) => step.key === 'floor3d');
   const floor3dBadge = floor3d ? FLOOR3D_BADGES[floor3d.state] : undefined;
@@ -130,6 +134,20 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
                 </StatusBadge>
               </span>
             )}
+            {qualityBadge && (
+              <span title={qualityBadge.reasons.join('; ')}>
+                <StatusBadge tone="warning" wrap>
+                  {qualityBadge.label}
+                </StatusBadge>
+              </span>
+            )}
+            {stale.length > 0 && (
+              <span title={stale.join('; ')}>
+                <StatusBadge tone="neutral" wrap>
+                  устарел
+                </StatusBadge>
+              </span>
+            )}
             <span
               className="font-mono text-xs text-muted"
               title="Завершено основных шагов конвейера"
@@ -153,6 +171,15 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
       <div onClick={toggle}>
         <PipelineStepper steps={steps} />
       </div>
+
+      {(qualityBadge || stale.length > 0) && (
+        <div className="flex flex-col gap-[var(--s-1)] text-xs [overflow-wrap:anywhere]">
+          {qualityBadge && (
+            <p className="m-0 text-warning">{`На проверку: ${qualityBadge.reasons.join('; ')}`}</p>
+          )}
+          {stale.length > 0 && <p className="m-0 text-muted">{`Устарел: ${stale.join('; ')}`}</p>}
+        </div>
+      )}
 
       {(failed?.detail || floor3dBadge) && (
         <div className="flex flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">

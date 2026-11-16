@@ -30,6 +30,14 @@ export interface ICadBulkLaunchBarProps {
   readonly total: number;
   readonly finished: number;
   readonly failures: readonly IBulkLaunchFailureView[];
+  /** Листов с этапами, выполненными не закреплённой версией движка или генератора. */
+  readonly staleCount: number;
+  /** Из них (с учётом поиска) можно пересчитать прямо сейчас. */
+  readonly staleRecomputableCount: number;
+  /** Показаны только устаревшие листы. */
+  readonly staleOnly: boolean;
+  readonly onStaleOnlyChange: (checked: boolean) => void;
+  readonly onRecomputeStale: () => void;
   readonly onToggleAll: (checked: boolean) => void;
   readonly onLaunch: () => void;
   readonly onStop: () => void;
@@ -44,11 +52,17 @@ export const CadBulkLaunchBar: FC<ICadBulkLaunchBarProps> = ({
   total,
   finished,
   failures,
+  staleCount,
+  staleRecomputableCount,
+  staleOnly,
+  onStaleOnlyChange,
+  onRecomputeStale,
   onToggleAll,
   onLaunch,
   onStop,
 }) => {
   const checkId = useId();
+  const staleId = useId();
   const checkRef = useRef<HTMLInputElement>(null);
   const allSelected = launchableCount > 0 && selectedCount >= launchableCount;
   const partial = selectedCount > 0 && !allSelected;
@@ -60,7 +74,10 @@ export const CadBulkLaunchBar: FC<ICadBulkLaunchBarProps> = ({
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-3)] border-b border-border pb-[var(--s-4)]">
-      <p className="m-0 text-sm text-muted">{`Планов: ${plansCount} · без CAD: ${withoutCadCount}`}</p>
+      <p className="m-0 text-sm text-muted">
+        {`Планов: ${plansCount} · без CAD: ${withoutCadCount}`}
+        {staleCount > 0 && ` · устарело: ${staleCount}`}
+      </p>
       <div className="flex min-w-0 flex-col gap-[var(--s-3)] md:flex-row md:items-center md:justify-between">
         <label
           htmlFor={checkId}
@@ -98,6 +115,32 @@ export const CadBulkLaunchBar: FC<ICadBulkLaunchBarProps> = ({
           </Button>
         )}
       </div>
+      {(staleCount > 0 || staleOnly) && (
+        <div className="flex min-w-0 flex-col gap-[var(--s-3)] md:flex-row md:items-center md:justify-between">
+          <label
+            htmlFor={staleId}
+            className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-[var(--s-3)] text-sm"
+          >
+            <input
+              id={staleId}
+              type="checkbox"
+              checked={staleOnly}
+              onChange={(event) => onStaleOnlyChange(event.target.checked)}
+              className="size-5 flex-none accent-accent"
+            />
+            Только устаревшие
+          </label>
+          <Button
+            variant="default"
+            compact
+            disabled={running || staleRecomputableCount === 0}
+            onClick={onRecomputeStale}
+            className="max-md:h-[44px] max-md:w-full"
+          >
+            {`Пересчитать устаревшие (${staleRecomputableCount})`}
+          </Button>
+        </div>
+      )}
       {total > 0 && (
         <p role="status" className="m-0 text-xs text-muted">
           {running

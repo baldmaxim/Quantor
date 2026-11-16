@@ -8,6 +8,7 @@ import { CadRoomTypeSelect } from '@/components/cad/finishes/CadRoomTypeSelect';
 import { ClearableInput } from '@/components/ui/ClearableInput';
 import { Button, cx } from '@/components/ui';
 import { ROOM_TYPE_LABELS, type RoomType } from '@/lib/cad/room-types';
+import { ZONE_QUALITY_LABELS } from '@/lib/cad/zone-quality';
 import { canSplitZoneKind } from '@/lib/cad/zone-split';
 import { zoneSpecValue, zoneTitle, type ParkingType } from '@/lib/cad/zones';
 
@@ -113,6 +114,22 @@ export const CadZoneSpecRow: FC<ICadZoneSpecRowProps> = ({
           <span className="flex min-w-0 flex-col gap-[2px]">
             <span className="min-w-0 text-sm break-words">{title}</span>
             {typeText !== null && <span className="text-xs text-muted">{typeText}</span>}
+            {zone.quality_status !== 'ok' && (
+              <span
+                className={cx(
+                  'text-xs [overflow-wrap:anywhere]',
+                  zone.quality_status === 'failed' ? 'text-danger' : 'text-warning',
+                )}
+              >
+                {`! ${ZONE_QUALITY_LABELS[zone.quality_status]}`}
+                {zone.quality_reason ? `: ${zone.quality_reason}` : ''}
+              </span>
+            )}
+            {zone.quality_status === 'ok' && zone.quality_reason && active && (
+              <span className="text-xs text-muted [overflow-wrap:anywhere]">
+                {zone.quality_reason}
+              </span>
+            )}
           </span>
           <span className="shrink-0 text-right text-xs text-muted">{zoneSpecValue(zone)}</span>
         </button>

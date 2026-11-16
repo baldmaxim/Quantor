@@ -12,11 +12,11 @@ import uuid
 from fastapi import APIRouter, Depends
 
 from app.api.v1.cad import _scope
-from app.api.v1.deps import AuthDep, SessionDep, require, require_feature
+from app.api.v1.deps import AuthDep, SessionDep, SettingsDep, require, require_feature
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
 from app.contracts.cad_pipeline import CadPipelineRead
-from app.services import cad_pipeline
+from app.services import cad_pins, cad_pipeline
 
 router = APIRouter(
     prefix="/projects/{project_id}/revisions/{revision_id}/cad",
@@ -36,10 +36,15 @@ async def read_cad_pipeline(
     revision_id: uuid.UUID,
     session: SessionDep,
     context: AuthDep,
+    settings: SettingsDep,
 ) -> CadPipelineRead:
     await _scope(session, context, project_id, revision_id)
     return await cad_pipeline.build_pipeline(
-        session, workspace_id=context.tenant, project_id=project_id, revision_id=revision_id
+        session,
+        workspace_id=context.tenant,
+        project_id=project_id,
+        revision_id=revision_id,
+        pinned=cad_pins.pinned_versions(settings),
     )
 
 

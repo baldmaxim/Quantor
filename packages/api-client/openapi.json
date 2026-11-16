@@ -7789,6 +7789,14 @@
             ],
             "title": "Scale Source"
           },
+          "stale": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CadPipelineStaleRead"
+            },
+            "title": "Stale",
+            "type": "array"
+          },
           "title": {
             "anyOf": [
               {
@@ -7882,6 +7890,29 @@
             ],
             "title": "Progress"
           },
+          "quality_reasons": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Quality Reasons",
+            "type": "array"
+          },
+          "quality_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "review"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Status"
+          },
           "result_status": {
             "anyOf": [
               {
@@ -7920,6 +7951,54 @@
           "finished_at"
         ],
         "title": "CadPipelineStageRead",
+        "type": "object"
+      },
+      "CadPipelineStaleRead": {
+        "description": "Этап листа выполнен версией движка или генератора, отличной от закреплённой (pins.json).",
+        "properties": {
+          "now": {
+            "title": "Now",
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "convert",
+              "walls",
+              "zones"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
+          },
+          "was": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Was"
+          }
+        },
+        "required": [
+          "stage",
+          "view",
+          "was",
+          "now"
+        ],
+        "title": "CadPipelineStaleRead",
         "type": "object"
       },
       "CadPipelineViewRead": {
@@ -7987,6 +8066,11 @@
           "zones_count": {
             "title": "Zones Count",
             "type": "integer"
+          },
+          "zones_recreatable": {
+            "default": false,
+            "title": "Zones Recreatable",
+            "type": "boolean"
           }
         },
         "required": [
@@ -8266,7 +8350,7 @@
         "type": "object"
       },
       "CadProjectSummaryRead": {
-        "description": "Листы последних открываемых ревизий проекта по состоянию конвейера CAD.\n\nИнвариант: `sheets_total` = `sheets_done` + `sheets_running` + `sheets_failed` + `sheets_idle`.",
+        "description": "Листы последних открываемых ревизий проекта по состоянию конвейера CAD.\n\nИнвариант: `sheets_total` = `sheets_done` + `sheets_review` + `sheets_running` +\n`sheets_failed` + `sheets_idle`.",
         "properties": {
           "documents_total": {
             "title": "Documents Total",
@@ -8282,6 +8366,11 @@
           },
           "sheets_idle": {
             "title": "Sheets Idle",
+            "type": "integer"
+          },
+          "sheets_review": {
+            "default": 0,
+            "title": "Sheets Review",
             "type": "integer"
           },
           "sheets_running": {
@@ -11074,6 +11163,17 @@
             ],
             "title": "Door Height Mm"
           },
+          "expl_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expl Area M2"
+          },
           "finish_template_id": {
             "anyOf": [
               {
@@ -11085,6 +11185,17 @@
               }
             ],
             "title": "Finish Template Id"
+          },
+          "generator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator Version"
           },
           "geometry_issue": {
             "anyOf": [
@@ -11122,6 +11233,13 @@
               }
             ],
             "title": "Name"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
           },
           "page_index": {
             "title": "Page Index",
@@ -11177,6 +11295,50 @@
             },
             "title": "Points",
             "type": "array"
+          },
+          "quality_accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Accepted At"
+          },
+          "quality_accepted_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Accepted By"
+          },
+          "quality_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Reason"
+          },
+          "quality_status": {
+            "enum": [
+              "ok",
+              "review",
+              "failed"
+            ],
+            "title": "Quality Status",
+            "type": "string"
           },
           "revision_id": {
             "format": "uuid",
@@ -11240,6 +11402,15 @@
             ],
             "title": "Room Type Source"
           },
+          "source": {
+            "enum": [
+              "auto",
+              "human",
+              "unknown"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -11276,10 +11447,68 @@
           "width_m",
           "calibration_missing",
           "geometry_issue",
+          "source",
+          "generator_version",
+          "expl_area_m2",
+          "notes",
+          "quality_status",
+          "quality_reason",
+          "quality_accepted_by",
+          "quality_accepted_at",
           "created_at",
           "updated_at"
         ],
         "title": "CadZoneRead",
+        "type": "object"
+      },
+      "CadZoneUnmatchedMarkRead": {
+        "description": "Марка экспликации без зоны: из итога последнего задания разметки листа.",
+        "properties": {
+          "expl_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expl Area M2"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "room_mark": {
+            "title": "Room Mark",
+            "type": "string"
+          }
+        },
+        "required": [
+          "room_mark",
+          "name",
+          "expl_area_m2",
+          "reason"
+        ],
+        "title": "CadZoneUnmatchedMarkRead",
         "type": "object"
       },
       "CadZoneUpdate": {
@@ -11446,6 +11675,19 @@
         "title": "CadZoneUpdate",
         "type": "object"
       },
+      "CadZonesDeleteRead": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "CadZonesDeleteRead",
+        "type": "object"
+      },
       "CadZonesJobRead": {
         "description": "Задание `cad_zones`, поставленное на автоматическую разметку вида.",
         "properties": {
@@ -11490,6 +11732,118 @@
           "created_at"
         ],
         "title": "CadZonesJobRead",
+        "type": "object"
+      },
+      "CadZonesSheetSummaryRead": {
+        "description": "Сводка сверки зон листа с экспликацией.",
+        "properties": {
+          "apartments_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartments Area M2"
+          },
+          "apartments_compared": {
+            "title": "Apartments Compared",
+            "type": "integer"
+          },
+          "apartments_delta_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartments Delta Percent"
+          },
+          "apartments_expl_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartments Expl Area M2"
+          },
+          "auto": {
+            "title": "Auto",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "generator_versions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Generator Versions",
+            "type": "array"
+          },
+          "human": {
+            "title": "Human",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "integer"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "recreate_allowed": {
+            "title": "Recreate Allowed",
+            "type": "boolean"
+          },
+          "review": {
+            "title": "Review",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "unknown": {
+            "title": "Unknown",
+            "type": "integer"
+          },
+          "unmatched_marks": {
+            "items": {
+              "$ref": "#/components/schemas/CadZoneUnmatchedMarkRead"
+            },
+            "title": "Unmatched Marks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "revision_id",
+          "page_index",
+          "ok",
+          "review",
+          "failed",
+          "auto",
+          "human",
+          "unknown",
+          "generator_versions",
+          "apartments_compared",
+          "apartments_area_m2",
+          "apartments_expl_area_m2",
+          "apartments_delta_percent",
+          "unmatched_marks",
+          "recreate_allowed"
+        ],
+        "title": "CadZonesSheetSummaryRead",
         "type": "object"
       },
       "CalcAmount": {
@@ -36518,6 +36872,49 @@
         ]
       }
     },
+    "/api/v1/cad/zones/{zone_id}/accept": {
+      "post": {
+        "operationId": "accept_cad_zone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "zone_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Zone Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadZoneRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Принять зону вне допуска сверки с экспликацией: она снова участвует в расчётах",
+        "tags": [
+          "cad-zones"
+        ]
+      }
+    },
     "/api/v1/calc/calculators": {
       "get": {
         "description": "Что можно запустить: версии, система, стадия, сценарии, нужные факты и правила.\n\nДемонстрационные калькуляторы скрыты; `include_demo=true` — отладочный режим.",
@@ -42305,6 +42702,81 @@
       }
     },
     "/api/v1/projects/{project_id}/cad/zones": {
+      "delete": {
+        "description": "`scope=auto` - только зоны авторазметки, не тронутые человеком; `scope=all` - все зоны.",
+        "operationId": "delete_cad_zones_of_sheet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "enum": [
+                "auto",
+                "all"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadZonesDeleteRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Удалить зоны листа: только созданные авторазметкой либо все",
+        "tags": [
+          "cad-zones"
+        ]
+      },
       "get": {
         "operationId": "list_cad_zones",
         "parameters": [
@@ -42479,6 +42951,69 @@
         "summary": "Назначить шаблон отделки зонам проекта (null снимает); двери пропускаются",
         "tags": [
           "cad-finishes"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/zones/summary": {
+      "get": {
+        "operationId": "read_cad_zones_summary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Page Index",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadZonesSheetSummaryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сводка сверки зон листа с экспликацией: итоги, происхождение, сумма по квартирам",
+        "tags": [
+          "cad-zones"
         ]
       }
     },
@@ -43187,7 +43722,7 @@
     },
     "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/zones/auto": {
       "post": {
-        "description": "409 `CAD_ZONES_NOT_EMPTY` - на листе уже есть зоны; 409 `CAD_ZONES_BUSY` - разметка идёт.",
+        "description": "Лист без зон размечается, лист только с авто-зонами размечается заново.\n\n409 `CAD_ZONES_NOT_EMPTY` - на листе есть зоны человека или неизвестного происхождения;\n409 `CAD_ZONES_BUSY` - разметка идёт.",
         "operationId": "start_cad_zones_auto",
         "parameters": [
           {

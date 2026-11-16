@@ -16,19 +16,27 @@ export interface ICadRecognitionSummaryProps {
 }
 
 interface ISegment {
-  readonly key: 'done' | 'running' | 'failed' | 'idle';
+  readonly key: 'done' | 'review' | 'running' | 'failed' | 'idle';
   readonly label: string;
   /** Цвет полосы и точки подписи: только токены темы. */
   readonly color: string;
   readonly count: number;
 }
 
-const segmentsOf = (data: CadProjectSummaryRead): readonly ISegment[] => [
-  { key: 'done', label: 'Готово', color: 'bg-success', count: data.sheets_done },
-  { key: 'running', label: 'Идёт', color: 'bg-accent', count: data.sheets_running },
-  { key: 'failed', label: 'Ошибки', color: 'bg-danger', count: data.sheets_failed },
-  { key: 'idle', label: 'Не запускались', color: 'bg-border-strong', count: data.sheets_idle },
-];
+const segmentsOf = (data: CadProjectSummaryRead): readonly ISegment[] => {
+  const review = data.sheets_review ?? 0;
+  return [
+    { key: 'done', label: 'Готово', color: 'bg-success', count: data.sheets_done },
+    // Порог качества: конструкции листа требуют проверки, готовым лист не считается. Сегмент
+    // есть, только когда такие листы есть.
+    ...(review > 0
+      ? [{ key: 'review', label: 'На проверку', color: 'bg-warning', count: review } as const]
+      : []),
+    { key: 'running', label: 'Идёт', color: 'bg-accent', count: data.sheets_running },
+    { key: 'failed', label: 'Ошибки', color: 'bg-danger', count: data.sheets_failed },
+    { key: 'idle', label: 'Не запускались', color: 'bg-border-strong', count: data.sheets_idle },
+  ];
+};
 
 const WRAPPER = 'shrink-0 border-b border-border px-[var(--s-6)] py-[var(--s-4)]';
 

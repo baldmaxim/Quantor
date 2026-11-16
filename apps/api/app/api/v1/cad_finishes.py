@@ -27,7 +27,13 @@ from app.contracts.cad_finishes import (
 from app.errors import not_found
 from app.models import CadFinishTemplate
 from app.services import cad as cad_service
-from app.services import cad_finish_templates, cad_finishes, cad_partitions, cad_zones
+from app.services import (
+    cad_finish_templates,
+    cad_finishes,
+    cad_partitions,
+    cad_zones,
+    cad_zones_review,
+)
 from app.services import projects as projects_service
 from app.services.cad_walls_version import current_walls_generator
 
@@ -181,7 +187,10 @@ async def read_cad_finishes(
         is None
     ):
         raise not_found("Ревизия")
-    zones = await cad_zones.list_zones(session, revision_id=revision_id, page_index=page_index)
+    # Зоны, отклонённые сверкой с экспликацией, в отделку не идут до принятия человеком.
+    zones = cad_zones_review.usable(
+        await cad_zones.list_zones(session, revision_id=revision_id, page_index=page_index)
+    )
     templates = await cad_finish_templates.list_templates(session, project_id=project_id)
     context_sheet = await cad_finishes.load_finish_context(
         session,

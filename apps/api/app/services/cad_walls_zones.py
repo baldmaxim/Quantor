@@ -27,7 +27,7 @@ from app.domain import JobType
 from app.errors import DomainError, ErrorCode, http_error
 from app.models import Job
 from app.services import cad as cad_service
-from app.services import cad_floor3d, cad_views, cad_zones
+from app.services import cad_floor3d, cad_views, cad_zones, cad_zones_review
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 log = get_logger(__name__)
@@ -198,9 +198,12 @@ async def sheet_room_zones(
                 origin_pt=frame.origin_pt,
                 mm_per_pdf_point=frame.mm_per_pdf_point,
             )
+    # Зоны, отклонённые сверкой с экспликацией, в контур плиты не идут до принятия человеком.
     rows = [
         zone
-        for zone in await cad_zones.list_zones(session, revision_id=revision, page_index=page_index)
+        for zone in cad_zones_review.usable(
+            await cad_zones.list_zones(session, revision_id=revision, page_index=page_index)
+        )
         if zone.kind in ROOM_KINDS and len(zone.points) >= 3
     ]
     if not rows:

@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Final, Literal
 
@@ -25,6 +26,7 @@ from app.contracts.cad_pipeline import (
     CadPipelineRead,
     CadPipelineSheetRead,
     CadPipelineStageRead,
+    CadPipelineStaleRead,
     CadPipelineViewRead,
 )
 from app.domain import JobStatus, JobType
@@ -32,8 +34,9 @@ from app.models import CadDecision, CadZone, Job, ScaleCalibration, Sheet, Sheet
 from app.models.cad_decision import DECISION_MEP_ACCEPTANCE, DECISION_VIEW_APPROVAL
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_walls
+from app.services import cad_quality, cad_walls
 from app.services import documents as documents_service
+from app.services.cad_pins import PinnedVersions
 from app.services.cad_plan_sheets import is_plan_sheet
 
 _PIPELINE_TYPES: Final = (
@@ -49,18 +52,87 @@ _ChildKey = tuple[JobType, str, int, int]
 _DecisionKey = tuple[uuid.UUID, int, int, int]
 
 
+@dataclass(slots=True)
+class ZoneInfo:
+    """Зоны страницы: число, происхождение и версии генератора авто-зон."""
+
+    count: int = 0
+    sources: set[str] = field(default_factory=set)
+    # Версии авто-зон; `None` - у авто-зоны версия не записана.
+    versions: set[str | None] = field(default_factory=set)
+
+    @property
+    def only_auto(self) -> bool:
+        return self.count > 0 and self.sources == {"auto"}
+
+
 def stage_of(job: Job) -> CadPipelineStageRead:
+    result = cad_service.current_result(job)
+    quality_status, quality_reasons = (
+        cad_quality.walls_result_quality(result)
+        if job.job_type is JobType.CAD_WALLS and job.status is JobStatus.SUCCEEDED
+        else (None, [])
+    )
     return CadPipelineStageRead(
         job_id=job.id,
         job_type=job.job_type.value,
         status=job.status,
         progress=job.progress,
         stage=job.stage,
-        result_status=cad_service.current_result(job).get("result_status"),
+        result_status=result.get("result_status"),
         error_code=job.error_code,
         created_at=job.created_at,
         finished_at=job.finished_at,
+        quality_status=quality_status,
+        quality_reasons=quality_reasons,
     )
+
+
+def _version(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _stale(
+    convert: Job | None,
+    walls: dict[int, Job],
+    zones: ZoneInfo | None,
+    pinned: PinnedVersions | None,
+) -> list[CadPipelineStaleRead]:
+    """Этапы листа, выполненные не закреплённой версией: преобразование, конструкции, авто-зоны.
+
+    Сравнивается только готовый результат: идущее и отказавшее задание устаревшим не считается.
+    Зоны человека и неизвестного происхождения версии не имеют и сюда не попадают.
+    """
+    if pinned is None or convert is None or convert.status is not JobStatus.SUCCEEDED:
+        return []
+    stale: list[CadPipelineStaleRead] = []
+    if pinned.convert is not None and cad_service.current_result(convert):
+        was = _version(convert.payload.get("engine_version"))
+        if was != pinned.convert:
+            stale.append(
+                CadPipelineStaleRead(stage="convert", view=None, was=was, now=pinned.convert)
+            )
+    if pinned.walls is not None:
+        for view, job in sorted(walls.items()):
+            if job.status is not JobStatus.SUCCEEDED:
+                continue
+            was = _version(cad_service.current_result(job).get("generator_version")) or _version(
+                job.payload.get("generator_version")
+            )
+            if was != pinned.walls:
+                stale.append(
+                    CadPipelineStaleRead(stage="walls", view=view, was=was, now=pinned.walls)
+                )
+    if pinned.zones is not None and zones is not None and zones.only_auto:
+        outdated = sorted(
+            (version for version in zones.versions if version != pinned.zones),
+            key=lambda version: version or "",
+        )
+        if outdated:
+            stale.append(
+                CadPipelineStaleRead(stage="zones", view=None, was=outdated[0], now=pinned.zones)
+            )
+    return stale
 
 
 def _convert_pages(job: Job) -> list[int]:
@@ -123,9 +195,10 @@ def _pipeline_of(
     sheet_rows: list[Any],
     stamp_titles: dict[uuid.UUID, str],
     passports: dict[int, Any],
-    zone_counts: dict[int, int],
+    zone_infos: dict[int, ZoneInfo],
     approvals: set[_DecisionKey],
     acceptances: set[_DecisionKey],
+    pinned: PinnedVersions | None,
 ) -> CadPipelineRead:
     """Сборка вида конвейера одной ревизии из уже прочитанных данных (без запросов)."""
     # Самое новое задание листа (любой статус) и самое новое успешное с видами по этому листу.
@@ -196,6 +269,7 @@ def _pipeline_of(
         update = newest if newest is not None and newest is not convert else None
         convert_attempt = None if convert is None else cad_service.result_of(convert).get("attempt")
         children = by_page.get(page_index, {})
+        zone_info = zone_infos.get(page_index)
         views: list[CadPipelineViewRead] = []
         for row in _view_rows(convert, page_index):
             view = int(row["view"])
@@ -215,7 +289,8 @@ def _pipeline_of(
                     and cad_walls.view_has_dxf(convert, page_index, view) is not None,
                     walls=None if walls is None else stage_of(walls),
                     zones=None if zones is None else stage_of(zones),
-                    zones_count=zone_counts.get(page_index, 0),
+                    zones_count=0 if zone_info is None else zone_info.count,
+                    zones_recreatable=zone_info is not None and zone_info.only_auto,
                     approved=convert is not None
                     and type(convert_attempt) is int
                     and (convert.id, convert_attempt, page_index, view) in approvals,
@@ -237,6 +312,7 @@ def _pipeline_of(
                 convert=None if convert is None else stage_of(convert),
                 update=None if update is None else stage_of(update),
                 scale_source=_scale_source(convert, page_index),
+                stale=_stale(convert, children.get(JobType.CAD_WALLS, {}), zone_info, pinned),
                 views=views,
             )
         )
@@ -249,11 +325,13 @@ async def build_pipelines(
     workspace_id: uuid.UUID,
     project_id: uuid.UUID,
     revision_ids: Sequence[uuid.UUID],
+    pinned: PinnedVersions | None = None,
 ) -> dict[uuid.UUID, CadPipelineRead]:
     """Виды конвейера сразу для списка ревизий: тот же код сборки, что и у одной ревизии.
 
     Читает всё по одному запросу на таблицу для всех ревизий сразу, поэтому число запросов не
-    зависит ни от числа ревизий, ни от числа листов. Ревизии проверяет вызывающий.
+    зависит ни от числа ревизий, ни от числа листов. Ревизии проверяет вызывающий. `pinned` -
+    закреплённые версии для метки «устарел»; не переданы - метка не считается.
     """
     wanted = list(dict.fromkeys(revision_ids))
     if not wanted:
@@ -309,14 +387,26 @@ async def build_pipelines(
     for passport_row in passport_rows.all():
         passports_by_revision[passport_row.revision_id][passport_row.page_index] = passport_row
 
-    zone_counts_by_revision: dict[uuid.UUID, dict[int, int]] = defaultdict(dict)
+    zone_infos_by_revision: dict[uuid.UUID, dict[int, ZoneInfo]] = defaultdict(dict)
     zone_rows = await session.execute(
-        select(CadZone.revision_id, CadZone.page_index, func.count())
+        select(
+            CadZone.revision_id,
+            CadZone.page_index,
+            CadZone.source,
+            CadZone.generator_version,
+            func.count(),
+        )
         .where(CadZone.revision_id.in_(wanted))
-        .group_by(CadZone.revision_id, CadZone.page_index)
+        .group_by(
+            CadZone.revision_id, CadZone.page_index, CadZone.source, CadZone.generator_version
+        )
     )
-    for revision_id, page_index, count in zone_rows.tuples():
-        zone_counts_by_revision[revision_id][page_index] = count
+    for revision_id, page_index, source, generator_version, count in zone_rows.tuples():
+        info = zone_infos_by_revision[revision_id].setdefault(page_index, ZoneInfo())
+        info.count += count
+        info.sources.add(source)
+        if source == "auto":
+            info.versions.add(generator_version)
 
     # Ключ решения содержит идентификатор задания, поэтому наборы общие для всех ревизий.
     approvals: set[_DecisionKey] = set()
@@ -343,9 +433,10 @@ async def build_pipelines(
             sheet_rows=sheet_rows_by_revision.get(revision_id, []),
             stamp_titles=stamp_titles,
             passports=passports_by_revision.get(revision_id, {}),
-            zone_counts=zone_counts_by_revision.get(revision_id, {}),
+            zone_infos=zone_infos_by_revision.get(revision_id, {}),
             approvals=approvals,
             acceptances=acceptances,
+            pinned=pinned,
         )
         for revision_id in wanted
     }
@@ -357,8 +448,13 @@ async def build_pipeline(
     workspace_id: uuid.UUID,
     project_id: uuid.UUID,
     revision_id: uuid.UUID,
+    pinned: PinnedVersions | None = None,
 ) -> CadPipelineRead:
     pipelines = await build_pipelines(
-        session, workspace_id=workspace_id, project_id=project_id, revision_ids=[revision_id]
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        revision_ids=[revision_id],
+        pinned=pinned,
     )
     return pipelines[revision_id]

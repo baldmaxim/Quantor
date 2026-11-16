@@ -64,6 +64,31 @@ describe('WorkspaceCadPipeline', () => {
     ).toBeInTheDocument();
   });
 
+  it('порог качества и метка «устарел»: «на проверку» с причинами, этап и версии', () => {
+    const walls = stage({
+      job_id: 'w1',
+      job_type: 'cad_walls',
+      quality_status: 'review',
+      quality_reasons: ['на плане нет конструкций', 'высота этажа не определена'],
+    });
+    mount(
+      pipelineOfSheet(
+        pipelineSheet({
+          views: [pipelineView({ walls })],
+          stale: [{ stage: 'walls', view: 0, was: 'cad_walls.v1.14', now: 'cad_walls.v1.15' }],
+        }),
+      ),
+    );
+    const step = screen.getByText('Конструкции').closest('li');
+    expect(step).toHaveTextContent('Конструкциина проверку');
+    const reasons = screen.getByTestId('pipeline-quality-reasons');
+    expect(reasons).toHaveTextContent('на плане нет конструкций');
+    expect(reasons).toHaveTextContent('высота этажа не определена');
+    expect(screen.getByTestId('pipeline-stale')).toHaveTextContent(
+      'Устарел: Конструкции: было cad_walls.v1.14, стало cad_walls.v1.15',
+    );
+  });
+
   it('нет калибровки: запуск и калибровка из WorkspaceCadConvert под шагом «Калибровка»', () => {
     mount(pipelineOfSheet(null));
     const stub = screen.getByTestId('convert-stub');

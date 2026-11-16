@@ -72,6 +72,19 @@ describe('CadRecognitionSummary', () => {
     expect(widths).toEqual(['50%', '25%']);
   });
 
+  it('листы на проверку: отдельный сегмент, в «готово» не входят', async () => {
+    mocks.summary.mockResolvedValue({
+      data: summaryOf({ sheets_total: 4, sheets_done: 1, sheets_review: 2, sheets_idle: 1 }),
+    });
+    renderSummary();
+    const bar = await screen.findByRole('img');
+    expect(bar).toHaveAttribute(
+      'aria-label',
+      'готово 1, на проверку 2, идёт 0, ошибки 0, не запускались 1 из 4 листов',
+    );
+    expect(screen.getByText(/Распознавание: 1 из 4 листов/)).toBeInTheDocument();
+  });
+
   it('нулевой проект: «Листов для CAD нет»', async () => {
     mocks.summary.mockResolvedValue({ data: summaryOf({}) });
     renderSummary();

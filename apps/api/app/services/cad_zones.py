@@ -28,7 +28,9 @@ from app.contracts.cad_zones import (
     CadParkingType,
     CadZoneCreate,
     CadZoneKind,
+    CadZoneQualityStatus,
     CadZoneRead,
+    CadZoneSource,
     CadZoneUpdate,
 )
 from app.domain import GeometryType, QuantityState
@@ -96,6 +98,26 @@ class ZoneFields:
     parking_type: str | None = None
     room_type: str | None = None
     finish_template_id: uuid.UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ZoneOrigin:
+    """Происхождение зоны и итог её сверки с экспликацией.
+
+    Умолчание - зона человека: `human`, `ok`. Авто-зону с данными zones.json задаёт обработчик
+    задания `cad_zones`.
+    """
+
+    source: CadZoneSource = "human"
+    generator_version: str | None = None
+    expl_area_m2: float | None = None
+    generator_area_m2: float | None = None
+    notes: tuple[str, ...] = ()
+    quality_status: CadZoneQualityStatus = "ok"
+    quality_reason: str | None = None
+
+
+HUMAN_ORIGIN: Final = ZoneOrigin()
 
 
 def derive_room_type(kind: str, name: str | None) -> CadRoomType | None:
@@ -276,6 +298,7 @@ async def create_zone(
     project_id: uuid.UUID,
     body: CadZoneCreate,
     user_id: uuid.UUID | None,
+    origin: ZoneOrigin = HUMAN_ORIGIN,
 ) -> CadZone:
     fields = validate_fields(
         ZoneFields(
@@ -297,6 +320,13 @@ async def create_zone(
         revision_id=body.revision_id,
         page_index=body.page_index,
         created_by=user_id,
+        source=origin.source,
+        generator_version=origin.generator_version,
+        expl_area_m2=origin.expl_area_m2,
+        generator_area_m2=origin.generator_area_m2,
+        notes=list(origin.notes) or None,
+        quality_status=origin.quality_status,
+        quality_reason=origin.quality_reason,
         **_fields_dict(fields),
     )
     session.add(zone)
@@ -325,6 +355,10 @@ async def update_zone(session: AsyncSession, *, zone: CadZone, body: CadZoneUpda
     Смена вида сбрасывает вид-зависимые поля (№ квартиры, высоту, тип помещения), если их не
     передали: прежние значения не принадлежат новому виду. Явный null у `room_type` возвращает
     выведенный тип, у `finish_template_id` - снимает назначение.
+
+    Правка человека делает зону его разметкой: `human`, `ok` - авторазметка её больше не удалит,
+    а сверка с экспликацией на неё не действует. Площадь контура по zones.json после смены
+    контура недействительна и сбрасывается.
     """
     sent = body.model_fields_set
     current = _fields_of(zone)
@@ -363,7 +397,12 @@ async def update_zone(session: AsyncSession, *, zone: CadZone, body: CadZoneUpda
     await require_template(
         session, project_id=zone.project_id, template_id=fields.finish_template_id
     )
+    if fields.points != current.points:
+        zone.generator_area_m2 = None
     _apply(zone, fields)
+    zone.source = "human"
+    zone.quality_status = "ok"
+    zone.quality_reason = None
     await session.flush()
     await session.refresh(zone)
     return zone
@@ -468,6 +507,14 @@ def zone_read(zone: CadZone, scale: PageScale) -> CadZoneRead:
         width_m=width,
         calibration_missing=missing,
         geometry_issue=issue,
+        source=_source(zone.source),
+        generator_version=zone.generator_version,
+        expl_area_m2=zone.expl_area_m2,
+        notes=[str(note) for note in zone.notes or []],
+        quality_status=_quality(zone.quality_status),
+        quality_reason=zone.quality_reason,
+        quality_accepted_by=zone.quality_accepted_by,
+        quality_accepted_at=zone.quality_accepted_at,
         created_at=zone.created_at,
         updated_at=zone.updated_at,
     )
@@ -484,6 +531,24 @@ def _kind(value: str) -> CadZoneKind:
         case "parking_space":
             return "parking_space"
     raise DomainError(ErrorCode.VALIDATION_FAILED, f"Неизвестный вид зоны: {value}")
+
+
+def _source(value: str) -> CadZoneSource:
+    match value:
+        case "auto":
+            return "auto"
+        case "human":
+            return "human"
+    return "unknown"
+
+
+def _quality(value: str) -> CadZoneQualityStatus:
+    match value:
+        case "review":
+            return "review"
+        case "failed":
+            return "failed"
+    return "ok"
 
 
 def _parking_type(value: str | None) -> CadParkingType | None:

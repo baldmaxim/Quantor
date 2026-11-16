@@ -315,9 +315,13 @@ async def test_handler_inserts_zones_through_the_zone_service_and_stores_zones_j
         assert seen == {"page_index": "0", "out_name": "zones.json", "params_name": "params.json"}
         assert not any((tmp_path / "work").rglob("*")), "каталог попытки не удалён"
 
-        # Разметка уже есть - второй запуск вручную закрыт.
+        # Зона создана авторазметкой и человеком не тронута: происхождение и сверка записаны.
+        assert (zone["source"], zone["generator_version"]) == ("auto", "cad_mep.v1")
+        assert (zone["expl_area_m2"], zone["quality_status"]) == (12.5, "ok")
+
+        # Все зоны листа - авто: второй запуск вручную разрешён и пересоздаст их.
         again = await api.post(_zones_url(project_id, job_id))
-        assert again.status_code == 409 and again.json()["detail"]["code"] == "CAD_ZONES_NOT_EMPTY"
+        assert again.status_code == 202, again.text
 
 
 async def test_handler_inserts_mop_zones_with_derived_room_type(
@@ -378,9 +382,10 @@ async def test_handler_inserts_parking_spaces_when_there_are_no_room_zones(
         assert all(z["apartment_no"] is None and z["room_mark"] is None for z in zones)
         assert all(z["area_m2"] is not None for z in zones)
 
-        # Места - разметка листа: повторный автозапуск их не дублирует.
+        # Места созданы авторазметкой: повторный ручной запуск ставится и до своего выполнения
+        # их не дублирует (обработчик удалит и вставит заново одной транзакцией).
         again = await api.post(_zones_url(project_id, job_id))
-        assert again.status_code == 409 and again.json()["detail"]["code"] == "CAD_ZONES_NOT_EMPTY"
+        assert again.status_code == 202, again.text
         assert len(await _zones_of(db_session)) == 2
 
 
@@ -592,6 +597,7 @@ async def test_pipeline_calibrated_page_without_jobs(
                 "convert": None,
                 "update": None,
                 "scale_source": None,
+                "stale": [],
                 "views": [],
             }
         ]
@@ -633,6 +639,8 @@ async def test_pipeline_converted_page_shows_walls_zones_and_decisions(
             "error_code",
             "created_at",
             "finished_at",
+            "quality_status",
+            "quality_reasons",
         }
         (view,) = sheet["views"]
         assert set(view) == {
@@ -642,6 +650,7 @@ async def test_pipeline_converted_page_shows_walls_zones_and_decisions(
             "walls",
             "zones",
             "zones_count",
+            "zones_recreatable",
             "approved",
             "routes",
             "routes_accepted",

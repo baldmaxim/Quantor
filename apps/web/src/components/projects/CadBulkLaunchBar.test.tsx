@@ -14,6 +14,11 @@ const bar = (overrides: Partial<ICadBulkLaunchBarProps> = {}) => {
     total: 0,
     finished: 0,
     failures: [],
+    staleCount: 0,
+    staleRecomputableCount: 0,
+    staleOnly: false,
+    onStaleOnlyChange: vi.fn(),
+    onRecomputeStale: vi.fn(),
     onToggleAll: vi.fn(),
     onLaunch: vi.fn(),
     onStop: vi.fn(),
@@ -72,6 +77,30 @@ describe('панель массового запуска', () => {
 
     await user.click(screen.getByRole('button', { name: 'Остановить' }));
     expect(props.onStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('устаревших листов нет: фильтра и пересчёта нет', () => {
+    bar();
+    expect(screen.queryByRole('checkbox', { name: 'Только устаревшие' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Пересчитать устаревшие/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('устаревшие листы: счётчик, фильтр и «Пересчитать устаревшие»', async () => {
+    const user = userEvent.setup();
+    const { props } = bar({ staleCount: 4, staleRecomputableCount: 3 });
+    expect(screen.getByText('Планов: 5 · без CAD: 3 · устарело: 4')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Только устаревшие' }));
+    expect(props.onStaleOnlyChange).toHaveBeenCalledWith(true);
+    await user.click(screen.getByRole('button', { name: 'Пересчитать устаревшие (3)' }));
+    expect(props.onRecomputeStale).toHaveBeenCalledTimes(1);
+  });
+
+  it('идёт партия или пересчитывать нечего: пересчёт устаревших заблокирован', () => {
+    bar({ staleCount: 2, staleRecomputableCount: 2, running: true, total: 2 });
+    expect(screen.getByRole('button', { name: 'Пересчитать устаревшие (2)' })).toBeDisabled();
   });
 
   it('партия закончена: итог и ошибки по листам', () => {

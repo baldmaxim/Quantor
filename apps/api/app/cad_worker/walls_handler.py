@@ -52,7 +52,8 @@ from app.errors import ErrorCode
 from app.models import DocumentRevision, Job
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_progress, cad_walls_zones
+from app.services import cad_progress, cad_quality, cad_walls_zones
+from app.services import cad_requeue as requeue
 from app.services import cad_walls as cad_walls_service
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
@@ -289,13 +290,27 @@ async def execute_cad_walls(
 
         params = cad_walls_service.load_params(settings)
         raw_params = params.path.read_bytes()
+        if cad_service.params_sha256(json.loads(raw_params)) != params.sha256:
+            raise CadError(ErrorCode.CAD_PARAMS_INVALID, "файл параметров не совпал с закреплением")
         if (
             params.sha256 != job.payload.get("params_sha256")
             or params.generator_version != job.payload.get("generator_version")
             or params.params_version != job.payload.get("params_version")
-            or cad_service.params_sha256(json.loads(raw_params)) != params.sha256
         ):
-            raise CadError(ErrorCode.CAD_PARAMS_INVALID, "параметры или версия скрипта изменены")
+            # Пин сменился после постановки: то же задание ставится с действующими параметрами.
+            if not requeue.can_requeue(job):
+                raise CadError(
+                    ErrorCode.CAD_PARAMS_INVALID, "параметры или версия скрипта изменены"
+                )
+            if not await _still_owned(session, job, owner, attempt, lock=True):
+                return job
+            replacement = await cad_walls_service.requeue_with_current_params(
+                session,
+                job=job,
+                parent=source.parent,
+                params=params,
+            )
+            return await requeue.supersede(session, job, replacement, attempt)
         # Имя копии = имя исходного файла: версию параметров скрипт берёт из него.
         params_file = attempt_dir / "in" / params.path.name
         params_file.write_bytes(raw_params)
@@ -392,6 +407,9 @@ async def execute_cad_walls(
             ),
             "warnings": len(document.checks.warnings),
         },
+        # Порог качества: итог остаётся `walls_ready`, а причины «на проверку» идут отдельным
+        # блоком - потребители результата (3D, итоги, отделка) его не читают и не ломаются.
+        "quality": cad_quality.walls_quality(document),
         "artifacts": artifacts,
     }
     log.info("cad_walls_finished", job_id=str(job.id))

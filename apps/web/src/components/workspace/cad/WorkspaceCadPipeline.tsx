@@ -7,6 +7,7 @@ import { Button, Skeleton } from '@/components/ui';
 import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import {
   isUpdateActive,
+  sheetStaleTexts,
   sheetUpdateBadge,
   type IPipelineStep,
   type PipelineStepKey,
@@ -208,6 +209,7 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
   const floorTitle = formatFloorTitle(sheet?.floor_title, '');
   // Новый прогон CAD поверх готового листа: шаг остаётся «готово» по прежнему результату.
   const update = sheet ? sheetUpdateBadge(sheet) : null;
+  const stale = sheet ? sheetStaleTexts(sheet) : [];
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-5)]" data-testid="workspace-cad-pipeline">
@@ -225,7 +227,12 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
       )}
       <ol className="m-0 flex list-none flex-col gap-[var(--s-4)] p-0" aria-label="Шаги обработки листа">
         {steps.map((step) => {
-          const tone = TONE_TEXT[PIPELINE_STATE_TONES[step.state]] ?? 'text-muted';
+          // Порог качества: готовый шаг с замечаниями показывается «на проверку» с причинами.
+          const review = step.review ?? [];
+          const tone =
+            review.length > 0
+              ? 'text-warning'
+              : (TONE_TEXT[PIPELINE_STATE_TONES[step.state]] ?? 'text-muted');
           const extra = action(step.key, step.state);
           const position =
             step.state === 'queued' && step.jobId !== null
@@ -235,11 +242,23 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
             <li key={step.key} className="flex min-w-0 flex-col gap-[var(--s-2)]">
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-[var(--s-3)]">
                 <span aria-hidden="true" className={`w-[1.25em] flex-none text-center ${tone}`}>
-                  {PIPELINE_STATE_GLYPHS[step.state]}
+                  {review.length > 0 ? PIPELINE_STATE_GLYPHS.review : PIPELINE_STATE_GLYPHS[step.state]}
                 </span>
                 <span className="text-sm font-medium">{step.label}</span>
-                <span className={`text-xs ${tone}`}>{PIPELINE_STATE_WORDS[step.state]}</span>
+                <span className={`text-xs ${tone}`}>
+                  {review.length > 0 ? 'на проверку' : PIPELINE_STATE_WORDS[step.state]}
+                </span>
               </div>
+              {review.length > 0 && (
+                <ul
+                  data-testid="pipeline-quality-reasons"
+                  className="m-0 list-disc pl-[calc(1.25em+var(--s-3)+var(--s-5))] text-xs text-warning [overflow-wrap:anywhere]"
+                >
+                  {review.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              )}
               {step.key === 'convert' && update && (
                 <p
                   role="status"
@@ -269,6 +288,15 @@ export const WorkspaceCadPipeline: FC<IWorkspaceCadPipelineProps> = ({
           );
         })}
       </ol>
+      {stale.length > 0 && (
+        <p
+          role="status"
+          data-testid="pipeline-stale"
+          className="m-0 text-xs text-muted [overflow-wrap:anywhere]"
+        >
+          Устарел: {stale.join('; ')}
+        </p>
+      )}
       <p className="text-xs text-muted">{HINT}</p>
     </div>
   );

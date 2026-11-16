@@ -89,6 +89,41 @@ def load_generator_pin(settings: Settings, name: GeneratorName) -> GeneratorPin:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class PinnedVersions:
+    """Закреплённые версии этапов конвейера листа; `None` - закрепление этапа не читается."""
+
+    convert: str | None
+    walls: str | None
+    zones: str | None
+
+
+def pinned_versions(settings: Settings) -> PinnedVersions:
+    """Версии движка PDF->DXF, `cad_walls` и генератора зон (`cad_mep`) из pins.json.
+
+    Нужны только метке «устарел»: нечитаемый файл или раздел - `None`, без отказа.
+    """
+    try:
+        pins = json.loads(pins_path(settings).read_bytes())
+    except (OSError, ValueError):
+        return PinnedVersions(None, None, None)
+    if not isinstance(pins, dict) or pins.get("schema") != _PINS_SCHEMA:
+        return PinnedVersions(None, None, None)
+    engine, generators = pins.get("engine"), pins.get("generators")
+
+    def version(section: object, key: str) -> str | None:
+        value = section.get(key) if isinstance(section, dict) else None
+        return value if isinstance(value, str) and value else None
+
+    def generator(name: GeneratorName) -> str | None:
+        entry = generators.get(name) if isinstance(generators, dict) else None
+        return version(entry, "generator_version")
+
+    return PinnedVersions(
+        convert=version(engine, "version"), walls=generator("cad_walls"), zones=generator("cad_mep")
+    )
+
+
 def floor3d_dxf_version(settings: Settings) -> str:
     """Версия скрипта выгрузки 3D DXF (`cad_floor3d_dxf.vN`) из закрепления `cad_walls`."""
     version = load_generator_pin(settings, "cad_walls").floor3d_dxf_version

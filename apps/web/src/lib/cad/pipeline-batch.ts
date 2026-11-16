@@ -1,4 +1,4 @@
-import type { CadPipelineSheetRead } from '@quantor/api-client';
+import type { CadPipelineSheetRead, CadPipelineStaleRead } from '@quantor/api-client';
 
 import { isUpdateActive } from './pipeline';
 import {
@@ -69,4 +69,65 @@ export const nextBatchStep = (
   if (launched.has(key))
     return { kind: 'failed', message: batchStepFailedAgain(next.row.step.label) };
   return { kind: 'run', action: next.action, key };
+};
+
+/**
+ * Действие, пересчитывающее устаревший этап листа. Преобразование - новый прогон движка (за ним
+ * конструкции пересчитаются сами); конструкции - пересчёт вида; зоны - повторная авторазметка, и
+ * только у листа с одним видом: зоны хранятся по листу, и разметка одного вида заменила бы зоны
+ * остальных. Трассы в пересчёт не входят.
+ */
+const staleAction = (
+  item: CadPipelineStaleRead,
+  rows: readonly IPipelineRow[],
+): IPipelineAction | null => {
+  if (item.stage === 'convert') {
+    const row = rows.find((candidate) => candidate.key === 'convert');
+    return row?.actions.find((candidate) => candidate.kind === 'convert') ?? null;
+  }
+  if (item.stage === 'walls') {
+    const row = rows.find((candidate) => candidate.key === 'walls' && candidate.view === item.view);
+    return row?.actions.find((candidate) => candidate.kind === 'walls') ?? null;
+  }
+  const zones = rows.filter((candidate) => candidate.key === 'zones' && candidate.view !== null);
+  if (zones.length !== 1) return null;
+  return zones[0]?.actions.find((candidate) => candidate.kind === 'zones-auto') ?? null;
+};
+
+/** Первое доступное действие пересчёта устаревшего листа; пересчитывать нечего - `null`. */
+export const staleNextAction = (
+  sheet: CadPipelineSheetRead,
+  rows: readonly IPipelineRow[],
+): IPipelineAction | null => {
+  for (const item of sheet.stale ?? []) {
+    const found = staleAction(item, rows);
+    if (found) return found;
+  }
+  return null;
+};
+
+/** Лист можно выбрать для пересчёта устаревших: есть устаревший этап с доступным пересчётом. */
+export const isStaleRecomputable = (
+  sheet: CadPipelineSheetRead,
+  rows: readonly IPipelineRow[],
+): boolean => !isUpdateActive(sheet) && staleNextAction(sheet, rows) !== null;
+
+/**
+ * Следующий шаг листа в партии «Пересчитать устаревшие»: по одному устаревшему этапу за раз, в
+ * порядке конвейера. Лист без устаревших этапов закончен; решения человека не запускаются.
+ */
+export const nextStaleStep = (
+  sheet: CadPipelineSheetRead,
+  rows: readonly IPipelineRow[],
+  launched: ReadonlySet<string>,
+): BatchDecision => {
+  if (hasActiveStep(rows)) return { kind: 'wait' };
+  const next = staleNextAction(sheet, rows);
+  if (next === null) return { kind: 'done', outcome: 'ready' };
+  const key = batchActionKey(next);
+  if (launched.has(key)) {
+    const row = rows.find((candidate) => candidate.actions.includes(next));
+    return { kind: 'failed', message: batchStepFailedAgain(row?.step.label ?? next.label) };
+  }
+  return { kind: 'run', action: next, key };
 };
