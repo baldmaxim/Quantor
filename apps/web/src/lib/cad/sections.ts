@@ -105,27 +105,16 @@ export const levelDecisionLabel = (
 ): string =>
   level.status === 'accepted' && level.auto_accepted ? 'Авто' : STATUS_LABELS[level.status];
 
-export interface ISectionReview {
-  /** Кандидаты: разногласия, нет разделения плиты, высота вне пределов - решает человек. */
-  readonly review: readonly SectionLevelRead[];
-  /** Принятые: системой (точное попадание в отметки) и человеком. */
-  readonly accepted: readonly SectionLevelRead[];
-  readonly rejected: readonly SectionLevelRead[];
-  /** Сколько из принятых приняла система. */
-  readonly auto: number;
-}
+/** Фильтр списка приёмки по статусу решения; `all` - без фильтра. Общий для разрезов и фасадов. */
+export type ReviewFilter = 'all' | SectionLevelStatus;
 
-/** Уровни листа по корзинам приёмки, внутри - сверху вниз по отметке. */
-export const reviewBuckets = (levels: readonly SectionLevelRead[]): ISectionReview => {
-  const ordered = [...levels].sort((a, b) => b.elevation_mm - a.elevation_mm || a.seq - b.seq);
-  const accepted = ordered.filter((level) => level.status === 'accepted');
-  return {
-    review: ordered.filter((level) => level.status === 'candidate'),
-    accepted,
-    rejected: ordered.filter((level) => level.status === 'rejected'),
-    auto: accepted.filter((level) => level.auto_accepted).length,
-  };
-};
+/** Строка проходит фильтр приёмки. Фильтр только скрывает строки: порядок и группы прежние. */
+export const matchesReviewFilter = (status: SectionLevelStatus, filter: ReviewFilter): boolean =>
+  filter === 'all' || status === filter;
+
+/** Сколько уровней приняла система (ADR-0050), а не человек. */
+export const autoAcceptedCount = (levels: readonly SectionLevelRead[]): number =>
+  levels.filter((level) => level.status === 'accepted' && level.auto_accepted).length;
 
 /**
  * Область перехода к уровню на листе (доли листа): полоса уровня с запасом в этаж сверху и снизу,
@@ -222,6 +211,21 @@ export const groupLevelsByCut = (levels: readonly SectionLevelRead[]): ISectionC
     ...groups.filter((group) => group.cut === null),
   ];
 };
+
+/**
+ * Группы уровней для списка приёмки: порядок групп и строк постоянный (как у `groupLevelsByCut`),
+ * фильтр убирает только не подходящие строки и опустевшие группы.
+ */
+export const filterCutGroups = (
+  groups: readonly ISectionCutGroup[],
+  filter: ReviewFilter,
+): ISectionCutGroup[] =>
+  groups
+    .map((group) => ({
+      ...group,
+      levels: group.levels.filter((level) => matchesReviewFilter(level.status, filter)),
+    }))
+    .filter((group) => group.levels.length > 0);
 
 export interface ISectionCounts {
   readonly total: number;

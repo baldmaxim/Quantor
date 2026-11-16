@@ -86,6 +86,7 @@ export const useWorkspaceCadFacades = ({
     data,
     loadError: query.isError ? cadErrorText(query.error) : null,
     onReload: () => void query.refetch(),
+    pageIndex,
     starting: start.isPending,
     onStart: () => {
       decide.reset();

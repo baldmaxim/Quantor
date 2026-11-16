@@ -13,7 +13,9 @@ import {
   levelDecisionLabel,
   levelFocusRect,
   levelsOfPage,
-  reviewBuckets,
+  autoAcceptedCount,
+  filterCutGroups,
+  matchesReviewFilter,
   sectionPageLabel,
   sectionPageRows,
   routeLevelsText,
@@ -212,18 +214,38 @@ describe('источник высоты у задания трасс', () => {
 });
 
 describe('приёмка уровней (ADR-0050)', () => {
-  it('кандидаты - на проверку, принятые и отклонённые отдельно, сверху вниз по отметке', () => {
-    const buckets = reviewBuckets([
-      level({ id: 'low', status: 'accepted', auto_accepted: true }),
-      level({ id: 'high', elevation_mm: 3300, status: 'accepted', auto_accepted: true }),
-      level({ id: 'human', elevation_mm: 6600, status: 'accepted' }),
-      level({ id: 'c', elevation_mm: 9900 }),
-      level({ id: 'r', status: 'rejected' }),
+  it('один список: порядок групп и строк постоянный, фильтр только скрывает строки', () => {
+    const levels = [
+      level({ id: 'low', seq: 0, status: 'accepted', auto_accepted: true }),
+      level({ id: 'high', seq: 1, elevation_mm: 3300, status: 'accepted', auto_accepted: true }),
+      level({ id: 'human', seq: 2, elevation_mm: 6600, status: 'accepted' }),
+      level({ id: 'c', seq: 3, elevation_mm: 9900 }),
+      level({ id: 'r', seq: 4, cut: '2-2', status: 'rejected' }),
+      level({ id: 'c2', seq: 5, cut: '2-2', elevation_mm: 3300 }),
+    ];
+    const groups = groupLevelsByCut(levels);
+    const ids = (filter: Parameters<typeof filterCutGroups>[1]) =>
+      filterCutGroups(groups, filter).map((group) => [
+        group.cut,
+        group.levels.map((item) => item.id),
+      ]);
+    expect(ids('all')).toEqual([
+      ['1-1', ['c', 'human', 'high', 'low']],
+      ['2-2', ['c2', 'r']],
     ]);
-    expect(buckets.review.map((l) => l.id)).toEqual(['c']);
-    expect(buckets.accepted.map((l) => l.id)).toEqual(['human', 'high', 'low']);
-    expect(buckets.rejected.map((l) => l.id)).toEqual(['r']);
-    expect(buckets.auto).toBe(2);
+    expect(ids('candidate')).toEqual([
+      ['1-1', ['c']],
+      ['2-2', ['c2']],
+    ]);
+    expect(ids('accepted')).toEqual([['1-1', ['human', 'high', 'low']]]);
+    expect(ids('rejected')).toEqual([['2-2', ['r']]]);
+    expect(autoAcceptedCount(levels)).toBe(2);
+  });
+
+  it('фильтр приёмки: «все» пропускает любой статус', () => {
+    expect(matchesReviewFilter('rejected', 'all')).toBe(true);
+    expect(matchesReviewFilter('accepted', 'accepted')).toBe(true);
+    expect(matchesReviewFilter('candidate', 'accepted')).toBe(false);
   });
 
   it('подпись: «Авто» только у автопринятого', () => {

@@ -1,6 +1,7 @@
 import type { FacadeIssueRead, FacadeViewRead } from '@quantor/api-client';
 
-import { formatMark } from './sections';
+import { formatMark, matchesReviewFilter } from './sections';
+import type { ISectionCounts, ReviewFilter } from './sections';
 
 /**
  * Чистые правила вкладки «Фасады» (режим CAD): подписи видов, привязки по отметкам, группировка по
@@ -45,6 +46,21 @@ export const isFacadeScaled = (view: Pick<FacadeViewRead, 'scale_status'>): bool
 export const canAcceptFacade = (view: Pick<FacadeViewRead, 'scale_status' | 'status'>): boolean =>
   view.status !== 'accepted' && isFacadeScaled(view);
 
+/** Кандидаты с привязкой по отметкам: что принимает «Принять все». */
+export const acceptableFacadeCandidateIds = (views: readonly FacadeViewRead[]): string[] =>
+  views.filter((view) => view.status === 'candidate' && isFacadeScaled(view)).map((view) => view.id);
+
+/** Сводка видов по статусам решения. */
+export const countFacades = (views: readonly FacadeViewRead[]): ISectionCounts => {
+  const count = (status: FacadeViewStatus) => views.filter((view) => view.status === status).length;
+  return {
+    total: views.length,
+    accepted: count('accepted'),
+    candidate: count('candidate'),
+    rejected: count('rejected'),
+  };
+};
+
 export const FACADE_ACCEPT_BLOCKED = 'Вид не привязан по отметкам: принять нельзя';
 
 /** Число (мм) или «—». */
@@ -88,6 +104,30 @@ export const groupFacadesByPage = (views: readonly FacadeViewRead[]): IFacadePag
       pageIndex,
       views: [...items].sort((a, b) => a.seq - b.seq),
     }));
+};
+
+export interface IFacadeReviewGroup extends IFacadePageGroup {
+  /** Группа открытого листа: идёт первой, заголовок «На этом листе». */
+  readonly current: boolean;
+}
+
+/**
+ * Группы видов для списка приёмки: первой - страница открытого листа, затем остальные по номеру
+ * страницы; внутри - по `seq`. Фильтр убирает только не подходящие виды и опустевшие группы.
+ */
+export const facadeReviewGroups = (
+  views: readonly FacadeViewRead[],
+  currentPageIndex: number | null,
+  filter: ReviewFilter = 'all',
+): IFacadeReviewGroup[] => {
+  const groups = groupFacadesByPage(views)
+    .map((group) => ({
+      pageIndex: group.pageIndex,
+      views: group.views.filter((view) => matchesReviewFilter(view.status, filter)),
+      current: group.pageIndex === currentPageIndex,
+    }))
+    .filter((group) => group.views.length > 0);
+  return [...groups.filter((group) => group.current), ...groups.filter((group) => !group.current)];
 };
 
 export const facadeIssuesOfPage = (

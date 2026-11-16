@@ -4,9 +4,17 @@ import { describe, expect, it, vi } from 'vitest';
 const panel = vi.hoisted(() => vi.fn());
 
 vi.mock('@/components/cad/finishes/CadFinishPanel', () => ({
-  CadFinishPanel: (props: { load: boolean; pageIndex: number | null }) => {
+  CadFinishPanel: (props: {
+    load: boolean;
+    pageIndex: number | null;
+    onOpenTab?: (id: 'zones' | 'constructions') => void;
+  }) => {
     panel(props);
-    return <p>панель отделки</p>;
+    return (
+      <button type="button" onClick={() => props.onOpenTab?.('zones')}>
+        панель отделки
+      </button>
+    );
   },
 }));
 vi.mock('@/components/cad/viewer/CadZonesPanel', () => ({
@@ -43,13 +51,24 @@ const mount = (patch: Partial<IWorkspaceCadSideProps> = {}) =>
   );
 
 describe('раздел «Отделка» правой панели CAD', () => {
-  it('лист без задания: «Отделка» после «Зон»', () => {
+  it('лист без задания: «Отделка» после «Зон», открыт последний «Лист»', () => {
     mount();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Задание',
       'Зоны',
       'Отделка',
+      'Лист',
     ]);
+    expect(screen.getByRole('tab', { name: 'Лист' })).toHaveAttribute('aria-selected', 'true');
+    // Открыт «Лист»: ведомость отделки не читается.
+    expect(panel.mock.calls.at(-1)?.[0]).toMatchObject({ load: false });
+  });
+
+  it('переход из «Отделки» открывает «Зоны»', () => {
+    mount();
+    fireEvent.click(screen.getByRole('tab', { name: 'Отделка' }));
+    fireEvent.click(screen.getByText('панель отделки'));
+    expect(screen.getByRole('tab', { name: 'Зоны' })).toHaveAttribute('aria-selected', 'true');
+    expect(panel.mock.calls.at(-1)?.[0]).toMatchObject({ load: false });
   });
 
   it('ведомость не читается, пока раздел закрыт; открытие включает чтение листа', () => {

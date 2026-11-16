@@ -27,19 +27,29 @@ describe('CadScaleSection', () => {
     ].forEach((pattern) => expect(screen.queryByText(pattern)).toBeNull());
   });
 
-  it('таблица контролей по размерным цепочкам после строки масштаба', () => {
+  it('таблица контролей по размерным цепочкам свёрнута у подтверждённого масштаба', () => {
     render(<CadScaleSection scale={scale()} />);
-    const table = screen.getByRole('table');
+    const details = screen.getByText('Контрольные цепочки (2)').closest('details');
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute('open');
+    const table = within(details as HTMLElement).getByRole('table', { hidden: true });
     ['Цепочка', 'Роль', 'Подпись, мм', 'По масштабу, мм', 'Невязка, мм', 'Допуск, мм'].forEach(
       (name) => expect(within(table).getByText(name)).toBeInTheDocument(),
     );
     expect(within(table).getByText(/^3\s000/)).toBeInTheDocument();
-    expect(within(table).getAllByRole('row')).toHaveLength(3);
+    expect(within(table).getAllByRole('row', { hidden: true })).toHaveLength(3);
+  });
+
+  it('масштаб не подтверждён: контрольные цепочки раскрыты', () => {
+    render(<CadScaleSection scale={scale({ passed: false, hold_reasons: ['Проверьте калибровку'] })} />);
+    expect(screen.getByText('Контрольные цепочки (2)').closest('details')).toHaveAttribute('open');
+    expect(screen.getByRole('table')).toBeVisible();
   });
 
   it('без контролей таблицы нет', () => {
     render(<CadScaleSection scale={scale({ controls: [] })} />);
-    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('table', { hidden: true })).toBeNull();
+    expect(screen.queryByText(/Контрольные цепочки/)).toBeNull();
     expect(screen.getByText(/Размерных цепочек для контроля не найдено/)).toBeInTheDocument();
   });
 

@@ -137,7 +137,9 @@ describe('CadFacadesPanel', () => {
     expect(onDecide).toHaveBeenLastCalledWith(['a'], 'accept');
     fireEvent.click(screen.getByRole('button', { name: 'Отклонить: Фасад 1-8' }));
     expect(onDecide).toHaveBeenLastCalledWith(['a'], 'reject');
-    fireEvent.click(screen.getByRole('button', { name: 'Сбросить: Фасад Р' }));
+    // У решённого вида одна кнопка - «Вернуть»: противоположного решения в строке нет.
+    expect(screen.queryByRole('button', { name: 'Принять: Фасад Р' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Вернуть в кандидаты: Фасад Р' }));
     expect(onDecide).toHaveBeenLastCalledWith(['r'], 'reset');
   });
 
@@ -146,11 +148,83 @@ describe('CadFacadesPanel', () => {
     const onOpenPage = vi.fn();
     const onSelectView = vi.fn();
     render(<CadFacadesPanel {...props({ onStart, onOpenPage, onSelectView })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Разобрать фасады заново' }));
+    // Результат есть: главной кнопки запуска наверху нет, статус завершённого задания скрыт.
+    expect(screen.queryByRole('button', { name: 'Разобрать фасады' })).toBeNull();
+    expect(screen.queryByText(/попытка/)).toBeNull();
+    const again = screen.getByRole('button', { name: 'Разобрать заново' });
+    const rows = screen.getAllByTestId('facade-view');
+    expect(
+      rows[rows.length - 1]!.compareDocumentPosition(again) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(again);
     expect(onStart).toHaveBeenCalled();
     fireEvent.click(screen.getAllByTitle('Открыть страницу вида')[0]!);
     expect(onOpenPage).toHaveBeenCalledWith(4);
     expect(onSelectView).toHaveBeenCalledWith('a');
+  });
+
+  it('первой идёт группа открытого листа, остальные страницы - по номеру с заголовком-кнопкой', () => {
+    const onOpenPage = vi.fn();
+    const data = read({
+      views: [
+        view({ id: 'p2', page_index: 1, title: 'Фасад стр2' }),
+        view({ id: 'p5', page_index: 4, title: 'Фасад стр5' }),
+        view({ id: 'p9', page_index: 8, title: 'Фасад стр9' }),
+      ],
+    });
+    render(<CadFacadesPanel {...props({ data, pageIndex: 4, onOpenPage })} />);
+    const groups = screen.getAllByTestId('facades-page');
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'На этом листе',
+      'Страница 2',
+      'Страница 9',
+    ]);
+    expect(groups[0]?.textContent).toContain('Фасад стр5');
+    expect(screen.queryByRole('button', { name: 'Стр. 5' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Стр. 9' }));
+    expect(onOpenPage).toHaveBeenCalledWith(8);
+  });
+
+  it('сводка, «Принять все» и фильтр по статусу; строка после решения остаётся на месте', () => {
+    const onDecide = vi.fn();
+    const views = [
+      view({ id: 'a' }),
+      view({ id: 'b', scale_status: 'none', title: 'Фасад Г-А', seq: 1 }),
+      view({ id: 'c', title: 'Фасад В', seq: 2 }),
+    ];
+    const { rerender } = render(<CadFacadesPanel {...props({ onDecide, data: read({ views }) })} />);
+    expect(screen.getByTestId('review-summary').textContent).toBe('Осталось проверить: 3 из 3');
+    fireEvent.click(screen.getByRole('button', { name: 'Принять все (2)' }));
+    expect(onDecide).toHaveBeenLastCalledWith(['a', 'c'], 'accept');
+    expect((screen.getByRole('button', { name: 'Принято 0' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+
+    const decided = views.map((item) =>
+      item.id === 'a' ? { ...item, status: 'accepted' as const } : item,
+    );
+    rerender(<CadFacadesPanel {...props({ onDecide, data: read({ views: decided }) })} />);
+    const rows = () => screen.getAllByTestId('facade-view');
+    expect(rows().map((row) => row.getAttribute('data-status'))).toEqual([
+      'accepted',
+      'candidate',
+      'candidate',
+    ]);
+    expect(screen.getByTestId('review-summary').textContent).toBe('Осталось проверить: 2 из 3');
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить 2' }));
+    expect(rows().length).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Все 3' }));
+    expect(rows().length).toBe(3);
+  });
+
+  it('задание идёт: виден статус и попытка, повторный запуск заблокирован', () => {
+    const data = read({ job: { ...read().job!, status: 'running', attempt: 2 } });
+    render(<CadFacadesPanel {...props({ data })} />);
+    expect(screen.getByText('Выполняется')).toBeTruthy();
+    expect(screen.getByText(/попытка 2/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Разобрать заново' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 
   it('упавшее задание показывает ошибку, без заданий - предложение запуска', () => {

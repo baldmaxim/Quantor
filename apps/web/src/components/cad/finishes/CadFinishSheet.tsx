@@ -2,7 +2,7 @@
 
 import type { FC } from 'react';
 
-import type { CadFinishTemplateRead } from '@quantor/api-client';
+import type { CadFinishTemplateRead, CadFinishWarningRead } from '@quantor/api-client';
 
 import { Button, Skeleton } from '@/components/ui';
 import { cadErrorText } from '@/lib/cad/errors';
@@ -22,6 +22,10 @@ interface ICadFinishSheetProps {
   activeId: string | null;
   /** Выделить зону на листе, как выбор в списке зон. */
   onActivate: (id: string | null) => void;
+  /** Предупреждения шага: без показанных в плашке калибровки и в шаге назначения шаблонов. */
+  warnings: readonly CadFinishWarningRead[];
+  /** Открыть раздел «Конструкции» (высоты листа). */
+  onOpenConstructions?: () => void;
 }
 
 /**
@@ -36,6 +40,8 @@ export const CadFinishSheet: FC<ICadFinishSheetProps> = ({
   templates,
   activeId,
   onActivate,
+  warnings,
+  onOpenConstructions,
 }) => {
   const sheet = useCadFinishSheet(projectId, revisionId, pageIndex, load);
   const data = sheet.data;
@@ -45,24 +51,6 @@ export const CadFinishSheet: FC<ICadFinishSheetProps> = ({
       aria-label="Ведомость отделки листа"
       className="flex min-w-0 flex-col gap-[var(--s-4)]"
     >
-      <div className="flex flex-wrap items-center justify-between gap-[var(--s-2)]">
-        <h4 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
-          Ведомость листа
-        </h4>
-        <Button
-          compact
-          disabled={data === undefined || pageIndex === null}
-          className="max-md:h-[44px]"
-          onClick={() => {
-            if (data !== undefined && pageIndex !== null) {
-              downloadCsv(finishCsvFilename(pageIndex), buildFinishCsv(data, templates));
-            }
-          }}
-        >
-          Скачать CSV
-        </Button>
-      </div>
-
       {sheet.isPending && sheet.fetchStatus !== 'idle' && (
         <div
           role="status"
@@ -88,7 +76,12 @@ export const CadFinishSheet: FC<ICadFinishSheetProps> = ({
 
       {data !== undefined && (
         <>
-          <CadFinishWarnings warnings={data.warnings} zones={data.zones} onActivate={onActivate} />
+          <CadFinishWarnings
+            warnings={warnings}
+            zones={data.zones}
+            onActivate={onActivate}
+            onOpenConstructions={onOpenConstructions}
+          />
           <CadFinishSheetTable
             zones={data.zones}
             templates={templates}
@@ -96,6 +89,18 @@ export const CadFinishSheet: FC<ICadFinishSheetProps> = ({
             onActivate={onActivate}
           />
           <CadFinishTotals totals={data.totals} byRoomType={data.by_room_type} />
+          <Button
+            compact
+            disabled={pageIndex === null}
+            className="self-start max-md:h-[44px]"
+            onClick={() => {
+              if (pageIndex !== null) {
+                downloadCsv(finishCsvFilename(pageIndex), buildFinishCsv(data, templates));
+              }
+            }}
+          >
+            Скачать CSV
+          </Button>
           <p className="text-micro text-muted">
             Рабочая таблица пилота: не ВОР и не смета. Стоимости нет.
           </p>

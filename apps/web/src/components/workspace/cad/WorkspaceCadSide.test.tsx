@@ -30,12 +30,30 @@ vi.mock('@/components/cad/viewer/CadZonesPanel', () => ({
 vi.mock('@/components/cad/viewer/CadFilesSection', () => ({
   CadFilesSection: () => <p>панель файлов</p>,
 }));
+vi.mock('@/components/cad/mep/CadMepPanel', () => ({
+  CadMepPanel: (props: { risers?: ReactNode }) => (
+    <div>
+      <p>панель трасс</p>
+      {props.risers}
+    </div>
+  ),
+}));
+vi.mock('@/components/cad/risers/CadRisersPanel', () => ({
+  CadRisersPanel: (props: { parent: { jobId: string } }) => <p>реестр стояков {props.parent.jobId}</p>,
+}));
+vi.mock('./CadStylePanel', () => ({ CadStylePanel: () => <p>панель профиля</p> }));
+// Отделка читает сервер; её раздел проверяет WorkspaceCadSideFinishes.test.tsx.
+vi.mock('@/components/cad/finishes/CadFinishPanel', () => ({
+  CadFinishPanel: () => <p>панель отделки</p>,
+}));
 
 import type { CadJobRead } from '@quantor/api-client';
+import type { ReactNode } from 'react';
 
 import type {
   IWorkspaceCadConstructions,
   IWorkspaceCadFacades,
+  IWorkspaceCadMep,
   IWorkspaceCadSections,
   IWorkspaceCadSideProps,
   IWorkspaceCadZones,
@@ -145,6 +163,39 @@ const FACADES = {
   onOpenPage: vi.fn(),
 } as IWorkspaceCadFacades;
 
+const MEP = { parent: { jobId: 'j1' } } as IWorkspaceCadMep;
+
+const CONSTRUCTIONS: IWorkspaceCadConstructions = {
+  status: 'not-ready',
+  data: null,
+  notReadyText: 'Конструкции этого листа ещё не считались.',
+  loadError: null,
+  onReload: vi.fn(),
+  calculating: false,
+  actionError: null,
+  onCompute: vi.fn(),
+  levelsSaving: false,
+  onSaveLevels: vi.fn(),
+  activeGroup: null,
+  onSelectGroup: vi.fn(),
+};
+
+const JOBS = (onSelectJob = vi.fn(), selectedJobId: string | null = 'j7') => ({
+  projectId: 'p1',
+  revisionId: 'r1',
+  selectedJobId,
+  onSelectJob,
+});
+
+const tabNames = () => screen.getAllByRole('tab').map((tab) => tab.textContent);
+const openSheet = () => fireEvent.click(screen.getByRole('tab', { name: 'Лист' }));
+/** Сворачиваемый блок раздела «Лист» по заголовку. */
+const fold = (title: string) => {
+  const details = screen.getByText(title).closest('details');
+  if (details === null) throw new Error(`Блок «${title}» не сворачиваемый`);
+  return details;
+};
+
 describe('WorkspaceCadSide', () => {
   it('«Фасады»: вкладка есть при переданном разделе и скрыта без него', () => {
     mount({ facades: FACADES });
@@ -186,59 +237,126 @@ describe('WorkspaceCadSide', () => {
     const plan = { ...SECTIONS(false), pageIndex: 10 };
     const section = { ...SECTIONS(true), pageIndex: 3 };
     const { rerender } = render(<WorkspaceCadSide {...props} sections={plan} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Файлы' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Замечания' }));
     rerender(<WorkspaceCadSide {...props} sections={section} />);
     expect(screen.getByRole('tab', { name: 'Разрезы' })).toHaveAttribute('aria-selected', 'true');
     expect(onSideTabChange).toHaveBeenLastCalledWith('sections');
   });
 
   it('страница-разрез: выбранная вручную вкладка не перебивается', () => {
-    mount({ sections: SECTIONS(true), sideTab: 'files' });
-    expect(screen.getByRole('tab', { name: 'Файлы' })).toHaveAttribute('aria-selected', 'true');
+    mount({ sections: SECTIONS(true), sideTab: 'remarks' });
+    expect(screen.getByRole('tab', { name: 'Замечания' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('лист с результатом: пять разделов, открыт «Слои» с ползунком непрозрачности PDF', () => {
+  it('страница-разрез без вида: «Разрезы» открыты, «Лист» последний', () => {
+    mount({ sections: SECTIONS(true), view: null, zones: ZONES });
+    expect(tabNames()).toEqual(['Разрезы', 'Зоны', 'Лист']);
+    expect(screen.getByRole('tab', { name: 'Разрезы' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('лист с результатом: три раздела, открыт «Слои» с ползунком непрозрачности PDF', () => {
     mount();
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Слои',
-      'Замечания',
-      'Масштаб',
-      'Файлы',
-      'Задание',
-    ]);
+    expect(tabNames()).toEqual(['Слои', 'Замечания', 'Лист']);
     expect(screen.getByRole('tab', { name: 'Слои' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Непрозрачность PDF')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'WALLS' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Группа «Кладка и перегородки»' })).toBeChecked();
   });
 
-  it('«Масштаб» - человекочитаемая сводка без технических строк', () => {
+  it('полный состав: девять разделов в едином порядке, «Лист» последний', () => {
+    mount({
+      sections: SECTIONS(true),
+      zones: ZONES,
+      constructions: CONSTRUCTIONS,
+      finishes: { projectId: 'p1', revisionId: null, pageIndex: null, load: false },
+      view: { ...VIEW, mep: MEP },
+      facades: FACADES,
+      style: {} as NonNullable<IWorkspaceCadSideProps['style']>,
+      jobs: JOBS(),
+    });
+    expect(tabNames()).toEqual([
+      'Разрезы',
+      'Слои',
+      'Зоны',
+      'Конструкции',
+      'Отделка',
+      'Трассы',
+      'Фасады',
+      'Замечания',
+      'Лист',
+    ]);
+  });
+
+  it('прежних вкладок «Масштаб», «Файлы», «Задание», «Задания», «Стояки», «Профиль оформления» нет', () => {
+    mount({
+      view: { ...VIEW, mep: MEP },
+      style: {} as NonNullable<IWorkspaceCadSideProps['style']>,
+      jobs: JOBS(),
+    });
+    ['Масштаб', 'Файлы', 'Задание', 'Задания', 'Стояки', 'Профиль оформления'].forEach((name) =>
+      expect(screen.queryByRole('tab', { name })).toBeNull(),
+    );
+  });
+
+  it('«Лист»: масштаб - человекочитаемая сводка без технических строк', () => {
     mount();
-    fireEvent.click(screen.getByRole('tab', { name: 'Масштаб' }));
+    openSheet();
+    expect(screen.getByTestId('cad-scale-summary')).toBeVisible();
     expect(screen.getByTestId('cad-scale-summary')).toHaveTextContent('Масштаб 1:100');
     expect(screen.queryByText(/Независимые оси/)).toBeNull();
     expect(screen.queryByText(/Проверки движка/i)).toBeNull();
   });
 
-  it('«Файлы» начинаются с результата попытки с результатом, затем файлы', () => {
+  it('«Лист»: после масштаба результат попытки с результатом, затем файлы, затем ход', () => {
     mount();
-    fireEvent.click(screen.getByRole('tab', { name: 'Файлы' }));
-    const result = screen.getByText('результат попытки 1');
-    const files = screen.getByText('панель файлов');
-    expect(result.compareDocumentPosition(files) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    openSheet();
+    const order = [
+      screen.getByTestId('cad-scale-summary'),
+      screen.getByText('результат попытки 1'),
+      screen.getByText('панель файлов'),
+      screen.getByText('ход задания j1'),
+    ];
+    order.slice(1).forEach((node, index) => {
+      const before = order[index];
+      expect(before).toBeDefined();
+      expect(
+        (before as HTMLElement).compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+    expect(screen.getByText('результат попытки 1')).toBeVisible();
+    expect(screen.getByText('панель файлов')).toBeVisible();
   });
 
-  it('«Задание» без блока «Действия» и без результата', () => {
+  it('«Лист» без блока «Действия» и без запуска преобразования', () => {
     mount();
-    fireEvent.click(screen.getByRole('tab', { name: 'Задание' }));
+    openSheet();
     expect(screen.queryByText('Действия')).toBeNull();
     expect(screen.queryByText(/Запустить по выбранным/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Преобразовать лист в CAD' })).toBeNull();
   });
 
-  it('задание листа упало: в «Задании» кнопки запуска нет, запуск - у бейджа в шапке', () => {
+  it('«Лист» с видом: ход, профиль и задания документа свёрнуты, но смонтированы', () => {
+    mount({ style: {} as NonNullable<IWorkspaceCadSideProps['style']>, jobs: JOBS() });
+    openSheet();
+    ['Ход преобразования', 'Профиль оформления', 'Задания документа'].forEach((title) =>
+      expect(fold(title)).not.toHaveAttribute('open'),
+    );
+    expect(fold('Ход преобразования')).toHaveTextContent('ход задания j1');
+    expect(fold('Профиль оформления')).toHaveTextContent('панель профиля');
+    expect(fold('Задания документа')).toHaveTextContent('список заданий, выбрано j7');
+  });
+
+  it('«Трассы»: реестр стояков передан внутрь раздела', () => {
+    mount({ view: { ...VIEW, mep: MEP } });
+    expect(tabNames()).toEqual(['Слои', 'Трассы', 'Замечания', 'Лист']);
+    fireEvent.click(screen.getByRole('tab', { name: 'Трассы' }));
+    expect(screen.getByText('панель трасс')).toBeVisible();
+    expect(screen.getByText('реестр стояков j1')).toBeInTheDocument();
+  });
+
+  it('задание листа упало: в «Листе» кнопки запуска нет, запуск - у бейджа в шапке', () => {
     mount({ view: null, job: { ...JOB, failed: true } });
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Задание']);
+    expect(tabNames()).toEqual(['Лист']);
     expect(screen.getByText('ход задания j1')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Преобразовать лист в CAD' })).toBeNull();
   });
@@ -251,22 +369,43 @@ describe('WorkspaceCadSide', () => {
 
   it('раздел, открытый снаружи, главнее выбора по умолчанию и сообщает о смене', () => {
     const onSideTabChange = vi.fn();
-    mount({ sideTab: 'scale', onSideTabChange });
-    expect(screen.getByRole('tab', { name: 'Масштаб' })).toHaveAttribute('aria-selected', 'true');
-    fireEvent.click(screen.getByRole('tab', { name: 'Файлы' }));
-    expect(onSideTabChange).toHaveBeenCalledWith('files');
+    mount({ sideTab: 'remarks', onSideTabChange });
+    expect(screen.getByRole('tab', { name: 'Замечания' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: 'Лист' }));
+    expect(onSideTabChange).toHaveBeenCalledWith('job');
   });
 
-  it('раздел «Задание» показывает ход выбранного задания для листа', () => {
-    mount();
-    fireEvent.click(screen.getByRole('tab', { name: 'Задание' }));
+  it('окно «Обработка» открывает «Трассы» и «Конструкции» по их id', () => {
+    const { unmount } = mount({ view: { ...VIEW, mep: MEP }, sideTab: 'mep' });
+    expect(screen.getByRole('tab', { name: 'Трассы' })).toHaveAttribute('aria-selected', 'true');
+    unmount();
+    mount({ constructions: CONSTRUCTIONS, sideTab: 'constructions' });
+    expect(screen.getByRole('tab', { name: 'Конструкции' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('неизвестный раздел снаружи: у листа с видом открыты «Слои»', () => {
+    mount({ sideTab: 'scale', zones: ZONES });
+    expect(screen.getByRole('tab', { name: 'Слои' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('раздела нет у листа без вида: открыт «Лист», а не первая вкладка', () => {
+    mount({ view: null, zones: ZONES, sideTab: 'mep' });
+    expect(tabNames()).toEqual(['Зоны', 'Лист']);
+    expect(screen.getByRole('tab', { name: 'Лист' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('ход задания j1')).toBeVisible();
+  });
+
+  it('«Лист»: блок «Ход преобразования» показывает ход выбранного задания для листа', () => {
+    mount();
+    openSheet();
+    fireEvent.click(screen.getByText('Ход преобразования'));
+    expect(fold('Ход преобразования')).toHaveTextContent('ход задания j1');
     expect(mocks.detail.mock.calls.at(-1)?.[0]).toMatchObject({ jobId: 'j1', selectedPage: 0 });
   });
 
   it('выбранный раздел остаётся при смене диагностики (переходе на другой лист)', () => {
     const view = mount();
-    fireEvent.click(screen.getByRole('tab', { name: 'Файлы' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Замечания' }));
     view.rerender(
       <WorkspaceCadSide
         state="ready"
@@ -280,16 +419,27 @@ describe('WorkspaceCadSide', () => {
         view={{ ...VIEW, diagnostics: diagnostics({ page_index: 1 }) }}
       />,
     );
-    expect(screen.getByRole('tab', { name: 'Файлы' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Замечания' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('задание есть, вида нет (идёт или отказ): только «Задание»', () => {
+  it('задание есть, вида нет (идёт или отказ): только «Лист», ход открыт', () => {
     mount({ view: null });
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Задание']);
+    expect(tabNames()).toEqual(['Лист']);
     expect(screen.getByText('ход задания j1')).toBeVisible();
+    expect(screen.getByText('ход задания j1').closest('details')).toBeNull();
   });
 
-  it('вид читается: скелетон в разделе «Задание»', () => {
+  it('задание есть, вида нет: профиль и задания документа свёрнуты под ходом', () => {
+    mount({
+      view: null,
+      style: {} as NonNullable<IWorkspaceCadSideProps['style']>,
+      jobs: JOBS(),
+    });
+    expect(fold('Профиль оформления')).not.toHaveAttribute('open');
+    expect(fold('Задания документа')).not.toHaveAttribute('open');
+  });
+
+  it('вид читается: скелетон в разделе «Лист»', () => {
     mount({ view: null, viewLoading: true });
     expect(screen.getByRole('status', { name: 'Загрузка вида' })).toBeInTheDocument();
   });
@@ -328,84 +478,56 @@ describe('WorkspaceCadSide', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('с разделом зон: «Зоны» среди разделов листа с результатом, перед «Заданием»', () => {
+  it('с разделом зон: «Зоны» после «Слоёв», «Лист» последний', () => {
     mount({ zones: ZONES });
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Слои',
-      'Замечания',
-      'Масштаб',
-      'Файлы',
-      'Зоны',
-      'Задание',
-    ]);
+    expect(tabNames()).toEqual(['Слои', 'Зоны', 'Замечания', 'Лист']);
     fireEvent.click(screen.getByRole('tab', { name: 'Зоны' }));
     expect(screen.getByText('панель зон')).toBeVisible();
   });
 
-  it('лист без задания: зоны доступны рядом с запуском преобразования', () => {
+  it('лист без задания: зоны первые, но открыт «Лист» с подсказкой о преобразовании', () => {
     mount({ state: 'none', job: null, view: null, zones: ZONES });
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Задание', 'Зоны']);
-    expect(screen.getByText('Лист не преобразовывался')).toBeInTheDocument();
+    expect(tabNames()).toEqual(['Зоны', 'Лист']);
+    expect(screen.getByRole('tab', { name: 'Лист' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Лист не преобразовывался')).toBeVisible();
     fireEvent.click(screen.getByRole('tab', { name: 'Зоны' }));
     expect(screen.getByText('панель зон')).toBeVisible();
   });
-  it('раздел «Конструкции» стоит перед «Заданием», его слой - в панели слоёв', () => {
-    const constructions: IWorkspaceCadConstructions = {
-      status: 'not-ready',
-      data: null,
-      notReadyText: 'Конструкции этого листа ещё не считались.',
-      loadError: null,
-      onReload: vi.fn(),
-      calculating: false,
-      actionError: null,
-      onCompute: vi.fn(),
-      levelsSaving: false,
-      onSaveLevels: vi.fn(),
-      activeGroup: null,
-      onSelectGroup: vi.fn(),
-    };
-    mount({ constructions });
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Слои',
-      'Замечания',
-      'Масштаб',
-      'Файлы',
-      'Конструкции',
-      'Задание',
-    ]);
+
+  it('раздел «Конструкции» стоит после «Слоёв», его слой - в панели слоёв', () => {
+    mount({ constructions: CONSTRUCTIONS });
+    expect(tabNames()).toEqual(['Слои', 'Конструкции', 'Замечания', 'Лист']);
     fireEvent.click(screen.getByRole('tab', { name: 'Конструкции' }));
     expect(screen.getByRole('button', { name: 'Посчитать конструкции' })).toBeVisible();
   });
 
-  it('«Задания» - последний раздел; список с выбранным заданием, выбор уходит наружу', () => {
+  it('«Задания документа» - блок «Листа»; список с выбранным заданием, выбор уходит наружу', () => {
     const onSelectJob = vi.fn();
-    mount({
-      jobs: { projectId: 'p1', revisionId: 'r1', selectedJobId: 'j7', onSelectJob },
-    });
-    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
-    expect(tabs.at(-1)).toBe('Задания');
-    fireEvent.click(screen.getByRole('tab', { name: 'Задания' }));
+    mount({ jobs: JOBS(onSelectJob) });
+    expect(tabNames().at(-1)).toBe('Лист');
+    openSheet();
+    fireEvent.click(screen.getByText('Задания документа'));
     fireEvent.click(screen.getByText('список заданий, выбрано j7'));
     expect(onSelectJob).toHaveBeenCalledWith('j9');
   });
 
-  it('лист без задания: «Задания» рядом с запуском преобразования, последним', () => {
+  it('лист без задания: «Задания документа» и профиль - под подсказкой в «Листе»', () => {
     mount({
       state: 'none',
       job: null,
       view: null,
-      zones: ZONES,
-      jobs: { projectId: 'p1', revisionId: 'r1', selectedJobId: null, onSelectJob: vi.fn() },
+      style: {} as NonNullable<IWorkspaceCadSideProps['style']>,
+      jobs: JOBS(vi.fn(), null),
     });
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Задание',
-      'Зоны',
-      'Задания',
-    ]);
+    expect(tabNames()).toEqual(['Лист']);
+    expect(screen.getByText('Лист не преобразовывался')).toBeVisible();
+    expect(fold('Профиль оформления')).toHaveTextContent('панель профиля');
+    expect(fold('Задания документа')).toHaveTextContent('список заданий, выбрано ничего');
   });
 
-  it('без jobs раздела «Задания» нет', () => {
+  it('без jobs и style блоков «Задания документа» и «Профиль оформления» нет', () => {
     mount();
-    expect(screen.queryByRole('tab', { name: 'Задания' })).toBeNull();
+    expect(screen.queryByText('Задания документа')).toBeNull();
+    expect(screen.queryByText('Профиль оформления')).toBeNull();
   });
 });

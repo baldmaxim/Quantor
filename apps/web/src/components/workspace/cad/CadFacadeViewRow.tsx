@@ -29,14 +29,15 @@ interface ICadFacadeViewRowProps {
   onDecide: IWorkspaceCadFacades['onDecide'];
 }
 
-const TONES = { accepted: 'success', candidate: 'accent', rejected: 'neutral' } as const;
+const TONES = { accepted: 'success', candidate: 'warning', rejected: 'neutral' } as const;
 const TH = 'px-[var(--s-2)] py-[var(--s-1)] text-left font-medium';
 const TD = 'tabular mono px-[var(--s-2)] py-[var(--s-1)]';
 
 /**
  * Вид фасада: заголовок, оси, тип, привязка по отметкам, число окон и решения человека. Раскрытие -
  * окна (высоты от ±0,000, положение от оси `axis_from`) и отметки с этажами. Щелчок по заголовку
- * открывает страницу вида в рабочей области.
+ * открывает страницу вида в рабочей области. Строка после решения остаётся на месте: меняются бейдж
+ * и кнопки; кандидат отмечен полосой слева, у принятого и отклонённого одна кнопка «Вернуть».
  */
 export const CadFacadeViewRow: FC<ICadFacadeViewRowProps> = ({
   view,
@@ -54,10 +55,12 @@ export const CadFacadeViewRow: FC<ICadFacadeViewRowProps> = ({
       className={cx(
         'flex min-w-0 flex-col gap-[var(--s-2)] rounded-[var(--radius-sm)] border px-[var(--s-2)] py-[var(--s-2)]',
         active ? 'border-accent bg-accent-soft' : 'border-border',
+        view.status === 'candidate' && 'border-l-[3px] border-l-warning',
       )}
       data-testid="facade-view"
+      data-status={view.status}
     >
-      <div className="flex min-w-0 items-start gap-[var(--s-2)]">
+      <div className="flex min-w-0 flex-wrap items-start gap-[var(--s-2)]">
         <button
           type="button"
           title="Открыть страницу вида"
@@ -66,7 +69,10 @@ export const CadFacadeViewRow: FC<ICadFacadeViewRowProps> = ({
             onSelect(view.id);
             onOpenPage(view.page_index);
           }}
-          className="flex min-h-[32px] min-w-0 flex-1 flex-col items-start justify-center text-left max-md:min-h-[44px]"
+          className={cx(
+            'flex min-h-[32px] min-w-[9rem] flex-1 flex-col items-start justify-center text-left max-md:min-h-[44px]',
+            view.status === 'rejected' && 'opacity-60',
+          )}
         >
           <span className="flex w-full min-w-0 items-center gap-x-[var(--s-2)]">
             <span className="truncate text-xs font-medium">{title}</span>
@@ -89,43 +95,43 @@ export const CadFacadeViewRow: FC<ICadFacadeViewRowProps> = ({
             {view.axes.length}
           </span>
         </button>
-        <div className="flex shrink-0 gap-[var(--s-1)]">
-          {view.status !== 'accepted' && (
+        <div className="ml-auto flex shrink-0 gap-[var(--s-1)]">
+          {view.status === 'candidate' ? (
+            <>
+              <Button
+                compact
+                variant="primary"
+                className="max-md:h-[44px]"
+                aria-label={`Принять: ${title}`}
+                title={acceptable ? 'Принять' : FACADE_ACCEPT_BLOCKED}
+                disabled={busy || !acceptable}
+                onClick={() => onDecide([view.id], 'accept')}
+              >
+                <span aria-hidden="true">✓</span> Принять
+              </Button>
+              <Button
+                compact
+                iconOnly
+                aria-label={`Отклонить: ${title}`}
+                title="Отклонить"
+                disabled={busy}
+                onClick={() => onDecide([view.id], 'reject')}
+              >
+                <span aria-hidden="true">✕</span>
+              </Button>
+            </>
+          ) : (
             <Button
               compact
-              iconOnly
-              variant="primary"
-              aria-label={`Принять: ${title}`}
-              title={acceptable ? 'Принять' : FACADE_ACCEPT_BLOCKED}
-              disabled={busy || !acceptable}
-              onClick={() => onDecide([view.id], 'accept')}
-            >
-              <span aria-hidden="true">✓</span>
-            </Button>
-          )}
-          {view.status !== 'rejected' && (
-            <Button
-              compact
-              iconOnly
-              aria-label={`Отклонить: ${title}`}
-              title="Отклонить"
-              disabled={busy}
-              onClick={() => onDecide([view.id], 'reject')}
-            >
-              <span aria-hidden="true">✕</span>
-            </Button>
-          )}
-          {view.status !== 'candidate' && (
-            <Button
-              compact
-              iconOnly
               variant="ghost"
-              aria-label={`Сбросить: ${title}`}
-              title="Сбросить: вернуть в кандидаты"
+              className="max-md:h-[44px]"
+              icon={<IconReset />}
+              aria-label={`Вернуть в кандидаты: ${title}`}
+              title="Вернуть в кандидаты"
               disabled={busy}
               onClick={() => onDecide([view.id], 'reset')}
             >
-              <IconReset />
+              Вернуть
             </Button>
           )}
         </div>

@@ -2,9 +2,12 @@ import type { FacadeViewRead } from '@quantor/api-client';
 import { describe, expect, it } from 'vitest';
 
 import {
+  acceptableFacadeCandidateIds,
   canAcceptFacade,
+  countFacades,
   facadeAxesText,
   facadeBodyText,
+  facadeReviewGroups,
   facadeScaleText,
   groupFacadesByPage,
   isFacadesJobActive,
@@ -55,6 +58,33 @@ describe('facades', () => {
     const groups = groupFacadesByPage(views);
     expect(groups.map((g) => g.pageIndex)).toEqual([2, 5]);
     expect(groups[1]?.views.map((v) => v.id)).toEqual(['c', 'a']);
+  });
+
+  it('список приёмки: первой группа открытого листа, остальные по номеру; фильтр скрывает строки', () => {
+    const views = [
+      { id: 'a', page_index: 5, seq: 1, status: 'accepted', scale_status: 'fitted' },
+      { id: 'b', page_index: 2, seq: 0, status: 'candidate', scale_status: 'none' },
+      { id: 'c', page_index: 5, seq: 0, status: 'candidate', scale_status: 'weak' },
+      { id: 'd', page_index: 7, seq: 0, status: 'rejected', scale_status: 'fitted' },
+    ] as FacadeViewRead[];
+    const shape = (groups: ReturnType<typeof facadeReviewGroups>) =>
+      groups.map((g) => [g.pageIndex, g.current, g.views.map((v) => v.id)]);
+    expect(shape(facadeReviewGroups(views, 5))).toEqual([
+      [5, true, ['c', 'a']],
+      [2, false, ['b']],
+      [7, false, ['d']],
+    ]);
+    expect(shape(facadeReviewGroups(views, null))).toEqual([
+      [2, false, ['b']],
+      [5, false, ['c', 'a']],
+      [7, false, ['d']],
+    ]);
+    expect(shape(facadeReviewGroups(views, 5, 'candidate'))).toEqual([
+      [5, true, ['c']],
+      [2, false, ['b']],
+    ]);
+    expect(countFacades(views)).toEqual({ total: 4, accepted: 1, candidate: 2, rejected: 1 });
+    expect(acceptableFacadeCandidateIds(views)).toEqual(['c']);
   });
 
   it('задание идёт: queued и running', () => {

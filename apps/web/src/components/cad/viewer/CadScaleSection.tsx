@@ -12,6 +12,8 @@ interface ICadScaleSectionProps {
   scale: CadScaleRead | null;
 }
 
+const HEADING = 'text-micro font-semibold tracking-[0.06em] text-muted uppercase';
+
 /** Причины, по которым масштаб не подтверждён: причины отказа, иначе общая причина. */
 const reasonsOf = (scale: CadScaleRead): readonly string[] => {
   if (scale.hold_reasons.length > 0) return scale.hold_reasons;
@@ -48,7 +50,17 @@ export const CadScaleSection: FC<ICadScaleSectionProps> = ({ scale }) => {
             Отклонение от размерных цепочек: {formatDeviationPercent(scale.deviation)}
           </p>
         )}
-        <CadControlsTable controls={scale.controls} />
+        {scale.controls.length === 0 ? (
+          <CadControlsTable controls={scale.controls} />
+        ) : (
+          // Таблица контролей нужна при разборе отказа: у подтверждённого масштаба она свёрнута.
+          <details open={!confirmed} className="flex min-w-0 flex-col gap-[var(--s-2)]">
+            <summary className={`${HEADING} min-h-[32px] cursor-pointer content-center max-md:min-h-[44px]`}>
+              Контрольные цепочки ({scale.controls.length})
+            </summary>
+            <CadControlsTable controls={scale.controls} />
+          </details>
+        )}
         {reasons.length > 0 && (
           <div
             role="alert"

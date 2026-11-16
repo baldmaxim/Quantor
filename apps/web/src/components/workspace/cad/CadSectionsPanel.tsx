@@ -11,8 +11,8 @@ import { CadSectionsPage } from './CadSectionsPage';
 import type { IWorkspaceCadSections } from './types';
 
 /**
- * Вкладка «Разрезы» - только на странице-разрезе: повторный запуск распознавания, кандидаты
- * уровней страницы и решения человека. Со страниц плана разрезы открывают из запуска трасс.
+ * Вкладка «Разрезы» - только на странице-разрезе: сводка приёмки, уровни страницы и решения
+ * человека; первый запуск распознавания - наверху, повторный - внизу. Со страниц плана разрезы открывают из запуска трасс.
  * Принятые уровни уходят в запуск трасс как высота в свету; кандидаты и отклонённые - нет.
  */
 export const CadSectionsPanel: FC<IWorkspaceCadSections> = ({
@@ -49,71 +49,95 @@ export const CadSectionsPanel: FC<IWorkspaceCadSections> = ({
   }
 
   const { job } = data;
-  const running = starting || isSectionsJobActive(job?.status);
+  const jobActive = isSectionsJobActive(job?.status);
+  const running = starting || jobActive;
+  const hasResult = data.result_job_id !== null;
   const page = pageIndex === null ? undefined : data.pages.find((item) => item.page_index === pageIndex);
 
+  // Под сводкой - там, где человек только что нажал: отказ действия и флажок разметки.
+  const underSummary = (
+    <>
+      {actionError !== null && (
+        <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
+          {actionError}
+        </p>
+      )}
+      {hasResult && (
+        <label className="flex min-h-[32px] items-center gap-[var(--s-3)] text-xs max-md:min-h-[44px]">
+          <input
+            type="checkbox"
+            checked={markupVisible}
+            onChange={(event) => onMarkupVisibleChange(event.target.checked)}
+            className="size-4 shrink-0"
+          />
+          Разметка разрезов на листе
+        </label>
+      )}
+    </>
+  );
+
   return (
-    <div className="flex min-w-0 flex-col gap-[var(--s-5)]" data-testid="cad-sections">
-      <div className="flex min-w-0 flex-col gap-[var(--s-3)]">
+    <div className="flex min-w-0 flex-col gap-[var(--s-4)]" data-testid="cad-sections">
+      {!hasResult && (
+        <div className="flex min-w-0 flex-col gap-[var(--s-3)]">
+          <Button
+            variant="primary"
+            loading={running}
+            onClick={onStart}
+            className="min-h-[44px] self-start max-md:h-[44px] max-md:w-full"
+          >
+            Распознать разрезы
+          </Button>
+          <p className="text-xs text-muted">
+            Разрезы ещё не распознавались: запустите распознавание, результат появится здесь.
+          </p>
+        </div>
+      )}
+
+      {/* Статус задания - только пока оно идёт или упало: успешное завершение места не занимает. */}
+      {job !== null && (jobActive || job.status === 'failed') && (
+        <div className="flex min-w-0 flex-col gap-[var(--s-2)]" role="status" aria-live="polite">
+          <span className="flex flex-wrap items-center gap-[var(--s-3)]">
+            <StatusBadge tone={jobTone(job.status)}>{jobLabel(job.status)}</StatusBadge>
+            <span className="mono text-xs text-muted">попытка {job.attempt}</span>
+          </span>
+          {jobActive && (
+            <p className="text-xs text-muted">Разрезы распознаются. Список обновится сам.</p>
+          )}
+          {job.status === 'failed' && (
+            <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
+              {job.error_code ? cadCodeText(job.error_code) : 'Разрезы не распознаны.'}
+              {job.error_message ? ` ${job.error_message}` : ''}
+            </p>
+          )}
+        </div>
+      )}
+
+      {hasResult && page !== undefined && pageIndex !== null ? (
+        <CadSectionsPage
+          page={page}
+          levels={levelsOfPage(data.levels, pageIndex)}
+          issues={issuesOfPage(data.issues, pageIndex)}
+          busy={deciding}
+          activeLevelId={activeLevelId}
+          onSelectLevel={onSelectLevel}
+          onDecide={onDecide}
+          underSummary={underSummary}
+        />
+      ) : (
+        underSummary
+      )}
+
+      {/* Повторный запуск - редкое действие: внизу и вторичной кнопкой. */}
+      {hasResult && (
         <Button
-          variant="primary"
+          compact
           loading={running}
           onClick={onStart}
-          className="min-h-[44px] self-start max-md:h-[44px] max-md:w-full"
+          className="self-start max-md:h-[44px]"
         >
-          {job === null ? 'Распознать разрезы' : 'Распознать разрезы заново'}
+          Распознать заново
         </Button>
-        {job !== null && (
-          <div className="flex min-w-0 flex-col gap-[var(--s-2)]" role="status" aria-live="polite">
-            <span className="flex flex-wrap items-center gap-[var(--s-3)]">
-              <StatusBadge tone={jobTone(job.status)}>{jobLabel(job.status)}</StatusBadge>
-              <span className="mono text-xs text-muted">попытка {job.attempt}</span>
-            </span>
-            {isSectionsJobActive(job.status) && (
-              <p className="text-xs text-muted">Разрезы распознаются. Список обновится сам.</p>
-            )}
-            {job.status === 'failed' && (
-              <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
-                {job.error_code ? cadCodeText(job.error_code) : 'Разрезы не распознаны.'}
-                {job.error_message ? ` ${job.error_message}` : ''}
-              </p>
-            )}
-          </div>
-        )}
-        {actionError !== null && (
-          <p role="alert" className="text-xs text-danger [overflow-wrap:anywhere]">
-            {actionError}
-          </p>
-        )}
-      </div>
-
-      {data.result_job_id === null ? (
-        <p className="text-xs text-muted">
-          Разрезы ещё не распознавались: запустите распознавание, результат появится здесь.
-        </p>
-      ) : (
-        <>
-          <label className="flex min-h-[44px] items-center gap-[var(--s-3)] text-sm">
-            <input
-              type="checkbox"
-              checked={markupVisible}
-              onChange={(event) => onMarkupVisibleChange(event.target.checked)}
-              className="size-5 shrink-0"
-            />
-            Разметка разрезов на листе
-          </label>
-          {page !== undefined && pageIndex !== null && (
-            <CadSectionsPage
-              page={page}
-              levels={levelsOfPage(data.levels, pageIndex)}
-              issues={issuesOfPage(data.issues, pageIndex)}
-              busy={deciding}
-              activeLevelId={activeLevelId}
-              onSelectLevel={onSelectLevel}
-              onDecide={onDecide}
-            />
-          )}
-        </>
       )}
     </div>
   );

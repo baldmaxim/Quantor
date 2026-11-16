@@ -350,7 +350,7 @@ export interface IWorkspaceCadView {
   readonly remarks: IWorkspaceCadRemarks | null;
 }
 
-/** Задание листа: то, что нужно разделам «Задание» и «Файлы». */
+/** Задание листа: то, что нужно разделу «Лист» (ход преобразования и файлы). */
 export interface IWorkspaceCadJob {
   readonly projectId: string;
   readonly revisionId: string;
@@ -484,6 +484,8 @@ export interface IWorkspaceCadFacades {
   readonly data: FacadesRead | null;
   readonly loadError: string | null;
   readonly onReload: () => void;
+  /** Индекс страницы открытого листа: его виды идут в списке первыми; `null` - лист не выбран. */
+  readonly pageIndex?: number | null;
   /** Постановка задания идёт. */
   readonly starting: boolean;
   readonly onStart: () => void;
