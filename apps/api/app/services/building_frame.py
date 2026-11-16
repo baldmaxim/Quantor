@@ -30,6 +30,7 @@ from app.contracts.building_frame import (
 )
 from app.errors import ErrorCode, http_error, not_found
 from app.models import DocQuestionAnswer, FrameNode, SheetPassport
+from app.services.consistency.align_checks import ALIGN_CHECKS_VERSION, run_align_checks
 from app.services.consistency.building_frame import (
     FRAME_VERSION,
     ElevationSource,
@@ -56,6 +57,7 @@ from app.services.consistency.frame_checks import (
     run_frame_checks,
 )
 from app.services.consistency.register_checks import REGISTER_CHECKS_VERSION, run_register_checks
+from app.services.plan_alignments import align_check_inputs
 from app.services.sheet_passports import latest_pdf_revisions
 from app.services.sheet_registers import register_check_inputs
 
@@ -74,6 +76,7 @@ def versions() -> dict[str, str]:
         "frame": FRAME_VERSION,
         "checks": FRAME_CHECKS_VERSION,
         "register_checks": REGISTER_CHECKS_VERSION,
+        "align_checks": ALIGN_CHECKS_VERSION,
     }
 
 
@@ -458,6 +461,7 @@ async def frame_view(session: AsyncSession, *, project_id: uuid.UUID) -> FrameOu
         session, project_id
     )
     checks += run_register_checks(registers, register_sheets, candidates=register_candidates)
+    checks += run_align_checks(await align_check_inputs(session, project_id))
     confirmed_plans, candidate_plans = await _plan_counts(session, project_id)
     return FrameOut(
         nodes=[_node_out(row, heights.get(str(row.id))) for row in rows],

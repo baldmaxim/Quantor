@@ -58,6 +58,8 @@ class CheckCode(StrEnum):
     REGISTER_SHEETS = "register_sheets"
     SHEETS_IN_REGISTER = "sheets_in_register"
     REGISTER_TITLES = "register_titles"
+    # План ↔ уровень: каталог `consistency.checks.align.v1` (align_checks.py).
+    PLANS_ALIGNED = "plans_aligned"
 
 
 CHECK_TITLES: Final[dict[CheckCode, str]] = {
@@ -71,6 +73,7 @@ CHECK_TITLES: Final[dict[CheckCode, str]] = {
     CheckCode.REGISTER_SHEETS: "Ведомость → листы",
     CheckCode.SHEETS_IN_REGISTER: "Листы → ведомость",
     CheckCode.REGISTER_TITLES: "Наименования в ведомости и на листах",
+    CheckCode.PLANS_ALIGNED: "Совмещение планов с уровнем",
 }
 
 
@@ -85,6 +88,7 @@ class RefKind(StrEnum):
     ANSWER = "answer"
     LEVEL = "level"
     REGISTER = "register"
+    ALIGNMENT = "alignment"
 
 
 @dataclass(frozen=True, slots=True)

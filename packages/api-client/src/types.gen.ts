@@ -228,6 +228,107 @@ export type AdminWorkspaceRead = {
 };
 
 /**
+ * AlignParamsOut
+ *
+ * Параметры правила совмещения действующей версии.
+ */
+export type AlignParamsOut = {
+    /**
+     * Axis Agree Mm
+     */
+    axis_agree_mm: number;
+    /**
+     * Residual Check Mm
+     */
+    residual_check_mm: number;
+};
+
+/**
+ * AlignResult
+ */
+export type AlignResult = 'reference' | 'aligned' | 'check' | 'failed' | 'not_run';
+
+/**
+ * AlignRunSummary
+ *
+ * Итог последнего задания совмещения; чисел, которых нет в итоге, - null.
+ */
+export type AlignRunSummary = {
+    /**
+     * Aligned
+     */
+    aligned: number | null;
+    /**
+     * Check
+     */
+    check: number | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Failed
+     */
+    failed: number | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Not Run
+     */
+    not_run: number | null;
+    /**
+     * Plans
+     */
+    plans: number | null;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
+    /**
+     * Views
+     */
+    views: number | null;
+    /**
+     * Without Cad
+     */
+    without_cad: number | null;
+};
+
+/**
+ * AlignScaleSource
+ */
+export type AlignScaleSource = 'calibration' | 'dimension_chains';
+
+/**
+ * AlignmentStatus
+ */
+export type AlignmentStatus = 'candidate' | 'confirmed' | 'rejected';
+
+/**
  * ApprovalStatus
  *
  * Допуск личности к порталу (ADR-0031).
@@ -10821,7 +10922,7 @@ export type ChangePasswordResponse = {
 /**
  * CheckCode
  */
-export type CheckCode = 'ar_plan_per_level' | 'scheme_per_system' | 'level_sequence' | 'level_elevations' | 'pz_storeys' | 'pz_floors_total' | 'pz_floor_height' | 'register_sheets' | 'sheets_in_register' | 'register_titles';
+export type CheckCode = 'ar_plan_per_level' | 'scheme_per_system' | 'level_sequence' | 'level_elevations' | 'pz_storeys' | 'pz_floors_total' | 'pz_floor_height' | 'register_sheets' | 'sheets_in_register' | 'register_titles' | 'plans_aligned';
 
 /**
  * CheckStatus
@@ -12479,7 +12580,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
 
 /**
  * LengthUnit
@@ -13759,6 +13860,159 @@ export type PasswordLoginResponse = {
 };
 
 /**
+ * PlanAlignmentBulkOut
+ */
+export type PlanAlignmentBulkOut = {
+    /**
+     * Updated
+     */
+    updated: number;
+};
+
+/**
+ * PlanAlignmentBulkStatus
+ */
+export type PlanAlignmentBulkStatus = {
+    /**
+     * Ids
+     */
+    ids: Array<string>;
+    status: AlignmentStatus;
+};
+
+/**
+ * PlanAlignmentOut
+ *
+ * Совмещение вида плана с уровнем: `точка уровня = R(rotation_deg) · точка листа + (dx, dy)`.
+ *
+ * Точка листа - мм DXF вида CAD; из точки PDF (pt от левого верхнего угла страницы) она
+ * получается по кадру вида: `((x - origin_x) · k, (origin_y - y) · k)`, `k = mm_per_pdf_point`.
+ */
+export type PlanAlignmentOut = {
+    /**
+     * Agreed Axes
+     */
+    agreed_axes: number;
+    /**
+     * Axes
+     */
+    axes: Array<string>;
+    /**
+     * Building
+     */
+    building: string | null;
+    /**
+     * Cad Job Id
+     */
+    cad_job_id: string | null;
+    /**
+     * Common Axes
+     */
+    common_axes: number;
+    /**
+     * Confirmed At
+     */
+    confirmed_at: string | null;
+    /**
+     * Dx Mm
+     */
+    dx_mm: number | null;
+    /**
+     * Dy Mm
+     */
+    dy_mm: number | null;
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Level From
+     */
+    level_from: string | null;
+    /**
+     * Level To
+     */
+    level_to: string | null;
+    /**
+     * Mm Per Pdf Point
+     */
+    mm_per_pdf_point: number | null;
+    /**
+     * Origin Pt
+     */
+    origin_pt: Array<number> | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Passport Id
+     */
+    passport_id: string;
+    /**
+     * Reasons
+     */
+    reasons: Array<string>;
+    /**
+     * Reference Id
+     */
+    reference_id: string | null;
+    /**
+     * Residual Max Mm
+     */
+    residual_max_mm: number | null;
+    /**
+     * Residual Rms Mm
+     */
+    residual_rms_mm: number | null;
+    result: AlignResult;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Rotation Deg
+     */
+    rotation_deg: number | null;
+    scale_source: AlignScaleSource | null;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Section Mark
+     */
+    section_mark: string | null;
+    status: AlignmentStatus;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * PlanAlignmentsOut
+ */
+export type PlanAlignmentsOut = {
+    /**
+     * Alignments
+     */
+    alignments: Array<PlanAlignmentOut>;
+    last_run: AlignRunSummary | null;
+    params: AlignParamsOut;
+    /**
+     * Versions
+     */
+    versions: {
+        [key: string]: string;
+    };
+};
+
+/**
  * PointGeometry
  */
 export type PointGeometry = {
@@ -14171,7 +14425,7 @@ export type RecognitionArtifactRead = {
 /**
  * RefKind
  */
-export type RefKind = 'passport' | 'answer' | 'level' | 'register';
+export type RefKind = 'passport' | 'answer' | 'level' | 'register' | 'alignment';
 
 /**
  * RegionRead
@@ -22036,6 +22290,96 @@ export type ListProjectJobsResponses = {
 };
 
 export type ListProjectJobsResponse = ListProjectJobsResponses[keyof ListProjectJobsResponses];
+
+export type GetPlanAlignmentsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/plan-alignments';
+};
+
+export type GetPlanAlignmentsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetPlanAlignmentsError = GetPlanAlignmentsErrors[keyof GetPlanAlignmentsErrors];
+
+export type GetPlanAlignmentsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PlanAlignmentsOut;
+};
+
+export type GetPlanAlignmentsResponse = GetPlanAlignmentsResponses[keyof GetPlanAlignmentsResponses];
+
+export type BulkPlanAlignmentStatusData = {
+    body: PlanAlignmentBulkStatus;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/plan-alignments/bulk-status';
+};
+
+export type BulkPlanAlignmentStatusErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BulkPlanAlignmentStatusError = BulkPlanAlignmentStatusErrors[keyof BulkPlanAlignmentStatusErrors];
+
+export type BulkPlanAlignmentStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: PlanAlignmentBulkOut;
+};
+
+export type BulkPlanAlignmentStatusResponse = BulkPlanAlignmentStatusResponses[keyof BulkPlanAlignmentStatusResponses];
+
+export type StartPlanAlignData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/plan-alignments/run';
+};
+
+export type StartPlanAlignErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartPlanAlignError = StartPlanAlignErrors[keyof StartPlanAlignErrors];
+
+export type StartPlanAlignResponses = {
+    /**
+     * Successful Response
+     */
+    202: JobRead;
+};
+
+export type StartPlanAlignResponse = StartPlanAlignResponses[keyof StartPlanAlignResponses];
 
 export type ListProjectRevisionsData = {
     body?: never;

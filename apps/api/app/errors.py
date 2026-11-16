@@ -80,6 +80,8 @@ class ErrorCode(StrEnum):
     DOC_QUESTIONS_SEARCH_FAILED = "DOC_QUESTIONS_SEARCH_FAILED"
     # Ведомости листов: задание разбора ведомостей не удалось выполнить.
     SHEET_REGISTER_EXTRACT_FAILED = "SHEET_REGISTER_EXTRACT_FAILED"
+    # Совмещение планов: задание совмещения не удалось выполнить.
+    PLAN_ALIGN_FAILED = "PLAN_ALIGN_FAILED"
 
     # --- калибровка масштаба (ADR-0018) ---
     SCALE_GEOMETRY_REQUIRED = "SCALE_GEOMETRY_REQUIRED"
@@ -266,6 +268,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.GEOMETRY_EXTRACT_FAILED: "Извлечь геометрию страниц не удалось",
     ErrorCode.DOC_QUESTIONS_SEARCH_FAILED: "Найти ответы на вопросы к документации не удалось",
     ErrorCode.SHEET_REGISTER_EXTRACT_FAILED: "Разобрать ведомости листов не удалось",
+    ErrorCode.PLAN_ALIGN_FAILED: "Совместить планы с уровнями не удалось",
     ErrorCode.SCALE_GEOMETRY_REQUIRED: "Масштаб нельзя задать до извлечения геометрии страницы",
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: "Отрезок калибровки слишком короткий",
     ErrorCode.SHEET_PASSPORT_EXTRACT_FAILED: "Разобрать паспорта листов не удалось",
@@ -451,6 +454,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.GEOMETRY_EXTRACT_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.DOC_QUESTIONS_SEARCH_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.SHEET_REGISTER_EXTRACT_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.PLAN_ALIGN_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     ErrorCode.SCALE_GEOMETRY_REQUIRED: status.HTTP_409_CONFLICT,
     ErrorCode.SCALE_SEGMENT_TOO_SHORT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.MEASUREMENT_VERSION_CONFLICT: status.HTTP_409_CONFLICT,

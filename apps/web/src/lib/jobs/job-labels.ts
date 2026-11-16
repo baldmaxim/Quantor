@@ -17,6 +17,7 @@ export const JOB_TYPE_LABELS: Readonly<Record<JobType, string>> = {
   sheet_passport_extract: 'Паспорт листа',
   doc_questions_search: 'Вопросы к документации',
   sheet_register_extract: 'Ведомости листов',
+  plan_align: 'Совмещение планов',
 };
 
 export const jobTypeLabel = (jobType: JobType): string => JOB_TYPE_LABELS[jobType] ?? jobType;

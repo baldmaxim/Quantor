@@ -10,6 +10,7 @@ import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 import { useFeatures, useMeta, useProject } from '@/lib/queries';
 
 import { FrameChecksPanel } from './FrameChecksPanel';
+import { FramePlanAlignPanel } from './FramePlanAlignPanel';
 import { FrameRebuildPanel } from './FrameRebuildPanel';
 import { FrameRegistersPanel } from './FrameRegistersPanel';
 import { FrameTree } from './FrameTree';
@@ -63,7 +64,8 @@ export const FrameScreen: FC<IScreenProps> = ({ projectId }) => {
             Корпуса, секции и уровни собираются из подтверждённых паспортов листов-планов. Кандидат
             идёт в проверки только после подтверждения. Расхождение источников не решается молча:
             оно остаётся замечанием со ссылкой на лист или ответ к документации. Ведомость листов
-            сверяется с паспортами листов своего документа.
+            сверяется с паспортами листов своего документа, а планы этажей совмещаются с уровнем по
+            осям.
           </p>
           {frame.isPending && <SkeletonRows rows={6} />}
           {frame.isError && (
@@ -78,6 +80,7 @@ export const FrameScreen: FC<IScreenProps> = ({ projectId }) => {
             <>
               <FrameRebuildPanel projectId={projectId} frame={frame.data} />
               <FrameRegistersPanel projectId={projectId} />
+              <FramePlanAlignPanel projectId={projectId} />
               <FrameChecksPanel checks={frame.data.checks} />
               <FrameTree projectId={projectId} nodes={frame.data.nodes} />
             </>

@@ -71,7 +71,9 @@ class TestStageBoundaries:
         оно читает размеры страницы и ничего не распознаёт. Трек «Модель здания» добавил
         конвертацию PDF → CAD: детерминированный движок в отдельном исполнителе за гейтом
         CAD_QA_ENABLED (только local/test), модели он не вызывает. Конструкции CAD и выгрузка
-        3D DXF — детерминированные скрипты в исполнителе CAD, моделей не вызывают.
+        3D DXF — детерминированные скрипты в исполнителе CAD, моделей не вызывают. Контур
+        согласованности (ADR-0043) добавил паспорт листа, вопросы к документации, ведомости листов
+        и совмещение планов: текстовый слой PDF и итоги CAD, без модели, OCR и растра.
         """
         assert [job_type.value for job_type in JobType] == [
             "legacy_import",
@@ -82,6 +84,11 @@ class TestStageBoundaries:
             "cad_floor3d_dxf",
             "cad_zones",
             "cad_sections",
+            "cad_eom_route",
+            "sheet_passport_extract",
+            "doc_questions_search",
+            "sheet_register_extract",
+            "plan_align",
         ]
 
     def test_no_job_type_invokes_a_model(self) -> None:

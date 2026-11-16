@@ -36,6 +36,7 @@ from app.models.identity import (
 )
 from app.models.job import Job
 from app.models.page_geometry import PageGeometry
+from app.models.plan_alignment import PlanAlignment
 from app.models.project import Project
 from app.models.revision_page_text import RevisionPageText
 from app.models.scale import ScaleCalibration
@@ -88,6 +89,7 @@ __all__ = [
     "LocalCredential",
     "Measurement",
     "PageGeometry",
+    "PlanAlignment",
     "Project",
     "RecognitionArtifact",
     "Region",

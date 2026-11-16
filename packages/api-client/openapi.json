@@ -426,6 +426,220 @@
         "title": "AdminWorkspaceRead",
         "type": "object"
       },
+      "AlignParamsOut": {
+        "description": "Параметры правила совмещения действующей версии.",
+        "properties": {
+          "axis_agree_mm": {
+            "title": "Axis Agree Mm",
+            "type": "number"
+          },
+          "residual_check_mm": {
+            "title": "Residual Check Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "axis_agree_mm",
+          "residual_check_mm"
+        ],
+        "title": "AlignParamsOut",
+        "type": "object"
+      },
+      "AlignResult": {
+        "enum": [
+          "reference",
+          "aligned",
+          "check",
+          "failed",
+          "not_run"
+        ],
+        "title": "AlignResult",
+        "type": "string"
+      },
+      "AlignRunSummary": {
+        "description": "Итог последнего задания совмещения; чисел, которых нет в итоге, - null.",
+        "properties": {
+          "aligned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aligned"
+          },
+          "check": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "not_run": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Run"
+          },
+          "plans": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plans"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          },
+          "views": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Views"
+          },
+          "without_cad": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Without Cad"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "progress",
+          "stage",
+          "error_code",
+          "created_at",
+          "finished_at",
+          "plans",
+          "views",
+          "without_cad",
+          "aligned",
+          "check",
+          "failed",
+          "not_run",
+          "versions"
+        ],
+        "title": "AlignRunSummary",
+        "type": "object"
+      },
+      "AlignScaleSource": {
+        "enum": [
+          "calibration",
+          "dimension_chains"
+        ],
+        "title": "AlignScaleSource",
+        "type": "string"
+      },
+      "AlignmentStatus": {
+        "enum": [
+          "candidate",
+          "confirmed",
+          "rejected"
+        ],
+        "title": "AlignmentStatus",
+        "type": "string"
+      },
       "ApprovalStatus": {
         "description": "Допуск личности к порталу (ADR-0031).\n\nСамостоятельная регистрация заводит заявку, а не доступ: войти можно только после\nодобрения администратором платформы. Отклонённая заявка остаётся строкой — повторная\nрегистрация на тот же адрес не должна тихо превращаться в новую заявку.",
         "enum": [
@@ -21687,7 +21901,8 @@
           "pz_floor_height",
           "register_sheets",
           "sheets_in_register",
-          "register_titles"
+          "register_titles",
+          "plans_aligned"
         ],
         "title": "CheckCode",
         "type": "string"
@@ -24954,7 +25169,8 @@
           "cad_eom_route",
           "sheet_passport_extract",
           "doc_questions_search",
-          "sheet_register_extract"
+          "sheet_register_extract",
+          "plan_align"
         ],
         "title": "JobType",
         "type": "string"
@@ -27296,6 +27512,355 @@
         "title": "PasswordLoginResponse",
         "type": "object"
       },
+      "PlanAlignmentBulkOut": {
+        "properties": {
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "updated"
+        ],
+        "title": "PlanAlignmentBulkOut",
+        "type": "object"
+      },
+      "PlanAlignmentBulkStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlignmentStatus"
+          }
+        },
+        "required": [
+          "ids",
+          "status"
+        ],
+        "title": "PlanAlignmentBulkStatus",
+        "type": "object"
+      },
+      "PlanAlignmentOut": {
+        "description": "Совмещение вида плана с уровнем: `точка уровня = R(rotation_deg) · точка листа + (dx, dy)`.\n\nТочка листа - мм DXF вида CAD; из точки PDF (pt от левого верхнего угла страницы) она\nполучается по кадру вида: `((x - origin_x) · k, (origin_y - y) · k)`, `k = mm_per_pdf_point`.",
+        "properties": {
+          "agreed_axes": {
+            "title": "Agreed Axes",
+            "type": "integer"
+          },
+          "axes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Axes",
+            "type": "array"
+          },
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "cad_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cad Job Id"
+          },
+          "common_axes": {
+            "title": "Common Axes",
+            "type": "integer"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "dx_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dx Mm"
+          },
+          "dy_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dy Mm"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "level_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level From"
+          },
+          "level_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level To"
+          },
+          "mm_per_pdf_point": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mm Per Pdf Point"
+          },
+          "origin_pt": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Pt"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "passport_id": {
+            "format": "uuid",
+            "title": "Passport Id",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "reference_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Id"
+          },
+          "residual_max_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Max Mm"
+          },
+          "residual_rms_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Rms Mm"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AlignResult"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "rotation_deg": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotation Deg"
+          },
+          "scale_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlignScaleSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "section_mark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Mark"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlignmentStatus"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "passport_id",
+          "revision_id",
+          "file_name",
+          "page_index",
+          "view",
+          "section_mark",
+          "building",
+          "section",
+          "level_from",
+          "level_to",
+          "cad_job_id",
+          "reference_id",
+          "result",
+          "rotation_deg",
+          "dx_mm",
+          "dy_mm",
+          "axes",
+          "common_axes",
+          "agreed_axes",
+          "residual_rms_mm",
+          "residual_max_mm",
+          "scale_source",
+          "mm_per_pdf_point",
+          "origin_pt",
+          "reasons",
+          "status",
+          "confirmed_at"
+        ],
+        "title": "PlanAlignmentOut",
+        "type": "object"
+      },
+      "PlanAlignmentsOut": {
+        "properties": {
+          "alignments": {
+            "items": {
+              "$ref": "#/components/schemas/PlanAlignmentOut"
+            },
+            "title": "Alignments",
+            "type": "array"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlignRunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "params": {
+            "$ref": "#/components/schemas/AlignParamsOut"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "alignments",
+          "last_run",
+          "params",
+          "versions"
+        ],
+        "title": "PlanAlignmentsOut",
+        "type": "object"
+      },
       "PointGeometry": {
         "additionalProperties": false,
         "properties": {
@@ -28062,7 +28627,8 @@
           "passport",
           "answer",
           "level",
-          "register"
+          "register",
+          "alignment"
         ],
         "title": "RefKind",
         "type": "string"
@@ -41846,6 +42412,145 @@
         "summary": "Задания проекта",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/plan-alignments": {
+      "get": {
+        "operationId": "get_plan_alignments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanAlignmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Совмещения планов последних ревизий с уровнями и итог последнего запуска",
+        "tags": [
+          "plan-alignments"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/plan-alignments/bulk-status": {
+      "post": {
+        "operationId": "bulk_plan_alignment_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanAlignmentBulkStatus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanAlignmentBulkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Единый статус пачке совмещений планов; чужой id - 404, ничего не меняется",
+        "tags": [
+          "plan-alignments"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/plan-alignments/run": {
+      "post": {
+        "operationId": "start_plan_align",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить совмещение планов с уровнями по осям CAD; активное задание возвращается",
+        "tags": [
+          "plan-alignments"
         ]
       }
     },

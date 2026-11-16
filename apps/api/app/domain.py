@@ -446,6 +446,9 @@ class JobType(StrEnum):
     # ведомости в основном исполнителе, результат - кандидаты `sheet_registers`; подтверждает
     # человек.
     SHEET_REGISTER_EXTRACT = "sheet_register_extract"
+    # Совмещение планов с уровнем по осям CAD (ADR-0043, С3): основной исполнитель читает walls.json
+    # и кадр вида, результат - кандидаты `plan_alignments`; подтверждает человек.
+    PLAN_ALIGN = "plan_align"
 
 
 class JobStatus(StrEnum):

@@ -1,5 +1,12 @@
 import * as client from '@quantor/api-client';
-import type { FrameCheckOut, FrameNodeOut, FrameOut, SheetRegistersOut } from '@quantor/api-client';
+import type {
+  FrameCheckOut,
+  FrameNodeOut,
+  FrameOut,
+  PlanAlignmentOut,
+  PlanAlignmentsOut,
+  SheetRegistersOut,
+} from '@quantor/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -27,6 +34,9 @@ vi.mock('@quantor/api-client', async (importOriginal) => ({
   getSheetRegisters: vi.fn(),
   startSheetRegisterExtract: vi.fn(),
   bulkSheetRegisterStatus: vi.fn(),
+  getPlanAlignments: vi.fn(),
+  startPlanAlign: vi.fn(),
+  bulkPlanAlignmentStatus: vi.fn(),
 }));
 
 const ok = (data: unknown) => Promise.resolve({ data }) as never;
@@ -154,6 +164,85 @@ const REGISTERS: SheetRegistersOut = {
   versions: {},
 };
 
+const alignment = (overrides: Partial<PlanAlignmentOut>): PlanAlignmentOut => ({
+  id: 'a',
+  passport_id: 'pp',
+  revision_id: 'rev',
+  file_name: 'АР.pdf',
+  page_index: 0,
+  view: 1,
+  section_mark: 'АР',
+  building: '1',
+  section: '1',
+  level_from: '2',
+  level_to: '5',
+  cad_job_id: 'cad',
+  reference_id: 'a-ref',
+  result: 'aligned',
+  rotation_deg: 0,
+  dx_mm: 100,
+  dy_mm: -250,
+  axes: ['1', '2', 'А'],
+  common_axes: 3,
+  agreed_axes: 3,
+  residual_rms_mm: 4.4,
+  residual_max_mm: 6,
+  scale_source: 'calibration',
+  mm_per_pdf_point: 35.28,
+  origin_pt: [10, 20],
+  reasons: [],
+  status: 'candidate',
+  confirmed_at: null,
+  ...overrides,
+});
+
+const ALIGNMENTS: PlanAlignmentsOut = {
+  alignments: [
+    alignment({ id: 'a-ref', result: 'reference', dx_mm: 0, dy_mm: 0, axes: [] }),
+    alignment({ id: 'a-ios', file_name: 'ИОС2.pdf', section_mark: 'ИОС2' }),
+    alignment({
+      id: 'a-check',
+      file_name: 'ИОС3.pdf',
+      section_mark: 'ИОС3',
+      result: 'check',
+      reasons: ['план повёрнут относительно эталона на 90°'],
+    }),
+    alignment({
+      id: 'a-none',
+      section: '2',
+      view: 0,
+      result: 'not_run',
+      reference_id: null,
+      cad_job_id: null,
+      dx_mm: null,
+      dy_mm: null,
+      rotation_deg: null,
+      axes: [],
+      scale_source: null,
+      reasons: ['последняя ревизия листа не преобразована в CAD'],
+    }),
+  ],
+  last_run: {
+    job_id: 'j-a',
+    status: 'succeeded',
+    progress: 1,
+    stage: null,
+    error_code: null,
+    created_at: '2026-11-15T10:00:00Z',
+    finished_at: '2026-11-15T10:01:00Z',
+    plans: 4,
+    views: 4,
+    without_cad: 1,
+    aligned: 2,
+    check: 1,
+    failed: 0,
+    not_run: 1,
+    versions: {},
+  },
+  params: { axis_agree_mm: 150, residual_check_mm: 50 },
+  versions: {},
+};
+
 const setup = (features: Record<string, boolean> = { 'project.consistency': true }) => {
   vi.mocked(queries.useMeta).mockReturnValue({ isSuccess: true } as never);
   vi.mocked(queries.useFeatures).mockReturnValue(features);
@@ -186,6 +275,15 @@ describe('экран «Каркас здания»', () => {
     vi.mocked(client.startSheetRegisterExtract)
       .mockReset()
       .mockImplementation(() => ok({ id: 'j-2' }));
+    vi.mocked(client.getPlanAlignments)
+      .mockReset()
+      .mockImplementation(() => ok(ALIGNMENTS));
+    vi.mocked(client.bulkPlanAlignmentStatus)
+      .mockReset()
+      .mockImplementation(() => ok({ updated: 2 }));
+    vi.mocked(client.startPlanAlign)
+      .mockReset()
+      .mockImplementation(() => ok({ id: 'j-3' }));
   });
 
   it('флаг закрыт — заглушка, запроса нет', () => {
@@ -241,5 +339,37 @@ describe('экран «Каркас здания»', () => {
     setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Разобрать ведомости' }));
     await waitFor(() => expect(client.startSheetRegisterExtract).toHaveBeenCalled());
+  });
+
+  it('совмещение: секции, сдвиг, причины и пачка только без замечаний', async () => {
+    setup();
+    const rows = await screen.findAllByTestId('plan-alignment');
+    expect(rows).toHaveLength(4);
+    expect(screen.getByText('Корпус 1 · секция 1')).toBeInTheDocument();
+    expect(screen.getByText('Корпус 1 · секция 2')).toBeInTheDocument();
+    expect(within(rows[0]!).getByText('Задаёт систему координат секции')).toBeInTheDocument();
+    expect(
+      within(rows[1]!).getByText(
+        'Поворот 0° · сдвиг 100 мм, -250 мм · оси 3 из 3 · невязка 4 мм (макс. 6 мм)',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(rows[2]!).getByText('план повёрнут относительно эталона на 90°'),
+    ).toBeInTheDocument();
+    expect(within(rows[3]!).getByText('Не совмещался')).toBeInTheDocument();
+    expect(screen.getByTestId('align-summary')).toHaveTextContent('без CAD: 1');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Принять совмещённые без замечаний (2)' }),
+    );
+    await waitFor(() => expect(client.bulkPlanAlignmentStatus).toHaveBeenCalled());
+    const options = vi.mocked(client.bulkPlanAlignmentStatus).mock.calls[0]![0];
+    expect(options.body).toEqual({ ids: ['a-ref', 'a-ios'], status: 'confirmed' });
+  });
+
+  it('«Совместить планы» ставит задание', async () => {
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Совместить планы' }));
+    await waitFor(() => expect(client.startPlanAlign).toHaveBeenCalled());
   });
 });
