@@ -16,7 +16,7 @@ from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
 from app.contracts.cad_building3d import CadBuilding3dRead
 from app.errors import not_found
-from app.services import cad_building3d
+from app.services import cad_building3d_assembly
 from app.services import projects as projects_service
 
 router = APIRouter(tags=["cad-building3d"], dependencies=[require_feature("cad.export")])
@@ -43,7 +43,7 @@ async def read_cad_building3d(
     )
     if project is None:
         raise not_found("Проект")
-    return await cad_building3d.build_building3d(
+    return await cad_building3d_assembly.build_building3d(
         session, storage, workspace_id=context.tenant, project_id=project_id, include_walls=walls
     )
 

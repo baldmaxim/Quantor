@@ -718,9 +718,25 @@ export type CadBuilding3dFloorRead = {
      */
     alignment_axes: Array<string>;
     /**
+     * Alignment Axes Common
+     */
+    alignment_axes_common?: number | null;
+    /**
+     * Alignment Max Mm
+     */
+    alignment_max_mm?: number | null;
+    /**
      * Alignment Message
      */
     alignment_message: string | null;
+    /**
+     * Alignment Rms Mm
+     */
+    alignment_rms_mm?: number | null;
+    /**
+     * Alignment Scale Permille
+     */
+    alignment_scale_permille?: number | null;
     /**
      * Base Z Mm
      */
@@ -749,6 +765,10 @@ export type CadBuilding3dFloorRead = {
      * Floor Height Mm
      */
     floor_height_mm: number;
+    /**
+     * Floor Height Source
+     */
+    floor_height_source?: 'derived_stack' | 'default' | null;
     /**
      * Group Key
      */
@@ -812,6 +832,10 @@ export type CadBuilding3dFloorRead = {
      * Slab Thickness Mm
      */
     slab_thickness_mm: number;
+    /**
+     * Typical Of
+     */
+    typical_of?: string | null;
     /**
      * View
      */
@@ -927,6 +951,10 @@ export type CadBuilding3dRead = {
      */
     groups: Array<CadBuilding3dGroupRead>;
     /**
+     * Service Sheets
+     */
+    service_sheets?: Array<CadBuilding3dServiceSheetRead>;
+    /**
      * Units
      */
     units: 'mm';
@@ -934,6 +962,46 @@ export type CadBuilding3dRead = {
      * Warnings
      */
     warnings: Array<CadBuilding3dWarningRead>;
+};
+
+/**
+ * CadBuilding3dServiceSheetRead
+ *
+ * Служебный лист: конструкции посчитаны, но в стопку этажей здания лист не входит.
+ */
+export type CadBuilding3dServiceSheetRead = {
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Reason
+     */
+    reason: 'not_plan' | 'superseded';
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * View
+     */
+    view: number;
 };
 
 /**
@@ -4530,6 +4598,10 @@ export type CadScaleRead = {
      * Fit Controls
      */
     fit_controls: number;
+    /**
+     * Fitted Mm Per Pdf Point
+     */
+    fitted_mm_per_pdf_point?: number | null;
     /**
      * Heldout Chains
      */

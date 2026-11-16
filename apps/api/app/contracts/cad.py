@@ -489,6 +489,9 @@ class CadScaleRead(BaseModel):
     reason: str | None = None
     method: str | None
     mm_per_pdf_point: float | None
+    # Подбор движка по размерным цепочкам. У масштаба оператора `mm_per_pdf_point` - его
+    # калибровка (по ней построен DXF), а подбор остаётся здесь: с ним сверяется кадр вида.
+    fitted_mm_per_pdf_point: float | None = None
     scale_denominator: float | None
     printed_scale_labels: list[float]
     printed_scale_consistent: bool | None

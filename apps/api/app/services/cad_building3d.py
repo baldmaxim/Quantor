@@ -12,6 +12,10 @@
 наибольшим числом общих марок (обычно паркинг), смещение тоже применено, клиент получает геометрию
 поставленных зданий в системе объекта, не поставленных - в системе эталонного этажа группы.
 
+В стопку идут только планы этажей и уровней (`plan_problem`): разрез или таблица с посчитанными
+конструкциями - служебный лист. Сборку ответа (дубли планов, сведение групп одного корпуса, высота
+по стопке, этажи типовых листов) ведёт `cad_building3d_assembly`.
+
 Порядок работы: сначала всё нужное из базы — последовательно (сессия не конкурентна), затем
 `walls.json` листов читаются из хранилища параллельно с ограничением, проверка контракта и сборка
 этажа идут в потоке. Этаж листа до совмещения запоминается в памяти процесса (`floor_cache`) по
@@ -23,6 +27,7 @@ MEP вид не входит.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import math
 import re
 import statistics
@@ -42,19 +47,19 @@ from app.contracts.cad_building3d import (
     CadBuilding3dGroupRead,
     CadBuilding3dLevelZoneRead,
     CadBuilding3dPlacement,
-    CadBuilding3dRead,
     CadBuilding3dWallRead,
     CadBuilding3dWarningRead,
 )
-from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
+from app.contracts.cad_constructions import CadSheetFloorTitle, CadSheetLevelsRead, WallsDocument
 from app.contracts.cad_floor3d import WallsFloorExtras, WallsLevels
 from app.domain import JobStatus, JobType
-from app.models import Document, DocumentRevision, Job, Sheet
+from app.models import Document, DocumentRevision, Job, Sheet, SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_construction_store, cad_site_cores, cad_views, cad_walls
 from app.services import documents as documents_service
 from app.services.cad_constructions import ProjectSlab, effective_levels
-from app.services.cad_floor_title import format_floor_title
+from app.services.cad_floor_title import floors_text, format_floor_title
+from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 MAX_OUTLINE_POINTS: Final = 200
@@ -75,6 +80,25 @@ DEFAULT_SLAB_THICKNESS_MM: Final = 200
 AXIS_TOLERANCE_MM: Final = 150.0
 # Минимальная доля перекрытия bbox совмещённого этажа с эталоном (от меньшего bbox).
 MIN_ALIGN_OVERLAP: Final = 0.3
+# Наклон шкалы лист - эталон (промилле): больше первого - предупреждение, больше второго - этаж
+# не совмещается с причиной «масштаб листа». Оценка - по парам осей не ближе `SCALE_MIN_SPAN_MM`
+# (на коротком отрезке сдвиг кружка на выноске даёт большой наклон), пар не меньше трёх.
+SCALE_WARN_PERMILLE: Final = 0.5
+SCALE_FAIL_PERMILLE: Final = 5.0
+SCALE_MIN_SPAN_MM: Final = 5000.0
+SCALE_MIN_PAIRS: Final = 3
+# Виды планов этажей и уровней в заголовке (`title.kind`, cad_walls с v1.15): только они - этажи.
+PLAN_KINDS: Final = frozenset({"floor", "roof", "roof_exit", "technical"})
+KIND_SINCE: Final = (1, 15)
+GENERATOR_VERSION: Final = re.compile(r"\.v(\d+)(?:\.(\d+))?")
+SHEET_KIND_LABELS: Final = {
+    SheetKind.SECTION.value: "разрез",
+    SheetKind.FACADE.value: "фасад",
+    SheetKind.SCHEME.value: "схема",
+    SheetKind.TABLE.value: "таблица",
+    SheetKind.TEXT.value: "текст",
+    SheetKind.GENERAL_DATA.value: "общие данные",
+}
 GROUP_NONE_KEY: Final = "none"
 GROUP_NONE_LABEL: Final = "Корпус не указан"
 MESSAGE_AXES_OUTDATED: Final = "оси не распознаны: пересчитайте конструкции листа"
@@ -96,6 +120,10 @@ CORE_MIN_RINGS: Final = 4
 # Опора по ядрам: этажи здания площадью от этого (м², сводный план секций), не больше трёх.
 CORE_PIN_MIN_AREA_M2: Final = 1200
 CORE_PIN_FLOORS: Final = 3
+# Резерв по ядрам (`CoreMatch.reserve`) принимается, только если контур здания лежит в пределах
+# контура основы (доля вершин, с допуском у границы) и здание не ложится на поставленные.
+CORE_RESERVE_INSIDE: Final = 0.9
+CORE_RESERVE_EDGE_MM: Final = 2000.0
 
 Point = tuple[float, float]
 
@@ -239,6 +267,10 @@ class SheetRef:
     checks_key: str | None = None
     # Название листа из штампа: по нему узнаётся сводный лист отдельных планов секций.
     stamp_title: str | None = None
+    # Паспорт листа (не отклонённый): вид листа, корпус и секция; паспорта нет - `None`.
+    passport_kind: str | None = None
+    passport_building: str | None = None
+    passport_section: str | None = None
 
 
 # «Секции 8, 9, 10, 15-16, 17, …»: перечень секций через запятую в названии листа.
@@ -261,6 +293,76 @@ def is_summary_sheet(stamp_title: str | None) -> bool:
         return False
     items = [item for item in found.group(1).split(",") if item.strip(" -–")]
     return len(items) >= SUMMARY_MIN_SECTIONS
+
+
+def _knows_kind(generator: str) -> bool:
+    """Версия `cad_walls` пишет вид плана в заголовок (с v1.15); не разобрать версию - нет."""
+    found = GENERATOR_VERSION.search(generator)
+    if found is None:
+        return False
+    return (int(found.group(1)), int(found.group(2) or 0)) >= KIND_SINCE
+
+
+def plan_problem(document: WallsDocument, passport_kind: str | None) -> str | None:
+    """Почему лист не план этажа или уровня (в стопку этажей не идёт); план - `None`.
+
+    План - лист с видом плана в заголовке (`title.kind`) или с паспортом `floor_plan`: паспорт
+    подземной автостоянки бывает «таблица» (экспликация на том же листе), а заголовок плана у неё
+    есть. Паспорт с другим видом без заголовка плана - служебный лист (разрез с конструкциями).
+    Без паспорта решает заголовок; файл `cad_walls` до v1.15 вида плана не пишет - по нему лист
+    не отсеять, он остаётся этажом.
+    """
+    title = document.heights.title
+    if title is not None and title.kind in PLAN_KINDS:
+        return None
+    if passport_kind == SheetKind.FLOOR_PLAN.value:
+        return None
+    if passport_kind is not None:
+        kind = SHEET_KIND_LABELS.get(passport_kind, passport_kind)
+        return f"не план этажа: по паспорту листа - {kind}"
+    if _knows_kind(document.generator):
+        return "не план этажа: заголовок плана на листе не найден"
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class TypicalPlan:
+    """Типовой лист на несколько этажей: подписи этажей и отметки остальных от этажа листа.
+
+    `own` - подпись этажа самого листа («К10 · С12-14 · 5 эт. (по листу «5, 7 эт.»)»), `others` -
+    остальные этажи листа: подпись и разность отметки с этажом листа, мм.
+    """
+
+    own: str
+    others: tuple[tuple[str, int], ...]
+
+
+def typical_plan(document: WallsDocument, fallback: str) -> TypicalPlan | None:
+    """Этажи типового листа по заголовку: этажей несколько и у каждого своя отметка.
+
+    Этаж листа - тот, чья отметка заголовка равна отметке листа (иначе первый). Числа этажей и
+    отметок не сходятся - разнести нечем, `None`.
+    """
+    title = document.heights.title
+    if title is None or len(title.floors) < 2 or len(title.marks_mm) != len(title.floors):
+        return None
+    marks = title.marks_mm
+    elevation = document.heights.floor_elevation_mm
+    own = marks.index(elevation) if elevation in marks else 0
+    sheet = floors_text(title.floors)
+
+    def label(index: int) -> str:
+        single = CadSheetFloorTitle(
+            corps=title.corps, section=title.section, floors=[title.floors[index]], kind=title.kind
+        )
+        return f"{format_floor_title(single, fallback)} (по листу «{sheet} эт.»)"
+
+    others = tuple(
+        (label(i), marks[i] - marks[own])
+        for i in range(len(marks))
+        if i != own and marks[i] != marks[own]
+    )
+    return TypicalPlan(label(own), others) if others else None
 
 
 def group_of(corps: str | None, section: str | None) -> tuple[str, str]:
@@ -605,6 +707,10 @@ class BuiltFloor:
     axes: FloorAxes
     # Монолитные стены и пилоны листа (кольца, мм DXF): по ним скопления ставятся на объект.
     cores: tuple[CoreRing, ...] = ()
+    # Остальные этажи типового листа; лист одного этажа - `None`.
+    typical: TypicalPlan | None = None
+    # Корпус и секция паспорта листа: подсказка при сведении групп одного корпуса.
+    hint: tuple[str | None, str | None] = (None, None)
 
 
 def _agreed(diffs: dict[str, float]) -> tuple[list[str], int]:
@@ -644,9 +750,20 @@ def _plurality(diffs: dict[str, float]) -> tuple[float, list[str]] | None:
     return statistics.median(diffs[label] for label in agreed), agreed
 
 
+@dataclass(frozen=True, slots=True)
+class _OrientMatch:
+    """Совмещение по одному направлению: сдвиг, согласные подписи, остатки согласных осей после
+    сдвига (мм) и число общих подписей."""
+
+    shift: float
+    labels: list[str]
+    residuals: list[float]
+    common: int
+
+
 def _match_orient(
     reference: dict[str, float], other: dict[str, float], name: str
-) -> tuple[float, list[str]] | str:
+) -> _OrientMatch | str:
     """Смещение по одному направлению (по согласному большинству) и согласные подписи, либо
     причина отказа."""
     common = sorted(reference.keys() & other.keys(), key=_natural_key)
@@ -656,7 +773,58 @@ def _match_orient(
     found = _plurality(diffs)
     if found is None:
         return f"{name} оси расходятся с эталоном: {', '.join(common)}"
-    return found
+    shift, labels = found
+    return _OrientMatch(shift, labels, [diffs[label] - shift for label in labels], len(common))
+
+
+def _scale_ratio(
+    base: FloorAxes, ours: FloorAxes, only: frozenset[str] | None = None
+) -> float | None:
+    """Отношение шкал эталон / лист: медиана отношений расстояний между общими осями.
+
+    Берутся пары осей одного направления не ближе `SCALE_MIN_SPAN_MM` на листе; `only` - только
+    эти подписи (согласные). Медиана не боится нескольких кружков на выносках. Пар меньше
+    `SCALE_MIN_PAIRS` - оценки нет.
+    """
+    ratios: list[float] = []
+    for ref, own in ((base.vertical, ours.vertical), (base.horizontal, ours.horizontal)):
+        labels = sorted(label for label in ref.keys() & own.keys() if only is None or label in only)
+        for i, first in enumerate(labels):
+            for second in labels[i + 1 :]:
+                span = own[second] - own[first]
+                if abs(span) >= SCALE_MIN_SPAN_MM:
+                    ratios.append((ref[second] - ref[first]) / span)
+    return statistics.median(ratios) if len(ratios) >= SCALE_MIN_PAIRS else None
+
+
+def _permille(ratio: float) -> float:
+    return round((ratio - 1.0) * 1000.0, 2)
+
+
+def _scale_message(ratio: float) -> str:
+    drift = f"{_permille(ratio):+.1f}".replace(".", ",")
+    times = f"{ratio:.3f}".replace(".", ",")
+    return (
+        f"масштаб листа: расстояния между осями расходятся с эталоном на {drift} ‰ "
+        f"(в {times} раза) - проверьте калибровку листа и эталона"
+    )
+
+
+def _scale_explains(base: FloorAxes, ours: FloorAxes) -> float | None:
+    """Отношение шкал, если расхождение осей с эталоном объясняется масштабом листа.
+
+    Оси «расходятся», когда лист построен в другом масштабе: сдвиги марок растут вдоль листа.
+    Масштаб - причина, если наклон шкалы больше `SCALE_FAIL_PERMILLE` и после поправки на него
+    оси сходятся в обоих направлениях. Иначе - `None` (другая сетка осей, выноски).
+    """
+    ratio = _scale_ratio(base, ours)
+    if ratio is None or ratio <= 0 or abs(_permille(ratio)) <= SCALE_FAIL_PERMILLE:
+        return None
+    for ref, own in ((base.vertical, ours.vertical), (base.horizontal, ours.horizontal)):
+        scaled = {label: value * ratio for label, value in own.items()}
+        if isinstance(_match_orient(ref, scaled, ""), str):
+            return None
+    return ratio
 
 
 def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding3dFloorRead:
@@ -707,7 +875,10 @@ def _center(box: Sequence[float] | None) -> Point | None:
 
 
 def _fallback(
-    item: BuiltFloor, reference: BuiltFloor | None, message: str
+    item: BuiltFloor,
+    reference: BuiltFloor | None,
+    message: str,
+    scale_permille: float | None = None,
 ) -> CadBuilding3dFloorRead:
     """Не совмещён: центр bbox на центр эталона (или без смещения) и причина."""
     dx = dy = 0.0
@@ -718,7 +889,12 @@ def _fallback(
     if target is not None and own is not None:
         dx, dy = target[0] - own[0], target[1] - own[1]
     return _shifted(item.floor, dx, dy).model_copy(
-        update={"alignment": "none", "alignment_axes": [], "alignment_message": message}
+        update={
+            "alignment": "none",
+            "alignment_axes": [],
+            "alignment_message": message,
+            "alignment_scale_permille": scale_permille,
+        }
     )
 
 
@@ -791,11 +967,9 @@ def _split_unnamed(
         key = f"{GROUP_NONE_KEY}-{number}"
         label = f"{GROUP_NONE_LABEL} · {items[sub_ref].floor.label}"
         renamed = [
-            BuiltFloor(
-                items[i].floor.model_copy(update={"group_key": key, "group_label": label}),
-                items[i].order,
-                items[i].axes,
-                items[i].cores,
+            dataclasses.replace(
+                items[i],
+                floor=items[i].floor.model_copy(update={"group_key": key, "group_label": label}),
             )
             for i in members
         ]
@@ -850,10 +1024,18 @@ def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead
     along_x = _match_orient(base.vertical, ours.vertical, "вертикальных")
     along_y = _match_orient(base.horizontal, ours.horizontal, "горизонтальных")
     if isinstance(along_x, str) or isinstance(along_y, str):
+        wrong = _scale_explains(base, ours)
+        if wrong is not None:
+            return _fallback(item, reference, _scale_message(wrong), _permille(wrong))
         problems = [m for m in (along_x, along_y) if isinstance(m, str)]
         return _fallback(item, reference, "; ".join(problems))
-    shifted = _shifted(item.floor, along_x[0], along_y[0])
-    labels = [*along_x[1], *along_y[1]]
+    labels = [*along_x.labels, *along_y.labels]
+    ratio = _scale_ratio(base, ours, frozenset(labels))
+    permille = None if ratio is None else _permille(ratio)
+    if ratio is not None and permille is not None and abs(permille) > SCALE_FAIL_PERMILLE:
+        return _fallback(item, reference, _scale_message(ratio), permille)
+    shifted = _shifted(item.floor, along_x.shift, along_y.shift)
+    residuals = [*along_x.residuals, *along_y.residuals]
     if shifted.bbox is not None and reference.floor.bbox is not None:
         share = _overlap_share(shifted.bbox, reference.floor.bbox)
         if share < MIN_ALIGN_OVERLAP:
@@ -868,6 +1050,10 @@ def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead
             "alignment": "axes",
             "alignment_axes": labels,
             "alignment_message": None,
+            "alignment_rms_mm": round(math.sqrt(sum(r * r for r in residuals) / len(residuals)), 1),
+            "alignment_max_mm": round(max(abs(r) for r in residuals), 1),
+            "alignment_axes_common": along_x.common + along_y.common,
+            "alignment_scale_permille": permille,
         }
     )
 
@@ -1149,11 +1335,20 @@ BASE_CACHE_MAX: Final = 8
 def _register_cached(
     base: Sequence[CoreRing], other: Sequence[CoreRing]
 ) -> cad_site_cores.CoreMatch | None:
-    base_key = hash(tuple(base))
-    key = (base_key, hash(tuple(other)))
+    key = (hash(tuple(base)), hash(tuple(other)))
     if key in _CORE_CACHE:
         _CORE_CACHE.move_to_end(key)
         return _CORE_CACHE[key]
+    found = cad_site_cores.register(base_index(base), other)
+    _CORE_CACHE[key] = found
+    while len(_CORE_CACHE) > CORE_CACHE_MAX:
+        _CORE_CACHE.popitem(last=False)
+    return found
+
+
+def base_index(base: Sequence[CoreRing]) -> cad_site_cores.BaseIndex:
+    """Индекс монолита основы (клетки и элементы) из кеша процесса: ключ - содержимое колец."""
+    base_key = hash(tuple(base))
     index = _BASE_CACHE.get(base_key)
     if index is None:
         index = cad_site_cores.index_base(base)
@@ -1162,11 +1357,7 @@ def _register_cached(
             _BASE_CACHE.popitem(last=False)
     else:
         _BASE_CACHE.move_to_end(base_key)
-    found = cad_site_cores.register(index, other)
-    _CORE_CACHE[key] = found
-    while len(_CORE_CACHE) > CORE_CACHE_MAX:
-        _CORE_CACHE.popitem(last=False)
-    return found
+    return index
 
 
 def _moved_ring(ring: CoreRing, rotation: float, dx: float, dy: float) -> CoreRing:
@@ -1367,13 +1558,18 @@ def _axis_links(
 
 
 def _group_floor_cores(
-    items: Sequence[BuiltFloor], aligned: Sequence[CadBuilding3dFloorRead], key: str
-) -> list[list[CoreRing]]:
-    """Ядра нижних больших этажей здания по отдельности, в системе эталона здания (снизу вверх).
+    items: Sequence[BuiltFloor],
+    aligned: Sequence[CadBuilding3dFloorRead],
+    key: str,
+    min_area_m2: int = CORE_PIN_MIN_AREA_M2,
+) -> list[tuple[int, list[CoreRing]]]:
+    """Ядра нижних больших этажей здания по отдельности, в системе эталона здания (снизу вверх),
+    с индексом этажа.
 
-    Пробуются только этажи от `CORE_PIN_MIN_AREA_M2`: сводный план нескольких секций по ядрам
-    встаёт однозначно, а ядро одной башни похоже на многие места подземки - башня встаёт по осям
-    от опоры. Не больше `CORE_PIN_FLOORS`: первый этаж может не совпасть (монолит другого уровня),
+    Пробуются только этажи от `min_area_m2`: сводный план нескольких секций по ядрам встаёт
+    однозначно, а ядро одной башни похоже на многие места подземки - башня встаёт по осям от
+    опоры (резерв пробует все нижние этажи, но с отрывом от второго варианта и проверками по
+    месту). Не больше `CORE_PIN_FLOORS`: первый этаж может не совпасть (монолит другого уровня),
     а следующий - совпасть.
     """
     rows = sorted(
@@ -1381,13 +1577,120 @@ def _group_floor_cores(
         for i, floor in enumerate(aligned)
         if floor.group_key == key
         and len(items[i].cores) >= CORE_MIN_RINGS
-        and _floor_area_m2(floor) >= CORE_PIN_MIN_AREA_M2
+        and _floor_area_m2(floor) >= min_area_m2
     )
-    out: list[list[CoreRing]] = []
+    out: list[tuple[int, list[CoreRing]]] = []
     for *_rank, index in rows[:CORE_PIN_FLOORS]:
         fx, fy = aligned[index].offset_mm
-        out.append([_moved_ring(ring, 0.0, fx, fy) for ring in items[index].cores])
+        out.append((index, [_moved_ring(ring, 0.0, fx, fy) for ring in items[index].cores]))
     return out
+
+
+SiteLevel = tuple[int, tuple[float, float, float, float]]
+
+
+def _site_levels(info: _GroupInfo, rotation_deg: float, offset: Point) -> list[SiteLevel]:
+    """Этажи здания с отметкой в системе объекта: отметка и bbox после поворота и сдвига."""
+    levels: list[SiteLevel] = []
+    for _low, _high, z, box in info.levels:
+        corners = [
+            cad_site_cores.transform_point(x, y, rotation_deg, offset[0], offset[1])
+            for x in (box[0], box[2])
+            for y in (box[1], box[3])
+        ]
+        xs, ys = [c[0] for c in corners], [c[1] for c in corners]
+        levels.append((z, (min(xs), min(ys), max(xs), max(ys))))
+    return levels
+
+
+def _site_clash(first: Sequence[SiteLevel], second: Sequence[SiteLevel]) -> bool:
+    """Этажи двух зданий на одной отметке занимают одно место на объекте."""
+    return any(
+        abs(z1 - z2) <= SITE_SAME_LEVEL_MM and _overlap_share(box1, box2) > SITE_MAX_OVERLAP
+        for z1, box1 in first
+        for z2, box2 in second
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _Reserve:
+    """Итог резерва по ядрам: принятая опора (`key`, `pin`) и причины отказа по зданиям."""
+
+    key: str | None
+    pin: cad_site_cores.CoreMatch | None
+    notes: dict[str, str]
+    tried: dict[str, cad_site_cores.CoreMatch]
+
+
+def _reserve_pin(
+    items: Sequence[BuiltFloor],
+    aligned: Sequence[CadBuilding3dFloorRead],
+    infos: dict[str, _GroupInfo],
+    placed: dict[str, GroupPlacement],
+    site: Sequence[CoreRing],
+    base_outline: Sequence[Sequence[float]],
+) -> _Reserve:
+    """Резерв по ядрам: первое не поставленное здание, которое можно поставить с проверками.
+
+    Пробуются нижние этажи каждого не поставленного здания (любой площади), большие здания
+    первыми. Совмещение годится, если оно резервное (`CoreMatch.reserve`: доля меньше обычной, но
+    с большим отрывом от второго варианта), контур совмещённых этажей здания лежит в пределах
+    контура основы и здание не ложится на уже поставленные на той же отметке. Одна доля ядер для
+    башни ничего не значит: её ядро похоже на многие места подземки.
+    """
+    notes: dict[str, str] = {}
+    tried: dict[str, cad_site_cores.CoreMatch] = {}
+    sizes = {
+        key: max((_floor_area_m2(f) for f in aligned if f.group_key == key), default=0)
+        for key in infos
+    }
+    for key in sorted((k for k in infos if k not in placed), key=lambda k: (-sizes[k], k)):
+        best: cad_site_cores.CoreMatch | None = None
+        matched = -1
+        for index, rings in _group_floor_cores(items, aligned, key, 0):
+            found = _register_cached(site, rings)
+            if found is None:
+                continue
+            if key not in tried or found.share > tried[key].share:
+                tried[key] = found
+            if found.reserve and (best is None or found.share > best.share):
+                best, matched = found, index
+        if best is None:
+            continue
+        # Контур здания: этаж, давший совмещение, и совмещённые с ним по осям этажи группы.
+        together = aligned[matched].alignment != "none"
+        points = [
+            cad_site_cores.transform_point(x, y, best.rotation_deg, best.tx, best.ty)
+            for i, floor in enumerate(aligned)
+            if i == matched or (together and floor.group_key == key and floor.alignment != "none")
+            for x, y in floor.outline
+        ]
+        inside = cad_site_cores.inside_share(points, base_outline, CORE_RESERVE_EDGE_MM)
+        if inside < CORE_RESERVE_INSIDE:
+            notes[key] = (
+                f"совпадение по ядрам {best.share:.0%} (у другого варианта "
+                f"{best.second_share:.0%}) не принято: контур здания выходит за контур основы "
+                f"({inside:.0%} внутри)"
+            )
+            continue
+        levels = _site_levels(infos[key], best.rotation_deg, (best.tx, best.ty))
+        clash = next(
+            (
+                k
+                for k, p in placed.items()
+                if _site_clash(_site_levels(infos[k], p.rotation_deg, p.offset_mm), levels)
+            ),
+            None,
+        )
+        if clash is not None:
+            notes[key] = (
+                f"совпадение по ядрам {best.share:.0%} (у другого варианта "
+                f"{best.second_share:.0%}) не принято: здание ложится на «{infos[clash].label}» "
+                "на той же отметке"
+            )
+            continue
+        return _Reserve(key, best, notes, tried)
+    return _Reserve(None, None, notes, tried)
 
 
 def place_site(
@@ -1402,6 +1705,11 @@ def place_site(
     по цепочке (ближайшая опора выигрывает): сводный лист, на котором крыло комплекса нарисовано не
     в той ориентации, что на объекте, не уводит крыло, у которого есть своя опора. Совпадение марок
     без номера секции принимается только без наложения этажей на одной отметке.
+
+    Здание, не вставшее ни так, ни так, пробует резерв по ядрам (`_reserve_pin`): совмещение с
+    меньшей долей, но с большим отрывом от второго варианта, принятое только в пределах контура
+    основы и без наложения на поставленные здания. Вставшее по резерву - тоже опора: к нему по осям
+    присоединяются остальные.
 
     Если ни одно здание по ядрам не встало, постановка - как раньше, только по осям
     (`place_groups` и `place_by_cores`).
@@ -1428,7 +1736,7 @@ def place_site(
         if key == base_key:
             continue
         best: cad_site_cores.CoreMatch | None = None
-        for rings in _group_floor_cores(items, aligned, key):
+        for _index, rings in _group_floor_cores(items, aligned, key):
             found = _register_cached(site, rings)
             if found is not None and (
                 best is None or (found.accepted, found.share) > (best.accepted, best.share)
@@ -1439,14 +1747,12 @@ def place_site(
         tried[key] = best
         if best.accepted:
             pins[key] = best
-    if not pins:
-        return place_by_cores(items, aligned, place_groups(items, aligned))
-    links = _axis_links(infos)
     placed: dict[str, GroupPlacement] = {
         base_key: GroupPlacement("reference", (0.0, 0.0), (), None, None, base_key)
     }
     hops: dict[str, int] = {base_key: 0}
-    for key, pin in pins.items():
+
+    def pin_group(key: str, pin: cad_site_cores.CoreMatch) -> None:
         placed[key] = GroupPlacement(
             "cores",
             (pin.tx, pin.ty),
@@ -1458,83 +1764,49 @@ def place_site(
             round(pin.share, 3),
         )
         hops[key] = 0
+
+    base_outline = aligned[biggest].outline
+    reserve_notes: dict[str, str] = {}
+    if not pins:
+        first = _reserve_pin(items, aligned, infos, placed, site, base_outline)
+        if first.key is None or first.pin is None:
+            return place_by_cores(items, aligned, place_groups(items, aligned))
+        pins[first.key] = first.pin
+    links = _axis_links(infos)
+    for key, pin in pins.items():
+        pin_group(key, pin)
     rejected: dict[str, str] = {}
     while True:
-        candidates = sorted(
-            (
-                (base, other, match)
-                for (base, other), match in links.items()
-                if base in placed and other not in placed
-            ),
-            key=lambda row: (
-                hops[row[0]],
-                not row[2].prefixed,
-                -len(row[2].labels),
-                keys.index(row[1]),
-                keys.index(row[0]),
-            ),
-        )
-        attached = False
-        for base, other, match in candidates:
-            anchor_p = placed[base]
-            sx, sy = cad_site_cores.transform_point(
-                match.shift[0], match.shift[1], anchor_p.rotation_deg, 0.0, 0.0
-            )
-            offset = (anchor_p.offset_mm[0] + sx, anchor_p.offset_mm[1] + sy)
-            if not match.prefixed:
-                if not (infos[other].levels and infos[base].levels):
-                    rejected[other] = (
-                        f"совпадение по осям {', '.join(match.labels)} без номера секции, а этажей "
-                        "с отметкой для проверки наложения нет"
-                    )
-                    continue
-                clash = next(
-                    (
-                        k
-                        for k, p in placed.items()
-                        if p.rotation_deg == anchor_p.rotation_deg
-                        and _clash(infos[k], p.offset_mm, infos[other], offset)
-                    ),
-                    None,
-                )
-                if clash is not None:
-                    rejected[other] = (
-                        f"по осям {', '.join(match.labels)} здание ложится на "
-                        f"«{infos[clash].label}» на той же отметке: совпадение марок случайное"
-                    )
-                    continue
-            placed[other] = GroupPlacement(
-                "axes",
-                (round(offset[0], 3), round(offset[1], 3)),
-                tuple(sorted(match.labels, key=_natural_key)),
-                base,
-                None,
-                anchor_p.cluster,
-                anchor_p.rotation_deg,
-            )
-            hops[other] = hops[base] + 1
-            rejected.pop(other, None)
-            attached = True
+        if _attach_by_axes(infos, keys, links, placed, hops, rejected):
+            continue
+        reserve = _reserve_pin(items, aligned, infos, placed, site, base_outline)
+        reserve_notes = reserve.notes
+        for key, found in reserve.tried.items():
+            previous = tried.get(key)
+            if previous is None or found.share > previous.share:
+                tried[key] = found
+        if reserve.key is None or reserve.pin is None:
             break
-        if not attached:
-            break
+        pin_group(reserve.key, reserve.pin)
     base_label = infos[base_key].label
     for key in keys:
         if key in placed:
             continue
         found = tried.get(key)
-        message = rejected.get(key)
+        message = rejected.get(key) or reserve_notes.get(key)
         if message is None and found is not None:
             message = (
                 f"по ядрам не совмещено с «{base_label}»: совпадение {found.share:.0%}, у другого "
                 f"варианта {found.second_share:.0%} (нужно не меньше "
-                f"{cad_site_cores.MIN_SHARE:.0%} и вдвое больше; у листа с неверным масштабом ядра "
+                f"{cad_site_cores.MIN_SHARE:.0%} и вдвое больше либо от "
+                f"{cad_site_cores.RESERVE_SHARE:.0%} при отрыве в "
+                f"{cad_site_cores.RESERVE_RATIO:g} раза; у листа с неверным масштабом ядра "
                 "не совпадут), общих осей с поставленными зданиями нет"
             )
         elif message is None:
             message = (
-                "нет общих осей с поставленными зданиями; по ядрам ставятся только сводные планы "
-                f"от {CORE_PIN_MIN_AREA_M2} м² с монолитом"
+                "нет общих осей с поставленными зданиями, монолитных стен и пилонов для "
+                "совмещения по ядрам мало"
             )
         placed[key] = GroupPlacement(
             "none",
@@ -1547,6 +1819,76 @@ def place_site(
             None if found is None else round(found.share, 3),
         )
     return placed
+
+
+def _attach_by_axes(
+    infos: dict[str, _GroupInfo],
+    keys: Sequence[str],
+    links: dict[tuple[str, str], _SiteMatch],
+    placed: dict[str, GroupPlacement],
+    hops: dict[str, int],
+    rejected: dict[str, str],
+) -> bool:
+    """Присоединение одного здания по осям к уже поставленным; некого присоединить - `False`.
+
+    Сначала к опорам, потом дальше по цепочке (ближайшая опора выигрывает); совпадение марок без
+    номера секции принимается только без наложения этажей на одной отметке.
+    """
+    candidates = sorted(
+        (
+            (base, other, match)
+            for (base, other), match in links.items()
+            if base in placed and other not in placed
+        ),
+        key=lambda row: (
+            hops[row[0]],
+            not row[2].prefixed,
+            -len(row[2].labels),
+            keys.index(row[1]),
+            keys.index(row[0]),
+        ),
+    )
+    for base, other, match in candidates:
+        anchor_p = placed[base]
+        sx, sy = cad_site_cores.transform_point(
+            match.shift[0], match.shift[1], anchor_p.rotation_deg, 0.0, 0.0
+        )
+        offset = (anchor_p.offset_mm[0] + sx, anchor_p.offset_mm[1] + sy)
+        if not match.prefixed:
+            if not (infos[other].levels and infos[base].levels):
+                rejected[other] = (
+                    f"совпадение по осям {', '.join(match.labels)} без номера секции, а этажей "
+                    "с отметкой для проверки наложения нет"
+                )
+                continue
+            clash = next(
+                (
+                    k
+                    for k, p in placed.items()
+                    if p.rotation_deg == anchor_p.rotation_deg
+                    and _clash(infos[k], p.offset_mm, infos[other], offset)
+                ),
+                None,
+            )
+            if clash is not None:
+                rejected[other] = (
+                    f"по осям {', '.join(match.labels)} здание ложится на "
+                    f"«{infos[clash].label}» на той же отметке: совпадение марок случайное"
+                )
+                continue
+        placed[other] = GroupPlacement(
+            "axes",
+            (round(offset[0], 3), round(offset[1], 3)),
+            tuple(sorted(match.labels, key=_natural_key)),
+            base,
+            None,
+            anchor_p.cluster,
+            anchor_p.rotation_deg,
+        )
+        hops[other] = hops[base] + 1
+        rejected.pop(other, None)
+        return True
+    return False
 
 
 def apply_placements(
@@ -1765,6 +2107,26 @@ async def collect_sheets(
         ).all()
     }
     stamp_titles = await documents_service.sheet_titles(session, sheet_ids=list(sheet_ids.values()))
+    # Паспорта листов (не отклонённые человеком): вид листа отсеивает разрезы и таблицы, корпус и
+    # секция - подсказка при сведении групп одного корпуса.
+    passports = {
+        (row.revision_id, row.page_index): row
+        for row in (
+            await session.execute(
+                select(
+                    SheetPassport.revision_id,
+                    SheetPassport.page_index,
+                    SheetPassport.sheet_kind,
+                    SheetPassport.building,
+                    SheetPassport.section,
+                ).where(
+                    SheetPassport.project_id == project_id,
+                    SheetPassport.revision_id.in_(list(revisions)),
+                    SheetPassport.status != "rejected",
+                )
+            )
+        ).all()
+    }
     taken: set[tuple[uuid.UUID, int]] = set()
     sheets: list[SheetRef] = []
     for job, revision_id in ordered:
@@ -1776,6 +2138,7 @@ async def collect_sheets(
             if not views:
                 continue
             taken.add((document.id, page_index))
+            passport = passports.get((revision_id, page_index))
             for view in views:
                 label = f"{document.display_name} · лист {page_index + 1}"
                 if len(views) > 1:
@@ -1810,6 +2173,9 @@ async def collect_sheets(
                         stamp_title=stamp_titles.get(sheet_id)
                         if (sheet_id := sheet_ids.get((revision_id, page_index))) is not None
                         else None,
+                        passport_kind=None if passport is None else passport.sheet_kind,
+                        passport_building=None if passport is None else _clean(passport.building),
+                        passport_section=None if passport is None else _clean(passport.section),
                     )
                 )
     return sheets, [], project_slab
@@ -1882,6 +2248,9 @@ class _SheetFloor:
     axes: FloorAxes
     cost: int = 1
     cores: tuple[CoreRing, ...] = ()
+    typical: TypicalPlan | None = None
+    # Почему лист служебный (не план этажа): в стопку не идёт, но и не ошибка.
+    service: str | None = None
 
 
 # Ключ - всё, от чего зависит этаж листа: адрес и подпись листа, ключи артефактов (неизменны в
@@ -1961,6 +2330,7 @@ def _sheet_key(sheet: SheetRef, project_slab: ProjectSlab | None, include_walls:
         sheet.scale_key,
         sheet.checks_key,
         sheet.stamp_title,
+        sheet.passport_kind,
         sheet.overrides.model_dump_json(),
         project_slab,
         include_walls,
@@ -1975,18 +2345,41 @@ def _sheet_floor(
     include_walls: bool,
 ) -> _SheetFloor:
     """Этаж из прочитанного walls.json: проверка контракта и сборка. Чисто вычисление, без I/O."""
+    invalid = _SheetFloor(
+        None,
+        (
+            CadBuilding3dWarningRead(
+                code="walls_invalid",
+                message=f"{sheet.label}: walls.json вне контракта или без геометрии, "
+                "лист пропущен.",
+            ),
+        ),
+        NO_AXES,
+    )
     try:
         document = WallsDocument.model_validate(raw)
         extras = WallsFloorExtras.model_validate(raw)
+    except ValidationError:
+        return invalid
+    service = plan_problem(document, sheet.passport_kind)
+    if service is not None:
+        return _SheetFloor(None, (), NO_AXES, service=service)
+    try:
         floor, floor_warnings = build_floor(
             sheet, document, extras, project_slab, include_walls=include_walls
         )
     except (ValidationError, ValueError):
-        warning = CadBuilding3dWarningRead(
-            code="walls_invalid",
-            message=f"{sheet.label}: walls.json вне контракта или без геометрии, лист пропущен.",
+        return invalid
+    typical = typical_plan(document, sheet.label)
+    title = document.heights.title
+    if typical is None and title is not None and len(title.floors) > 1:
+        floor_warnings.append(
+            CadBuilding3dWarningRead(
+                code="typical_floors_unplaced",
+                message=f"{floor.label}: лист на несколько этажей, но отметок остальных этажей "
+                "в заголовке нет - этаж показан один раз.",
+            )
         )
-        return _SheetFloor(None, (warning,), NO_AXES)
     # Оси сводного листа не связывают здания: планы секций на нём разложены не как на объекте.
     summary = is_summary_sheet(sheet.stamp_title)
     axes = NO_AXES if frame is None or summary else axes_in_mm(raw, frame)
@@ -1998,7 +2391,7 @@ def _sheet_floor(
         + sum(len(wall.shell) for wall in floor.walls or ())
         + sum(len(zone.shell) + sum(len(h) for h in zone.holes) for zone in floor.levels)
     )
-    return _SheetFloor(floor, tuple(floor_warnings), axes, cost, cores)
+    return _SheetFloor(floor, tuple(floor_warnings), axes, cost, cores, typical)
 
 
 def core_rings(document: WallsDocument) -> tuple[CoreRing, ...]:
@@ -2041,45 +2434,3 @@ async def _load_sheet_floor(
     if cacheable:
         floor_cache.put(key, item, generation)
     return item
-
-
-async def build_building3d(
-    session: AsyncSession,
-    storage: ObjectStorage,
-    *,
-    workspace_id: uuid.UUID,
-    project_id: uuid.UUID,
-    include_walls: bool = False,
-) -> CadBuilding3dRead:
-    sheets, warnings, project_slab = await collect_sheets(
-        session, workspace_id=workspace_id, project_id=project_id
-    )
-    gate = asyncio.Semaphore(READ_CONCURRENCY)
-    generation = floor_cache.begin()
-    loaded = await asyncio.gather(
-        *(
-            _load_sheet_floor(storage, sheet, project_slab, include_walls, gate, generation)
-            for sheet in sheets
-        )
-    )
-    built: list[BuiltFloor] = []
-    for sheet, item in zip(sheets, loaded, strict=True):
-        warnings.extend(item.warnings)
-        if item.floor is not None:
-            built.append(BuiltFloor(item.floor, sheet.order, item.axes, item.cores))
-    aligned = align_floors(built)
-    # Постановка по ядрам - чистый расчёт на тысячах точек: в потоке, не на event loop.
-    placements = await asyncio.to_thread(place_site, built, aligned)
-    placed = apply_placements(aligned, placements)
-    floors = sort_floors([(f, item.order) for f, item in zip(placed, built, strict=True)])
-    groups = build_groups(floors, placements)
-    lost = [g.label for g in groups if g.placement == "none"]
-    if len(groups) > 1 and lost:
-        warnings.append(
-            CadBuilding3dWarningRead(
-                code="groups_not_placed",
-                message="Не поставлены на объект по осям и ядрам: "
-                f"{', '.join(lost)}. В виде «Весь объект» они стоят рядом.",
-            )
-        )
-    return CadBuilding3dRead(units="mm", floors=floors, groups=groups, warnings=warnings)

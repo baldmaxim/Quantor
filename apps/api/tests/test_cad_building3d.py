@@ -13,6 +13,7 @@ from app.contracts.cad_building3d import CadBuilding3dFloorRead
 from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
 from app.contracts.cad_floor3d import WallsFloorExtras
 from app.services import cad_building3d as b3d
+from app.services import cad_site_cores
 from app.services.cad_constructions import ProjectSlab
 from tests.test_cad_floor3d import BASE, NO_LEVELS, heights, raw_document, raw_extras
 
@@ -1007,6 +1008,89 @@ def test_building_whose_cores_do_not_match_stays_aside_with_reason() -> None:
     root = placements["k1-s1"]
     assert root.placement == "none"
     assert root.message is not None and "по ядрам" in root.message
+
+
+SITE_OUTLINE = [[0.0, 0.0], [220000.0, 0.0], [220000.0, 180000.0], [0.0, 180000.0]]
+
+
+def second_core() -> list[list[tuple[float, float]]]:
+    """Второе ядро плана, не похожее на первое: вдвоём они встают на подземку однозначно."""
+    from tests.test_cad_site_cores import wall
+
+    return [
+        wall(45000, 12000, 5200, 400),
+        wall(45000, 12400, 7400, 400, 90),
+        wall(48300, 13500, 2600, 300),
+        wall(50200, 10000, 6400, 400, 90),
+        wall(41000, 15000, 2800, 400),
+        wall(53000, 18000, 1800, 1800),
+        wall(43000, 6000, 5200, 400),
+        wall(55000, 7000, 3600, 400, 90),
+        wall(46500, 21500, 3000, 600),
+    ]
+
+
+def site_parking(*, outline: bool = True) -> b3d.BuiltFloor:
+    """Подземка 220 x 180 м с двумя ядрами плана секций, повёрнутыми на 27°, и чужими стенами.
+
+    `outline=False` - контур плиты подземки не по размеру листа (план ложится вне контура).
+    """
+    from tests.test_cad_site_cores import CORE, moved, wall
+
+    rings = moved([*CORE, *second_core()], 27.0, 120000.0, 45000.0)
+    rings += [wall(20000 + 9000 * i, 15000 + 4000 * (i % 3), 6000, 300) for i in range(6)]
+    rings += [wall(60000, 70000 + 5000 * i, 300, 3000, 90) for i in range(4)]
+    under = with_cores(
+        built(corps=None, section=None, elevation=BASE - 5000),
+        rings,
+        bbox=[0.0, 0.0, 220000.0, 180000.0],
+    )
+    if not outline:
+        return under
+    floor = under.floor.model_copy(update={"outline": SITE_OUTLINE})
+    return b3d.BuiltFloor(floor, under.order, under.axes, under.cores)
+
+
+def partial_cores() -> list[list[tuple[float, float]]]:
+    """Монолит плана: сквозь подземку проходят только два ядра, шесть пилонов 3 x 3 м - свои."""
+    from tests.test_cad_site_cores import CORE, wall
+
+    own = [wall(-8000 + 12000 * i, 26000 + 1500 * (i % 2), 3000, 3000) for i in range(6)]
+    return [*CORE, *second_core(), *own]
+
+
+def test_plan_with_partial_core_match_is_placed_by_the_reserve_inside_the_base() -> None:
+    """Доля ядер меньше обычной, но второго варианта нет, контур в пределах подземки - резерв."""
+    plan = with_cores(built(corps=None, section="1-6", order=1), partial_cores())
+    placements, _ = placed([site_parking(), plan])
+    root = placements["s1_6"]
+    assert (root.placement, root.anchor_key, root.message) == ("cores", "none", None)
+    assert root.share is not None
+    assert cad_site_cores.RESERVE_SHARE <= root.share < cad_site_cores.MIN_SHARE
+    assert root.rotation_deg == pytest.approx(27.0, abs=0.5)
+    assert root.offset_mm == pytest.approx((120000.0, 45000.0), abs=500.0)
+
+
+def test_reserve_is_not_taken_outside_the_base_outline() -> None:
+    plan = with_cores(built(corps=None, section="1-6", order=1), partial_cores())
+    placements, _ = placed([site_parking(outline=False), plan])
+    assert placements["s1_6"].placement == "none"
+
+
+def test_reserve_is_not_taken_over_a_placed_building_on_the_same_level() -> None:
+    from tests.test_cad_site_cores import CORE
+
+    tower = with_cores(
+        built(corps="1", section="1", order=1),
+        [*CORE, *second_core()],
+        bbox=[-8000.0, -5000.0, 58000.0, 30000.0],
+    )
+    plan = with_cores(built(corps=None, section="1-6", order=2), partial_cores())
+    placements, _ = placed([site_parking(), tower, plan])
+    assert placements["k1-s1"].placement == "cores"
+    lost = placements["s1_6"]
+    assert lost.placement == "none"
+    assert lost.message is not None and "ложится на «Корп. 1 · сек. 1»" in lost.message
 
 
 def test_without_core_match_the_larger_axes_cluster_stays_the_reference() -> None:

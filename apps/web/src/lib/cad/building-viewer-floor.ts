@@ -11,6 +11,8 @@ export interface IFloorEntry {
   readonly group: THREE.Group;
   /** Смещение по высоте при полном разнесении, м. */
   readonly offset: number;
+  /** Этаж здания, не поставленного на объект: рисуется полупрозрачным. */
+  readonly ghost: boolean;
   readonly meshes: ReadonlyMap<Part, THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>>;
 }
 
@@ -52,5 +54,5 @@ export const buildFloor = (spec: IViewerFloorSpec, offset: number): IFloorEntry 
   const group = new THREE.Group();
   group.userData.floorKey = spec.key;
   for (const mesh of meshes.values()) group.add(mesh);
-  return { key: spec.key, group, offset, meshes };
+  return { key: spec.key, group, offset, ghost: spec.ghost === true, meshes };
 };

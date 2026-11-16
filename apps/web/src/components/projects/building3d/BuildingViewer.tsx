@@ -6,7 +6,13 @@ import { useEffect, useMemo, useRef, useState, type FC, type ReactNode } from 'r
 import { Button } from '@/components/ui';
 import { CadFloor3dLazy } from '@/components/workspace/cad/floor3d/CadFloor3dLazy';
 import { Splitter } from '@/components/workspace/Splitter';
-import { filterFloorsByGroup, floorKey, resolveGroupKey, splitFloors } from '@/lib/cad/building3d-geometry';
+import {
+  filterFloorsByGroup,
+  floorKey,
+  resolveGroupKey,
+  sheetCountOf,
+  splitFloors,
+} from '@/lib/cad/building3d-geometry';
 import { useCadBuilding3dWalls } from '@/lib/cad/building3d-queries';
 import { ALL_GROUPS_KEY } from '@/lib/cad/building-viewer-layout';
 import { cadErrorText } from '@/lib/cad/errors';
@@ -14,6 +20,7 @@ import { cadErrorText } from '@/lib/cad/errors';
 import { BuildingFloorList } from './BuildingFloorList';
 import { BuildingFloorPanel } from './BuildingFloorPanel';
 import { BuildingViewerCanvas } from './BuildingViewerCanvas';
+import { BuildingViewerNotes } from './BuildingViewerNotes';
 import { BuildingViewerToolbar } from './BuildingViewerToolbar';
 import { useFloorViewParams } from './useFloorViewParams';
 import { useResizableWidth } from './useResizableWidth';
@@ -56,9 +63,10 @@ const Message: FC<{ children: ReactNode; alert?: boolean }> = ({ children, alert
  * Просмотрщик объекта: здание из настоящих стен всех этажей (вращение, наклон, зум), клик по этажу -
  * параметры этажа справа или под холстом, двойной клик или «Этаж подробно» - детальный 3D этажа на этой
  * же странице (только чтение). Корпус и секция выбираются переключателем; «Разнести этажи» раздвигает
- * этажи по вертикали. «Весь объект» ставит все корпуса в один ряд (раскладка условная). Повторный клик
- * по выбранному этажу, клик в пустоту или Esc снимают выбор. Конструкции выбираются только в детальном
- * 3D этажа. Правая панель тянется разделителем.
+ * этажи по вертикали. «Весь объект» показывает корпуса на своих местах; не поставленные на объект стоят
+ * отдельным блоком, полупрозрачные, с причиной в списке. Повторный клик по выбранному этажу, клик в
+ * пустоту или Esc снимают выбор. Конструкции выбираются только в детальном 3D этажа. Правая панель
+ * тянется разделителем, внизу неё - замечания сборки и служебные листы.
  */
 export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection, onSelectionChange, onOpenSheet }) => {
   const query = useCadBuilding3dWalls(projectId);
@@ -91,10 +99,11 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
   const hasKnown = useMemo(() => splitFloors(floors).known.length > 0, [floors]);
   const view = useFloorViewParams(projectId, selected);
   const detail = selection.detail && selected !== null;
-  const groupFloorCount = useMemo(
-    () => (selected === null ? 0 : floors.filter((item) => item.group_key === selected.group_key).length),
+  const groupSheetCount = useMemo(
+    () => (selected === null ? 0 : sheetCountOf(floors.filter((item) => item.group_key === selected.group_key))),
     [floors, selected],
   );
+  const hasLost = groups.some((group) => group.placement === 'none');
 
   // `null` - выбор снят (повторный щелчок по этажу, щелчок в пустоту).
   const select = (key: string | null): void =>
@@ -146,9 +155,9 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
           onOpenDetail={openDetail}
           onError={setCanvasError}
         />
-        {isAll && (
+        {isAll && hasLost && (
           <p className="pointer-events-none absolute top-[var(--s-3)] left-[var(--s-3)] max-w-[calc(100%-24px)] rounded-[var(--radius-sm)] border border-border bg-surface/90 px-[var(--s-3)] py-[var(--s-1)] text-xs text-muted">
-            Взаимное расположение корпусов условное
+            Полупрозрачные корпуса не поставлены на объект: их место условное
           </p>
         )}
         {selected !== null && (
@@ -209,7 +218,7 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
         <aside aria-label="Этаж и список этажей" className={SIDE}>
           <BuildingFloorPanel
             floor={selected}
-            groupFloorCount={groupFloorCount}
+            groupSheetCount={groupSheetCount}
             view={view}
             detail={detail}
             onOpenDetail={() => selected !== null && openDetail(floorKey(selected))}
@@ -221,6 +230,10 @@ export const BuildingViewer: FC<IBuildingViewerProps> = ({ projectId, selection,
             selectedKey={selection.floor}
             onSelect={select}
             onHover={setHoverKey}
+          />
+          <BuildingViewerNotes
+            warnings={query.data?.warnings ?? []}
+            serviceSheets={query.data?.service_sheets ?? []}
           />
         </aside>
       </div>

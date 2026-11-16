@@ -55,6 +55,8 @@ const MAX_POLAR = Math.PI / 2 - 0.03;
 const MIN_DISTANCE_M = 2;
 /** Изометрия по умолчанию: с юга (+Z сцены) и сверху, как «лист». */
 const START_DIRECTION = new THREE.Vector3(0.7, 0.8, 1).normalize();
+/** Непрозрачность плит и стен здания, не поставленного на объект. */
+const GHOST_OPACITY = 0.28;
 
 /** Разнесение этажей: коэффициент, цель камеры и расстояние плывут от прежних значений к новым. */
 interface IExplodeAnim {
@@ -223,6 +225,8 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
         let opacity = 1;
         if (part === 'volume') opacity = selected ? 0.3 : hovered ? 0.35 : dimmed ? 0.05 : 0.12;
         else if (dimmed) opacity = 0.3;
+        // Здание не поставлено на объект: его место условное, поэтому оно полупрозрачное.
+        if (entry.ghost && !selected && part !== 'volume') opacity = Math.min(opacity, hovered ? 0.6 : GHOST_OPACITY);
         mesh.material.opacity = opacity;
         // Смена прозрачности меняет вариант шейдера (OPAQUE): без `needsUpdate` он не перекомпилируется.
         if (mesh.material.transparent !== opacity < 1) {

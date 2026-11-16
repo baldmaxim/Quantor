@@ -406,6 +406,37 @@ def test_operator_scale_diagnostics_and_frame() -> None:
     assert cad_views.frame_from(passed, checks).mm_per_pdf_point == 35.0
 
 
+def test_operator_scale_far_from_the_fitted_one_gives_no_frame() -> None:
+    """Лист 1:200 откалиброван оператором как 1:144 (×0,72): кадр вида не принимается."""
+    wrong = {
+        "status": "needs_review",
+        "source": "operator_calibration",
+        "operator_mm_per_pt": 50.763,
+        "mm_per_pdf_point_fitted": 70.557,
+        "reason": "Калибровка не подтверждена размерами",
+    }
+    checks = {"units": "mm", "origin_pdf_display_pt": [1.0, 2.0]}
+    scale = cad_views.scale_from(wrong)
+    assert scale is not None
+    assert (scale.mm_per_pdf_point, scale.fitted_mm_per_pdf_point) == (50.763, 70.557)
+    frame = cad_views.frame_from(scale, checks)
+    assert frame.confirmed is False
+    assert frame.reason == (
+        "Масштаб оператора расходится с подобранным на 28 %: кадр координат не установлен."
+    )
+    # В пределах 2 % кадр остаётся: расхождение калибровки видно в проверке масштаба.
+    close = cad_views.scale_from({**wrong, "operator_mm_per_pt": 70.481})
+    assert cad_views.frame_from(close, checks).confirmed is True
+    edge = cad_views.frame_from(cad_views.scale_from({**wrong, "operator_mm_per_pt": 72.3}), checks)
+    assert edge.confirmed is False and edge.reason is not None and "на 2,5 %" in edge.reason
+    # Масштаб оператора, подтверждённый размерами, сверку прошёл в движке; без подбора сверять
+    # не с чем.
+    passed = cad_views.scale_from({**wrong, "status": "passed"})
+    assert cad_views.frame_from(passed, checks).confirmed is True
+    unfitted = cad_views.scale_from({**wrong, "mm_per_pdf_point_fitted": None})
+    assert cad_views.frame_from(unfitted, checks).confirmed is True
+
+
 def test_contract_is_exported_for_the_client_and_routes_are_always_mounted(
     tmp_path: Path,
 ) -> None:

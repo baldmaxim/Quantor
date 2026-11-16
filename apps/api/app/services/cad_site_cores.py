@@ -16,6 +16,9 @@
 4. Лучший кандидат уточняется по повороту (±1° шагом 0,1°) и сдвигу; принимается, если доля не
    меньше `MIN_SHARE` и не меньше чем в `MIN_RATIO` раза больше лучшего другого варианта (дальше
    `DISTINCT_MM` или с другим поворотом): у одинаковых секций ядро похоже на чужое место.
+5. Резерв (`CoreMatch.reserve`): доля от `RESERVE_SHARE` при отрыве от второго варианта в
+   `RESERVE_RATIO` раз. Одной доли здесь мало - вызывающий принимает такое совмещение только с
+   проверками по месту (контур в пределах основы, нет наложения на поставленные здания).
 
 Колонны в счёт не идут: сетка колонн паркинга периодична и даёт ложные совпадения со сдвигом на
 шаг. Масштаб не подбирается: геометрия листа - по его калибровке (лист с неверным масштабом не
@@ -45,6 +48,11 @@ FINE_SAMPLES: Final = 2000
 # Доля совпадения: верные совмещения ЖК Знаки 0,60–0,89; лист с неверным масштабом 0,31.
 MIN_SHARE: Final = 0.5
 MIN_RATIO: Final = 2.0
+# Резерв: кровля стилобата секций 1-6 ЖК Знаки встаёт верно при 0,38 против 0,13 у второго
+# варианта (сквозь неё проходят не все ядра подземки); у ложных совмещений одиночных башен отрыв
+# от второго варианта не больше 1,5.
+RESERVE_SHARE: Final = 0.35
+RESERVE_RATIO: Final = 2.5
 MIN_SAMPLES: Final = 200
 DISTINCT_MM: Final = 3000.0
 FINE_STEP_DEG: Final = 0.1
@@ -68,6 +76,11 @@ class CoreMatch:
     share: float
     second_share: float
     accepted: bool
+
+    @property
+    def reserve(self) -> bool:
+        """Годится как резерв: доля меньше обычной, зато отрыв от второго варианта больше."""
+        return self.share >= RESERVE_SHARE and self.share >= RESERVE_RATIO * self.second_share
 
 
 @dataclass(frozen=True, slots=True)
@@ -362,3 +375,25 @@ def register(base: Sequence[Ring] | BaseIndex, other: Sequence[Ring]) -> CoreMat
 def transform_point(x: float, y: float, rotation_deg: float, tx: float, ty: float) -> Point:
     rx, ry = _rotate(x, y, rotation_deg)
     return rx + tx, ry + ty
+
+
+def _edge_distance(x: float, y: float, pts: Sequence[Point]) -> float:
+    best = math.inf
+    for i, (x0, y0) in enumerate(pts):
+        x1, y1 = pts[(i + 1) % len(pts)]
+        dx, dy = x1 - x0, y1 - y0
+        length2 = dx * dx + dy * dy
+        t = 0.0 if length2 == 0 else max(0.0, min(1.0, ((x - x0) * dx + (y - y0) * dy) / length2))
+        best = min(best, math.hypot(x - x0 - t * dx, y - y0 - t * dy))
+    return best
+
+
+def inside_share(points: Sequence[Point], outline: Ring, tolerance_mm: float) -> float:
+    """Доля точек внутри контура или не дальше `tolerance_mm` от его границы; нет точек - 0."""
+    pts = _ring(outline)
+    if not points or len(pts) < 3:
+        return 0.0
+    hits = sum(
+        1 for x, y in points if _inside(x, y, pts) or _edge_distance(x, y, pts) <= tolerance_mm
+    )
+    return hits / len(points)

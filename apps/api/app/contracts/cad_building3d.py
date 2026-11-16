@@ -22,6 +22,12 @@ CadBuilding3dAlignment = Literal["reference", "axes", "none"]
 # ядер (монолита) с уже поставленными, с поворотом; `none` - не поставлено, геометрия в своей
 # системе.
 CadBuilding3dPlacement = Literal["reference", "axes", "cores", "none"]
+# Откуда высота этажа, когда она не определена (`floor_height_known = false`): `derived_stack` -
+# разность отметок до следующего этажа здания; `default` - типовая (соседа сверху нет).
+CadBuilding3dHeightSource = Literal["derived_stack", "default"]
+# Почему лист с конструкциями не вошёл в стопку этажей: `not_plan` - не план этажа или уровня
+# (разрез, таблица); `superseded` - дубль плана на той же отметке, оставлен лист большей площади.
+CadBuilding3dServiceReason = Literal["not_plan", "superseded"]
 
 
 class CadBuilding3dWarningRead(BaseModel):
@@ -74,10 +80,12 @@ class CadBuilding3dFloorRead(BaseModel):
     # Отметка этажа (верх плиты); не определена — 0 и `elevation_known = false`.
     elevation_known: bool
     base_z_mm: int
-    # Высота этажа и толщина плиты; не определены — типовые значения для отрисовки и
+    # Высота этажа и толщина плиты; не определены — значения для отрисовки и
     # `*_known = false` (значение не из документации и не от человека).
     floor_height_mm: int
     floor_height_known: bool
+    # Источник высоты для отрисовки, когда она не определена; определена - `None`.
+    floor_height_source: CadBuilding3dHeightSource | None = None
     slab_thickness_mm: int
     slab_thickness_known: bool
     # Контур плиты (не более 200 точек) или прямоугольник по стенам.
@@ -103,6 +111,17 @@ class CadBuilding3dFloorRead(BaseModel):
     alignment_axes: list[str]
     # Почему этаж не совмещён (`alignment = none`); иначе `None`.
     alignment_message: str | None
+    # Качество совмещения по осям (`alignment = axes`): остаток согласных осей после сдвига (СКО
+    # и максимум, мм) и число общих с эталоном марок; согласные - `alignment_axes`.
+    alignment_rms_mm: float | None = None
+    alignment_max_mm: float | None = None
+    alignment_axes_common: int | None = None
+    # Наклон шкалы лист - эталон, промилле: на столько расстояния между осями эталона больше, чем
+    # на листе (масштабы листов расходятся). Осей для оценки мало - `None`.
+    alignment_scale_permille: float | None = None
+    # Этаж типового листа на несколько этажей, показанный копией геометрии листа: подпись листа.
+    # Только для 3D: в объёмы листа копия не входит. У этажа самого листа - `None`.
+    typical_of: str | None = None
     # Вид плана по заголовку (`floor` | `roof` | `roof_exit` | `technical`); старый файл - `None`.
     kind: str | None = None
     # Участки плиты на своих отметках (cad_walls v1.15). Есть - плита рисуется по ним, а не по
@@ -138,8 +157,23 @@ class CadBuilding3dGroupRead(BaseModel):
     placement_message: str | None
 
 
+class CadBuilding3dServiceSheetRead(BaseModel):
+    """Служебный лист: конструкции посчитаны, но в стопку этажей здания лист не входит."""
+
+    job_id: UUID
+    revision_id: UUID
+    page_index: int
+    view: int
+    document_id: UUID | None
+    label: str
+    reason: CadBuilding3dServiceReason
+    message: str
+
+
 class CadBuilding3dRead(BaseModel):
     units: Literal["mm"]
     floors: list[CadBuilding3dFloorRead]
     groups: list[CadBuilding3dGroupRead]
     warnings: list[CadBuilding3dWarningRead]
+    # Листы вне стопки этажей: не планы и дубли планов.
+    service_sheets: list[CadBuilding3dServiceSheetRead] = []

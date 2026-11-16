@@ -6,6 +6,8 @@ import {
   GROUP_GAP_FACTOR,
   LABEL_LIFT_M,
   MIN_GROUP_GAP_M,
+  MIN_LOST_GAP_M,
+  NOT_PLACED_NOTE,
   buildAllGroupsPlan,
   groupGap,
   layoutGroupPlans,
@@ -176,13 +178,24 @@ describe('группы, поставленные на объект по осям
     expect(span(shell('k2:0:0'), 1)[0] - parkingMinY).toBeCloseTo(20);
   });
 
-  it('не поставленная группа - справа от поставленных с зазором', () => {
+  it('не поставленная группа - отдельным блоком за поставленными, полупрозрачная и с пометкой', () => {
     const plan = buildAllGroupsPlan(floors, groups);
-    const shell = (key: string) => plan?.floors.find((spec) => spec.key === key)?.shell;
-    const placedRight = span(shell('p1:0:0'), 0)[1];
-    // Ширина поставленных 40 м, зазор max(10; 0,15·40) = 10 м.
-    expect(span(shell('k3:0:0'), 0)[0] - placedRight).toBeCloseTo(10);
-    expect(plan?.size.width).toBeCloseTo(40 + 10 + 10);
+    const spec = (key: string) => plan?.floors.find((item) => item.key === key);
+    // Не в ряд с поставленными: по X - по центру, по глубине - за блоком поставленных с зазором.
+    const [lostMinX, lostMaxX] = span(spec('k3:0:0')?.shell, 0);
+    expect((lostMinX + lostMaxX) / 2).toBeCloseTo(0);
+    const placedBack = span(spec('p1:0:0')?.shell, 1)[1];
+    expect(span(spec('k3:0:0')?.shell, 1)[0] - placedBack).toBeCloseTo(MIN_LOST_GAP_M);
+    expect(plan?.size.width).toBeCloseTo(40);
+    expect(plan?.size.depth).toBeCloseTo(30 + MIN_LOST_GAP_M + 6);
+    expect(spec('k3:0:0')?.ghost).toBe(true);
+    expect([spec('p1:0:0')?.ghost, spec('k1:0:0')?.ghost]).toEqual([undefined, undefined]);
+    const label = plan?.labels.find((item) => item.key === 'k3');
+    expect(label?.note).toBe(NOT_PLACED_NOTE);
+    // Подпись стоит над своей группой: ось v уходит в сцене в -Z.
+    const [lostMinV, lostMaxV] = span(spec('k3:0:0')?.shell, 1);
+    expect(label?.z).toBeCloseTo(-(lostMinV + lostMaxV) / 2);
+    expect(plan?.labels.find((item) => item.key === 'k1')?.note).toBeUndefined();
   });
 
   it('подпись каждой поставленной группы - над её верхним этажом по центру её контура', () => {
@@ -197,10 +210,20 @@ describe('группы, поставленные на объект по осям
     expect(labelK2?.y).toBeCloseTo((shellK2?.volumeTop ?? 0) + LABEL_LIFT_M);
   });
 
-  it('одна опора без поставленных групп - прежняя раскладка в ряд', () => {
+  it('одна опора без поставленных групп: опора на месте, остальные - блоком «не поставлен»', () => {
     const only = [group('k1', 'К1'), group('p', 'Паркинг', 1, 'reference')];
     const plan = buildAllGroupsPlan([floors[1], floors[0]] as CadBuilding3dFloorRead[], only);
-    expect(plan?.labels.map((label) => label.key)).toEqual(['k1', 'p']);
-    expect(plan?.size.width).toBeCloseTo(10 + 10 + 40);
+    expect(plan?.labels.map((label) => [label.key, label.note])).toEqual([
+      ['p', undefined],
+      ['k1', NOT_PLACED_NOTE],
+    ]);
+    expect(plan?.floors.find((spec) => spec.key === 'k1:0:0')?.ghost).toBe(true);
+    expect(plan?.size.width).toBeCloseTo(40);
+  });
+
+  it('ответ без постановки (ни одной поставленной группы) - все группы в ряд, без пометок', () => {
+    const plan = buildAllGroupsPlan(floors, groups.map((item) => ({ ...item, placement: 'none' as const })));
+    expect(plan?.labels.every((label) => label.note === undefined)).toBe(true);
+    expect(plan?.floors.every((spec) => spec.ghost === undefined)).toBe(true);
   });
 });

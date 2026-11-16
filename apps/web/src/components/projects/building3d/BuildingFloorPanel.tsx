@@ -4,7 +4,7 @@ import type { CadBuilding3dFloorRead } from '@quantor/api-client';
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui';
-import { alignmentNote, formatElevation } from '@/lib/cad/building3d-geometry';
+import { alignmentNote, alignmentQuality, formatElevation } from '@/lib/cad/building3d-geometry';
 import { countWalls } from '@/lib/cad/building-viewer-geometry';
 import { formatNumber } from '@/lib/cad/view-format';
 
@@ -14,8 +14,8 @@ import type { IFloorViewParams } from './useFloorViewParams';
 interface IBuildingFloorPanelProps {
   /** Выбранный этаж; `null` - ничего не выбрано. */
   readonly floor: CadBuilding3dFloorRead | null;
-  /** Число этажей выбранного здания: от него зависит пометка «не совмещён». */
-  readonly groupFloorCount: number;
+  /** Число листов здания выбранного этажа: здание из одного листа совмещать не с чем. */
+  readonly groupSheetCount: number;
   readonly view: IFloorViewParams;
   /** Детальный вид уже открыт: кнопка «Этаж подробно» не нужна. */
   readonly detail: boolean;
@@ -31,13 +31,14 @@ const Row: FC<{ label: string; value: string }> = ({ label, value }) => (
 );
 
 const NOT_DEFINED = 'не определена, показана типовая';
+const BY_STACK = 'не определена, показана по отметке следующего этажа';
 
 const meters = (mm: number): string => formatNumber(mm / 1000, 3, 'м');
 
 /** Параметры выбранного этажа, число конструкций по видам и итоги листа (считает сервер). */
 export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
   floor,
-  groupFloorCount,
+  groupSheetCount,
   view,
   detail,
   onOpenDetail,
@@ -46,7 +47,9 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
   if (floor === null) {
     return <p className="p-[var(--s-4)] text-sm text-muted">Нажмите на этаж</p>;
   }
-  const note = alignmentNote(floor, groupFloorCount);
+  const note = alignmentNote(floor, groupSheetCount);
+  const typical = floor.typical_of ?? null;
+  const heightUnknown = floor.floor_height_source === 'derived_stack' ? BY_STACK : NOT_DEFINED;
   const counts = countWalls(floor.walls);
   const place = [floor.corps ? `корпус ${floor.corps}` : null, floor.section ? `секция ${floor.section}` : null]
     .filter((part): part is string => part !== null)
@@ -57,12 +60,18 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
       <div className="min-w-0">
         <h2 className="text-base font-medium [overflow-wrap:anywhere]">{floor.label}</h2>
         {place !== '' && <p className="text-xs text-muted">{place}</p>}
+        {typical !== null && (
+          <p className="text-xs text-muted [overflow-wrap:anywhere]">
+            Этаж показан по типовому листу «{typical}»: геометрия листа на отметке этого этажа. В объёмы листа
+            этаж не входит.
+          </p>
+        )}
       </div>
       <dl className="divide-y divide-border">
         <Row label="Отметка" value={floor.elevation_known ? formatElevation(floor.base_z_mm) : 'не определена'} />
         <Row
           label="Высота этажа"
-          value={floor.floor_height_known ? meters(floor.floor_height_mm) : `${NOT_DEFINED} (${meters(floor.floor_height_mm)})`}
+          value={floor.floor_height_known ? meters(floor.floor_height_mm) : `${heightUnknown} (${meters(floor.floor_height_mm)})`}
         />
         <Row
           label="Толщина плиты"
@@ -71,6 +80,7 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
           }
         />
         {note && <Row label="Совмещение" value={note.text} />}
+        {floor.alignment === 'axes' && <Row label="Качество совмещения" value={alignmentQuality(floor)} />}
         {counts && (
           <>
             <Row label="Монолит, конструкций" value={String(counts.monolith)} />
@@ -89,7 +99,7 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
           Открыть лист в CAD
         </Button>
       </div>
-      <BuildingFloorTotals params={view.params} pending={view.pending} />
+      {typical === null && <BuildingFloorTotals params={view.params} pending={view.pending} />}
     </section>
   );
 };

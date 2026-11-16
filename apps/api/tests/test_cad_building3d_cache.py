@@ -15,6 +15,7 @@ from app.contracts.cad_building3d import CadBuilding3dRead
 from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
 from app.contracts.cad_floor3d import WallsFloorExtras
 from app.services import cad_building3d as b3d
+from app.services import cad_building3d_assembly as assembly
 from app.services.cad_constructions import ProjectSlab
 from tests.conftest import FakeObjectStorage
 from tests.test_cad_floor3d import NO_LEVELS, raw_document, raw_extras
@@ -66,11 +67,21 @@ def _serve(monkeypatch: pytest.MonkeyPatch, sheets: list[b3d.SheetRef]) -> None:
     ) -> tuple[list[b3d.SheetRef], list[object], ProjectSlab | None]:
         return list(sheets), [], None
 
+    async def no_missing(
+        _session: AsyncSession,
+        *,
+        workspace_id: uuid.UUID,
+        project_id: uuid.UUID,
+        sheets: list[b3d.SheetRef],
+    ) -> list[object]:
+        return []
+
     monkeypatch.setattr(b3d, "collect_sheets", collect)
+    monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
 
 
 async def _build(storage: CountingStorage) -> CadBuilding3dRead:
-    return await b3d.build_building3d(
+    return await assembly.build_building3d(
         cast(AsyncSession, object()),
         storage,
         workspace_id=uuid.uuid4(),
