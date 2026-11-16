@@ -20,8 +20,8 @@ CadBuilding3dAlignment = Literal["reference", "axes", "none"]
 # Постановка здания на объект: `reference` - опора (система объекта = система её эталона);
 # `axes` - поставлено по общим маркам осей; `cores` - скопление зданий поставлено по совпадению
 # ядер (монолита) с уже поставленными, с поворотом; `none` - не поставлено, геометрия в своей
-# системе.
-CadBuilding3dPlacement = Literal["reference", "axes", "cores", "none"]
+# системе; `manual` - привязано человеком по двум парам точек (ADR-0052).
+CadBuilding3dPlacement = Literal["reference", "axes", "cores", "manual", "none"]
 # Откуда высота этажа, когда она не определена (`floor_height_known = false`): `derived_stack` -
 # разность отметок до следующего этажа здания; `default` - типовая (соседа сверху нет).
 CadBuilding3dHeightSource = Literal["derived_stack", "default"]
@@ -161,6 +161,8 @@ class CadBuilding3dGroupRead(BaseModel):
     placement_anchor: str | None
     # Почему здание не поставлено (`placement = none`); иначе `None`.
     placement_message: str | None
+    # Ручная привязка (`placement = manual`): id применённой привязки корпуса к площадке.
+    site_pin_id: UUID | None = None
 
 
 class CadBuilding3dServiceSheetRead(BaseModel):

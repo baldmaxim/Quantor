@@ -173,6 +173,8 @@ class ErrorCode(StrEnum):
     # Отзыв решений и отметки этажа из документации (ADR-0036 п. 8).
     CAD_ALREADY_REVOKED = "CAD_ALREADY_REVOKED"
     CAD_ROUTES_ACCEPTED = "CAD_ROUTES_ACCEPTED"
+    # Ручная привязка корпуса к площадке (ADR-0052): точки не годятся для привязки.
+    CAD_SITE_PIN_INVALID = "CAD_SITE_PIN_INVALID"
     CAD_VIEW_APPROVAL_REVOKED = "CAD_VIEW_APPROVAL_REVOKED"
     CAD_ELEVATION_NOT_FOUND = "CAD_ELEVATION_NOT_FOUND"
     CAD_FLOOR_HEIGHT_NOT_FOUND = "CAD_FLOOR_HEIGHT_NOT_FOUND"
@@ -359,6 +361,7 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_ROUTES_NOT_ACCEPTED: "Трассы не приняты: DXF трасс недоступен",
     ErrorCode.CAD_MEP_NOT_BUILT: "Генератор не построил трассы",
     ErrorCode.CAD_ALREADY_REVOKED: "Решение уже отозвано",
+    ErrorCode.CAD_SITE_PIN_INVALID: "Точки не годятся для привязки корпуса к площадке",
     ErrorCode.CAD_ROUTES_ACCEPTED: "По этому одобрению приняты трассы: сначала отзовите принятие",
     ErrorCode.CAD_VIEW_APPROVAL_REVOKED: "Одобрение вида отозвано",
     ErrorCode.CAD_ELEVATION_NOT_FOUND: (
@@ -549,6 +552,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_ROUTES_NOT_ACCEPTED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_MEP_NOT_BUILT: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_ALREADY_REVOKED: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_SITE_PIN_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_ROUTES_ACCEPTED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_VIEW_APPROVAL_REVOKED: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_ELEVATION_NOT_FOUND: status.HTTP_422_UNPROCESSABLE_CONTENT,

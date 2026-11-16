@@ -43,7 +43,8 @@ from app.domain import JobStatus, JobType
 from app.models import Job, SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_building3d as b3d
-from app.services import cad_site_cores, cad_views, sheet_passports
+from app.services import cad_site_cores, cad_site_pins, cad_views, sheet_passports
+from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectStorage
 
@@ -372,9 +373,11 @@ class Stack:
     kept: list[int]
     real: list[CadBuilding3dFloorRead]
     superseded: dict[int, int]
+    # Ручные привязки корпусов к площадке (ADR-0052), которые не применены, с причиной.
+    ignored_pins: tuple[b3d.PinIgnored, ...] = ()
 
 
-def build_stack(built: Sequence[b3d.BuiltFloor]) -> Stack:
+def build_stack(built: Sequence[b3d.BuiltFloor], pins: Sequence[SitePin] = ()) -> Stack:
     """Здание из этажей листов: совмещение, дубли, сведение групп, постановка, типовые, высоты."""
     items = list(built)
     kept = list(range(len(items)))
@@ -405,7 +408,8 @@ def build_stack(built: Sequence[b3d.BuiltFloor]) -> Stack:
         items = renamed
     if superseded or merged:
         aligned = b3d.align_floors(items)
-    placements = b3d.place_site(items, aligned)
+    site = b3d.place_site_report(items, aligned, pins)
+    placements = site.placements
     placed = b3d.apply_placements(aligned, placements)
     real, copies = expand_typical(items, placed)
     heights = stack_heights([*real, *(copy for copy, _item in copies)])
@@ -419,7 +423,7 @@ def build_stack(built: Sequence[b3d.BuiltFloor]) -> Stack:
             ),
         ]
     )
-    return Stack(floors, b3d.build_groups(floors, placements), kept, real, superseded)
+    return Stack(floors, b3d.build_groups(floors, placements), kept, real, superseded, site.ignored)
 
 
 def review_warnings(groups: Sequence[CadBuilding3dGroupRead]) -> list[CadBuilding3dWarningRead]:
@@ -607,7 +611,8 @@ async def build_building3d(
         )
         sources.append((sheet, item.warnings))
     # Совмещение, дубли и постановка по ядрам - чистый расчёт на тысячах точек: в потоке.
-    stack = await asyncio.to_thread(build_stack, built)
+    pins = await cad_site_pins.active_site_pins(session, project_id=project_id)
+    stack = await asyncio.to_thread(build_stack, built, pins)
     for index, floor in zip(stack.kept, stack.real, strict=True):
         derived = floor.floor_height_source == "derived_stack"
         warnings.extend(
@@ -642,6 +647,13 @@ async def build_building3d(
             )
         )
     warnings.extend(review_warnings(stack.groups))
+    warnings.extend(
+        CadBuilding3dWarningRead(
+            code="site_pin_ignored",
+            message=f"Ручная привязка корпуса к площадке не применена: {ignored.message}.",
+        )
+        for ignored in stack.ignored_pins
+    )
     warnings.extend(missing)
     return CadBuilding3dRead(
         units="mm",

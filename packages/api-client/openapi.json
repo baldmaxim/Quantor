@@ -1736,6 +1736,7 @@
               "reference",
               "axes",
               "cores",
+              "manual",
               "none"
             ],
             "title": "Placement",
@@ -1794,6 +1795,18 @@
             ],
             "title": "Site Offset Mm",
             "type": "array"
+          },
+          "site_pin_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Pin Id"
           },
           "site_rotation_deg": {
             "default": 0.0,
@@ -10309,6 +10322,266 @@
           "risers"
         ],
         "title": "CadSheetRisersPut",
+        "type": "object"
+      },
+      "CadSitePinCreate": {
+        "additionalProperties": false,
+        "description": "Две точки листа корпуса (`source`) и те же две точки листа площадки (`target`).",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CadSiteSheetRef"
+          },
+          "source_points": {
+            "items": {
+              "$ref": "#/components/schemas/CadSitePoint"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Source Points",
+            "type": "array"
+          },
+          "target": {
+            "$ref": "#/components/schemas/CadSiteSheetRef"
+          },
+          "target_points": {
+            "items": {
+              "$ref": "#/components/schemas/CadSitePoint"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Target Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "source_points",
+          "target_points"
+        ],
+        "title": "CadSitePinCreate",
+        "type": "object"
+      },
+      "CadSitePinRead": {
+        "properties": {
+          "baseline_mm": {
+            "title": "Baseline Mm",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "offset_x_mm": {
+            "title": "Offset X Mm",
+            "type": "number"
+          },
+          "offset_y_mm": {
+            "title": "Offset Y Mm",
+            "type": "number"
+          },
+          "residual_mm": {
+            "title": "Residual Mm",
+            "type": "number"
+          },
+          "revoke_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoke Reason"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "rotation_deg": {
+            "title": "Rotation Deg",
+            "type": "number"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CadSiteSheetRef"
+          },
+          "source_points": {
+            "items": {
+              "$ref": "#/components/schemas/CadSitePoint"
+            },
+            "title": "Source Points",
+            "type": "array"
+          },
+          "target": {
+            "$ref": "#/components/schemas/CadSiteSheetRef"
+          },
+          "target_points": {
+            "items": {
+              "$ref": "#/components/schemas/CadSitePoint"
+            },
+            "title": "Target Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "target",
+          "source_points",
+          "target_points",
+          "rotation_deg",
+          "offset_x_mm",
+          "offset_y_mm",
+          "baseline_mm",
+          "residual_mm",
+          "note",
+          "created_by",
+          "created_by_name",
+          "created_at"
+        ],
+        "title": "CadSitePinRead",
+        "type": "object"
+      },
+      "CadSitePinRevoke": {
+        "additionalProperties": false,
+        "description": "Отзыв привязки; причина необязательна.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "CadSitePinRevoke",
+        "type": "object"
+      },
+      "CadSitePinsRead": {
+        "description": "Действующие привязки проекта (отозванные в список не входят).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CadSitePinRead"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CadSitePinsRead",
+        "type": "object"
+      },
+      "CadSitePoint": {
+        "additionalProperties": false,
+        "properties": {
+          "x_mm": {
+            "maximum": 100000000.0,
+            "minimum": -100000000.0,
+            "title": "X Mm",
+            "type": "number"
+          },
+          "y_mm": {
+            "maximum": 100000000.0,
+            "minimum": -100000000.0,
+            "title": "Y Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x_mm",
+          "y_mm"
+        ],
+        "title": "CadSitePoint",
+        "type": "object"
+      },
+      "CadSiteSheetRef": {
+        "additionalProperties": false,
+        "description": "Лист в сборке 3D: ревизия документа, страница, вид (как в `CadBuilding3dFloorRead`).",
+        "properties": {
+          "page_index": {
+            "minimum": 0.0,
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "view": {
+            "minimum": 0.0,
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision_id",
+          "page_index",
+          "view"
+        ],
+        "title": "CadSiteSheetRef",
         "type": "object"
       },
       "CadStageRead": {
@@ -44217,6 +44490,170 @@
           }
         },
         "summary": "Общий вид здания: этажи проекта (листы CAD) с отметками и контуром плиты",
+        "tags": [
+          "cad-building3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/building3d/site-pins": {
+      "get": {
+        "operationId": "list_site_pins",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadSitePinsRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Действующие ручные привязки корпусов к площадке",
+        "tags": [
+          "cad-building3d"
+        ]
+      },
+      "post": {
+        "operationId": "create_site_pin",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadSitePinCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadSitePinRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Привязать корпус к площадке по двум парам точек (прежняя привязка листа отзывается)",
+        "tags": [
+          "cad-building3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/building3d/site-pins/{pin_id}": {
+      "delete": {
+        "operationId": "revoke_site_pin",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "pin_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CadSitePinRevoke"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadSitePinRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отозвать привязку корпуса к площадке; запись остаётся",
         "tags": [
           "cad-building3d"
         ]

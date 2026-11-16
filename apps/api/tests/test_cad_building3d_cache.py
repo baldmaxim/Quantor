@@ -16,6 +16,7 @@ from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
 from app.contracts.cad_floor3d import WallsFloorExtras
 from app.services import cad_building3d as b3d
 from app.services import cad_building3d_assembly as assembly
+from app.services import cad_site_pins
 from app.services.cad_constructions import ProjectSlab
 from tests.conftest import FakeObjectStorage
 from tests.test_cad_floor3d import NO_LEVELS, raw_document, raw_extras
@@ -61,6 +62,10 @@ def empty_cache() -> Iterator[None]:
     b3d.floor_cache.clear()
 
 
+async def _no_pins(_session: AsyncSession, **_kwargs: object) -> list[object]:
+    return []
+
+
 def _serve(monkeypatch: pytest.MonkeyPatch, sheets: list[b3d.SheetRef]) -> None:
     async def collect(
         _session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
@@ -78,6 +83,8 @@ def _serve(monkeypatch: pytest.MonkeyPatch, sheets: list[b3d.SheetRef]) -> None:
 
     monkeypatch.setattr(b3d, "collect_sheets", collect)
     monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
+    # Ручные привязки корпусов (ADR-0052) читаются из базы: в этом тесте базы нет.
+    monkeypatch.setattr(cad_site_pins, "active_site_pins", _no_pins)
 
 
 async def _build(storage: CountingStorage) -> CadBuilding3dRead:

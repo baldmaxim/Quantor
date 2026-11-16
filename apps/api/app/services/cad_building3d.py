@@ -56,9 +56,11 @@ from app.domain import JobStatus, JobType
 from app.models import Document, DocumentRevision, Job, Sheet, SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_construction_store, cad_site_cores, cad_views, cad_walls
+from app.services import cad_site_pins_math as pins_math
 from app.services import documents as documents_service
 from app.services.cad_constructions import ProjectSlab, effective_levels
 from app.services.cad_floor_title import floors_text, format_floor_title
+from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
@@ -1152,6 +1154,8 @@ class GroupPlacement:
     cluster: str | None = None
     rotation_deg: float = 0.0
     share: float | None = None
+    # Ручная привязка по двум парам точек (`placement = manual`): id применённого пина.
+    pin_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1911,8 +1915,11 @@ def _reserve_pin(
     placed: dict[str, GroupPlacement],
     site: Sequence[CoreRing],
     base_outline: Sequence[Sequence[float]],
+    skip: frozenset[str] = frozenset(),
 ) -> _Reserve:
     """Резерв по ядрам: первое не поставленное здание, которое можно поставить с проверками.
+
+    `skip` - здания, ожидающие ручной привязки (ADR-0052): резерв их не ставит.
 
     Пробуются нижние этажи каждого не поставленного здания (любой площади), большие здания
     первыми. Совмещение годится, если оно резервное (`CoreMatch.reserve`: доля меньше обычной, но
@@ -1932,7 +1939,9 @@ def _reserve_pin(
         key: max((_floor_area_m2(f) for f in aligned if f.group_key == key), default=0)
         for key in infos
     }
-    for key in sorted((k for k in infos if k not in placed), key=lambda k: (-sizes[k], k)):
+    for key in sorted(
+        (k for k in infos if k not in placed and k not in skip), key=lambda k: (-sizes[k], k)
+    ):
         best: cad_site_cores.CoreMatch | None = None
         matched = -1
         for index, rings in _group_floor_cores(items, aligned, key, 0):
@@ -2019,9 +2028,235 @@ def _reserve_choose(
     return _Reserve(None, None, notes, tried)
 
 
+# --------------------------------------------------------------------------- ручная привязка
+
+
+@dataclass(frozen=True, slots=True)
+class PinIgnored:
+    """Ручная привязка, не применённая при посадке: причина для человека (`site_pin_ignored`)."""
+
+    pin_id: uuid.UUID
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class SiteResult:
+    placements: dict[str, GroupPlacement]
+    ignored: tuple[PinIgnored, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class _PinCandidate:
+    pin: SitePin
+    source: int
+    target: int
+
+
+def _decimal(value: float) -> str:
+    return f"{value:.1f}".replace(".", ",")
+
+
+class _ManualPins:
+    """Ручные привязки корпусов к площадке за одну посадку (ADR-0052).
+
+    Лист источника и лист цели узнаются в сборке по тройке (ревизия, страница, вид). Группа
+    источника встаёт, когда группа цели уже поставлена: `G = S_цели ∘ T_пина ∘ A_источника⁻¹`
+    (`pins_math.group_placement`). До этого группа «ожидает» (`held`): по осям и ядрам её не
+    ставят, чтобы привязка не оказалась слабее автоматики. Не применённая привязка получает
+    причину (`ignored`), а не молчание.
+    """
+
+    def __init__(
+        self,
+        pins: Sequence[SitePin],
+        aligned: Sequence[CadBuilding3dFloorRead],
+        infos: dict[str, _GroupInfo],
+        base_key: str | None,
+    ) -> None:
+        self._aligned = aligned
+        self._infos = infos
+        self._ignored: dict[uuid.UUID, str] = {}
+        self._order: list[uuid.UUID] = []
+        self._groups: dict[str, list[_PinCandidate]] = {}
+        self._done: set[str] = set()
+        index: dict[pins_math.SheetKey, int] = {}
+        for i, floor in enumerate(aligned):
+            index.setdefault((floor.revision_id, floor.page_index, floor.view), i)
+        for pin in sorted(pins, key=lambda p: (p.created_at, str(p.id))):
+            self._order.append(pin.id)
+            source, target = index.get(pin.source), index.get(pin.target)
+            if source is None or target is None:
+                which = pin.source if source is None else pin.target
+                role = "источника" if source is None else "цели"
+                self._ignore(
+                    pin.id,
+                    f"лист {role} (стр. {which[1] + 1}, вид {which[2]}) не найден среди этажей "
+                    "сборки: ревизия документа заменена или лист не построен",
+                )
+                continue
+            source_key, target_key = aligned[source].group_key, aligned[target].group_key
+            label = self._label(source_key)
+            if source_key == base_key:
+                self._ignore(pin.id, f"«{label}» - основа площадки, привязывать её не нужно")
+            elif source_key == target_key:
+                self._ignore(pin.id, f"оба листа привязки входят в здание «{label}»")
+            else:
+                self._groups.setdefault(source_key, []).append(_PinCandidate(pin, source, target))
+
+    def _label(self, key: str) -> str:
+        info = self._infos.get(key)
+        return key if info is None else info.label
+
+    def _ignore(self, pin_id: uuid.UUID, message: str) -> None:
+        self._ignored.setdefault(pin_id, message)
+
+    def held(self, placed: dict[str, GroupPlacement]) -> frozenset[str]:
+        """Здания, ожидающие цели своей привязки."""
+        return frozenset(k for k in self._groups if k not in self._done and k not in placed)
+
+    def _candidate_placement(
+        self, candidate: _PinCandidate, target: GroupPlacement
+    ) -> tuple[float, Point]:
+        s, t = self._aligned[candidate.source], self._aligned[candidate.target]
+        t_rotation = t.rotation_deg + target.rotation_deg
+        rx, ry = pins_math.rotate(t.offset_mm, target.rotation_deg)
+        rotation, offset = pins_math.group_placement(
+            source_rotation_deg=s.rotation_deg,
+            source_offset_mm=s.offset_mm,
+            target_rotation_deg=t_rotation,
+            target_offset_mm=(rx + target.offset_mm[0], ry + target.offset_mm[1]),
+            pin_rotation_deg=candidate.pin.rotation_deg,
+            pin_offset_mm=candidate.pin.offset_mm,
+        )
+        return rotation, offset
+
+    def apply(self, placed: dict[str, GroupPlacement], hops: dict[str, int]) -> bool:
+        """Ставит одно здание по привязке, цель которой уже поставлена; нечего ставить - `False`."""
+        for key in sorted(self._groups):
+            if key in self._done or key in placed:
+                continue
+            ready = [c for c in self._groups[key] if self._aligned[c.target].group_key in placed]
+            if not ready:
+                continue
+            options = [
+                (c, *self._candidate_placement(c, placed[self._aligned[c.target].group_key]))
+                for c in ready
+            ]
+            self._done.add(key)
+            problem = self._disagreement(key, options)
+            if problem is not None:
+                for candidate in self._groups[key]:
+                    self._ignore(candidate.pin.id, problem)
+                return True
+            chosen, rotation, offset = options[-1]
+            pin = chosen.pin
+            placed[key] = GroupPlacement(
+                "manual",
+                (round(offset[0], 3), round(offset[1], 3)),
+                (),
+                self._aligned[chosen.target].group_key,
+                f"привязано вручную: невязка {round(pin.residual_mm)} мм, "
+                f"база {_decimal(pin.baseline_mm / 1000)} м",
+                key,
+                rotation,
+                None,
+                pin.id,
+            )
+            hops[key] = 0
+            return True
+        return False
+
+    def _disagreement(
+        self, key: str, options: Sequence[tuple[_PinCandidate, float, tuple[float, float]]]
+    ) -> str | None:
+        """Привязки одного здания по разным листам должны давать одно место: поворот и точка."""
+        if len(options) < 2:
+            return None
+        floor = self._aligned[options[0][0].source]
+        box = floor.bbox
+        centre = (0.0, 0.0) if box is None else ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+        sites = [
+            pins_math.apply_transform(rotation, offset, centre) for _c, rotation, offset in options
+        ]
+        for i, (_a, rotation_a, _oa) in enumerate(options):
+            for j in range(i + 1, len(options)):
+                turn = cad_site_cores._turn_gap(rotation_a, options[j][1])
+                shift = math.dist(sites[i], sites[j])
+                if (
+                    turn > cad_site_cores.AGREE_ROTATION_DEG
+                    or shift > cad_site_cores.AGREE_SHIFT_MM
+                ):
+                    return (
+                        f"привязки здания «{self._label(key)}» по разным листам расходятся: "
+                        f"поворот на {_decimal(turn)}°, положение на {_decimal(shift / 1000)} м"
+                    )
+        return None
+
+    def release(self, placed: dict[str, GroupPlacement]) -> list[str]:
+        """Цели ожидающих привязок не поставлены: привязки не применяются, здания свободны."""
+        released = sorted(self.held(placed))
+        for key in released:
+            self._done.add(key)
+            for candidate in self._groups[key]:
+                target = self._label(self._aligned[candidate.target].group_key)
+                self._ignore(
+                    candidate.pin.id,
+                    f"здание «{target}», к которому привязано «{self._label(key)}», "
+                    "не поставлено на объект",
+                )
+        return released
+
+    def finish(self, placed: dict[str, GroupPlacement]) -> tuple[PinIgnored, ...]:
+        """Итог посадки: привязки, которым не нашлось места, получают причину."""
+        for key, candidates in sorted(self._groups.items()):
+            current = placed.get(key)
+            if current is None or current.placement == "manual":
+                continue
+            for candidate in candidates:
+                self._ignore(
+                    candidate.pin.id,
+                    f"«{self._label(key)}» уже поставлено автоматически "
+                    f"({current.placement}), ручная привязка к нему не применена",
+                )
+        return tuple(PinIgnored(i, self._ignored[i]) for i in self._order if i in self._ignored)
+
+
+def _site_fallback(
+    items: Sequence[BuiltFloor],
+    aligned: Sequence[CadBuilding3dFloorRead],
+    infos: dict[str, _GroupInfo],
+    pins: Sequence[SitePin],
+    base_key: str | None,
+) -> SiteResult:
+    """Постановка без основы по ядрам (осями и скоплениями); ручные привязки - только зданиям,
+    которые автоматика не поставила (`none`)."""
+    manual = _ManualPins(pins, aligned, infos, base_key)
+    placements = place_by_cores(items, aligned, place_groups(items, aligned))
+    live = {k: p for k, p in placements.items() if p.placement != "none"}
+    hops: dict[str, int] = {}
+    while manual.apply(live, hops):
+        pass
+    manual.release(live)
+    for key, found in live.items():
+        if found.placement == "manual":
+            placements[key] = found
+    return SiteResult(placements, manual.finish(live))
+
+
 def place_site(
-    items: Sequence[BuiltFloor], aligned: Sequence[CadBuilding3dFloorRead]
+    items: Sequence[BuiltFloor],
+    aligned: Sequence[CadBuilding3dFloorRead],
+    pins: Sequence[SitePin] = (),
 ) -> dict[str, GroupPlacement]:
+    """Постановка зданий на объект (`place_site_report` без отчёта о ручных привязках)."""
+    return place_site_report(items, aligned, pins).placements
+
+
+def place_site_report(
+    items: Sequence[BuiltFloor],
+    aligned: Sequence[CadBuilding3dFloorRead],
+    pins: Sequence[SitePin] = (),
+) -> SiteResult:
     """Постановка зданий на объект: опоры по ядрам, остальные - по осям от ближайшей опоры.
 
     Основа - здание с самым большим этажом (план подземной автостоянки несёт ядра всех корпусов).
@@ -2037,26 +2272,32 @@ def place_site(
     основы и без наложения на поставленные здания. Вставшее по резерву - тоже опора: к нему по осям
     присоединяются остальные.
 
+    Ручные привязки (`pins`, ADR-0052) сильнее автоматики для своего здания: оно встаёт сразу,
+    как только поставлено здание цели, до резерва и присоединения по осям, и становится опорой
+    для соседей. Непригодная привязка называется в `SiteResult.ignored`.
+
     Если ни одно здание по ядрам не встало, постановка - как раньше, только по осям
     (`place_groups` и `place_by_cores`).
     """
     infos = _group_infos(items, aligned)
     keys = sorted(infos, key=lambda k: (_natural_key(infos[k].label), k))
     if not keys:
-        return {}
+        return SiteResult({}, _ManualPins(pins, aligned, infos, None).finish({}))
     if len(keys) == 1:
-        return {keys[0]: GroupPlacement("reference", (0.0, 0.0), (), None, None, keys[0])}
+        placed_one = {keys[0]: GroupPlacement("reference", (0.0, 0.0), (), None, None, keys[0])}
+        return SiteResult(placed_one, _ManualPins(pins, aligned, infos, keys[0]).finish(placed_one))
     biggest = max(
         (i for i, floor in enumerate(aligned) if len(items[i].cores) >= CORE_MIN_RINGS),
         key=lambda i: (_floor_area_m2(aligned[i]), -i),
         default=None,
     )
     if biggest is None:
-        return place_by_cores(items, aligned, place_groups(items, aligned))
+        return _site_fallback(items, aligned, infos, pins, None)
     base_key = aligned[biggest].group_key
+    manual = _ManualPins(pins, aligned, infos, base_key)
     fx, fy = aligned[biggest].offset_mm
     site = [_moved_ring(r, aligned[biggest].rotation_deg, fx, fy) for r in items[biggest].cores]
-    pins: dict[str, cad_site_cores.CoreMatch] = {}
+    core_pins: dict[str, cad_site_cores.CoreMatch] = {}
     tried: dict[str, cad_site_cores.CoreMatch | None] = {}
     for key in keys:
         if key == base_key:
@@ -2072,7 +2313,7 @@ def place_site(
             continue
         tried[key] = best
         if best.accepted:
-            pins[key] = best
+            core_pins[key] = best
     placed: dict[str, GroupPlacement] = {
         base_key: GroupPlacement("reference", (0.0, 0.0), (), None, None, base_key)
     }
@@ -2094,28 +2335,44 @@ def place_site(
     base_outline = aligned[biggest].outline
     reserve_notes: dict[str, str] = {}
     reviews: dict[str, str] = {}
-    if not pins:
-        first = _reserve_pin(items, aligned, infos, placed, site, base_outline)
+    while manual.apply(placed, hops):
+        pass
+    waiting = manual.held(placed)
+    if not core_pins and len(placed) == 1:
+        first = _reserve_pin(items, aligned, infos, placed, site, base_outline, waiting)
+        if (first.key is None or first.pin is None) and waiting:
+            # Ждать привязкам нечего: цели не из чего поставить.
+            manual.release(placed)
+            first = _reserve_pin(items, aligned, infos, placed, site, base_outline)
         if first.key is None or first.pin is None:
-            return place_by_cores(items, aligned, place_groups(items, aligned))
-        pins[first.key] = first.pin
+            return _site_fallback(items, aligned, infos, pins, base_key)
+        core_pins[first.key] = first.pin
         if first.review is not None:
             reviews[first.key] = first.review
     links = _axis_links(infos)
-    for key, pin in pins.items():
-        pin_group(key, pin, reviews.get(key))
+    for key, found in core_pins.items():
+        if key not in placed and key not in manual.held(placed):
+            pin_group(key, found, reviews.get(key))
     rejected: dict[str, str] = {}
     while True:
-        if _attach_by_axes(infos, keys, links, placed, hops, rejected):
+        if manual.apply(placed, hops):
             continue
-        reserve = _reserve_pin(items, aligned, infos, placed, site, base_outline)
+        held = manual.held(placed)
+        if _attach_by_axes(infos, keys, links, placed, hops, rejected, held):
+            continue
+        reserve = _reserve_pin(items, aligned, infos, placed, site, base_outline, held)
         reserve_notes = reserve.notes
         for key, found in reserve.tried.items():
             previous = tried.get(key)
             if previous is None or found.share > previous.share:
                 tried[key] = found
         if reserve.key is None or reserve.pin is None:
-            break
+            if not held:
+                break
+            for key in manual.release(placed):
+                if key in core_pins and key not in placed:
+                    pin_group(key, core_pins[key], reviews.get(key))
+            continue
         pin_group(reserve.key, reserve.pin, reserve.review)
     base_label = infos[base_key].label
     for key in keys:
@@ -2147,7 +2404,7 @@ def place_site(
             0.0,
             None if found is None else round(found.share, 3),
         )
-    return placed
+    return SiteResult(placed, manual.finish(placed))
 
 
 def _attach_by_axes(
@@ -2157,8 +2414,11 @@ def _attach_by_axes(
     placed: dict[str, GroupPlacement],
     hops: dict[str, int],
     rejected: dict[str, str],
+    held: frozenset[str] = frozenset(),
 ) -> bool:
     """Присоединение одного здания по осям к уже поставленным; некого присоединить - `False`.
+
+    `held` - здания, ожидающие ручной привязки (ADR-0052): по осям они не присоединяются.
 
     Сначала к опорам, потом дальше по цепочке (ближайшая опора выигрывает); совпадение марок без
     номера секции принимается только без наложения этажей на одной отметке.
@@ -2167,7 +2427,7 @@ def _attach_by_axes(
         (
             (base, other, match)
             for (base, other), match in links.items()
-            if base in placed and other not in placed
+            if base in placed and other not in placed and other not in held
         ),
         key=lambda row: (
             hops[row[0]],
@@ -2321,6 +2581,7 @@ def build_groups(
                 placement_axes=[] if placement is None else list(placement.axes),
                 placement_anchor=None if placement is None else placement.anchor_key,
                 placement_message=None if placement is None else placement.message,
+                site_pin_id=None if placement is None else placement.pin_id,
             )
         )
     return groups
