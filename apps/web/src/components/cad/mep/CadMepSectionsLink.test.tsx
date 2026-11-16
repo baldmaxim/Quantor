@@ -25,6 +25,7 @@ const level = (id: string, status: 'accepted' | 'candidate' | 'rejected', page =
   status,
   decided_by: null,
   decided_at: null,
+  auto_accepted: false,
 });
 
 const job = (status: string, extra: Record<string, unknown> = {}) =>

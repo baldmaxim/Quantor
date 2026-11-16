@@ -339,6 +339,9 @@ export const useWorkspaceCad = ({
     load: enabled && opened && revisionId !== null,
     active,
     onOpenPage: (target) => goToSheet(target, { job: null, view: null }),
+    camera,
+    page,
+    viewportSize,
   });
 
   const paintData = useMemo(() => {

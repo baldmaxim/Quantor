@@ -215,9 +215,11 @@ async def publish_levels(
         await session.delete(old)
     await session.flush()
 
+    auto = _auto_acceptable(document)
+    now = datetime.now(UTC)
     seq = 0
-    for page in document.sections:
-        for level in page.levels:
+    for page_no, page in enumerate(document.sections):
+        for level_no, level in enumerate(page.levels):
             decision = carried.get(
                 _decision_key(
                     page.page_index,
@@ -227,32 +229,66 @@ async def publish_levels(
                     level.structure_mm,
                 )
             )
-            session.add(
-                CadSectionLevel(
-                    workspace_id=workspace_id,
-                    project_id=project_id,
-                    job_id=job.id,
-                    revision_id=revision_id,
-                    seq=seq,
-                    page_index=page.page_index,
-                    cut=level.cut,
-                    corps=page.corps,
-                    section=page.section,
-                    floor=level.floor,
-                    elevation_mm=level.elevation_mm,
-                    upper_elevation_mm=level.upper_elevation_mm,
-                    clear_height_mm=level.clear_height_mm,
-                    structure_mm=level.structure_mm,
-                    evidence=level.evidence,
-                    markup=level.markup.model_dump(mode="json"),
-                    status="candidate" if decision is None else decision[0],
-                    decided_by=None if decision is None else decision[1],
-                    decided_at=None if decision is None else decision[2],
-                )
+            automatic = decision is None and (page_no, level_no) in auto
+            row = CadSectionLevel(
+                workspace_id=workspace_id,
+                project_id=project_id,
+                job_id=job.id,
+                revision_id=revision_id,
+                seq=seq,
+                page_index=page.page_index,
+                cut=level.cut,
+                corps=page.corps,
+                section=page.section,
+                floor=level.floor,
+                elevation_mm=level.elevation_mm,
+                upper_elevation_mm=level.upper_elevation_mm,
+                clear_height_mm=level.clear_height_mm,
+                structure_mm=level.structure_mm,
+                evidence=level.evidence,
+                markup=level.markup.model_dump(mode="json"),
+                status="candidate" if decision is None else decision[0],
+                decided_by=None if decision is None else decision[1],
+                decided_at=None if decision is None else decision[2],
+                auto_accepted=False,
             )
+            if automatic:
+                row.status, row.decided_at, row.auto_accepted = "accepted", now, True
+            session.add(row)
             seq += 1
     await session.flush()
     return seq
+
+
+_GroupKey = tuple[str | None, str | None, int, int]
+
+
+def _auto_acceptable(document: SectionsFile) -> set[tuple[int, int]]:
+    """Уровни, которые система принимает сама (ADR-0050): `(номер листа, номер уровня)` в файле.
+
+    Генератор выдаёт высоту в свету и плиту, только когда звенья размерной цепочки дают разность
+    соседних отметок точно (попадание в отметку). Такой уровень принимается, если его высота в
+    пределах генератора трасс и ни один уровень того же корпуса, секции и интервала отметок (на
+    любом листе и линии разреза) не даёт других высоты или плиты. Уровень без разделения плиты
+    (высота не определена) мнения не имеет: не принимается и не мешает. Остальное - человеку.
+    """
+    values: dict[_GroupKey, set[tuple[int, int]]] = {}
+    for page in document.sections:
+        for level in page.levels:
+            if level.clear_height_mm is None or level.structure_mm is None:
+                continue
+            key = (page.corps, page.section, level.elevation_mm, level.upper_elevation_mm)
+            values.setdefault(key, set()).add((level.clear_height_mm, level.structure_mm))
+    return {
+        (page_no, level_no)
+        for page_no, page in enumerate(document.sections)
+        for level_no, level in enumerate(page.levels)
+        if level.clear_height_mm is not None
+        and level.structure_mm is not None
+        and CLEAR_HEIGHT_MIN_MM <= level.clear_height_mm <= CLEAR_HEIGHT_MAX_MM
+        and len(values[(page.corps, page.section, level.elevation_mm, level.upper_elevation_mm)])
+        == 1
+    }
 
 
 async def list_levels(
@@ -330,6 +366,8 @@ async def decide(
             )
     now = datetime.now(UTC)
     for row in rows:
+        # Решение человека заменяет автопринятие: признак снимается при любом решении.
+        row.auto_accepted = False
         if decision == "reset":
             row.status, row.decided_by, row.decided_at = "candidate", None, None
         else:

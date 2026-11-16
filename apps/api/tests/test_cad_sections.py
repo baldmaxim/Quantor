@@ -5,7 +5,10 @@
 `fail` - код выхода 2, `bad_schema`/`bad_sha`/`bad_page`/`extra_file` - файл вне контракта,
 `v2` - у уровня Б другая толщина перекрытия (решение по нему не переносится),
 `v3` - схема `cad_sections.v3` с окном и ролями sill/window/above_window у первого уровня,
-`bad_v4` - неизвестная схема `cad_sections.v4`.
+`bad_v4` - неизвестная схема `cad_sections.v4`, `conflict` - второй разрез того же корпуса и
+секции с другой высотой на интервале уровня А (разногласие: ни один из двух не принимается сам).
+
+Уровни с высотой в свету и плитой без разногласий система принимает при публикации (ADR-0050).
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dev import DEV_USER_ID
 from app.cad_worker import HANDLERS
 from app.cad_worker.sections_handler import execute_cad_sections
-from app.contracts.cad_sections import SectionLevelFile
+from app.contracts.cad_sections import SectionLevelFile, SectionsFile
 from app.core.config import Settings
 from app.core.workspace import DEV_WORKSPACE_ID
 from app.domain import JobStatus, JobType
@@ -88,6 +91,8 @@ sections = [
      "page_size_pt": [841.9, 595.3], "rotation": 90,
      "levels": [level(47600, 51200, 3200, 400, "2-2")]},
 ]
+if mode == "conflict":
+    sections[0]["levels"].append(level(47600, 50900, 2900, 400, "1-1"))
 if args.pages:
     wanted = {int(p) for p in args.pages}
     sections = [s for s in sections if s["page_index"] in wanted]
@@ -282,7 +287,14 @@ async def test_job_publishes_candidates_and_the_artifact(
             (1, 3),
         ]
         first = levels[0]
-        assert first["status"] == "candidate" and first["decided_by"] is None
+        # Точная раскладка без разногласий принята системой: автора нет, время есть (ADR-0050).
+        assert first["status"] == "accepted" and first["decided_by"] is None
+        assert first["auto_accepted"] is True and first["decided_at"] is not None
+        assert [(r["status"], r["auto_accepted"]) for r in levels[1:]] == [
+            ("accepted", True),
+            ("candidate", False),  # без высоты в свету - человеку
+            ("accepted", True),
+        ]
         assert (first["elevation_mm"], first["upper_elevation_mm"]) == (47600, 50900)
         assert (first["clear_height_mm"], first["structure_mm"]) == (3000, 300)
         assert (first["corps"], first["section"], first["cut"]) == ("9", "3", "1-1")
@@ -544,7 +556,7 @@ async def test_decisions_accept_reject_reset_and_their_guards(
         rows = accepted.json()["levels"]
         assert [r["id"] for r in rows] == [a, b]
         assert all(r["status"] == "accepted" and r["decided_by"] == str(DEV_USER_ID) for r in rows)
-        assert all(r["decided_at"] is not None for r in rows)
+        assert all(r["decided_at"] is not None and r["auto_accepted"] is False for r in rows)
 
         rejected = await api.post(decide, json={"level_ids": [d], "decision": "reject"})
         assert rejected.json()["levels"][0]["status"] == "rejected"
@@ -641,8 +653,10 @@ async def test_rerun_replaces_old_rows_and_carries_decisions_over(
         assert carried_a["status"] == "accepted"
         assert carried_a["decided_by"] == before[a]["decided_by"]
         assert carried_a["decided_at"] == before[a]["decided_at"]
-        assert changed_b["structure_mm"] == 350 and changed_b["status"] == "candidate"
-        assert changed_b["decided_by"] is None
+        # решение человека потеряно, но раскладка точная и без разногласий - принят системой
+        assert changed_b["structure_mm"] == 350 and changed_b["status"] == "accepted"
+        assert changed_b["decided_by"] is None and changed_b["auto_accepted"] is True
+        assert carried_a["auto_accepted"] is False
         assert by_key[(1, 47600)]["status"] == "rejected"
         assert by_key[(0, 54200)]["status"] == "candidate"
         total = await db_session.scalar(select(func.count()).select_from(CadSectionLevel))
@@ -684,10 +698,13 @@ async def test_unknown_floor_elevation_with_accepted_levels_warns_instead_of_ski
                 plan_page_index=0,
             )
 
-        # Принятых уровней нет: предупреждать не о чем.
+        # Принятых уровней нет (автопринятые сброшены): предупреждать не о чем.
+        decide = f"/api/v1/projects/{project_id}/cad/sections/levels/decide"
+        everything = [row["id"] for row in levels]
+        reset = await api.post(decide, json={"level_ids": everything, "decision": "reset"})
+        assert reset.status_code == 200, reset.text
         assert (await resolve(None)).warnings == ()
 
-        decide = f"/api/v1/projects/{project_id}/cad/sections/levels/decide"
         ids = [levels[0]["id"], levels[1]["id"]]
         accepted = await api.post(decide, json={"level_ids": ids, "decision": "accept"})
         assert accepted.status_code == 200, accepted.text
@@ -701,3 +718,57 @@ async def test_unknown_floor_elevation_with_accepted_levels_warns_instead_of_ski
         known = await resolve(47600)
         assert known.warnings == ()
         assert known.source == cad_sections.LEVELS_SOURCE_SECTION and known.clear_height_mm == 3000
+
+
+async def test_disagreeing_levels_wait_for_a_human_and_the_rest_are_accepted(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    sections_tools: Path,
+    tmp_path: Path,
+) -> None:
+    """Два уровня одного корпуса, секции и интервала с разной высотой - оба кандидаты; прочие
+    уровни (другой интервал, другой корпус) приняты системой."""
+    settings = sections_settings(sections_tools, tmp_path)
+    _set_mode(sections_tools, "conflict")
+    async with build_api(make_context(), settings=settings) as api:
+        _, _, levels = await _published(api, db_session, fake_storage, settings)
+        by_key = {(r["page_index"], r["elevation_mm"], r["clear_height_mm"]): r for r in levels}
+        assert len(levels) == 5
+        for key in ((0, 47600, 3000), (0, 47600, 2900)):
+            assert (by_key[key]["status"], by_key[key]["auto_accepted"]) == ("candidate", False)
+        for key in ((0, 50900, 3000), (1, 47600, 3200)):
+            assert (by_key[key]["status"], by_key[key]["auto_accepted"]) == ("accepted", True)
+        assert by_key[(0, 54200, None)]["status"] == "candidate"
+
+
+def test_auto_accept_skips_heights_outside_the_route_generator_range() -> None:
+    """Высота в свету вне пределов генератора трасс системой не принимается."""
+    box = [0.1, 0.1, 0.2, 0.2]
+
+    def level(clear: int) -> dict[str, Any]:
+        return {
+            "elevation_mm": 0,
+            "upper_elevation_mm": clear + 300,
+            "clear_height_mm": clear,
+            "structure_mm": 300,
+            "source": "observed",
+            "evidence": "отм.",
+            "markup": {"upper_mark": box, "lower_mark": box, "band": box, "dims": []},
+        }
+
+    document = SectionsFile.model_validate(
+        {
+            "generator_version": "cad_mep.v16.5",
+            "source": {"pdf_sha256": "0" * 64},
+            "sections": [
+                {
+                    "page_index": 0,
+                    "page_size_pt": [100, 100],
+                    "rotation": 0,
+                    "levels": [level(3000), level(cad_sections.CLEAR_HEIGHT_MAX_MM + 100)],
+                }
+            ],
+        }
+    )
+    assert cad_sections._auto_acceptable(document) == {(0, 0)}

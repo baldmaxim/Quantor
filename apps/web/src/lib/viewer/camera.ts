@@ -123,6 +123,40 @@ export class Camera {
     this.apply({ ...placed, offsetY: FIT_PADDING });
   }
 
+  /**
+   * Вписывает область листа (единицы листа при масштабе 1) по центру области отрисовки.
+   *
+   * Переход к месту на листе: уровню разреза, замечанию. Масштаб не больше `maxScale` — узкая
+   * полоса не раздувается до пикселей; вырожденная область считается не меньше единицы.
+   */
+  fitRect(
+    rect: {
+      readonly x: number;
+      readonly y: number;
+      readonly width: number;
+      readonly height: number;
+    },
+    viewport: Viewport,
+    maxScale = MAX_SCALE,
+  ): void {
+    const width = Math.max(rect.width, 1);
+    const height = Math.max(rect.height, 1);
+    const scale = clamp(
+      Math.min(
+        (viewport.width - FIT_PADDING * 2) / width,
+        (viewport.height - FIT_PADDING * 2) / height,
+        maxScale,
+      ),
+      MIN_SCALE,
+      MAX_SCALE,
+    );
+    this.apply({
+      scale,
+      offsetX: viewport.width / 2 - (rect.x + rect.width / 2) * scale,
+      offsetY: viewport.height / 2 - (rect.y + rect.height / 2) * scale,
+    });
+  }
+
   /** Сбрасывает вид к вписанному листу. */
   reset(content: ContentSize, viewport: Viewport): void {
     this.fitPage(content, viewport);

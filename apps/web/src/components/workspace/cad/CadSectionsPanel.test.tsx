@@ -24,6 +24,7 @@ const level = (over: Partial<SectionLevelRead> & { id: string }): SectionLevelRe
   status: 'candidate',
   decided_by: null,
   decided_at: null,
+  auto_accepted: false,
   ...over,
 });
 
@@ -44,7 +45,15 @@ const read = (over: Partial<SectionsRead> = {}): SectionsRead => ({
   levels: [level({ id: 'a' }), level({ id: 'b', clear_height_mm: null, elevation_mm: 0 })],
   issues: [{ code: 'x', message: 'Размер не найден', page_index: 3, bbox: null }],
   pages: [
-    { page_index: 3, title: 'Разрез 1-1', corps: '9', section: '3', cuts: ['1-1'], page_size_pt: [10, 10], rotation: 0 },
+    {
+      page_index: 3,
+      title: 'Разрез 1-1',
+      corps: '9',
+      section: '3',
+      cuts: ['1-1'],
+      page_size_pt: [10, 10],
+      rotation: 0,
+    },
   ],
   ...over,
 });
@@ -80,16 +89,52 @@ describe('CadSectionsPanel', () => {
   it('«Принять» без высоты недоступна; «Принять все» берёт только допустимых', () => {
     const onDecide = vi.fn();
     render(<CadSectionsPanel {...props({ onDecide })} />);
-    const accept = screen.getAllByRole('button', { name: 'Принять' });
+    const accept = screen.getAllByRole('button', { name: /^Принять: / });
     expect((accept[1] as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: /Принять все на листе/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Принять все/ }));
     expect(onDecide).toHaveBeenCalledWith(['a'], 'accept');
+  });
+
+  it('автопринятые свёрнуты в «Принято», на проверку - только кандидаты', () => {
+    const data = read({
+      levels: [
+        level({
+          id: 'auto',
+          status: 'accepted',
+          auto_accepted: true,
+          decided_at: '2026-11-16T00:00:00Z',
+        }),
+        level({ id: 'c', elevation_mm: 44300, upper_elevation_mm: 47600 }),
+      ],
+    });
+    render(<CadSectionsPanel {...props({ data })} />);
+    expect(screen.getByTestId('sections-review-summary').textContent).toContain(
+      'Принято автоматически: 1 · на проверку: 1',
+    );
+    const review = screen.getByRole('region', { name: 'На проверку' });
+    expect(review.textContent).toContain('+44,300');
+    expect(review.textContent).not.toContain('Авто');
+    expect(screen.getByText('Принято (1)')).toBeTruthy();
+    expect(screen.getByText('Авто')).toBeTruthy();
+  });
+
+  it('щелчок по уровню выделяет его (переход к участку листа), повторный - снимает', () => {
+    const onSelectLevel = vi.fn();
+    const { rerender } = render(<CadSectionsPanel {...props({ onSelectLevel })} />);
+    const row = () => screen.getAllByTitle('Показать на листе')[0] as HTMLElement;
+    fireEvent.click(row());
+    expect(onSelectLevel).toHaveBeenLastCalledWith('a');
+    rerender(<CadSectionsPanel {...props({ onSelectLevel, activeLevelId: 'a' })} />);
+    fireEvent.click(row());
+    expect(onSelectLevel).toHaveBeenLastCalledWith(null);
   });
 
   it('задание идёт: кнопка запуска заблокирована, виден статус', () => {
     const data = read({ job: { ...read().job!, status: 'running' } });
     render(<CadSectionsPanel {...props({ data })} />);
-    expect((screen.getByRole('button', { name: /Распознать разрезы/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: /Распознать разрезы/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
     expect(screen.getByText('Выполняется')).toBeTruthy();
   });
 
@@ -101,7 +146,12 @@ describe('CadSectionsPanel', () => {
 
   it('ошибка задания показывает причину', () => {
     const data = read({
-      job: { ...read().job!, status: 'failed', error_code: 'CAD_ENGINE_FAILED', error_message: 'сбой' },
+      job: {
+        ...read().job!,
+        status: 'failed',
+        error_code: 'CAD_ENGINE_FAILED',
+        error_message: 'сбой',
+      },
     });
     render(<CadSectionsPanel {...props({ data })} />);
     expect(screen.getByRole('alert').textContent).toContain('сбой');

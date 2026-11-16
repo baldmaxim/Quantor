@@ -184,6 +184,8 @@ class SectionLevelRead(BaseModel):
     status: LevelStatus
     decided_by: UUID | None
     decided_at: datetime | None
+    # Принят системой (ADR-0050): точная раскладка по отметкам без разногласий; автора нет.
+    auto_accepted: bool
 
 
 class SectionPageRead(BaseModel):

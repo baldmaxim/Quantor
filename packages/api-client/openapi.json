@@ -29581,6 +29581,10 @@
       },
       "SectionLevelRead": {
         "properties": {
+          "auto_accepted": {
+            "title": "Auto Accepted",
+            "type": "boolean"
+          },
           "clear_height_mm": {
             "anyOf": [
               {
@@ -29731,7 +29735,8 @@
           "markup",
           "status",
           "decided_by",
-          "decided_at"
+          "decided_at",
+          "auto_accepted"
         ],
         "title": "SectionLevelRead",
         "type": "object"

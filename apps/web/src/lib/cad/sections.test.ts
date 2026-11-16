@@ -10,7 +10,10 @@ import {
   formatMark,
   groupLevelsByCut,
   issuesOfPage,
+  levelDecisionLabel,
+  levelFocusRect,
   levelsOfPage,
+  reviewBuckets,
   sectionPageLabel,
   sectionPageRows,
   routeLevelsText,
@@ -36,6 +39,7 @@ const level = (over: Partial<SectionLevelRead> & { id: string }): SectionLevelRe
   status: 'candidate',
   decided_by: null,
   decided_at: null,
+  auto_accepted: false,
   ...over,
 });
 
@@ -109,8 +113,24 @@ describe('группировка', () => {
 
 describe('страницы и сводка', () => {
   const pages: SectionPageRead[] = [
-    { page_index: 7, title: 'Разрез 2-2', corps: '9', section: '3', cuts: ['2-2'], page_size_pt: [1, 1], rotation: 0 },
-    { page_index: 3, title: null, corps: null, section: null, cuts: [], page_size_pt: [1, 1], rotation: 0 },
+    {
+      page_index: 7,
+      title: 'Разрез 2-2',
+      corps: '9',
+      section: '3',
+      cuts: ['2-2'],
+      page_size_pt: [1, 1],
+      rotation: 0,
+    },
+    {
+      page_index: 3,
+      title: null,
+      corps: null,
+      section: null,
+      cuts: [],
+      page_size_pt: [1, 1],
+      rotation: 0,
+    },
   ];
   const levels = [
     level({ id: 'a', page_index: 3, status: 'accepted' }),
@@ -141,7 +161,9 @@ describe('страницы и сводка', () => {
 
 describe('предупреждение трасс', () => {
   it('известный код - текст, неизвестный - как есть', () => {
-    expect(sectionWarningText('section_level_ambiguous')).toContain('уточните уровни на листе разреза');
+    expect(sectionWarningText('section_level_ambiguous')).toContain(
+      'уточните уровни на листе разреза',
+    );
     expect(sectionWarningText('other')).toBe('other');
   });
 
@@ -186,5 +208,40 @@ describe('источник высоты у задания трасс', () => {
       'Высота в свету: 2900 мм — по ответу к документации',
     );
     expect(routeLevelsText({ levels_source: 'doc_answer' })).toBe('Высота: допущение движка');
+  });
+});
+
+describe('приёмка уровней (ADR-0050)', () => {
+  it('кандидаты - на проверку, принятые и отклонённые отдельно, сверху вниз по отметке', () => {
+    const buckets = reviewBuckets([
+      level({ id: 'low', status: 'accepted', auto_accepted: true }),
+      level({ id: 'high', elevation_mm: 3300, status: 'accepted', auto_accepted: true }),
+      level({ id: 'human', elevation_mm: 6600, status: 'accepted' }),
+      level({ id: 'c', elevation_mm: 9900 }),
+      level({ id: 'r', status: 'rejected' }),
+    ]);
+    expect(buckets.review.map((l) => l.id)).toEqual(['c']);
+    expect(buckets.accepted.map((l) => l.id)).toEqual(['human', 'high', 'low']);
+    expect(buckets.rejected.map((l) => l.id)).toEqual(['r']);
+    expect(buckets.auto).toBe(2);
+  });
+
+  it('подпись: «Авто» только у автопринятого', () => {
+    expect(levelDecisionLabel({ status: 'accepted', auto_accepted: true })).toBe('Авто');
+    expect(levelDecisionLabel({ status: 'accepted', auto_accepted: false })).toBe('Принят');
+    expect(levelDecisionLabel({ status: 'candidate', auto_accepted: false })).toBe('Кандидат');
+  });
+
+  it('переход к уровню: полоса с запасом в этаж сверху и снизу, не за краем листа', () => {
+    const band = [0.2, 0.4, 0.6, 0.5] as [number, number, number, number];
+    const rect = levelFocusRect({ markup: { ...level({ id: 'a' }).markup, band } });
+    expect(rect[0]).toBeCloseTo(0.1);
+    expect(rect[1]).toBeCloseTo(0.3);
+    expect(rect[2]).toBeCloseTo(0.7);
+    expect(rect[3]).toBeCloseTo(0.6);
+    const edge = levelFocusRect({
+      markup: { ...level({ id: 'a' }).markup, band: [0, 0, 1, 0.1] },
+    });
+    expect(edge).toEqual([0, 0, 1, 0.2]);
   });
 });

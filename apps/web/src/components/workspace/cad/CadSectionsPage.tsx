@@ -1,10 +1,10 @@
 'use client';
 
 import type { SectionIssueRead, SectionLevelRead, SectionPageRead } from '@quantor/api-client';
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
-import { acceptableCandidateIds, groupLevelsByCut } from '@/lib/cad/sections';
+import { acceptableCandidateIds, reviewBuckets } from '@/lib/cad/sections';
 
 import { CadSectionLevelRow } from './CadSectionLevelRow';
 import type { IWorkspaceCadSections } from './types';
@@ -19,7 +19,15 @@ interface ICadSectionsPageProps {
   onDecide: IWorkspaceCadSections['onDecide'];
 }
 
-/** Разрез на открытом листе: заголовок, уровни по линиям разреза, замечания генератора. */
+const HEADING = 'text-micro font-semibold tracking-[0.06em] text-muted uppercase';
+
+/**
+ * Разрез на открытом листе: заголовок, сводка, уровни на проверку, принятые и отклонённые,
+ * замечания генератора.
+ *
+ * Уровень, разложенный по отметкам точно и без разногласий, система принимает сама (ADR-0050):
+ * человеку остаются только кандидаты - они наверху и раскрыты. Принятые и отклонённые свёрнуты.
+ */
 export const CadSectionsPage: FC<ICadSectionsPageProps> = ({
   page,
   levels,
@@ -29,12 +37,29 @@ export const CadSectionsPage: FC<ICadSectionsPageProps> = ({
   onSelectLevel,
   onDecide,
 }) => {
-  const groups = groupLevelsByCut(levels);
+  const buckets = reviewBuckets(levels);
   const acceptable = acceptableCandidateIds(levels);
+  const manyCuts = new Set(levels.map((level) => level.cut)).size > 1;
   const place = [
     page.corps ? `корпус ${page.corps}` : null,
     page.section ? `секция ${page.section}` : null,
   ].filter((part): part is string => part !== null);
+
+  const list = (items: readonly SectionLevelRead[]): ReactNode => (
+    <ul className="m-0 flex list-none flex-col gap-[var(--s-1)] p-0">
+      {items.map((level) => (
+        <CadSectionLevelRow
+          key={level.id}
+          level={level}
+          active={level.id === activeLevelId}
+          busy={busy}
+          showCut={manyCuts}
+          onSelect={onSelectLevel}
+          onDecide={onDecide}
+        />
+      ))}
+    </ul>
+  );
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--s-4)]" data-testid="sections-page">
@@ -55,46 +80,66 @@ export const CadSectionsPage: FC<ICadSectionsPageProps> = ({
         <p className="text-xs text-muted">На этой странице уровни не найдены.</p>
       ) : (
         <>
-          <Button
-            compact
-            variant="primary"
-            className="min-h-[44px] self-start max-md:h-[44px] max-md:w-full"
-            disabled={busy || acceptable.length === 0}
-            onClick={() => onDecide(acceptable, 'accept')}
-          >
-            Принять все на листе{acceptable.length > 0 ? ` (${acceptable.length})` : ''}
-          </Button>
-          {groups.map((group) => (
-            <section
-              key={group.cut ?? '—'}
-              aria-label={group.label}
-              className="flex min-w-0 flex-col gap-[var(--s-2)]"
-            >
-              <h5 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
-                {group.label}
-              </h5>
-              <ul className="m-0 flex list-none flex-col gap-[var(--s-3)] p-0">
-                {group.levels.map((level) => (
-                  <CadSectionLevelRow
-                    key={level.id}
-                    level={level}
-                    active={level.id === activeLevelId}
-                    busy={busy}
-                    onSelect={onSelectLevel}
-                    onDecide={onDecide}
-                  />
-                ))}
-              </ul>
-            </section>
-          ))}
+          <p className="text-xs text-muted" data-testid="sections-review-summary">
+            Принято автоматически: {buckets.auto} · на проверку: {buckets.review.length}
+            {buckets.rejected.length > 0 ? ` · отклонено: ${buckets.rejected.length}` : ''}
+          </p>
+
+          <section aria-label="На проверку" className="flex min-w-0 flex-col gap-[var(--s-2)]">
+            <div className="flex min-w-0 flex-wrap items-center gap-[var(--s-2)]">
+              <h5 className={HEADING}>На проверку ({buckets.review.length})</h5>
+              {acceptable.length > 0 && (
+                <Button
+                  compact
+                  variant="primary"
+                  className="ml-auto max-md:h-[44px]"
+                  disabled={busy}
+                  onClick={() => onDecide(acceptable, 'accept')}
+                >
+                  Принять все ({acceptable.length})
+                </Button>
+              )}
+            </div>
+            {buckets.review.length === 0 ? (
+              <p className="text-xs text-muted">
+                Разногласий нет: все уровни попали в отметки и приняты.
+              </p>
+            ) : (
+              list(buckets.review)
+            )}
+          </section>
+
+          {buckets.accepted.length > 0 && (
+            <details className="flex min-w-0 flex-col gap-[var(--s-2)]">
+              <summary
+                className={`${HEADING} min-h-[32px] cursor-pointer content-center max-md:min-h-[44px]`}
+              >
+                Принято ({buckets.accepted.length})
+              </summary>
+              {list(buckets.accepted)}
+            </details>
+          )}
+
+          {buckets.rejected.length > 0 && (
+            <details className="flex min-w-0 flex-col gap-[var(--s-2)]">
+              <summary
+                className={`${HEADING} min-h-[32px] cursor-pointer content-center max-md:min-h-[44px]`}
+              >
+                Отклонено ({buckets.rejected.length})
+              </summary>
+              {list(buckets.rejected)}
+            </details>
+          )}
         </>
       )}
 
       {issues.length > 0 && (
-        <section aria-label="Замечания страницы" className="flex min-w-0 flex-col gap-[var(--s-2)]">
-          <h5 className="text-micro font-semibold tracking-[0.06em] text-muted uppercase">
-            Замечания страницы
-          </h5>
+        <details aria-label="Замечания страницы" className="flex min-w-0 flex-col gap-[var(--s-2)]">
+          <summary
+            className={`${HEADING} min-h-[32px] cursor-pointer content-center max-md:min-h-[44px]`}
+          >
+            Замечания страницы ({issues.length})
+          </summary>
           <ul className="m-0 flex list-none flex-col gap-[var(--s-2)] p-0">
             {issues.map((issue, index) => (
               <li
@@ -105,7 +150,7 @@ export const CadSectionsPage: FC<ICadSectionsPageProps> = ({
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
     </div>
   );

@@ -3,11 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import { cadErrorText } from '@/lib/cad/errors';
-import {
-  issuesOfPage,
-  levelsOfPage,
-  sectionsErrorText,
-} from '@/lib/cad/sections';
+import { issuesOfPage, levelFocusRect, levelsOfPage, sectionsErrorText } from '@/lib/cad/sections';
 import {
   useCadSections,
   useDecideCadSectionLevels,
@@ -16,10 +12,13 @@ import {
 import { readSectionColors, type ISectionPaintData } from '@/lib/cad/sections-painter';
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import { useTheme } from '@/lib/theme';
+import type { Camera, ContentSize, Viewport } from '@/lib/viewer/camera';
 
 import type { IWorkspaceCadSections } from './types';
 
 const MARKUP_KEY = 'quantor.cad.sections-markup';
+/** Переход к уровню не крупнее 4× листа: полоса этажа остаётся читаемой вместе с отметками. */
+const FOCUS_MAX_SCALE = 4;
 
 interface IInput {
   projectId: string;
@@ -32,6 +31,11 @@ interface IInput {
   active: boolean;
   /** Открыть страницу-разрез в рабочей области. */
   onOpenPage: (pageIndex: number) => void;
+  /** Камера рабочей области: выбор уровня переводит вид к его полосе. */
+  camera?: Camera | null;
+  /** Размер открытого листа у отрисовщика (pt при масштабе 1); `null` - ещё не известен. */
+  page?: ContentSize | null;
+  viewportSize?: (() => Viewport) | null;
 }
 
 export interface IWorkspaceCadSectionsState {
@@ -40,7 +44,10 @@ export interface IWorkspaceCadSectionsState {
   /** Данные слоя разметки; `null` - на листе рисовать нечего или разметка выключена. */
   readonly paintData: ISectionPaintData | null;
   /** Переключатель в «Слоях»; `null` - на листе разрезов нет. */
-  readonly layers: { readonly visible: boolean; readonly onVisibleChange: (visible: boolean) => void } | null;
+  readonly layers: {
+    readonly visible: boolean;
+    readonly onVisibleChange: (visible: boolean) => void;
+  } | null;
 }
 
 /**
@@ -56,6 +63,9 @@ export const useWorkspaceCadSections = ({
   load,
   active,
   onOpenPage,
+  camera = null,
+  page = null,
+  viewportSize = null,
 }: IInput): IWorkspaceCadSectionsState => {
   const theme = useTheme();
   const colors = useMemo(() => {
@@ -103,7 +113,9 @@ export const useWorkspaceCadSections = ({
     onReload: () => void query.refetch(),
     pageIndex,
     isSectionPage:
-      data !== null && pageIndex !== null && data.pages.some((item) => item.page_index === pageIndex),
+      data !== null &&
+      pageIndex !== null &&
+      data.pages.some((item) => item.page_index === pageIndex),
     starting: start.isPending,
     onStart: () => {
       decide.reset();
@@ -116,7 +128,23 @@ export const useWorkspaceCadSections = ({
     },
     actionError,
     activeLevelId,
-    onSelectLevel: setSelected,
+    onSelectLevel: (id) => {
+      setSelected(id);
+      const level = id === null ? undefined : pageLevels.find((item) => item.id === id);
+      if (!level || !camera || !page || !viewportSize) return;
+      // Полоса уровня в долях отображаемой страницы (ADR-0008) -> единицы листа камеры.
+      const [x0, y0, x1, y1] = levelFocusRect(level);
+      camera.fitRect(
+        {
+          x: x0 * page.width,
+          y: y0 * page.height,
+          width: (x1 - x0) * page.width,
+          height: (y1 - y0) * page.height,
+        },
+        viewportSize(),
+        FOCUS_MAX_SCALE,
+      );
+    },
     markupVisible,
     onMarkupVisibleChange: setMarkupVisible,
     onOpenPage,

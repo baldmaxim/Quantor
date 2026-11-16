@@ -105,6 +105,23 @@ describe('камера', () => {
       expect(camera.getState().scale).toBeLessThan(zoomed.scale);
     });
 
+    it('область листа встаёт по центру и целиком помещается', () => {
+      const rect = { x: 400, y: 1000, width: 600, height: 100 };
+      camera.fitRect(rect, VIEWPORT);
+      const { scale, offsetX, offsetY } = camera.getState();
+      expect(scale).toBeCloseTo((VIEWPORT.width - 48) / rect.width);
+      expect(offsetX + (rect.x + rect.width / 2) * scale).toBeCloseTo(VIEWPORT.width / 2);
+      expect(offsetY + (rect.y + rect.height / 2) * scale).toBeCloseTo(VIEWPORT.height / 2);
+      expect(rect.height * scale).toBeLessThanOrEqual(VIEWPORT.height);
+    });
+
+    it('узкую область не раздувает выше заданного масштаба', () => {
+      camera.fitRect({ x: 10, y: 10, width: 4, height: 2 }, VIEWPORT, 3);
+      expect(camera.getState().scale).toBe(3);
+      camera.fitRect({ x: 10, y: 10, width: 0, height: 0 }, VIEWPORT);
+      expect(camera.getState().scale).toBe(MAX_SCALE);
+    });
+
     it('пустой лист не ломает камеру', () => {
       camera.fitPage({ width: 0, height: 0 }, VIEWPORT);
 

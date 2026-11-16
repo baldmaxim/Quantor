@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -22,6 +23,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.dialects import postgresql as pg
@@ -68,6 +70,10 @@ class CadSectionLevel(Base):
     )
     decided_by: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Принят системой при публикации (ADR-0050): точная раскладка без разногласий; автора нет.
+    auto_accepted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -85,8 +91,11 @@ class CadSectionLevel(Base):
             name="accepted_needs_clear_height",
         ),
         CheckConstraint(
-            "(status = 'candidate' and decided_by is null and decided_at is null)"
-            " or (status <> 'candidate' and decided_by is not null and decided_at is not null)",
+            "(status = 'candidate' and decided_by is null and decided_at is null"
+            " and not auto_accepted)"
+            " or (status <> 'candidate' and decided_at is not null"
+            " and (decided_by is not null) <> auto_accepted"
+            " and (status = 'accepted' or not auto_accepted))",
             name="decided_matches_status",
         ),
         CheckConstraint("jsonb_typeof(markup) = 'object'", name="markup_is_object"),

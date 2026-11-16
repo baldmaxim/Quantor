@@ -92,6 +92,52 @@ const STATUS_LABELS: Readonly<Record<SectionLevelStatus, string>> = {
 
 export const levelStatusLabel = (status: SectionLevelStatus): string => STATUS_LABELS[status];
 
+/** Подпись статуса уровня: автопринятие системой (ADR-0050) отличается от решения человека. */
+export const levelDecisionLabel = (
+  level: Pick<SectionLevelRead, 'status' | 'auto_accepted'>,
+): string =>
+  level.status === 'accepted' && level.auto_accepted ? 'Авто' : STATUS_LABELS[level.status];
+
+export interface ISectionReview {
+  /** Кандидаты: разногласия, нет разделения плиты, высота вне пределов - решает человек. */
+  readonly review: readonly SectionLevelRead[];
+  /** Принятые: системой (точное попадание в отметки) и человеком. */
+  readonly accepted: readonly SectionLevelRead[];
+  readonly rejected: readonly SectionLevelRead[];
+  /** Сколько из принятых приняла система. */
+  readonly auto: number;
+}
+
+/** Уровни листа по корзинам приёмки, внутри - сверху вниз по отметке. */
+export const reviewBuckets = (levels: readonly SectionLevelRead[]): ISectionReview => {
+  const ordered = [...levels].sort((a, b) => b.elevation_mm - a.elevation_mm || a.seq - b.seq);
+  const accepted = ordered.filter((level) => level.status === 'accepted');
+  return {
+    review: ordered.filter((level) => level.status === 'candidate'),
+    accepted,
+    rejected: ordered.filter((level) => level.status === 'rejected'),
+    auto: accepted.filter((level) => level.auto_accepted).length,
+  };
+};
+
+/**
+ * Область перехода к уровню на листе (доли листа): полоса уровня с запасом в этаж сверху и снизу,
+ * чтобы были видны соседние отметки.
+ */
+export const levelFocusRect = (
+  level: Pick<SectionLevelRead, 'markup'>,
+): readonly [number, number, number, number] => {
+  const [x0, y0, x1, y1] = level.markup.band;
+  const height = Math.abs(y1 - y0);
+  const width = Math.abs(x1 - x0);
+  return [
+    Math.max(0, Math.min(x0, x1) - width * 0.25),
+    Math.max(0, Math.min(y0, y1) - height),
+    Math.min(1, Math.max(x0, x1) + width * 0.25),
+    Math.min(1, Math.max(y0, y1) + height),
+  ];
+};
+
 /** Отметка в метрах с запятой и знаком: 47600 -> «+47,600», -3200 -> «-3,200», 0 -> «±0,000». */
 export const formatMark = (mm: number): string => {
   const sign = mm > 0 ? '+' : mm < 0 ? '-' : '±';
@@ -128,7 +174,9 @@ export const canAcceptLevel = (
 
 /** Кандидаты с допустимой высотой: что принимает «Принять все на листе». */
 export const acceptableCandidateIds = (levels: readonly SectionLevelRead[]): string[] =>
-  levels.filter((level) => level.status === 'candidate' && hasValidClearHeight(level)).map((level) => level.id);
+  levels
+    .filter((level) => level.status === 'candidate' && hasValidClearHeight(level))
+    .map((level) => level.id);
 
 /** Уровни одной страницы, сверху вниз по отметке. */
 export const levelsOfPage = (
@@ -162,7 +210,10 @@ export const groupLevelsByCut = (levels: readonly SectionLevelRead[]): ISectionC
     label: cut === null ? 'Разрез без обозначения' : `Разрез ${cut}`,
     levels: items.sort((a, b) => b.elevation_mm - a.elevation_mm || a.seq - b.seq),
   }));
-  return [...groups.filter((group) => group.cut !== null), ...groups.filter((group) => group.cut === null)];
+  return [
+    ...groups.filter((group) => group.cut !== null),
+    ...groups.filter((group) => group.cut === null),
+  ];
 };
 
 export interface ISectionCounts {
@@ -173,7 +224,8 @@ export interface ISectionCounts {
 }
 
 export const countLevels = (levels: readonly SectionLevelRead[]): ISectionCounts => {
-  const count = (status: SectionLevelStatus) => levels.filter((level) => level.status === status).length;
+  const count = (status: SectionLevelStatus) =>
+    levels.filter((level) => level.status === status).length;
   return {
     total: levels.length,
     accepted: count('accepted'),
@@ -194,7 +246,10 @@ export const sectionPageRows = (
 ): ISectionPageRow[] =>
   [...pages]
     .sort((a, b) => a.page_index - b.page_index)
-    .map((page) => ({ page, counts: countLevels(levels.filter((level) => level.page_index === page.page_index)) }));
+    .map((page) => ({
+      page,
+      counts: countLevels(levels.filter((level) => level.page_index === page.page_index)),
+    }));
 
 /** Подпись страницы-разреза: заголовок, корпус, секция; без них - номер страницы. */
 export const sectionPageLabel = (page: SectionPageRead): string => {

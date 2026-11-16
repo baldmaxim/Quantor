@@ -14940,6 +14940,10 @@ export type SectionIssueRead = {
  */
 export type SectionLevelRead = {
     /**
+     * Auto Accepted
+     */
+    auto_accepted: boolean;
+    /**
      * Clear Height Mm
      */
     clear_height_mm: number | null;
