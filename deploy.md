@@ -113,6 +113,27 @@ ssh suvpn 'free -m; df -h /'
 не аргументом. Ручные команды compose — только через `compose.sh`: он подставляет выпуск из
 `RELEASE`.
 
+## Замечания CAD и разбор задания
+
+`pnpm prod` с рабочей машины: по ssh в работающем контейнере api (`app/services/cad_ops.py`,
+команды `python -m app.cli cad-*`). HTTP-маршрутов и токенов нет. На сервер пишут только
+`resolve` и `reopen`, и меняют они лишь статус замечания.
+
+```bash
+pnpm prod release                              # выкаченный sha и коммиты origin/main сверх него
+pnpm prod remarks                              # открытые замечания, JSON; --status all, --project, --job
+pnpm prod bundle <job_id>                      # входы и выходы попытки → .quantor-prod/bundles/<job_id>/
+pnpm prod bundle <job_id> --attempt 1 --no-pdf # прошлая попытка, без исходного PDF
+pnpm prod resolve <remark_id>                  # замечание исправлено; reopen — снова открыто
+```
+
+Выгрузка повторяет каталог попытки у исполнителя CAD: в `in/` — `source.pdf`, `plan_candidates.dxf`,
+`scale.json`, `preview.json` вида родителя и `risers.json`, в `out/` — опубликованные артефакты. Ещё
+есть `job.json` (задание, payload, ручные флаги генератора) и `remarks.json`. Каждый файл сверяется с
+sha256 из итога задания. Замечание с `stale: true` относится к пересчитанной попытке. `bbox_pt` —
+точки PDF от левого верхнего угла. Выгрузки — данные Заказчика: каталог `.quantor-prod/`
+исключён из git. Сервер — `QUANTOR_SSH`, по умолчанию `suvpn`.
+
 ## Нельзя
 
 - Собирать образы на сервере — там нет исходников, сборка — только CI или `ship-local.sh`.

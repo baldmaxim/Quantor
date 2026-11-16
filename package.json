@@ -32,6 +32,7 @@
     "lint:licenses": "node scripts/vision.mjs licenses-check",
     "lint:web": "pnpm --filter @quantor/web lint && pnpm --filter @quantor/admin lint",
     "planswift": "node scripts/planswift.mjs",
+    "prod": "node scripts/prod.mjs",
     "setup": "node scripts/setup.mjs",
     "test": "pnpm run test:api && pnpm run test:web",
     "test:api": "node scripts/py.mjs -m pytest",
