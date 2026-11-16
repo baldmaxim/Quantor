@@ -466,6 +466,75 @@ async def test_bulk_status_and_filters(
             assert (await api.post(_url(project_id, "/bulk-status"), json=body)).status_code == 422
 
 
+async def test_groups_filters_and_group_status(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    texts: _Texts,
+) -> None:
+    async with build_api(make_context(), settings=_settings()) as api:
+        project_id = await _project(api)
+        await _add_pdf(db_session, fake_storage, project_id, PLAN_PDF)
+        await _add_pdf(db_session, fake_storage, project_id, SCHEME_PDF)
+        await _extract(api, db_session, fake_storage, project_id)
+        plans = (await api.get(_url(project_id, "?sheet_kind=floor_plan"))).json()
+        assert plans["total"] == 2
+        first, second = plans["items"]
+        patched = await api.patch(
+            _url(project_id, f"/{first['id']}"), json={"building": "9", "section": "3"}
+        )
+        assert patched.status_code == 200, patched.text
+
+        listing = (await api.get(_url(project_id))).json()
+        assert listing["sheet_kinds"] == ["floor_plan", "scheme"]
+        assert (listing["buildings"], listing["sections"]) == (["9"], ["3"])
+        assert (await api.get(_url(project_id, "?building=9"))).json()["total"] == 1
+        assert (await api.get(_url(project_id, "?section=3"))).json()["total"] == 1
+        # Пустое значение фильтра - поле не указано.
+        assert (await api.get(_url(project_id, "?building="))).json()["total"] == 2
+        assert (await api.get(_url(project_id, "?sheet_kind=scheme"))).json()["total"] == 1
+
+        groups = (await api.get(_url(project_id, "/groups?sheet_kind=floor_plan"))).json()
+        assert [(g["building"], g["section"], g["total"]) for g in groups["groups"]] == [
+            ("9", "3", 1),
+            (None, None, 1),
+        ]
+        assert groups["groups"][0]["candidate"] == 1
+        assert groups["groups"][0]["without_levels"] == 0
+        everything = (await api.get(_url(project_id, "/groups"))).json()["groups"]
+        assert len(everything) == 3
+
+        # Решение по листу группа не перебивает: отклонённый остаётся отклонённым.
+        rejected = await api.post(
+            _url(project_id, "/bulk-status"), json={"ids": [second["id"]], "status": "rejected"}
+        )
+        assert rejected.status_code == 200
+        unknown = {"section_mark": "АР", "sheet_kind": "floor_plan", "building": None}
+        empty_group = {**unknown, "section": None}
+        built_group = {**unknown, "building": "9", "section": "3"}
+        confirm = await api.post(
+            _url(project_id, "/group-status"), json={**empty_group, "status": "confirmed"}
+        )
+        assert confirm.status_code == 200 and confirm.json() == {"updated": 0}
+        confirm = await api.post(
+            _url(project_id, "/group-status"), json={**built_group, "status": "confirmed"}
+        )
+        assert confirm.json() == {"updated": 1}
+        [stored] = (await api.get(_url(project_id, "?status=confirmed"))).json()["items"]
+        assert stored["id"] == first["id"] and stored["confirmed_by"] is not None
+        back = await api.post(
+            _url(project_id, "/group-status"), json={**empty_group, "status": "candidate"}
+        )
+        assert back.json() == {"updated": 1}
+        statuses = {i["id"]: i["status"] for i in (await api.get(_url(project_id))).json()["items"]}
+        assert (statuses[first["id"]], statuses[second["id"]]) == ("confirmed", "candidate")
+        # Ключ группы обязателен: пропуск не значит «любое».
+        missing = await api.post(
+            _url(project_id, "/group-status"), json={**unknown, "status": "confirmed"}
+        )
+        assert missing.status_code == 422
+
+
 async def test_foreign_workspace_and_foreign_project_ids_get_404(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],
@@ -494,6 +563,9 @@ async def test_foreign_workspace_and_foreign_project_ids_get_404(
             "items": [],
             "total": 0,
             "section_marks": [],
+            "sheet_kinds": [],
+            "buildings": [],
+            "sections": [],
         }
         # Итог разбора чужого проекта через свой не виден.
         assert (await api.get(_url(other_project, "/extract-summary"))).json() is None

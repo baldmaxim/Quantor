@@ -26,6 +26,8 @@ from app.contracts.sheet_passports import (
     FieldEvidenceOut,
     SheetPassportExtractError,
     SheetPassportExtractSummary,
+    SheetPassportGroupOut,
+    SheetPassportGroupStatus,
     SheetPassportOut,
     SheetPassportPatch,
     SheetPassportStatus,
@@ -537,6 +539,13 @@ def _scoped(project_id: uuid.UUID) -> Any:
     )
 
 
+def _match(column: Any, value: str | None) -> Any:
+    """Условие фильтра: None - без фильтра, пустая строка - поле не указано, иначе - равенство."""
+    if value is None:
+        return None
+    return column.is_(None) if value == "" else column == value
+
+
 async def list_passports(
     session: AsyncSession,
     *,
@@ -546,14 +555,24 @@ async def list_passports(
     revision_id: uuid.UUID | None,
     limit: int,
     offset: int,
+    sheet_kind: str | None = None,
+    building: str | None = None,
+    section: str | None = None,
 ) -> tuple[list[SheetPassportOut], int]:
     conditions = []
     if status is not None:
         conditions.append(SheetPassport.status == status.value)
-    if section_mark is not None:
-        conditions.append(SheetPassport.section_mark == section_mark)
     if revision_id is not None:
         conditions.append(SheetPassport.revision_id == revision_id)
+    for column, value in (
+        (SheetPassport.section_mark, section_mark),
+        (SheetPassport.sheet_kind, sheet_kind),
+        (SheetPassport.building, building),
+        (SheetPassport.section, section),
+    ):
+        condition = _match(column, value)
+        if condition is not None:
+            conditions.append(condition)
     total = await session.scalar(
         select(func.count())
         .select_from(SheetPassport)
@@ -571,15 +590,113 @@ async def list_passports(
     return items, int(total or 0)
 
 
-async def section_marks(session: AsyncSession, *, project_id: uuid.UUID) -> list[str]:
-    """Разделы всех паспортов проекта: фильтр по разделу не зависит от загруженной страницы."""
+@dataclass(frozen=True, slots=True)
+class PassportFacets:
+    """Значения фильтров всего проекта: фильтр не зависит от загруженной страницы."""
+
+    section_marks: list[str]
+    sheet_kinds: list[str]
+    buildings: list[str]
+    sections: list[str]
+
+
+async def _distinct(session: AsyncSession, project_id: uuid.UUID, column: Any) -> list[str]:
     result = await session.scalars(
-        select(SheetPassport.section_mark)
-        .where(SheetPassport.project_id == project_id, SheetPassport.section_mark.is_not(None))
+        select(column)
+        .where(SheetPassport.project_id == project_id, column.is_not(None))
         .distinct()
-        .order_by(SheetPassport.section_mark)
+        .order_by(column)
     )
-    return [mark for mark in result.all() if mark]
+    return [str(value) for value in result.all() if value]
+
+
+async def passport_facets(session: AsyncSession, *, project_id: uuid.UUID) -> PassportFacets:
+    return PassportFacets(
+        section_marks=await _distinct(session, project_id, SheetPassport.section_mark),
+        sheet_kinds=await _distinct(session, project_id, SheetPassport.sheet_kind),
+        buildings=await _distinct(session, project_id, SheetPassport.building),
+        sections=await _distinct(session, project_id, SheetPassport.section),
+    )
+
+
+def _status_count(status: SheetPassportStatus) -> Any:
+    return func.count().filter(SheetPassport.status == status.value)
+
+
+async def passport_groups(
+    session: AsyncSession, *, project_id: uuid.UUID, sheet_kind: str | None
+) -> list[SheetPassportGroupOut]:
+    """Группы раздел · тип · корпус · секция со счётчиками статусов; пустое поле - своя группа."""
+    keys = (
+        SheetPassport.section_mark,
+        SheetPassport.sheet_kind,
+        SheetPassport.building,
+        SheetPassport.section,
+    )
+    query = (
+        select(
+            *keys,
+            func.count(),
+            _status_count(SheetPassportStatus.CANDIDATE),
+            _status_count(SheetPassportStatus.CONFIRMED),
+            _status_count(SheetPassportStatus.REJECTED),
+            func.count().filter(SheetPassport.level_from.is_(None)),
+        )
+        .where(SheetPassport.project_id == project_id)
+        .group_by(*keys)
+        .order_by(*(key.asc().nulls_last() for key in keys))
+    )
+    condition = _match(SheetPassport.sheet_kind, sheet_kind)
+    if condition is not None:
+        query = query.where(condition)
+    return [
+        SheetPassportGroupOut(
+            section_mark=row[0],
+            sheet_kind=row[1],
+            building=row[2],
+            section=row[3],
+            total=int(row[4]),
+            candidate=int(row[5]),
+            confirmed=int(row[6]),
+            rejected=int(row[7]),
+            without_levels=int(row[8]),
+        )
+        for row in (await session.execute(query)).all()
+    ]
+
+
+async def group_status(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    body: SheetPassportGroupStatus,
+    user_id: uuid.UUID,
+) -> int:
+    """Статус группе: подтверждение и отклонение - только кандидатам, возврат - решённым."""
+    conditions = [SheetPassport.project_id == project_id]
+    for column, value in (
+        (SheetPassport.section_mark, body.section_mark),
+        (SheetPassport.sheet_kind, body.sheet_kind),
+        (SheetPassport.building, body.building),
+        (SheetPassport.section, body.section),
+    ):
+        conditions.append(column.is_(None) if value is None else column == value)
+    review = body.status is not SheetPassportStatus.CANDIDATE
+    candidate = SheetPassportStatus.CANDIDATE.value
+    conditions.append(
+        SheetPassport.status == candidate if review else SheetPassport.status != candidate
+    )
+    updated = await session.scalars(
+        update(SheetPassport)
+        .where(*conditions)
+        .values(
+            status=body.status.value,
+            confirmed_by=user_id if review else None,
+            confirmed_at=datetime.now(UTC) if review else None,
+        )
+        .returning(SheetPassport.id)
+    )
+    return len(updated.all())
 
 
 async def get_passport_out(

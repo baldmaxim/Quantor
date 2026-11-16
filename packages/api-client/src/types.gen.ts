@@ -15478,11 +15478,97 @@ export type SheetPassportExtractSummary = {
 };
 
 /**
+ * SheetPassportGroupOut
+ *
+ * Группа паспортов: раздел, тип, корпус, секция. null - поле не указано (не «любое»).
+ */
+export type SheetPassportGroupOut = {
+    /**
+     * Building
+     */
+    building: string | null;
+    /**
+     * Candidate
+     */
+    candidate: number;
+    /**
+     * Confirmed
+     */
+    confirmed: number;
+    /**
+     * Rejected
+     */
+    rejected: number;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Section Mark
+     */
+    section_mark: string | null;
+    /**
+     * Sheet Kind
+     */
+    sheet_kind: string | null;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Without Levels
+     */
+    without_levels: number;
+};
+
+/**
+ * SheetPassportGroupStatus
+ *
+ * Статус группе целиком. null в ключе - поле не указано; ключ обязателен (не «любое»).
+ *
+ * Подтверждение и отклонение касаются только кандидатов: решение человека по листу группа не
+ * перебивает. Возврат в кандидаты касается подтверждённых и отклонённых.
+ */
+export type SheetPassportGroupStatus = {
+    /**
+     * Building
+     */
+    building: string | null;
+    /**
+     * Section
+     */
+    section: string | null;
+    /**
+     * Section Mark
+     */
+    section_mark: string | null;
+    /**
+     * Sheet Kind
+     */
+    sheet_kind: string | null;
+    status: SheetPassportStatus;
+};
+
+/**
+ * SheetPassportGroupsOut
+ */
+export type SheetPassportGroupsOut = {
+    /**
+     * Groups
+     */
+    groups: Array<SheetPassportGroupOut>;
+};
+
+/**
  * SheetPassportListOut
  *
- * Страница паспортов; `section_marks` - все разделы проекта, а не этой страницы или фильтра.
+ * Страница паспортов и значения фильтров всего проекта, а не этой страницы или фильтра.
  */
 export type SheetPassportListOut = {
+    /**
+     * Buildings
+     */
+    buildings: Array<string>;
     /**
      * Items
      */
@@ -15491,6 +15577,14 @@ export type SheetPassportListOut = {
      * Section Marks
      */
     section_marks: Array<string>;
+    /**
+     * Sections
+     */
+    sections: Array<string>;
+    /**
+     * Sheet Kinds
+     */
+    sheet_kinds: Array<string>;
     /**
      * Total
      */
@@ -23316,6 +23410,18 @@ export type ListSheetPassportsData = {
          */
         revision_id?: string | null;
         /**
+         * Sheet Kind
+         */
+        sheet_kind?: string | null;
+        /**
+         * Building
+         */
+        building?: string | null;
+        /**
+         * Section
+         */
+        section?: string | null;
+        /**
          * Limit
          */
         limit?: number;
@@ -23436,6 +23542,71 @@ export type GetSheetPassportExtractSummaryResponses = {
 };
 
 export type GetSheetPassportExtractSummaryResponse = GetSheetPassportExtractSummaryResponses[keyof GetSheetPassportExtractSummaryResponses];
+
+export type GroupSheetPassportStatusData = {
+    body: SheetPassportGroupStatus;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/sheet-passports/group-status';
+};
+
+export type GroupSheetPassportStatusErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GroupSheetPassportStatusError = GroupSheetPassportStatusErrors[keyof GroupSheetPassportStatusErrors];
+
+export type GroupSheetPassportStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: SheetPassportBulkOut;
+};
+
+export type GroupSheetPassportStatusResponse = GroupSheetPassportStatusResponses[keyof GroupSheetPassportStatusResponses];
+
+export type ListSheetPassportGroupsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Sheet Kind
+         */
+        sheet_kind?: string | null;
+    };
+    url: '/api/v1/projects/{project_id}/sheet-passports/groups';
+};
+
+export type ListSheetPassportGroupsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSheetPassportGroupsError = ListSheetPassportGroupsErrors[keyof ListSheetPassportGroupsErrors];
+
+export type ListSheetPassportGroupsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SheetPassportGroupsOut;
+};
+
+export type ListSheetPassportGroupsResponse = ListSheetPassportGroupsResponses[keyof ListSheetPassportGroupsResponses];
 
 export type PatchSheetPassportData = {
     body: SheetPassportPatch;

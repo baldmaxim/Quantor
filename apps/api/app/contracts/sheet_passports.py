@@ -80,11 +80,48 @@ class SheetPassportOut(BaseModel):
 
 
 class SheetPassportListOut(BaseModel):
-    """Страница паспортов; `section_marks` - все разделы проекта, а не этой страницы или фильтра."""
+    """Страница паспортов и значения фильтров всего проекта, а не этой страницы или фильтра."""
 
     items: list[SheetPassportOut]
     total: int
     section_marks: list[str]
+    sheet_kinds: list[str]
+    buildings: list[str]
+    sections: list[str]
+
+
+class SheetPassportGroupOut(BaseModel):
+    """Группа паспортов: раздел, тип, корпус, секция. null - поле не указано (не «любое»)."""
+
+    section_mark: str | None
+    sheet_kind: str | None
+    building: str | None
+    section: str | None
+    total: int
+    candidate: int
+    confirmed: int
+    rejected: int
+    without_levels: int
+
+
+class SheetPassportGroupsOut(BaseModel):
+    groups: list[SheetPassportGroupOut]
+
+
+class SheetPassportGroupStatus(BaseModel):
+    """Статус группе целиком. null в ключе - поле не указано; ключ обязателен (не «любое»).
+
+    Подтверждение и отклонение касаются только кандидатов: решение человека по листу группа не
+    перебивает. Возврат в кандидаты касается подтверждённых и отклонённых.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    section_mark: str | None = Field(max_length=TEXT_MAX)
+    sheet_kind: str | None = Field(max_length=TEXT_MAX)
+    building: str | None = Field(max_length=TEXT_MAX)
+    section: str | None = Field(max_length=TEXT_MAX)
+    status: SheetPassportStatus
 
 
 class SheetPassportPatch(BaseModel):

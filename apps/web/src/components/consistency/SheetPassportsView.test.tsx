@@ -10,6 +10,8 @@ import { SheetPassportsView } from './SheetPassportsView';
 vi.mock('@quantor/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof client>()),
   listSheetPassports: vi.fn(),
+  listSheetPassportGroups: vi.fn(),
+  groupSheetPassportStatus: vi.fn(),
   getSheetPassportExtractSummary: vi.fn(),
   bulkSheetPassportStatus: vi.fn(),
   startSheetPassportExtract: vi.fn(),
@@ -38,8 +40,38 @@ const ROWS = [
   }),
 ];
 
-// Разделы всего проекта: КР нет среди строк загруженной страницы.
-const MARKS = ['АР', 'КР'];
+// Значения фильтров всего проекта: КР и корпуса 9 нет среди строк загруженной страницы.
+const FACETS = {
+  section_marks: ['АР', 'КР'],
+  sheet_kinds: ['floor_plan', 'scheme'],
+  buildings: ['9'],
+  sections: ['3'],
+};
+
+const GROUPS = [
+  {
+    section_mark: 'АР',
+    sheet_kind: 'floor_plan',
+    building: '9',
+    section: '3',
+    total: 29,
+    candidate: 27,
+    confirmed: 2,
+    rejected: 0,
+    without_levels: 0,
+  },
+  {
+    section_mark: 'ИОС4',
+    sheet_kind: 'floor_plan',
+    building: null,
+    section: null,
+    total: 75,
+    candidate: 75,
+    confirmed: 0,
+    rejected: 0,
+    without_levels: 3,
+  },
+];
 
 const mount = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -60,8 +92,12 @@ describe('Листы комплекта', () => {
       .mockReset()
       .mockImplementation(((options: { query?: { status?: string } }) =>
         options.query?.status === 'confirmed'
-          ? ok({ items: [], total: 4, section_marks: MARKS })
-          : ok({ items: ROWS, total: 2, section_marks: MARKS })) as never);
+          ? ok({ items: [], total: 4, ...FACETS })
+          : ok({ items: ROWS, total: 2, ...FACETS })) as never);
+    vi.mocked(client.listSheetPassportGroups)
+      .mockReset()
+      .mockImplementation(() => ok({ groups: GROUPS }));
+    vi.mocked(client.groupSheetPassportStatus).mockReset();
   });
 
   it('пустые значения — прочерк, не 0; у значения метка источника с цитатой', async () => {
@@ -87,7 +123,70 @@ describe('Листы комплекта', () => {
     const options = within(select)
       .getAllByRole('option')
       .map((option) => option.textContent);
-    expect(options).toEqual(['Все', 'АР', 'КР']);
+    expect(options).toEqual(['Все', 'Не указан', 'АР', 'КР']);
+  });
+
+  it('фильтры типа, корпуса и секции — значения проекта и пункт «Не указан»', async () => {
+    mount();
+    await screen.findAllByTestId('passport-row');
+    const options = (name: string) =>
+      within(screen.getByRole('combobox', { name }))
+        .getAllByRole('option')
+        .map((option) => option.textContent);
+    expect(options('Тип листа')).toEqual(['Все', 'Не указан', 'План', 'Схема']);
+    expect(options('Корпус')).toEqual(['Все', 'Не указан', '9']);
+    expect(options('Секция')).toEqual(['Все', 'Не указан', '3']);
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Корпус' }), '9');
+    await waitFor(() =>
+      expect(client.listSheetPassports).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ building: '9' }) }),
+      ),
+    );
+  });
+
+  it('«Показать» ставит фильтры группы: не указанное поле — пустая строка', async () => {
+    mount();
+    await screen.findAllByTestId('passport-group');
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Показать: ИОС4 · План · корпус не указан · секция не указана',
+      }),
+    );
+    await waitFor(() =>
+      expect(client.listSheetPassports).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            section_mark: 'ИОС4',
+            sheet_kind: 'floor_plan',
+            building: '',
+            section: '',
+            status: null,
+          }),
+        }),
+      ),
+    );
+    expect(screen.getByRole('combobox', { name: 'Корпус' })).toHaveDisplayValue('Не указан');
+  });
+
+  it('«Подтвердить» отправляет ключ группы целиком, с null для не указанного', async () => {
+    vi.mocked(client.groupSheetPassportStatus).mockImplementation(() => ok({ updated: 27 }));
+    mount();
+    const [built] = await screen.findAllByTestId('passport-group');
+    expect(within(built!).getByText('2 из 29')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Подтвердить 75: ИОС4 · План · корпус не указан · секция не указана',
+      }),
+    );
+    await waitFor(() => expect(client.groupSheetPassportStatus).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(client.groupSheetPassportStatus).mock.calls[0]?.[0]?.body).toEqual({
+      section_mark: 'ИОС4',
+      sheet_kind: 'floor_plan',
+      building: null,
+      section: null,
+      status: 'confirmed',
+    });
   });
 
   it('поиск по шифру и заголовку работает на клиенте и очищается крестиком', async () => {

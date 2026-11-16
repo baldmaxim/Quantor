@@ -30724,9 +30724,180 @@
         "title": "SheetPassportExtractSummary",
         "type": "object"
       },
-      "SheetPassportListOut": {
-        "description": "Страница паспортов; `section_marks` - все разделы проекта, а не этой страницы или фильтра.",
+      "SheetPassportGroupOut": {
+        "description": "Группа паспортов: раздел, тип, корпус, секция. null - поле не указано (не «любое»).",
         "properties": {
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "candidate": {
+            "title": "Candidate",
+            "type": "integer"
+          },
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "integer"
+          },
+          "rejected": {
+            "title": "Rejected",
+            "type": "integer"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "section_mark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Mark"
+          },
+          "sheet_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Kind"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "without_levels": {
+            "title": "Without Levels",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "section_mark",
+          "sheet_kind",
+          "building",
+          "section",
+          "total",
+          "candidate",
+          "confirmed",
+          "rejected",
+          "without_levels"
+        ],
+        "title": "SheetPassportGroupOut",
+        "type": "object"
+      },
+      "SheetPassportGroupStatus": {
+        "additionalProperties": false,
+        "description": "Статус группе целиком. null в ключе - поле не указано; ключ обязателен (не «любое»).\n\nПодтверждение и отклонение касаются только кандидатов: решение человека по листу группа не\nперебивает. Возврат в кандидаты касается подтверждённых и отклонённых.",
+        "properties": {
+          "building": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "section_mark": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Mark"
+          },
+          "sheet_kind": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Kind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SheetPassportStatus"
+          }
+        },
+        "required": [
+          "section_mark",
+          "sheet_kind",
+          "building",
+          "section",
+          "status"
+        ],
+        "title": "SheetPassportGroupStatus",
+        "type": "object"
+      },
+      "SheetPassportGroupsOut": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SheetPassportGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "title": "SheetPassportGroupsOut",
+        "type": "object"
+      },
+      "SheetPassportListOut": {
+        "description": "Страница паспортов и значения фильтров всего проекта, а не этой страницы или фильтра.",
+        "properties": {
+          "buildings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Buildings",
+            "type": "array"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/SheetPassportOut"
@@ -30741,6 +30912,20 @@
             "title": "Section Marks",
             "type": "array"
           },
+          "sections": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "sheet_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sheet Kinds",
+            "type": "array"
+          },
           "total": {
             "title": "Total",
             "type": "integer"
@@ -30749,7 +30934,10 @@
         "required": [
           "items",
           "total",
-          "section_marks"
+          "section_marks",
+          "sheet_kinds",
+          "buildings",
+          "sections"
         ],
         "title": "SheetPassportListOut",
         "type": "object"
@@ -44303,6 +44491,57 @@
           },
           {
             "in": "query",
+            "name": "sheet_kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sheet Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "building",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Building"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section"
+            }
+          },
+          {
+            "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
@@ -44495,6 +44734,119 @@
           }
         },
         "summary": "Итог последнего разбора листов проекта; null, если заданий не было",
+        "tags": [
+          "sheet-passports"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/sheet-passports/group-status": {
+      "post": {
+        "operationId": "group_sheet_passport_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetPassportGroupStatus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetPassportBulkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Статус группе паспортов; подтверждение и отклонение - только кандидатам",
+        "tags": [
+          "sheet-passports"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/sheet-passports/groups": {
+      "get": {
+        "operationId": "list_sheet_passport_groups",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sheet_kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sheet Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetPassportGroupsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Группы паспортов: раздел, тип, корпус, секция; счётчики статусов",
         "tags": [
           "sheet-passports"
         ]

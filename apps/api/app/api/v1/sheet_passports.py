@@ -16,9 +16,12 @@ from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
 from app.contracts.sheet_passports import (
     LIST_MAX,
+    TEXT_MAX,
     SheetPassportBulkOut,
     SheetPassportBulkStatus,
     SheetPassportExtractSummary,
+    SheetPassportGroupsOut,
+    SheetPassportGroupStatus,
     SheetPassportListOut,
     SheetPassportOut,
     SheetPassportPatch,
@@ -90,6 +93,9 @@ async def list_sheet_passports(
     status_filter: Annotated[SheetPassportStatus | None, Query(alias="status")] = None,
     section_mark: Annotated[str | None, Query(max_length=32)] = None,
     revision_id: Annotated[uuid.UUID | None, Query()] = None,
+    sheet_kind: Annotated[str | None, Query(max_length=TEXT_MAX)] = None,
+    building: Annotated[str | None, Query(max_length=TEXT_MAX)] = None,
+    section: Annotated[str | None, Query(max_length=TEXT_MAX)] = None,
     limit: Annotated[int, Query(ge=1, le=LIST_MAX)] = 500,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> SheetPassportListOut:
@@ -102,9 +108,55 @@ async def list_sheet_passports(
         revision_id=revision_id,
         limit=limit,
         offset=offset,
+        sheet_kind=sheet_kind,
+        building=building,
+        section=section,
     )
-    marks = await sheet_passports.section_marks(session, project_id=project_id)
-    return SheetPassportListOut(items=items, total=total, section_marks=marks)
+    facets = await sheet_passports.passport_facets(session, project_id=project_id)
+    return SheetPassportListOut(
+        items=items,
+        total=total,
+        section_marks=facets.section_marks,
+        sheet_kinds=facets.sheet_kinds,
+        buildings=facets.buildings,
+        sections=facets.sections,
+    )
+
+
+@router.get(
+    "/projects/{project_id}/sheet-passports/groups",
+    response_model=SheetPassportGroupsOut,
+    summary="Группы паспортов: раздел, тип, корпус, секция; счётчики статусов",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def list_sheet_passport_groups(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    sheet_kind: Annotated[str | None, Query(max_length=TEXT_MAX)] = None,
+) -> SheetPassportGroupsOut:
+    await _project(session, context, project_id)
+    groups = await sheet_passports.passport_groups(
+        session, project_id=project_id, sheet_kind=sheet_kind
+    )
+    return SheetPassportGroupsOut(groups=groups)
+
+
+@router.post(
+    "/projects/{project_id}/sheet-passports/group-status",
+    response_model=SheetPassportBulkOut,
+    summary="Статус группе паспортов; подтверждение и отклонение - только кандидатам",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def group_sheet_passport_status(
+    project_id: uuid.UUID, body: SheetPassportGroupStatus, session: SessionDep, context: AuthDep
+) -> SheetPassportBulkOut:
+    await _project(session, context, project_id)
+    updated = await sheet_passports.group_status(
+        session, project_id=project_id, body=body, user_id=context.principal.user_id
+    )
+    await session.commit()
+    return SheetPassportBulkOut(updated=updated)
 
 
 @router.post(

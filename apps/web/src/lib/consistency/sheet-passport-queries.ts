@@ -3,12 +3,16 @@
 import {
   bulkSheetPassportStatus,
   getSheetPassportExtractSummary,
+  groupSheetPassportStatus,
+  listSheetPassportGroups,
   listSheetPassports,
   patchSheetPassport,
   startSheetPassportExtract,
   type JobRead,
   type SheetPassportBulkOut,
   type SheetPassportExtractSummary,
+  type SheetPassportGroupOut,
+  type SheetPassportGroupsOut,
   type SheetPassportListOut,
   type SheetPassportOut,
   type SheetPassportPatch,
@@ -34,9 +38,19 @@ import { unwrap } from '@/lib/queries';
 
 const JOB_POLL_MS = 2000;
 
-export interface IPassportFilters {
-  readonly status: SheetPassportStatus | null;
+/**
+ * Отбор по полям паспорта: null - без фильтра, пустая строка - поле не указано.
+ * Пустая строка уходит на сервер как есть: так сервер ищет паспорта без корпуса, секции и т. п.
+ */
+export interface IPassportScope {
   readonly sectionMark: string | null;
+  readonly sheetKind: string | null;
+  readonly building: string | null;
+  readonly section: string | null;
+}
+
+export interface IPassportFilters extends IPassportScope {
+  readonly status: SheetPassportStatus | null;
   readonly offset: number;
   readonly limit: number;
 }
@@ -45,10 +59,19 @@ export const passportKeys = {
   project: (projectId: string) => ['sheet-passports', projectId] as const,
   list: (projectId: string, filters: IPassportFilters) =>
     ['sheet-passports', projectId, 'list', filters] as const,
-  confirmed: (projectId: string, sectionMark: string | null) =>
-    ['sheet-passports', projectId, 'confirmed', sectionMark] as const,
+  confirmed: (projectId: string, scope: IPassportScope) =>
+    ['sheet-passports', projectId, 'confirmed', scope] as const,
+  groups: (projectId: string, sheetKind: string | null) =>
+    ['sheet-passports', projectId, 'groups', sheetKind] as const,
   extractSummary: (projectId: string) => ['sheet-passports', projectId, 'extract-summary'] as const,
 };
+
+const scopeQuery = (scope: IPassportScope) => ({
+  section_mark: scope.sectionMark,
+  sheet_kind: scope.sheetKind,
+  building: scope.building,
+  section: scope.section,
+});
 
 export const useSheetPassports = (
   projectId: string,
@@ -65,8 +88,8 @@ export const useSheetPassports = (
           throwOnError: true,
           path: { project_id: projectId },
           query: {
+            ...scopeQuery(filters),
             status: filters.status,
-            section_mark: filters.sectionMark,
             limit: filters.limit,
             offset: filters.offset,
           },
@@ -74,24 +97,73 @@ export const useSheetPassports = (
       ),
   });
 
-/** Сколько подтверждено в выборке по разделу: нужен только `total` ответа, строки не грузятся. */
+/** Сколько подтверждено в выборке: нужен только `total` ответа, строки не грузятся. */
 export const useConfirmedCount = (
   projectId: string,
-  sectionMark: string | null,
+  scope: IPassportScope,
   enabled: boolean,
 ): UseQueryResult<number> =>
   useQuery({
-    queryKey: passportKeys.confirmed(projectId, sectionMark),
+    queryKey: passportKeys.confirmed(projectId, scope),
     enabled,
     queryFn: async () =>
       unwrap(
         await listSheetPassports({
           throwOnError: true,
           path: { project_id: projectId },
-          query: { status: 'confirmed', section_mark: sectionMark, limit: 1, offset: 0 },
+          query: { ...scopeQuery(scope), status: 'confirmed', limit: 1, offset: 0 },
         }),
       ).total,
   });
+
+/** Группы раздел · тип · корпус · секция; `sheetKind` - только этот тип листа, null - все. */
+export const useSheetPassportGroups = (
+  projectId: string,
+  sheetKind: string | null,
+  enabled: boolean,
+): UseQueryResult<SheetPassportGroupsOut> =>
+  useQuery({
+    queryKey: passportKeys.groups(projectId, sheetKind),
+    enabled,
+    placeholderData: (previous) => previous,
+    queryFn: async () =>
+      unwrap(
+        await listSheetPassportGroups({
+          throwOnError: true,
+          path: { project_id: projectId },
+          query: { sheet_kind: sheetKind },
+        }),
+      ),
+  });
+
+export interface IGroupStatus {
+  readonly group: SheetPassportGroupOut;
+  readonly status: SheetPassportStatus;
+}
+
+/** Статус группе целиком: подтверждение и отклонение сервер применяет только к кандидатам. */
+export const useGroupPassportStatus = (
+  projectId: string,
+): UseMutationResult<SheetPassportBulkOut, unknown, IGroupStatus> => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ group, status }) =>
+      unwrap(
+        await groupSheetPassportStatus({
+          throwOnError: true,
+          path: { project_id: projectId },
+          body: {
+            section_mark: group.section_mark,
+            sheet_kind: group.sheet_kind,
+            building: group.building,
+            section: group.section,
+            status,
+          },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: passportKeys.project(projectId) }),
+  });
+};
 
 const isActive = (summary: SheetPassportExtractSummary | null | undefined): boolean =>
   summary?.status === 'queued' || summary?.status === 'running';

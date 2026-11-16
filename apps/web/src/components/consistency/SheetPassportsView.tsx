@@ -1,6 +1,10 @@
 'use client';
 
-import type { SheetPassportOut, SheetPassportStatus } from '@quantor/api-client';
+import type {
+  SheetPassportGroupOut,
+  SheetPassportOut,
+  SheetPassportStatus,
+} from '@quantor/api-client';
 import { useState, type FC } from 'react';
 
 import { EmptyState, SkeletonRows } from '@/components/ui';
@@ -8,6 +12,7 @@ import {
   useBulkPassportStatus,
   useConfirmedCount,
   useSheetPassports,
+  type IPassportScope,
 } from '@/lib/consistency/sheet-passport-queries';
 import { EMPTY_CELL, PASSPORT_PAGE_SIZE, matchesSearch } from '@/lib/consistency/sheet-passports';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
@@ -15,14 +20,16 @@ import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 import { SheetPassportBulkBar } from './SheetPassportBulkBar';
 import { SheetPassportEditDialog } from './SheetPassportEditDialog';
 import { SheetPassportExtractPanel } from './SheetPassportExtractPanel';
-import { SheetPassportFilters } from './SheetPassportFilters';
+import { SheetPassportFilters, type IPassportFacets } from './SheetPassportFilters';
+import { SheetPassportGroupsPanel } from './SheetPassportGroupsPanel';
 import { SheetPassportPager } from './SheetPassportPager';
 import { SheetPassportTable } from './SheetPassportTable';
 
 /**
- * «Листы комплекта» (ADR-0043, С1): разбор, фильтры, таблица, выбор строк и правка.
+ * «Листы комплекта» (ADR-0043, С1): разбор, группы, фильтры, таблица, выбор строк и правка.
  *
- * Статус и раздел фильтруются на сервере (страница меняется), поиск — по загруженной странице.
+ * Статус, раздел, тип, корпус и секция фильтруются на сервере (страница меняется), поиск — по
+ * загруженной странице. «Показать» в группе ставит фильтры группы.
  * Выбор сбрасывается при смене фильтра или страницы: в пачку не должно попасть невидимое.
  */
 
@@ -31,32 +38,41 @@ interface IViewProps {
 }
 
 const noRows: readonly SheetPassportOut[] = [];
+const noValues: readonly string[] = [];
+
+const ALL: IPassportScope = { sectionMark: null, sheetKind: null, building: null, section: null };
+
+/** Ключ группы в фильтр: null группы (поле не указано) - пустая строка фильтра. */
+const groupScope = (group: SheetPassportGroupOut): IPassportScope => ({
+  sectionMark: group.section_mark ?? '',
+  sheetKind: group.sheet_kind ?? '',
+  building: group.building ?? '',
+  section: group.section ?? '',
+});
 
 export const SheetPassportsView: FC<IViewProps> = ({ projectId }) => {
   const [status, setStatus] = useState<SheetPassportStatus | null>(null);
-  const [sectionMark, setSectionMark] = useState<string | null>(null);
+  const [scope, setScope] = useState<IPassportScope>(ALL);
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<SheetPassportOut | null>(null);
-  // Разделы всего проекта отдаёт сервер: страница листов их не ограничивает. Копятся, чтобы
-  // список не пропадал, пока грузится страница с новым фильтром.
-  const [knownMarks, setKnownMarks] = useState<readonly string[]>([]);
-
   const list = useSheetPassports(
     projectId,
-    { status, sectionMark, offset, limit: PASSPORT_PAGE_SIZE },
+    { ...scope, status, offset, limit: PASSPORT_PAGE_SIZE },
     true,
   );
-  const confirmed = useConfirmedCount(projectId, sectionMark, true);
+  const confirmed = useConfirmedCount(projectId, scope, true);
   const bulk = useBulkPassportStatus(projectId);
 
   const items = list.data?.items ?? noRows;
-  const found = list.data?.section_marks ?? [];
-  const merged = [...new Set([...knownMarks, ...found, ...(sectionMark ? [sectionMark] : [])])];
-  if (merged.length !== knownMarks.length) {
-    setKnownMarks(merged);
-  }
+  // Значения фильтров - всего проекта (сервер), а не загруженной страницы.
+  const facets: IPassportFacets = {
+    marks: list.data?.section_marks ?? noValues,
+    kinds: list.data?.sheet_kinds ?? noValues,
+    buildings: list.data?.buildings ?? noValues,
+    sections: list.data?.sections ?? noValues,
+  };
 
   const visible = items.filter((row) => matchesSearch(row, search));
   const total = list.data?.total ?? 0;
@@ -67,8 +83,15 @@ export const SheetPassportsView: FC<IViewProps> = ({ projectId }) => {
     setOffset(0);
     resetSelection();
   };
-  const changeSection = (value: string | null) => {
-    setSectionMark(value);
+  const changeScope = (value: Partial<IPassportScope>) => {
+    setScope((current) => ({ ...current, ...value }));
+    setOffset(0);
+    resetSelection();
+  };
+  const showGroup = (group: SheetPassportGroupOut) => {
+    setScope(groupScope(group));
+    setStatus(null);
+    setSearch('');
     setOffset(0);
     resetSelection();
   };
@@ -102,13 +125,14 @@ export const SheetPassportsView: FC<IViewProps> = ({ projectId }) => {
   return (
     <div className="flex flex-col gap-[var(--s-5)]">
       <SheetPassportExtractPanel projectId={projectId} />
+      <SheetPassportGroupsPanel projectId={projectId} onShow={showGroup} />
       <SheetPassportFilters
         status={status}
-        sectionMark={sectionMark}
-        marks={knownMarks}
+        scope={scope}
+        facets={facets}
         search={search}
         onStatus={changeStatus}
-        onSectionMark={changeSection}
+        onScope={changeScope}
         onSearch={setSearch}
       />
       {list.isPending && <SkeletonRows rows={6} />}
@@ -163,7 +187,7 @@ export const SheetPassportsView: FC<IViewProps> = ({ projectId }) => {
           key={editing.id}
           projectId={projectId}
           row={editing}
-          marks={knownMarks}
+          marks={facets.marks}
           onClose={() => setEditing(null)}
         />
       )}
