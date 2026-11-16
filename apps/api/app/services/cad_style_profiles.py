@@ -117,7 +117,31 @@ async def get_version(
     return None if row is None else _version_read(row)
 
 
-def _conflict(current: int | None) -> DomainError:
+def _source_dict(body: CadStyleVersionWrite, preview_job_id: uuid.UUID | None) -> dict[str, object]:
+    """Происхождение для базы: `mm_per_pt: null` остаётся; `preview_job_id` - только от сервера."""
+    source: dict[str, object] = body.source.model_dump(mode="json", by_alias=True)
+    if preview_job_id is not None:
+        source["preview_job_id"] = str(preview_job_id)
+    return source
+
+
+async def current_version(
+    session: AsyncSession, *, workspace_id: uuid.UUID, document_id: uuid.UUID
+) -> int | None:
+    profile = await _find_profile(session, workspace_id=workspace_id, document_id=document_id)
+    if profile is None:
+        return None
+    return (
+        await session.execute(
+            select(CadStyleProfileVersion.version)
+            .where(CadStyleProfileVersion.profile_id == profile.id)
+            .order_by(CadStyleProfileVersion.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+def conflict(current: int | None) -> DomainError:
     return DomainError(
         ErrorCode.CAD_STYLE_PROFILE_VERSION_CONFLICT,
         issue={"current_version": current},
@@ -132,6 +156,7 @@ async def create_version(
     document_id: uuid.UUID,
     body: CadStyleVersionWrite,
     created_by: uuid.UUID | None,
+    preview_job_id: uuid.UUID | None = None,
 ) -> CadStyleVersionRead:
     """Создаёт профиль тома, если его нет, и следующую версию."""
     profile = await _find_profile(
@@ -139,7 +164,7 @@ async def create_version(
     )
     if profile is None:
         if body.expected_current_version is not None:
-            raise _conflict(None)
+            raise conflict(None)
         # Гонка двух первых записей: проигравшая видит конфликт, а не 500.
         await session.execute(
             pg_insert(CadStyleProfile)
@@ -157,7 +182,7 @@ async def create_version(
             session, workspace_id=workspace_id, document_id=document_id, lock=True
         )
         if profile is None:
-            raise _conflict(None)
+            raise conflict(None)
     current = (
         await session.execute(
             select(CadStyleProfileVersion.version)
@@ -167,7 +192,7 @@ async def create_version(
         )
     ).scalar_one_or_none()
     if current != body.expected_current_version:
-        raise _conflict(current)
+        raise conflict(current)
 
     number = (current or 0) + 1
     style = build_style(profile.profile_key, number, body.profile.model_dump(mode="json"))
@@ -177,7 +202,7 @@ async def create_version(
         title=body.title,
         style=style,
         sha256=style_sha256(style),
-        source=body.source.model_dump(mode="json", by_alias=True, exclude_none=True),
+        source=_source_dict(body, preview_job_id),
         created_by=created_by,
     )
     session.add(row)

@@ -61,12 +61,15 @@ import { useWorkspaceCadJob } from './useWorkspaceCadJob';
 import { useWorkspaceCadRemarks } from './useWorkspaceCadRemarks';
 import { useWorkspaceCadRoutes } from './useWorkspaceCadRoutes';
 import { useWorkspaceCadFacades } from './useWorkspaceCadFacades';
+import { useWorkspaceCadStyle, type IStyleCaptureData } from './useWorkspaceCadStyle';
 import { useWorkspaceCadSections } from './useWorkspaceCadSections';
 import { useWorkspaceCadZones, type IWorkspaceCadZonesState } from './useWorkspaceCadZones';
 
 interface IUseWorkspaceCadInput {
   projectId: string;
   revisionId: string | null;
+  /** Документ (том) открытой ревизии: профиль оформления принадлежит ему; нет - раздела нет. */
+  documentId?: string | null;
   /** Листы ревизии в порядке рабочей области: позиция листа в адресе - номер с 1. */
   sheets: readonly Pick<SheetRead, 'page_index'>[];
   sheet: Pick<SheetRead, 'id' | 'page_index' | 'page_label'> | null;
@@ -108,6 +111,8 @@ export interface IWorkspaceCad {
   side: IWorkspaceCadSideProps;
   /** Данные слоя рисования зоны; `null` - режим рисования выключен. */
   zoneCapture: IWorkspaceCadZonesState['capture'];
+  /** Данные слоя образцов профиля оформления; `null` - режим выключен. */
+  styleCapture: IStyleCaptureData | null;
   /** Правка контура и разрез зоны; `null` - режим выключен. */
   zoneEdit: IWorkspaceCadZonesState['edit'];
   zoneSplit: IWorkspaceCadZonesState['split'];
@@ -131,6 +136,7 @@ export interface IWorkspaceCad {
 export const useWorkspaceCad = ({
   projectId,
   revisionId,
+  documentId = null,
   sheets,
   sheet,
   floorTitle = null,
@@ -307,6 +313,23 @@ export const useWorkspaceCad = ({
     remarksCapturing: remarks.capturing,
   });
 
+  // --- профиль оформления тома по образцам (ADR-0049): щелчки по листу, предпросмотр, принятие ---
+  const styleState = useWorkspaceCadStyle({
+    projectId,
+    documentId,
+    revisionId,
+    pageIndex,
+    pageSize,
+    camera,
+    load: enabled && opened && revisionId !== null,
+    active,
+    blocked:
+      remarks.capturing ||
+      zonesState.capture !== null ||
+      zonesState.edit !== null ||
+      zonesState.split !== null,
+  });
+
   // --- конструкции листа: кладка и монолит с величинами (ADR-0038) ---
   const constructionsState = useWorkspaceCadConstructions({
     params,
@@ -319,7 +342,8 @@ export const useWorkspaceCad = ({
       remarks.capturing ||
       zonesState.capture !== null ||
       zonesState.edit !== null ||
-      zonesState.split !== null,
+      zonesState.split !== null ||
+      styleState.capture !== null,
     hiddenCategories: visibility.hiddenCategories,
     hiddenLayerNames: visibility.hiddenLayerNames,
   });
@@ -659,6 +683,7 @@ export const useWorkspaceCad = ({
     constructions: constructionsState.side,
     sections: sectionsState.side,
     facades: enabled ? facadesState.side : null,
+    style: enabled ? styleState.side : null,
     finishes: {
       projectId,
       revisionId,
@@ -696,6 +721,7 @@ export const useWorkspaceCad = ({
     bar,
     side,
     zoneCapture: zonesState.capture,
+    styleCapture: enabled ? styleState.capture : null,
     zoneEdit: zonesState.edit,
     zoneSplit: zonesState.split,
     constructionPicker: constructionsState.picker,

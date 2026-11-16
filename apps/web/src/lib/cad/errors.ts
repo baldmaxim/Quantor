@@ -33,6 +33,9 @@ const CAD_MESSAGES: Readonly<Record<string, string>> = {
   CAD_ZONES_BUSY: 'Разметка зон уже идёт.',
   CAD_FINISH_TEMPLATE_NAME_TAKEN: 'Шаблон с таким названием уже есть в проекте.',
   CAD_FINISH_ROOM_TYPE_TAKEN: 'Один из типов помещений уже назначен другому шаблону.',
+  CAD_STYLE_PROFILE_VERSION_CONFLICT:
+    'Профиль изменился, пока вы смотрели предпросмотр — сделайте предпросмотр заново.',
+  CAD_STYLE_PREVIEW_NOT_READY: 'Предпросмотр ещё не готов или не дал профиля: принять нечего.',
   CAD_RECOMPUTE_SAME_PARAMS: 'Те же отметка, высота и версия генератора: результат не изменится.',
 };
 

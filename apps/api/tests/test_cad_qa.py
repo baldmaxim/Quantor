@@ -125,7 +125,7 @@ async def test_every_cad_route_is_closed_when_the_flag_is_off(
     assert len(routes) >= 12
     # Профиль оформления проектировщика (ADR-0049) закрыт тем же флагом.
     style_routes = [route for route in style_profiles_router.routes if isinstance(route, APIRoute)]
-    assert len(style_routes) == 3
+    assert len(style_routes) == 6
     routes += style_routes
     fill = {
         "project_id": str(uuid.uuid4()),
@@ -206,7 +206,9 @@ def test_main_worker_never_claims_cad_and_cad_worker_claims_only_cad() -> None:
             JobType.CAD_FLOOR3D_DXF.value,
             JobType.CAD_ZONES.value,
             JobType.CAD_SECTIONS.value,
+            JobType.CAD_FACADES.value,
             JobType.CAD_EOM_ROUTE.value,
+            JobType.CAD_STYLE_PREVIEW.value,
         ]
     )
 

@@ -3093,6 +3093,7 @@ export type CadJobRead = {
      */
     started_at: string | null;
     status: JobStatus;
+    style_profile?: CadStyleProfileRef | null;
     /**
      * View
      */
@@ -4832,6 +4833,106 @@ export type CadStyleMasonryAcceptance = {
 };
 
 /**
+ * CadStylePreviewCreate
+ */
+export type CadStylePreviewCreate = {
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Samples
+     */
+    samples: Array<CadStyleSample>;
+};
+
+/**
+ * CadStylePreviewCreated
+ */
+export type CadStylePreviewCreated = {
+    /**
+     * Job Id
+     */
+    job_id: string;
+};
+
+/**
+ * CadStylePreviewRead
+ */
+export type CadStylePreviewRead = {
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    result: CadStylePreviewResult | null;
+    status: JobStatus;
+};
+
+/**
+ * CadStylePreviewResult
+ *
+ * Итог исполнителя CAD: что нашёл профиль на листе. Профиль - кандидат до принятия.
+ */
+export type CadStylePreviewResult = {
+    /**
+     * Base Version
+     */
+    base_version: number | null;
+    /**
+     * Engine Version
+     */
+    engine_version: string | null;
+    /**
+     * Mm Per Pt
+     */
+    mm_per_pt: number | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Preview
+     */
+    preview: {
+        [key: string]: unknown;
+    };
+    /**
+     * Profile
+     */
+    profile: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Reasons
+     */
+    reasons?: Array<string>;
+    /**
+     * Result Status
+     */
+    result_status: 'profile' | 'no_signature' | 'profile_out_of_limits';
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Scale Source
+     */
+    scale_source: 'calibration' | 'cad_auto' | 'none';
+};
+
+/**
  * CadStyleProfileBody
  */
 export type CadStyleProfileBody = {
@@ -4898,6 +4999,22 @@ export type CadStyleProfileRead = {
 };
 
 /**
+ * CadStyleProfileRef
+ *
+ * Версия профиля оформления тома, с которой выполнено преобразование (ADR-0049).
+ */
+export type CadStyleProfileRef = {
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
  * CadStyleSample
  *
  * Подпись человека на странице: класс, положение (доли страницы) и «это не он».
@@ -4924,7 +5041,11 @@ export type CadStyleSample = {
 /**
  * CadStyleSamplesSource
  *
- * Профиль снят по подписям человека: ревизия, лист, подписи и масштаб обязательны.
+ * Профиль снят по подписям человека: ревизия, лист и подписи обязательны.
+ *
+ * `mm_per_pt` - обязательный ключ: масштаб листа может быть неизвестен, и это честный `null`,
+ * а не пропуск. `preview_job_id` клиент не передаёт (лишнее поле - 422): при принятии
+ * предпросмотра его ставит только сервер.
  */
 export type CadStyleSamplesSource = {
     /**
@@ -4934,7 +5055,7 @@ export type CadStyleSamplesSource = {
     /**
      * Mm Per Pt
      */
-    mm_per_pt: number;
+    mm_per_pt: number | null;
     /**
      * Page Index
      */
@@ -4965,6 +5086,24 @@ export type CadStyleVersionBrief = {
      * Version
      */
     version: number;
+};
+
+/**
+ * CadStyleVersionFromPreview
+ */
+export type CadStyleVersionFromPreview = {
+    /**
+     * Expected Current Version
+     */
+    expected_current_version: number | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Title
+     */
+    title?: string | null;
 };
 
 /**
@@ -13477,7 +13616,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
 
 /**
  * LengthUnit
@@ -23325,6 +23464,78 @@ export type GetStyleProfileResponses = {
 
 export type GetStyleProfileResponse = GetStyleProfileResponses[keyof GetStyleProfileResponses];
 
+export type CreateStylePreviewData = {
+    body: CadStylePreviewCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/previews';
+};
+
+export type CreateStylePreviewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateStylePreviewError = CreateStylePreviewErrors[keyof CreateStylePreviewErrors];
+
+export type CreateStylePreviewResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadStylePreviewCreated;
+};
+
+export type CreateStylePreviewResponse = CreateStylePreviewResponses[keyof CreateStylePreviewResponses];
+
+export type GetStylePreviewData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/previews/{job_id}';
+};
+
+export type GetStylePreviewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetStylePreviewError = GetStylePreviewErrors[keyof GetStylePreviewErrors];
+
+export type GetStylePreviewResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadStylePreviewRead;
+};
+
+export type GetStylePreviewResponse = GetStylePreviewResponses[keyof GetStylePreviewResponses];
+
 export type CreateStyleProfileVersionData = {
     body: CadStyleVersionWrite;
     path: {
@@ -23358,6 +23569,40 @@ export type CreateStyleProfileVersionResponses = {
 };
 
 export type CreateStyleProfileVersionResponse = CreateStyleProfileVersionResponses[keyof CreateStyleProfileVersionResponses];
+
+export type CreateStyleVersionFromPreviewData = {
+    body: CadStyleVersionFromPreview;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/versions/from-preview';
+};
+
+export type CreateStyleVersionFromPreviewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateStyleVersionFromPreviewError = CreateStyleVersionFromPreviewErrors[keyof CreateStyleVersionFromPreviewErrors];
+
+export type CreateStyleVersionFromPreviewResponses = {
+    /**
+     * Successful Response
+     */
+    201: CadStyleVersionRead;
+};
+
+export type CreateStyleVersionFromPreviewResponse = CreateStyleVersionFromPreviewResponses[keyof CreateStyleVersionFromPreviewResponses];
 
 export type GetStyleProfileVersionData = {
     body?: never;

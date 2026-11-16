@@ -6537,6 +6537,16 @@
           "status": {
             "$ref": "#/components/schemas/JobStatus"
           },
+          "style_profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadStyleProfileRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "view": {
             "anyOf": [
               {
@@ -10195,6 +10205,207 @@
         "title": "CadStyleMasonryAcceptance",
         "type": "object"
       },
+      "CadStylePreviewCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "page_index": {
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/CadStyleSample"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Samples",
+            "type": "array"
+          }
+        },
+        "required": [
+          "revision_id",
+          "page_index",
+          "samples"
+        ],
+        "title": "CadStylePreviewCreate",
+        "type": "object"
+      },
+      "CadStylePreviewCreated": {
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "CadStylePreviewCreated",
+        "type": "object"
+      },
+      "CadStylePreviewRead": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadStylePreviewResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "error_code",
+          "error_message",
+          "result"
+        ],
+        "title": "CadStylePreviewRead",
+        "type": "object"
+      },
+      "CadStylePreviewResult": {
+        "description": "Итог исполнителя CAD: что нашёл профиль на листе. Профиль - кандидат до принятия.",
+        "properties": {
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "engine_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Version"
+          },
+          "mm_per_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mm Per Pt"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "preview": {
+            "additionalProperties": true,
+            "title": "Preview",
+            "type": "object"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "result_status": {
+            "enum": [
+              "profile",
+              "no_signature",
+              "profile_out_of_limits"
+            ],
+            "title": "Result Status",
+            "type": "string"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "scale_source": {
+            "enum": [
+              "calibration",
+              "cad_auto",
+              "none"
+            ],
+            "title": "Scale Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result_status",
+          "profile",
+          "preview",
+          "base_version",
+          "engine_version",
+          "mm_per_pt",
+          "scale_source",
+          "revision_id",
+          "page_index"
+        ],
+        "title": "CadStylePreviewResult",
+        "type": "object"
+      },
       "CadStyleProfileBody": {
         "additionalProperties": false,
         "properties": {
@@ -10327,6 +10538,25 @@
         "title": "CadStyleProfileRead",
         "type": "object"
       },
+      "CadStyleProfileRef": {
+        "description": "Версия профиля оформления тома, с которой выполнено преобразование (ADR-0049).",
+        "properties": {
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "sha256"
+        ],
+        "title": "CadStyleProfileRef",
+        "type": "object"
+      },
       "CadStyleSample": {
         "additionalProperties": false,
         "description": "Подпись человека на странице: класс, положение (доли страницы) и «это не он».",
@@ -10371,7 +10601,7 @@
       },
       "CadStyleSamplesSource": {
         "additionalProperties": false,
-        "description": "Профиль снят по подписям человека: ревизия, лист, подписи и масштаб обязательны.",
+        "description": "Профиль снят по подписям человека: ревизия, лист и подписи обязательны.\n\n`mm_per_pt` - обязательный ключ: масштаб листа может быть неизвестен, и это честный `null`,\nа не пропуск. `preview_job_id` клиент не передаёт (лишнее поле - 422): при принятии\nпредпросмотра его ставит только сервер.",
         "properties": {
           "kind": {
             "const": "samples",
@@ -10379,9 +10609,16 @@
             "type": "string"
           },
           "mm_per_pt": {
-            "exclusiveMinimum": 0.0,
-            "title": "Mm Per Pt",
-            "type": "number"
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mm Per Pt"
           },
           "page_index": {
             "maximum": 2147483647.0,
@@ -10443,6 +10680,47 @@
           "created_at"
         ],
         "title": "CadStyleVersionBrief",
+        "type": "object"
+      },
+      "CadStyleVersionFromPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_current_version": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Current Version"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "job_id",
+          "expected_current_version"
+        ],
+        "title": "CadStyleVersionFromPreview",
         "type": "object"
       },
       "CadStyleVersionRead": {
@@ -26860,6 +27138,7 @@
           "cad_zones",
           "cad_sections",
           "cad_facades",
+          "cad_style_preview",
           "cad_eom_route",
           "sheet_passport_extract",
           "doc_questions_search",
@@ -44383,6 +44662,132 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/previews": {
+      "post": {
+        "operationId": "create_style_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadStylePreviewCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadStylePreviewCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Поставить предпросмотр профиля по образцам на листе (снимает исполнитель CAD)",
+        "tags": [
+          "cad-style-profile"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/previews/{job_id}": {
+      "get": {
+        "operationId": "get_style_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadStylePreviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Состояние и результат предпросмотра профиля по образцам",
+        "tags": [
+          "cad-style-profile"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/versions": {
       "post": {
         "operationId": "create_style_profile_version",
@@ -44441,6 +44846,69 @@
           }
         },
         "summary": "Создать следующую версию профиля оформления (профиль создаётся при первой)",
+        "tags": [
+          "cad-style-profile"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/documents/{document_id}/cad/style-profile/versions/from-preview": {
+      "post": {
+        "operationId": "create_style_version_from_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadStyleVersionFromPreview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadStyleVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Принять результат предпросмотра: новая версия профиля тома",
         "tags": [
           "cad-style-profile"
         ]

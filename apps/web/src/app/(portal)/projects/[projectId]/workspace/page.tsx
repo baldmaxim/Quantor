@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { CadRemarkCapture } from '@/components/cad/viewer/CadRemarkCapture';
+import { CadStyleCapture } from '@/components/cad/viewer/CadStyleCapture';
 import { CadZoneCapture } from '@/components/cad/viewer/CadZoneCapture';
 import { CadZoneEdit } from '@/components/cad/viewer/CadZoneEdit';
 import { CadZoneSplit } from '@/components/cad/viewer/CadZoneSplit';
@@ -566,6 +567,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const cad = useWorkspaceCad({
     projectId,
     revisionId,
+    documentId: revision.data?.document_id ?? null,
     sheets: pages,
     sheet,
     floorTitle: pipeline.sheet?.floor_title ?? null,
@@ -1016,6 +1018,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               {viewportSheet && <DrawingScaleBadge scale={drawingScale} />}
               {cad.capture && <CadRemarkCapture {...cad.capture} />}
               {cad.zoneCapture && <CadZoneCapture {...cad.zoneCapture} />}
+              {cad.styleCapture && <CadStyleCapture {...cad.styleCapture} />}
               {cad.zoneEdit && <CadZoneEdit key={cad.zoneEdit.zoneId} {...cad.zoneEdit} />}
               {cad.zoneSplit && <CadZoneSplit key={cad.zoneSplit.zoneId} {...cad.zoneSplit} />}
               {cad.constructionPicker && (

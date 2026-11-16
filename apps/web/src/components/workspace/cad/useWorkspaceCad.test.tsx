@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   view: vi.fn(),
   preview: vi.fn(),
   remarks: vi.fn(),
+  styleProfile: vi.fn(),
   jobsData: { current: undefined as unknown },
   jobData: { current: undefined as unknown },
   diagnosticsPatch: { current: {} as Parameters<typeof diagnostics>[0] },
@@ -53,6 +54,15 @@ vi.mock('@/lib/cad/facades-queries', () => ({
   useCadFacades: () => ({ data: undefined, isError: false, error: null, refetch: vi.fn() }),
   useStartCadFacades: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
   useDecideCadFacadeViews: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+}));
+vi.mock('@/lib/cad/style-profile-queries', () => ({
+  useStyleProfile: (...args: unknown[]) => {
+    mocks.styleProfile(...args);
+    return { data: undefined, isError: false, error: null, refetch: vi.fn() };
+  },
+  useCreateStylePreview: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+  useStylePreviewJob: () => ({ data: undefined, isError: false, error: null }),
+  useAcceptStylePreview: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
 }));
 vi.mock('@/lib/cad/finishes-queries', () => ({
   useCadFinishTemplates: () => ({ data: undefined }),
@@ -192,6 +202,20 @@ describe('useWorkspaceCad: запросы', () => {
     mount({ enabled: false });
     expect(mocks.jobs).toHaveBeenCalledWith('p1', null, 0);
     expect(mocks.job).toHaveBeenCalledWith('p1', null, null);
+  });
+
+  it('профиль оформления: без флага запросов нет, с флагом и документом - читается', () => {
+    const off = mount({ enabled: false, documentId: 'd1' });
+    expect(mocks.styleProfile).toHaveBeenLastCalledWith('p1', 'd1', false);
+    expect(off.result.current.side.style).toBeNull();
+
+    const on = mount({ documentId: 'd1' });
+    expect(mocks.styleProfile).toHaveBeenLastCalledWith('p1', 'd1', true);
+    expect(on.result.current.side.style).not.toBeNull();
+    expect(on.result.current.styleCapture).toBeNull();
+
+    mount({ documentId: null });
+    expect(mocks.styleProfile).toHaveBeenLastCalledWith('p1', null, true);
   });
 
   it('режим «Листы»: задания и вид читаются сразу, без захода в CAD; открытие CAD их не перезапускает', () => {

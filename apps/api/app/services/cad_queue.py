@@ -29,6 +29,7 @@ QUEUE_JOB_TYPES: Final = (
     JobType.CAD_SECTIONS,
     JobType.CAD_FACADES,
     JobType.CAD_EOM_ROUTE,
+    JobType.CAD_STYLE_PREVIEW,
 )
 RECENT_FINISHED_WINDOW: Final = timedelta(hours=1)
 RECENT_FINISHED_LIMIT: Final = 10

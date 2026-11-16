@@ -195,6 +195,8 @@ class ErrorCode(StrEnum):
     CAD_FINISH_ROOM_TYPE_TAKEN = "CAD_FINISH_ROOM_TYPE_TAKEN"
     # Профиль оформления проектировщика (ADR-0049): запись поверх устаревшей версии.
     CAD_STYLE_PROFILE_VERSION_CONFLICT = "CAD_STYLE_PROFILE_VERSION_CONFLICT"
+    # Принятие предпросмотра, у которого нет профиля: задание не выполнено или подпись не снята.
+    CAD_STYLE_PREVIEW_NOT_READY = "CAD_STYLE_PREVIEW_NOT_READY"
 
     # --- поставщики моделей ---
     MODEL_PROVIDER_NOT_CONFIGURED = "MODEL_PROVIDER_NOT_CONFIGURED"
@@ -368,6 +370,9 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_STYLE_PROFILE_VERSION_CONFLICT: (
         "Профиль оформления изменён другим пользователем: обновите и повторите"
     ),
+    ErrorCode.CAD_STYLE_PREVIEW_NOT_READY: (
+        "Предпросмотр профиля ещё не готов или не дал профиля: принимать нечего"
+    ),
     ErrorCode.CAD_FINISH_TEMPLATE_NAME_TAKEN: "Шаблон отделки с таким названием уже есть в проекте",
     ErrorCode.CAD_FINISH_ROOM_TYPE_TAKEN: (
         "Тип помещения уже назначен другому шаблону отделки проекта"
@@ -536,6 +541,7 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.CAD_FINISH_TEMPLATE_NAME_TAKEN: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_FINISH_ROOM_TYPE_TAKEN: status.HTTP_409_CONFLICT,
     ErrorCode.CAD_STYLE_PROFILE_VERSION_CONFLICT: status.HTTP_409_CONFLICT,
+    ErrorCode.CAD_STYLE_PREVIEW_NOT_READY: status.HTTP_409_CONFLICT,
     ErrorCode.JOB_NOT_RETRYABLE: status.HTTP_409_CONFLICT,
     ErrorCode.WORKER_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.MODEL_PROVIDER_NOT_CONFIGURED: status.HTTP_409_CONFLICT,

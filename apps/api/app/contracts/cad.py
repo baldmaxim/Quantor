@@ -293,6 +293,24 @@ def _levels_doc_answer(job: Job) -> CadLevelsDocAnswerRead | None:
         return None
 
 
+class CadStyleProfileRef(BaseModel):
+    """Версия профиля оформления тома, с которой выполнено преобразование (ADR-0049)."""
+
+    version: int
+    sha256: str
+
+
+def _style_profile_of(job: Job) -> CadStyleProfileRef | None:
+    raw = job.payload.get("style_profile")
+    if (
+        isinstance(raw, dict)
+        and type(raw.get("version")) is int
+        and isinstance(raw.get("sha256"), str)
+    ):
+        return CadStyleProfileRef(version=raw["version"], sha256=raw["sha256"])
+    return None
+
+
 class CadJobRead(BaseModel):
     job_id: UUID
     job_type: CadJobType
@@ -349,6 +367,8 @@ class CadJobRead(BaseModel):
     # Предупреждения постановки (хранятся в задании): `section_level_ambiguous` - принятые
     # разрезы с отметкой этажа дают разную высоту в свету, высота в трассы не передана.
     warnings: list[str] = Field(default_factory=list)
+    # Только у `cad_pdf_convert` с профилем тома: версия и хеш профиля, по которому снят DXF.
+    style_profile: CadStyleProfileRef | None = None
 
     @classmethod
     def of(cls, job: Job, state: cad_mep_service.MepState | None = None) -> CadJobRead:
@@ -411,6 +431,7 @@ class CadJobRead(BaseModel):
                 else []
             ),
             route_attempts=attempts_read(job) if parent else [],
+            style_profile=_style_profile_of(job),
             generator_version=version if isinstance(version, str) else None,
             status=job.status,
             stage=job.stage,
