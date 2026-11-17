@@ -39,11 +39,15 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   const host = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<ISpeckleModelViewer | null>(null);
   const handlers = useRef({ onPick, onError });
-  const state = useRef({ hiddenDisciplines, selectedId, colorByCategory });
+  const state = useRef({ parts, hiddenDisciplines, selectedId, colorByCategory });
   useEffect(() => {
     handlers.current = { onPick, onError };
-    state.current = { hiddenDisciplines, selectedId, colorByCategory };
+    state.current = { parts, hiddenDisciplines, selectedId, colorByCategory };
   });
+  // Состав содержимого - по ключам частей (sha256), а не по идентичности массива: родитель
+  // собирает массив заново на каждый рендер, и без этого любой щелчок перезагружал бы модель.
+  const partsKey = parts.map((part) => part.key).join('|');
+  const disciplinesKey = [...new Set(parts.map((part) => part.discipline))].sort().join('|');
 
   useEffect(() => {
     const element = host.current;
@@ -76,19 +80,20 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
 
   useEffect(() => {
     if (view === null) return;
-    for (const code of new Set(parts.map((part) => part.discipline))) {
-      view.setDisciplineVisible(code, !state.current.hiddenDisciplines.has(code));
+    const current = state.current;
+    for (const code of new Set(current.parts.map((part) => part.discipline))) {
+      view.setDisciplineVisible(code, !current.hiddenDisciplines.has(code));
     }
-    view.setColorByCategory(state.current.colorByCategory);
-    void view.setContent(parts, elements).then(() => view.select(state.current.selectedId));
-  }, [view, parts, elements]);
+    view.setColorByCategory(current.colorByCategory);
+    void view.setContent(current.parts, elements).then(() => view.select(state.current.selectedId));
+  }, [view, partsKey, elements]);
 
   useEffect(() => {
     if (view === null) return;
-    for (const code of new Set(parts.map((part) => part.discipline))) {
+    for (const code of disciplinesKey === '' ? [] : disciplinesKey.split('|')) {
       view.setDisciplineVisible(code, !hiddenDisciplines.has(code));
     }
-  }, [view, hiddenDisciplines, parts]);
+  }, [view, hiddenDisciplines, disciplinesKey]);
 
   useEffect(() => {
     view?.select(selectedId);
