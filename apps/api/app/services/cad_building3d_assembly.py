@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import bisect
+import contextlib
 import dataclasses
 import math
 import re
@@ -30,6 +31,7 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contracts.cad_building3d import (
@@ -41,14 +43,24 @@ from app.contracts.cad_building3d import (
     CadBuilding3dWallRead,
     CadBuilding3dWarningRead,
 )
+from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.models import Job, SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_building3d as b3d
-from app.services import cad_site_cores, cad_site_pins, cad_views, sheet_passports
+from app.services import cad_building3d_windows as b3d_windows
+from app.services import (
+    cad_facade_windows,
+    cad_site_cores,
+    cad_site_pins,
+    cad_views,
+    sheet_passports,
+)
 from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectStorage
+
+log = get_logger(__name__)
 
 # Ключ группы сводного листа планов нескольких секций (`cad_building3d.build_floor`).
 SUMMARY_PREFIX: Final = "summary-"
@@ -291,7 +303,12 @@ def _lifted(floor: CadBuilding3dFloorRead, dz: int) -> CadBuilding3dFloorRead:
         for zone in floor.levels
     ]
     return floor.model_copy(
-        update={"base_z_mm": floor.base_z_mm + dz, "walls": walls, "levels": levels}
+        update={
+            "base_z_mm": floor.base_z_mm + dz,
+            "walls": walls,
+            "windows": b3d_windows.lift_windows(floor.windows, dz),
+            "levels": levels,
+        }
     )
 
 
@@ -428,7 +445,11 @@ def build_stack(built: Sequence[b3d.BuiltFloor], pins: Sequence[SitePin] = ()) -
         placements = {k: p for k, p in placements.items() if k not in lost}
     placed = b3d.apply_placements(aligned, placements)
     real, copies = expand_typical(items, placed)
-    heights = stack_heights([*real, *(copy for copy, _item in copies)])
+    # Верх стены этажа известен только после высот по стопке: окна обрезаются по нему здесь.
+    heights = [
+        b3d_windows.finalize_windows(floor)
+        for floor in stack_heights([*real, *(copy for copy, _item in copies)])
+    ]
     real = heights[: len(real)]
     floors = b3d.sort_floors(
         [
@@ -606,6 +627,134 @@ def _drift(permille: float) -> str:
     return f"{permille:+.1f}".replace(".", ",")
 
 
+async def _with_windows(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    loaded: list[b3d._SheetFloor],
+) -> tuple[list[b3d._SheetFloor], list[b3d_windows.FloorWindows | None], bool]:
+    """Окна этажей с высотами по фасадам и ручному вводу (ADR-0048 п. 6).
+
+    Виды фасадов проекта грузятся один раз на запрос; этажи в кеше не меняются: окна кладутся в
+    копию этажа. Результат по каждому листу (`None` - лист пропущен или окон в плане нет) отдаётся
+    отдельно: замечания считаются только по этажам, вошедшим в стопку. Любая ошибка расчёта этажа
+    даёт ему пустой список окон и `failed`; ошибка чтения видов - пустые окна всего здания и
+    `views_failed` (последнее значение), ответ здания не падает.
+    """
+    has_sources = any(item.floor is not None and item.windows is not None for item in loaded)
+    views = cad_facade_windows.LoadedViews([])
+    views_failed = False
+    if has_sources:
+        try:
+            views = await cad_facade_windows.load_views(
+                session, workspace_id=workspace_id, project_id=project_id
+            )
+        except Exception as error:
+            log.warning("cad_building3d_windows_views_failed", error=type(error).__name__)
+            views_failed = True
+            if isinstance(error, SQLAlchemyError):
+                # Прерванная ошибкой транзакция не должна ломать дальнейшие чтения запроса.
+                with contextlib.suppress(Exception):
+                    await session.rollback()
+
+    def compute() -> tuple[list[b3d._SheetFloor], list[b3d_windows.FloorWindows | None]]:
+        out: list[b3d._SheetFloor] = []
+        results: list[b3d_windows.FloorWindows | None] = []
+        for item in loaded:
+            floor = item.floor
+            if floor is None:
+                out.append(item)
+                results.append(None)
+                continue
+            result: b3d_windows.FloorWindows | None = None
+            if item.windows is not None and not views_failed:
+                try:
+                    result = b3d_windows.floor_windows(item.windows, floor.base_z_mm, views)
+                except Exception as error:
+                    log.warning("cad_building3d_windows_failed", error=type(error).__name__)
+                    result = b3d_windows.FloorWindows([], failed=True)
+            results.append(result)
+            shown = [] if result is None else result.windows
+            out.append(dataclasses.replace(item, floor=floor.model_copy(update={"windows": shown})))
+        return out, results
+
+    out, results = await asyncio.to_thread(compute)
+    return out, results, views_failed
+
+
+def _window_warnings(
+    notes: b3d_windows.WindowNotes,
+    *,
+    views_failed: bool,
+    unknown_wall_floors: int,
+    dropped: int,
+    floors: Sequence[CadBuilding3dFloorRead],
+) -> list[CadBuilding3dWarningRead]:
+    """Замечания по окнам: без высоты, без контура, фасады, кандидаты, верх стены, сбои."""
+    warnings: list[CadBuilding3dWarningRead] = []
+    if views_failed:
+        warnings.append(
+            CadBuilding3dWarningRead(
+                code=b3d_windows.CODE_VIEWS_FAILED,
+                message="Окна не построены: виды фасадов проекта не прочитаны.",
+            )
+        )
+    if notes.failed:
+        warnings.append(
+            CadBuilding3dWarningRead(
+                code=b3d_windows.CODE_FAILED,
+                message=f"Окна не построены из-за ошибки расчёта на этажах: {notes.failed}.",
+            )
+        )
+    if notes.without_height:
+        warnings.append(
+            CadBuilding3dWarningRead(
+                code=b3d_windows.CODE_WITHOUT_HEIGHT,
+                message="Окна без высоты (фасад или ручной ввод листа) не построены, проём "
+                f"остаётся открытым: {notes.without_height} (этажей: "
+                f"{notes.floors_without_height}).",
+            )
+        )
+    if notes.no_contour:
+        warnings.append(
+            CadBuilding3dWarningRead(
+                code=b3d_windows.CODE_NO_CONTOUR,
+                message=f"Окна с высотой без контура проёма не показаны: {notes.no_contour}.",
+            )
+        )
+    if unknown_wall_floors:
+        warnings.append(
+            CadBuilding3dWarningRead(
+                code=b3d_windows.CODE_WALL_HEIGHT_UNKNOWN,
+                message="Высота этажа или толщина плиты не определены (показана типовая): окна "
+                f"этажей не построены. Этажей: {unknown_wall_floors}.",
+            )
+        )
+    warnings.extend(
+        CadBuilding3dWarningRead(
+            code=code, message=f"{message} Этажей: {count}." if count > 1 else message
+        )
+        for code, (message, count) in notes.issues.items()
+    )
+    candidates = sum(1 for floor in floors for w in floor.windows or () if not w.accepted)
+    if candidates:
+        warnings.append(
+            CadBuilding3dWarningRead(
+                code=b3d_windows.CODE_UNACCEPTED,
+                message=f"Окна по непринятым видам фасадов: {candidates}, показаны как кандидаты.",
+            )
+        )
+    if dropped > 0:
+        warnings.append(
+            CadBuilding3dWarningRead(
+                code=b3d_windows.CODE_ABOVE_WALL,
+                message=f"Окно выше верха стены этажа: {dropped}; окно не построено.",
+            )
+        )
+    return warnings
+
+
 async def build_building3d(
     session: AsyncSession,
     storage: ObjectStorage,
@@ -628,10 +777,17 @@ async def build_building3d(
             for sheet in sheets
         )
     )
+    window_results: list[b3d_windows.FloorWindows | None] = []
+    views_failed = False
+    if include_walls:
+        loaded, window_results, views_failed = await _with_windows(
+            session, workspace_id=workspace_id, project_id=project_id, loaded=loaded
+        )
     built: list[b3d.BuiltFloor] = []
     sources: list[tuple[b3d.SheetRef, tuple[CadBuilding3dWarningRead, ...]]] = []
+    built_windows: list[b3d_windows.FloorWindows | None] = []
     service: list[CadBuilding3dServiceSheetRead] = []
-    for sheet, item in zip(sheets, loaded, strict=True):
+    for position, (sheet, item) in enumerate(zip(sheets, loaded, strict=True)):
         if item.floor is None:
             warnings.extend(item.warnings)
             if item.service is not None:
@@ -648,6 +804,7 @@ async def build_building3d(
             )
         )
         sources.append((sheet, item.warnings))
+        built_windows.append(window_results[position] if window_results else None)
     # Совмещение, дубли и постановка по ядрам - чистый расчёт на тысячах точек: в потоке.
     pins = await cad_site_pins.active_site_pins(session, project_id=project_id)
     stack = await asyncio.to_thread(build_stack, built, pins)
@@ -702,6 +859,26 @@ async def build_building3d(
         )
         for ignored in stack.ignored_pins
     )
+    if include_walls:
+        # Замечания и счётчики - только по этажам, оставшимся в стопке (без дублей `superseded`).
+        kept_results = [r for index in stack.kept if (r := built_windows[index]) is not None]
+        unknown_wall_floors = 0
+        dropped = 0
+        for index, floor in zip(stack.kept, stack.real, strict=True):
+            before = len(built[index].floor.windows or ())
+            if before and not b3d_windows.wall_height_known(floor):
+                unknown_wall_floors += 1
+            else:
+                dropped += before - len(floor.windows or ())
+        warnings.extend(
+            _window_warnings(
+                b3d_windows.summarize(kept_results),
+                views_failed=views_failed,
+                unknown_wall_floors=unknown_wall_floors,
+                dropped=dropped,
+                floors=stack.real,
+            )
+        )
     warnings.extend(missing)
     return CadBuilding3dRead(
         units="mm",

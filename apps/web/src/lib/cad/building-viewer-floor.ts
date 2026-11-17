@@ -2,9 +2,10 @@ import * as THREE from 'three';
 
 import { extrudeLevels, extrudeShell, mergeWalls, type IViewerFloorSpec } from './building-viewer-geometry';
 
-/** Меши одного этажа просмотрщика объекта: плита, слитые стены по материалам, объём. */
+/** Меши одного этажа просмотрщика объекта: плита, слитые стены по материалам, окна, объём. */
 
-export type Part = 'slab' | 'monolith' | 'masonry' | 'volume';
+/** `sill` - подоконная часть и перемычки окон; `glass` и `glassCandidate` - стекло по принятой высоте и кандидат. */
+export type Part = 'slab' | 'monolith' | 'masonry' | 'sill' | 'glass' | 'glassCandidate' | 'volume';
 
 export interface IFloorEntry {
   readonly key: string;
@@ -22,6 +23,33 @@ const makeMesh = (geometry: THREE.BufferGeometry, key: string): FloorMesh => {
   const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ transparent: true }));
   mesh.userData.floorKey = key;
   return mesh;
+};
+
+/**
+ * Окна этажа: подоконная часть (от верха плиты до низа стекла) и перемычка (от верха окна до верха
+ * стены) - один меш цветом кладки; стекло принятых высот и кандидатов - два меша (разная прозрачность).
+ * Каждый слит в один буфер, как стены.
+ */
+const addWindows = (meshes: Map<Part, FloorMesh>, spec: IViewerFloorSpec): void => {
+  const solid = spec.windows.flatMap((window) => [
+    { id: window.id, shell: window.shell, bottom: window.sillBottom, top: window.glassBottom },
+    { id: window.id, shell: window.shell, bottom: window.glassTop, top: window.lintelTop },
+  ]);
+  const sill = mergeWalls(solid, spec.slabTop, spec.wallTop);
+  if (sill !== null) meshes.set('sill', makeMesh(sill.geometry, spec.key));
+  for (const [part, accepted] of [
+    ['glass', true],
+    ['glassCandidate', false],
+  ] as const) {
+    const glass = mergeWalls(
+      spec.windows
+        .filter((window) => window.accepted === accepted)
+        .map((window) => ({ id: window.id, shell: window.shell, bottom: window.glassBottom, top: window.glassTop })),
+      spec.slabTop,
+      spec.wallTop,
+    );
+    if (glass !== null) meshes.set(part, makeMesh(glass.geometry, spec.key));
+  }
 };
 
 /** Меши этажа: плита, стены двух материалов (слиянием), а без стен - прозрачный объём этажа. */
@@ -42,6 +70,7 @@ export const buildFloor = (spec: IViewerFloorSpec, offset: number): IFloorEntry 
     if (merged === null) continue;
     meshes.set(material, makeMesh(merged.geometry, spec.key));
   }
+  addWindows(meshes, spec);
   if (!meshes.has('monolith') && !meshes.has('masonry')) {
     const volume = extrudeShell(spec.shell, spec.slabTop, spec.volumeTop);
     if (volume !== null) {

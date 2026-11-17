@@ -35,6 +35,13 @@ const BY_STACK = 'не определена, показана по отметк�
 
 const meters = (mm: number): string => formatNumber(mm / 1000, 3, 'м');
 
+/** «Окна: принятые N, кандидаты M» (кандидат - вид фасада не принят); окон не запрошено - «—». */
+export const windowsSummary = (windows: CadBuilding3dFloorRead['windows']): string => {
+  if (windows === null || windows === undefined) return '—';
+  const candidates = windows.filter((window) => !window.accepted).length;
+  return `принятые ${windows.length - candidates}, кандидаты ${candidates}`;
+};
+
 /** Параметры выбранного этажа, число конструкций по видам и итоги листа (считает сервер). */
 export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
   floor,
@@ -86,6 +93,7 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
             <Row label="Монолит, конструкций" value={String(counts.monolith)} />
             <Row label="Кладка, конструкций" value={String(counts.masonry)} />
             {counts.partition > 0 && <Row label="Перегородки ГКЛ, конструкций" value={String(counts.partition)} />}
+            <Row label="Окна" value={windowsSummary(floor.windows)} />
           </>
         )}
       </dl>

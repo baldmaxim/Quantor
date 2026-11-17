@@ -55,6 +55,14 @@ const shiftSpec = (spec: IViewerFloorSpec, dx: number, dy: number, dv = 0, ghost
     shell: wall.shell.map(([u, v]) => [u + dx, v + dv] as const),
     ...(wall.top === undefined ? {} : { top: wall.top + dy }),
   })),
+  windows: spec.windows.map((window) => ({
+    ...window,
+    shell: window.shell.map(([u, v]) => [u + dx, v + dv] as const),
+    sillBottom: window.sillBottom + dy,
+    glassBottom: window.glassBottom + dy,
+    glassTop: window.glassTop + dy,
+    lintelTop: window.lintelTop + dy,
+  })),
   levels: spec.levels.map((level) => ({
     shell: level.shell.map(([u, v]) => [u + dx, v + dv] as const),
     holes: level.holes.map((ring) => ring.map(([u, v]) => [u + dx, v + dv] as const)),

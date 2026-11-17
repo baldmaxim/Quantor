@@ -599,6 +599,62 @@ def merge_manual_heights(
     return FacadeMatch(heights, kept)
 
 
+@dataclass(frozen=True, slots=True)
+class SheetAxes:
+    """Оси плана листа в мм DXF для сопоставления с видами фасадов или причина, почему их нет.
+
+    `issue` - кадр вида не подтверждён или осей на плане нет: окна по фасадам не сопоставляются.
+    """
+
+    vertical: Mapping[str, float] = field(default_factory=dict)
+    horizontal: Mapping[str, float] = field(default_factory=dict)
+    issue: MatchIssue | None = None
+
+
+def sheet_window_heights(
+    *,
+    loaded: LoadedViews,
+    openings: Sequence[WallsOpening],
+    extras: Sequence[WallsOpeningExtras],
+    slab_shell: Sequence[Sequence[float]] | None,
+    axes: SheetAxes | None,
+    corps: str | None,
+    section: str | None,
+    level: SheetLevel,
+    manual_sill_mm: int | None,
+    manual_head_mm: int | None,
+) -> FacadeMatch:
+    """Высоты окон листа без `opening_height_mm`: общий расчёт для 3D этажа, объёма и 3D здания.
+
+    Приоритет: принятый вид фасада, ручной ввод листа (`manual_*`, проверен человеком), вид-кандидат
+    фасада, затем высоты нет. `axes` нужны только при наличии видов; кадр не подтверждён или осей
+    нет - карта пустая и замечание (ручной ввод осей не требует). Нет окон без высоты - пусто.
+    """
+    if not any(o.kind == "window" and o.opening_height_mm is None for o in openings):
+        return FacadeMatch()
+    vertical: Mapping[str, float] = {}
+    horizontal: Mapping[str, float] = {}
+    match: FacadeMatch
+    if loaded.views and axes is not None and axes.issue is not None:
+        match = FacadeMatch(issues=(axes.issue,))
+    else:
+        if loaded.views and axes is not None:
+            vertical, horizontal = axes.vertical, axes.horizontal
+        match = match_sheet_windows(
+            openings=openings,
+            extras=extras,
+            slab_shell=slab_shell,
+            vertical_axes=vertical,
+            horizontal_axes=horizontal,
+            corps=corps,
+            section=section,
+            level=level,
+            views=loaded.views,
+            invalid_views=loaded.invalid,
+        )
+    return merge_manual_heights(match, openings, manual_sill_mm, manual_head_mm)
+
+
 def grouped_warnings(issues: Sequence[MatchIssue]) -> list[tuple[str, str]]:
     """Замечания по кодам, не по строке на окно: `(код, текст)`; при повторах - число случаев."""
     counts = Counter(issue.code for issue in issues)

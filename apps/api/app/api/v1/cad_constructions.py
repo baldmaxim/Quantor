@@ -270,10 +270,6 @@ async def _sheet_frame(storage: StorageDep, sheet: _Sheet) -> CadFrameRead | Non
     return cad_views.frame_from(scale, cad_checks)
 
 
-def _facade_issue(code: str, message: str) -> cad_facade_windows.FacadeMatch:
-    return cad_facade_windows.FacadeMatch(issues=(cad_facade_windows.MatchIssue(code, message),))
-
-
 async def facade_window_heights(
     session: SessionDep,
     storage: StorageDep,
@@ -285,68 +281,32 @@ async def facade_window_heights(
     """Высоты окон листа без `opening_height_mm` (ADR-0048): общие для 3D и объёма кладки.
 
     Приоритет: принятый вид фасада, затем ручной ввод листа (проверен человеком), затем вид-кандидат
-    фасада (только 3D, в объём не идёт), затем высоты нет.
+    фасада (только 3D, в объём не идёт), затем высоты нет. Сопоставление - общий расчёт
+    `cad_facade_windows.sheet_window_heights` (его же зовёт 3D здания); здесь - чтение видов и
+    кадра листа. Нет окон без высоты или нет видов - замечаний нет; кадр листа не подтверждён или
+    осей нет - карта фасадов пустая и замечание.
     """
-    match = await _facade_match(session, storage, sheet, walls, overrides, project_slab)
-    return cad_facade_windows.merge_manual_heights(
-        match, walls.document.openings, overrides.window_sill_mm, overrides.window_head_mm
-    )
-
-
-async def _facade_match(
-    session: SessionDep,
-    storage: StorageDep,
-    sheet: _Sheet,
-    walls: _Walls,
-    overrides: CadSheetLevelsRead,
-    project_slab: cad_constructions.ProjectSlab | None,
-) -> cad_facade_windows.FacadeMatch:
-    """Высоты окон листа без высоты по видам фасадов проекта; кадр и оси - листа.
-
-    Нет окон без высоты или нет видов - пусто без замечаний. Кадр листа не подтверждён или осей
-    нет - карта пустая и замечание.
-    """
-    if not any(o.kind == "window" and o.opening_height_mm is None for o in walls.document.openings):
+    openings = walls.document.openings
+    if not any(o.kind == "window" and o.opening_height_mm is None for o in openings):
         return cad_facade_windows.FacadeMatch()
     workspace_id = sheet.parent.workspace_id
-    if workspace_id is None:
-        return cad_facade_windows.FacadeMatch()
-    loaded = await cad_facade_windows.load_views(
-        session, workspace_id=workspace_id, project_id=sheet.project_id
+    loaded = (
+        cad_facade_windows.LoadedViews([])
+        if workspace_id is None
+        else await cad_facade_windows.load_views(
+            session, workspace_id=workspace_id, project_id=sheet.project_id
+        )
     )
-    axes_vertical: dict[str, float] = {}
-    axes_horizontal: dict[str, float] = {}
-    if loaded.views:
-        no_frame = "facade_windows_no_frame"
-        try:
-            frame = await _sheet_frame(storage, sheet)
-        except (HTTPException, DomainError, ValueError, ValidationError, OSError) as error:
-            log.warning("cad_facade_frame_unreadable", error=type(error).__name__)
-            return _facade_issue(
-                no_frame, "Окна по фасадам не сопоставлены: кадр вида листа не читается."
-            )
-        if frame is None or not frame.confirmed:
-            reason = (
-                frame.reason if frame is not None and frame.reason else "кадр вида не установлен"
-            )
-            return _facade_issue(no_frame, f"Окна по фасадам не сопоставлены: {reason}")
-        axes = cad_building3d.axes_in_mm(walls.raw, frame)
-        if not axes.vertical and not axes.horizontal:
-            return _facade_issue(
-                "facade_windows_no_axes",
-                "Окна по фасадам не сопоставлены: на плане нет осей "
-                f"({axes.message or 'нет осей'}).",
-            )
-        axes_vertical, axes_horizontal = axes.vertical, axes.horizontal
+    axes = await _facade_axes(storage, sheet, walls) if loaded.views else None
     levels = cad_constructions.effective_levels(walls.document.heights, overrides, project_slab)
     title = walls.document.heights.title
     slab = walls.extras.slab
-    return cad_facade_windows.match_sheet_windows(
-        openings=walls.document.openings,
+    return cad_facade_windows.sheet_window_heights(
+        loaded=loaded,
+        openings=openings,
         extras=walls.extras.openings,
         slab_shell=None if slab is None else slab.shell,
-        vertical_axes=axes_vertical,
-        horizontal_axes=axes_horizontal,
+        axes=axes,
         corps=None if title is None else title.corps,
         section=None if title is None else title.section,
         level=cad_facade_windows.SheetLevel(
@@ -354,9 +314,42 @@ async def _facade_match(
             floor_height_mm=levels.floor_height.value_mm,
             elevation_known=levels.elevation_mm is not None,
         ),
-        views=loaded.views,
-        invalid_views=loaded.invalid,
+        manual_sill_mm=overrides.window_sill_mm,
+        manual_head_mm=overrides.window_head_mm,
     )
+
+
+async def _facade_axes(
+    storage: StorageDep, sheet: _Sheet, walls: _Walls
+) -> cad_facade_windows.SheetAxes:
+    """Оси плана листа в мм по кадру вида; кадр не подтверждён или осей нет - причина."""
+    no_frame = "facade_windows_no_frame"
+    try:
+        frame = await _sheet_frame(storage, sheet)
+    except (HTTPException, DomainError, ValueError, ValidationError, OSError) as error:
+        log.warning("cad_facade_frame_unreadable", error=type(error).__name__)
+        return cad_facade_windows.SheetAxes(
+            issue=cad_facade_windows.MatchIssue(
+                no_frame, "Окна по фасадам не сопоставлены: кадр вида листа не читается."
+            )
+        )
+    if frame is None or not frame.confirmed:
+        reason = frame.reason if frame is not None and frame.reason else "кадр вида не установлен"
+        return cad_facade_windows.SheetAxes(
+            issue=cad_facade_windows.MatchIssue(
+                no_frame, f"Окна по фасадам не сопоставлены: {reason}"
+            )
+        )
+    axes = cad_building3d.axes_in_mm(walls.raw, frame)
+    if not axes.vertical and not axes.horizontal:
+        return cad_facade_windows.SheetAxes(
+            issue=cad_facade_windows.MatchIssue(
+                "facade_windows_no_axes",
+                "Окна по фасадам не сопоставлены: на плане нет осей "
+                f"({axes.message or 'нет осей'}).",
+            )
+        )
+    return cad_facade_windows.SheetAxes(axes.vertical, axes.horizontal)
 
 
 async def _totals(

@@ -1,4 +1,4 @@
-import type { CadBuilding3dFloorRead, CadBuilding3dWallRead } from '@quantor/api-client';
+import type { CadBuilding3dFloorRead, CadBuilding3dWallRead, CadBuilding3dWindowRead } from '@quantor/api-client';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
@@ -344,5 +344,58 @@ describe('уровни плиты (кровля, ступенчатый этаж
     expect(merged?.ranges.map((range) => range.id)).toEqual(['a', 'b']);
     merged?.geometry.computeBoundingBox();
     expect(merged?.geometry.boundingBox?.max.y).toBeCloseTo(5);
+  });
+});
+
+describe('окна этажа', () => {
+  const square = (u0: number, v0: number, u1: number, v1: number): [number, number][] => [
+    [u0, v0],
+    [u1, v0],
+    [u1, v1],
+    [u0, v1],
+  ];
+  const window = (patch: Partial<CadBuilding3dWindowRead> = {}): CadBuilding3dWindowRead => ({
+    opening_id: 'o1',
+    shell: rect(3000, 0, 4000, 200),
+    sill_z_bottom_mm: 0,
+    glass_z_bottom_mm: 900,
+    glass_z_top_mm: 2400,
+    lintel_z_top_mm: 2800,
+    accepted: true,
+    source: 'manual',
+    ...patch,
+  });
+
+  it('контур и высоты окна переводятся в метры от центра плана', () => {
+    const plan = buildViewerPlan([floor({ walls: [], windows: [window()] })]);
+    const spec = plan?.floors[0];
+    const center = plan?.zCenterMm ?? 0;
+    expect(spec?.windows).toHaveLength(1);
+    const item = spec?.windows[0];
+    expect(item?.id).toBe('o1');
+    expect(item?.sillBottom).toBeCloseTo((0 - center) / 1000);
+    expect(item?.glassBottom).toBeCloseTo((900 - center) / 1000);
+    expect(item?.glassTop).toBeCloseTo((2400 - center) / 1000);
+    expect(item?.lintelTop).toBeCloseTo((2800 - center) / 1000);
+    // Верх перемычки - верх стен этажа: тот же, что у стен.
+    expect(item?.lintelTop).toBeCloseTo(spec?.wallTop ?? 0);
+    expect(item?.accepted).toBe(true);
+    expect(item?.shell).toContainEqual([(3000 - 5000) / 1000, (0 - 3000) / 1000]);
+  });
+
+  it('окон нет или они не запрошены - список пустой; вырожденный контур пропускается', () => {
+    expect(buildViewerPlan([floor({ windows: null })])?.floors[0]?.windows).toEqual([]);
+    expect(buildViewerPlan([floor()])?.floors[0]?.windows).toEqual([]);
+    const flat = window({ shell: rect(3000, 0, 3000, 0) });
+    expect(buildViewerPlan([floor({ windows: [flat] })])?.floors[0]?.windows).toEqual([]);
+  });
+
+  it('призма со своим низом строится между своим низом и верхом', () => {
+    const merged = mergeWalls([{ id: 'g', shell: square(0, 0, 1, 1), bottom: 1, top: 2 }], 0, 3);
+    merged?.geometry.computeBoundingBox();
+    expect(merged?.geometry.boundingBox?.min.y).toBeCloseTo(1);
+    expect(merged?.geometry.boundingBox?.max.y).toBeCloseTo(2);
+    // Низ не ниже верха - призмы нет.
+    expect(mergeWalls([{ id: 'g', shell: square(0, 0, 1, 1), bottom: 2, top: 2 }], 0, 3)).toBeNull();
   });
 });

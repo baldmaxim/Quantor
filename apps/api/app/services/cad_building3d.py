@@ -50,15 +50,21 @@ from app.contracts.cad_building3d import (
     CadBuilding3dWallRead,
     CadBuilding3dWarningRead,
 )
-from app.contracts.cad_constructions import CadSheetFloorTitle, CadSheetLevelsRead, WallsDocument
-from app.contracts.cad_floor3d import WallsFloorExtras, WallsLevels
+from app.contracts.cad_constructions import (
+    CadSheetFloorTitle,
+    CadSheetLevelsRead,
+    WallsDocument,
+    WallsOpening,
+)
+from app.contracts.cad_floor3d import WallsFloorExtras, WallsLevels, WallsOpeningExtras
 from app.domain import JobStatus, JobType
 from app.models import Document, DocumentRevision, Job, Sheet, SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_construction_store, cad_site_cores, cad_views, cad_walls
 from app.services import cad_site_pins_math as pins_math
 from app.services import documents as documents_service
-from app.services.cad_constructions import ProjectSlab, effective_levels
+from app.services.cad_constructions import EffectiveLevels, ProjectSlab, effective_levels
+from app.services.cad_facade_windows import SheetLevel
 from app.services.cad_floor_title import floors_text, format_floor_title
 from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
@@ -712,6 +718,75 @@ def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class WindowSource:
+    """Окна листа для высот по фасадам (ADR-0048 п. 6) в системе DXF листа до совмещения.
+
+    Лежит в кеше этажа рядом с этажом: виды фасадов меняются без смены ключа этажа, поэтому
+    высоты считаются на каждый запрос здания (`cad_building3d_windows`), а не кешируются.
+    `frame_problem` - кадр вида не подтверждён (причина); `axes` - оси плана в мм (пусты, если
+    кадра нет или осей на плане нет).
+    """
+
+    openings: tuple[WallsOpening, ...]
+    extras: tuple[WallsOpeningExtras, ...]
+    slab_shell: list[list[float]] | None
+    corps: str | None
+    section: str | None
+    level: SheetLevel
+    opening_floor_z_mm: int
+    manual_sill_mm: int | None
+    manual_head_mm: int | None
+    axes: FloorAxes
+    frame_problem: str | None
+
+    @property
+    def points(self) -> int:
+        """Вес в кеше этажа: число точек контуров проёмов, плиты листа и осей."""
+        return (
+            sum(len(item.lintel or ()) for item in self.extras)
+            + len(self.slab_shell or ())
+            + len(self.axes.vertical)
+            + len(self.axes.horizontal)
+        )
+
+
+def window_source(
+    document: WallsDocument,
+    extras: WallsFloorExtras,
+    raw: Any,
+    frame: CadFrameRead | None,
+    levels: EffectiveLevels,
+) -> WindowSource | None:
+    """Окна листа без `opening_height_mm`; нет таких окон - `None` (строить нечего)."""
+    windows = tuple(o for o in document.openings if o.kind == "window")
+    if not any(o.opening_height_mm is None for o in windows):
+        return None
+    ids = {o.id for o in windows}
+    title = document.heights.title
+    confirmed = frame is not None and frame.confirmed
+    frame_problem: str | None = None
+    if frame is not None and not frame.confirmed:
+        frame_problem = frame.reason or MESSAGE_FRAME_MISSING
+    return WindowSource(
+        openings=windows,
+        extras=tuple(item for item in extras.openings if item.id in ids),
+        slab_shell=None if extras.slab is None else extras.slab.shell,
+        corps=None if title is None else title.corps,
+        section=None if title is None else title.section,
+        level=SheetLevel(
+            floor_z_mm=levels.opening_floor_z_mm,
+            floor_height_mm=levels.floor_height.value_mm,
+            elevation_known=levels.elevation_mm is not None,
+        ),
+        opening_floor_z_mm=levels.opening_floor_z_mm,
+        manual_sill_mm=levels.window_sill.value_mm,
+        manual_head_mm=levels.window_head.value_mm,
+        axes=axes_in_mm(raw, frame) if frame is not None and confirmed else NO_AXES,
+        frame_problem=frame_problem,
+    )
+
+
 CoreRing = tuple[tuple[int, int], ...]
 
 
@@ -860,6 +935,14 @@ def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding
             for wall in floor.walls
         ]
     )
+    windows = (
+        floor.windows
+        if floor.windows is None or (ix == 0 and iy == 0)
+        else [
+            window.model_copy(update={"shell": [[x + ix, y + iy] for x, y in window.shell]})
+            for window in floor.windows
+        ]
+    )
     levels = (
         floor.levels
         if not floor.levels or (ix == 0 and iy == 0)
@@ -877,6 +960,7 @@ def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding
     return floor.model_copy(
         update={
             "walls": walls,
+            "windows": windows,
             "levels": levels,
             "outline": [[x + dx, y + dy] for x, y in floor.outline],
             "bbox": None if box is None else [box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy],
@@ -2533,6 +2617,11 @@ def _rotated(
             for wall in floor.walls
         ]
     )
+    windows = (
+        None
+        if floor.windows is None
+        else [window.model_copy(update={"shell": ints(window.shell)}) for window in floor.windows]
+    )
     levels = [
         zone.model_copy(update={"shell": ints(zone.shell), "holes": [ints(h) for h in zone.holes]})
         for zone in floor.levels
@@ -2549,6 +2638,7 @@ def _rotated(
         update={
             "outline": outline,
             "walls": walls,
+            "windows": windows,
             "levels": levels,
             "bbox": bbox,
             "offset_mm": (round(ox, 3), round(oy, 3)),
@@ -2918,6 +3008,8 @@ class _SheetFloor:
     typical: TypicalPlan | None = None
     # Почему лист служебный (не план этажа): в стопку не идёт, но и не ошибка.
     service: str | None = None
+    # Окна листа без высоты в плане (только при `include_walls`); высоты - на каждый запрос.
+    windows: WindowSource | None = None
 
 
 # Ключ - всё, от чего зависит этаж листа: адрес и подпись листа, ключи артефактов (неизменны в
@@ -3051,14 +3143,26 @@ def _sheet_floor(
     summary = is_summary_sheet(sheet.stamp_title)
     axes = NO_AXES if frame is None or summary else axes_in_mm(raw, frame)
     cores = core_rings(document)
+    windows = (
+        window_source(
+            document,
+            extras,
+            raw,
+            frame,
+            effective_levels(document.heights, sheet.overrides, project_slab),
+        )
+        if include_walls
+        else None
+    )
     cost = (
         1
+        + (0 if windows is None else windows.points)
         + sum(len(ring) for ring in cores)
         + len(floor.outline)
         + sum(len(wall.shell) for wall in floor.walls or ())
         + sum(len(zone.shell) + sum(len(h) for h in zone.holes) for zone in floor.levels)
     )
-    return _SheetFloor(floor, tuple(floor_warnings), axes, cost, cores, typical)
+    return _SheetFloor(floor, tuple(floor_warnings), axes, cost, cores, typical, windows=windows)
 
 
 def core_rings(document: WallsDocument) -> tuple[CoreRing, ...]:

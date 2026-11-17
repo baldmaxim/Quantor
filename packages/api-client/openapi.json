@@ -1682,6 +1682,20 @@
               }
             ],
             "title": "Walls"
+          },
+          "windows": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CadBuilding3dWindowRead"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Windows"
           }
         },
         "required": [
@@ -2075,6 +2089,65 @@
           "message"
         ],
         "title": "CadBuilding3dWarningRead",
+        "type": "object"
+      },
+      "CadBuilding3dWindowRead": {
+        "description": "Окно этажа с высотой по виду фасада или ручному вводу листа (ADR-0048 п. 6).\n\nКонтур проёма - открытое кольцо в целых мм, не более 16 точек, уже преобразованное как этаж\n(`rotation_deg`, `offset_mm`). Все z - абсолютные мм от +-0,000: подоконная часть - от\n`sill_z_bottom_mm` (верх плиты) до `glass_z_bottom_mm`, стекло - от `glass_z_bottom_mm` до\n`glass_z_top_mm`, перемычка - от `glass_z_top_mm` до `lintel_z_top_mm` (верх стены этажа).\nВерх окна не ниже верха стены - перемычки нет: `lintel_z_top_mm = glass_z_top_mm`; нет\nподоконной части - `sill_z_bottom_mm = glass_z_bottom_mm`. `accepted = false` - вид фасада\nне принят человеком: окно показывается как кандидат.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "glass_z_bottom_mm": {
+            "title": "Glass Z Bottom Mm",
+            "type": "integer"
+          },
+          "glass_z_top_mm": {
+            "title": "Glass Z Top Mm",
+            "type": "integer"
+          },
+          "lintel_z_top_mm": {
+            "title": "Lintel Z Top Mm",
+            "type": "integer"
+          },
+          "opening_id": {
+            "title": "Opening Id",
+            "type": "string"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "sill_z_bottom_mm": {
+            "title": "Sill Z Bottom Mm",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "facade",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "opening_id",
+          "shell",
+          "sill_z_bottom_mm",
+          "glass_z_bottom_mm",
+          "glass_z_top_mm",
+          "lintel_z_top_mm",
+          "accepted",
+          "source"
+        ],
+        "title": "CadBuilding3dWindowRead",
         "type": "object"
       },
       "CadChecksRead": {

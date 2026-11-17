@@ -62,6 +62,12 @@ const MIN_DISTANCE_M = 2;
 const START_DIRECTION = new THREE.Vector3(0.7, 0.8, 1).normalize();
 /** Непрозрачность плит и стен здания, не поставленного на объект. */
 const GHOST_OPACITY = 0.28;
+/** Стекло окна с принятой высотой и стекло-кандидат (бледнее): как в 3D этажа. */
+const GLASS_OPACITY = 0.5;
+const GLASS_CANDIDATE_OPACITY = 0.22;
+/** Доля белого в цвете подоконной части и перемычки относительно кладки: как в 3D этажа. */
+const SILL_LIGHTEN = 0.4;
+const WHITE = new THREE.Color('white');
 
 /** Разнесение этажей: коэффициент, цель камеры и расстояние плывут от прежних значений к новым. */
 interface IExplodeAnim {
@@ -230,14 +236,15 @@ export const createBuildingViewer = (host: HTMLElement, options: IBuildingViewer
       const hovered = !selected && entry.key === hoverKey;
       const dimmed = dimOthers && !selected;
       for (const [part, mesh] of entry.meshes) {
-        const base = part === 'volume' ? colors.muted : colors[part];
+        const base = part === 'volume' ? colors.muted : part === 'sill' ? colors.masonry : colors[part === 'glassCandidate' ? 'glass' : part];
         scratch.set(base);
+        if (part === 'sill') scratch.lerp(WHITE, SILL_LIGHTEN);
         if (selected) scratch.copy(accentColor);
         else if (hovered) scratch.lerp(accentColor, 0.55);
         mesh.material.color.copy(scratch);
-        let opacity = 1;
+        let opacity = part === 'glass' ? GLASS_OPACITY : part === 'glassCandidate' ? GLASS_CANDIDATE_OPACITY : 1;
         if (part === 'volume') opacity = selected ? 0.3 : hovered ? 0.35 : dimmed ? 0.05 : 0.12;
-        else if (dimmed) opacity = 0.3;
+        else if (dimmed) opacity = Math.min(opacity, 0.3);
         // Здание не поставлено на объект: его место условное, поэтому оно полупрозрачное.
         if (entry.ghost && !selected && part !== 'volume') opacity = Math.min(opacity, hovered ? 0.6 : GHOST_OPACITY);
         mesh.material.opacity = opacity;

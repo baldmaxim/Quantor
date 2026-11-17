@@ -12,6 +12,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
@@ -19,6 +20,8 @@ import {
 import { unwrap } from '@/lib/queries';
 
 import { isFacadesJobActive } from './facades';
+import { building3dKeys } from './building3d-queries';
+import { floor3dKeys } from './floor3d-queries';
 
 /**
  * Фасады ревизии (флаг `cad.export`): последнее задание, кандидаты видов и замечания одним ответом.
@@ -52,6 +55,15 @@ export const useCadFacades = (
       isFacadesJobActive(query.state.data?.job?.status) ? FACADES_POLL_MS : false,
   });
 
+/**
+ * Окна 3D этажа и 3D здания берут высоты из принятых и кандидатных видов фасадов (ADR-0048):
+ * после запуска разбора и решения человека модели проекта перечитываются.
+ */
+const invalidateModels = (client: QueryClient, projectId: string): void => {
+  void client.invalidateQueries({ queryKey: floor3dKeys.project(projectId) });
+  void client.invalidateQueries({ queryKey: building3dKeys.project(projectId) });
+};
+
 /** Поставить разбор фасадов по ревизии: страницы не передаются, генератор находит их сам. */
 export const useStartCadFacades = (
   projectId: string,
@@ -67,6 +79,7 @@ export const useStartCadFacades = (
           body: { revision_id: revisionId ?? '', page_indexes: null },
         }),
       ),
+    onSuccess: () => invalidateModels(client, projectId),
     onSettled: () =>
       client.invalidateQueries({ queryKey: facadeKeys.revision(projectId, revisionId ?? '') }),
   });
@@ -94,6 +107,7 @@ export const useDecideCadFacadeViews = (
         }),
       ).views,
     onSuccess: (decided) => {
+      invalidateModels(client, projectId);
       client.setQueryData<FacadesRead>(key, (current) =>
         current
           ? {
