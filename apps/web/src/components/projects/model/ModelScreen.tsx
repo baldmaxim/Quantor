@@ -59,9 +59,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   const [colorByCategory, setColorByCategory] = useState(false);
   /** «Весь дом»: все этажи сразу; «Один этаж»: этаж со всеми дисциплинами и свойствами. */
   const [viewMode, setViewMode] = useState<'house' | 'storey'>('house');
-  const [houseDisciplines, setHouseDisciplines] = useState<ReadonlySet<string>>(
-    new Set(['ARCH']),
-  );
+  const [houseDisciplines, setHouseDisciplines] = useState<ReadonlySet<string>>(new Set(['ARCH']));
   const [maxLevel, setMaxLevel] = useState<number | null>(null);
   const [storeyOffset, setStoreyOffset] = useState(0);
   /** Этаж последнего выбранного элемента: из его файла берутся свойства. */
@@ -89,11 +87,12 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
     [byElevation],
   );
   const allDisciplines = useMemo(
-    () => [
-      ...new Set(
-        parts.filter((part) => part.kind === 'geometry').map((part) => part.discipline ?? ''),
-      ),
-    ].sort(),
+    () =>
+      [
+        ...new Set(
+          parts.filter((part) => part.kind === 'geometry').map((part) => part.discipline ?? ''),
+        ),
+      ].sort(),
     [parts],
   );
   // Весь дом: геометрия включённых дисциплин по всем этажам, снизу вверх.

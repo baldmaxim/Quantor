@@ -111,7 +111,9 @@ describe('часть пакета -> объекты Speckle', () => {
     const wallNode = node('w1', triangle(true));
     ((wallNode.children[0] as THREE.Mesh).material as THREE.Material).name = 'cat:wall';
     scene.add(wallNode);
-    const element = partToSpeckle('k', 'ARCH', scene, null).objects.find((item) => item.id === 'k:w1');
+    const element = partToSpeckle('k', 'ARCH', scene, null).objects.find(
+      (item) => item.id === 'k:w1',
+    );
     expect(element?.category).toBe('wall');
   });
 
