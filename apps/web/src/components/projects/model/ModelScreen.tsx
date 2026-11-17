@@ -149,8 +149,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
     [wantedGeometry, levelOf],
   );
   const viewerParts: IModelPartInput[] = useMemo(
-    () =>
-      geometry.parts.map((part) => ({ ...part, ...partMeta.get(part.key) })),
+    () => geometry.parts.map((part) => ({ ...part, ...partMeta.get(part.key) })),
     [geometry.parts, partMeta],
   );
   const disciplines = useMemo(

@@ -171,7 +171,9 @@ describe('обновление содержимого просмотрщика',
 
   it('подпись части: дисциплина, этаж и уровень', () => {
     const buffer = new ArrayBuffer(1);
-    expect(partSignature({ key: 'k', discipline: 'KR', buffer, group: 's3', level: 2 })).toBe('KR|s3|2');
+    expect(partSignature({ key: 'k', discipline: 'KR', buffer, group: 's3', level: 2 })).toBe(
+      'KR|s3|2',
+    );
     expect(partSignature({ key: 'k', discipline: 'KR', buffer })).toBe('KR||0');
   });
 });
