@@ -4,6 +4,8 @@
 Здесь - что из этого попадает в здание и как оно собрано:
 
 1. в стопку идут только планы этажей и уровней; разрезы и дубли планов - «служебные листы»;
+   туда же - сводный лист планов нескольких секций, не вставший на площадку: планы на нём
+   разложены по листу, а не по объекту, и отдельным блоком в 3D он только мешает;
 2. дубль плана в группе на одной отметке (монолит меньшего листа лежит на монолите большего) -
    остаётся лист большей площади;
 3. группы одного корпуса, разведённые текстом заголовка («Корп. 8 · сек. 1-2» и «сек. 1-2»),
@@ -48,6 +50,8 @@ from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectStorage
 
+# Ключ группы сводного листа планов нескольких секций (`cad_building3d.build_floor`).
+SUMMARY_PREFIX: Final = "summary-"
 # Дубль плана: доля монолита меньшего листа, лежащая на монолите большего на той же отметке.
 DUPLICATE_SHARE: Final = 0.9
 # Сведение групп одного корпуса: согласных общих марок осей не меньше этого числа и этой доли
@@ -189,7 +193,7 @@ def _groups(
                 # относительно корпусов - постановка на объект, а не одна стопка.
                 mergeable=axes.usable
                 and not underground
-                and not key.startswith("summary-")
+                and not key.startswith(SUMMARY_PREFIX)
                 and section_count(section) < b3d.SUMMARY_MIN_SECTIONS,
             )
         )
@@ -366,7 +370,8 @@ def stack_heights(floors: Sequence[CadBuilding3dFloorRead]) -> list[CadBuilding3
 @dataclass(frozen=True, slots=True)
 class Stack:
     """Собранное здание. `kept` - индексы входных этажей, вошедших в стопку, `real` - их этажи в том
-    же порядке (после постановки и высот); `superseded` - индекс дубля -> индекс оставленного."""
+    же порядке (после постановки и высот); `superseded` - индекс дубля -> индекс оставленного;
+    `summaries` - индексы этажей сводных листов, не вставших на площадку (в стопку не входят)."""
 
     floors: list[CadBuilding3dFloorRead]
     groups: list[CadBuilding3dGroupRead]
@@ -375,6 +380,7 @@ class Stack:
     superseded: dict[int, int]
     # Ручные привязки корпусов к площадке (ADR-0052), которые не применены, с причиной.
     ignored_pins: tuple[b3d.PinIgnored, ...] = ()
+    summaries: tuple[int, ...] = ()
 
 
 def build_stack(built: Sequence[b3d.BuiltFloor], pins: Sequence[SitePin] = ()) -> Stack:
@@ -410,6 +416,16 @@ def build_stack(built: Sequence[b3d.BuiltFloor], pins: Sequence[SitePin] = ()) -
         aligned = b3d.align_floors(items)
     site = b3d.place_site_report(items, aligned, pins)
     placements = site.placements
+    lost = unplaced_summaries(placements)
+    summaries: tuple[int, ...] = ()
+    if lost:
+        drop = {i for i, floor in enumerate(aligned) if floor.group_key in lost}
+        summaries = tuple(kept[i] for i in sorted(drop))
+        keep = [i for i in range(len(items)) if i not in drop]
+        kept = [kept[i] for i in keep]
+        items = [items[i] for i in keep]
+        aligned = [aligned[i] for i in keep]
+        placements = {k: p for k, p in placements.items() if k not in lost}
     placed = b3d.apply_placements(aligned, placements)
     real, copies = expand_typical(items, placed)
     heights = stack_heights([*real, *(copy for copy, _item in copies)])
@@ -423,7 +439,29 @@ def build_stack(built: Sequence[b3d.BuiltFloor], pins: Sequence[SitePin] = ()) -
             ),
         ]
     )
-    return Stack(floors, b3d.build_groups(floors, placements), kept, real, superseded, site.ignored)
+    return Stack(
+        floors,
+        b3d.build_groups(floors, placements),
+        kept,
+        real,
+        superseded,
+        site.ignored,
+        summaries,
+    )
+
+
+def unplaced_summaries(placements: dict[str, b3d.GroupPlacement]) -> frozenset[str]:
+    """Сводные листы (`summary-…`), не вставшие на площадку, когда на объекте есть другие здания.
+
+    Вставший по ядрам сводный лист остаётся в здании: он стоит на своём месте и служит опорой.
+    """
+    if len(placements) <= 1:
+        return frozenset()
+    return frozenset(
+        key
+        for key, placement in placements.items()
+        if key.startswith(SUMMARY_PREFIX) and placement.placement == "none"
+    )
 
 
 def review_warnings(groups: Sequence[CadBuilding3dGroupRead]) -> list[CadBuilding3dWarningRead]:
@@ -635,6 +673,16 @@ async def build_building3d(
                 "superseded",
                 f"{sheet.label}: дубль плана на той же отметке - в здании оставлен лист большей "
                 f"площади «{sources[keeper][0].label}».",
+            )
+        )
+    for index in stack.summaries:
+        sheet = sources[index][0]
+        service.append(
+            _service_sheet(
+                sheet,
+                "summary_unplaced",
+                f"{sheet.label}: сводный лист с планами нескольких секций не встал на площадку - "
+                "планы на нём разложены по листу, а не по объекту; в 3D объекта не показывается.",
             )
         )
     lost = [g.label for g in stack.groups if g.placement == "none"]

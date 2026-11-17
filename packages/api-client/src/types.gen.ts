@@ -1010,7 +1010,7 @@ export type CadBuilding3dServiceSheetRead = {
     /**
      * Reason
      */
-    reason: 'not_plan' | 'superseded';
+    reason: 'not_plan' | 'superseded' | 'summary_unplaced';
     /**
      * Revision Id
      */

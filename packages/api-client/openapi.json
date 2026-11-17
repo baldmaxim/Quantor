@@ -1981,7 +1981,8 @@
           "reason": {
             "enum": [
               "not_plan",
-              "superseded"
+              "superseded",
+              "summary_unplaced"
             ],
             "title": "Reason",
             "type": "string"

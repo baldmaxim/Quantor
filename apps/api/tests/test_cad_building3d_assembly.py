@@ -10,7 +10,7 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.contracts.cad_building3d import CadBuilding3dGroupRead
+from app.contracts.cad_building3d import CadBuilding3dGroupRead, CadBuilding3dPlacement
 from app.contracts.cad_constructions import WallsDocument
 from app.domain import JobStatus, JobType
 from app.models import Job
@@ -293,6 +293,47 @@ def test_section_count_reads_ranges_and_lists() -> None:
     ]
 
 
+# ------------------------------------------------------------------ сводные листы
+
+
+SUMMARY_KEY = "summary-0a1b2c3d-7"
+
+
+def test_unplaced_summary_sheet_leaves_the_stack() -> None:
+    """Сводный лист планов секций, не вставший на площадку, - служебный: в здании его нет."""
+    from tests.test_cad_site_cores import CORE, parking
+
+    under = with_cores(
+        built(corps=None, section=None, elevation=BASE - 5000),
+        parking(),
+        bbox=[0.0, 0.0, 220000.0, 180000.0],
+    )
+    tower = with_cores(built(corps="1", section="1", order=1), CORE)
+    summary = patched(
+        built(corps=None, section="17", order=2),
+        group_key=SUMMARY_KEY,
+        group_label="Сводный лист · АР1.2 · лист 8",
+    )
+    stack = assembly.build_stack([under, tower, summary])
+    assert stack.summaries == (2,)
+    assert stack.kept == [0, 1]
+    assert SUMMARY_KEY not in {g.key for g in stack.groups}
+    assert all(f.group_key != SUMMARY_KEY for f in stack.floors)
+    # Постановка остальных не меняется: корпус встал на паркинг по ядрам.
+    assert {g.key: g.placement for g in stack.groups} == {"none": "reference", "k1-s1": "cores"}
+
+
+def test_placed_or_single_summary_sheet_stays_in_the_building() -> None:
+    def placement(kind: CadBuilding3dPlacement) -> b3d.GroupPlacement:
+        return b3d.GroupPlacement(kind, (0.0, 0.0), (), None, None, None)
+
+    assert assembly.unplaced_summaries({SUMMARY_KEY: placement("reference")}) == frozenset()
+    placed = {"none": placement("reference"), SUMMARY_KEY: placement("cores")}
+    assert assembly.unplaced_summaries(placed) == frozenset()
+    lost = {"none": placement("reference"), SUMMARY_KEY: placement("none"), "k1": placement("none")}
+    assert assembly.unplaced_summaries(lost) == frozenset({SUMMARY_KEY})
+
+
 # ------------------------------------------------------------------ типовые листы
 
 
@@ -479,6 +520,61 @@ async def test_response_lists_service_sheets_and_follows_the_stack_height(
     (service,) = body.service_sheets
     assert (service.reason, service.page_index) == ("not_plan", 2)
     assert service.message == "АР · лист 3: не план этажа: по паспорту листа - разрез."
+
+
+async def test_response_lists_unplaced_summary_sheet_as_service_sheet(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    b3d.floor_cache.clear()
+    storage = FakeObjectStorage()
+    summary_title: dict[str, Any] = {
+        "corps": None,
+        "section": "17",
+        "floors": [],
+        "text": None,
+        "kind": "technical",
+    }
+    refs: list[b3d.SheetRef] = []
+    for index, (title, stamp) in enumerate(
+        [
+            (FLOOR_TITLE, None),
+            (summary_title, "Секции 8, 9, 10, 15-16, 17, 18, 19, 20. План тех. пространств"),
+        ]
+    ):
+        key = f"walls-{index}"
+        await storage.put_bytes(
+            key, walls_bytes(title, elevation=BASE, height=3300), content_type="application/json"
+        )
+        refs.append(
+            dataclasses.replace(
+                sheet(order=(0.0, 0.0, index, 1)),
+                walls_key=key,
+                label=f"АР · лист {index + 1}",
+                stamp_title=stamp,
+            )
+        )
+
+    async def collect(
+        _session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> tuple[list[b3d.SheetRef], list[object], None]:
+        return list(refs), [], None
+
+    async def no_missing(_session: AsyncSession, **_kwargs: object) -> list[object]:
+        return []
+
+    monkeypatch.setattr(b3d, "collect_sheets", collect)
+    monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
+    monkeypatch.setattr(cad_site_pins, "active_site_pins", _no_pins)
+    body = await assembly.build_building3d(
+        cast(AsyncSession, object()), storage, workspace_id=uuid.uuid4(), project_id=uuid.uuid4()
+    )
+    b3d.floor_cache.clear()
+    assert [f.label for f in body.floors] == ["К9 · С3 · 2 эт."]
+    assert [g.key for g in body.groups] == ["k9-s3"]
+    assert not [w for w in body.warnings if w.code == "groups_not_placed"]
+    (service,) = body.service_sheets
+    assert (service.reason, service.page_index) == ("summary_unplaced", 1)
+    assert service.message.startswith("АР · лист 2: сводный лист с планами нескольких секций")
 
 
 # ------------------------------------------------------------------ планов нет в 3D

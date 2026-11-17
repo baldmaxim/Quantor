@@ -26,8 +26,9 @@ CadBuilding3dPlacement = Literal["reference", "axes", "cores", "manual", "none"]
 # разность отметок до следующего этажа здания; `default` - типовая (соседа сверху нет).
 CadBuilding3dHeightSource = Literal["derived_stack", "default"]
 # Почему лист с конструкциями не вошёл в стопку этажей: `not_plan` - не план этажа или уровня
-# (разрез, таблица); `superseded` - дубль плана на той же отметке, оставлен лист большей площади.
-CadBuilding3dServiceReason = Literal["not_plan", "superseded"]
+# (разрез, таблица); `superseded` - дубль плана на той же отметке, оставлен лист большей площади;
+# `summary_unplaced` - сводный лист планов нескольких секций, не вставший на площадку.
+CadBuilding3dServiceReason = Literal["not_plan", "superseded", "summary_unplaced"]
 
 
 class CadBuilding3dWarningRead(BaseModel):
