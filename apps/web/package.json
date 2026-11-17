@@ -18,6 +18,8 @@
     "@formkit/auto-animate": "0.10.0",
     "@quantor/api-client": "workspace:*",
     "@quantor/ui": "workspace:*",
+    "@speckle/objectloader2": "2.31.14",
+    "@speckle/viewer": "2.31.14",
     "@tanstack/react-query": "5.102.8",
     "@types/three": "0.169.0",
     "fflate": "0.8.3",

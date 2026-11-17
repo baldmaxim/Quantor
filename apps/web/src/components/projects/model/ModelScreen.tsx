@@ -22,6 +22,7 @@ import type { IModelPartInput } from '@/lib/model/model-scene';
 import { MODEL_STATUS, pickVersion } from '@/lib/model/model-versions';
 
 import { ModelImportPanel } from './ModelImportPanel';
+import { ModelSpeckleCanvas } from './ModelSpeckleCanvas';
 import { ModelViewerCanvas } from './ModelViewerCanvas';
 
 interface IModelScreenProps {
@@ -50,6 +51,9 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fitSeq, setFitSeq] = useState(0);
   const [viewerError, setViewerError] = useState<string | null>(null);
+  /** Запасной простой просмотр: на случай, если просмотрщик Speckle не запустился. */
+  const [simpleViewer, setSimpleViewer] = useState(false);
+  const [colorByCategory, setColorByCategory] = useState(false);
 
   const data = detail.data ?? null;
   const storeys = data?.storeys ?? [];
@@ -68,7 +72,12 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
     null;
   const geometry = useStoreyGeometry(projectId, data?.id ?? null, geometryParts);
   const elements = useStoreyElements(projectId, data?.id ?? null, elementsPart);
-  const viewerParts: IModelPartInput[] = useMemo(() => [...geometry.parts], [geometry.parts]);
+  // Просмотрщик Speckle собирает объекты вместе со свойствами: ждём элементы, чтобы не грузить дважды.
+  const propertiesPending = elementsPart !== null && elements.isPending;
+  const viewerParts: IModelPartInput[] = useMemo(
+    () => (propertiesPending && !simpleViewer ? [] : [...geometry.parts]),
+    [geometry.parts, propertiesPending, simpleViewer],
+  );
   const disciplines = useMemo(
     () => [...new Set(geometryParts.map((part) => part.discipline ?? ''))].sort(),
     [geometryParts],
@@ -187,14 +196,27 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
           <EmptyState title="В версии нет этажей с геометрией" compact />
         ) : (
           <>
-            <ModelViewerCanvas
-              parts={viewerParts}
-              hiddenDisciplines={hidden}
-              selectedId={selectedId}
-              fitSeq={fitSeq}
-              onPick={setSelectedId}
-              onError={setViewerError}
-            />
+            {simpleViewer ? (
+              <ModelViewerCanvas
+                parts={viewerParts}
+                hiddenDisciplines={hidden}
+                selectedId={selectedId}
+                fitSeq={fitSeq}
+                onPick={setSelectedId}
+                onError={setViewerError}
+              />
+            ) : (
+              <ModelSpeckleCanvas
+                parts={viewerParts}
+                elements={elements.data ?? null}
+                hiddenDisciplines={hidden}
+                selectedId={selectedId}
+                colorByCategory={colorByCategory}
+                fitSeq={fitSeq}
+                onPick={setSelectedId}
+                onError={setViewerError}
+              />
+            )}
             <div className="absolute left-[var(--s-3)] top-[var(--s-3)] flex items-center gap-[var(--s-2)] text-xs text-muted">
               <Button onClick={() => setFitSeq((value) => value + 1)}>Вписать</Button>
               {geometry.loading && <span role="status">Загрузка геометрии…</span>}
@@ -231,6 +253,30 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
             ))}
           </fieldset>
         )}
+        <fieldset className="flex flex-col gap-[var(--s-2)]">
+          <legend className="mb-[var(--s-1)] text-xs text-muted">Вид</legend>
+          {!simpleViewer && (
+            <label className="flex items-center gap-[var(--s-2)] text-sm">
+              <input
+                type="checkbox"
+                checked={colorByCategory}
+                onChange={(event) => setColorByCategory(event.target.checked)}
+              />
+              Раскрасить по категориям
+            </label>
+          )}
+          <label className="flex items-center gap-[var(--s-2)] text-sm">
+            <input
+              type="checkbox"
+              checked={simpleViewer}
+              onChange={(event) => {
+                setSimpleViewer(event.target.checked);
+                setViewerError(null);
+              }}
+            />
+            Простой просмотр
+          </label>
+        </fieldset>
         {element ? (
           <section aria-label="Свойства элемента" className="flex flex-col gap-[var(--s-2)]">
             <h2 className="text-sm font-medium">{elementTitle(element)}</h2>
