@@ -203,6 +203,20 @@ export interface ISpeckleModelViewer {
 export const partSignature = (part: IModelPartInput): string =>
   `${part.discipline}|${part.group ?? ''}|${part.level ?? 0}`;
 
+/**
+ * Показаны те же этажи (группы), что и просили: содержимое обновляется (новая версия, другая
+ * дисциплина), а не заменяется другим. Тогда вид, который смотрит человек, камера не сбрасывает;
+ * переход «весь дом» ↔ «один этаж» или к другому этажу - другой набор, камера вписывается заново.
+ */
+export const sameGroups = (
+  loaded: Iterable<string>,
+  wanted: Iterable<string>,
+): boolean => {
+  const have = new Set(loaded);
+  const want = new Set(wanted);
+  return have.size > 0 && have.size === want.size && [...want].every((group) => have.has(group));
+};
+
 export interface IContentPlan {
   /** Ключи загруженных частей, которые надо выгрузить. */
   readonly remove: readonly string[];
@@ -357,9 +371,11 @@ export const createSpeckleModelViewer = async (
     const reloadAll = elements !== lastElements || categories !== lastCategories;
     lastElements = elements;
     lastCategories = categories;
-    const wantedSignatures = new Set(parts.map(partSignature));
-    // Содержимое продолжается (те же этажи и дисциплины, обновились сами части): вид не трогаем.
-    const continuing = groups.some((group) => wantedSignatures.has(group.signature));
+    // Содержимое продолжается (те же этажи, обновились сами части): вид не трогаем.
+    const continuing = sameGroups(
+      groups.map((group) => group.group),
+      parts.map((part) => part.group ?? ''),
+    );
     const plan = planContentUpdate(
       new Map(groups.map((group) => [group.key, group.signature])),
       new Map(parts.map((part) => [part.key, partSignature(part)])),
@@ -411,7 +427,7 @@ export const createSpeckleModelViewer = async (
     await applyColors();
     // Камеру вписываем, только когда показано другое содержимое (другой этаж, первая загрузка):
     // обновление частей (пуш одной дисциплины) не должно сбрасывать вид, который смотрит человек.
-    if (added > 0 && !continuing) camera.setCameraView(undefined, FIT_TRANSITION);
+    if (groups.length > 0 && !continuing) camera.setCameraView(undefined, FIT_TRANSITION);
     return groups.length > 0;
   };
 

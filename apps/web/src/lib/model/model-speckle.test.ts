@@ -2,7 +2,13 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { IModelElement } from './model-elements';
-import { partSignature, partToSpeckle, planContentUpdate, speckleIdOf } from './model-speckle';
+import {
+  partSignature,
+  partToSpeckle,
+  planContentUpdate,
+  sameGroups,
+  speckleIdOf,
+} from './model-speckle';
 
 const triangle = (indexed: boolean): THREE.BufferGeometry => {
   const geometry = new THREE.BufferGeometry();
@@ -167,6 +173,15 @@ describe('обновление содержимого просмотрщика',
   it('пустой просмотрщик заполняется всеми частями в порядке запроса', () => {
     const plan = planContentUpdate(sig(), sig(['b', 'x'], ['a', 'y']), false);
     expect(plan).toEqual({ remove: [], add: ['b', 'a'], kept: 0 });
+  });
+
+  it('камера остаётся только когда показаны те же этажи', () => {
+    expect(sameGroups(['s1', 's1', 's2'], ['s2', 's1'])).toBe(true);
+    // «Весь дом» -> «Один этаж» и обратно, другой этаж, первая загрузка: вписать заново
+    expect(sameGroups(['s1', 's2', 's3'], ['s2'])).toBe(false);
+    expect(sameGroups(['s2'], ['s1', 's2', 's3'])).toBe(false);
+    expect(sameGroups(['s1'], ['s2'])).toBe(false);
+    expect(sameGroups([], ['s1'])).toBe(false);
   });
 
   it('подпись части: дисциплина, этаж и уровень', () => {
