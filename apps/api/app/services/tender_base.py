@@ -429,6 +429,9 @@ def _thickness(construction: WallsConstruction, props: CadConstructionProps | No
         return int(props.thickness_override_mm)
     if construction.thickness_nominal_mm is not None:
         return round(construction.thickness_nominal_mm)
+    if construction.section_mm is not None and construction.thickness_measured_mm > 0:
+        # cad_walls v1.17: монолит без номинала с габаритом сечения - толщина измеренная
+        return round(construction.thickness_measured_mm)
     return None
 
 

@@ -169,6 +169,15 @@ describe('служебные слои', () => {
     for (const name of ['01_КЛАДКА', '02_МОНОЛИТ', 'AUXILIARY', 'QAX', 'MY_AUX_X', '']) {
       expect(isServiceLayer(name)).toBe(false);
     }
+    expect(isServiceLayer('QA_МОНОЛИТ_НЕ_СТЕНА_ПРОВЕРИТЬ')).toBe(true);
+  });
+
+  it('каркасные C112 в AUX_ - не служебные, категория каркасной перегородки', () => {
+    for (const name of ['AUX_C112_КАРКАСНАЯ_ЗОНА_50', 'AUX_C112_ОБШИВКИ_ГКЛВ', 'aux_с112_x', '07_C112_ОБШИВКИ_ГКЛВ']) {
+      expect(isServiceLayer(name)).toBe(false);
+      expect(categoryOfLayer(name)).toBe('frame_partition');
+    }
+    expect(categoryOfLayer('AUX_КОНТУРЫ_СТЕН')).toBeNull();
   });
 });
 

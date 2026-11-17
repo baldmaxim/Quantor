@@ -123,6 +123,9 @@ class WallsConstruction(BaseModel):
     bbox: list[float]
     # Нет у монолита и каркасных перегородок и в старых walls.json (v1, v1.1).
     material_hint: WallsMaterialHint | None = None
+    # cad_walls v1.17: габарит сечения [короткая, длинная] у монолита без номинала (колонна, пилон,
+    # прямоугольный блок); объём такой конструкции — площадь в плане × высота.
+    section_mm: list[float] | None = None
 
 
 class WallsWindow(BaseModel):

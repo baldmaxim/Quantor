@@ -1177,3 +1177,31 @@ def test_view_bbox_is_in_view_frame_not_building() -> None:
     # Поворот на 90°: вид [0,0]-[10,4] после R(90) = [-4,0]-[0,10], затем сдвиг (100, 200).
     assert _bbox_in_view([96, 200, 100, 210], (100, 200), 90.0) == [0, 0, 10, 4]
     assert _bbox_in_view(None, (0, 0), 0.0) is None
+
+
+def test_object_base_thickness_of_monolith_without_nominal_uses_measured_section() -> None:
+    """cad_walls v1.17: монолит без номинала с `section_mm` - округлённая измеренная толщина."""
+    from app.contracts.cad_constructions import CadConstructionProps as PropsContract
+    from app.contracts.cad_floor3d import WallsFloorExtras
+    from app.services import tender_base
+    from tests.test_cad_constructions_calc import document, section_item
+
+    with_section = section_item("col", measured=649.9)
+    no_section = section_item("pil", kind="monolith_pylon", measured=649.9)
+    del no_section["section_mm"]
+    nominal = section_item("wall", kind="monolith_wall", nominal=400.0, measured=649.9)
+    doc = document([with_section, no_section, nominal])
+    by_id = {c.id: c for c in doc.constructions}
+
+    assert tender_base._thickness(by_id["col"], None) == 650
+    assert tender_base._thickness(by_id["pil"], None) is None
+    assert tender_base._thickness(by_id["wall"], None) == 400
+    override = PropsContract(thickness_override_mm=300)
+    assert tender_base._thickness(by_id["col"], override) == 300
+
+    built = tender_base.build_constructions(doc, WallsFloorExtras(), {})
+    assert {c.id: c.thickness_mm for c in built.constructions} == {
+        "col": 650,
+        "pil": None,
+        "wall": 400,
+    }

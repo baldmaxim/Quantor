@@ -583,3 +583,112 @@ def test_effective_levels_base_from_slab_top_then_sheet_elevation_then_zero() ->
     levels = calc.effective_levels(old, NO_LEVELS)
     assert (levels.base_z_mm, levels.opening_floor_z_mm) == (47600, 47600)
     assert calc.effective_levels(document([construction()]).heights, NO_LEVELS).base_z_mm == 0
+
+
+# ------------------------------------------- монолит без номинала с габаритом сечения (v1.17)
+
+SECTION_AREA_MM2 = 422_935.0  # 650 x 650 мм по габариту, измеренная толщина 649.9
+
+
+def section_item(
+    key: str = "col",
+    *,
+    kind: str = "monolith_column",
+    nominal: float | None = None,
+    measured: float = 649.9,
+    section: list[float] | None = None,
+    area: float = SECTION_AREA_MM2,
+) -> dict[str, Any]:
+    """Конструкция с `section_mm`; ось - площадь / измеренная толщина, как отдаёт cad_walls."""
+    item = construction(key, kind=kind, nominal=nominal, area=area, axis=area / (measured or 1.0))
+    item["thickness_measured_mm"] = measured
+    item["thickness_status"] = "matched" if nominal is not None else "check"
+    item["section_mm"] = [649.9, 650.0] if section is None else section
+    return item
+
+
+def test_monolith_without_nominal_with_section_is_measured_and_rounded() -> None:
+    doc = document([section_item()])
+    computed = only(doc)
+    # H = 3000 - 200 = 2800; толщина 649.9 -> 650 (целые мм), объём = площадь в плане x высота.
+    assert computed.status == "ok" and "thickness_check" not in computed.warnings
+    assert computed.thickness_mm == 650.0 and computed.sources.thickness == "derived"
+    assert computed.warnings == []
+    assert computed.volume_m3 == pytest.approx(SECTION_AREA_MM2 * 2800 / 1e9, rel=1e-3)
+    assert computed.length_m == pytest.approx(SECTION_AREA_MM2 / 649.9 / 1000, abs=1e-3)
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    assert result.summary.thickness_check_count == 0
+    assert [(g.kind, g.thickness_mm, g.count) for g in result.totals] == [
+        ("monolith_column", 650.0, 1)
+    ]
+
+
+@pytest.mark.parametrize("kind", ["monolith_wall", "monolith_pylon", "monolith_column"])
+def test_has_measured_section_covers_every_monolith_kind(kind: str) -> None:
+    doc = document([section_item(kind=kind)])
+    assert calc.has_measured_section(doc.constructions[0]) is True
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"kind": "masonry"},
+        {"kind": "frame_partition"},
+        {"nominal": 400.0},
+        {"measured": 0.0},
+    ],
+)
+def test_has_measured_section_is_false_for_other_cases(patch: dict[str, Any]) -> None:
+    doc = document([section_item(**patch)])
+    assert calc.has_measured_section(doc.constructions[0]) is False
+
+
+def test_has_measured_section_is_false_without_section_mm() -> None:
+    item = section_item()
+    del item["section_mm"]
+    assert calc.has_measured_section(document([item]).constructions[0]) is False
+
+
+def test_monolith_without_section_still_needs_a_thickness() -> None:
+    item = section_item()
+    del item["section_mm"]
+    computed = only(document([item]))
+    assert computed.status == "thickness_check" and computed.warnings == ["thickness_check"]
+    assert computed.thickness_mm is None and computed.volume_m3 is None
+
+
+def test_masonry_with_section_but_without_nominal_stays_thickness_check() -> None:
+    doc = document([section_item(kind="masonry")])
+    computed = only(doc)
+    assert computed.status == "thickness_check" and computed.warnings == ["thickness_check"]
+    assert computed.thickness_mm is None and computed.volume_m3 is None
+    assert calc.compute_sheet(doc, {}, NO_LEVELS).summary.thickness_check_count == 1
+
+
+def test_monolith_with_nominal_uses_the_nominal_not_the_measured_thickness() -> None:
+    computed = only(document([section_item(nominal=400.0)]))
+    assert computed.thickness_mm == 400.0 and computed.status == "ok"
+    assert computed.volume_m3 == pytest.approx(
+        SECTION_AREA_MM2 / 649.9 * 400 * 2800 / 1e9, abs=1e-4
+    )
+
+
+def test_thickness_override_beats_the_measured_section() -> None:
+    computed = only(document([section_item()]), CadConstructionProps(thickness_override_mm=300))
+    assert computed.thickness_mm == 300.0 and computed.sources.thickness == "manual"
+    assert computed.volume_m3 == pytest.approx(
+        SECTION_AREA_MM2 / 649.9 * 300 * 2800 / 1e9, abs=1e-4
+    )
+
+
+def test_columns_649_9_and_650_make_one_totals_group() -> None:
+    doc = document(
+        [
+            section_item("a", measured=649.9, section=[649.9, 650.0]),
+            section_item("b", measured=650.0, section=[650.0, 650.0], area=422_500.0),
+        ]
+    )
+    result = calc.compute_sheet(doc, {}, NO_LEVELS)
+    (group,) = result.totals
+    assert (group.kind, group.thickness_mm, group.count) == ("monolith_column", 650.0, 2)
+    assert group.volume_m3 == pytest.approx((SECTION_AREA_MM2 + 422_500.0) * 2800 / 1e9, rel=1e-3)

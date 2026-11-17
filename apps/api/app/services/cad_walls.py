@@ -22,9 +22,11 @@ from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, not_found
 from app.models import Job
+from app.models.sheet_passport import SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_pins, cad_requeue, cad_walls_zones
 from app.services import jobs as jobs_service
+from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectStorage
 
 log = get_logger(__name__)
@@ -268,6 +270,29 @@ async def requeue_with_current_params(
     )
 
 
+# Виды листа, на которых автопостановка `cad_walls` не нужна: разрез и фасад — не план этажа.
+# Кровли — планы, их не трогаем; лист без паспорта или с неподтверждённым видом идёт как раньше.
+_NOT_PLAN_KINDS: Final = frozenset({SheetKind.SECTION.value, SheetKind.FACADE.value})
+
+
+async def _not_plan_pages(session: AsyncSession, parent: Job) -> set[int]:
+    """Страницы ревизии конвертации, у которых подтверждённый паспорт — разрез или фасад."""
+    raw = parent.payload.get("revision_id")
+    try:
+        revision_id = uuid.UUID(str(raw))
+    except ValueError:
+        return set()
+    rows = await session.execute(
+        select(SheetPassport.page_index).where(
+            SheetPassport.revision_id == revision_id,
+            SheetPassport.sheet_kind.in_(_NOT_PLAN_KINDS),
+            # Только подтверждённый человеком паспорт: вид кандидата по заголовку может ошибаться.
+            SheetPassport.status == "confirmed",
+        )
+    )
+    return {int(index) for index in rows.scalars()}
+
+
 async def enqueue_after_convert(
     session: AsyncSession, storage: ObjectStorage, parent: Job, settings: Settings
 ) -> list[Job]:
@@ -284,6 +309,7 @@ async def enqueue_after_convert(
         log.warning("cad_walls_params_unavailable", job_id=str(parent.id))
         return []
     jobs: list[Job] = []
+    not_plans = await _not_plan_pages(session, parent)
     for page in cad_service.result_of(parent).get("pages", []):
         for row in page.get("views", []):
             page_index, view = page.get("index"), row.get("view")
@@ -291,6 +317,11 @@ async def enqueue_after_convert(
                 continue
             dxf = view_has_dxf(parent, page_index, view)
             if dxf is None:
+                continue
+            if page_index in not_plans:
+                # Разрез или фасад по паспорту листа: конструкций плана этажа там нет, а cad_walls
+                # принял бы линии разреза за сотни стен и дверей.
+                log.info("cad_walls_skipped_not_plan", job_id=str(parent.id), page_index=page_index)
                 continue
             zones = await cad_walls_zones.prepare_or_empty(
                 session, storage, parent=parent, page_index=page_index, view=view

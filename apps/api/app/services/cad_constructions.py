@@ -909,6 +909,16 @@ def _gap_height_source(
     return min(sources, key=_SOURCE_RANK.index)
 
 
+def has_measured_section(construction: WallsConstruction) -> bool:
+    """Монолит без номинала, у которого cad_walls v1.17 отдал габарит сечения `section_mm`."""
+    return (
+        construction.thickness_nominal_mm is None
+        and construction.section_mm is not None
+        and _is_monolith_kind(construction.kind)
+        and construction.thickness_measured_mm > 0
+    )
+
+
 def compute_construction(
     construction: WallsConstruction,
     host_openings: list[WallsOpening],
@@ -935,6 +945,11 @@ def compute_construction(
         thickness, thickness_source = float(props.thickness_override_mm), "manual"
     elif construction.thickness_nominal_mm is not None:
         thickness, thickness_source = construction.thickness_nominal_mm, "derived"
+    elif has_measured_section(construction):
+        # cad_walls v1.17: монолит без номинала с габаритом сечения — толщина измеренная,
+        # длина оси × толщина = площадь в плане, объём = площадь × высота. Целые мм: толщина — ключ
+        # группы итогов и привязок ВОР, дробная часть от пересчёта к пересчёту плавает.
+        thickness, thickness_source = float(round(construction.thickness_measured_mm)), "derived"
     else:
         thickness, thickness_source = None, None
 
