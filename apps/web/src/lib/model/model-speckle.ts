@@ -299,6 +299,12 @@ export const createSpeckleModelViewer = async (
   let lastCategories = '';
   let generation = 0;
   let disposed = false;
+  /**
+   * Камеру надо вписать: показано другое содержимое (первая загрузка, другой этаж, режим). Признак
+   * живёт между вызовами: вызов, который его выставил, могли вытеснить новым до конца, и тогда
+   * вписывает тот, кто дойдёт до конца, - иначе камера остаётся у стены (по умолчанию).
+   */
+  let needsFit = false;
 
   const applyVisibility = (): void => {
     for (const group of groups) {
@@ -373,6 +379,7 @@ export const createSpeckleModelViewer = async (
       groups.map((group) => group.group),
       parts.map((part) => part.group ?? ''),
     );
+    if (!continuing) needsFit = true;
     const plan = planContentUpdate(
       new Map(groups.map((group) => [group.key, group.signature])),
       new Map(parts.map((part) => [part.key, partSignature(part)])),
@@ -422,9 +429,12 @@ export const createSpeckleModelViewer = async (
     applyVisibility();
     if (offsetMeters !== 0) applyOffset();
     await applyColors();
-    // Камеру вписываем, только когда показано другое содержимое (другой этаж, первая загрузка):
-    // обновление частей (пуш одной дисциплины) не должно сбрасывать вид, который смотрит человек.
-    if (groups.length > 0 && !continuing) camera.setCameraView(undefined, FIT_TRANSITION);
+    // Обновление частей (пуш одной дисциплины, новая версия) вид не сбрасывает: вписываем только
+    // когда показано другое содержимое.
+    if (needsFit && groups.length > 0) {
+      needsFit = false;
+      camera.setCameraView(undefined, FIT_TRANSITION);
+    }
     return groups.length > 0;
   };
 
