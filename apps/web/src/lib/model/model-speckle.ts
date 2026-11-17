@@ -244,6 +244,21 @@ export const planContentUpdate = (
   return { remove, add, kept };
 };
 
+/**
+ * Порядок выгрузки. Та же часть, которую надо загрузить заново (другая подпись, полная замена),
+ * выгружается до загрузки: у неё те же id объектов. Ушедшие части выгружаются после загрузки
+ * новых, чтобы при обновлении версии ничего не пропадало с экрана.
+ */
+export const splitRemovals = (
+  plan: IContentPlan,
+): { readonly before: readonly string[]; readonly after: readonly string[] } => {
+  const adding = new Set(plan.add);
+  return {
+    before: plan.remove.filter((key) => adding.has(key)),
+    after: plan.remove.filter((key) => !adding.has(key)),
+  };
+};
+
 /** Просмотрщик на `@speckle/viewer`; библиотека подгружается здесь, а не при открытии страницы. */
 export const createSpeckleModelViewer = async (
   host: HTMLElement,
@@ -291,6 +306,8 @@ export const createSpeckleModelViewer = async (
   const hidden = new Set<string>();
   const groups: ILoadedGroup[] = [];
   const speckleIds = new Map<string, string>();
+  /** Обратная карта id объекта -> GlobalId: выгрузка части за время, пропорциональное её размеру. */
+  const elementOf = new Map<string, string>();
   const levelOf = new Map<string, number>();
   let maxLevel: number | null = null;
   let offsetMeters = 0;
@@ -306,12 +323,18 @@ export const createSpeckleModelViewer = async (
    */
   let needsFit = false;
 
+  const isOff = (group: ILoadedGroup): boolean =>
+    hidden.has(group.discipline) || (maxLevel !== null && group.level > maxLevel);
+
   const applyVisibility = (): void => {
+    const hide: string[] = [];
+    const show: string[] = [];
     for (const group of groups) {
-      const off = hidden.has(group.discipline) || (maxLevel !== null && group.level > maxLevel);
-      if (off) filtering.hideObjects([...group.ids], undefined, false);
-      else filtering.showObjects([...group.ids], undefined, false);
+      const target = isOff(group) ? hide : show;
+      for (const id of group.ids) target.push(id);
     }
+    if (show.length > 0) filtering.showObjects(show, undefined, false);
+    if (hide.length > 0) filtering.hideObjects(hide, undefined, false);
     viewer.requestRender();
   };
 
@@ -328,11 +351,14 @@ export const createSpeckleModelViewer = async (
   const applyColors = async (): Promise<void> => {
     if (!colorByCategory) {
       filtering.removeColorFilter();
-    } else {
-      const properties = await viewer.getObjectProperties();
-      const category = properties.find((property) => property.key === 'category');
-      if (category !== undefined) filtering.setColorFilter(category);
+      viewer.requestRender();
+      return;
     }
+    const properties = await viewer.getObjectProperties();
+    // Раскраску могли выключить, пока читались свойства.
+    if (!colorByCategory) return;
+    const category = properties.find((property) => property.key === 'category');
+    if (category !== undefined) filtering.setColorFilter(category);
     viewer.requestRender();
   };
 
@@ -357,10 +383,13 @@ export const createSpeckleModelViewer = async (
     const group = groups[index];
     if (group === undefined) return;
     groups.splice(index, 1);
-    for (const [elementId, id] of [...speckleIds]) {
-      if (group.ids.includes(id)) speckleIds.delete(elementId);
+    for (const id of group.ids) {
+      const elementId = elementOf.get(id);
+      // Тот же GlobalId мог прийти и в другой части (новая версия): ссылку на неё не трогаем.
+      if (elementId !== undefined && speckleIds.get(elementId) === id) speckleIds.delete(elementId);
+      elementOf.delete(id);
+      levelOf.delete(id);
     }
-    for (const id of group.ids) levelOf.delete(id);
     await viewer.unloadObject(group.resource);
   };
 
@@ -385,7 +414,9 @@ export const createSpeckleModelViewer = async (
       new Map(parts.map((part) => [part.key, partSignature(part)])),
       reloadAll,
     );
-    for (const key of plan.remove) await unloadGroup(key);
+    const removals = splitRemovals(plan);
+    if (disposed || token !== generation) return groups.length > 0;
+    for (const key of removals.before) await unloadGroup(key);
     const byKey = new Map(parts.map((part) => [part.key, part]));
     let added = 0;
     for (const key of plan.add) {
@@ -411,9 +442,10 @@ export const createSpeckleModelViewer = async (
       for (const [elementId, id] of resource.speckleIds) {
         ids.push(id);
         speckleIds.set(elementId, id);
+        elementOf.set(id, elementId);
         levelOf.set(id, level);
       }
-      groups.push({
+      const loaded: ILoadedGroup = {
         key: part.key,
         resource: resource.resource,
         signature: partSignature(part),
@@ -421,10 +453,16 @@ export const createSpeckleModelViewer = async (
         discipline: part.discipline,
         level,
         ids,
-      });
+      };
+      groups.push(loaded);
+      // Новая часть сразу получает срез этажей и разнос, а не только в конце всей загрузки.
+      if (isOff(loaded)) filtering.hideObjects([...ids], undefined, false);
+      if (offsetMeters !== 0) applyOffset();
       added += 1;
       content.onProgress?.(added, plan.add.length);
     }
+    if (disposed || token !== generation) return groups.length > 0;
+    for (const key of removals.after) await unloadGroup(key);
     if (disposed || token !== generation) return groups.length > 0;
     applyVisibility();
     if (offsetMeters !== 0) applyOffset();

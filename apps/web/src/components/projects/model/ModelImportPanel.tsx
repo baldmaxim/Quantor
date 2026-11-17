@@ -1,12 +1,21 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, type FC } from 'react';
+import { useEffect, useRef, type FC } from 'react';
 
 import { Button, StatusBadge } from '@/components/ui';
 import { extractCode } from '@/lib/errors';
-import { useModelImport, useStartModelImport } from '@/lib/model/model-queries';
-import { importActive, importErrorText, importView } from '@/lib/model/model-versions';
+import {
+  invalidateModelMeta,
+  useModelImport,
+  useStartModelImport,
+} from '@/lib/model/model-queries';
+import {
+  importActive,
+  importErrorText,
+  importJustFinished,
+  importView,
+} from '@/lib/model/model-versions';
 
 interface IModelImportPanelProps {
   readonly projectId: string;
@@ -24,10 +33,13 @@ export const ModelImportPanel: FC<IModelImportPanelProps> = ({ projectId }) => {
   const status = current?.status ?? null;
   const busy = start.isPending || importActive(status);
 
+  // Только на переходе «строится -> построена»: при открытии страницы с уже построенной моделью
+  // ничего не сбрасываем, а части пакета (по sha256) не перекачиваем никогда.
+  const previous = useRef<string | null>(null);
   useEffect(() => {
-    if (status === 'succeeded') {
-      void queryClient.invalidateQueries({ queryKey: ['model', projectId] });
-    }
+    const before = previous.current;
+    previous.current = status;
+    if (importJustFinished(before, status)) void invalidateModelMeta(queryClient, projectId);
   }, [status, projectId, queryClient]);
 
   const view = status === null ? null : importView(status);

@@ -8,6 +8,7 @@ import {
   planContentUpdate,
   sameGroups,
   speckleIdOf,
+  splitRemovals,
 } from './model-speckle';
 
 const triangle = (indexed: boolean): THREE.BufferGeometry => {
@@ -182,6 +183,15 @@ describe('обновление содержимого просмотрщика',
     expect(sameGroups(['s2'], ['s1', 's2', 's3'])).toBe(false);
     expect(sameGroups(['s1'], ['s2'])).toBe(false);
     expect(sameGroups([], ['s1'])).toBe(false);
+  });
+
+  it('ушедшие части выгружаются после загрузки новых, те же - до', () => {
+    // новая версия: часть b заменена на b2, часть c загружается заново (другой этаж)
+    expect(splitRemovals({ remove: ['b', 'c'], add: ['b2', 'c'], kept: 1 })).toEqual({
+      before: ['c'],
+      after: ['b'],
+    });
+    expect(splitRemovals({ remove: [], add: ['a'], kept: 0 })).toEqual({ before: [], after: [] });
   });
 
   it('подпись части: дисциплина, этаж и уровень', () => {

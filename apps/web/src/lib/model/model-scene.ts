@@ -30,6 +30,10 @@ export interface IModelPartInput {
   readonly level?: number;
 }
 
+/** Дисциплины «Всего дома» до первого выбора: АР, если есть, иначе первая по алфавиту. */
+export const defaultHouseDisciplines = (all: readonly string[]): ReadonlySet<string> =>
+  new Set(all.includes('ARCH') ? ['ARCH'] : all.slice(0, 1));
+
 export interface IModelViewerColors {
   readonly accent: string;
   readonly background: string;

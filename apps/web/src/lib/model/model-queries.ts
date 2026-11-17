@@ -18,6 +18,7 @@ import {
   useQueries,
   useQuery,
   useQueryClient,
+  type QueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
@@ -39,6 +40,19 @@ export const modelKeys = {
     ['model', projectId, 'elements', sha256] as const,
   import: (projectId: string) => ['model', projectId, 'import'] as const,
 };
+
+/**
+ * Метаданные модели (версии, описание версии, задание сборки) - без частей пакета: часть
+ * неизменяема и определяется sha256, скачивать её заново после сборки или утверждения незачем.
+ */
+export const isModelMetaQuery = (key: readonly unknown[]): boolean =>
+  key[2] !== 'part' && key[2] !== 'elements';
+
+export const invalidateModelMeta = (client: QueryClient, projectId: string): Promise<void> =>
+  client.invalidateQueries({
+    queryKey: ['model', projectId],
+    predicate: (query) => isModelMetaQuery(query.queryKey),
+  });
 
 /** Живой вид: как часто страница спрашивает портал о новых версиях и ходе сборки (вкладка в фоне не опрашивает). */
 const LIVE_POLL_MS = 8000;
@@ -78,7 +92,10 @@ export const useModelVersion = (
           path: { project_id: projectId, version_id: versionId ?? '' },
         }),
       ),
-    retry: retryOnNetwork,
+    // Версия могла не открыться из-за перезапуска портала (5xx): повторяем и потом опрашиваем,
+    // иначе 3D в живом виде осталось бы пустым до следующей версии.
+    retry: (count) => count < 3,
+    refetchInterval: (query) => (query.state.status === 'error' ? LIVE_POLL_MS : false),
   });
 
 /** Часть пакета целиком: неизменяема и ключуется по sha256, поэтому кэшируется надолго. */
@@ -180,7 +197,7 @@ export const useApproveModelVersion = (
         }),
       ),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['model', projectId] });
+      await invalidateModelMeta(queryClient, projectId);
     },
   });
 };

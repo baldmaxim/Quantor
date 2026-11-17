@@ -22,6 +22,13 @@ export const pickVersion = (items: readonly ModelVersionRead[]): string | null =
 export const newestVersion = (items: readonly ModelVersionRead[]): string | null =>
   items.find((item) => item.status !== 'uploading')?.id ?? null;
 
+/**
+ * Сборка только что закончилась (а не была закончена до открытия страницы): тогда список версий
+ * обновляют сразу, не дожидаясь очередного опроса.
+ */
+export const importJustFinished = (before: string | null, now: string | null): boolean =>
+  now === 'succeeded' && (before === 'queued' || before === 'running');
+
 export interface IImportView {
   readonly label: string;
   readonly tone: StatusTone;

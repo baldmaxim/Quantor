@@ -97,7 +97,11 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
       view.setDisciplineVisible(code, !current.hiddenDisciplines.has(code));
     }
     view.setColorByCategory(current.colorByCategory);
-    void view.setContent(current.parts, elements).then(() => view.select(state.current.selectedId));
+    void view
+      .setContent(current.parts, elements)
+      .then(() => view.select(state.current.selectedId))
+      // Просмотрщик уже освобождён (ушли со страницы): загрузку молча бросаем.
+      .catch(() => undefined);
   }, [view, partsKey, elements, pending]);
 
   useEffect(() => {

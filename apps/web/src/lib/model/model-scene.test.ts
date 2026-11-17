@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { elementIdOf } from './model-scene';
+import { defaultHouseDisciplines, elementIdOf } from './model-scene';
 
 describe('выбор элемента в 3D', () => {
   const build = () => {
@@ -36,5 +36,13 @@ describe('выбор элемента в 3D', () => {
     expect(elementIdOf(stray)).toBeNull();
     expect(elementIdOf(root)).toBeNull();
     expect(elementIdOf(null)).toBeNull();
+  });
+});
+
+describe('дисциплины «Всего дома» по умолчанию', () => {
+  it('АР, если есть, иначе первая по алфавиту, пустая модель - ничего', () => {
+    expect([...defaultHouseDisciplines(['ARCH', 'PL', 'VAC'])]).toEqual(['ARCH']);
+    expect([...defaultHouseDisciplines(['FF', 'PL'])]).toEqual(['FF']);
+    expect(defaultHouseDisciplines([]).size).toBe(0);
   });
 });

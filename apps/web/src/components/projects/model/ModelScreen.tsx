@@ -18,7 +18,7 @@ import {
   useStoreyElements,
   useStoreyGeometry,
 } from '@/lib/model/model-queries';
-import type { IModelPartInput } from '@/lib/model/model-scene';
+import { defaultHouseDisciplines, type IModelPartInput } from '@/lib/model/model-scene';
 import { MODEL_STATUS, newestVersion, pickVersion } from '@/lib/model/model-versions';
 
 import { ModelImportPanel } from './ModelImportPanel';
@@ -47,8 +47,10 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   const [chosen, setChosen] = useState<string | null>(null);
   const items = versions.data?.items ?? [];
   const latest = newestVersion(items);
-  const following = chosen === null;
-  const versionId = chosen ?? latest ?? pickVersion(items);
+  // Закреплённая версия пропала из списка - снова следим за последней.
+  const pinned = chosen !== null && items.some((item) => item.id === chosen) ? chosen : null;
+  const following = pinned === null;
+  const versionId = pinned ?? latest ?? pickVersion(items);
   /** Новейшая версия, о которой человек уже знает: новее неё - показываем уведомление. */
   const [acknowledged, setAcknowledged] = useState<string | null>(null);
   if (acknowledged === null && latest !== null) setAcknowledged(latest);
@@ -71,7 +73,8 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   const [colorByCategory, setColorByCategory] = useState(false);
   /** «Весь дом»: все этажи сразу; «Один этаж»: этаж со всеми дисциплинами и свойствами. */
   const [viewMode, setViewMode] = useState<'house' | 'storey'>('house');
-  const [houseDisciplines, setHouseDisciplines] = useState<ReadonlySet<string>>(new Set(['ARCH']));
+  /** Дисциплины «Всего дома», выбранные человеком; `null` - ещё не выбирал (АР по умолчанию). */
+  const [houseChoice, setHouseChoice] = useState<ReadonlySet<string> | null>(null);
   const [maxLevel, setMaxLevel] = useState<number | null>(null);
   const [storeyOffset, setStoreyOffset] = useState(0);
   /** Этаж последнего выбранного элемента: из его файла берутся свойства. */
@@ -107,25 +110,27 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
       ].sort(),
     [parts],
   );
+  // Галочки показывают ровно то, что грузится: сняли все - дом пуст, а не «все дисциплины».
+  const houseDisciplines = useMemo(
+    () => houseChoice ?? defaultHouseDisciplines(allDisciplines),
+    [houseChoice, allDisciplines],
+  );
   // Весь дом: геометрия включённых дисциплин по всем этажам, снизу вверх.
   const houseGeometry = useMemo(() => {
-    const enabled = allDisciplines.some((code) => houseDisciplines.has(code))
-      ? houseDisciplines
-      : new Set(allDisciplines);
     return parts
       .filter(
         (part) =>
           part.kind === 'geometry' &&
           part.storey_key !== null &&
           part.storey_key !== undefined &&
-          enabled.has(part.discipline ?? ''),
+          houseDisciplines.has(part.discipline ?? ''),
       )
       .sort(
         (a, b) =>
           (levelOf.get(a.storey_key ?? '') ?? 0) - (levelOf.get(b.storey_key ?? '') ?? 0) ||
           (a.discipline ?? '').localeCompare(b.discipline ?? ''),
       );
-  }, [parts, allDisciplines, houseDisciplines, levelOf]);
+  }, [parts, houseDisciplines, levelOf]);
   const wantedGeometry = house ? houseGeometry : geometryParts;
   const propsStoreyKey = house ? (pickedStorey ?? storey?.storey_key) : storey?.storey_key;
   const elementsPart =
@@ -162,7 +167,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
     selectedId === null ? null : (elements.data?.get(selectedId) ?? null);
 
   if (versions.isPending) return <SkeletonRows rows={6} />;
-  if (versions.isError) {
+  if (versions.isError && versions.data === undefined) {
     return (
       <ErrorState
         title="Не удалось получить версии модели"
@@ -212,6 +217,11 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
             ))}
           </select>
         </label>
+        {versions.isError && (
+          <span role="status" className="text-xs text-[var(--danger)]">
+            Нет связи с порталом: показана последняя полученная версия.
+          </span>
+        )}
         {following ? (
           <span className="text-xs text-muted">Живой вид: показана последняя версия</span>
         ) : (
@@ -247,7 +257,8 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
             {data.status === 'candidate' && (
               <Button
                 variant="primary"
-                disabled={approve.isPending}
+                // Пока открывается новая версия, на экране ещё прежняя: утверждать нечего.
+                disabled={approve.isPending || detail.isPlaceholderData}
                 onClick={() => approve.mutate({ versionId: data.id })}
               >
                 Утвердить версию
@@ -271,6 +282,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                 onChange={() => {
                   setViewMode('house');
                   setSelectedId(null);
+                  setFocus(null);
                 }}
               />
               Весь дом
@@ -283,6 +295,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                 onChange={() => {
                   setViewMode('storey');
                   setSelectedId(null);
+                  setFocus(null);
                 }}
               />
               Один этаж
@@ -414,12 +427,18 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                   type="checkbox"
                   checked={house ? houseDisciplines.has(code) : !hidden.has(code)}
                   onChange={(event) => {
-                    const setter = house ? setHouseDisciplines : setHidden;
-                    const on = house ? event.target.checked : !event.target.checked;
-                    setter((previous) => {
-                      const next = new Set(previous);
-                      if (on) next.add(code);
+                    const checked = event.target.checked;
+                    if (house) {
+                      const next = new Set(houseDisciplines);
+                      if (checked) next.add(code);
                       else next.delete(code);
+                      setHouseChoice(next);
+                      return;
+                    }
+                    setHidden((previous) => {
+                      const next = new Set(previous);
+                      if (checked) next.delete(code);
+                      else next.add(code);
                       return next;
                     });
                   }}
