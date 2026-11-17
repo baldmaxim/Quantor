@@ -194,6 +194,8 @@ export interface ISpeckleModelViewer {
   select: (id: string | null) => void;
   setColorByCategory: (enabled: boolean) => void;
   fit: () => void;
+  /** Подлететь камерой к этажу (группе частей), ничего не скрывая. */
+  focusGroup: (group: string) => void;
   dispose: () => void;
 }
 
@@ -268,6 +270,7 @@ export const createSpeckleModelViewer = async (
     readonly key: string;
     readonly resource: string;
     readonly signature: string;
+    readonly group: string;
     readonly discipline: string;
     readonly level: number;
     readonly ids: readonly string[];
@@ -394,6 +397,7 @@ export const createSpeckleModelViewer = async (
         key: part.key,
         resource: resource.resource,
         signature: partSignature(part),
+        group: part.group ?? '',
         discipline: part.discipline,
         level,
         ids,
@@ -446,6 +450,10 @@ export const createSpeckleModelViewer = async (
       void applyColors();
     },
     fit: () => camera.setCameraView(undefined, FIT_TRANSITION),
+    focusGroup: (group) => {
+      const ids = groups.filter((item) => item.group === group).flatMap((item) => [...item.ids]);
+      if (ids.length > 0) camera.setCameraView(ids, FIT_TRANSITION);
+    },
     dispose: () => {
       disposed = true;
       generation += 1;

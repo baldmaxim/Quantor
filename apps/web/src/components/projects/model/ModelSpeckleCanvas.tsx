@@ -22,6 +22,8 @@ interface IModelSpeckleCanvasProps {
   readonly pending?: boolean;
   /** Команда «Вписать»: счётчик, чтобы повторное нажатие не терялось. */
   readonly fitSeq: number;
+  /** Подлёт камеры к этажу: новый объект - новая команда (в том числе к тому же этажу). */
+  readonly focus?: { readonly group: string } | null;
   readonly onPick: (id: string | null, group: string | null) => void;
   /** Просмотрщик не запустился (нет WebGL) или часть не разобрана. */
   readonly onError: (message: string) => void;
@@ -42,6 +44,7 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   storeyOffset = 0,
   pending = false,
   fitSeq,
+  focus = null,
   onPick,
   onError,
 }) => {
@@ -123,6 +126,10 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   useEffect(() => {
     if (fitSeq > 0) view?.fit();
   }, [view, fitSeq]);
+
+  useEffect(() => {
+    if (focus !== null) view?.focusGroup(focus.group);
+  }, [view, focus]);
 
   return (
     <div

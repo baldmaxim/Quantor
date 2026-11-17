@@ -63,6 +63,8 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fitSeq, setFitSeq] = useState(0);
+  /** Подлёт камеры к этажу, выбранному в списке (в режиме «весь дом»). */
+  const [focus, setFocus] = useState<{ readonly group: string } | null>(null);
   const [viewerError, setViewerError] = useState<string | null>(null);
   /** Запасной простой просмотр: на случай, если просмотрщик Speckle не запустился. */
   const [simpleViewer, setSimpleViewer] = useState(false);
@@ -332,7 +334,9 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                     onClick={() => {
                       setStoreyChoice(item.storey_key);
                       setSelectedId(null);
-                      if (house) setMaxLevel(levelOf.get(item.storey_key) ?? null);
+                      // Весь дом: камера подлетает к этажу, остальные этажи остаются на месте;
+                      // срезать дом сверху можно только ползунком «Этажи снизу до».
+                      if (house) setFocus({ group: item.storey_key });
                     }}
                     className={`flex w-full items-baseline justify-between gap-[var(--s-2)] rounded-[var(--radius-sm)] border px-[var(--s-2)] py-[var(--s-2)] text-left text-sm ${
                       active
@@ -377,6 +381,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                 storeyOffset={house ? storeyOffset : 0}
                 pending={updating}
                 fitSeq={fitSeq}
+                focus={house ? focus : null}
                 onPick={(id, group) => {
                   setSelectedId(id);
                   if (house && group !== null) setPickedStorey(group);

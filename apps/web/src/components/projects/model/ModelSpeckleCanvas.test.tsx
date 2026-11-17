@@ -16,6 +16,7 @@ const fakeViewer = (): ISpeckleModelViewer => ({
   select: vi.fn(),
   setColorByCategory: vi.fn(),
   fit: vi.fn(),
+  focusGroup: vi.fn(),
   dispose: vi.fn(),
 });
 
@@ -92,6 +93,18 @@ describe('холст Speckle: перезагрузка содержимого', 
     view.rerender(<ModelSpeckleCanvas {...props([part('a'), part('b'), part('c')])} />);
     await vi.waitFor(() => expect(viewer.setContent).toHaveBeenCalledTimes(2));
     expect(vi.mocked(viewer.setContent).mock.calls[1]?.[0]).toHaveLength(3);
+  });
+
+  it('подлёт к этажу передаётся просмотрщику один раз и не перезагружает содержимое', async () => {
+    const view = await mounted([part('a')]);
+    const focus = { group: 'storey-2' };
+    view.rerender(<ModelSpeckleCanvas {...props([part('a')])} focus={focus} />);
+    view.rerender(<ModelSpeckleCanvas {...props([part('a')])} focus={focus} selectedId="gid" />);
+    expect(viewer.focusGroup).toHaveBeenCalledTimes(1);
+    expect(viewer.focusGroup).toHaveBeenCalledWith('storey-2');
+    expect(viewer.setContent).toHaveBeenCalledTimes(1);
+    view.rerender(<ModelSpeckleCanvas {...props([part('a')])} focus={{ group: 'storey-2' }} />);
+    expect(viewer.focusGroup).toHaveBeenCalledTimes(2);
   });
 
   it('просмотрщик освобождается при размонтировании', async () => {
