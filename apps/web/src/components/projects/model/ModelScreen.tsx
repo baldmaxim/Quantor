@@ -68,7 +68,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   const [pickedStorey, setPickedStorey] = useState<string | null>(null);
 
   const data = detail.data ?? null;
-  const storeys = data?.storeys ?? [];
+  const storeys = useMemo(() => data?.storeys ?? [], [data]);
   const parts = useMemo(() => data?.parts ?? [], [data]);
   const warnings = data?.warnings ?? [];
   const storey =
