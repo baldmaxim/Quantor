@@ -323,6 +323,17 @@ export const createSpeckleModelViewer = async (
    */
   let needsFit = false;
 
+  /** У холста нет размера (вкладка или панель скрыты): вписанная камера получила бы NaN и чёрный экран. */
+  const canFit = (): boolean => host.clientWidth > 0 && host.clientHeight > 0;
+  const fitIfNeeded = (): void => {
+    if (!needsFit || groups.length === 0 || !canFit()) return;
+    needsFit = false;
+    camera.setCameraView(undefined, FIT_TRANSITION);
+  };
+  // Холст получил размер позже загрузки - вписываем тогда.
+  const resize = new ResizeObserver(fitIfNeeded);
+  resize.observe(host);
+
   const isOff = (group: ILoadedGroup): boolean =>
     hidden.has(group.discipline) || (maxLevel !== null && group.level > maxLevel);
 
@@ -469,10 +480,7 @@ export const createSpeckleModelViewer = async (
     await applyColors();
     // Обновление частей (пуш одной дисциплины, новая версия) вид не сбрасывает: вписываем только
     // когда показано другое содержимое.
-    if (needsFit && groups.length > 0) {
-      needsFit = false;
-      camera.setCameraView(undefined, FIT_TRANSITION);
-    }
+    fitIfNeeded();
     return groups.length > 0;
   };
 
@@ -510,7 +518,10 @@ export const createSpeckleModelViewer = async (
       colorByCategory = enabled;
       void applyColors();
     },
-    fit: () => camera.setCameraView(undefined, FIT_TRANSITION),
+    fit: () => {
+      if (canFit()) camera.setCameraView(undefined, FIT_TRANSITION);
+      else needsFit = true;
+    },
     focusGroup: (group) => {
       const ids = groups.filter((item) => item.group === group).flatMap((item) => [...item.ids]);
       if (ids.length > 0) camera.setCameraView(ids, FIT_TRANSITION);
@@ -518,6 +529,7 @@ export const createSpeckleModelViewer = async (
     dispose: () => {
       disposed = true;
       generation += 1;
+      resize.disconnect();
       viewer.dispose();
     },
   };
