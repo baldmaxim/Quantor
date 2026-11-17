@@ -154,6 +154,7 @@ async def start_model_version(
         tender_version_id=tender_version_id,
         comment=comment,
     )
+    await session.commit()
     if not created:
         response.status_code = status.HTTP_200_OK
     missing = (
@@ -191,6 +192,7 @@ async def put_model_part(
             issue={"code": "PART_PATH", "where": path[: qmp.MAX_PATH]},
         )
     part = await models_service.store_part(session, storage, version, path, _body_chunks(request))
+    await session.commit()
     return ModelPartRead.model_validate(part)
 
 
@@ -210,6 +212,7 @@ async def commit_model_version(
     version = await _version(session, context, project_id, version_id, lock=True)
     await models_service.commit_version(session, storage, version)
     await _audit(session, context, AuditAction.MODEL_VERSION_COMMITTED, version)
+    await session.commit()
     return await _detail(session, version)
 
 
@@ -231,6 +234,7 @@ async def approve_model_version(
         session, version, user_id=context.principal.user_id, comment=body.comment
     )
     await _audit(session, context, AuditAction.MODEL_VERSION_APPROVED, version)
+    await session.commit()
     return await _detail(session, version)
 
 
@@ -250,6 +254,7 @@ async def delete_model_version(
     version = await _version(session, context, project_id, version_id, lock=True)
     await models_service.delete_uploading(session, storage, version)
     await _audit(session, context, AuditAction.MODEL_VERSION_DELETED, version)
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -378,6 +383,7 @@ async def start_model_import(
         revision_ids=body.revision_ids,
         settings=settings,
     )
+    await session.commit()
     return ModelImportRead.of(job)
 
 

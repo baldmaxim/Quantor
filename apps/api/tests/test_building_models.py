@@ -17,15 +17,16 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.cad_worker import HANDLERS
 from app.cad_worker.model_handler import execute_model_ifc_import, generator_failure
 from app.core.config import Settings
-from app.domain import DocumentKind, JobStatus, JobType
+from app.domain import DocumentKind, JobStatus, JobType, ModelVersionStatus
 from app.errors import ErrorCode
 from app.main import create_app
-from app.models import Document, DocumentRevision, Job
+from app.models import BuildingModelVersion, Document, DocumentRevision, Job, ModelPart
 from app.services import cad_queue
 from app.services import jobs as jobs_service
 from app.services import model_package as qmp
@@ -433,3 +434,69 @@ async def test_generator_refusal_fails_the_job_with_its_reason(
         assert job.error_code == ErrorCode.MODEL_IFC_NOT_BUILT.value
         latest = (await api.get(f"/api/v1/projects/{project}/model/imports/latest")).json()
         assert latest["status"] == "failed" and latest["version_id"] is None
+
+
+async def test_api_writes_are_committed_and_seen_from_another_session(
+    db_session: AsyncSession,
+    db_engine: AsyncEngine,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    model_tools: Path,
+    tmp_path: Path,
+) -> None:
+    """Запись маршрута фиксируется в базе: её видно из другой сессии.
+
+    API и проверка в тестах делят одну сессию и не заметили бы пропущенный `commit`; на проде
+    сессия запроса закрывается без него, и всё, что маршрут не зафиксировал, откатывается
+    (кнопка «Построить модель из IFC» отвечала 202, а задания в базе не появлялось).
+    """
+    settings = import_settings(model_tools, tmp_path)
+    factory = async_sessionmaker(db_engine, expire_on_commit=False)
+
+    async def seen_status(version: str) -> ModelVersionStatus | None:
+        async with factory() as other:
+            row = await other.get(BuildingModelVersion, uuid.UUID(version))
+            return None if row is None else row.status
+
+    async with build_api(make_context(), settings=settings) as api:
+        project = await new_project(api)
+        await add_ifc(db_session, fake_storage, project, "KPLSK_ARCH.ifc")
+        base = f"/api/v1/projects/{project}/model"
+
+        queued = await api.post(f"{base}/imports", json={})
+        assert queued.status_code == 202, queued.text
+        async with factory() as other:
+            assert await other.get(Job, uuid.UUID(queued.json()["job_id"])) is not None
+
+        _, files, manifest = build_package()
+        started = await start(api, project, manifest)
+        version = started.json()["id"]
+        assert await seen_status(version) is ModelVersionStatus.UPLOADING
+
+        first = next(iter(files))
+        assert (await put_part(api, project, version, first, files[first])).status_code == 200
+        async with factory() as other:
+            stored = (
+                (
+                    await other.execute(
+                        select(ModelPart.path).where(ModelPart.version_id == uuid.UUID(version))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert stored == [first]
+
+        await upload_all(api, project, version, files, skip=first)
+        assert (await api.post(f"{base}/versions/{version}/commit")).status_code == 200
+        assert await seen_status(version) is ModelVersionStatus.CANDIDATE
+        assert (await api.post(f"{base}/versions/{version}/approve", json={})).status_code == 200
+        assert await seen_status(version) is ModelVersionStatus.APPROVED
+
+        # Отмена выгрузки: незавершённая версия другого проекта удаляется насовсем.
+        other_project = await new_project(api)
+        draft = (await start(api, other_project, manifest)).json()["id"]
+        assert await seen_status(draft) is ModelVersionStatus.UPLOADING
+        deleted = await api.delete(f"/api/v1/projects/{other_project}/model/versions/{draft}")
+        assert deleted.status_code == 204
+        assert await seen_status(draft) is None
