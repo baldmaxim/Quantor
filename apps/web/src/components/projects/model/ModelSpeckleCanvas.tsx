@@ -14,9 +14,13 @@ interface IModelSpeckleCanvasProps {
   readonly hiddenDisciplines: ReadonlySet<string>;
   readonly selectedId: string | null;
   readonly colorByCategory: boolean;
+  /** Показать только этажи с номером не выше этого; `null` - все (режим «весь дом»). */
+  readonly maxLevel?: number | null;
+  /** Разнос этажей по вертикали, метров на этаж. */
+  readonly storeyOffset?: number;
   /** Команда «Вписать»: счётчик, чтобы повторное нажатие не терялось. */
   readonly fitSeq: number;
-  readonly onPick: (id: string | null) => void;
+  readonly onPick: (id: string | null, group: string | null) => void;
   /** Просмотрщик не запустился (нет WebGL) или часть не разобрана. */
   readonly onError: (message: string) => void;
 }
@@ -32,6 +36,8 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   hiddenDisciplines,
   selectedId,
   colorByCategory,
+  maxLevel = null,
+  storeyOffset = 0,
   fitSeq,
   onPick,
   onError,
@@ -55,7 +61,7 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
     let cancelled = false;
     let created: ISpeckleModelViewer | null = null;
     createSpeckleModelViewer(element, {
-      onPick: (id) => handlers.current.onPick(id),
+      onPick: (id, group) => handlers.current.onPick(id, group),
       onError: (message) => handlers.current.onError(message),
     })
       .then((viewer) => {
@@ -102,6 +108,14 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   useEffect(() => {
     view?.setColorByCategory(colorByCategory);
   }, [view, colorByCategory]);
+
+  useEffect(() => {
+    view?.setMaxLevel(maxLevel);
+  }, [view, maxLevel, partsKey]);
+
+  useEffect(() => {
+    view?.setStoreyOffset(storeyOffset);
+  }, [view, storeyOffset, partsKey]);
 
   useEffect(() => {
     if (fitSeq > 0) view?.fit();

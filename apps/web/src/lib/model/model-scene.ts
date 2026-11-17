@@ -24,6 +24,10 @@ export interface IModelPartInput {
   readonly key: string;
   readonly discipline: string;
   readonly buffer: ArrayBuffer;
+  /** Этаж части (storey_key): по нему просмотрщик Speckle разносит и скрывает этажи. */
+  readonly group?: string;
+  /** Номер этажа снизу вверх (0 - нижний). */
+  readonly level?: number;
 }
 
 export interface IModelViewerColors {

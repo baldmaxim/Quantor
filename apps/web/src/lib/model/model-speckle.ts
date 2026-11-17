@@ -72,6 +72,18 @@ const meshOf = (node: THREE.Object3D): IMeshData | null => {
   return faces.length > 0 ? { vertices, faces } : null;
 };
 
+/** Категория элемента из имени материала GLB (`cat:<категория>`): свойства для неё не нужны. */
+const categoryOf = (node: THREE.Object3D): string | null => {
+  let found: string | null = null;
+  node.traverse((object) => {
+    if (found !== null || !(object instanceof THREE.Mesh)) return;
+    const material = Array.isArray(object.material) ? object.material[0] : object.material;
+    const name = (material as THREE.Material | undefined)?.name ?? '';
+    if (name.startsWith('cat:')) found = name.slice(4);
+  });
+  return found;
+};
+
 /** Узлы элементов части: ближайшие к корню узлы с именем (GlobalId), сам корень не считается. */
 const elementNodes = (root: THREE.Object3D): THREE.Object3D[] => {
   const found: THREE.Object3D[] = [];
@@ -89,20 +101,30 @@ const elementNodes = (root: THREE.Object3D): THREE.Object3D[] => {
  * Часть пакета (разобранная сцена GLB) -> объекты Speckle. Элементы без геометрии пропускаются;
  * свойства берутся из `elements`, если часть элементов загружена.
  */
+export interface IPartOptions {
+  /** Только эти категории (остальные пропускаются): лёгкий вид всего здания. `null` - все. */
+  readonly categories?: ReadonlySet<string> | null;
+  /** Этаж части (storey_key): пишется в элемент, чтобы щелчок знал, из какого он этажа. */
+  readonly group?: string;
+}
+
 export const partToSpeckle = (
   partKey: string,
   discipline: string,
   scene: THREE.Object3D,
   elements: ReadonlyMap<string, IModelElement> | null,
+  options: IPartOptions = {},
 ): ISpeckleResource => {
   const objects: ISpeckleObject[] = [];
   const speckleIds = new Map<string, string>();
   const refs: Array<{ speckle_type: string; referencedId: string }> = [];
   const closure: Record<string, number> = {};
   for (const node of elementNodes(scene)) {
+    const info = elements?.get(node.name);
+    const category = info?.category ?? categoryOf(node);
+    if (options.categories && category !== null && !options.categories.has(category)) continue;
     const mesh = meshOf(node);
     if (mesh === null) continue;
-    const info = elements?.get(node.name);
     const id = speckleIdOf(partKey, node.name);
     const meshId = `${id}:mesh`;
     objects.push(
@@ -119,7 +141,8 @@ export const partToSpeckle = (
         speckle_type: 'Base',
         name: info?.name ?? node.name,
         applicationId: node.name,
-        category: info?.category ?? null,
+        category,
+        storeyKey: options.group ?? null,
         ifcClass: info?.ifc_class ?? null,
         type: info?.type ?? null,
         discipline: info?.discipline ?? discipline,
@@ -145,10 +168,15 @@ export const partToSpeckle = (
 };
 
 export interface ISpeckleViewerOptions {
-  /** Щелчок: GlobalId элемента или `null` по пустому месту. */
-  readonly onPick: (id: string | null) => void;
+  /** Щелчок: GlobalId элемента и этаж его части, либо `null` по пустому месту. */
+  readonly onPick: (id: string | null, group: string | null) => void;
   /** Часть не разобрана или просмотрщик не запустился. */
   readonly onError: (message: string) => void;
+}
+
+export interface ISetContentOptions extends IPartOptions {
+  /** Ход загрузки: сколько частей из скольких уже в просмотрщике. */
+  readonly onProgress?: (done: number, total: number) => void;
 }
 
 export interface ISpeckleModelViewer {
@@ -156,8 +184,13 @@ export interface ISpeckleModelViewer {
   setContent: (
     parts: readonly IModelPartInput[],
     elements: ReadonlyMap<string, IModelElement> | null,
+    options?: ISetContentOptions,
   ) => Promise<boolean>;
   setDisciplineVisible: (discipline: string, visible: boolean) => void;
+  /** Показать только этажи с номером не выше `level`; `null` - все. */
+  setMaxLevel: (level: number | null) => void;
+  /** Разнос этажей по вертикали: на сколько метров поднят каждый следующий этаж. */
+  setStoreyOffset: (meters: number) => void;
   select: (id: string | null) => void;
   setColorByCategory: (enabled: boolean) => void;
   fit: () => void;
@@ -194,21 +227,42 @@ export const createSpeckleModelViewer = async (
   const selection = viewer.createExtension(speckle.SelectionExtension);
   const filtering = viewer.createExtension(speckle.FilteringExtension);
 
+  /** Загруженная часть: что она значит для видимости и разноса. */
+  interface ILoadedGroup {
+    readonly discipline: string;
+    readonly level: number;
+    readonly ids: readonly string[];
+  }
+
   const gltf = new GLTFLoader();
   const hidden = new Set<string>();
-  const byDiscipline = new Map<string, string[]>();
+  const groups: ILoadedGroup[] = [];
   const speckleIds = new Map<string, string>();
+  const levelOf = new Map<string, number>();
   let resources: string[] = [];
+  let maxLevel: number | null = null;
+  let offsetMeters = 0;
   let colorByCategory = false;
   let generation = 0;
   let disposed = false;
 
   const applyVisibility = (): void => {
-    for (const [discipline, ids] of byDiscipline) {
-      if (hidden.has(discipline)) filtering.hideObjects(ids, undefined, false);
-      else filtering.showObjects(ids, undefined, false);
+    for (const group of groups) {
+      const off = hidden.has(group.discipline) || (maxLevel !== null && group.level > maxLevel);
+      if (off) filtering.hideObjects([...group.ids], undefined, false);
+      else filtering.showObjects([...group.ids], undefined, false);
     }
     viewer.requestRender();
+  };
+
+  /** Разнос этажей: каждый объект поднимается на номер своего этажа, умноженный на шаг. */
+  const applyOffset = (): void => {
+    for (const object of viewer.getRenderer().getObjects()) {
+      const level = levelOf.get(object.renderView.renderData.id.replace(/:mesh$/, ''));
+      if (level === undefined) continue;
+      object.transformTRS({ x: 0, y: 0, z: level * offsetMeters }, undefined, undefined, undefined);
+    }
+    viewer.requestRender(speckle.UpdateFlags.RENDER_RESET | speckle.UpdateFlags.SHADOWS);
   };
 
   const applyColors = async (): Promise<void> => {
@@ -225,28 +279,29 @@ export const createSpeckleModelViewer = async (
   viewer.on(ViewerEvent.ObjectClicked, (event) => {
     const hit = event?.hits[0];
     if (hit === undefined) {
-      options.onPick(null);
+      options.onPick(null, null);
       return;
     }
     for (let node: typeof hit.node | null = hit.node; node; node = node.parent ?? null) {
-      const raw = node.model?.raw as { applicationId?: unknown } | undefined;
+      const raw = node.model?.raw as { applicationId?: unknown; storeyKey?: unknown } | undefined;
       if (typeof raw?.applicationId === 'string') {
-        options.onPick(raw.applicationId);
+        options.onPick(raw.applicationId, typeof raw.storeyKey === 'string' ? raw.storeyKey : null);
         return;
       }
     }
-    options.onPick(null);
+    options.onPick(null, null);
   });
 
   const unloadAll = async (): Promise<void> => {
     const previous = resources;
     resources = [];
-    byDiscipline.clear();
+    groups.length = 0;
     speckleIds.clear();
+    levelOf.clear();
     for (const resource of previous) await viewer.unloadObject(resource);
   };
 
-  const setContent: ISpeckleModelViewer['setContent'] = async (parts, elements) => {
+  const setContent: ISpeckleModelViewer['setContent'] = async (parts, elements, content = {}) => {
     generation += 1;
     const token = generation;
     await unloadAll();
@@ -256,7 +311,10 @@ export const createSpeckleModelViewer = async (
       let resource: ISpeckleResource;
       try {
         const parsed = await gltf.parseAsync(part.buffer, '');
-        resource = partToSpeckle(part.key, part.discipline, parsed.scene, elements);
+        resource = partToSpeckle(part.key, part.discipline, parsed.scene, elements, {
+          ...content,
+          group: part.group,
+        });
       } catch {
         options.onError('Часть модели не удалось разобрать.');
         continue;
@@ -265,16 +323,20 @@ export const createSpeckleModelViewer = async (
       const loader = new MemoryLoader(viewer.getWorldTree(), resource.objects, resource.resource);
       await viewer.loadObject(loader, false);
       resources.push(resource.resource);
-      const ids = byDiscipline.get(part.discipline) ?? [];
+      const level = part.level ?? 0;
+      const ids: string[] = [];
       for (const [elementId, id] of resource.speckleIds) {
         ids.push(id);
         speckleIds.set(elementId, id);
+        levelOf.set(id, level);
       }
-      byDiscipline.set(part.discipline, ids);
+      groups.push({ discipline: part.discipline, level, ids });
       loaded = true;
+      content.onProgress?.(resources.length, parts.length);
     }
     if (disposed || token !== generation) return loaded;
     applyVisibility();
+    if (offsetMeters !== 0) applyOffset();
     await applyColors();
     if (loaded) camera.setCameraView(undefined, FIT_TRANSITION);
     return loaded;
@@ -286,6 +348,14 @@ export const createSpeckleModelViewer = async (
       if (visible) hidden.delete(discipline);
       else hidden.add(discipline);
       applyVisibility();
+    },
+    setMaxLevel: (level) => {
+      maxLevel = level;
+      applyVisibility();
+    },
+    setStoreyOffset: (meters) => {
+      offsetMeters = meters;
+      applyOffset();
     },
     select: (id) => {
       const target = id === null ? undefined : speckleIds.get(id);

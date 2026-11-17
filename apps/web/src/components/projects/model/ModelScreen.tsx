@@ -32,6 +32,9 @@ interface IModelScreenProps {
 const geometryOf = (parts: readonly ModelPartRead[], storeyKey: string): ModelPartRead[] =>
   parts.filter((part) => part.kind === 'geometry' && part.storey_key === storeyKey);
 
+const NO_HIDDEN: ReadonlySet<string> = new Set();
+const MAX_OFFSET_M = 12;
+
 const SIDE = 'flex min-h-0 min-w-0 flex-col gap-[var(--s-4)] overflow-y-auto p-[var(--s-4)]';
 
 /**
@@ -54,6 +57,15 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   /** Запасной простой просмотр: на случай, если просмотрщик Speckle не запустился. */
   const [simpleViewer, setSimpleViewer] = useState(false);
   const [colorByCategory, setColorByCategory] = useState(false);
+  /** «Весь дом»: все этажи сразу; «Один этаж»: этаж со всеми дисциплинами и свойствами. */
+  const [viewMode, setViewMode] = useState<'house' | 'storey'>('house');
+  const [houseDisciplines, setHouseDisciplines] = useState<ReadonlySet<string>>(
+    new Set(['ARCH']),
+  );
+  const [maxLevel, setMaxLevel] = useState<number | null>(null);
+  const [storeyOffset, setStoreyOffset] = useState(0);
+  /** Этаж последнего выбранного элемента: из его файла берутся свойства. */
+  const [pickedStorey, setPickedStorey] = useState<string | null>(null);
 
   const data = detail.data ?? null;
   const storeys = data?.storeys ?? [];
@@ -67,16 +79,70 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
     () => (storey !== null ? geometryOf(parts, storey.storey_key) : []),
     [parts, storey],
   );
+  const house = viewMode === 'house' && !simpleViewer;
+  const byElevation = useMemo(
+    () => [...storeys].sort((a, b) => a.elevation_mm - b.elevation_mm),
+    [storeys],
+  );
+  const levelOf = useMemo(
+    () => new Map(byElevation.map((item, index) => [item.storey_key, index])),
+    [byElevation],
+  );
+  const allDisciplines = useMemo(
+    () => [
+      ...new Set(
+        parts.filter((part) => part.kind === 'geometry').map((part) => part.discipline ?? ''),
+      ),
+    ].sort(),
+    [parts],
+  );
+  // Весь дом: геометрия включённых дисциплин по всем этажам, снизу вверх.
+  const houseGeometry = useMemo(() => {
+    const enabled = allDisciplines.some((code) => houseDisciplines.has(code))
+      ? houseDisciplines
+      : new Set(allDisciplines);
+    return parts
+      .filter(
+        (part) =>
+          part.kind === 'geometry' &&
+          part.storey_key !== null &&
+          part.storey_key !== undefined &&
+          enabled.has(part.discipline ?? ''),
+      )
+      .sort(
+        (a, b) =>
+          (levelOf.get(a.storey_key ?? '') ?? 0) - (levelOf.get(b.storey_key ?? '') ?? 0) ||
+          (a.discipline ?? '').localeCompare(b.discipline ?? ''),
+      );
+  }, [parts, allDisciplines, houseDisciplines, levelOf]);
+  const wantedGeometry = house ? houseGeometry : geometryParts;
+  const propsStoreyKey = house ? (pickedStorey ?? storey?.storey_key) : storey?.storey_key;
   const elementsPart =
-    parts.find((part) => part.kind === 'elements' && part.storey_key === storey?.storey_key) ??
-    null;
-  const geometry = useStoreyGeometry(projectId, data?.id ?? null, geometryParts);
+    parts.find((part) => part.kind === 'elements' && part.storey_key === propsStoreyKey) ?? null;
+  const geometry = useStoreyGeometry(projectId, data?.id ?? null, wantedGeometry);
   const elements = useStoreyElements(projectId, data?.id ?? null, elementsPart);
-  // Просмотрщик Speckle собирает объекты вместе со свойствами: ждём элементы, чтобы не грузить дважды.
-  const propertiesPending = elementsPart !== null && elements.isPending;
+  // Один этаж: просмотрщик собирает объекты вместе со свойствами, ждём элементы, чтобы не грузить
+  // дважды. Весь дом: свойства не нужны (категория берётся из геометрии), их грузят по щелчку.
+  const propertiesPending = !house && elementsPart !== null && elements.isPending;
+  const partMeta = useMemo(
+    () =>
+      new Map(
+        wantedGeometry.map((part) => [
+          part.sha256,
+          {
+            group: part.storey_key ?? undefined,
+            level: levelOf.get(part.storey_key ?? '') ?? 0,
+          },
+        ]),
+      ),
+    [wantedGeometry, levelOf],
+  );
   const viewerParts: IModelPartInput[] = useMemo(
-    () => (propertiesPending && !simpleViewer ? [] : [...geometry.parts]),
-    [geometry.parts, propertiesPending, simpleViewer],
+    () =>
+      propertiesPending && !simpleViewer
+        ? []
+        : geometry.parts.map((part) => ({ ...part, ...partMeta.get(part.key) })),
+    [geometry.parts, partMeta, propertiesPending, simpleViewer],
   );
   const disciplines = useMemo(
     () => [...new Set(geometryParts.map((part) => part.discipline ?? ''))].sort(),
@@ -123,6 +189,8 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
               setChosen(event.target.value);
               setStoreyChoice(null);
               setSelectedId(null);
+              setPickedStorey(null);
+              setMaxLevel(null);
             }}
           >
             {items.map((item) => (
@@ -156,6 +224,64 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
             )}
           </div>
         )}
+        {data && (
+          <fieldset className="flex flex-col gap-[var(--s-2)]">
+            <legend className="mb-[var(--s-1)] text-xs text-muted">Показ</legend>
+            <label className="flex items-center gap-[var(--s-2)] text-sm">
+              <input
+                type="radio"
+                name="model-view-mode"
+                checked={viewMode === 'house'}
+                onChange={() => {
+                  setViewMode('house');
+                  setSelectedId(null);
+                }}
+              />
+              Весь дом
+            </label>
+            <label className="flex items-center gap-[var(--s-2)] text-sm">
+              <input
+                type="radio"
+                name="model-view-mode"
+                checked={viewMode === 'storey'}
+                onChange={() => {
+                  setViewMode('storey');
+                  setSelectedId(null);
+                }}
+              />
+              Один этаж
+            </label>
+            {house && byElevation.length > 1 && (
+              <>
+                <label className="flex flex-col gap-[var(--s-1)] text-xs text-muted">
+                  Этажи снизу до: {byElevation[maxLevel ?? byElevation.length - 1]?.name ?? 'все'}
+                  <input
+                    type="range"
+                    min={0}
+                    max={byElevation.length - 1}
+                    step={1}
+                    value={maxLevel ?? byElevation.length - 1}
+                    onChange={(event) => {
+                      const level = Number(event.target.value);
+                      setMaxLevel(level >= byElevation.length - 1 ? null : level);
+                    }}
+                  />
+                </label>
+                <label className="flex flex-col gap-[var(--s-1)] text-xs text-muted">
+                  Разнести этажи: {storeyOffset} м
+                  <input
+                    type="range"
+                    min={0}
+                    max={MAX_OFFSET_M}
+                    step={0.5}
+                    value={storeyOffset}
+                    onChange={(event) => setStoreyOffset(Number(event.target.value))}
+                  />
+                </label>
+              </>
+            )}
+          </fieldset>
+        )}
         {detail.isPending && versionId !== null && <SkeletonRows rows={4} />}
         {detail.isError && (
           <ErrorState title="Версию не удалось открыть" code={extractCode(detail.error)} />
@@ -172,6 +298,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                     onClick={() => {
                       setStoreyChoice(item.storey_key);
                       setSelectedId(null);
+                      if (house) setMaxLevel(levelOf.get(item.storey_key) ?? null);
                     }}
                     className={`flex w-full items-baseline justify-between gap-[var(--s-2)] rounded-[var(--radius-sm)] border px-[var(--s-2)] py-[var(--s-2)] text-left text-sm ${
                       active
@@ -191,7 +318,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
         )}
       </aside>
 
-      <section className="relative flex min-h-0 min-w-0 flex-col" aria-label="3D этажа">
+      <section className="relative flex min-h-0 min-w-0 flex-col" aria-label="3D модели">
         {storey === null ? (
           <EmptyState title="В версии нет этажей с геометрией" compact />
         ) : (
@@ -208,12 +335,17 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
             ) : (
               <ModelSpeckleCanvas
                 parts={viewerParts}
-                elements={elements.data ?? null}
-                hiddenDisciplines={hidden}
+                elements={house ? null : (elements.data ?? null)}
+                hiddenDisciplines={house ? NO_HIDDEN : hidden}
                 selectedId={selectedId}
                 colorByCategory={colorByCategory}
+                maxLevel={house ? maxLevel : null}
+                storeyOffset={house ? storeyOffset : 0}
                 fitSeq={fitSeq}
-                onPick={setSelectedId}
+                onPick={(id, group) => {
+                  setSelectedId(id);
+                  if (house && group !== null) setPickedStorey(group);
+                }}
                 onError={setViewerError}
               />
             )}
@@ -231,22 +363,26 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
       </section>
 
       <aside className={`${SIDE} border-l border-border`} aria-label="Слои и свойства">
-        {disciplines.length > 0 && (
+        {(house ? allDisciplines : disciplines).length > 0 && (
           <fieldset className="flex flex-col gap-[var(--s-2)]">
-            <legend className="mb-[var(--s-1)] text-xs text-muted">Дисциплины</legend>
-            {disciplines.map((code) => (
+            <legend className="mb-[var(--s-1)] text-xs text-muted">
+              {house ? 'Дисциплины (подгружаются по галочке)' : 'Дисциплины'}
+            </legend>
+            {(house ? allDisciplines : disciplines).map((code) => (
               <label key={code} className="flex items-center gap-[var(--s-2)] text-sm">
                 <input
                   type="checkbox"
-                  checked={!hidden.has(code)}
-                  onChange={(event) =>
-                    setHidden((previous) => {
+                  checked={house ? houseDisciplines.has(code) : !hidden.has(code)}
+                  onChange={(event) => {
+                    const setter = house ? setHouseDisciplines : setHidden;
+                    const on = house ? event.target.checked : !event.target.checked;
+                    setter((previous) => {
                       const next = new Set(previous);
-                      if (event.target.checked) next.delete(code);
-                      else next.add(code);
+                      if (on) next.add(code);
+                      else next.delete(code);
                       return next;
-                    })
-                  }
+                    });
+                  }}
                 />
                 {code}
               </label>
@@ -289,6 +425,10 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
               ))}
             </dl>
           </section>
+        ) : selectedId !== null && elements.isFetching ? (
+          <p role="status" className="text-xs text-muted">
+            Загрузка свойств…
+          </p>
         ) : (
           <p className="text-xs text-muted">Щёлкните по элементу, чтобы увидеть его свойства.</p>
         )}

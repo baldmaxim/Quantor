@@ -11,6 +11,8 @@ vi.mock('@/lib/model/model-speckle', () => ({ createSpeckleModelViewer: vi.fn() 
 const fakeViewer = (): ISpeckleModelViewer => ({
   setContent: vi.fn(() => Promise.resolve(true)),
   setDisciplineVisible: vi.fn(),
+  setMaxLevel: vi.fn(),
+  setStoreyOffset: vi.fn(),
   select: vi.fn(),
   setColorByCategory: vi.fn(),
   fit: vi.fn(),
@@ -62,6 +64,16 @@ describe('холст Speckle: перезагрузка содержимого', 
     expect(viewer.select).toHaveBeenLastCalledWith('gid-1');
     view.rerender(<ModelSpeckleCanvas {...props([part('a')])} colorByCategory />);
     expect(viewer.setColorByCategory).toHaveBeenLastCalledWith(true);
+    expect(viewer.setContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('показ до этажа и разнос передаются просмотрщику без перезагрузки', async () => {
+    const view = await mounted([part('a')]);
+    view.rerender(<ModelSpeckleCanvas {...props([part('a')])} maxLevel={3} storeyOffset={2.5} />);
+    expect(viewer.setMaxLevel).toHaveBeenLastCalledWith(3);
+    expect(viewer.setStoreyOffset).toHaveBeenLastCalledWith(2.5);
+    view.rerender(<ModelSpeckleCanvas {...props([part('a')])} maxLevel={null} />);
+    expect(viewer.setMaxLevel).toHaveBeenLastCalledWith(null);
     expect(viewer.setContent).toHaveBeenCalledTimes(1);
   });
 

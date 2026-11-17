@@ -106,6 +106,35 @@ describe('часть пакета -> объекты Speckle', () => {
     expect(partToSpeckle('k', 'ARCH', scene, null).speckleIds.has('inner')).toBe(true);
   });
 
+  it('категория берётся из имени материала GLB, если свойств нет', () => {
+    const scene = new THREE.Group();
+    const wallNode = node('w1', triangle(true));
+    ((wallNode.children[0] as THREE.Mesh).material as THREE.Material).name = 'cat:wall';
+    scene.add(wallNode);
+    const element = partToSpeckle('k', 'ARCH', scene, null).objects.find((item) => item.id === 'k:w1');
+    expect(element?.category).toBe('wall');
+  });
+
+  it('фильтр категорий пропускает остальные элементы', () => {
+    const scene = new THREE.Group();
+    const wallNode = node('w1', triangle(true));
+    const chairNode = node('c1', triangle(true));
+    ((wallNode.children[0] as THREE.Mesh).material as THREE.Material).name = 'cat:wall';
+    ((chairNode.children[0] as THREE.Mesh).material as THREE.Material).name = 'cat:furniture';
+    scene.add(wallNode, chairNode);
+    const result = partToSpeckle('k', 'ARCH', scene, null, { categories: new Set(['wall']) });
+    expect([...result.speckleIds.keys()]).toEqual(['w1']);
+  });
+
+  it('этаж части записывается в элемент: по щелчку видно, из какого он этажа', () => {
+    const scene = new THREE.Group();
+    scene.add(node('a', triangle(true)));
+    const element = partToSpeckle('k', 'ARCH', scene, null, { group: 'storey-7' }).objects.find(
+      (item) => item.id === 'k:a',
+    );
+    expect(element?.storeyKey).toBe('storey-7');
+  });
+
   it('одинаковый GlobalId в разных частях получает разные id объектов', () => {
     expect(speckleIdOf('part1', 'gid')).not.toBe(speckleIdOf('part2', 'gid'));
   });
