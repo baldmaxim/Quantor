@@ -208,10 +208,7 @@ export const partSignature = (part: IModelPartInput): string =>
  * дисциплина), а не заменяется другим. Тогда вид, который смотрит человек, камера не сбрасывает;
  * переход «весь дом» ↔ «один этаж» или к другому этажу - другой набор, камера вписывается заново.
  */
-export const sameGroups = (
-  loaded: Iterable<string>,
-  wanted: Iterable<string>,
-): boolean => {
+export const sameGroups = (loaded: Iterable<string>, wanted: Iterable<string>): boolean => {
   const have = new Set(loaded);
   const want = new Set(wanted);
   return have.size > 0 && have.size === want.size && [...want].every((group) => have.has(group));
