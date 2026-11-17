@@ -13,6 +13,7 @@ import {
   type ModelVersionList,
 } from '@quantor/api-client';
 import {
+  keepPreviousData,
   useMutation,
   useQueries,
   useQuery,
@@ -30,12 +31,18 @@ export const modelKeys = {
   versions: (projectId: string) => ['model', projectId, 'versions'] as const,
   version: (projectId: string, versionId: string) =>
     ['model', projectId, 'version', versionId] as const,
-  part: (projectId: string, versionId: string, sha256: string) =>
-    ['model', projectId, versionId, 'part', sha256] as const,
-  elements: (projectId: string, versionId: string, sha256: string) =>
-    ['model', projectId, versionId, 'elements', sha256] as const,
+  // Часть пакета неизменяема и определяется sha256: у новой версии те же части (неизменившиеся
+  // дисциплины) берутся из кэша, а не скачиваются заново.
+  part: (projectId: string, _versionId: string, sha256: string) =>
+    ['model', projectId, 'part', sha256] as const,
+  elements: (projectId: string, _versionId: string, sha256: string) =>
+    ['model', projectId, 'elements', sha256] as const,
   import: (projectId: string) => ['model', projectId, 'import'] as const,
 };
+
+/** Живой вид: как часто страница спрашивает портал о новых версиях и ходе сборки (вкладка в фоне не опрашивает). */
+const LIVE_POLL_MS = 8000;
+const BUILD_POLL_MS = 3000;
 
 const retryOnNetwork = (count: number, error: Error): boolean =>
   extractCode(error) === 'NETWORK_ERROR' && count < 2;
@@ -47,7 +54,8 @@ export const useModelVersions = (
   useQuery({
     queryKey: modelKeys.versions(projectId),
     enabled,
-    staleTime: 30_000,
+    staleTime: LIVE_POLL_MS,
+    refetchInterval: LIVE_POLL_MS,
     queryFn: async () =>
       unwrap(await listModelVersions({ throwOnError: true, path: { project_id: projectId } })),
     retry: retryOnNetwork,
@@ -61,6 +69,8 @@ export const useModelVersion = (
     queryKey: modelKeys.version(projectId, versionId ?? ''),
     enabled: versionId !== null,
     staleTime: 30_000,
+    // Новая версия открывается поверх прежней, а не пустым экраном: живой вид не мигает.
+    placeholderData: keepPreviousData,
     queryFn: async () =>
       unwrap(
         await readModelVersion({
@@ -175,7 +185,6 @@ export const useApproveModelVersion = (
   });
 };
 
-const IMPORT_POLL_MS = 3000;
 
 /** Новейшее задание «Модель из IFC» проекта; `null`, пока ни одного не ставили. */
 export const useModelImport = (
@@ -187,7 +196,7 @@ export const useModelImport = (
     enabled,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === 'queued' || status === 'running' ? IMPORT_POLL_MS : false;
+      return status === 'queued' || status === 'running' ? BUILD_POLL_MS : LIVE_POLL_MS;
     },
     queryFn: async () => {
       try {

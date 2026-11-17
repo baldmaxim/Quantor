@@ -18,6 +18,10 @@ export const pickVersion = (items: readonly ModelVersionRead[]): string | null =
   return items.find((item) => item.status !== 'uploading')?.id ?? null;
 };
 
+/** Новейшая законченная выгрузка (список приходит новыми первыми): за ней следит живой вид. */
+export const newestVersion = (items: readonly ModelVersionRead[]): string | null =>
+  items.find((item) => item.status !== 'uploading')?.id ?? null;
+
 export interface IImportView {
   readonly label: string;
   readonly tone: StatusTone;

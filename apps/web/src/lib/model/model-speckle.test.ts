@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
 import type { IModelElement } from './model-elements';
-import { partToSpeckle, speckleIdOf } from './model-speckle';
+import { partSignature, partToSpeckle, planContentUpdate, speckleIdOf } from './model-speckle';
 
 const triangle = (indexed: boolean): THREE.BufferGeometry => {
   const geometry = new THREE.BufferGeometry();
@@ -139,5 +139,39 @@ describe('часть пакета -> объекты Speckle', () => {
 
   it('одинаковый GlobalId в разных частях получает разные id объектов', () => {
     expect(speckleIdOf('part1', 'gid')).not.toBe(speckleIdOf('part2', 'gid'));
+  });
+});
+
+describe('обновление содержимого просмотрщика', () => {
+  const sig = (...entries: Array<[string, string]>): Map<string, string> => new Map(entries);
+
+  it('неизменившиеся части остаются, новые добавляются, ушедшие выгружаются', () => {
+    const plan = planContentUpdate(
+      sig(['a', 'ARCH|s1|0'], ['b', 'ARCH|s2|1'], ['c', 'PL|s1|0']),
+      sig(['a', 'ARCH|s1|0'], ['b2', 'ARCH|s2|1'], ['c', 'PL|s1|0']),
+      false,
+    );
+    expect(plan).toEqual({ remove: ['b'], add: ['b2'], kept: 2 });
+  });
+
+  it('та же часть с другой подписью (другой этаж) грузится заново', () => {
+    const plan = planContentUpdate(sig(['a', 'ARCH|s1|0']), sig(['a', 'ARCH|s2|1']), false);
+    expect(plan).toEqual({ remove: ['a'], add: ['a'], kept: 0 });
+  });
+
+  it('полная замена выгружает и грузит всё, что нужно', () => {
+    const plan = planContentUpdate(sig(['a', 'x'], ['b', 'y']), sig(['a', 'x'], ['b', 'y']), true);
+    expect(plan).toEqual({ remove: ['a', 'b'], add: ['a', 'b'], kept: 0 });
+  });
+
+  it('пустой просмотрщик заполняется всеми частями в порядке запроса', () => {
+    const plan = planContentUpdate(sig(), sig(['b', 'x'], ['a', 'y']), false);
+    expect(plan).toEqual({ remove: [], add: ['b', 'a'], kept: 0 });
+  });
+
+  it('подпись части: дисциплина, этаж и уровень', () => {
+    const buffer = new ArrayBuffer(1);
+    expect(partSignature({ key: 'k', discipline: 'KR', buffer, group: 's3', level: 2 })).toBe('KR|s3|2');
+    expect(partSignature({ key: 'k', discipline: 'KR', buffer })).toBe('KR||0');
   });
 });

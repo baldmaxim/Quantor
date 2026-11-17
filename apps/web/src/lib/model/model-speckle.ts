@@ -197,6 +197,40 @@ export interface ISpeckleModelViewer {
   dispose: () => void;
 }
 
+/** Подпись части: если она изменилась у той же части (другой этаж, дисциплина), её грузят заново. */
+export const partSignature = (part: IModelPartInput): string =>
+  `${part.discipline}|${part.group ?? ''}|${part.level ?? 0}`;
+
+export interface IContentPlan {
+  /** Ключи загруженных частей, которые надо выгрузить. */
+  readonly remove: readonly string[];
+  /** Ключи частей, которые надо загрузить, в порядке `wanted`. */
+  readonly add: readonly string[];
+  /** Сколько прежних частей остаётся на месте. */
+  readonly kept: number;
+}
+
+/**
+ * Что сделать, чтобы из загруженного получить нужное. Неизменившиеся части (тот же sha256 и та же
+ * подпись) остаются: пуш одной дисциплины не перезагружает всё здание. `reloadAll` - полная замена
+ * (изменились свойства элементов или фильтр категорий).
+ */
+export const planContentUpdate = (
+  loaded: ReadonlyMap<string, string>,
+  wanted: ReadonlyMap<string, string>,
+  reloadAll: boolean,
+): IContentPlan => {
+  const remove: string[] = [];
+  let kept = 0;
+  for (const [key, signature] of loaded) {
+    if (!reloadAll && wanted.get(key) === signature) kept += 1;
+    else remove.push(key);
+  }
+  const removed = new Set(remove);
+  const add = [...wanted.keys()].filter((key) => !loaded.has(key) || removed.has(key));
+  return { remove, add, kept };
+};
+
 /** Просмотрщик на `@speckle/viewer`; библиотека подгружается здесь, а не при открытии страницы. */
 export const createSpeckleModelViewer = async (
   host: HTMLElement,
@@ -223,12 +257,17 @@ export const createSpeckleModelViewer = async (
 
   const viewer = new Viewer(host, { ...DefaultViewerParams, showStats: false, verbose: false });
   await viewer.init();
+  // Тени в просмотрщике не нужны: ни от солнца, ни «тень на земле» (и сборка кадра дешевле).
+  viewer.setLightConfiguration({ castShadow: false, shadowcatcher: false });
   const camera = viewer.createExtension(speckle.CameraController);
   const selection = viewer.createExtension(speckle.SelectionExtension);
   const filtering = viewer.createExtension(speckle.FilteringExtension);
 
-  /** Загруженная часть: что она значит для видимости и разноса. */
+  /** Загруженная часть: что она значит для видимости и разноса и как её выгрузить. */
   interface ILoadedGroup {
+    readonly key: string;
+    readonly resource: string;
+    readonly signature: string;
     readonly discipline: string;
     readonly level: number;
     readonly ids: readonly string[];
@@ -239,10 +278,11 @@ export const createSpeckleModelViewer = async (
   const groups: ILoadedGroup[] = [];
   const speckleIds = new Map<string, string>();
   const levelOf = new Map<string, number>();
-  let resources: string[] = [];
   let maxLevel: number | null = null;
   let offsetMeters = 0;
   let colorByCategory = false;
+  let lastElements: ReadonlyMap<string, IModelElement> | null = null;
+  let lastCategories = '';
   let generation = 0;
   let disposed = false;
 
@@ -292,22 +332,43 @@ export const createSpeckleModelViewer = async (
     options.onPick(null, null);
   });
 
-  const unloadAll = async (): Promise<void> => {
-    const previous = resources;
-    resources = [];
-    groups.length = 0;
-    speckleIds.clear();
-    levelOf.clear();
-    for (const resource of previous) await viewer.unloadObject(resource);
+  const unloadGroup = async (key: string): Promise<void> => {
+    const index = groups.findIndex((group) => group.key === key);
+    const group = groups[index];
+    if (group === undefined) return;
+    groups.splice(index, 1);
+    for (const [elementId, id] of [...speckleIds]) {
+      if (group.ids.includes(id)) speckleIds.delete(elementId);
+    }
+    for (const id of group.ids) levelOf.delete(id);
+    await viewer.unloadObject(group.resource);
   };
 
-  const setContent: ISpeckleModelViewer['setContent'] = async (parts, elements, content = {}) => {
-    generation += 1;
-    const token = generation;
-    await unloadAll();
-    let loaded = false;
-    for (const part of parts) {
-      if (disposed || token !== generation) return loaded;
+  const applyContent = async (
+    token: number,
+    parts: readonly IModelPartInput[],
+    elements: ReadonlyMap<string, IModelElement> | null,
+    content: ISetContentOptions,
+  ): Promise<boolean> => {
+    const categories = content.categories ? [...content.categories].sort().join(',') : '';
+    const reloadAll = elements !== lastElements || categories !== lastCategories;
+    lastElements = elements;
+    lastCategories = categories;
+    const wantedSignatures = new Set(parts.map(partSignature));
+    // Содержимое продолжается (те же этажи и дисциплины, обновились сами части): вид не трогаем.
+    const continuing = groups.some((group) => wantedSignatures.has(group.signature));
+    const plan = planContentUpdate(
+      new Map(groups.map((group) => [group.key, group.signature])),
+      new Map(parts.map((part) => [part.key, partSignature(part)])),
+      reloadAll,
+    );
+    for (const key of plan.remove) await unloadGroup(key);
+    const byKey = new Map(parts.map((part) => [part.key, part]));
+    let added = 0;
+    for (const key of plan.add) {
+      const part = byKey.get(key);
+      if (part === undefined) continue;
+      if (disposed || token !== generation) return groups.length > 0;
       let resource: ISpeckleResource;
       try {
         const parsed = await gltf.parseAsync(part.buffer, '');
@@ -319,10 +380,9 @@ export const createSpeckleModelViewer = async (
         options.onError('Часть модели не удалось разобрать.');
         continue;
       }
-      if (disposed || token !== generation) return loaded;
+      if (disposed || token !== generation) return groups.length > 0;
       const loader = new MemoryLoader(viewer.getWorldTree(), resource.objects, resource.resource);
       await viewer.loadObject(loader, false);
-      resources.push(resource.resource);
       const level = part.level ?? 0;
       const ids: string[] = [];
       for (const [elementId, id] of resource.speckleIds) {
@@ -330,16 +390,34 @@ export const createSpeckleModelViewer = async (
         speckleIds.set(elementId, id);
         levelOf.set(id, level);
       }
-      groups.push({ discipline: part.discipline, level, ids });
-      loaded = true;
-      content.onProgress?.(resources.length, parts.length);
+      groups.push({
+        key: part.key,
+        resource: resource.resource,
+        signature: partSignature(part),
+        discipline: part.discipline,
+        level,
+        ids,
+      });
+      added += 1;
+      content.onProgress?.(added, plan.add.length);
     }
-    if (disposed || token !== generation) return loaded;
+    if (disposed || token !== generation) return groups.length > 0;
     applyVisibility();
     if (offsetMeters !== 0) applyOffset();
     await applyColors();
-    if (loaded) camera.setCameraView(undefined, FIT_TRANSITION);
-    return loaded;
+    // Камеру вписываем, только когда показано другое содержимое (другой этаж, первая загрузка):
+    // обновление частей (пуш одной дисциплины) не должно сбрасывать вид, который смотрит человек.
+    if (added > 0 && !continuing) camera.setCameraView(undefined, FIT_TRANSITION);
+    return groups.length > 0;
+  };
+
+  let queue: Promise<unknown> = Promise.resolve();
+  const setContent: ISpeckleModelViewer['setContent'] = (parts, elements, content = {}) => {
+    generation += 1;
+    const token = generation;
+    const run = queue.then(() => applyContent(token, parts, elements, content));
+    queue = run.catch(() => undefined);
+    return run;
   };
 
   return {

@@ -83,6 +83,17 @@ describe('холст Speckle: перезагрузка содержимого', 
     await vi.waitFor(() => expect(viewer.setContent).toHaveBeenCalledTimes(2));
   });
 
+  it('пока части скачиваются, прежнее содержимое остаётся; потом - одно обновление', async () => {
+    const view = await mounted([part('a')]);
+    view.rerender(<ModelSpeckleCanvas {...props([part('a'), part('b')])} pending />);
+    view.rerender(<ModelSpeckleCanvas {...props([part('a'), part('b'), part('c')])} pending />);
+    await Promise.resolve();
+    expect(viewer.setContent).toHaveBeenCalledTimes(1);
+    view.rerender(<ModelSpeckleCanvas {...props([part('a'), part('b'), part('c')])} />);
+    await vi.waitFor(() => expect(viewer.setContent).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(viewer.setContent).mock.calls[1]?.[0]).toHaveLength(3);
+  });
+
   it('просмотрщик освобождается при размонтировании', async () => {
     const view = await mounted([part('a')]);
     view.unmount();

@@ -18,6 +18,8 @@ interface IModelSpeckleCanvasProps {
   readonly maxLevel?: number | null;
   /** Разнос этажей по вертикали, метров на этаж. */
   readonly storeyOffset?: number;
+  /** Новые части ещё скачиваются: прежнее содержимое остаётся, пока не придёт всё нужное. */
+  readonly pending?: boolean;
   /** Команда «Вписать»: счётчик, чтобы повторное нажатие не терялось. */
   readonly fitSeq: number;
   readonly onPick: (id: string | null, group: string | null) => void;
@@ -38,6 +40,7 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   colorByCategory,
   maxLevel = null,
   storeyOffset = 0,
+  pending = false,
   fitSeq,
   onPick,
   onError,
@@ -85,14 +88,14 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   }, []);
 
   useEffect(() => {
-    if (view === null) return;
+    if (view === null || pending) return;
     const current = state.current;
     for (const code of new Set(current.parts.map((part) => part.discipline))) {
       view.setDisciplineVisible(code, !current.hiddenDisciplines.has(code));
     }
     view.setColorByCategory(current.colorByCategory);
     void view.setContent(current.parts, elements).then(() => view.select(state.current.selectedId));
-  }, [view, partsKey, elements]);
+  }, [view, partsKey, elements, pending]);
 
   useEffect(() => {
     if (view === null) return;

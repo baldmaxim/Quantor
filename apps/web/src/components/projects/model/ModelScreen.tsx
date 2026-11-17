@@ -19,7 +19,7 @@ import {
   useStoreyGeometry,
 } from '@/lib/model/model-queries';
 import type { IModelPartInput } from '@/lib/model/model-scene';
-import { MODEL_STATUS, pickVersion } from '@/lib/model/model-versions';
+import { MODEL_STATUS, newestVersion, pickVersion } from '@/lib/model/model-versions';
 
 import { ModelImportPanel } from './ModelImportPanel';
 import { ModelSpeckleCanvas } from './ModelSpeckleCanvas';
@@ -43,9 +43,19 @@ const SIDE = 'flex min-h-0 min-w-0 flex-col gap-[var(--s-4)] overflow-y-auto p-[
  */
 export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   const versions = useModelVersions(projectId, true);
+  /** Выбранная вручную версия; `null` - живой вид, следящий за последней выгрузкой. */
   const [chosen, setChosen] = useState<string | null>(null);
   const items = versions.data?.items ?? [];
-  const versionId = chosen ?? pickVersion(items);
+  const latest = newestVersion(items);
+  const following = chosen === null;
+  const versionId = chosen ?? latest ?? pickVersion(items);
+  /** Новейшая версия, о которой человек уже знает: новее неё - показываем уведомление. */
+  const [acknowledged, setAcknowledged] = useState<string | null>(null);
+  if (acknowledged === null && latest !== null) setAcknowledged(latest);
+  const fresh =
+    following && latest !== null && acknowledged !== null && acknowledged !== latest
+      ? (items.find((item) => item.id === latest) ?? null)
+      : null;
   const detail = useModelVersion(projectId, versionId);
   const approve = useApproveModelVersion(projectId);
 
@@ -123,6 +133,8 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   // Один этаж: просмотрщик собирает объекты вместе со свойствами, ждём элементы, чтобы не грузить
   // дважды. Весь дом: свойства не нужны (категория берётся из геометрии), их грузят по щелчку.
   const propertiesPending = !house && elementsPart !== null && elements.isPending;
+  // Пока версия, части или свойства догружаются, холст держит прежний вид (нет мигания).
+  const updating = geometry.loading || propertiesPending || detail.isPlaceholderData;
   const partMeta = useMemo(
     () =>
       new Map(
@@ -138,10 +150,8 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   );
   const viewerParts: IModelPartInput[] = useMemo(
     () =>
-      propertiesPending && !simpleViewer
-        ? []
-        : geometry.parts.map((part) => ({ ...part, ...partMeta.get(part.key) })),
-    [geometry.parts, partMeta, propertiesPending, simpleViewer],
+      geometry.parts.map((part) => ({ ...part, ...partMeta.get(part.key) })),
+    [geometry.parts, partMeta],
   );
   const disciplines = useMemo(
     () => [...new Set(geometryParts.map((part) => part.discipline ?? ''))].sort(),
@@ -185,7 +195,9 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
             className="rounded-[var(--radius-sm)] border border-border bg-surface p-[var(--s-2)] text-sm text-fg"
             value={versionId}
             onChange={(event) => {
-              setChosen(event.target.value);
+              // Выбрана новейшая версия - снова следим за последней, иначе фиксируем выбор.
+              setChosen(event.target.value === latest ? null : event.target.value);
+              setAcknowledged(latest);
               setStoreyChoice(null);
               setSelectedId(null);
               setPickedStorey(null);
@@ -199,6 +211,30 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
             ))}
           </select>
         </label>
+        {following ? (
+          <span className="text-xs text-muted">Живой вид: показана последняя версия</span>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setChosen(null);
+              setAcknowledged(latest);
+            }}
+          >
+            Следить за последней
+          </Button>
+        )}
+        {fresh !== null && (
+          <div
+            role="status"
+            className="flex items-center justify-between gap-[var(--s-2)] rounded-[var(--radius-sm)] border border-accent p-[var(--s-2)] text-xs"
+          >
+            <span>Модель обновилась: версия № {fresh.number}</span>
+            <Button variant="ghost" onClick={() => setAcknowledged(latest)}>
+              Понятно
+            </Button>
+          </div>
+        )}
         {data && status && (
           <div className="flex flex-col gap-[var(--s-2)] text-xs text-muted">
             <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
@@ -340,6 +376,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                 colorByCategory={colorByCategory}
                 maxLevel={house ? maxLevel : null}
                 storeyOffset={house ? storeyOffset : 0}
+                pending={updating}
                 fitSeq={fitSeq}
                 onPick={(id, group) => {
                   setSelectedId(id);
