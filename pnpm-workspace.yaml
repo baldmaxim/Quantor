@@ -6,6 +6,9 @@ packages:
 # unrs-resolver — нативный резолвер импортов для ESLint, требует сборки при установке.
 allowBuilds:
   unrs-resolver: true
+  # msgpackr-extract (зависимость @speckle/objectloader2) — необязательный нативный ускоритель;
+  # без него msgpackr работает на чистом JS, поэтому скрипт сборки чужого пакета не запускаем.
+  msgpackr-extract: false
 
 minimumReleaseAgeExclude:
   - '@types/react-dom@19.2.7'
