@@ -30,8 +30,8 @@ from app.services import cad_style_profiles
 from app.services import jobs as jobs_service
 
 # Закрепление движка: архив сверяется и здесь (передаётся runner'у), и в tools/cad_engine/pins.json.
-ENGINE_VERSION: Final = "2026.11.18+5b8bceee3e56"
-ENGINE_ARCHIVE_SHA256: Final = "934f9e26e1bba6885d6130f955ec52676a3d15f743d2b7e4cae09b38c90a7ed8"
+ENGINE_VERSION: Final = "2026.11.18+f0c7f14eb2cb"
+ENGINE_ARCHIVE_SHA256: Final = "8e2e049e15f6444819d10e60a02090b07d1f023a571474a4048d1319a438c0d5"
 PARAMS_SCHEMA: Final = "quantor.cad_engine.params.v2"
 PAGE_SELECTION: Final = "operator"
 MAX_PAGES: Final = 50
