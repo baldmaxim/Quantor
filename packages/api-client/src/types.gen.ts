@@ -15559,6 +15559,78 @@ export type NotInProjectAnswerIn = {
 };
 
 /**
+ * OAuthAuthorizeDecision
+ */
+export type OAuthAuthorizeDecision = {
+    /**
+     * Approve
+     */
+    approve: boolean;
+    /**
+     * Params
+     */
+    params: {
+        [key: string]: string;
+    };
+    /**
+     * Scopes
+     */
+    scopes?: Array<string> | null;
+};
+
+/**
+ * OAuthAuthorizeInfo
+ *
+ * Что показать человеку перед «Разрешить», либо куда сразу вернуть чат с ошибкой.
+ */
+export type OAuthAuthorizeInfo = {
+    /**
+     * Already Connected
+     */
+    already_connected?: boolean;
+    /**
+     * Client Name
+     */
+    client_name?: string;
+    /**
+     * Error Redirect
+     */
+    error_redirect?: string | null;
+    /**
+     * Local App
+     */
+    local_app?: boolean;
+    /**
+     * Redirect Host
+     */
+    redirect_host?: string;
+    /**
+     * Scope Titles
+     */
+    scope_titles?: {
+        [key: string]: string;
+    };
+    /**
+     * Scopes
+     */
+    scopes?: Array<string>;
+    /**
+     * Workspace Name
+     */
+    workspace_name?: string;
+};
+
+/**
+ * OAuthAuthorizeRedirect
+ */
+export type OAuthAuthorizeRedirect = {
+    /**
+     * Redirect To
+     */
+    redirect_to: string;
+};
+
+/**
  * OriginalPrediction
  *
  * Исходный выход модели или детерминированного экстрактора до исправлений человека.
@@ -16109,6 +16181,10 @@ export type PersonalTokenCreated = {
      */
     active: boolean;
     /**
+     * Client Name
+     */
+    client_name?: string | null;
+    /**
      * Created At
      */
     created_at: string;
@@ -16154,6 +16230,10 @@ export type PersonalTokenRead = {
      * Active
      */
     active: boolean;
+    /**
+     * Client Name
+     */
+    client_name?: string | null;
     /**
      * Created At
      */
@@ -23637,6 +23717,89 @@ export type ReadMetaResponses = {
 };
 
 export type ReadMetaResponse = ReadMetaResponses[keyof ReadMetaResponses];
+
+export type OauthAuthorizeCheckData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Client Id
+         */
+        client_id?: string | null;
+        /**
+         * Redirect Uri
+         */
+        redirect_uri?: string | null;
+        /**
+         * Response Type
+         */
+        response_type?: string | null;
+        /**
+         * State
+         */
+        state?: string | null;
+        /**
+         * Scope
+         */
+        scope?: string | null;
+        /**
+         * Code Challenge
+         */
+        code_challenge?: string | null;
+        /**
+         * Code Challenge Method
+         */
+        code_challenge_method?: string | null;
+        /**
+         * Resource
+         */
+        resource?: string | null;
+    };
+    url: '/api/v1/oauth/authorize';
+};
+
+export type OauthAuthorizeCheckErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OauthAuthorizeCheckError = OauthAuthorizeCheckErrors[keyof OauthAuthorizeCheckErrors];
+
+export type OauthAuthorizeCheckResponses = {
+    /**
+     * Successful Response
+     */
+    200: OAuthAuthorizeInfo;
+};
+
+export type OauthAuthorizeCheckResponse = OauthAuthorizeCheckResponses[keyof OauthAuthorizeCheckResponses];
+
+export type OauthAuthorizeDecideData = {
+    body: OAuthAuthorizeDecision;
+    path?: never;
+    query?: never;
+    url: '/api/v1/oauth/authorize';
+};
+
+export type OauthAuthorizeDecideErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OauthAuthorizeDecideError = OauthAuthorizeDecideErrors[keyof OauthAuthorizeDecideErrors];
+
+export type OauthAuthorizeDecideResponses = {
+    /**
+     * Successful Response
+     */
+    200: OAuthAuthorizeRedirect;
+};
+
+export type OauthAuthorizeDecideResponse = OauthAuthorizeDecideResponses[keyof OauthAuthorizeDecideResponses];
 
 export type ListProjectsData = {
     body?: never;

@@ -40,6 +40,7 @@ from app.models.identity import (
     WorkspaceMembership,
 )
 from app.models.job import Job
+from app.models.oauth import OAuthClient, OAuthToken
 from app.models.page_geometry import PageGeometry
 from app.models.plan_alignment import PlanAlignment
 from app.models.project import Project
@@ -102,6 +103,8 @@ __all__ = [
     "Measurement",
     "ModelPart",
     "ModelStorey",
+    "OAuthClient",
+    "OAuthToken",
     "PageGeometry",
     "PlanAlignment",
     "Project",

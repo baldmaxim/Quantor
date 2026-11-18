@@ -34,6 +34,7 @@ from app.errors import DomainError, ErrorCode, http_error
 from app.models import UserIdentity
 from app.services import api_tokens as api_tokens_service
 from app.services import identity as identity_service
+from app.services import oauth as oauth_service
 
 log = get_logger(__name__)
 
@@ -73,7 +74,19 @@ async def get_auth_context(
     if settings.auth_mode == "dev":
         return dev_context(request.headers.get(DEV_ROLE_HEADER))
 
-    identity = await _authenticate(request, settings, session)
+    try:
+        identity = await _authenticate(request, settings, session)
+    except HTTPException as error:
+        if error.status_code == 401 and request.url.path == oauth_service.MCP_PATH:
+            # Отказ MCP говорит чату, где метаданные ресурса: с них начинается вход по OAuth
+            # (RFC 9728 §5.1, спецификация MCP).
+            error.headers = {
+                **(error.headers or {}),
+                "WWW-Authenticate": oauth_service.www_authenticate(
+                    settings, invalid_token=bool(request.headers.get("Authorization"))
+                ),
+            }
+        raise
     principal, credential = identity.principal, identity.credential
 
     # Подтверждение — после опознания и только для cookie: у запроса с заголовком
@@ -113,6 +126,8 @@ async def _authenticate(request: Request, settings: Settings, session: AsyncSess
         if raw_token.startswith(api_tokens_service.QTK_PREFIX):
             # Персональный токен проверяется в любом режиме входа: его выдал сам портал.
             return await _authenticate_api_token(session, raw_token)
+        if raw_token.startswith(oauth_service.ACCESS_PREFIX):
+            return await _authenticate_oauth_access(request, session, raw_token)
         if settings.auth_mode != "oidc":
             # Токен в заголовке выдаёт только провайдер. При локальном входе его нет, и
             # проверять подпись нечем — это отказ в учётных данных, а не сбой настройки.
@@ -192,6 +207,37 @@ async def _authenticate_api_token(session: AsyncSession, raw_token: str) -> _Ide
     workspace_id, scopes = row.workspace_id, tuple(row.scopes)
     if api_tokens_service.needs_touch(row):
         await api_tokens_service.touch(session, row)
+        await session.commit()
+    return _Identity(
+        _principal(user),
+        CredentialKind.API_TOKEN,
+        None,
+        token_workspace_id=workspace_id,
+        token_scopes=scopes,
+    )
+
+
+async def _authenticate_oauth_access(
+    request: Request, session: AsyncSession, raw_token: str
+) -> _Identity:
+    """Опознаёт ИИ-чат по доступу `qoa_` (ADR-0054): права - как у разрешения `api_tokens`.
+
+    Доступ чата годится только для MCP: снаружи - `POST /api/v1/mcp`, внутри - вызовы его
+    инструментов с секретом процесса. Остальной API ему закрыт тем же отказом, что и чужому.
+    """
+    if request.url.path != oauth_service.MCP_PATH and not oauth_service.is_internal_call(
+        request.headers
+    ):
+        raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
+    grant = await oauth_service.find_access_grant(session, raw_token)
+    if grant is None:
+        raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
+    user = await identity_service.get_user(session, grant.user_id)
+    if user is None or not identity_service.can_sign_in(user):
+        raise _unauthenticated(ErrorCode.CREDENTIAL_INVALID)
+    workspace_id, scopes = grant.workspace_id, tuple(grant.scopes)
+    if api_tokens_service.needs_touch(grant):
+        await api_tokens_service.touch(session, grant)
         await session.commit()
     return _Identity(
         _principal(user),

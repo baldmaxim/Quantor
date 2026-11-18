@@ -44,6 +44,11 @@ class ApiToken(Base):
     # Пусто — бессрочный.
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Разрешение ИИ-чату по OAuth (ADR-0054): значения `qtk_` у такой строки нет, чат ходит
+    # своими `qoa_` из `oauth_tokens`; отзыв строки гасит их все.
+    oauth_client_id: Mapped[uuid.UUID | None] = mapped_column(
+        pg.UUID(as_uuid=True), ForeignKey("oauth_clients.id", ondelete="CASCADE")
+    )
 
     __table_args__ = (
         Index("ix_api_tokens_user_id_workspace_id", "user_id", "workspace_id"),

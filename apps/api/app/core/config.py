@@ -217,6 +217,17 @@ class Settings(BaseSettings):
     # запросы, а сюда уходит переадресация, и подставлять её из запроса нельзя.
     portal_base_url: str = "http://localhost:3000"
 
+    # Вход ИИ-чатов по OAuth (ADR-0054). Издатель - `portal_base_url`. Сюда чат может вернуть
+    # человека после разрешения: точный адрес или префикс, оканчивающийся на «/». Адреса этого
+    # компьютера (http://localhost, 127.0.0.1 - Claude Code и другие программы) - отдельным флагом.
+    oauth_redirect_uris: str = (
+        "https://claude.ai/api/mcp/auth_callback,"
+        "https://claude.com/api/mcp/auth_callback,"
+        "https://chatgpt.com/connector_platform_oauth_redirect,"
+        "https://chatgpt.com/connector/oauth/"
+    )
+    oauth_allow_loopback: bool = True
+
     # Аварийное переопределение настроек: `documents.content_url_ttl_seconds=900`.
     # Рычаг на случай, когда неудачное значение в базе положило портал и добраться до
     # админки уже нельзя. Поэтому старше базы и только для чтения из интерфейса.
@@ -234,6 +245,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.api_cors_origins.split(",") if origin.strip()]
+
+    @property
+    def oauth_redirect_allowlist(self) -> list[str]:
+        return [item.strip() for item in self.oauth_redirect_uris.split(",") if item.strip()]
 
     @property
     def tenderhub_enabled(self) -> bool:

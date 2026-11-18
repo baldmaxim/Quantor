@@ -1,8 +1,10 @@
 """MCP-сервер портала для ИИ-чатов и агентов: `POST /api/v1/mcp`.
 
 Протокол и инструменты - `app.services.mcp_server`.
-Только личный токен: у входа по cookie есть CSRF, а MCP-клиенты (Claude, ChatGPT, агенты) ходят с
-заголовком `Authorization`. Запрос с чужим `Origin` (страница в браузере) отклоняется - защита от
+Только личный токен `qtk_` или доступ чата по OAuth `qoa_` (ADR-0054): у входа по cookie есть
+CSRF, а MCP-клиенты (Claude, ChatGPT, агенты) ходят с заголовком `Authorization`. Без него - 401 с
+`WWW-Authenticate: Bearer resource_metadata=…`: с этого чат начинает вход по OAuth.
+Запрос с чужим `Origin` (страница в браузере) отклоняется - защита от
 подмены адреса из браузера, как требует спецификация MCP.
 """
 
@@ -21,6 +23,7 @@ from app.core.middleware import REQUEST_ID_HEADER
 from app.core.request_context import get_request_id
 from app.errors import ErrorCode, http_error
 from app.services import mcp_server
+from app.services import oauth as oauth_service
 
 router = APIRouter(tags=["mcp"])
 
@@ -31,7 +34,7 @@ INTERNAL_TIMEOUT_SECONDS = 120.0
 
 @router.post(
     "/mcp",
-    summary="MCP-сервер для ИИ-агентов (JSON-RPC 2.0), только по личному токену",
+    summary="MCP-сервер для ИИ-агентов (JSON-RPC 2.0): личный токен или вход чата по OAuth",
     dependencies=[require(Permission.WORKSPACE_READ)],
 )
 async def mcp_endpoint(
@@ -40,7 +43,7 @@ async def mcp_endpoint(
     if context.credential is not CredentialKind.API_TOKEN:
         raise http_error(
             ErrorCode.PERMISSION_DENIED,
-            message="MCP работает только по личному токену: Authorization: Bearer qtk_…",
+            message="MCP работает по личному токену или входу чата: Authorization: Bearer …",
         )
     origin = request.headers.get("origin")
     if origin and origin not in settings.cors_origins:
@@ -89,6 +92,8 @@ async def mcp_endpoint(
             "Authorization": request.headers.get("authorization", ""),
             "User-Agent": f"{request.headers.get('user-agent', 'MCP')} (via quantor-mcp)",
             REQUEST_ID_HEADER: get_request_id() or "",
+            # Доступ чата `qoa_` внутренние адреса принимают только с этим секретом процесса.
+            **oauth_service.internal_headers(),
         },
         timeout=INTERNAL_TIMEOUT_SECONDS,
     ) as client:

@@ -766,6 +766,8 @@ class PersonalTokenRead(BaseModel):
     expires_at: datetime | None
     revoked_at: datetime | None
     active: bool
+    # Разрешение ИИ-чату по OAuth (ADR-0054): имя чата; у такой строки нет значения `qtk_`.
+    client_name: str | None = None
 
 
 class PersonalTokenCreated(PersonalTokenRead):

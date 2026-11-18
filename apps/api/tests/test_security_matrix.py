@@ -254,6 +254,10 @@ def test_8_admin_api_denies_by_default() -> None:
             "register",
             "login_with_password",
             "change_password",
+            "oauth_authorization_server_metadata",
+            "oauth_protected_resource_metadata",
+            "oauth_register_client",
+            "oauth_token",
         }
         and not any(
             isinstance(dependency.call, PermissionCheck)

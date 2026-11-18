@@ -30857,6 +30857,111 @@
         "title": "NotInProjectAnswerIn",
         "type": "object"
       },
+      "OAuthAuthorizeDecision": {
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "required": [
+          "params",
+          "approve"
+        ],
+        "title": "OAuthAuthorizeDecision",
+        "type": "object"
+      },
+      "OAuthAuthorizeInfo": {
+        "description": "Что показать человеку перед «Разрешить», либо куда сразу вернуть чат с ошибкой.",
+        "properties": {
+          "already_connected": {
+            "default": false,
+            "title": "Already Connected",
+            "type": "boolean"
+          },
+          "client_name": {
+            "default": "",
+            "title": "Client Name",
+            "type": "string"
+          },
+          "error_redirect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Redirect"
+          },
+          "local_app": {
+            "default": false,
+            "title": "Local App",
+            "type": "boolean"
+          },
+          "redirect_host": {
+            "default": "",
+            "title": "Redirect Host",
+            "type": "string"
+          },
+          "scope_titles": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Scope Titles",
+            "type": "object"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "workspace_name": {
+            "default": "",
+            "title": "Workspace Name",
+            "type": "string"
+          }
+        },
+        "title": "OAuthAuthorizeInfo",
+        "type": "object"
+      },
+      "OAuthAuthorizeRedirect": {
+        "properties": {
+          "redirect_to": {
+            "title": "Redirect To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "redirect_to"
+        ],
+        "title": "OAuthAuthorizeRedirect",
+        "type": "object"
+      },
       "OriginalPrediction": {
         "additionalProperties": false,
         "description": "Исходный выход модели или детерминированного экстрактора до исправлений человека.",
@@ -31797,6 +31902,17 @@
             "title": "Active",
             "type": "boolean"
           },
+          "client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Name"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -31883,6 +31999,17 @@
           "active": {
             "title": "Active",
             "type": "boolean"
+          },
+          "client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Name"
           },
           "created_at": {
             "format": "date-time",
@@ -44865,7 +44992,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "MCP-сервер для ИИ-агентов (JSON-RPC 2.0), только по личному токену",
+        "summary": "MCP-сервер для ИИ-агентов (JSON-RPC 2.0): личный токен или вход чата по OAuth",
         "tags": [
           "mcp"
         ]
@@ -45146,6 +45273,206 @@
         "summary": "Версии и возможности API",
         "tags": [
           "meta"
+        ]
+      }
+    },
+    "/api/v1/oauth/authorize": {
+      "get": {
+        "operationId": "oauth_authorize_check",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "client_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Client Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "redirect_uri",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Redirect Uri"
+            }
+          },
+          {
+            "in": "query",
+            "name": "response_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Response Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_challenge",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code Challenge"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_challenge_method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code Challenge Method"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthAuthorizeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запрос ИИ-чата на доступ: что показать на странице согласия",
+        "tags": [
+          "oauth"
+        ]
+      },
+      "post": {
+        "operationId": "oauth_authorize_decide",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthAuthorizeDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthAuthorizeRedirect"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Решение человека: разрешить ИИ-чату доступ или отказать",
+        "tags": [
+          "oauth"
         ]
       }
     },

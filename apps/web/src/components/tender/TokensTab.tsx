@@ -38,7 +38,8 @@ const TokenRow: FC<{
         <span className="block text-xs text-muted">{scopesLabel(token.scopes ?? [])}</span>
       </td>
       <td data-label="Префикс" className={cx(TD, 'mono text-xs')}>
-        {token.prefix}…
+        {/* Разрешение ИИ-чату по OAuth: значения qtk_ у него нет, чат входит сам. */}
+        {token.client_name ? 'вход чата' : `${token.prefix}…`}
       </td>
       <td data-label="Создан" className={cx(TD, 'text-muted')}>
         {formatWhen(token.created_at)}
