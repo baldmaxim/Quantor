@@ -1,5 +1,6 @@
-"""MCP-сервер портала для ИИ-чатов и агентов: `POST /api/v1/mcp` (протокол - `app.services.mcp_server`).
+"""MCP-сервер портала для ИИ-чатов и агентов: `POST /api/v1/mcp`.
 
+Протокол и инструменты - `app.services.mcp_server`.
 Только личный токен: у входа по cookie есть CSRF, а MCP-клиенты (Claude, ChatGPT, агенты) ходят с
 заголовком `Authorization`. Запрос с чужим `Origin` (страница в браузере) отклоняется - защита от
 подмены адреса из браузера, как требует спецификация MCP.
@@ -44,7 +45,11 @@ async def mcp_endpoint(request: Request, context: AuthDep, settings: SettingsDep
         payload = json.loads(await request.body())
     except ValueError:
         return JSONResponse(
-            {"jsonrpc": "2.0", "id": None, "error": {"code": mcp_server.PARSE_ERROR, "message": "Тело не JSON"}},
+            {
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": mcp_server.PARSE_ERROR, "message": "Тело не JSON"},
+            },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
     async with httpx.AsyncClient(

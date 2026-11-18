@@ -22,14 +22,18 @@ import httpx
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 SERVER_INFO = {"name": "quantor", "title": "Quantor — портал объекта", "version": "1.0"}
 INSTRUCTIONS = (
-    "Портал Quantor: проекты (тендерные объекты), документы, модель здания и координационный файл - "
-    "общая сетка осей и этажи объекта, к которым привязываются все разделы. Перед работой с объектом "
+    "Портал Quantor: проекты (тендерные объекты), документы, модель здания и координационный "
+    "файл - общая сетка осей и этажи объекта, к которым привязываются все разделы. "
+    "Перед работой с объектом "
     "возьми координационный файл (get_coordination). «Отправить в 3D» - send_ifc_to_3d: IFC своей "
     "дисциплины новой ревизией документа того же имени, затем сборка модели (4-9 минут, следить - "
-    "job_status или model_status). Отправляй только облегчённые IFC (через MCP - до 3 МБ). Новый выпуск "
+    "job_status или model_status). Отправляй только облегчённые IFC (через MCP - до 3 МБ). "
+    "Новый выпуск "
     "базы делает только человек. Проект можно называть точным названием или id."
 )
-UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 MAX_MCP_IFC_BYTES = 3 * 1024 * 1024
 
 # Коды ошибок JSON-RPC 2.0
@@ -102,7 +106,10 @@ class ToolResult:
     is_error: bool = False
 
     def as_mcp(self) -> dict[str, Any]:
-        out: dict[str, Any] = {"content": [{"type": "text", "text": self.text}], "isError": self.is_error}
+        out: dict[str, Any] = {
+            "content": [{"type": "text", "text": self.text}],
+            "isError": self.is_error,
+        }
         if self.data is not None and isinstance(self.data, dict):
             out["structuredContent"] = self.data
         return out
@@ -152,7 +159,9 @@ async def resolve_project(caller: Caller, value: str) -> tuple[str, str]:
     if len(exact) == 1:
         return str(exact[0]["id"]), str(exact[0]["name"])
     if len(exact) > 1:
-        raise ToolInputError(f"Несколько проектов «{value}»: укажите id ({', '.join(str(p['id']) for p in exact)})")
+        raise ToolInputError(
+            f"Несколько проектов «{value}»: укажите id ({', '.join(str(p['id']) for p in exact)})"
+        )
     near = "; ".join(str(p.get("name")) for p in items[:8]) or "ничего похожего"
     raise ToolInputError(f"Проект «{value}» не найден. Похожие: {near}")
 
@@ -176,7 +185,9 @@ async def get_coordination(caller: Caller, args: dict[str, Any]) -> ToolResult:
     if fmt not in ("json", "ifc"):
         raise ToolInputError("format: json или ifc")
     try:
-        response = await caller.get_raw(f"/api/v1/projects/{project_id}/tender/base/coordination.{fmt}")
+        response = await caller.get_raw(
+            f"/api/v1/projects/{project_id}/tender/base/coordination.{fmt}"
+        )
     except CallError as error:
         if error.status == 404:
             return ToolResult(
@@ -187,35 +198,46 @@ async def get_coordination(caller: Caller, args: dict[str, Any]) -> ToolResult:
         raise
     release = response.headers.get("x-quantor-base-release", "?")
     if fmt == "ifc":
-        return ToolResult(response.text, {"project_id": project_id, "release": release, "format": "ifc"})
+        return ToolResult(
+            response.text, {"project_id": project_id, "release": release, "format": "ifc"}
+        )
     data = response.json()
     summary = [f"Координационный файл «{name}», выпуск базы №{release}."]
     for group in data.get("groups", []):
         axes = group.get("axes", [])
         storeys = group.get("storeys", [])
         summary.append(
-            f"{group.get('group_label')}: осей {len(axes)} ({', '.join(a['label'] for a in axes)}), "
+            f"{group.get('group_label')}: осей {len(axes)} "
+            f"({', '.join(a['label'] for a in axes)}), "
             f"этажей {len(storeys)} ({storeys[0]['base_z_mm'] if storeys else '-'}…"
             f"{storeys[-1]['base_z_mm'] if storeys else '-'} мм)."
         )
     if data.get("doubts"):
         summary.append("Сомнения: " + "; ".join(data["doubts"]))
     summary.append(json.dumps(data, ensure_ascii=False))
-    return ToolResult("\n".join(summary), {"project_id": project_id, "release": release, "coordination": data})
+    return ToolResult(
+        "\n".join(summary), {"project_id": project_id, "release": release, "coordination": data}
+    )
 
 
 async def list_base_releases(caller: Caller, args: dict[str, Any]) -> ToolResult:
     project_id, name = await resolve_project(caller, str(args.get("project", "")))
     rows = await caller.get(f"/api/v1/projects/{project_id}/tender/base/releases") or []
     items = [
-        {"number": r.get("number"), "released_at": r.get("released_at"),
-         "released_by": r.get("released_by_name"), "revoked": bool(r.get("revoked_at")), "id": r.get("id")}
+        {
+            "number": r.get("number"),
+            "released_at": r.get("released_at"),
+            "released_by": r.get("released_by_name"),
+            "revoked": bool(r.get("revoked_at")),
+            "id": r.get("id"),
+        }
         for r in rows
     ]
     if not items:
         return ToolResult(f"У «{name}» выпусков базы нет.", {"releases": []})
     lines = [
-        f"№{i['number']} от {i['released_at']} ({i['released_by'] or '?'}){' — отозван' if i['revoked'] else ''}"
+        f"№{i['number']} от {i['released_at']} ({i['released_by'] or '?'})"
+        + (" — отозван" if i["revoked"] else "")
         for i in items
     ]
     return ToolResult(f"Выпуски базы «{name}»:\n" + "\n".join(lines), {"releases": items})
@@ -236,19 +258,25 @@ async def model_status(caller: Caller, args: dict[str, Any]) -> ToolResult:
     if newest:
         detail = await caller.get(f"/api/v1/projects/{project_id}/model/versions/{newest['id']}")
         storeys = [
-            {"name": s.get("name"), "elevation_mm": s.get("elevation_mm")} for s in detail.get("storeys", [])
+            {"name": s.get("name"), "elevation_mm": s.get("elevation_mm")}
+            for s in detail.get("storeys", [])
         ]
     lines = [f"Модель «{name}»."]
     lines.append(
-        f"Последняя сборка: {job.get('status')} ({job.get('stage') or '-'}), задание {job.get('job_id')}"
-        if job else "Сборок ещё не было."
+        f"Последняя сборка: {job.get('status')} ({job.get('stage') or '-'}), "
+        f"задание {job.get('job_id')}"
+        if job
+        else "Сборок ещё не было."
     )
     if newest:
         lines.append(
-            f"Новейшая версия №{newest.get('number')} ({newest.get('status')}), этажей {len(storeys)}: "
+            f"Новейшая версия №{newest.get('number')} ({newest.get('status')}), "
+            f"этажей {len(storeys)}: "
             + ", ".join(f"{s['name']} {s['elevation_mm']}" for s in storeys)
         )
-    return ToolResult("\n".join(lines), {"import": job, "newest_version": newest, "storeys": storeys})
+    return ToolResult(
+        "\n".join(lines), {"import": job, "newest_version": newest, "storeys": storeys}
+    )
 
 
 async def list_documents(caller: Caller, args: dict[str, Any]) -> ToolResult:
@@ -268,20 +296,26 @@ async def send_ifc_to_3d(caller: Caller, args: dict[str, Any]) -> ToolResult:
     project_id, name = await resolve_project(caller, str(args.get("project", "")))
     filename = str(args.get("filename", "")).strip()
     if not filename.lower().endswith(".ifc") or "/" in filename or "\\" in filename:
-        raise ToolInputError("filename: имя файла дисциплины с расширением .ifc, без папок (например KR.ifc)")
+        raise ToolInputError(
+            "filename: имя файла дисциплины с расширением .ifc, без папок (например KR.ifc)"
+        )
     content = args.get("content")
     if not isinstance(content, str) or not content.lstrip().startswith("ISO-10303-21"):
         raise ToolInputError("content: текст IFC (STEP), начинается с ISO-10303-21")
     data = content.encode("utf-8")
     if len(data) > MAX_MCP_IFC_BYTES:
         raise ToolInputError(
-            f"IFC {len(data) // 1024} КБ больше предела MCP {MAX_MCP_IFC_BYTES // 1024} КБ: загрузите его "
+            f"IFC {len(data) // 1024} КБ больше предела MCP {MAX_MCP_IFC_BYTES // 1024} КБ: "
+            "загрузите его "
             "клиентом push (tools/quantor_agent) или облегчите"
         )
     page = await caller.get(f"/api/v1/projects/{project_id}/documents", {"limit": 200})
     same = next(
-        (d for d in page.get("items", [])
-         if d.get("document_kind") == "ifc" and d.get("display_name") == filename),
+        (
+            d
+            for d in page.get("items", [])
+            if d.get("document_kind") == "ifc" and d.get("display_name") == filename
+        ),
         None,
     )
     fields = {"document_id": str(same["id"])} if same else {}
@@ -289,13 +323,17 @@ async def send_ifc_to_3d(caller: Caller, args: dict[str, Any]) -> ToolResult:
     where = "новая ревизия документа" if same else "новый документ"
     if uploaded.get("is_duplicate"):
         where = "такой файл уже был загружен, ревизия не создана"
-    result: dict[str, Any] = {"document_id": (uploaded.get("document") or {}).get("id"), "upload": where}
+    result: dict[str, Any] = {
+        "document_id": (uploaded.get("document") or {}).get("id"),
+        "upload": where,
+    }
     lines = [f"«{name}»: {filename} - {where}."]
     if args.get("build", True):
         job = await caller.post(f"/api/v1/projects/{project_id}/model/imports", {})
         result["job_id"] = job.get("job_id")
         lines.append(
-            f"Сборка модели запущена: задание {job.get('job_id')} (входных IFC {job.get('inputs')}). "
+            f"Сборка модели запущена: задание {job.get('job_id')} "
+            f"(входных IFC {job.get('inputs')}). "
             "Обычно 4-9 минут; следите model_status или job_status."
         )
     return ToolResult("\n".join(lines), result)
@@ -325,33 +363,93 @@ async def job_status(caller: Caller, args: dict[str, Any]) -> ToolResult:
 TOOLS: dict[str, Tool] = {
     t.name: t
     for t in (
-        Tool("find_projects", "Найти проекты", "Проекты пространства (тендерные объекты): название и id.",
-             {"search": {"type": "string", "description": "часть названия"}}, handler=find_projects),
-        Tool("get_coordination", "Координационный файл",
-             "Общая сетка осей и этажи объекта из последнего выпуска базы: format=json - оси линиями в мм "
-             "системы здания и этажи с отметками; format=ifc - тот же файл IFC4.",
-             {"project": PROJECT_ARG, "format": {"type": "string", "enum": ["json", "ifc"], "default": "json"}},
-             ["project"], get_coordination),
-        Tool("list_base_releases", "Выпуски базы", "Выпуски базы объекта, новые сверху (отозванные помечены).",
-             {"project": PROJECT_ARG}, ["project"], list_base_releases),
-        Tool("model_status", "Модель здания",
-             "Последняя сборка модели из IFC и новейшая версия: этажи с отметками.",
-             {"project": PROJECT_ARG}, ["project"], model_status),
-        Tool("list_documents", "Документы", "Документы проекта (kind: ifc, pdf…).",
-             {"project": PROJECT_ARG, "kind": {"type": "string", "description": "фильтр: ifc, pdf…"}},
-             ["project"], list_documents),
-        Tool("send_ifc_to_3d", "Отправить в 3D",
-             "Загрузить IFC своей дисциплины (текст STEP) новой ревизией документа того же имени и собрать "
-             "модель здания. Нужна область токена upload. Только облегчённые IFC, до 3 МБ.",
-             {"project": PROJECT_ARG,
-              "filename": {"type": "string", "description": "имя файла дисциплины, например KR.ifc"},
-              "content": {"type": "string", "description": "текст IFC (ISO-10303-21 …)"},
-              "build": {"type": "boolean", "default": True, "description": "сразу собрать модель"}},
-             ["project", "filename", "content"], send_ifc_to_3d, read_only=False),
-        Tool("build_model", "Собрать модель", "Пересобрать модель здания из IFC проекта (область upload).",
-             {"project": PROJECT_ARG}, ["project"], build_model, read_only=False),
-        Tool("job_status", "Задание", "Состояние задания портала по id (сборка модели и другие).",
-             {"job_id": {"type": "string", "description": "id задания"}}, ["job_id"], job_status),
+        Tool(
+            "find_projects",
+            "Найти проекты",
+            "Проекты пространства (тендерные объекты): название и id.",
+            {"search": {"type": "string", "description": "часть названия"}},
+            handler=find_projects,
+        ),
+        Tool(
+            "get_coordination",
+            "Координационный файл",
+            "Общая сетка осей и этажи объекта из последнего выпуска базы: "
+            "format=json - оси линиями в мм "
+            "системы здания и этажи с отметками; format=ifc - тот же файл IFC4.",
+            {
+                "project": PROJECT_ARG,
+                "format": {"type": "string", "enum": ["json", "ifc"], "default": "json"},
+            },
+            ["project"],
+            get_coordination,
+        ),
+        Tool(
+            "list_base_releases",
+            "Выпуски базы",
+            "Выпуски базы объекта, новые сверху (отозванные помечены).",
+            {"project": PROJECT_ARG},
+            ["project"],
+            list_base_releases,
+        ),
+        Tool(
+            "model_status",
+            "Модель здания",
+            "Последняя сборка модели из IFC и новейшая версия: этажи с отметками.",
+            {"project": PROJECT_ARG},
+            ["project"],
+            model_status,
+        ),
+        Tool(
+            "list_documents",
+            "Документы",
+            "Документы проекта (kind: ifc, pdf…).",
+            {
+                "project": PROJECT_ARG,
+                "kind": {"type": "string", "description": "фильтр: ifc, pdf…"},
+            },
+            ["project"],
+            list_documents,
+        ),
+        Tool(
+            "send_ifc_to_3d",
+            "Отправить в 3D",
+            "Загрузить IFC своей дисциплины (текст STEP) новой ревизией документа того же имени "
+            "и собрать "
+            "модель здания. Нужна область токена upload. Только облегчённые IFC, до 3 МБ.",
+            {
+                "project": PROJECT_ARG,
+                "filename": {
+                    "type": "string",
+                    "description": "имя файла дисциплины, например KR.ifc",
+                },
+                "content": {"type": "string", "description": "текст IFC (ISO-10303-21 …)"},
+                "build": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "сразу собрать модель",
+                },
+            },
+            ["project", "filename", "content"],
+            send_ifc_to_3d,
+            read_only=False,
+        ),
+        Tool(
+            "build_model",
+            "Собрать модель",
+            "Пересобрать модель здания из IFC проекта (область upload).",
+            {"project": PROJECT_ARG},
+            ["project"],
+            build_model,
+            read_only=False,
+        ),
+        Tool(
+            "job_status",
+            "Задание",
+            "Состояние задания портала по id (сборка модели и другие).",
+            {"job_id": {"type": "string", "description": "id задания"}},
+            ["job_id"],
+            job_status,
+        ),
     )
 }
 
@@ -370,8 +468,11 @@ def _result(message_id: Any, result: dict[str, Any]) -> dict[str, Any]:
 async def handle_message(message: Any, caller: Caller) -> dict[str, Any] | None:
     """Одно сообщение JSON-RPC. Уведомления (без id) ответа не получают."""
     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or "method" not in message:
-        return _error(message.get("id") if isinstance(message, dict) else None, INVALID_REQUEST,
-                      "Нужен запрос JSON-RPC 2.0")
+        return _error(
+            message.get("id") if isinstance(message, dict) else None,
+            INVALID_REQUEST,
+            "Нужен запрос JSON-RPC 2.0",
+        )
     method = message["method"]
     message_id = message.get("id")
     is_notification = "id" not in message
@@ -381,26 +482,36 @@ async def handle_message(message: Any, caller: Caller) -> dict[str, Any] | None:
     if method == "initialize":
         asked = params.get("protocolVersion") if isinstance(params, dict) else None
         version = asked if asked in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0]
-        return _result(message_id, {
-            "protocolVersion": version,
-            "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": SERVER_INFO,
-            "instructions": INSTRUCTIONS,
-        })
+        return _result(
+            message_id,
+            {
+                "protocolVersion": version,
+                "capabilities": {"tools": {"listChanged": False}},
+                "serverInfo": SERVER_INFO,
+                "instructions": INSTRUCTIONS,
+            },
+        )
     if method == "ping":
         return _result(message_id, {})
     if method == "tools/list":
         return _result(message_id, {"tools": [tool.describe() for tool in TOOLS.values()]})
     if method == "tools/call":
         if not isinstance(params, dict) or params.get("name") not in TOOLS:
-            return _error(message_id, INVALID_PARAMS, f"Нет инструмента {params.get('name') if isinstance(params, dict) else ''!r}")
+            return _error(
+                message_id,
+                INVALID_PARAMS,
+                f"Нет инструмента {params.get('name') if isinstance(params, dict) else ''!r}",
+            )
         tool = TOOLS[params["name"]]
         arguments = params.get("arguments") or {}
         if not isinstance(arguments, dict):
             return _error(message_id, INVALID_PARAMS, "arguments должен быть объектом")
         missing = [name for name in tool.required if name not in arguments]
         if missing:
-            return _result(message_id, ToolResult(f"Не хватает аргументов: {', '.join(missing)}", is_error=True).as_mcp())
+            return _result(
+                message_id,
+                ToolResult(f"Не хватает аргументов: {', '.join(missing)}", is_error=True).as_mcp(),
+            )
         assert tool.handler is not None
         try:
             outcome = await tool.handler(caller, arguments)
@@ -417,6 +528,8 @@ async def dispatch(payload: Any, caller: Caller) -> Any:
     if isinstance(payload, list):
         if not payload:
             return _error(None, INVALID_REQUEST, "Пустая пачка")
-        answers = [answer for item in payload if (answer := await handle_message(item, caller)) is not None]
+        answers = [
+            answer for item in payload if (answer := await handle_message(item, caller)) is not None
+        ]
         return answers or None
     return await handle_message(payload, caller)
