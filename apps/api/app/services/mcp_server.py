@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from collections.abc import Awaitable, Callable
@@ -18,6 +19,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
+
+from app.core.logging import get_logger
+
+log = get_logger(__name__)
 
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 SERVER_INFO = {"name": "quantor", "title": "Quantor — портал объекта", "version": "1.0"}
@@ -35,6 +40,12 @@ UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 MAX_MCP_IFC_BYTES = 3 * 1024 * 1024
+# Пачка JSON-RPC больше - отказ: каждый вызов инструмента идёт в портал (а get_coordination
+# читает ZIP выпуска), и одна пачка не должна занимать сервер.
+MAX_BATCH = 20
+# Сколько ждать один инструмент: внутренний вызов ASGI тайм-аутов httpx не знает.
+TOOL_TIMEOUT_SECONDS = 120.0
+DOCUMENTS_PAGE = 200
 
 # Коды ошибок JSON-RPC 2.0
 PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS = -32700, -32600, -32601, -32602
@@ -72,11 +83,18 @@ class Caller:
             message += " (у токена нет нужной области или права у роли)"
         return CallError(response.status_code, message)
 
+    @staticmethod
+    def _json(response: httpx.Response) -> Any:
+        try:
+            return response.json()
+        except ValueError:
+            raise CallError(response.status_code, "портал ответил не JSON") from None
+
     async def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         response = await self.client.get(path, params=params)
         if response.status_code >= 400:
             raise self._error(response)
-        return response.json()
+        return self._json(response)
 
     async def get_raw(self, path: str) -> httpx.Response:
         response = await self.client.get(path)
@@ -88,7 +106,7 @@ class Caller:
         response = await self.client.post(path, json=body)
         if response.status_code >= 400:
             raise self._error(response)
-        return response.json() if response.content else None
+        return self._json(response) if response.content else None
 
     async def upload(self, path: str, filename: str, data: bytes, fields: dict[str, str]) -> Any:
         response = await self.client.post(
@@ -96,7 +114,7 @@ class Caller:
         )
         if response.status_code >= 400:
             raise self._error(response)
-        return response.json()
+        return self._json(response)
 
 
 @dataclass
@@ -279,13 +297,26 @@ async def model_status(caller: Caller, args: dict[str, Any]) -> ToolResult:
     )
 
 
+async def all_documents(caller: Caller, project_id: str) -> list[dict[str, Any]]:
+    """Все документы проекта, по страницам (в большом проекте их больше одной страницы)."""
+    items: list[dict[str, Any]] = []
+    while True:
+        page = await caller.get(
+            f"/api/v1/projects/{project_id}/documents",
+            {"limit": DOCUMENTS_PAGE, "offset": len(items)},
+        )
+        batch = page.get("items", []) if isinstance(page, dict) else []
+        items += batch
+        if not batch or len(items) >= int(page.get("total", len(items))):
+            return items
+
+
 async def list_documents(caller: Caller, args: dict[str, Any]) -> ToolResult:
     project_id, name = await resolve_project(caller, str(args.get("project", "")))
-    page = await caller.get(f"/api/v1/projects/{project_id}/documents", {"limit": 200})
     kind = args.get("kind")
     items = [
         {"id": d.get("id"), "name": d.get("display_name"), "kind": d.get("document_kind")}
-        for d in page.get("items", [])
+        for d in await all_documents(caller, project_id)
         if not kind or d.get("document_kind") == kind
     ]
     lines = [f"{d['name']} [{d['kind']}] — {d['id']}" for d in items] or ["Документов нет"]
@@ -302,18 +333,20 @@ async def send_ifc_to_3d(caller: Caller, args: dict[str, Any]) -> ToolResult:
     content = args.get("content")
     if not isinstance(content, str) or not content.lstrip().startswith("ISO-10303-21"):
         raise ToolInputError("content: текст IFC (STEP), начинается с ISO-10303-21")
-    data = content.encode("utf-8")
+    try:
+        data = content.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ToolInputError("content: в тексте IFC есть недопустимые символы") from None
     if len(data) > MAX_MCP_IFC_BYTES:
         raise ToolInputError(
             f"IFC {len(data) // 1024} КБ больше предела MCP {MAX_MCP_IFC_BYTES // 1024} КБ: "
             "загрузите его "
             "клиентом push (tools/quantor_agent) или облегчите"
         )
-    page = await caller.get(f"/api/v1/projects/{project_id}/documents", {"limit": 200})
     same = next(
         (
             d
-            for d in page.get("items", [])
+            for d in await all_documents(caller, project_id)
             if d.get("document_kind") == "ifc" and d.get("display_name") == filename
         ),
         None,
@@ -514,11 +547,19 @@ async def handle_message(message: Any, caller: Caller) -> dict[str, Any] | None:
             )
         assert tool.handler is not None
         try:
-            outcome = await tool.handler(caller, arguments)
+            outcome = await asyncio.wait_for(
+                tool.handler(caller, arguments), timeout=TOOL_TIMEOUT_SECONDS
+            )
         except ToolInputError as error:
             outcome = ToolResult(str(error), is_error=True)
         except CallError as error:
             outcome = ToolResult(f"Портал отказал (HTTP {error.status}): {error}", is_error=True)
+        except TimeoutError:
+            outcome = ToolResult("Инструмент не уложился во время: повторите позже", is_error=True)
+        except Exception:
+            # Ответ остаётся ответом JSON-RPC с тем же id: пачка и клиент не теряются.
+            log.exception("mcp_tool_failed", tool=tool.name)
+            outcome = ToolResult("Внутренняя ошибка портала при вызове инструмента", is_error=True)
         return _result(message_id, outcome.as_mcp())
     return _error(message_id, METHOD_NOT_FOUND, f"Метод {method!r} не поддерживается")
 
@@ -528,6 +569,8 @@ async def dispatch(payload: Any, caller: Caller) -> Any:
     if isinstance(payload, list):
         if not payload:
             return _error(None, INVALID_REQUEST, "Пустая пачка")
+        if len(payload) > MAX_BATCH:
+            return _error(None, INVALID_REQUEST, f"В пачке больше {MAX_BATCH} сообщений")
         answers = [
             answer for item in payload if (answer := await handle_message(item, caller)) is not None
         ]

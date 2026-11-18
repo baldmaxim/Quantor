@@ -96,6 +96,11 @@
           "title": "Base Z Mm",
           "type": "integer"
         },
+        "elevation_known": {
+          "default": true,
+          "title": "Elevation Known",
+          "type": "boolean"
+        },
         "floor_height_mm": {
           "title": "Floor Height Mm",
           "type": "integer"

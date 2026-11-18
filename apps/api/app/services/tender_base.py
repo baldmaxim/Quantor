@@ -879,6 +879,7 @@ async def create_release(
                     rotation_deg=source.floor.rotation_deg,
                     alignment=source.floor.alignment,
                     axes=view_axes.axes,
+                    elevation_known=source.floor.elevation_known,
                 )
             )
         building = ObjectBaseBuilding(

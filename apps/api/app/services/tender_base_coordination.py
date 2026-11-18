@@ -23,7 +23,6 @@ import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal, cast
 
 from app.contracts.tender_exchange import (
     ObjectBaseAxis,
@@ -58,6 +57,8 @@ class CoordinationFloor:
     rotation_deg: float
     alignment: str
     axes: Sequence[ObjectBaseAxis]
+    # Отметка известна (`base_z_mm` из листа); неизвестная хранится 0 и не должна сливаться с 0.000.
+    elevation_known: bool = True
 
 
 @dataclass
@@ -108,8 +109,17 @@ def _merge(lines: Sequence[_Line], reference_view: str | None) -> tuple[_Line, f
     return _Line(point, (dx, dy), ref.view_key), max(offsets) - min(offsets)
 
 
-def _direction_key(axis: ObjectBaseAxis) -> tuple[str, str]:
-    return axis.orient, axis.label
+def _parallel(a: _Line, b: _Line) -> bool:
+    """Направления совпадают или противоположны (лист повёрнут на 180°) - одна ось."""
+    return abs(a.direction[0] * b.direction[1] - a.direction[1] * b.direction[0]) < 0.05
+
+
+def _aligned_with(line: _Line, ref: _Line) -> _Line:
+    """Линия в том же направлении, что эталон (противоположное направление разворачивается)."""
+    dot = line.direction[0] * ref.direction[0] + line.direction[1] * ref.direction[1]
+    if dot >= 0:
+        return line
+    return _Line(line.point, (-line.direction[0], -line.direction[1]), line.view_key)
 
 
 def _label_order(label: str) -> tuple[int, int, str]:
@@ -137,13 +147,30 @@ def build_coordination(floors: Iterable[CoordinationFloor]) -> ObjectBaseCoordin
                     "его оси в сетку не вошли"
                 )
         reference = next((f.view_key for f in placed if f.alignment == "reference"), None)
+        # Ось сводится по подписи и направлению в здании, а не по тому, как она нарисована на
+        # своём листе: лист, повёрнутый на 90°, рисует вертикальную ось горизонтальной.
         lines: dict[tuple[str, str], list[_Line]] = {}
-        for f in placed:
+        families: dict[str, list[tuple[str, _Line]]] = {}
+        ordered = sorted(placed, key=lambda f: f.view_key != reference)
+        for f in ordered:
             for axis in f.axes:
-                lines.setdefault(_direction_key(axis), []).append(_axis_line(axis, f))
+                line = _axis_line(axis, f)
+                known = families.setdefault(axis.label, [])
+                match = next((orient for orient, ref in known if _parallel(line, ref)), None)
+                if match is None:
+                    match = axis.orient if not known else f"{axis.orient}#{len(known)}"
+                    if known:
+                        doubts.append(
+                            f"{acc.label}: ось {axis.label} на виде «{f.label}» "
+                            "идёт поперёк той же оси "
+                            "на других этажах - проверьте подписи или совмещение"
+                        )
+                    known.append((match, line))
+                ref_line = next(ref for orient, ref in known if orient == match)
+                lines.setdefault((match, axis.label), []).append(_aligned_with(line, ref_line))
         floors_with_axes = sum(1 for f in placed if f.axes)
         axes_out: list[ObjectBaseCoordinationAxis] = []
-        for (orient, label), group_lines in sorted(
+        for (_family, label), group_lines in sorted(
             lines.items(), key=lambda kv: (kv[0][0] != "vertical", _label_order(kv[0][1]))
         ):
             merged, spread = _merge(group_lines, reference)
@@ -159,7 +186,12 @@ def build_coordination(floors: Iterable[CoordinationFloor]) -> ObjectBaseCoordin
             axes_out.append(
                 ObjectBaseCoordinationAxis(
                     label=label,
-                    orient=cast(Literal["vertical", "horizontal"], orient),
+                    # Семья оси - по направлению в здании (IFC: U вертикальные, V горизонтальные).
+                    orient=(
+                        "vertical"
+                        if abs(merged.direction[1]) >= abs(merged.direction[0])
+                        else "horizontal"
+                    ),
                     point_mm=[round(merged.point[0]), round(merged.point[1])],
                     direction=[round(merged.direction[0], 6), round(merged.direction[1], 6)],
                     views=len(group_lines),
@@ -168,16 +200,24 @@ def build_coordination(floors: Iterable[CoordinationFloor]) -> ObjectBaseCoordin
             )
         if not axes_out:
             doubts.append(f"{acc.label}: оси не найдены ни на одном этаже - сетки нет")
-        storeys: dict[int, ObjectBaseCoordinationStorey] = {}
-        for f in sorted(acc.floors, key=lambda f: f.base_z_mm):
-            row = storeys.get(f.base_z_mm)
+        storeys: dict[tuple[bool, int, str], ObjectBaseCoordinationStorey] = {}
+        for f in sorted(acc.floors, key=lambda f: (not f.elevation_known, f.base_z_mm)):
+            # Неизвестная отметка - свой этаж с пометкой, а не «этаж на 0.000».
+            key = (True, f.base_z_mm, "") if f.elevation_known else (False, 0, f.view_key)
+            row = storeys.get(key)
             if row is None:
-                storeys[f.base_z_mm] = ObjectBaseCoordinationStorey(
+                storeys[key] = ObjectBaseCoordinationStorey(
                     label=f.label,
                     base_z_mm=f.base_z_mm,
                     floor_height_mm=f.floor_height_mm,
+                    elevation_known=f.elevation_known,
                     view_keys=[f.view_key],
                 )
+                if not f.elevation_known:
+                    doubts.append(
+                        f"{acc.label}: у вида «{f.label}» отметка не найдена - "
+                        "этаж без отметки, в IFC не вошёл"
+                    )
             else:
                 row.view_keys.append(f.view_key)
         out.append(
@@ -336,6 +376,8 @@ def coordination_ifc(
         horizontal = [a for a in group.axes if a.orient == "horizontal"]
         storeys: list[str] = []
         for storey in group.storeys:
+            if not storey.elevation_known:
+                continue
             storey_place = step.placement(storey.base_z_mm, building_place)
             storey_ref = step.add(
                 f"IFCBUILDINGSTOREY({guid()},$,{_step_text(storey.label)},$,$,{storey_place},$,$,"

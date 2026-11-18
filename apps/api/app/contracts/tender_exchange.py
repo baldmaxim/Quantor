@@ -278,7 +278,7 @@ class ObjectBaseCoordinationAxis(_Strict):
     """Ось группы линией в мм системы здания: точка на оси и единичное направление."""
 
     label: str
-    # Как ось нарисована на виде: вертикальная (цифровая обычно) или горизонтальная.
+    # Направление оси в системе здания: вертикальная (вдоль Y) или горизонтальная (вдоль X).
     orient: Literal["vertical", "horizontal"]
     point_mm: Point2
     direction: Annotated[list[float], Field(min_length=2, max_length=2)]
@@ -291,6 +291,8 @@ class ObjectBaseCoordinationStorey(_Strict):
     label: str
     base_z_mm: int
     floor_height_mm: int
+    # Отметка взята с листа; нет - этаж без отметки (base_z_mm = 0 условно), в IFC не входит.
+    elevation_known: bool = True
     view_keys: list[ViewKey]
 
 

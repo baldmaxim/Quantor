@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.workspace import DEV_WORKSPACE_ID
 from app.domain import Role
+from app.services import mcp_server
 from app.services import projects as projects_service
 from tests.conftest import clean_settings
 from tests.test_api_tokens import TOKENS, _csrf
@@ -193,3 +194,29 @@ async def test_cookie_session_and_anonymous_are_refused(
         assert "токену" in by_cookie.json()["detail"]["message"]
     async with build_api(settings=_settings()) as anonymous:
         assert (await anonymous.post(MCP, json=_rpc("ping"))).status_code == 401
+
+
+async def test_size_type_batch_and_internal_errors_stay_json_rpc(
+    db_session: AsyncSession, build_api: Callable[..., AsyncClient], monkeypatch: Any
+) -> None:
+    """Тело только JSON (предел 4 МБ), пачка до 20, сбой инструмента - isError с тем же id."""
+    await _approved_user(db_session, role=Role.ENGINEER)
+    token = await _token(build_api, ["read"])
+
+    async def broken(_caller: Any, _args: dict[str, Any]) -> Any:
+        raise RuntimeError("сломалось внутри")
+
+    monkeypatch.setattr(mcp_server.TOOLS["find_projects"], "handler", broken)
+    async with build_api(settings=_settings()) as client:
+        client.headers["Authorization"] = f"Bearer {token}"
+        plain = await client.post(MCP, content=b"{}", headers={"Content-Type": "text/plain"})
+        assert plain.status_code == 415
+        many = await client.post(MCP, json=[_rpc("ping", message_id=i) for i in range(21)])
+        assert many.json()["error"]["code"] == -32600
+        failed = await client.post(MCP, json=_rpc("tools/call", {"name": "find_projects"}, 5))
+        body = failed.json()
+        assert failed.status_code == 200 and body["id"] == 5
+        assert (
+            body["result"]["isError"] is True
+            and "Внутренняя ошибка" in body["result"]["content"][0]["text"]
+        )

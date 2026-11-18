@@ -151,8 +151,10 @@ class Portal:
             if not 200 <= response.status < 300:
                 raise self._fail(response, raw)
             return json.loads(raw) if raw else None
-        except OSError as error:
+        except (OSError, http.client.HTTPException) as error:
             raise PortalError(f"Портал недоступен: {error}") from error
+        except ValueError as error:
+            raise PortalError("Портал ответил не JSON") from error
         finally:
             conn.close()
 
@@ -281,7 +283,8 @@ def cmd_coordination(portal: Portal, args: argparse.Namespace) -> tuple[int, Any
                 _say(f"Координационного файла нет: {error}")
                 return EXIT_MISSING, None
             raise
-        release = headers.get("x-quantor-base-release", "?")
+        release = headers.get("x-quantor-base-release", "")
+        release = release if release.isdigit() else "unknown"
         target = Path(args.output or f"coordination-{release}.{args.format}")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(temp.read_bytes())

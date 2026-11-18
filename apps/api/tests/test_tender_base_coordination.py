@@ -140,3 +140,31 @@ def test_ifc_этажи_сетка_и_ссылки() -> None:
         moment=datetime(2026, 11, 18, tzinfo=UTC),
     ).decode("ascii")
     assert again == data
+
+
+def test_лист_повёрнутый_на_90_сводится_в_ту_же_ось() -> None:
+    # Эталон: ось 1 вертикальная x = 1000. Лист второго этажа нарисован повёрнутым: там ось 1
+    # горизонтальная y = 500, «Здание» ставит его поворотом на 90° и сдвигом (1500, 0).
+    first = _floor(10, 0, _axes({"1": 1000}, {}), alignment="reference")
+    turned = _floor(11, 3000, _axes({}, {"1": 500}), rotation_deg=90.0, offset_mm=(1500.0, 0.0))
+    result = build_coordination([turned, first])
+    (axis,) = result.groups[0].axes
+    assert axis.label == "1" and axis.orient == "vertical"
+    assert axis.views == 2 and axis.spread_mm == 0 and axis.point_mm[0] == 1000
+    assert result.doubts == []
+
+
+def test_этаж_без_отметки_не_сливается_с_нулевым() -> None:
+    known = _floor(10, 0, _axes({"1": 0, "2": 6000}, {"А": 0, "Б": 5000}), alignment="reference")
+    unknown = _floor(11, 0, _axes({"1": 0, "2": 6000}, {"А": 0, "Б": 5000}), elevation_known=False)
+    coordination = build_coordination([known, unknown])
+    storeys = coordination.groups[0].storeys
+    assert [(s.base_z_mm, s.elevation_known) for s in storeys] == [(0, True), (0, False)]
+    assert any("отметка не найдена" in d for d in coordination.doubts)
+    ifc = coordination_ifc(
+        coordination,
+        project_name="X",
+        release_id=uuid.UUID(int=3),
+        moment=datetime(2026, 11, 18, tzinfo=UTC),
+    ).decode("ascii")
+    assert ifc.count("IFCBUILDINGSTOREY(") == 1
