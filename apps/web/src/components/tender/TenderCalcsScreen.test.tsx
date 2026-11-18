@@ -447,7 +447,9 @@ describe('раздел «Доступ для TENDER»', () => {
     expect(await within(dialog).findByDisplayValue('qtr_abcdef-секрет')).toBeInTheDocument();
     expect(within(dialog).getByRole('alert')).toBeInTheDocument();
     expect(client.createPersonalToken).toHaveBeenCalledWith(
-      expect.objectContaining({ body: { name: 'Ноутбук', expires_in_days: 90 } }),
+      expect.objectContaining({
+        body: { name: 'Ноутбук', expires_in_days: 90, scopes: ['tender'] },
+      }),
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Готово' }));
     await waitFor(() =>
