@@ -747,8 +747,11 @@ async def _write_view(
     source: ViewSource,
     *,
     include_dxf: bool,
-) -> tuple[str | None, ObjectBaseAxes]:
-    """Файлы одного вида в пакет. Возвращает версию генератора конструкций и оси вида."""
+) -> tuple[str | None, ObjectBaseAxes, tuple[cad_building3d.ObliqueAxis, ...]]:
+    """Файлы одного вида в пакет. Возвращает версию генератора конструкций, оси вида и оси под
+    углом к листу (в `axes.json` их нет: формат обмена с TENDER - только вертикальные и
+    горизонтальные; они идут только в координационный файл).
+    """
     floor, frame = source.floor, source.frame
     assert frame.origin_pt is not None and frame.mm_per_pdf_point is not None
     assert source.page_size_pt is not None
@@ -787,7 +790,7 @@ async def _write_view(
         await sink.add_bytes(f"{base}/risers.json", _dump(build_risers(risers)))
     if include_dxf and source.dxf_key is not None:
         await sink.add_stream(f"{base}/plan.dxf", storage.iter_stream(source.dxf_key))
-    return document.generator, axes
+    return document.generator, axes, cad_building3d.axes_in_mm(raw, frame).oblique
 
 
 def _select(sources: Sequence[ViewSource], view_keys: Sequence[str] | None) -> list[ViewSource]:
@@ -863,7 +866,7 @@ async def create_release(
         walls_generator: str | None = None
         coordination_floors: list[CoordinationFloor] = []
         for source in chosen:
-            generator, view_axes = await _write_view(
+            generator, view_axes, view_oblique = await _write_view(
                 session, storage, sink, source, include_dxf=body.include_dxf
             )
             walls_generator = walls_generator or generator
@@ -879,6 +882,7 @@ async def create_release(
                     rotation_deg=source.floor.rotation_deg,
                     alignment=source.floor.alignment,
                     axes=view_axes.axes,
+                    oblique=[(o.label, o.point_mm, o.direction) for o in view_oblique],
                     elevation_known=source.floor.elevation_known,
                 )
             )

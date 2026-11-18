@@ -59,6 +59,8 @@ class CoordinationFloor:
     axes: Sequence[ObjectBaseAxis]
     # Отметка известна (`base_z_mm` из листа); неизвестная хранится 0 и не должна сливаться с 0.000.
     elevation_known: bool = True
+    # Оси под углом к листу (cad_walls v1.19): подпись, точка и направление в мм кадра вида.
+    oblique: Sequence[tuple[str, tuple[float, float], tuple[float, float]]] = ()
 
 
 @dataclass
@@ -88,6 +90,15 @@ def _axis_line(axis: ObjectBaseAxis, floor: CoordinationFloor) -> _Line:
         point, direction = (float(axis.pos_mm), 0.0), (0.0, 1.0)
     else:
         point, direction = (0.0, float(axis.pos_mm)), (1.0, 0.0)
+    px, py = _rotate(*point, floor.rotation_deg)
+    dx, dy = _rotate(*direction, floor.rotation_deg)
+    return _Line((px + floor.offset_mm[0], py + floor.offset_mm[1]), (dx, dy), floor.view_key)
+
+
+def _oblique_line(
+    point: tuple[float, float], direction: tuple[float, float], floor: CoordinationFloor
+) -> _Line:
+    """Ось под углом к листу линией в системе здания: тот же поворот и сдвиг этажа."""
     px, py = _rotate(*point, floor.rotation_deg)
     dx, dy = _rotate(*direction, floor.rotation_deg)
     return _Line((px + floor.offset_mm[0], py + floor.offset_mm[1]), (dx, dy), floor.view_key)
@@ -153,22 +164,25 @@ def build_coordination(floors: Iterable[CoordinationFloor]) -> ObjectBaseCoordin
         families: dict[str, list[tuple[str, _Line]]] = {}
         ordered = sorted(placed, key=lambda f: f.view_key != reference)
         for f in ordered:
-            for axis in f.axes:
-                line = _axis_line(axis, f)
-                known = families.setdefault(axis.label, [])
-                match = next((orient for orient, ref in known if _parallel(line, ref)), None)
+            entries = [(a.label, a.orient, _axis_line(a, f)) for a in f.axes] + [
+                (label, "oblique", _oblique_line(point, direction, f))
+                for label, point, direction in f.oblique
+            ]
+            for label, orient, line in entries:
+                known = families.setdefault(label, [])
+                match = next((fam for fam, ref in known if _parallel(line, ref)), None)
                 if match is None:
-                    match = axis.orient if not known else f"{axis.orient}#{len(known)}"
+                    match = orient if not known else f"{orient}#{len(known)}"
                     if known:
                         doubts.append(
-                            f"{acc.label}: ось {axis.label} на виде «{f.label}» "
+                            f"{acc.label}: ось {label} на виде «{f.label}» "
                             "идёт поперёк той же оси "
                             "на других этажах - проверьте подписи или совмещение"
                         )
                     known.append((match, line))
-                ref_line = next(ref for orient, ref in known if orient == match)
-                lines.setdefault((match, axis.label), []).append(_aligned_with(line, ref_line))
-        floors_with_axes = sum(1 for f in placed if f.axes)
+                ref_line = next(ref for fam, ref in known if fam == match)
+                lines.setdefault((match, label), []).append(_aligned_with(line, ref_line))
+        floors_with_axes = sum(1 for f in placed if f.axes or f.oblique)
         axes_out: list[ObjectBaseCoordinationAxis] = []
         for (_family, label), group_lines in sorted(
             lines.items(), key=lambda kv: (kv[0][0] != "vertical", _label_order(kv[0][1]))

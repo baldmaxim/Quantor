@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 import uuid
 from datetime import UTC, datetime
@@ -168,3 +169,51 @@ def test_этаж_без_отметки_не_сливается_с_нулевы�
         moment=datetime(2026, 11, 18, tzinfo=UTC),
     ).decode("ascii")
     assert ifc.count("IFCBUILDINGSTOREY(") == 1
+
+
+def test_ось_под_углом_к_листу_входит_в_сетку_здания() -> None:
+    # Сводный план: корпус повёрнут на листе, его ось 7/1 - под углом (cad_walls v1.19). Этаж
+    # повёрнут «Зданием» на 26° - в системе здания ось ложится как на остальных этажах.
+    a = math.radians(64.0)
+    direction = (math.cos(a), -math.sin(a))
+    first = _floor(
+        10,
+        0,
+        _axes({"1": 1000}, {"А": 500}),
+        alignment="reference",
+        oblique=[("7/1", (2000.0, 1000.0), direction)],
+    )
+    second = _floor(
+        11, 3000, _axes({"1": 1000}, {"А": 500}), oblique=[("7/1", (2000.0, 1000.0), direction)]
+    )
+    result = build_coordination([first, second])
+    (group,) = result.groups
+    by_label = {x.label: x for x in group.axes}
+    assert set(by_label) == {"1", "А", "7/1"}
+    slanted = by_label["7/1"]
+    assert slanted.views == 2 and slanted.spread_mm == 0
+    assert slanted.direction == pytest.approx([direction[0], direction[1]], abs=1e-6)
+    # точка оси лежит на её линии в системе здания
+    nx, ny = -direction[1], direction[0]
+    offset = nx * 2000.0 + ny * 1000.0
+    assert nx * slanted.point_mm[0] + ny * slanted.point_mm[1] == pytest.approx(offset, abs=1.0)
+    assert result.doubts == []
+
+
+def test_ifc_с_осью_под_углом_остаётся_корректным() -> None:
+    a = math.radians(64.0)
+    floor = _floor(
+        10,
+        0,
+        _axes({"1": 1000, "2": 7000}, {"А": 500, "Б": 6500}),
+        alignment="reference",
+        oblique=[("7/1", (2000.0, 1000.0), (math.cos(a), -math.sin(a)))],
+    )
+    coordination = build_coordination([floor])
+    raw = coordination_ifc(
+        coordination,
+        project_name="Объект",
+        release_id=uuid.UUID(int=1),
+        moment=datetime(2026, 11, 18, tzinfo=UTC),
+    ).decode()
+    assert "IFCGRIDAXIS('7/1'" in raw

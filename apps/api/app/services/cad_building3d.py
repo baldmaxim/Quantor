@@ -642,15 +642,26 @@ def _natural_key(text: str) -> list[tuple[int, int, str]]:
 
 
 @dataclass(frozen=True, slots=True)
+class ObliqueAxis:
+    """Ось под углом к листу (cad_walls v1.19) в мм DXF: точка на оси и единичное направление."""
+
+    label: str
+    point_mm: tuple[float, float]
+    direction: tuple[float, float]
+
+
+@dataclass(frozen=True, slots=True)
 class FloorAxes:
     """Оси этажа в мм DXF: подпись -> координата (x у вертикальных, y у горизонтальных).
 
     `message` - почему оси непригодны для совмещения (нет блока, нет кадра, одно направление).
+    `oblique` - оси под углом к листу: в совмещение этажей не идут, только в координационный файл.
     """
 
     vertical: dict[str, float]
     horizontal: dict[str, float]
     message: str | None
+    oblique: tuple[ObliqueAxis, ...] = ()
 
     @property
     def usable(self) -> bool:
@@ -658,6 +669,9 @@ class FloorAxes:
 
 
 NO_AXES: Final = FloorAxes({}, {}, MESSAGE_AXES_OUTDATED)
+MESSAGE_AXES_OBLIQUE_ONLY: Final = (
+    "на листе только оси под углом к листу: для совмещения нужны вертикальные и горизонтальные"
+)
 
 
 def _axis_rows(raw: Any) -> list[tuple[str, str, float]]:
@@ -680,6 +694,51 @@ def _axis_rows(raw: Any) -> list[tuple[str, str, float]]:
     return rows
 
 
+def _finite(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _oblique_rows(raw: Any) -> list[tuple[str, float, tuple[float, float]]]:
+    """Оси под углом из блока `axes`: подпись, угол на листе (градусы), точка на оси (pt)."""
+    rows: list[tuple[str, float, tuple[float, float]]] = []
+    if not isinstance(raw, list):
+        return rows
+    for item in raw:
+        if not isinstance(item, dict) or item.get("orient") != "oblique":
+            continue
+        label, angle, point = item.get("label"), item.get("angle_deg"), item.get("point_pt")
+        if (
+            isinstance(label, str)
+            and label.strip()
+            and isinstance(angle, int | float)
+            and _finite(angle)
+            and isinstance(point, list)
+            and len(point) == 2
+            and all(_finite(v) for v in point)
+        ):
+            rows.append((label.strip(), float(angle), (float(point[0]), float(point[1]))))
+    return rows
+
+
+def _oblique_in_mm(
+    rows: list[tuple[str, float, tuple[float, float]]],
+    origin: tuple[float, float],
+    factor: float,
+) -> tuple[ObliqueAxis, ...]:
+    """Оси под углом в мм DXF: y листа вниз, y DXF вверх - направление (cos, -sin)."""
+    out: dict[str, ObliqueAxis] = {}
+    for label, angle, (px, py) in rows:
+        if label in out:
+            continue
+        a = math.radians(angle)
+        out[label] = ObliqueAxis(
+            label=label,
+            point_mm=((px - origin[0]) * factor, (origin[1] - py) * factor),
+            direction=(math.cos(a), -math.sin(a)),
+        )
+    return tuple(out.values())
+
+
 def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
     """Оси листа из walls.json в мм DXF по кадру вида.
 
@@ -690,7 +749,8 @@ def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
     if not isinstance(block, dict):
         return NO_AXES
     rows = _axis_rows(block.get("items"))
-    if not rows:
+    slanted = _oblique_rows(block.get("items"))
+    if not rows and not slanted:
         message = block.get("message")
         return FloorAxes(
             {}, {}, message if isinstance(message, str) and message else MESSAGE_AXES_EMPTY
@@ -698,6 +758,7 @@ def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
     origin, factor = frame.origin_pt, frame.mm_per_pdf_point
     if not frame.confirmed or origin is None or factor is None or factor <= 0:
         return FloorAxes({}, {}, frame.reason or MESSAGE_FRAME_MISSING)
+    oblique = _oblique_in_mm(slanted, (origin[0], origin[1]), factor)
     values: dict[tuple[str, str], list[float]] = {}
     for label, orient, pos in rows:
         mm = (pos - origin[0]) * factor if orient == "vertical" else (origin[1] - pos) * factor
@@ -709,12 +770,16 @@ def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
             continue
         (vertical if orient == "vertical" else horizontal)[label] = sum(mms) / len(mms)
     if vertical and horizontal:
-        return FloorAxes(vertical, horizontal, None)
+        return FloorAxes(vertical, horizontal, None, oblique)
     if not vertical and not horizontal:
-        return FloorAxes({}, {}, MESSAGE_AXES_EMPTY)
+        message = MESSAGE_AXES_OBLIQUE_ONLY if oblique else MESSAGE_AXES_EMPTY
+        return FloorAxes({}, {}, message, oblique)
     found = "вертикальные" if vertical else "горизонтальные"
     return FloorAxes(
-        vertical, horizontal, f"найдены только {found} оси: для совмещения нужны оба направления"
+        vertical,
+        horizontal,
+        f"найдены только {found} оси: для совмещения нужны оба направления",
+        oblique,
     )
 
 

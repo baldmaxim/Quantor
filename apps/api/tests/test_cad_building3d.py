@@ -1467,3 +1467,33 @@ def test_project_without_floors_has_no_placements() -> None:
     """Проект без готовых этажей: пусто, а не ошибка (раньше `max()` от пустого - 500)."""
     assert b3d.place_site([], []) == {}
     assert b3d.place_by_cores([], [], {}) == {}
+
+
+def test_oblique_axes_go_to_mm_but_not_into_alignment() -> None:
+    # cad_walls v1.19: ось под углом к листу - точка и угол на странице; в мм DXF y вверх.
+    block = axes_block(REF_X, REF_Y)
+    block["items"].append(
+        {"label": "7/1", "orient": "oblique", "angle_deg": 64.0, "point_pt": [600.0, 300.0]}
+    )
+    block["items"].append({"label": "bad", "orient": "oblique", "angle_deg": "x"})
+    axes = b3d.axes_in_mm({"axes": block}, FRAME)
+    assert axes.usable and set(axes.vertical) == set(REF_X)
+    (oblique,) = axes.oblique
+    assert oblique.label == "7/1"
+    assert oblique.point_mm == pytest.approx((1000.0, 400.0))
+    assert oblique.direction == pytest.approx(
+        (math.cos(math.radians(64.0)), -math.sin(math.radians(64.0)))
+    )
+
+
+def test_only_oblique_axes_are_kept_with_alignment_message() -> None:
+    block = {
+        "status": "found",
+        "items": [
+            {"label": "1", "orient": "oblique", "angle_deg": 31.0, "point_pt": [200.0, 200.0]},
+            {"label": "А", "orient": "oblique", "angle_deg": 121.0, "point_pt": [250.0, 260.0]},
+        ],
+    }
+    axes = b3d.axes_in_mm({"axes": block}, FRAME)
+    assert not axes.usable and len(axes.oblique) == 2
+    assert axes.message == b3d.MESSAGE_AXES_OBLIQUE_ONLY
