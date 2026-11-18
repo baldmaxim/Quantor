@@ -26,6 +26,7 @@ BASE_ZONES_SCHEMA: Final = "quantor.object_base.zones.v1"
 BASE_CONSTRUCTIONS_SCHEMA: Final = "quantor.object_base.constructions.v1"
 BASE_RISERS_SCHEMA: Final = "quantor.object_base.risers.v1"
 BASE_BUILDING_SCHEMA: Final = "quantor.object_base.building.v1"
+BASE_COORDINATION_SCHEMA: Final = "quantor.object_base.coordination.v1"
 
 CALC_SCHEMA: Final = "quantor.tender_calc.v1"
 CALC_VIEW_SCHEMA: Final = "quantor.tender_calc.view.v1"
@@ -482,6 +483,7 @@ PACKAGE_MODELS: Final[dict[str, type[BaseModel]]] = {
     BASE_CONSTRUCTIONS_SCHEMA: ObjectBaseConstructions,
     BASE_RISERS_SCHEMA: ObjectBaseRisers,
     BASE_BUILDING_SCHEMA: ObjectBaseBuilding,
+    BASE_COORDINATION_SCHEMA: ObjectBaseCoordination,
     CALC_SCHEMA: CalcManifest,
     CALC_VIEW_SCHEMA: CalcViewFile,
     CALC_QUANTITIES_SCHEMA: CalcQuantitiesFile,

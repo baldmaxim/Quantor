@@ -71,7 +71,7 @@ export const BaseReleaseDialog: FC<IDialogProps> = ({ projectId, open, onClose }
       busy={busy}
       size="lg"
       title="Выпустить базу объекта"
-      description="Выпуск неизменяем: в него войдёт состояние выбранных этажей на сейчас."
+      description="Выпуск неизменяем: в него войдёт состояние выбранных этажей на сейчас. В ZIP есть и координационный файл - общая сетка осей и этажи (coordination.json и coordination.ifc)."
       onExited={() => {
         create.reset();
         setOverrides({});
