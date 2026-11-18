@@ -65,5 +65,8 @@ async def read_meta(request: Request, session: SessionDep, settings: SettingsDep
     dependencies=[require(Permission.WORKSPACE_READ)],
 )
 async def openapi_for_agents(request: Request) -> JSONResponse:
-    """Описание API для агентов и скриптов: только вошедшим и по токену (`/api/docs` наружу закрыт)."""
+    """Описание API для агентов и скриптов: только вошедшим и по токену.
+
+    `/api/docs` наружу закрыт: вход на портал маршрутизирует только `/api/v1`.
+    """
     return JSONResponse(request.app.openapi())

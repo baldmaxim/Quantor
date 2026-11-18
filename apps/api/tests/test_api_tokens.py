@@ -331,7 +331,8 @@ async def test_scopes_union_within_the_owner_role() -> None:
     assert Permission.DOCUMENT_UPLOAD not in read and Permission.TENDER_CALC_UPLOAD not in read
     upload = permissions_for_scopes(Role.ENGINEER, ["upload"])
     assert Permission.DOCUMENT_UPLOAD in upload and Permission.TENDER_CALC_UPLOAD not in upload
-    assert Permission.TENDER_CALC_UPLOAD in permissions_for_scopes(Role.ENGINEER, ["read", "tender"])
+    read_tender = permissions_for_scopes(Role.ENGINEER, ["read", "tender"])
+    assert Permission.TENDER_CALC_UPLOAD in read_tender
     assert permissions_for_scopes(Role.ENGINEER, ["admin"]) == frozenset()
     everything = permissions_for_scopes(Role.ENGINEER, ["read", "tender", "upload"])
     assert everything <= permissions_for(Role.ENGINEER)
@@ -367,7 +368,8 @@ async def test_read_token_reads_but_cannot_upload_and_sees_the_agent_openapi(
         assert (await bearer.get("/api/v1/projects")).status_code == 200
         spec = await bearer.get("/api/v1/meta/openapi.json")
         assert spec.status_code == 200
-        assert "/api/v1/projects/{project_id}/tender/base/coordination.{fmt}" in spec.json()["paths"]
+        coordination = "/api/v1/projects/{project_id}/tender/base/coordination.{fmt}"
+        assert coordination in spec.json()["paths"]
         upload = await bearer.post(
             f"/api/v1/projects/{project.id}/uploads",
             files={"file": ("a.ifc", b"ISO-10303-21;", "application/octet-stream")},

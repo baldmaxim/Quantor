@@ -740,6 +740,10 @@ class TenderBuildingLayersRead(BaseModel):
 TokenScope = Literal["read", "tender", "upload"]
 
 
+def _tender_scope() -> list[TokenScope]:
+    return ["tender"]
+
+
 class PersonalTokenCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -747,7 +751,7 @@ class PersonalTokenCreate(BaseModel):
     expires_in_days: int | None = Field(default=None, ge=1, le=365)
     # Для чего токен: `read` - только чтение (агенты), `tender` - обмен расчётами TENDER, `upload` -
     # загрузка документов и модели здания. Права - объединение областей в пределах роли владельца.
-    scopes: list[TokenScope] = Field(default_factory=lambda: ["tender"], min_length=1, max_length=3)
+    scopes: list[TokenScope] = Field(default_factory=_tender_scope, min_length=1, max_length=3)
 
 
 class PersonalTokenRead(BaseModel):
