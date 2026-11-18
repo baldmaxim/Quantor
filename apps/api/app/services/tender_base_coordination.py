@@ -354,7 +354,8 @@ def coordination_ifc(
             v = _grid_axes(step, horizontal, vertical, curves)
             curve_set = step.add(f"IFCGEOMETRICCURVESET(({','.join(curves)}))")
             shape = step.add(
-                f"IFCSHAPEREPRESENTATION({axis_context},'FootPrint','GeometricCurveSet',({curve_set}))"
+                f"IFCSHAPEREPRESENTATION({axis_context},'FootPrint',"
+                f"'GeometricCurveSet',({curve_set}))"
             )
             product_shape = step.add(f"IFCPRODUCTDEFINITIONSHAPE($,$,({shape}))")
             grid_place = step.placement(0.0, storey_place)
