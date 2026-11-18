@@ -87,7 +87,7 @@ async def mcp_endpoint(
         base_url=INTERNAL_BASE_URL,
         headers={
             "Authorization": request.headers.get("authorization", ""),
-            "User-Agent": f"{request.headers.get('user-agent', 'MCP')} (через MCP)",
+            "User-Agent": f"{request.headers.get('user-agent', 'MCP')} (via quantor-mcp)",
             REQUEST_ID_HEADER: get_request_id() or "",
         },
         timeout=INTERNAL_TIMEOUT_SECONDS,
@@ -98,7 +98,9 @@ async def mcp_endpoint(
     return JSONResponse(answer)
 
 
-@router.get("/mcp", include_in_schema=False)
+@router.get(
+    "/mcp", include_in_schema=False, dependencies=[require(Permission.WORKSPACE_READ)]
+)
 async def mcp_without_stream() -> Response:
     """Потока событий сервер не держит: всё - ответами на POST."""
     return Response(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, headers={"Allow": "POST"})
