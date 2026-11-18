@@ -23427,6 +23427,20 @@ export type ReadCadOutlineSourceResponses = {
     200: unknown;
 };
 
+export type McpEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/mcp';
+};
+
+export type McpEndpointResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ListPersonalTokensData = {
     body?: never;
     path?: never;

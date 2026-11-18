@@ -44852,6 +44852,25 @@
         ]
       }
     },
+    "/api/v1/mcp": {
+      "post": {
+        "operationId": "mcp_endpoint",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "MCP-сервер для ИИ-агентов (JSON-RPC 2.0), только по личному токену",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
     "/api/v1/me/api-tokens": {
       "get": {
         "operationId": "list_personal_tokens",
