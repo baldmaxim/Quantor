@@ -43,6 +43,7 @@ from app.contracts.cad_building3d import (
     CadBuilding3dWallRead,
     CadBuilding3dWarningRead,
 )
+from app.contracts.cad_constructions import CadSheetFloorTitle
 from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.models import Job, SheetPassport
@@ -51,11 +52,13 @@ from app.services import cad_building3d as b3d
 from app.services import cad_building3d_windows as b3d_windows
 from app.services import (
     cad_facade_windows,
+    cad_project_levels,
     cad_site_cores,
     cad_site_pins,
     cad_views,
     sheet_passports,
 )
+from app.services.cad_floor_title import floors_text, format_floor_title
 from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectStorage
@@ -345,6 +348,126 @@ def expand_typical(
             )
             copies.append((copy, item))
     return real, copies
+
+
+# --------------------------------------------------------------------------- отметки проекта
+
+# Отметка по паспорту или схеме КР заменяет отметку по знакам плана, только если они расходятся
+# больше этого: пирог пола и местные перепады плиты - сотни мм, ошибочный знак плана - метры
+# (объект 346: выход на кровлю корпуса 5 на -23,26 м при +112,95 в заголовке).
+PROJECT_LEVEL_TOLERANCE_MM: Final = 400
+# Типовой лист шире этого по паспорту - не перечень этажей, а ошибка разбора: не размножается.
+PROJECT_FLOORS_MAX: Final = 60
+
+
+def _sheet_floors(sheet: b3d.SheetRef, item: b3d._SheetFloor) -> list[int]:
+    """Номера этажей листа: из заголовка плана (cad_walls), иначе «от - до» паспорта."""
+    numbers = [int(f) for f in item.title_floors if f.lstrip("-").isdigit()]
+    if numbers:
+        return numbers
+    first, last = sheet.passport_floor_from, sheet.passport_floor_to
+    if first is None:
+        return []
+    last = first if last is None else last
+    if not 0 <= last - first <= PROJECT_FLOORS_MAX:
+        return []
+    return [n for n in range(first, last + 1) if n != 0]
+
+
+def _own_floor(
+    floors: Sequence[int],
+    corps: str,
+    floor: CadBuilding3dFloorRead,
+    levels: cad_project_levels.ProjectLevels,
+) -> int | None:
+    """Этаж самого листа среди его этажей с отметкой КР: ближайший по отметке, иначе первый."""
+    known = [f for f in floors if (corps, f) in levels]
+    if not known:
+        return None
+    if not floor.elevation_known:
+        return known[0]
+    return min(
+        known, key=lambda f: (abs(levels[(corps, f)].z_mm - floor.base_z_mm), floors.index(f))
+    )
+
+
+def _typical_label(floor: CadBuilding3dFloorRead, number: int, sheet_floors: str) -> str:
+    title = CadSheetFloorTitle(
+        corps=floor.corps, section=floor.section, floors=[str(number)], kind=floor.kind
+    )
+    return f"{format_floor_title(title, floor.label)} (по листу «{sheet_floors} эт.»)"
+
+
+def apply_project_levels(
+    sheets: Sequence[b3d.SheetRef],
+    loaded: Sequence[b3d._SheetFloor],
+    levels: cad_project_levels.ProjectLevels,
+) -> list[b3d._SheetFloor]:
+    """Отметки этажей и типовые этажи по паспортам, когда в заголовке плана отметок нет.
+
+    Отметка этажа: из заголовка листа по паспорту, иначе из схемы КР корпуса для этажа листа;
+    отметку по знакам плана она заменяет при расхождении больше `PROJECT_LEVEL_TOLERANCE_MM`
+    (с предупреждением). Типовой лист («5-16 этажа») разносится по отметкам КР своих этажей.
+    Лист с отметками в заголовке плана не трогается: там отметки дал сам лист.
+    """
+    out: list[b3d._SheetFloor] = []
+    for sheet, item in zip(sheets, loaded, strict=True):
+        floor = item.floor
+        if floor is None or item.title_marked:
+            out.append(item)
+            continue
+        corps = cad_project_levels.corps_key(floor.corps or sheet.passport_building)
+        floors = _sheet_floors(sheet, item)
+        warnings = list(item.warnings)
+        target: int | None = None
+        why = ""
+        if sheet.passport_elevation_mm is not None:
+            target, why = sheet.passport_elevation_mm, "по заголовку листа"
+        elif corps is not None and floors:
+            own = _own_floor(floors, corps, floor, levels)
+            if own is not None:
+                level = levels[(corps, own)]
+                target, why = level.z_mm, f"по схеме КР ({level.ref})"
+        if target is not None and (
+            not floor.elevation_known or abs(floor.base_z_mm - target) > PROJECT_LEVEL_TOLERANCE_MM
+        ):
+            before = floor.base_z_mm if floor.elevation_known else None
+            floor = _lifted(floor, target - floor.base_z_mm).model_copy(
+                update={"elevation_known": True}
+            )
+            text = f"{floor.label}: отметка этажа {target / 1000:+.3f} {why}"
+            if before is not None:
+                text += f" вместо {before / 1000:+.3f} по знакам отметок плана"
+            warnings.append(
+                CadBuilding3dWarningRead(code="floor_elevation_project", message=f"{text}.")
+            )
+        typical = item.typical
+        if typical is None and corps is not None and len(floors) > 1 and floor.elevation_known:
+            own = _own_floor(floors, corps, floor, levels)
+            if own is not None:
+                base = levels[(corps, own)].z_mm
+                sheet_floors = floors_text([str(f) for f in floors]) or ""
+                others = tuple(
+                    (_typical_label(floor, f, sheet_floors), levels[(corps, f)].z_mm - base)
+                    for f in floors
+                    if f != own and (corps, f) in levels and levels[(corps, f)].z_mm != base
+                )
+                if others:
+                    typical = b3d.TypicalPlan(_typical_label(floor, own, sheet_floors), others)
+                    warnings = [w for w in warnings if w.code != "typical_floors_unplaced"]
+                    missing = [str(f) for f in floors if f != own and (corps, f) not in levels]
+                    if missing:
+                        warnings.append(
+                            CadBuilding3dWarningRead(
+                                code="typical_floors_unplaced",
+                                message=f"{floor.label}: этажи {', '.join(missing)} - отметок в "
+                                "схемах КР нет, не показаны.",
+                            )
+                        )
+        out.append(
+            dataclasses.replace(item, floor=floor, typical=typical, warnings=tuple(warnings))
+        )
+    return out
 
 
 # --------------------------------------------------------------------------- высота по стопке
@@ -777,6 +900,9 @@ async def build_building3d(
             for sheet in sheets
         )
     )
+    # Отметки этажей по паспортам (заголовок листа, схемы КР) - до окон: окна ставятся от базы.
+    project_levels = await cad_project_levels.load_project_levels(session, project_id=project_id)
+    loaded = apply_project_levels(sheets, loaded, project_levels)
     window_results: list[b3d_windows.FloorWindows | None] = []
     views_failed = False
     if include_walls:

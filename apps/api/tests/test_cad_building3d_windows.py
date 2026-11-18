@@ -22,7 +22,7 @@ from app.services import cad_building3d as b3d
 from app.services import cad_building3d_assembly as assembly
 from app.services import cad_building3d_windows as windows
 from app.services import cad_facade_windows as fw
-from app.services import cad_site_pins
+from app.services import cad_project_levels, cad_site_pins
 from app.services.cad_constructions import ProjectSlab
 from tests.conftest import FakeObjectStorage
 from tests.test_cad_facade_windows import FACADE_OK, view
@@ -280,6 +280,9 @@ def _serve(monkeypatch: pytest.MonkeyPatch, sheets: list[b3d.SheetRef], loads: l
     async def no_pins(_session: AsyncSession, **_kwargs: object) -> list[object]:
         return []
 
+    async def no_levels(_session: AsyncSession, **_kwargs: object) -> dict[object, object]:
+        return {}
+
     async def load_views(
         _session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
     ) -> fw.LoadedViews:
@@ -289,6 +292,7 @@ def _serve(monkeypatch: pytest.MonkeyPatch, sheets: list[b3d.SheetRef], loads: l
     monkeypatch.setattr(b3d, "collect_sheets", collect)
     monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
     monkeypatch.setattr(cad_site_pins, "active_site_pins", no_pins)
+    monkeypatch.setattr(cad_project_levels, "load_project_levels", no_levels)
     monkeypatch.setattr(fw, "load_views", load_views)
 
 

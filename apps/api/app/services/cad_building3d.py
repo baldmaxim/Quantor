@@ -290,6 +290,11 @@ class SheetRef:
     passport_kind: str | None = None
     passport_building: str | None = None
     passport_section: str | None = None
+    # Отметка из заголовка листа по паспорту (мм) и этажи листа «от - до» (номера этажей):
+    # отметка этажа и типовые этажи, когда движок не нашёл отметок в заголовке (объект 346).
+    passport_elevation_mm: int | None = None
+    passport_floor_from: int | None = None
+    passport_floor_to: int | None = None
     # Показан прежний прогон листа (у нового конструкций ещё нет): текст предупреждения.
     previous_run_note: str | None = None
 
@@ -2878,6 +2883,9 @@ async def collect_sheets(
                     SheetPassport.sheet_kind,
                     SheetPassport.building,
                     SheetPassport.section,
+                    SheetPassport.elevation_m,
+                    SheetPassport.level_from_ordinal,
+                    SheetPassport.level_to_ordinal,
                 ).where(
                     SheetPassport.project_id == project_id,
                     SheetPassport.revision_id.in_(list(revisions)),
@@ -2945,10 +2953,23 @@ async def collect_sheets(
                         passport_kind=None if passport is None else passport.sheet_kind,
                         passport_building=None if passport is None else _clean(passport.building),
                         passport_section=None if passport is None else _clean(passport.section),
+                        passport_elevation_mm=_passport_mm(passport),
+                        passport_floor_from=None
+                        if passport is None
+                        else passport.level_from_ordinal,
+                        passport_floor_to=None if passport is None else passport.level_to_ordinal,
                         previous_run_note=note,
                     )
                 )
     return sheets, [], project_slab
+
+
+def _passport_mm(passport: Any) -> int | None:
+    """Отметка из заголовка листа по паспорту, мм; нет паспорта или отметки - `None`."""
+    value = None if passport is None else passport.elevation_m
+    if not isinstance(value, int | float) or not math.isfinite(value):
+        return None
+    return round(value * 1000)
 
 
 def _walls_state(walls: Job | None) -> str:
@@ -3075,6 +3096,10 @@ class _SheetFloor:
     service: str | None = None
     # Окна листа без высоты в плане (только при `include_walls`); высоты - на каждый запрос.
     windows: WindowSource | None = None
+    # Этажи заголовка плана (cad_walls) и есть ли в заголовке отметки: без отметок отметку этажа
+    # и типовые этажи даёт паспорт листа и схемы КР (`cad_project_levels`).
+    title_floors: tuple[str, ...] = ()
+    title_marked: bool = False
 
 
 # Ключ - всё, от чего зависит этаж листа: адрес и подпись листа, ключи артефактов (неизменны в
@@ -3227,7 +3252,17 @@ def _sheet_floor(
         + sum(len(wall.shell) for wall in floor.walls or ())
         + sum(len(zone.shell) + sum(len(h) for h in zone.holes) for zone in floor.levels)
     )
-    return _SheetFloor(floor, tuple(floor_warnings), axes, cost, cores, typical, windows=windows)
+    return _SheetFloor(
+        floor,
+        tuple(floor_warnings),
+        axes,
+        cost,
+        cores,
+        typical,
+        windows=windows,
+        title_floors=tuple(title.floors) if title is not None else (),
+        title_marked=title is not None and bool(title.marks_mm),
+    )
 
 
 def core_rings(document: WallsDocument) -> tuple[CoreRing, ...]:
