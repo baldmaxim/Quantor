@@ -16,10 +16,13 @@ from httpx import AsyncClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.permissions import Permission, permissions_for
 from app.core.config import Settings
 from app.core.workspace import DEV_WORKSPACE_ID
 from app.domain import AuditAction, Role
 from app.models import ApiToken, AuditEvent, UserIdentity, Workspace
+from app.services import projects as projects_service
+from app.services.api_tokens import permissions_for_scopes
 from tests.conftest import clean_settings
 from tests.test_local_auth import EMAIL, PASSWORD, _approved_user, _login
 from tests.test_tender_exchange import _project_with_release, _url, build_package
@@ -319,3 +322,59 @@ async def test_engineer_token_uploads_a_calc_but_cannot_release_a_base(
         )
     ).scalar_one()
     assert author.credential == "api_token"
+
+
+async def test_scopes_union_within_the_owner_role() -> None:
+    """Области складываются, но не выходят за роль владельца и не дают создавать проекты."""
+    read = permissions_for_scopes(Role.ENGINEER, ["read"])
+    assert {Permission.DOCUMENT_READ, Permission.JOBS_READ, Permission.TENDER_CALC_READ} <= read
+    assert Permission.DOCUMENT_UPLOAD not in read and Permission.TENDER_CALC_UPLOAD not in read
+    upload = permissions_for_scopes(Role.ENGINEER, ["upload"])
+    assert Permission.DOCUMENT_UPLOAD in upload and Permission.TENDER_CALC_UPLOAD not in upload
+    assert Permission.TENDER_CALC_UPLOAD in permissions_for_scopes(Role.ENGINEER, ["read", "tender"])
+    assert permissions_for_scopes(Role.ENGINEER, ["admin"]) == frozenset()
+    everything = permissions_for_scopes(Role.ENGINEER, ["read", "tender", "upload"])
+    assert everything <= permissions_for(Role.ENGINEER)
+    assert Permission.PROJECT_CREATE not in everything
+    assert Permission.TENDER_BASE_RELEASE not in everything
+
+
+async def test_token_scopes_are_stored_in_order_and_unknown_is_refused(
+    db_session: AsyncSession, build_api: Callable[..., AsyncClient]
+) -> None:
+    await _approved_user(db_session)
+    async with _session_client(build_api) as client:
+        created = await _issue(client, scopes=["upload", "read", "read"])
+        assert created["scopes"] == ["read", "upload"]
+        bad = await client.post(
+            TOKENS, json={"name": "x", "scopes": ["admin"]}, headers=_csrf(client)
+        )
+        assert bad.status_code == 422
+
+
+async def test_read_token_reads_but_cannot_upload_and_sees_the_agent_openapi(
+    db_session: AsyncSession, build_api: Callable[..., AsyncClient]
+) -> None:
+    """Токен агента «только чтение»: проекты и описание API - да, загрузка - нет."""
+    await _approved_user(db_session, role=Role.ENGINEER)
+    project = await projects_service.create_project(
+        db_session, workspace_id=DEV_WORKSPACE_ID, name="Агент"
+    )
+    async with _session_client(build_api) as client:
+        token = (await _issue(client, scopes=["read"]))["token"]
+
+    async with _bearer(build_api, token) as bearer:
+        assert (await bearer.get("/api/v1/projects")).status_code == 200
+        spec = await bearer.get("/api/v1/meta/openapi.json")
+        assert spec.status_code == 200
+        assert "/api/v1/projects/{project_id}/tender/base/coordination.{fmt}" in spec.json()["paths"]
+        upload = await bearer.post(
+            f"/api/v1/projects/{project.id}/uploads",
+            files={"file": ("a.ifc", b"ISO-10303-21;", "application/octet-stream")},
+        )
+        assert upload.status_code == 403
+        missing = await bearer.get(_url(project.id, "base/coordination.ifc"))
+        assert missing.status_code == 404
+
+    async with build_api(settings=_settings()) as anonymous:
+        assert (await anonymous.get("/api/v1/meta/openapi.json")).status_code == 401

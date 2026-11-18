@@ -1016,6 +1016,15 @@ async def test_base_release_builds_a_checked_package(
         listed = (await api.get(_url(project_id, "base/releases"))).json()
         assert [r["number"] for r in listed] == [2, 1]
 
+        # Агенту - одним запросом: координационный файл последнего действующего выпуска (№ 2).
+        coord_json = await api.get(_url(project_id, "base/coordination.json"))
+        assert coord_json.status_code == 200, coord_json.text
+        assert coord_json.headers["x-quantor-base-release"] == "2"
+        assert coord_json.json()["schema"] == "quantor.object_base.coordination.v1"
+        coord_ifc = await api.get(_url(project_id, "base/coordination.ifc"))
+        assert coord_ifc.status_code == 200 and coord_ifc.text.startswith("ISO-10303-21;")
+        assert (await api.get(_url(project_id, "base/coordination.dwg"))).status_code == 422
+
     archive = zipfile.ZipFile(io.BytesIO(download.content))
     names = set(archive.namelist())
     folder = f"views/p0000-v1-{revision_id[:8]}"

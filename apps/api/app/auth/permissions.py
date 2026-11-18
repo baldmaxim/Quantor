@@ -173,6 +173,26 @@ API_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
 )
 
 
+# Область `read` (API для агентов, 2026-11-18): только чтение - пространство, проекты, документы и
+# их разбор (виды, оси, «Здание», модель), задания, выпуски базы и расчёты. Ничего не меняет.
+READ_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
+    {
+        Permission.WORKSPACE_READ,
+        Permission.PROJECT_READ,
+        Permission.DOCUMENT_READ,
+        Permission.JOBS_READ,
+        Permission.TENDER_CALC_READ,
+    }
+)
+
+# Область `upload`: чтение и загрузка документов (новые ревизии, IFC), а с ней всё, что на портале
+# закрыто тем же правом: построение модели здания из IFC, задания разбора чертежей. Как у человека с
+# этой ролью, но без создания проектов, расчёта, выпуска базы и токенов.
+UPLOAD_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = READ_TOKEN_PERMISSIONS | frozenset(
+    {Permission.DOCUMENT_UPLOAD}
+)
+
+
 def permissions_for(role: Role) -> frozenset[Permission]:
     """Набор разрешений роли."""
     return ROLE_PERMISSIONS[role]

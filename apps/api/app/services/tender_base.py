@@ -1030,6 +1030,23 @@ def release_read(release: TenderBaseRelease, names: dict[uuid.UUID, str]) -> Ten
     )
 
 
+async def read_package_member(storage: ObjectStorage, key: str, name: str) -> bytes | None:
+    """Один файл из ZIP выпуска: пакет качается из хранилища во временный файл, не в память."""
+    with tempfile.TemporaryFile() as handle:
+        async for chunk in storage.iter_stream(key):
+            await asyncio.to_thread(handle.write, chunk)
+
+        def pick() -> bytes | None:
+            handle.seek(0)
+            with zipfile.ZipFile(handle) as archive:
+                try:
+                    return archive.read(name)
+                except KeyError:
+                    return None
+
+        return await asyncio.to_thread(pick)
+
+
 async def list_releases(
     session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
 ) -> list[TenderBaseRelease]:

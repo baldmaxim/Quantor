@@ -7,10 +7,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app import API_VERSION, SCHEMA_VERSION
-from app.api.v1.deps import SessionDep, SettingsDep
+from app.api.v1.deps import SessionDep, SettingsDep, require
+from app.auth.permissions import Permission
 from app.auth.resolver import optional_context
 from app.core.config import AuthMode
 from app.services import feature_flags as flags_service
@@ -55,3 +57,13 @@ async def read_meta(request: Request, session: SessionDep, settings: SettingsDep
         features=features,
         auth_mode=settings.auth_mode,
     )
+
+
+@router.get(
+    "/meta/openapi.json",
+    include_in_schema=False,
+    dependencies=[require(Permission.WORKSPACE_READ)],
+)
+async def openapi_for_agents(request: Request) -> JSONResponse:
+    """Описание API для агентов и скриптов: только вошедшим и по токену (`/api/docs` наружу закрыт)."""
+    return JSONResponse(request.app.openapi())

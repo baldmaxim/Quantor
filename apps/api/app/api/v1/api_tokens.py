@@ -86,6 +86,7 @@ async def create_personal_token(
         workspace_id=context.tenant,
         name=body.name,
         expires_in_days=body.expires_in_days,
+        scopes=body.scopes,
     )
     await audit_service.record(
         session,

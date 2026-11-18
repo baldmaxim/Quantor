@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, File, Query, Response, UploadFile, status
@@ -173,6 +173,52 @@ async def list_tender_base_releases(
         session, [r.released_by for r in releases] + [r.revoked_by for r in releases]
     )
     return [tender_base.release_read(release, names) for release in releases]
+
+
+@router.get(
+    "/base/coordination.{fmt}",
+    summary="Координационный файл (сетка осей и этажи) последнего действующего выпуска базы",
+    dependencies=[require(Permission.TENDER_CALC_READ)],
+    response_class=Response,
+)
+async def read_latest_coordination(
+    project_id: uuid.UUID,
+    fmt: Literal["json", "ifc"],
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+) -> Response:
+    """Для агентов: один запрос вместо «список выпусков -> ZIP -> распаковка». Номер выпуска - в
+    заголовке `X-Quantor-Base-Release`; отозванные выпуски пропускаются."""
+    project = await _project(session, context, project_id)
+    releases = await tender_base.list_releases(
+        session, workspace_id=project.workspace_id, project_id=project.id
+    )
+    live = next((r for r in releases if r.revoked_at is None), None)
+    if live is None:
+        raise not_found("Действующий выпуск базы")
+    try:
+        data = await tender_base.read_package_member(
+            storage, live.package_key, f"coordination.{fmt}"
+        )
+    except ObjectNotFoundError as error:
+        raise http_error(ErrorCode.CONTENT_NOT_AVAILABLE) from error
+    except StorageUnavailableError as error:
+        raise http_error(ErrorCode.STORAGE_UNAVAILABLE) from error
+    if data is None:
+        raise http_error(
+            ErrorCode.NOT_FOUND,
+            message="В последнем выпуске нет координационного файла: выпустите базу заново",
+        )
+    filename = f"coordination-{live.number}.{fmt}"
+    return Response(
+        content=data,
+        media_type="application/json" if fmt == "json" else "application/x-step",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+            "X-Quantor-Base-Release": str(live.number),
+        },
+    )
 
 
 @router.get(

@@ -24,7 +24,7 @@ from app.auth import cache as auth_cache
 from app.auth import csrf, oidc, sessions
 from app.auth.context import AuthContext, CredentialKind, Principal
 from app.auth.dev import DEV_ROLE_HEADER, dev_context
-from app.auth.permissions import API_TOKEN_PERMISSIONS, Permission, permissions_for
+from app.auth.permissions import Permission, permissions_for
 from app.auth.session_cookie import STATE_KEY, SessionCookieRefresh
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
@@ -89,11 +89,7 @@ async def get_auth_context(
     if credential is CredentialKind.API_TOKEN:
         workspace_id, role = await _resolve_token_workspace(request, session, identity)
         # Права токена - права роли владельца, суженные областью токена (ADR-0051).
-        granted = (
-            permissions_for(role) & API_TOKEN_PERMISSIONS
-            if api_tokens_service.SCOPE_TENDER in identity.token_scopes
-            else frozenset[Permission]()
-        )
+        granted = api_tokens_service.permissions_for_scopes(role, identity.token_scopes)
     else:
         workspace_id, role = await _resolve_workspace(request, session, identity)
         granted = permissions_for(role)

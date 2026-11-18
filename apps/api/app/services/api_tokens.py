@@ -1,7 +1,8 @@
 """Персональные API-токены `qtk_…` (ADR-0051): выпуск, список, отзыв, опознание.
 
 Токен — `qtk_` и 40 знаков `secrets.token_urlsafe`; в базе только sha256 и первые 12 знаков для
-показа. Токен привязан к пространству и области (`scopes`, в версии 1 — `["tender"]`). Отзыв и
+показа. Токен привязан к пространству и областям (`scopes`: `read`, `tender`, `upload`; права токена -
+права роли владельца, суженные объединением прав его областей). Отзыв и
 истечение действуют сразу: токен проверяется по базе при каждом запросе, кэша у него нет.
 """
 
@@ -10,17 +11,35 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
+from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Final
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.permissions import (
+    API_TOKEN_PERMISSIONS,
+    READ_TOKEN_PERMISSIONS,
+    UPLOAD_TOKEN_PERMISSIONS,
+    Permission,
+    permissions_for,
+)
+from app.domain import Role
 from app.models import ApiToken
 from app.models.api_token import API_TOKEN_PREFIX_LENGTH
 
 QTK_PREFIX: Final = "qtk_"
 SCOPE_TENDER: Final = "tender"
+# API для агентов: только чтение и загрузка документов/модели.
+SCOPE_READ: Final = "read"
+SCOPE_UPLOAD: Final = "upload"
+SCOPES: Final = (SCOPE_READ, SCOPE_TENDER, SCOPE_UPLOAD)
+SCOPE_PERMISSIONS: Final[dict[str, frozenset[Permission]]] = {
+    SCOPE_READ: READ_TOKEN_PERMISSIONS,
+    SCOPE_TENDER: API_TOKEN_PERMISSIONS,
+    SCOPE_UPLOAD: UPLOAD_TOKEN_PERMISSIONS,
+}
 # 30 байт дают ровно 40 знаков urlsafe-base64 без добивки.
 _TOKEN_BYTES: Final = 30
 # Не чаще раза в минуту: токен используется потоком запросов, а метка нужна человеку в списке.
@@ -29,6 +48,20 @@ LAST_USED_INTERVAL: Final = timedelta(minutes=1)
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def permissions_for_scopes(role: Role, scopes: Iterable[str]) -> frozenset[Permission]:
+    """Права токена: права роли владельца, суженные объединением прав его областей."""
+    allowed: frozenset[Permission] = frozenset()
+    for scope in scopes:
+        allowed |= SCOPE_PERMISSIONS.get(scope, frozenset())
+    return permissions_for(role) & allowed
+
+
+def normalize_scopes(scopes: Iterable[str]) -> list[str]:
+    """Известные области без повторов в порядке SCOPES; пусто - `tender`, как в версии 1."""
+    chosen = {scope for scope in scopes if scope in SCOPE_PERMISSIONS}
+    return [scope for scope in SCOPES if scope in chosen] or [SCOPE_TENDER]
 
 
 def is_active(row: ApiToken, *, now: datetime | None = None) -> bool:
@@ -44,6 +77,7 @@ async def create(
     workspace_id: uuid.UUID,
     name: str,
     expires_in_days: int | None,
+    scopes: Sequence[str] = (SCOPE_TENDER,),
 ) -> tuple[ApiToken, str]:
     """Новый токен. Полное значение возвращается здесь один раз и нигде не сохраняется."""
     token = QTK_PREFIX + secrets.token_urlsafe(_TOKEN_BYTES)
@@ -53,7 +87,7 @@ async def create(
         name=name.strip(),
         prefix=token[:API_TOKEN_PREFIX_LENGTH],
         token_hash=hash_token(token),
-        scopes=[SCOPE_TENDER],
+        scopes=normalize_scopes(scopes),
         expires_at=(
             None if expires_in_days is None else datetime.now(UTC) + timedelta(days=expires_in_days)
         ),
