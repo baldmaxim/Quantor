@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import quantor_agent as qa  # noqa: E402
+import quantor_agent as qa
 
 TOKEN = "qtk_" + "b" * 40
 PROJECT = "11732c7f-f80c-4a2f-9314-9a39a149cdd3"
@@ -36,15 +36,29 @@ def _zip(files: dict[str, bytes]) -> bytes:
 class Stub:
     def __init__(self) -> None:
         manifest = json.dumps({"schema": "quantor.object_base.v1"}).encode()
-        self.package = _zip({"manifest.json": manifest, "coordination.ifc": b"ISO-10303-21;\n"})
+        self.package = _zip(
+            {"manifest.json": manifest, "coordination.ifc": b"ISO-10303-21;\n"}
+        )
         self.releases = [
-            {"id": "r2", "number": 2, "revoked_at": "2026-11-18T10:00:00Z", "package_sha256": "x",
-             "manifest_sha256": "x"},
-            {"id": "r1", "number": 1, "revoked_at": None,
-             "package_sha256": hashlib.sha256(self.package).hexdigest(),
-             "manifest_sha256": hashlib.sha256(manifest).hexdigest()},
+            {
+                "id": "r2",
+                "number": 2,
+                "revoked_at": "2026-11-18T10:00:00Z",
+                "package_sha256": "x",
+                "manifest_sha256": "x",
+            },
+            {
+                "id": "r1",
+                "number": 1,
+                "revoked_at": None,
+                "package_sha256": hashlib.sha256(self.package).hexdigest(),
+                "manifest_sha256": hashlib.sha256(manifest).hexdigest(),
+            },
         ]
-        self.projects = [{"id": PROJECT, "name": NAME}, {"id": "other", "name": "328 Остров"}]
+        self.projects = [
+            {"id": PROJECT, "name": NAME},
+            {"id": "other", "name": "328 Остров"},
+        ]
         self.documents: list[dict[str, Any]] = [
             {"id": "doc-arch", "document_kind": "ifc", "display_name": "ARCH.ifc"}
         ]
@@ -62,7 +76,9 @@ def make_handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
         def log_message(self, *_: Any) -> None:
             return
 
-        def _reply(self, status: int, body: Any, ctype: str = "application/json", headers=None) -> None:
+        def _reply(
+            self, status: int, body: Any, ctype: str = "application/json", headers=None
+        ) -> None:
             data = body if isinstance(body, bytes) else json.dumps(body).encode()
             self.send_response(status)
             self.send_header("Content-Type", ctype)
@@ -73,13 +89,17 @@ def make_handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
             self.wfile.write(data)
 
         def _authorized(self) -> bool:
-            stub.requests.append((self.command, self.path, self.headers.get("Authorization")))
+            stub.requests.append(
+                (self.command, self.path, self.headers.get("Authorization"))
+            )
             if self.headers.get("Authorization") != f"Bearer {TOKEN}":
-                self._reply(401, {"detail": {"code": "CREDENTIAL_INVALID", "message": "нет"}})
+                self._reply(
+                    401, {"detail": {"code": "CREDENTIAL_INVALID", "message": "нет"}}
+                )
                 return False
             return True
 
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             if not self._authorized():
                 return
             url = urlsplit(self.path)
@@ -95,33 +115,57 @@ def make_handler(stub: Stub) -> type[BaseHTTPRequestHandler]:
                 return self._reply(200, stub.package, "application/zip")
             if path.startswith(f"{base}/tender/base/coordination."):
                 if stub.coordination is None:
-                    return self._reply(404, {"detail": {"code": "NOT_FOUND", "message": "нет выпуска"}})
-                return self._reply(200, stub.coordination, "application/x-step",
-                                   {"X-Quantor-Base-Release": "1"})
+                    return self._reply(
+                        404, {"detail": {"code": "NOT_FOUND", "message": "нет выпуска"}}
+                    )
+                return self._reply(
+                    200,
+                    stub.coordination,
+                    "application/x-step",
+                    {"X-Quantor-Base-Release": "1"},
+                )
             if path == f"{base}/documents":
-                return self._reply(200, {"items": stub.documents, "total": len(stub.documents)})
+                return self._reply(
+                    200, {"items": stub.documents, "total": len(stub.documents)}
+                )
             if path == f"{base}/model/imports/latest":
-                return self._reply(200, stub.latest.pop(0) if len(stub.latest) > 1 else stub.latest[0])
+                return self._reply(
+                    200, stub.latest.pop(0) if len(stub.latest) > 1 else stub.latest[0]
+                )
             if path == f"{base}/model/versions":
-                return self._reply(200, {"items": [{"id": "ver-2", "number": 2, "status": "candidate"}]})
+                return self._reply(
+                    200,
+                    {"items": [{"id": "ver-2", "number": 2, "status": "candidate"}]},
+                )
             if path == "/api/v1/jobs/job-9":
                 return self._reply(200, {"id": "job-9", "status": "succeeded"})
             if path == "/api/v1/meta/openapi.json":
-                return self._reply(200, {"openapi": "3.1.0", "paths": {"/api/v1/projects": {}}})
+                return self._reply(
+                    200, {"openapi": "3.1.0", "paths": {"/api/v1/projects": {}}}
+                )
             return self._reply(404, {"detail": {"code": "NOT_FOUND", "message": path}})
 
-        def do_POST(self) -> None:  # noqa: N802
+        def do_POST(self) -> None:
             if not self._authorized():
                 return
             length = int(self.headers.get("Content-Length") or 0)
             body = self.rfile.read(length)
             if self.path == f"/api/v1/projects/{PROJECT}/uploads":
                 revision = b'name="document_id"' in body
-                return self._reply(201, {"document": {"id": "doc-arch" if revision else "doc-new"},
-                                         "is_duplicate": False})
+                return self._reply(
+                    201,
+                    {
+                        "document": {"id": "doc-arch" if revision else "doc-new"},
+                        "is_duplicate": False,
+                    },
+                )
             if self.path == f"/api/v1/projects/{PROJECT}/model/imports":
-                return self._reply(202, {"job_id": "job-1", "status": "queued", "inputs": 1})
-            return self._reply(404, {"detail": {"code": "NOT_FOUND", "message": self.path}})
+                return self._reply(
+                    202, {"job_id": "job-1", "status": "queued", "inputs": 1}
+                )
+            return self._reply(
+                404, {"detail": {"code": "NOT_FOUND", "message": self.path}}
+            )
 
     return Handler
 
@@ -163,17 +207,26 @@ def test_projects_and_exact_name_resolution(server: str, stub: Stub, capsys) -> 
         qa.resolve_project(portal, "Нет такого")
 
 
-def test_coordination_saved_with_release_number(server: str, tmp_path: Path, capsys) -> None:
+def test_coordination_saved_with_release_number(
+    server: str, tmp_path: Path, capsys
+) -> None:
     target = tmp_path / "c.ifc"
-    assert run(server, "--json", "coordination", "--project", NAME, "-o", str(target)) == 0
+    assert (
+        run(server, "--json", "coordination", "--project", NAME, "-o", str(target)) == 0
+    )
     assert target.read_bytes().startswith(b"ISO-10303-21;")
     summary = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert summary["release"] == "1" and summary["file"] == str(target)
 
 
-def test_coordination_missing_is_exit_1(server: str, stub: Stub, tmp_path: Path) -> None:
+def test_coordination_missing_is_exit_1(
+    server: str, stub: Stub, tmp_path: Path
+) -> None:
     stub.coordination = None
-    assert run(server, "coordination", "--project", PROJECT, "-o", str(tmp_path / "c.ifc")) == 1
+    assert (
+        run(server, "coordination", "--project", PROJECT, "-o", str(tmp_path / "c.ifc"))
+        == 1
+    )
 
 
 def test_base_takes_newest_live_release_checks_sha_and_skips_repeat(
@@ -188,13 +241,17 @@ def test_base_takes_newest_live_release_checks_sha_and_skips_repeat(
     assert not any(path.endswith("/download") for _, path, _ in stub.requests)
 
 
-def test_base_package_sha_mismatch_is_refused(server: str, stub: Stub, tmp_path: Path) -> None:
+def test_base_package_sha_mismatch_is_refused(
+    server: str, stub: Stub, tmp_path: Path
+) -> None:
     stub.releases[1]["package_sha256"] = "0" * 64
     assert run(server, "base", "--project", PROJECT, "--out", str(tmp_path)) == 3
     assert not (tmp_path / "выпуск-1").exists()
 
 
-def test_push_revision_then_build_waits_for_version(server: str, tmp_path: Path, capsys) -> None:
+def test_push_revision_then_build_waits_for_version(
+    server: str, tmp_path: Path, capsys
+) -> None:
     ifc = tmp_path / "ARCH.ifc"
     ifc.write_bytes(b"ISO-10303-21;\n")
     assert run(server, "--json", "push", "--project", NAME, str(ifc)) == 0
@@ -228,7 +285,10 @@ def test_token_never_printed_and_bad_token_is_portal_refusal(
     monkeypatch.setenv("QUANTOR_TOKEN", "qtk_wrong")
     assert run(server, "projects") == 3
     captured = capsys.readouterr()
-    assert TOKEN not in captured.out + captured.err and "qtk_wrong" not in captured.out + captured.err
+    assert (
+        TOKEN not in captured.out + captured.err
+        and "qtk_wrong" not in captured.out + captured.err
+    )
     assert "Проверьте токен" in captured.err
 
 
