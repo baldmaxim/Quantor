@@ -679,6 +679,12 @@ class FloorAxes:
 
 
 NO_AXES: Final = FloorAxes({}, {}, MESSAGE_AXES_OUTDATED)
+MESSAGE_AXES_FOREIGN: Final = (
+    "оси листа - чужих корпусов (схема расположения корпусов в углу листа, а не план): "
+    "не используются"
+)
+# Доля марок «N/X» чужих корпусов среди марок листа корпуса, с которой оси листа - не его плана.
+FOREIGN_MARKS_SHARE: Final = 0.6
 MESSAGE_AXES_OBLIQUE_ONLY: Final = (
     "на листе только оси под углом к листу: для совмещения нужны вертикальные и горизонтальные"
 )
@@ -3267,6 +3273,9 @@ def _sheet_floor(
     # Оси сводного листа не связывают здания: планы секций на нём разложены не как на объекте.
     summary = is_summary_sheet(sheet.stamp_title)
     axes = NO_AXES if frame is None or summary else axes_in_mm(raw, frame)
+    corps_of_sheet = (title.corps if title is not None else None) or sheet.passport_building
+    if foreign_axes(axes, corps_of_sheet):
+        axes = FloorAxes({}, {}, MESSAGE_AXES_FOREIGN)
     cores = core_rings(document)
     windows = (
         window_source(
@@ -3298,6 +3307,20 @@ def _sheet_floor(
         title_floors=tuple(title.floors) if title is not None else (),
         title_marked=title is not None and bool(title.marks_mm),
     )
+
+
+def foreign_axes(axes: FloorAxes, corps: str | None) -> bool:
+    """Оси листа корпуса - чужих корпусов: марки «N/X» с N не своего корпуса - большинство марок."""
+    own = (corps or "").strip()
+    labels = [*axes.vertical, *axes.horizontal]
+    if not own.isdigit() or not labels:
+        return False
+    foreign = 0
+    for label in labels:
+        found = CORPS_FRACTION_LABEL.match(label)
+        if found is not None and found.group(1) != own:
+            foreign += 1
+    return foreign >= FOREIGN_MARKS_SHARE * len(labels)
 
 
 def core_rings(document: WallsDocument) -> tuple[CoreRing, ...]:

@@ -40,3 +40,14 @@ def test_corps_marks_place_a_tower_even_when_a_quarter_of_common_marks_disagree(
     match = b3d._site_match(stylobate, TOWER, frozenset({"4"}))
     assert match is not None and match.prefixed
     assert match.shift == (shift, 1000.0)
+
+
+def test_axes_of_a_corps_sheet_with_mostly_other_corps_marks_are_the_site_scheme() -> None:
+    # Объект 346, корпус 2: подписи плана не читаются, найдены оси компоновочной схемы в углу.
+    scheme = axes(
+        {"1/1": 0.0, "1/10": 1.0, "2/Е": 2.0, "4/А": 3.0, "6/А": 4.0, "7/А": 5.0, "9/А": 6.0},
+        {"2/1": 0.0, "3/10": 1.0, "8/1": 2.0},
+    )
+    assert b3d.foreign_axes(scheme, "2")
+    assert not b3d.foreign_axes(TOWER, "4")
+    assert not b3d.foreign_axes(scheme, None)
