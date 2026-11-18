@@ -464,6 +464,7 @@ describe('раздел «Доступ для TENDER»', () => {
           id: 't-1',
           name: 'Ноутбук',
           prefix: 'qtr_ab',
+          scopes: ['read', 'upload'],
           active: true,
           created_at: '2026-11-16T10:00:00Z',
           expires_at: null,
@@ -476,6 +477,9 @@ describe('раздел «Доступ для TENDER»', () => {
     mountWith(<TokensTab />);
     expect(await screen.findByText('Ноутбук')).toBeInTheDocument();
     expect(screen.getByText('не использовался')).toBeInTheDocument();
+    expect(
+      screen.getByText('Только чтение (агенты), Загрузка документов и модели'),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Отозвать' }));
     await waitFor(() =>
       expect(client.revokePersonalToken).toHaveBeenCalledWith(

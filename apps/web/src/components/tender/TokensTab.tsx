@@ -35,7 +35,7 @@ const TokenRow: FC<{
     <tr className="border-b border-border last:border-b-0 max-md:flex max-md:flex-col max-md:px-[var(--s-5)] max-md:py-[var(--s-4)]">
       <td data-label="Название" className={cx(TD, '[overflow-wrap:anywhere]', dim)}>
         <span>{token.name}</span>
-        <span className="block text-xs text-muted">{scopesLabel(token.scopes)}</span>
+        <span className="block text-xs text-muted">{scopesLabel(token.scopes ?? [])}</span>
       </td>
       <td data-label="Префикс" className={cx(TD, 'mono text-xs')}>
         {token.prefix}…
