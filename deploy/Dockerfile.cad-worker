@@ -55,8 +55,10 @@ USER root
 ENV CAD_ENGINE_HOME=/opt/cad-engine \
     CAD_MODEL_HOME=/opt/cad-model
 
-COPY --from=cad-env /opt/cad-engine/venv ${CAD_ENGINE_HOME}/venv
-COPY --from=cad-env /opt/cad-model/venv ${CAD_MODEL_HOME}/venv
+# --link: слой собирается отдельно от образа API и не зависит от него, поэтому при новом коде API
+# берётся из кэша тем же блобом (без --link копия получала бы новые метки времени папок и новый хеш).
+COPY --link --from=cad-env /opt/cad-engine/venv ${CAD_ENGINE_HOME}/venv
+COPY --link --from=cad-env /opt/cad-model/venv ${CAD_MODEL_HOME}/venv
 
 # Runner и pins лежат рядом: runner читает pins.json из своего каталога.
 COPY tools/cad_engine/quantor_cad_runner.py tools/cad_engine/pins.json ${CAD_ENGINE_HOME}/runner/
