@@ -26,17 +26,17 @@ def _axes(vertical: dict[str, int], horizontal: dict[str, int]) -> list[ObjectBa
 
 
 def _floor(page: int, z: int, axes: list[ObjectBaseAxis], **kw: object) -> CoordinationFloor:
-    base: dict[str, object] = dict(
-        view_key=f"{REV}:{page}:1",
-        label=f"Этаж {page}",
-        group_key="k9:s3",
-        group_label="Корпус 9, секция 3",
-        base_z_mm=z,
-        floor_height_mm=3000,
-        offset_mm=(0.0, 0.0),
-        rotation_deg=0.0,
-        alignment="axes",
-    )
+    base: dict[str, object] = {
+        "view_key": f"{REV}:{page}:1",
+        "label": f"Этаж {page}",
+        "group_key": "k9:s3",
+        "group_label": "Корпус 9, секция 3",
+        "base_z_mm": z,
+        "floor_height_mm": 3000,
+        "offset_mm": (0.0, 0.0),
+        "rotation_deg": 0.0,
+        "alignment": "axes",
+    }
     base.update(kw)
     return CoordinationFloor(axes=axes, **base)  # type: ignore[arg-type]
 
@@ -64,7 +64,8 @@ def test_этажи_совмещённые_сдвигом_дают_одну_се
 
 
 def test_поворот_вида_переводит_ось_в_систему_здания() -> None:
-    # Вид повёрнут на 90° против часовой: вертикальная ось x = 1000 становится горизонтальной y = 1000.
+    # Вид повёрнут на 90° против часовой: вертикальная ось x = 1000 становится горизонтальной y =
+    # 1000.
     floor = _floor(10, 0, _axes({"1": 1000}, {}), rotation_deg=90.0, offset_mm=(100.0, 0.0))
     (axis,) = build_coordination([floor]).groups[0].axes
     assert axis.point_mm == [100, 1000]

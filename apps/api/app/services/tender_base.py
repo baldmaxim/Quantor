@@ -748,7 +748,8 @@ async def _write_view(
     *,
     include_dxf: bool,
 ) -> tuple[str | None, ObjectBaseAxes]:
-    """Файлы одного вида в пакет. Возвращает версию генератора конструкций из walls.json и оси вида."""
+    """Файлы одного вида в пакет. Возвращает версию генератора конструкций из walls.json и оси вида.
+    """
     floor, frame = source.floor, source.frame
     assert frame.origin_pt is not None and frame.mm_per_pdf_point is not None
     assert source.page_size_pt is not None

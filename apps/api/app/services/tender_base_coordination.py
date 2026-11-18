@@ -1,16 +1,18 @@
-"""Координационный файл выпуска базы объекта: общая сетка осей и этажи здания (ADR-0051, дополнение 2026-11-18).
+"""Координационный файл выпуска базы объекта: общая сетка осей и этажи здания.
 
-Источник — то же, что уже лежит в выпуске: оси каждого вида (`axes.json`, мм кадра вида, приняты движком) и
-размещение этажа в здании (`building.json`: `p = R(rotation_deg) · p_вида + offset_mm`, отметка `base_z_mm`).
-Ничего не распознаём заново: этажи группы уже совмещены «Зданием» по общим осям, здесь их оси переводятся
-в систему здания и сводятся по подписи. Расхождение одной оси между этажами - качество совмещения,
-оно пишется в файл и в сомнения.
+ADR-0051, дополнение 2026-11-18. Источник — то, что уже лежит в выпуске: оси каждого вида
+(`axes.json`, мм кадра вида, приняты движком) и размещение этажа в здании (`building.json`:
+`p = R(rotation_deg) · p_вида + offset_mm`, отметка `base_z_mm`). Ничего не распознаём заново:
+этажи группы уже совмещены «Зданием» по общим осям, здесь их оси переводятся в систему здания
+и сводятся по подписи. Расхождение одной оси между этажами - качество совмещения, оно пишется
+в файл и в сомнения.
 
 Два файла в корне ZIP:
-- `coordination.json` — `quantor.object_base.coordination.v1`: по группам (корпус/секция) оси линиями в мм
-  системы здания и этажи с отметками;
-- `coordination.ifc` — то же в IFC4 (мм): участок, здание на группу, этажи на отметках, `IfcGrid` на каждом
-  этаже. Пишется текстом STEP без ifcopenshell: в образе API тяжёлых зависимостей нет (ADR-0035).
+- `coordination.json` — `quantor.object_base.coordination.v1`: по группам (корпус/секция) оси
+  линиями в мм системы здания и этажи с отметками;
+- `coordination.ifc` — то же в IFC4 (мм): участок, здание на группу, этажи на отметках,
+  `IfcGrid` на каждом этаже. Пишется текстом STEP без ifcopenshell: в образе API тяжёлых
+  зависимостей нет (ADR-0035).
 """
 
 from __future__ import annotations
@@ -31,7 +33,8 @@ from app.contracts.tender_exchange import (
     ObjectBaseCoordinationStorey,
 )
 
-# Две подписи одной оси на разных этажах после совмещения расходятся больше - сомнение: совмещение «Здания»
+# Две подписи одной оси на разных этажах после совмещения расходятся больше - сомнение: совмещение
+# «Здания»
 # допускает до ширины линии, 50 мм уже видно на плане 1:100.
 SPREAD_DOUBT_MM = 50.0
 # На сколько оси выходят за крайние пересечения в IFC: чтобы подписи не лежали на углу здания.
@@ -77,7 +80,9 @@ def _rotate(x: float, y: float, degrees: float) -> tuple[float, float]:
 
 
 def _axis_line(axis: ObjectBaseAxis, floor: CoordinationFloor) -> _Line:
-    """Ось вида линией в системе здания: вертикальная - x = pos, горизонтальная - y = pos (мм кадра вида)."""
+    """Ось вида линией в системе здания: вертикальная - x = pos, горизонтальная - y = pos (мм кадра
+    вида).
+    """
     if axis.orient == "vertical":
         point, direction = (float(axis.pos_mm), 0.0), (0.0, 1.0)
     else:
@@ -128,7 +133,8 @@ def build_coordination(floors: Iterable[CoordinationFloor]) -> ObjectBaseCoordin
         for f in acc.floors:
             if f.alignment == "none":
                 doubts.append(
-                    f"{acc.label}: вид «{f.label}» не совмещён с остальными этажами - его оси в сетку не вошли"
+                    f"{acc.label}: вид «{f.label}» не совмещён с остальными этажами - "
+                    "его оси в сетку не вошли"
                 )
         reference = next((f.view_key for f in placed if f.alignment == "reference"), None)
         lines: dict[tuple[str, str], list[_Line]] = {}
@@ -205,7 +211,8 @@ def ifc_guid(value: uuid.UUID) -> str:
 
 
 def _step_text(value: str) -> str:
-    """Строка STEP: апостроф и обратная косая удваиваются, не-ASCII - кодом \\X2\\…\\X0\\ (UTF-16)."""
+    """Строка STEP: апостроф и обратная косая удваиваются, не-ASCII - кодом \\X2\\…\\X0\\ (UTF-16).
+    """
     out: list[str] = []
     wide: list[str] = []
 
@@ -250,7 +257,9 @@ class _Step:
 def _segment(
     axis: ObjectBaseCoordinationAxis, others: Sequence[ObjectBaseCoordinationAxis]
 ) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Отрезок оси в мм здания: от крайнего пересечения с осями другого направления до другого, с вылетом."""
+    """Отрезок оси в мм здания: от крайнего пересечения с осями другого направления до другого, с
+    вылетом.
+    """
     px, py = axis.point_mm
     dx, dy = axis.direction
     params: list[float] = []
@@ -268,6 +277,22 @@ def _segment(
     return (px + dx * lo, py + dy * lo), (px + dx * hi, py + dy * hi)
 
 
+def _grid_axes(
+    step: _Step,
+    axes: Sequence[ObjectBaseCoordinationAxis],
+    others: Sequence[ObjectBaseCoordinationAxis],
+    curves: list[str],
+) -> list[str]:
+    """Оси одной семьи как IfcGridAxis; их линии добавляются в `curves` (вид «FootPrint» сетки)."""
+    refs = []
+    for axis in axes:
+        (x1, y1), (x2, y2) = _segment(axis, others)
+        curve = step.add(f"IFCPOLYLINE(({step.point2(x1, y1)},{step.point2(x2, y2)}))")
+        curves.append(curve)
+        refs.append(step.add(f"IFCGRIDAXIS({_step_text(axis.label)},{curve},.T.)"))
+    return refs
+
+
 def coordination_ifc(
     coordination: ObjectBaseCoordination,
     *,
@@ -275,7 +300,8 @@ def coordination_ifc(
     release_id: uuid.UUID,
     moment: datetime,
 ) -> bytes:
-    """`coordination.ifc`: IFC4, мм. GlobalId выводятся из id выпуска - тот же выпуск даёт те же id."""
+    """`coordination.ifc`: IFC4, мм. GlobalId выводятся из id выпуска - тот же выпуск даёт те же id.
+    """
     step = _Step()
     counter = iter(range(1, 1_000_000))
 
@@ -320,30 +346,20 @@ def coordination_ifc(
             storeys.append(storey_ref)
             if not group.axes:
                 continue
+            # IfcGrid требует обе семьи осей: при одной - только этаж, без сетки.
+            if not vertical or not horizontal:
+                continue
             curves: list[str] = []
-
-            def grid_axes(
-                axes: Sequence[ObjectBaseCoordinationAxis],
-                others: Sequence[ObjectBaseCoordinationAxis],
-            ) -> list[str]:
-                refs = []
-                for axis in axes:
-                    (x1, y1), (x2, y2) = _segment(axis, others)
-                    curve = step.add(f"IFCPOLYLINE(({step.point2(x1, y1)},{step.point2(x2, y2)}))")
-                    curves.append(curve)
-                    refs.append(step.add(f"IFCGRIDAXIS({_step_text(axis.label)},{curve},.T.)"))
-                return refs
-
-            u = grid_axes(vertical, horizontal)
-            v = grid_axes(horizontal, vertical)
+            u = _grid_axes(step, vertical, horizontal, curves)
+            v = _grid_axes(step, horizontal, vertical, curves)
             curve_set = step.add(f"IFCGEOMETRICCURVESET(({','.join(curves)}))")
             shape = step.add(
                 f"IFCSHAPEREPRESENTATION({axis_context},'FootPrint','GeometricCurveSet',({curve_set}))"
             )
             product_shape = step.add(f"IFCPRODUCTDEFINITIONSHAPE($,$,({shape}))")
             grid_place = step.placement(0.0, storey_place)
-            u_list = f"({','.join(u)})" if u else "()"
-            v_list = f"({','.join(v)})" if v else "()"
+            u_list = f"({','.join(u)})"
+            v_list = f"({','.join(v)})"
             grid = step.add(
                 f"IFCGRID({guid()},$,{_step_text('Сетка осей')},$,$,{grid_place},{product_shape},"
                 f"{u_list},{v_list},$,$)"
