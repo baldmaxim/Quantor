@@ -123,6 +123,11 @@ SITE_MIN_AGREEMENT: Final = 0.75
 SITE_SAME_LEVEL_MM: Final = 300
 SITE_MAX_OVERLAP: Final = 0.3
 SITE_PREFIXED_LABEL: Final = re.compile(r"\d{1,2}[.\-]")
+# Марка «4/1» - корпус 4, ось 1 (объект 346): номер корпуса через дробь. Дробью же пишут
+# дополнительные оси («1/1» - первая после оси 1), поэтому номером корпуса дробь считается, только
+# если у здания этого корпуса такие марки - большинство его осей (`CORPS_MARKS_SHARE`).
+CORPS_FRACTION_LABEL: Final = re.compile(r"(\d{1,3})/")
+CORPS_MARKS_SHARE: Final = 0.6
 # Ядра для постановки по совпадению монолита: стены и пилоны (колонны паркинга периодичны).
 CORE_KINDS: Final = frozenset({"monolith_wall", "monolith_pylon"})
 # Нижних этажей скопления, пробуемых по одному, и наименьшее число колец ядер этажа.
@@ -1321,6 +1326,7 @@ class _GroupInfo:
     axes: FloorAxes
     # Этажи с известной отметкой: (низ плиты, верх объёма, отметка, bbox) в системе группы.
     levels: tuple[tuple[int, int, int, tuple[float, float, float, float]], ...]
+    corps: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1332,9 +1338,27 @@ class _SiteMatch:
     prefixed: bool
 
 
-def _is_prefixed(label: str) -> bool:
-    """Марка с номером секции («3.1», «2-А»): одна на весь объект, совпадение надёжно."""
-    return SITE_PREFIXED_LABEL.match(label) is not None
+def _is_prefixed(label: str, corps_marks: frozenset[str] = frozenset()) -> bool:
+    """Марка с номером секции («3.1», «2-А») или корпуса через дробь («4/1», если корпус в
+    `corps_marks`): одна на весь объект, совпадение надёжно."""
+    if SITE_PREFIXED_LABEL.match(label) is not None:
+        return True
+    found = CORPS_FRACTION_LABEL.match(label)
+    return found is not None and found.group(1) in corps_marks
+
+
+def _corps_marks(infos: dict[str, _GroupInfo]) -> frozenset[str]:
+    """Корпуса, у которых марки осей через дробь с номером корпуса («4/1») - большинство марок."""
+    out: set[str] = set()
+    for info in infos.values():
+        corps = (info.corps or "").strip()
+        labels = [*info.axes.vertical, *info.axes.horizontal]
+        if not corps.isdigit() or not labels:
+            continue
+        own = sum(1 for label in labels if label.startswith(f"{corps}/"))
+        if own >= CORPS_MARKS_SHARE * len(labels):
+            out.add(corps)
+    return frozenset(out)
 
 
 def _group_axes(
@@ -1362,7 +1386,9 @@ def _group_axes(
     return FloorAxes(vertical, horizontal, None)
 
 
-def _consensus(base: dict[str, float], other: dict[str, float]) -> tuple[float, list[str]] | None:
+def _consensus(
+    base: dict[str, float], other: dict[str, float], corps_marks: frozenset[str] = frozenset()
+) -> tuple[float, list[str]] | None:
     """Сдвиг по одному направлению по согласованным общим маркам; согласия нет - `None`.
 
     Марка с номером секции («15.1») одна на весь объект: случайного совпадения у неё нет, и
@@ -1378,24 +1404,26 @@ def _consensus(base: dict[str, float], other: dict[str, float]) -> tuple[float, 
     if found is None:
         return None
     agreed = found[1]
-    if not any(_is_prefixed(label) for label in agreed) and (
+    if not any(_is_prefixed(label, corps_marks) for label in agreed) and (
         len(agreed) < SITE_MIN_AGREEMENT * len(common)
     ):
         return None
     return found
 
 
-def _site_match(base: FloorAxes, other: FloorAxes) -> _SiteMatch | None:
+def _site_match(
+    base: FloorAxes, other: FloorAxes, corps_marks: frozenset[str] = frozenset()
+) -> _SiteMatch | None:
     """Совпадение осей двух зданий: нужны оба направления и не меньше `SITE_MIN_AXES` марок."""
-    along_x = _consensus(base.vertical, other.vertical)
-    along_y = _consensus(base.horizontal, other.horizontal)
+    along_x = _consensus(base.vertical, other.vertical, corps_marks)
+    along_y = _consensus(base.horizontal, other.horizontal, corps_marks)
     if along_x is None or along_y is None:
         return None
     labels = (*along_x[1], *along_y[1])
     if len(labels) < SITE_MIN_AXES:
         return None
     return _SiteMatch(
-        (along_x[0], along_y[0]), labels, any(_is_prefixed(label) for label in labels)
+        (along_x[0], along_y[0]), labels, any(_is_prefixed(label, corps_marks) for label in labels)
     )
 
 
@@ -1422,6 +1450,7 @@ def _group_infos(
             label=aligned[indexes[0]].group_label,
             axes=_group_axes([items[i] for i in indexes], [aligned[i] for i in indexes]),
             levels=levels,
+            corps=next((aligned[i].corps for i in indexes if aligned[i].corps), None),
         )
     return infos
 
@@ -1471,10 +1500,13 @@ def place_groups(
     # Здание без этажей с отметкой (план 1 этажа, техэтаж без отметки) - тоже связка: марки с
     # номером секции ставят его без проверки наложения.
     with_axes = [k for k in keys if infos[k].axes.usable]
+    corps_marks = _corps_marks(infos)
     matches: dict[tuple[str, str], _SiteMatch] = {}
     for base in with_axes:
         for other in with_axes:
-            if base != other and (match := _site_match(infos[base].axes, infos[other].axes)):
+            if base != other and (
+                match := _site_match(infos[base].axes, infos[other].axes, corps_marks)
+            ):
                 matches[(base, other)] = match
     result: dict[str, GroupPlacement] = {}
     rejected: dict[str, str] = {}
@@ -1790,10 +1822,13 @@ def _axis_links(
 ) -> dict[tuple[str, str], _SiteMatch]:
     """Совпадения осей всех пар зданий с осями в обоих направлениях: сдвиг из `other` в `base`."""
     with_axes = [k for k in infos if infos[k].axes.usable]
+    corps_marks = _corps_marks(infos)
     links: dict[tuple[str, str], _SiteMatch] = {}
     for base in with_axes:
         for other in with_axes:
-            if base != other and (match := _site_match(infos[base].axes, infos[other].axes)):
+            if base != other and (
+                match := _site_match(infos[base].axes, infos[other].axes, corps_marks)
+            ):
                 links[(base, other)] = match
     return links
 
