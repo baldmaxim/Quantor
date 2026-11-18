@@ -98,9 +98,7 @@ async def mcp_endpoint(
     return JSONResponse(answer)
 
 
-@router.get(
-    "/mcp", include_in_schema=False, dependencies=[require(Permission.WORKSPACE_READ)]
-)
+@router.get("/mcp", include_in_schema=False, dependencies=[require(Permission.WORKSPACE_READ)])
 async def mcp_without_stream() -> Response:
     """Потока событий сервер не держит: всё - ответами на POST."""
     return Response(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, headers={"Allow": "POST"})
