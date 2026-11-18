@@ -16092,6 +16092,10 @@ export type PersonalTokenCreate = {
      * Name
      */
     name: string;
+    /**
+     * Scopes
+     */
+    scopes?: Array<'read' | 'tender' | 'upload'>;
 };
 
 /**
@@ -28455,6 +28459,38 @@ export type ListTenderBaseCandidatesResponses = {
 };
 
 export type ListTenderBaseCandidatesResponse = ListTenderBaseCandidatesResponses[keyof ListTenderBaseCandidatesResponses];
+
+export type ReadLatestCoordinationData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Fmt
+         */
+        fmt: 'json' | 'ifc';
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/base/coordination.{fmt}';
+};
+
+export type ReadLatestCoordinationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadLatestCoordinationError = ReadLatestCoordinationErrors[keyof ReadLatestCoordinationErrors];
+
+export type ReadLatestCoordinationResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type ListTenderBaseReleasesData = {
     body?: never;

@@ -31768,6 +31768,20 @@
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "enum": [
+                "read",
+                "tender",
+                "upload"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array"
           }
         },
         "required": [
@@ -53436,6 +53450,56 @@
           }
         },
         "summary": "Виды проекта, которые можно включить в выпуск базы (этажи «Здания»)",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/base/coordination.{fmt}": {
+      "get": {
+        "description": "Для агентов: один запрос вместо «список выпусков -> ZIP -> распаковка». Номер выпуска - в\nзаголовке `X-Quantor-Base-Release`; отозванные выпуски пропускаются.",
+        "operationId": "read_latest_coordination",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fmt",
+            "required": true,
+            "schema": {
+              "enum": [
+                "json",
+                "ifc"
+              ],
+              "title": "Fmt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Координационный файл (сетка осей и этажи) последнего действующего выпуска базы",
         "tags": [
           "tender-exchange"
         ]
