@@ -198,7 +198,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
         <label className="flex flex-col gap-[var(--s-1)] text-xs text-muted">
           Версия модели
           <select
-            className="rounded-[var(--radius-sm)] border border-border bg-surface p-[var(--s-2)] text-sm text-fg"
+            className="rounded-[var(--radius-sm)] border border-border bg-surface p-[var(--s-2)] text-sm text-text"
             value={versionId}
             onChange={(event) => {
               // Выбрана новейшая версия - снова следим за последней, иначе фиксируем выбор.
