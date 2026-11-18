@@ -273,6 +273,43 @@ class ObjectBaseBuilding(_Strict):
     floors: list[ObjectBaseBuildingFloor]
 
 
+class ObjectBaseCoordinationAxis(_Strict):
+    """Ось группы линией в мм системы здания: точка на оси и единичное направление."""
+
+    label: str
+    # Как ось нарисована на виде: вертикальная (цифровая обычно) или горизонтальная.
+    orient: Literal["vertical", "horizontal"]
+    point_mm: Point2
+    direction: Annotated[list[float], Field(min_length=2, max_length=2)]
+    # Сколько этажей её показали и насколько они разошлись поперёк оси (качество совмещения).
+    views: int
+    spread_mm: int
+
+
+class ObjectBaseCoordinationStorey(_Strict):
+    label: str
+    base_z_mm: int
+    floor_height_mm: int
+    view_keys: list[ViewKey]
+
+
+class ObjectBaseCoordinationGroup(_Strict):
+    group_key: str
+    group_label: str
+    axes: list[ObjectBaseCoordinationAxis]
+    storeys: list[ObjectBaseCoordinationStorey]
+
+
+class ObjectBaseCoordination(_Strict):
+    """`coordination.json`: сетка осей и этажи по группам здания (корпус/секция), мм системы здания."""
+
+    schema_name: Literal["quantor.object_base.coordination.v1"] = Field(alias="schema")
+    units: Literal["mm"]
+    frame: Literal["building_mm"]
+    groups: list[ObjectBaseCoordinationGroup]
+    doubts: list[str]
+
+
 # ------------------------------------------------------------- расчёт: пакет TENDER → Quantor
 
 

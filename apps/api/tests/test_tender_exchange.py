@@ -1022,6 +1022,8 @@ async def test_base_release_builds_a_checked_package(
     assert names == {
         "manifest.json",
         "building.json",
+        "coordination.json",
+        "coordination.ifc",
         f"{folder}/view.json",
         f"{folder}/axes.json",
         f"{folder}/zones.json",
@@ -1085,6 +1087,16 @@ async def test_base_release_builds_a_checked_package(
     building = json.loads(archive.read("building.json"))
     assert [f["view_key"] for f in building["floors"]] == [view_key]
     assert building["floors"][0]["base_z_mm"] == 47600
+
+    # Координационный файл: этаж выпуска на своей отметке, IFC - текст STEP со своими этажами.
+    coordination = json.loads(archive.read("coordination.json"))
+    assert coordination["schema"] == "quantor.object_base.coordination.v1"
+    (group,) = coordination["groups"]
+    assert [s["base_z_mm"] for s in group["storeys"]] == [47600]
+    assert group["storeys"][0]["view_keys"] == [view_key]
+    ifc = archive.read("coordination.ifc").decode("ascii")
+    assert ifc.startswith("ISO-10303-21;") and "FILE_SCHEMA(('IFC4'));" in ifc
+    assert ifc.count("IFCBUILDINGSTOREY(") == 1
 
     stored = (
         (await db_session.execute(select(TenderBaseRelease).order_by(TenderBaseRelease.number)))

@@ -105,6 +105,11 @@ from app.services import (
     cad_walls,
     cad_zones,
 )
+from app.services.tender_base_coordination import (
+    CoordinationFloor,
+    build_coordination,
+    coordination_ifc,
+)
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 log = get_logger(__name__)
@@ -742,8 +747,8 @@ async def _write_view(
     source: ViewSource,
     *,
     include_dxf: bool,
-) -> str | None:
-    """Файлы одного вида в пакет. Возвращает версию генератора конструкций из walls.json."""
+) -> tuple[str | None, ObjectBaseAxes]:
+    """Файлы одного вида в пакет. Возвращает версию генератора конструкций из walls.json и оси вида."""
     floor, frame = source.floor, source.frame
     assert frame.origin_pt is not None and frame.mm_per_pdf_point is not None
     assert source.page_size_pt is not None
@@ -761,7 +766,8 @@ async def _write_view(
     )
     base = f"views/{source.dir}"
     await sink.add_bytes(f"{base}/view.json", _dump(build_view(source)))
-    await sink.add_bytes(f"{base}/axes.json", _dump(build_axes(raw, frame)))
+    axes = build_axes(raw, frame)
+    await sink.add_bytes(f"{base}/axes.json", _dump(axes))
     await sink.add_bytes(
         f"{base}/zones.json",
         _dump(
@@ -781,7 +787,7 @@ async def _write_view(
         await sink.add_bytes(f"{base}/risers.json", _dump(build_risers(risers)))
     if include_dxf and source.dxf_key is not None:
         await sink.add_stream(f"{base}/plan.dxf", storage.iter_stream(source.dxf_key))
-    return document.generator
+    return document.generator, axes
 
 
 def _select(sources: Sequence[ViewSource], view_keys: Sequence[str] | None) -> list[ViewSource]:
@@ -855,11 +861,26 @@ async def create_release(
     with tempfile.TemporaryFile() as target:
         sink = _ZipSink(target)
         walls_generator: str | None = None
+        coordination_floors: list[CoordinationFloor] = []
         for source in chosen:
-            generator = await _write_view(
+            generator, view_axes = await _write_view(
                 session, storage, sink, source, include_dxf=body.include_dxf
             )
             walls_generator = walls_generator or generator
+            coordination_floors.append(
+                CoordinationFloor(
+                    view_key=source.key,
+                    label=source.floor.label,
+                    group_key=source.floor.group_key,
+                    group_label=source.floor.group_label,
+                    base_z_mm=source.floor.base_z_mm,
+                    floor_height_mm=source.floor.floor_height_mm,
+                    offset_mm=(source.floor.offset_mm[0], source.floor.offset_mm[1]),
+                    rotation_deg=source.floor.rotation_deg,
+                    alignment=source.floor.alignment,
+                    axes=view_axes.axes,
+                )
+            )
         building = ObjectBaseBuilding(
             schema_name="quantor.object_base.building.v1",
             floors=[
@@ -880,6 +901,15 @@ async def create_release(
             ],
         )
         await sink.add_bytes("building.json", _dump(building))
+        # Координационный файл: общая сетка осей и этажи - из тех же осей и размещения этажей.
+        coordination = build_coordination(coordination_floors)
+        await sink.add_bytes("coordination.json", _dump(coordination))
+        await sink.add_bytes(
+            "coordination.ifc",
+            coordination_ifc(
+                coordination, project_name=project.name, release_id=release_id, moment=released_at
+            ),
+        )
         manifest = ObjectBaseManifest(
             schema_name="quantor.object_base.v1",
             release=ObjectBaseRelease(
