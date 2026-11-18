@@ -43,9 +43,14 @@ def _floor(page: int, z: int, axes: list[ObjectBaseAxis], **kw: object) -> Coord
 
 def test_этажи_совмещённые_сдвигом_дают_одну_сетку_без_расхождений() -> None:
     # Лист второго этажа нарисован на 5 м правее и на 2 м выше: «Здание» сдвинуло его обратно.
-    first = _floor(10, 0, _axes({"1": 1000, "2": 7000}, {"А": 500, "Б": 6500}), alignment="reference")
+    first = _floor(
+        10, 0, _axes({"1": 1000, "2": 7000}, {"А": 500, "Б": 6500}), alignment="reference"
+    )
     second = _floor(
-        11, 3000, _axes({"1": 6000, "2": 12000}, {"А": 2500, "Б": 8500}), offset_mm=(-5000.0, -2000.0)
+        11,
+        3000,
+        _axes({"1": 6000, "2": 12000}, {"А": 2500, "Б": 8500}),
+        offset_mm=(-5000.0, -2000.0),
     )
     result = build_coordination([second, first])
     (group,) = result.groups
