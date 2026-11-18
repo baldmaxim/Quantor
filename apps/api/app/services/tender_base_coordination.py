@@ -211,8 +211,7 @@ def ifc_guid(value: uuid.UUID) -> str:
 
 
 def _step_text(value: str) -> str:
-    """Строка STEP: апостроф и обратная косая удваиваются, не-ASCII - кодом \\X2\\…\\X0\\ (UTF-16).
-    """
+    """Строка STEP: апостроф и обратная косая удваиваются, не-ASCII - кодом \\X2\\…\\X0\\ (UTF-16)."""
     out: list[str] = []
     wide: list[str] = []
 
@@ -300,8 +299,7 @@ def coordination_ifc(
     release_id: uuid.UUID,
     moment: datetime,
 ) -> bytes:
-    """`coordination.ifc`: IFC4, мм. GlobalId выводятся из id выпуска - тот же выпуск даёт те же id.
-    """
+    """`coordination.ifc`: IFC4, мм. GlobalId выводятся из id выпуска - тот же выпуск даёт те же id."""
     step = _Step()
     counter = iter(range(1, 1_000_000))
 

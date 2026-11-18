@@ -301,8 +301,7 @@ class ObjectBaseCoordinationGroup(_Strict):
 
 
 class ObjectBaseCoordination(_Strict):
-    """`coordination.json`: сетка осей и этажи по группам здания (корпус/секция), мм системы здания.
-    """
+    """`coordination.json`: сетка осей и этажи по группам здания (корпус/секция), мм системы здания."""
 
     schema_name: Literal["quantor.object_base.coordination.v1"] = Field(alias="schema")
     units: Literal["mm"]
