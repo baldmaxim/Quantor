@@ -4,7 +4,7 @@
 Project
   └── BuildingModelVersion × N      неизменяемая выгрузка; статус: загрузка → кандидат → утверждена
         ├── ModelPart × N           принятая часть пакета (хеш и размер проверены при приёме)
-        └── ModelStorey × N         этажи версии, появляются при фиксации
+        └── ModelStorey × N         этажи версии (по зданиям, если их несколько), при фиксации
 ```
 
 Элементы и геометрия лежат в объектном хранилище как части пакета; база держит только то, по чему
@@ -147,6 +147,11 @@ class ModelStorey(Base):
     height_mm: Mapped[float | None] = mapped_column(Float)
     bbox_mm: Mapped[list[float] | None] = mapped_column(pg.JSONB)
     element_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Здание этажа (QMP v1, раздел 4): только в моделях с несколькими зданиями.
+    building_key: Mapped[str | None] = mapped_column(String(64))
+    building_name: Mapped[str | None] = mapped_column(String(200))
+    # Номер строки в storeys.json: по зданиям, внутри здания по отметке; у прежних версий пуст.
+    position: Mapped[int | None] = mapped_column(Integer)
 
     __table_args__ = (
         UniqueConstraint("version_id", "storey_key", name="uq_model_storeys_version_key"),

@@ -1,7 +1,7 @@
 """Сборка пакета QMP v1 из одного или нескольких IFC (весь конвейер спецификации).
 
 Порядок: файлы с повторяющимся sha256 отбрасываются; каждый файл открывается, читаются
-единицы, смещение, этажи (сводятся в общий список), оси, элементы по этажам и их
+единицы, смещение, здания и этажи (сводятся по зданиям), оси, элементы по этажам и их
 геометрия; затем пишутся storeys.json, grids.json, по этажу - elements, geometry (по
 дисциплинам, с делением на части), footprints, и последним manifest.json.
 Повторная сборка тех же файлов даёт те же байты частей и тот же `manifest_sha256`.
@@ -34,12 +34,13 @@ from .ifc_source import (
     authoring,
     length_unit_mm,
     open_ifc,
+    read_buildings,
     read_frame,
     read_grids,
     read_storeys,
 )
 from .qmp_check import ELEMENT_ID_RE, SCHEMA, file_digest, manifest_digest
-from .storeys import StoreyIndex, storey_rows
+from .storeys import BuildingIndex, StoreyIndex, storey_rows
 from .tessellate import Mesh, bbox6, tessellate
 
 DEFAULT_PART_LIMIT = 60 * 1024 * 1024  # запас к пределу 64 МиБ на неточность оценки
@@ -71,6 +72,7 @@ class Record:
 
 @dataclass(slots=True)
 class BuildState:
+    buildings: BuildingIndex = field(default_factory=BuildingIndex)
     storeys: StoreyIndex = field(default_factory=StoreyIndex)
     axes: list[RawAxis] = field(default_factory=list)
     records: dict[str, list[Record]] = field(default_factory=lambda: defaultdict(list))
@@ -184,10 +186,18 @@ def _process_file(
     _check_offset(state, frame.offset_mm, name)
     state.authoring.append(authoring(model))
     state.schemas.append(model.schema)
+    buildings = state.buildings.register_file(
+        [(b.global_id, b.name) for b in read_buildings(model)]
+    )
     keys: dict[int, tuple[str, str]] = {}
     for rs in read_storeys(model, frame, state.warnings, name):
         key, warns = state.storeys.register(
-            rs.global_id, rs.name, rs.elevation_mm, rs.elevation_source, name
+            rs.global_id,
+            rs.name,
+            rs.elevation_mm,
+            rs.elevation_source,
+            name,
+            buildings.get(rs.building_id) if rs.building_id is not None else None,
         )
         state.warnings.extend(warns)
         keys[rs.step_id] = (key, rs.name)
@@ -411,7 +421,7 @@ def build_package(
     prepare_out_dir(out_dir)
     writer = _Writer(out_dir)
     bboxes = {k: _storey_bbox(v) for k, v in state.records.items()}
-    rows = storey_rows(state.storeys.storeys, bboxes, keep)
+    rows = storey_rows(state.storeys.storeys, bboxes, keep, state.buildings.buildings)
     writer.write("storeys.json", _json_bytes(rows, indent=1), "storeys")
     axes, warns = merge_axes(state.axes)
     state.warnings.extend(warns)

@@ -96,10 +96,11 @@ async def list_versions(
 
 
 async def storeys_of(session: AsyncSession, version_id: uuid.UUID) -> list[ModelStorey]:
+    """Этажи в порядке storeys.json (по зданиям, внутри по отметке); прежние версии - по отметке."""
     rows = await session.execute(
         select(ModelStorey)
         .where(ModelStorey.version_id == version_id)
-        .order_by(ModelStorey.elevation_mm)
+        .order_by(ModelStorey.position.asc().nulls_last(), ModelStorey.elevation_mm)
     )
     return list(rows.scalars())
 
@@ -357,7 +358,7 @@ async def commit_version(
         for part in checked.parts
         if part.kind == "elements"
     }
-    for storey in storeys:
+    for position, storey in enumerate(storeys):
         session.add(
             ModelStorey(
                 version_id=version.id,
@@ -367,6 +368,9 @@ async def commit_version(
                 height_mm=storey.height_mm,
                 bbox_mm=storey.bbox_mm,
                 element_count=per_storey.get(storey.storey_key, 0),
+                building_key=storey.building_key,
+                building_name=storey.building_name,
+                position=position,
             )
         )
     version.warnings = _issues(report.warnings)

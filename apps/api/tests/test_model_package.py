@@ -132,6 +132,27 @@ def build_package() -> tuple[bytes, dict[str, bytes], dict[str, Any]]:
     return json.dumps(manifest).encode(), files, manifest
 
 
+def set_storeys(files: dict[str, bytes], manifest: dict[str, Any], rows: list[Any]) -> None:
+    """Подменить storeys.json и его размер и sha256 в манифесте (манифест не пересчитан)."""
+    data = json.dumps(rows, ensure_ascii=False).encode()
+    files["storeys.json"] = data
+    for part in manifest["parts"]:
+        if part["path"] == "storeys.json":
+            part["bytes"], part["sha256"] = len(data), hashlib.sha256(data).hexdigest()
+
+
+def two_building_package() -> tuple[bytes, dict[str, bytes], dict[str, Any]]:
+    """Тот же пакет, этажи в двух корпусах (раздел 4): сначала корпус 1 - этаж B на +3000,
+    затем корпус 2 - этаж A на 0. По отметке порядок был бы обратным."""
+    _, files, manifest = build_package()
+    a, b = json.loads(files["storeys.json"])
+    b |= {"building_key": "K1", "building_name": "Корпус 1"}
+    a |= {"building_key": "K2", "building_name": "Корпус 2", "height_mm": None}
+    set_storeys(files, manifest, [b, a])
+    reseal(manifest)
+    return json.dumps(manifest).encode(), files, manifest
+
+
 def run(manifest: dict[str, Any], files: dict[str, bytes]) -> qmp.Report:
     report, _ = qmp.validate_package(json.dumps(manifest).encode(), MemoryReader(files))
     return report
@@ -261,6 +282,37 @@ def test_not_a_glb() -> None:
         if part["path"] == path:
             part["bytes"], part["sha256"] = len(data), hashlib.sha256(data).hexdigest()
     assert "GLB_HEADER" in codes(run(reseal(manifest), files))
+
+
+def test_storeys_ascend_within_each_building() -> None:
+    data, files, manifest = two_building_package()
+    report, checked = qmp.validate_package(data, MemoryReader(files))
+    assert report.ok, report.errors
+    assert not report.warnings
+    assert checked is not None
+    storeys = qmp.check_storeys(files["storeys.json"], qmp.Report())
+    assert [(s.building_key, s.building_name) for s in storeys] == [
+        ("K1", "Корпус 1"),
+        ("K2", "Корпус 2"),
+    ]
+    rows = json.loads(files["storeys.json"])
+    rows[1] |= {"building_key": "K1", "building_name": "Корпус 1"}  # 0 после +3000 в корпусе 1
+    set_storeys(files, manifest, rows)
+    assert "STOREY_ORDER" in codes(run(reseal(manifest), files))
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [{"building_key": "K 1"}, {"building_name": None}, {"building_name": "Другое имя"}],
+)
+def test_building_fields_are_checked(patch: dict[str, Any]) -> None:
+    _, files, manifest = build_package()
+    rows = json.loads(files["storeys.json"])
+    for row in rows:
+        row |= {"building_key": "K1", "building_name": "Корпус 1"}
+    rows[1] |= patch
+    set_storeys(files, manifest, rows)
+    assert "STOREY_BUILDING" in codes(run(reseal(manifest), files))
 
 
 def test_counts_must_match() -> None:

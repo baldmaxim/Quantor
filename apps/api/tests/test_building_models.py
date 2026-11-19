@@ -32,7 +32,13 @@ from app.services import jobs as jobs_service
 from app.services import model_package as qmp
 from tests.cad_pins_helper import _entry, write_pins
 from tests.conftest import FakeObjectStorage, clean_settings, make_context
-from tests.test_model_package import STOREY_A, STOREY_B, build_package, reseal
+from tests.test_model_package import (
+    STOREY_A,
+    STOREY_B,
+    build_package,
+    reseal,
+    two_building_package,
+)
 
 GLB_A = f"geometry/{STOREY_A}__ARCH.glb"
 
@@ -112,6 +118,7 @@ async def test_upload_commit_read_and_approve(build_api: Callable[..., AsyncClie
         assert data["status"] == "candidate" and data["committed_at"] is not None
         assert [s["storey_key"] for s in data["storeys"]] == [STOREY_A, STOREY_B]
         assert [s["element_count"] for s in data["storeys"]] == [2, 1]
+        assert {s["building_key"] for s in data["storeys"]} == {None}
         assert data["counts"]["elements"] == 3 and data["warnings"] == []
         parts = {part["path"]: part for part in data["parts"]}
         assert set(parts) == set(files)
@@ -162,6 +169,24 @@ async def test_new_approved_version_supersedes_the_old_one(
         statuses = {v["id"]: v["status"] for v in listed}
         assert statuses == {ids[0]: "superseded", ids[1]: "approved"}
         assert [v["number"] for v in listed] == [2, 1]
+
+
+async def test_storeys_keep_their_building_and_package_order(
+    build_api: Callable[..., AsyncClient],
+) -> None:
+    """Модель с двумя корпусами (раздел 4): этажи отдаются по зданиям, в порядке storeys.json."""
+    async with build_api(make_context(), settings=open_settings()) as api:
+        project = await new_project(api)
+        _, files, manifest = two_building_package()
+        version = (await start(api, project, manifest)).json()["id"]
+        await upload_all(api, project, version, files)
+        base = f"/api/v1/projects/{project}/model/versions/{version}"
+        committed = await api.post(f"{base}/commit")
+        assert committed.status_code == 200, committed.text
+        assert committed.json()["warnings"] == []
+        detail = (await api.get(base)).json()
+        rows = [(s["storey_key"], s["building_key"], s["building_name"]) for s in detail["storeys"]]
+        assert rows == [(STOREY_B, "K1", "Корпус 1"), (STOREY_A, "K2", "Корпус 2")]
 
 
 async def test_part_with_wrong_hash_or_path_is_rejected(

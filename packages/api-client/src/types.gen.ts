@@ -15160,6 +15160,14 @@ export type ModelStoreyRead = {
      */
     bbox_mm?: Array<number> | null;
     /**
+     * Building Key
+     */
+    building_key?: string | null;
+    /**
+     * Building Name
+     */
+    building_name?: string | null;
+    /**
      * Element Count
      */
     element_count?: number;

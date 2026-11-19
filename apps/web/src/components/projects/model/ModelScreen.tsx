@@ -1,10 +1,12 @@
 'use client';
 
-import type { ModelPartRead } from '@quantor/api-client';
+import type { ModelPartRead, ModelStoreyRead } from '@quantor/api-client';
 import { useMemo, useState, type FC } from 'react';
 
 import { Button, EmptyState, ErrorState, SkeletonRows, StatusBadge } from '@/components/ui';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
+import { plural } from '@/lib/format';
+import { elevationLevels, hasBuildings, storeysByBuilding } from '@/lib/model/model-buildings';
 import {
   elementTitle,
   formatElevation,
@@ -94,14 +96,20 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
     [parts, storey],
   );
   const house = viewMode === 'house' && !simpleViewer;
-  const byElevation = useMemo(
-    () => [...storeys].sort((a, b) => a.elevation_mm - b.elevation_mm),
-    [storeys],
-  );
-  const levelOf = useMemo(
-    () => new Map(byElevation.map((item, index) => [item.storey_key, index])),
-    [byElevation],
-  );
+  /** Здания и их этажи (QMP v1, раздел 4); модель одного здания - одна группа без имени. */
+  const groups = useMemo(() => storeysByBuilding(storeys), [storeys]);
+  const multiBuilding = hasBuildings(groups);
+  // Уровень - номер различной отметки снизу: этажи разных корпусов на одной отметке режутся вместе.
+  const { levels, levelOf } = useMemo(() => elevationLevels(storeys), [storeys]);
+  const lastLevel = levels.length - 1;
+  const levelLabel = (level: number): string => {
+    const elevation = levels[level];
+    if (elevation === undefined) return 'все';
+    const at = storeys.filter((item) => item.elevation_mm === elevation);
+    return !multiBuilding && at[0] !== undefined
+      ? at[0].name
+      : `отметки ${formatElevation(elevation)}`;
+  };
   const allDisciplines = useMemo(
     () =>
       [
@@ -166,6 +174,40 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   );
   const element: IModelElement | null =
     selectedId === null ? null : (elements.data?.get(selectedId) ?? null);
+
+  /** Список этажей (сверху вниз): всей модели или одного здания. */
+  const storeyList = (items: readonly ModelStoreyRead[], label: string) => (
+    <ul className="flex flex-col gap-[var(--s-1)]" aria-label={label}>
+      {items.map((item) => {
+        const active = storey?.storey_key === item.storey_key;
+        return (
+          <li key={item.storey_key}>
+            <button
+              type="button"
+              aria-pressed={active}
+              onClick={() => {
+                setStoreyChoice(item.storey_key);
+                setSelectedId(null);
+                // Весь дом: камера подлетает к этажу, остальные этажи остаются на месте;
+                // срезать дом сверху можно только ползунком «Этажи снизу до».
+                if (house) setFocus({ group: item.storey_key });
+              }}
+              className={`flex w-full items-baseline justify-between gap-[var(--s-2)] rounded-[var(--radius-sm)] border px-[var(--s-2)] py-[var(--s-2)] text-left text-sm ${
+                active
+                  ? 'border-accent bg-surface-muted'
+                  : 'border-transparent hover:bg-surface-muted'
+              }`}
+            >
+              <span className="min-w-0 truncate">{item.name}</span>
+              <span className="shrink-0 text-xs text-muted">
+                {formatElevation(item.elevation_mm)}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   if (versions.isPending) return <SkeletonRows rows={6} />;
   if (versions.isError && versions.data === undefined) {
@@ -251,6 +293,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
           <div className="flex flex-col gap-[var(--s-2)] text-xs text-muted">
             <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
             <span title={data.generator ? `Выгрузчик: ${data.generator}` : undefined}>
+              {multiBuilding && `Зданий: ${String(groups.length)} · `}
               Этажей: {String(data.counts?.storeys ?? storeys.length)} · элементов:{' '}
               {String(data.counts?.elements ?? '—')}
             </span>
@@ -302,19 +345,19 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
               />
               Один этаж
             </label>
-            {house && byElevation.length > 1 && (
+            {house && lastLevel > 0 && (
               <>
                 <label className="flex flex-col gap-[var(--s-1)] text-xs text-muted">
-                  Этажи снизу до: {byElevation[maxLevel ?? byElevation.length - 1]?.name ?? 'все'}
+                  Этажи снизу до: {levelLabel(maxLevel ?? lastLevel)}
                   <input
                     type="range"
                     min={0}
-                    max={byElevation.length - 1}
+                    max={lastLevel}
                     step={1}
-                    value={maxLevel ?? byElevation.length - 1}
+                    value={maxLevel ?? lastLevel}
                     onChange={(event) => {
                       const level = Number(event.target.value);
-                      setMaxLevel(level >= byElevation.length - 1 ? null : level);
+                      setMaxLevel(level >= lastLevel ? null : level);
                     }}
                   />
                 </label>
@@ -337,37 +380,23 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
         {detail.isError && (
           <ErrorState title="Версию не удалось открыть" code={extractCode(detail.error)} />
         )}
-        {data && (
-          <ul className="flex flex-col gap-[var(--s-1)]" aria-label="Этажи">
-            {[...storeys].reverse().map((item) => {
-              const active = storey?.storey_key === item.storey_key;
-              return (
-                <li key={item.storey_key}>
-                  <button
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => {
-                      setStoreyChoice(item.storey_key);
-                      setSelectedId(null);
-                      // Весь дом: камера подлетает к этажу, остальные этажи остаются на месте;
-                      // срезать дом сверху можно только ползунком «Этажи снизу до».
-                      if (house) setFocus({ group: item.storey_key });
-                    }}
-                    className={`flex w-full items-baseline justify-between gap-[var(--s-2)] rounded-[var(--radius-sm)] border px-[var(--s-2)] py-[var(--s-2)] text-left text-sm ${
-                      active
-                        ? 'border-accent bg-surface-muted'
-                        : 'border-transparent hover:bg-surface-muted'
-                    }`}
-                  >
-                    <span className="min-w-0 truncate">{item.name}</span>
-                    <span className="shrink-0 text-xs text-muted">
-                      {formatElevation(item.elevation_mm)}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+        {data && !multiBuilding && storeyList([...storeys].reverse(), 'Этажи')}
+        {data && multiBuilding && (
+          // Несколько зданий (корпуса, стилобат, подземная часть): у каждого свои этажи сверху вниз.
+          <div className="flex flex-col gap-[var(--s-2)]" aria-label="Здания и этажи">
+            {groups.map((group) => (
+              <details key={group.key ?? '-'} open className="flex flex-col gap-[var(--s-1)]">
+                <summary className="cursor-pointer text-sm font-medium">
+                  {group.name ?? 'Вне зданий'}{' '}
+                  <span className="text-xs font-normal text-muted">
+                    · {group.storeys.length}{' '}
+                    {plural(group.storeys.length, ['этаж', 'этажа', 'этажей'])}
+                  </span>
+                </summary>
+                {storeyList([...group.storeys].reverse(), `Этажи: ${group.name ?? 'вне зданий'}`)}
+              </details>
+            ))}
+          </div>
         )}
       </aside>
 

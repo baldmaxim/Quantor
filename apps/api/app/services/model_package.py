@@ -157,6 +157,9 @@ class Storey(_Model):
     height_mm: float | None = None
     elevation_source: str | None = None
     bbox_mm: Annotated[list[float], Field(min_length=4, max_length=4)] | None = None
+    # Здание этажа (раздел 4): в модели с несколькими зданиями, оба поля вместе.
+    building_key: str | None = None
+    building_name: Annotated[str, Field(min_length=1, max_length=200)] | None = None
 
 
 class Element(_Model):
@@ -326,16 +329,36 @@ def check_storeys(data: bytes, report: Report) -> list[Storey]:
             continue
         if _KEY.match(storey.storey_key) is None:
             report.error("STOREY_KEY", f"storeys.json[{index}]", "Недопустимый storey_key")
+        _check_building(storey, f"storeys.json[{index}]", report)
         storeys.append(storey)
     keys = [s.storey_key for s in storeys]
     if len(set(keys)) != len(keys):
         report.error("STOREY_KEY", "storeys.json", "storey_key повторяется")
-    elevations = [s.elevation_mm for s in storeys]
-    if any(b <= a for a, b in pairwise(elevations)):
-        report.error("STOREY_ORDER", "storeys.json", "Отметки этажей должны возрастать")
+    names: dict[str, str] = {}
+    elevations: dict[str | None, list[float]] = {}
+    for storey in storeys:
+        elevations.setdefault(storey.building_key, []).append(storey.elevation_mm)
+        if (
+            storey.building_key is not None
+            and storey.building_name is not None
+            and names.setdefault(storey.building_key, storey.building_name) != storey.building_name
+        ):
+            report.error("STOREY_BUILDING", "storeys.json", "У здания разные имена")
+    if any(b <= a for group in elevations.values() for a, b in pairwise(group)):
+        report.error("STOREY_ORDER", "storeys.json", "Отметки этажей здания должны возрастать")
     for storey in storeys:
         _storey_plausibility(storey, report)
     return storeys
+
+
+def _check_building(storey: Storey, where: str, report: Report) -> None:
+    """`building_key` и `building_name` - вместе или ни одного; ключ из алфавита storey_key."""
+    if storey.building_key is None and storey.building_name is None:
+        return
+    if storey.building_key is None or storey.building_name is None:
+        report.error("STOREY_BUILDING", where, "Здание этажа: нужны building_key и building_name")
+    elif _KEY.match(storey.building_key) is None:
+        report.error("STOREY_BUILDING", where, "Недопустимый building_key")
 
 
 def _storey_plausibility(storey: Storey, report: Report) -> None:

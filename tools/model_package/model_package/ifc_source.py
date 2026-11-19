@@ -4,6 +4,7 @@
 предположений нет. Смещение `origin_offset_mm`: X и Y - перенос `IfcBuilding` (вместе с
 участком), Z - разность мировой Z этажа и его `Elevation` (медиана по этажам), то есть
 нулевая отметка проекта. Расхождение Z с переносом здания - предупреждение.
+Здание этажа - ближайшее `IfcBuilding` вверх по `IfcRelAggregates` (раздел 4).
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import ifcopenshell
+import ifcopenshell.util.element
 import ifcopenshell.util.placement
 import ifcopenshell.util.unit
 import numpy as np
@@ -24,12 +26,19 @@ class QmpError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
+class RawBuilding:
+    global_id: str
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
 class RawStorey:
     step_id: int
     global_id: str
     name: str
     elevation_mm: float
     elevation_source: str
+    building_id: str | None = None  # GlobalId здания этажа; None - этаж вне IfcBuilding
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,8 +112,28 @@ def _r(value: float, nd: int = 1) -> float:
     return 0.0 if out == 0 else out
 
 
+def read_buildings(model: Any) -> list[RawBuilding]:
+    """Здания файла в порядке файла."""
+    return [
+        RawBuilding(str(b.GlobalId), str(b.Name or b.LongName or b.GlobalId))
+        for b in model.by_type("IfcBuilding")
+    ]
+
+
+def _building_of(product: Any) -> Any | None:
+    """Ближайшее IfcBuilding вверх по IfcRelAggregates (этаж может входить в этаж)."""
+    seen: set[int] = set()
+    parent = ifcopenshell.util.element.get_aggregate(product)
+    while parent is not None and parent.id() not in seen:
+        if parent.is_a("IfcBuilding"):
+            return parent
+        seen.add(parent.id())
+        parent = ifcopenshell.util.element.get_aggregate(parent)
+    return None
+
+
 def read_storeys(model: Any, frame: Frame, warnings: list[str], name: str) -> list[RawStorey]:
-    """Этажи файла с отметкой относительно нуля проекта, мм."""
+    """Этажи файла с отметкой относительно нуля проекта, мм, и зданием каждого."""
     out: list[RawStorey] = []
     for s in model.by_type("IfcBuildingStorey"):
         if s.Elevation is not None:
@@ -118,8 +147,16 @@ def read_storeys(model: Any, frame: Frame, warnings: list[str], name: str) -> li
                 f"{name}: у этажа {s.Name!r} нет ни Elevation, ни размещения - пропущен"
             )
             continue
+        building = _building_of(s)
         out.append(
-            RawStorey(s.id(), s.GlobalId, s.Name or s.LongName or s.GlobalId, _r(elev), source)
+            RawStorey(
+                s.id(),
+                s.GlobalId,
+                s.Name or s.LongName or s.GlobalId,
+                _r(elev),
+                source,
+                str(building.GlobalId) if building is not None else None,
+            )
         )
     return out
 

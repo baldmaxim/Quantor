@@ -29,6 +29,7 @@ MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 MAX_PATH = 160
 MAX_PROPS = 24
 MAX_PROP_STR = 120
+MAX_BUILDING_NAME = 200
 STOREY_HEIGHT_MM = (1_500.0, 12_000.0)
 STOREY_EXTENT_MM = (5_000.0, 2_000_000.0)
 HASH_EXCLUDED = ("manifest_sha256", "generated_at")
@@ -118,7 +119,7 @@ FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
                 "bbox_mm",
             }
         ),
-        frozenset(),
+        frozenset({"building_key", "building_name"}),
     ),
     "grids": (frozenset({"source", "axes"}), frozenset()),
     "axis": (frozenset({"tag", "dir", "p0", "p1"}), frozenset()),
@@ -502,13 +503,18 @@ class Checker:
         if not isinstance(data, list) or not data:
             r.error("STOREYS", paths[0], "нужен непустой список этажей")
             return
-        elevations: list[float] = []
+        # Отметки возрастают внутри здания; этажи вне зданий - одна группа (ключ None).
+        elevations: dict[str | None, list[float]] = {}
+        names: dict[str, str] = {}
         for i, st in enumerate(data):
             where = f"storeys.json[{i}]"
             if _fields(st, "storey", where, r) and (elev := self._storey(st, where)) is not None:
-                elevations.append(elev)
-        if any(b <= a for a, b in pairwise(elevations)):
-            r.error("STOREY_ORDER", paths[0], "отметки этажей должны строго возрастать")
+                building = self._building(st, where, names)
+                elevations.setdefault(building, []).append(elev)
+        if any(b <= a for group in elevations.values() for a, b in pairwise(group)):
+            r.error("STOREY_ORDER", paths[0], "отметки этажей здания должны строго возрастать")
+        if names:
+            r.stats["buildings"] = len(names)
         counts = self.manifest.get("counts")
         if isinstance(counts, dict) and counts.get("storeys") != len(data):
             r.error(
@@ -549,6 +555,21 @@ class Checker:
             return float(elev)
         r.error("SCHEMA", where, "elevation_mm - число")
         return None
+
+    def _building(self, st: dict[str, Any], where: str, names: dict[str, str]) -> str | None:
+        """Здание этажа: `building_key` и `building_name` вместе или ни одного."""
+        r = self.report
+        key, name = st.get("building_key"), st.get("building_name")
+        if key is None and name is None:
+            return None
+        if not (isinstance(key, str) and KEY_RE.match(key)):
+            r.error("STOREY_BUILDING", where, f"недопустимый building_key {key!r}")
+            return None
+        if not (isinstance(name, str) and 0 < len(name) <= MAX_BUILDING_NAME):
+            r.error("STOREY_BUILDING", where, "building_name - строка до 200 знаков")
+        elif names.setdefault(key, name) != name:
+            r.error("STOREY_BUILDING", where, f"у здания {key} разные имена")
+        return key
 
     def _grids(self) -> None:
         r = self.report

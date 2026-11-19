@@ -30074,6 +30074,28 @@
             ],
             "title": "Bbox Mm"
           },
+          "building_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Key"
+          },
+          "building_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Name"
+          },
           "element_count": {
             "default": 0,
             "title": "Element Count",

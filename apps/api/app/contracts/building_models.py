@@ -30,6 +30,9 @@ class ModelStoreyRead(BaseModel):
     height_mm: float | None = None
     bbox_mm: list[float] | None = None
     element_count: int = 0
+    # Здание этажа: только в моделях с несколькими зданиями (QMP v1, раздел 4).
+    building_key: str | None = None
+    building_name: str | None = None
 
 
 class ModelVersionRead(BaseModel):

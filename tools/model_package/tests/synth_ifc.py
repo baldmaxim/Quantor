@@ -185,3 +185,50 @@ def make_pl_ifc(path: Path, schema: str = "IFC4") -> Path:
     b.contain(s2, pipe)
     b.f.write(str(path))
     return path
+
+
+TWO_BUILDINGS = (
+    ("Корпус 1", 0.0, (("1 этаж", 0.0), ("2 этаж", 3000.0), ("Кровля", 6000.0))),
+    ("Корпус 2", 30000.0, (("1 этаж", 0.0), ("2 этаж", 3000.0), ("Кровля", 5950.0))),
+)
+
+
+def make_two_buildings_ifc(path: Path, schema: str = "IFC4") -> dict[str, dict[str, str]]:
+    """Два корпуса в одном файле, как объект 346: этажи на одних и близких отметках.
+
+    Корпус 1: 0, +3000, кровля +6000; корпус 2 (сдвинут на 30 м по X): 0, +3000, кровля
+    +5950 - кровли расходятся на 50 мм. На каждом этаже стена «<корпус> <этаж>».
+    Возвращает {корпус: {этаж: GlobalId этажа}}.
+    """
+    b = _Builder(schema)
+    site = b.spatial("IfcSite", "Участок", b.project, _matrix(0, 0, 0))
+    out: dict[str, dict[str, str]] = {}
+    for name, dx, levels in TWO_BUILDINGS:
+        building = b.spatial("IfcBuilding", name, site, _matrix(0, 0, BUILDING_Z_MM))
+        out[name] = {}
+        for storey_name, elevation in levels:
+            z = BUILDING_Z_MM + elevation
+            storey = b.spatial("IfcBuildingStorey", storey_name, building, _matrix(0, 0, z))
+            storey.Elevation = elevation
+            wall = b.box("IfcWall", f"{name} {storey_name}", 12000, 2800, 200, _matrix(dx, 0, z))
+            b.contain(storey, wall)
+            out[name][storey_name] = storey.GlobalId
+    b.f.write(str(path))
+    return out
+
+
+def make_k2_str_ifc(path: Path, schema: str = "IFC4") -> str:
+    """КР корпуса 2 отдельным файлом: здание с тем же именем, этаж +3010, одна балка.
+
+    Возвращает GlobalId балки.
+    """
+    b = _Builder(schema)
+    site = b.spatial("IfcSite", "Участок", b.project, _matrix(0, 0, 0))
+    building = b.spatial("IfcBuilding", "Корпус 2", site, _matrix(0, 0, BUILDING_Z_MM))
+    z = BUILDING_Z_MM + 3010
+    storey = b.spatial("IfcBuildingStorey", "Этаж 2 КР", building, _matrix(0, 0, z))
+    storey.Elevation = 3010.0
+    beam = b.box("IfcBeam", "Балка", 6000, 400, 300, _matrix(30000, 2000, z + 2500))
+    b.contain(storey, beam)
+    b.f.write(str(path))
+    return str(beam.GlobalId)

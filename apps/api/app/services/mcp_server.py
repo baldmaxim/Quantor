@@ -277,6 +277,7 @@ async def model_status(caller: Caller, args: dict[str, Any]) -> ToolResult:
         detail = await caller.get(f"/api/v1/projects/{project_id}/model/versions/{newest['id']}")
         storeys = [
             {"name": s.get("name"), "elevation_mm": s.get("elevation_mm")}
+            | ({"building": s["building_name"]} if s.get("building_name") else {})
             for s in detail.get("storeys", [])
         ]
     lines = [f"Модель «{name}»."]
@@ -290,7 +291,10 @@ async def model_status(caller: Caller, args: dict[str, Any]) -> ToolResult:
         lines.append(
             f"Новейшая версия №{newest.get('number')} ({newest.get('status')}), "
             f"этажей {len(storeys)}: "
-            + ", ".join(f"{s['name']} {s['elevation_mm']}" for s in storeys)
+            + ", ".join(
+                f"{s['building'] + ': ' if 'building' in s else ''}{s['name']} {s['elevation_mm']}"
+                for s in storeys
+            )
         )
     return ToolResult(
         "\n".join(lines), {"import": job, "newest_version": newest, "storeys": storeys}
