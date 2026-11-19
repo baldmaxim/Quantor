@@ -10,6 +10,7 @@ import {
   isUpdateActive,
   pipelineHasActive,
   sheetProgress,
+  sheetStaleHint,
   sheetSteps,
   sheetSummary,
   sheetUpdateBadge,
@@ -139,7 +140,10 @@ describe('шаги листа', () => {
   });
 
   it('задание в очереди: состояние «в очереди» с номером задания, итог «В очереди»', () => {
-    const s = sheet({ convert: stage({ job_id: 'job-q', status: 'queued', progress: null }), views: [] });
+    const s = sheet({
+      convert: stage({ job_id: 'job-q', status: 'queued', progress: null }),
+      views: [],
+    });
     expect(state(s, 'convert')).toMatchObject({ state: 'queued', detail: null, jobId: 'job-q' });
     expect(state(s, 'walls')?.state).toBe('blocked');
     expect(sheetSummary(s)).toEqual({ tone: 'accent', label: 'В очереди' });
@@ -186,13 +190,11 @@ describe('шаги листа', () => {
       views: [view({ has_dxf: false })],
     });
     expect(state(s, 'convert')).toMatchObject({ state: 'done', detail: 'DXF не выпущен' });
-    expect(sheetSteps(s).slice(2).map((step) => step.state)).toEqual([
-      'skipped',
-      'skipped',
-      'skipped',
-      'skipped',
-      'skipped',
-    ]);
+    expect(
+      sheetSteps(s)
+        .slice(2)
+        .map((step) => step.state),
+    ).toEqual(['skipped', 'skipped', 'skipped', 'skipped', 'skipped']);
     expect(sheetSummary(s)).toEqual({ tone: 'neutral', label: 'CAD: DXF не выпущен' });
   });
 
@@ -242,7 +244,11 @@ describe('шаги листа', () => {
     const s = sheet({
       views: [
         view({
-          walls: stage({ status: 'failed', error_code: 'CAD_WALLS_NOT_READY', result_status: null }),
+          walls: stage({
+            status: 'failed',
+            error_code: 'CAD_WALLS_NOT_READY',
+            result_status: null,
+          }),
           zones: zonesReady,
           zones_count: 5,
         }),
@@ -352,7 +358,10 @@ describe('шаги листа', () => {
     };
     const running = sheet({
       views: [
-        view({ ...base, floor3d: stage({ job_type: 'cad_floor3d_dxf', status: 'running', progress: 0.2 }) }),
+        view({
+          ...base,
+          floor3d: stage({ job_type: 'cad_floor3d_dxf', status: 'running', progress: 0.2 }),
+        }),
       ],
     });
     expect(state(running, 'floor3d')).toMatchObject({ state: 'running', detail: '20 %' });
@@ -374,7 +383,11 @@ describe('шаги листа', () => {
           approved: true,
           routes: stage({ job_type: 'cad_mep_route' }),
           routes_accepted: true,
-          floor3d: stage({ status: 'failed', error_code: 'CAD_ELEVATION_NOT_FOUND', result_status: null }),
+          floor3d: stage({
+            status: 'failed',
+            error_code: 'CAD_ELEVATION_NOT_FOUND',
+            result_status: null,
+          }),
         }),
       ],
     });
@@ -441,21 +454,23 @@ describe('pipelineHasActive', () => {
   });
 
   it('завершённые этапы не активны', () => {
-    expect(pipelineHasActive(pipeline([sheet({ views: [view({ walls, zones: zonesReady })] })]))).toBe(
-      false,
-    );
+    expect(
+      pipelineHasActive(pipeline([sheet({ views: [view({ walls, zones: zonesReady })] })])),
+    ).toBe(false);
   });
 
   it('идёт преобразование листа', () => {
-    expect(
-      pipelineHasActive(pipeline([sheet({ convert: stage({ status: 'queued' }) })])),
-    ).toBe(true);
+    expect(pipelineHasActive(pipeline([sheet({ convert: stage({ status: 'queued' }) })]))).toBe(
+      true,
+    );
   });
 
   it('идёт этап вида', () => {
     const running = stage({ status: 'running' });
     for (const key of ['walls', 'zones', 'routes', 'floor3d'] as const) {
-      expect(pipelineHasActive(pipeline([sheet({ views: [view({ [key]: running })] })]))).toBe(true);
+      expect(pipelineHasActive(pipeline([sheet({ views: [view({ [key]: running })] })]))).toBe(
+        true,
+      );
     }
   });
 });
@@ -499,5 +514,74 @@ describe('обновление CAD листа', () => {
     });
     expect(pipelineHasActive(pipeline([sheet({ update: running })]))).toBe(true);
     expect(pipelineHasActive(pipeline([sheet({ update: failed })]))).toBe(false);
+  });
+});
+
+describe('отказы этапов словами этого этапа', () => {
+  const walls = stage({ job_id: 'w', job_type: 'cad_walls', result_status: 'walls_ready' });
+  const zonesFailed = (code: string) =>
+    stage({
+      job_id: 'z',
+      job_type: 'cad_zones',
+      status: 'failed',
+      result_status: null,
+      error_code: code,
+    });
+
+  it('зоны без квартир: не «трассы не построены», а причина авторазметки и что делать', () => {
+    const zones = state(
+      sheet({ views: [view({ walls, zones: zonesFailed('CAD_MEP_NOT_BUILT') })] }),
+      'zones',
+    );
+    expect(zones?.state).toBe('failed');
+    expect(zones?.detail).toMatch(/^Авторазметка не нашла квартир на плане/);
+    expect(zones?.detail).not.toMatch(/Трассы/);
+  });
+
+  it('зоны: привязка к PDF не прошла - не «PDF не подходит»', () => {
+    const zones = state(
+      sheet({ views: [view({ walls, zones: zonesFailed('CAD_INPUT_INVALID') })] }),
+      'zones',
+    );
+    expect(zones?.detail).toMatch(/^Авторазметка не смогла совместить CAD с PDF/);
+  });
+
+  it('у преобразования тот же код значит своё: «PDF не подходит»', () => {
+    const s = sheet({
+      convert: stage({ status: 'failed', result_status: null, error_code: 'CAD_INPUT_INVALID' }),
+      views: [],
+    });
+    expect(state(s, 'convert')?.detail).toBe('PDF не подходит для преобразования в CAD.');
+  });
+
+  it('одобрение не ждёт зон, которые авторазметка не нашла; итог листа остаётся ошибкой зон', () => {
+    const s = sheet({ views: [view({ walls, zones: zonesFailed('CAD_MEP_NOT_BUILT') })] });
+    expect(state(s, 'approval')).toMatchObject({
+      state: 'review',
+      detail: 'нужно решение человека',
+    });
+    expect(sheetSummary(s)).toEqual({ tone: 'danger', label: 'Ошибка: Зоны' });
+  });
+});
+
+describe('устаревший лист словами', () => {
+  it('шаги и что нажать; без версий движка', () => {
+    const s = sheet({
+      stale: [
+        {
+          stage: 'convert',
+          view: null,
+          was: '2026.11.18+f80883e8ef80',
+          now: '2026.11.18+f0c7f14eb2cb',
+        },
+        { stage: 'walls', view: 1, was: 'cad_walls.v1.22', now: 'cad_walls.v1.23' },
+      ],
+    });
+    const hint = sheetStaleHint(s);
+    expect(hint).toBe(
+      'Посчитан прежней версией движка (CAD, Конструкции): пересчитайте — кнопка «Пересчитать устаревшие» над списком листов.',
+    );
+    expect(hint).not.toMatch(/f80883e8ef80/);
+    expect(sheetStaleHint(sheet())).toBeNull();
   });
 });

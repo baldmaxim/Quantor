@@ -173,8 +173,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const [zoomPercent, setZoomPercent] = useState(100);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [regionSearch, setRegionSearch] = useState('');
-  // Открытый раздел правой панели CAD: действия окна «Обработка» у бейджа открывают его.
-  const [cadSideTab, setCadSideTab] = useState<string | null>(null);
+  // Открытый раздел правой панели CAD: действия окна «Обработка» у бейджа открывают его, ссылка
+  // со страницы проекта задаёт его в `?side=` (например, «Проверить вид» - «Трассы»).
+  const [cadSideTab, setCadSideTab] = useState<string | null>(() => searchParams.get('side'));
 
   const pages = sheets.data?.items ?? [];
   const pageIndex = Math.min(Math.max(pageParam - 1, 0), Math.max(pages.length - 1, 0));
@@ -465,11 +466,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
 
   // Обычный переход заменяет активную вкладку, `newTab` (Ctrl + щелчок, средняя кнопка) - открывает
   // лист рядом с ней. Уже открытый лист только становится активным.
-  const goToPage = (
-    index: number,
-    extra: Record<string, string | null> = {},
-    newTab = false,
-  ) => {
+  const goToPage = (index: number, extra: Record<string, string | null> = {}, newTab = false) => {
     const clamped = Math.min(Math.max(index, 0), pages.length - 1);
     const next = clamped + 1;
     const tabs =
@@ -557,7 +554,9 @@ const WorkspacePage = ({ params }: IPageProps) => {
   const floorTitleByPage = useMemo(
     () =>
       new Map(
-        pipeline.sheets.flatMap((row) => (row.floor_title ? [[row.page_index, row.floor_title] as const] : [])),
+        pipeline.sheets.flatMap((row) =>
+          row.floor_title ? [[row.page_index, row.floor_title] as const] : [],
+        ),
       ),
     [pipeline.sheets],
   );
@@ -702,10 +701,7 @@ const WorkspacePage = ({ params }: IPageProps) => {
               {/* CAD без флага `cad.export` не показывается вовсе (ADR-0036). */}
               {cadOn && (
                 <div className="flex shrink-0 items-center px-[var(--s-4)]">
-                  <WorkspaceModeSwitch
-                    mode={mode}
-                    onChange={setMode}
-                  />
+                  <WorkspaceModeSwitch mode={mode} onChange={setMode} />
                 </div>
               )}
 

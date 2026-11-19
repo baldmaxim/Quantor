@@ -27,9 +27,15 @@ describe('позиция листа', () => {
 
 describe('workspaceCadHref', () => {
   it('ревизия, лист, вкладка, задание и вид', () => {
+    expect(workspaceCadHref('p1', { revision: REVISION, position: 3, job: JOB, view: 2 })).toBe(
+      `/projects/p1/workspace?revision=${REVISION}&page=3&tab=cad&job=${JOB}&view=2`,
+    );
+  });
+
+  it('раздел правой панели - в `side`', () => {
     expect(
-      workspaceCadHref('p1', { revision: REVISION, position: 3, job: JOB, view: 2 }),
-    ).toBe(`/projects/p1/workspace?revision=${REVISION}&page=3&tab=cad&job=${JOB}&view=2`);
+      workspaceCadHref('p1', { revision: REVISION, position: 3, job: JOB, view: 1, side: 'mep' }),
+    ).toBe(`/projects/p1/workspace?revision=${REVISION}&page=3&tab=cad&job=${JOB}&view=1&side=mep`);
   });
 
   it('только ревизия - вкладка CAD без листа', () => {
@@ -45,9 +51,9 @@ describe('workspaceCadHref', () => {
   });
 
   it('вид без задания не пишется', () => {
-    expect(
-      workspaceCadHref('p1', { revision: REVISION, position: 1, job: null, view: 3 }),
-    ).toBe(`/projects/p1/workspace?revision=${REVISION}&page=1&tab=cad`);
+    expect(workspaceCadHref('p1', { revision: REVISION, position: 1, job: null, view: 3 })).toBe(
+      `/projects/p1/workspace?revision=${REVISION}&page=1&tab=cad`,
+    );
   });
 });
 

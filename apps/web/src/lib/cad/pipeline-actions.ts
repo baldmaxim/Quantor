@@ -10,6 +10,7 @@ import {
   convertStep,
   isAutoScaleUnconfirmed,
   isUpdateActive,
+  isZonesNotFound,
   PIPELINE_STEP_LABELS,
   sheetSteps,
   VIEW_KEYS,
@@ -109,6 +110,7 @@ const linkTo = (
   label: string,
   view: number | null,
   withJob: boolean,
+  side: string | null = null,
 ): IPipelineAction =>
   action(
     {
@@ -122,6 +124,7 @@ const linkTo = (
         position: context.position,
         job: withJob ? (context.sheet.convert?.job_id ?? null) : null,
         view: withJob ? view : null,
+        side,
       }),
     },
     context,
@@ -236,7 +239,14 @@ const zonesActions = (
   // Лист с зонами человека авторазметке не отдаётся (409): там только переход к зонам. Если все
   // зоны листа созданы авторазметкой, её можно запустить заново - прежние авто-зоны удалятся.
   if (view.zones_count > 0) {
-    const link = linkTo(context, `zones:${view.view}:link`, 'Открыть зоны', view.view, true);
+    const link = linkTo(
+      context,
+      `zones:${view.view}:link`,
+      'Открыть зоны',
+      view.view,
+      true,
+      'zones',
+    );
     if (!view.zones_recreatable) return [link];
     return [
       link,
@@ -249,6 +259,34 @@ const zonesActions = (
           view: view.view,
           jobId: context.sheet.convert?.job_id ?? null,
           confirm: true,
+        },
+        context,
+      ),
+    ];
+  }
+  // Авторазметка не нашла квартир или не совместила CAD с PDF: повтор даст то же. Главное -
+  // ручная разметка; повтор авторазметки остаётся второстепенным.
+  if (isZonesNotFound(view.zones)) {
+    return [
+      {
+        ...linkTo(
+          context,
+          `zones:${view.view}:manual`,
+          'Разметить вручную',
+          view.view,
+          true,
+          'zones',
+        ),
+        intent: 'fix',
+      },
+      action(
+        {
+          id: `zones:${view.view}`,
+          kind: 'zones-auto',
+          intent: 'redo',
+          label: 'Разметить автоматически',
+          view: view.view,
+          jobId: context.sheet.convert?.job_id ?? null,
         },
         context,
       ),
@@ -276,7 +314,7 @@ const approvalActions = (
   context: IContext,
 ): IPipelineAction[] =>
   step.state === 'review'
-    ? [linkTo(context, `approval:${view.view}:link`, 'Проверить вид', view.view, true)]
+    ? [linkTo(context, `approval:${view.view}:link`, 'Проверить вид', view.view, true, 'mep')]
     : [];
 
 /**
@@ -290,7 +328,14 @@ const routesActions = (
   view: CadPipelineViewRead,
   context: IContext,
 ): IPipelineAction[] => {
-  const link = linkTo(context, `routes:${view.view}:link`, 'Открыть трассы', view.view, true);
+  const link = linkTo(
+    context,
+    `routes:${view.view}:link`,
+    'Открыть трассы',
+    view.view,
+    true,
+    'mep',
+  );
   if (step.state === 'failed' && view.routes) {
     const retry = action(
       {
@@ -492,7 +537,14 @@ export const nextPipelineAction = (rows: readonly IPipelineRow[]): IPipelineNext
   const main = rows.filter((row) => row.key !== 'floor3d');
   // Не начатая калибровка - необязательна (масштаб по размерам), «следующим шагом» не предлагается.
   const pending = main.filter((row) => row.key !== 'calibration');
-  return firstCandidate(main, ['failed']) ?? firstCandidate(pending, ['todo', 'review']);
+  // Зоны, которые авторазметка не нашла, лист не держат: следующим шагом идёт одобрение вида, а
+  // ручная разметка остаётся в строке зон. Если ждать больше нечего - предлагается она.
+  const blocking = main.filter((row) => !(row.key === 'zones' && isZonesNotFound(row.stage)));
+  return (
+    firstCandidate(blocking, ['failed']) ??
+    firstCandidate(pending, ['todo', 'review']) ??
+    firstCandidate(main, ['failed'])
+  );
 };
 
 /**

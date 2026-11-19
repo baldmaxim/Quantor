@@ -253,7 +253,7 @@ describe('зоны', () => {
     const zones = rowOf(rows, 'zones');
     expect(labels(zones)).toEqual(['Открыть зоны']);
     expect(zones.actions[0]?.href).toBe(
-      '/projects/p-1/workspace?revision=rev-1&page=3&tab=cad&job=job-1&view=1',
+      '/projects/p-1/workspace?revision=rev-1&page=3&tab=cad&job=job-1&view=1&side=zones',
     );
   });
 
@@ -518,5 +518,63 @@ describe('isBulkLaunchable', () => {
       false,
     );
     expect(isBulkLaunchable(sheet())).toBe(false);
+  });
+});
+
+describe('авторазметка зон не нашла решения (ответы объекта 346)', () => {
+  // Те же коды, что приходят с сервера: 93 листа «квартиры на плане не найдены», 43 - «привязка
+  // PDF->DXF не прошла проверку».
+  const notFound = failedOf('cad_zones', 'CAD_MEP_NOT_BUILT');
+  const notAligned = failedOf('cad_zones', 'CAD_INPUT_INVALID');
+  const withZones = (zones: CadPipelineStageRead) =>
+    rowsOf(sheet({ views: [view({ walls: wallsDone, zones })] }));
+
+  it('главное действие - ручная разметка на вкладке «Зоны», авторазметка - второстепенная', () => {
+    const zones = rowOf(withZones(notFound), 'zones');
+    expect(labels(zones)).toEqual(['Разметить вручную', 'Разметить автоматически']);
+    expect(zones.actions[0]).toMatchObject({ kind: 'link', intent: 'fix' });
+    expect(zones.actions[0]?.href).toBe(
+      '/projects/p-1/workspace?revision=rev-1&page=3&tab=cad&job=job-1&view=1&side=zones',
+    );
+    expect(zones.actions[1]).toMatchObject({ kind: 'zones-auto', intent: 'redo' });
+  });
+
+  it('одобрение не ждёт зон: ссылка «Проверить вид» ведёт на вкладку «Трассы»', () => {
+    for (const zones of [notFound, notAligned]) {
+      const rows = withZones(zones);
+      const approval = rowOf(rows, 'approval');
+      expect(approval.step.state).toBe('review');
+      expect(approval.actions[0]?.href).toBe(
+        '/projects/p-1/workspace?revision=rev-1&page=3&tab=cad&job=job-1&view=1&side=mep',
+      );
+      const next = nextPipelineAction(rows);
+      expect(next?.row.key).toBe('approval');
+      expect(next?.action.label).toBe('Проверить вид');
+    }
+  });
+
+  it('вид одобрен и трассы приняты: следующим остаётся ручная разметка зон', () => {
+    const rows = rowsOf(
+      sheet({
+        views: [
+          view({
+            walls: wallsDone,
+            zones: notFound,
+            approved: true,
+            routes: stage({ job_id: 'r-1', job_type: 'cad_mep_route' }),
+            routes_accepted: true,
+          }),
+        ],
+      }),
+    );
+    const next = nextPipelineAction(rows);
+    expect(next?.row.key).toBe('zones');
+    expect(next?.action.label).toBe('Разметить вручную');
+  });
+
+  it('другой отказ зон (движок) по-прежнему держит одобрение', () => {
+    const rows = withZones(failedOf('cad_zones'));
+    expect(rowOf(rows, 'approval').step.state).toBe('blocked');
+    expect(labels(rowOf(rows, 'zones'))).toEqual(['Разметить автоматически']);
   });
 });

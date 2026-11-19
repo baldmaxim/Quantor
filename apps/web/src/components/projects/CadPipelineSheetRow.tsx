@@ -8,6 +8,7 @@ import { formatFloorTitle, formatFloorTitleFull } from '@/lib/cad/floor-title';
 import {
   sheetProgress,
   sheetQualityBadge,
+  sheetStaleHint,
   sheetStaleTexts,
   sheetSteps,
   sheetSummary,
@@ -62,6 +63,7 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
   const updateBadge = sheetUpdateBadge(sheet);
   const qualityBadge = sheetQualityBadge(sheet);
   const stale = sheetStaleTexts(sheet);
+  const staleHint = sheetStaleHint(sheet);
   const failed = steps.find((step) => step.state === 'failed' && step.key !== 'floor3d');
   const floor3d = steps.find((step) => step.key === 'floor3d');
   const floor3dBadge = floor3d ? FLOOR3D_BADGES[floor3d.state] : undefined;
@@ -177,7 +179,11 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
           {qualityBadge && (
             <p className="m-0 text-warning">{`На проверку: ${qualityBadge.reasons.join('; ')}`}</p>
           )}
-          {stale.length > 0 && <p className="m-0 text-muted">{`Устарел: ${stale.join('; ')}`}</p>}
+          {staleHint && (
+            <p className="m-0 text-muted" title={stale.join('; ')}>
+              {staleHint}
+            </p>
+          )}
         </div>
       )}
 
