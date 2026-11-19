@@ -112,7 +112,8 @@ export interface DocumentStatusView extends StatusView {
  *
  * Для PDF «не распознан» - норма: пакет распознавания (ADR-0037) не нужен ни листам, ни CAD,
  * ни обмерам, поэтому жёлтая плашка на каждом PDF выглядела бедой. IFC не «без обработчика» -
- * он строит модель на странице «Модель здания». RVT, NWD, NWC и книги Excel лежат на хранении.
+ * он строит модель на странице «Модель здания». Книга Excel хранится как есть (ВОР Заказчика
+ * берётся из неё для сверки конструкций), RVT, NWD и NWC лежат на хранении.
  */
 export const documentRecognitionStatus = (
   documentKind: string,
@@ -130,6 +131,13 @@ export const documentRecognitionStatus = (
       label: 'Для модели здания',
       tone: 'neutral',
       hint: 'Модель из IFC строится на странице «Модель здания» кнопкой «Построить модель из IFC».',
+    };
+  }
+  if (documentKind === 'other' && processingStatus === 'unprocessed') {
+    return {
+      label: 'Хранится',
+      tone: 'neutral',
+      hint: 'Книга хранится как есть; ВОР Заказчика из неё сверяется с конструкциями во вкладке CAD рабочей области.',
     };
   }
   if (processingStatus === 'unprocessed' || processingStatus === 'processor_unavailable') {

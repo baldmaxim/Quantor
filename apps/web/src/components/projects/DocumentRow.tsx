@@ -119,7 +119,8 @@ export const DocumentRow: FC<IDocumentRowProps> = ({
         {geometry && <StatusBadge tone={geometry.tone}>{geometry.label}</StatusBadge>}
 
         {recognition ? (
-          <span title={recognition.hint ?? undefined}>
+          // Над растянутой кнопкой строки: иначе подсказка не всплывает.
+          <span title={recognition.hint ?? undefined} className="relative z-10">
             <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
           </span>
         ) : (

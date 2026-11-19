@@ -15,7 +15,7 @@ import { useFeatures } from '@/lib/queries';
 /**
  * Полоса «Путь проекта» под шапкой карточки проекта: шаги по порядку с номером и одной строкой
  * «что сделать», ниже - разделы вне основного пути. Заменяет ряд из восьми кнопок в шапке.
- * На узком экране полоса листается вбок, страница - нет.
+ * Шаги переносятся строками: ни полоса, ни страница вбок не листаются.
  */
 
 export interface IProjectStepsProps {
@@ -34,7 +34,8 @@ export const ProjectSteps: FC<IProjectStepsProps> = ({ projectId, current = [] }
       aria-label="Путь проекта"
       className="flex-none border-b border-border bg-surface px-[var(--s-5)] md:px-[var(--s-6)]"
     >
-      <ol className="m-0 flex list-none gap-[var(--s-2)] overflow-x-auto p-0 py-[var(--s-3)] [overscroll-behavior-x:contain]">
+      {/* Шаги переносятся на вторую строку, а не уезжают вбок: все видны на любой ширине. */}
+      <ol className="m-0 flex list-none flex-wrap gap-[var(--s-2)] p-0 py-[var(--s-3)]">
         {steps.map((step, index) => {
           const here = current.includes(step.key);
           return (

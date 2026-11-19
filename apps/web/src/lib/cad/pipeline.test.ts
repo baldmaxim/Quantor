@@ -543,7 +543,7 @@ describe('отказы этапов словами этого этапа', () =>
       sheet({ views: [view({ walls, zones: zonesFailed('CAD_INPUT_INVALID') })] }),
       'zones',
     );
-    expect(zones?.detail).toMatch(/^Авторазметка не смогла совместить CAD с PDF/);
+    expect(zones?.detail).toMatch(/^Авторазметка не смогла связать CAD с PDF листа/);
   });
 
   it('у преобразования тот же код значит своё: «PDF не подходит»', () => {
