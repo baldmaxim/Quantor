@@ -10,6 +10,7 @@ import pytest
 from app.services.model_sheets import (
     ModelAxis,
     SheetAxis,
+    _ranges,
     building_number,
     fit_sheet,
     match_sheets,
@@ -279,3 +280,22 @@ def test_stylobate_takes_sheets_without_building_number() -> None:
         [tower, stylobate], building_name="Стилобат", storey_name="2 этаж", elevation_mm=7200
     )
     assert [m.sheet.page_index for m in found] == [9]
+
+
+def test_axis_standing_elsewhere_is_set_aside_and_named() -> None:
+    # как К3 на портале: одна ось листа на 300 мм не там, где в модели - лист привязан, ось названа
+    to_model, to_sheet = _truth(0.0, MM_PER_PT, 2000.0, 1000.0)
+    model, lines = _building(0.0, (0.0, 0.0), XS, YS, "3")
+    sheet = _sheet_from(lines, to_sheet)
+    i = next(k for k, a in enumerate(sheet) if a.label == "3/2")
+    sheet[i] = SheetAxis("3/2", "vertical", sheet[i].pos_pt + 300 / MM_PER_PT)
+    fit, reason = fit_sheet(sheet, model, MM_PER_PT)
+    assert reason is None
+    assert fit.rejected == ("3/2",)
+    assert fit.rms_mm < 1.0
+    _check(fit, to_model)
+
+
+def test_ranges() -> None:
+    assert _ranges([4, 5, 6, 9, 13, 14]) == "4-6, 9, 13-14"
+    assert _ranges([]) == ""

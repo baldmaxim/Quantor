@@ -30066,6 +30066,14 @@
       "ModelSheetOverlayRead": {
         "description": "Вид листа плана на отметке этажа модели и его привязка к сетке осей модели.\n\n`matrix` - подобие pt страницы (от левого верхнего угла, как кадр вида) → мм системы здания\nмодели: `x = a·x_pt + b·y_pt + c`, `y = d·x_pt + e·y_pt + f`, `[a, b, c, d, e, f]`.\nНет привязки -\n`None` и причина в `reason`.",
         "properties": {
+          "axes_rejected": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Axes Rejected",
+            "type": "array"
+          },
           "axes_used": {
             "default": [],
             "items": {

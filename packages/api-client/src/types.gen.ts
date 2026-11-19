@@ -15161,6 +15161,10 @@ export type ModelSheetOverlayList = {
  */
 export type ModelSheetOverlayRead = {
     /**
+     * Axes Rejected
+     */
+    axes_rejected?: Array<string>;
+    /**
      * Axes Used
      */
     axes_used?: Array<string>;

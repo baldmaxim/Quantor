@@ -89,7 +89,9 @@ export const fitLabel = (item: ModelSheetOverlayRead): string => {
   if (item.status !== 'registered') return item.reason ?? 'не привязан';
   const axes = item.axes_used?.length ?? 0;
   const rms = item.rms_mm ?? 0;
-  return `по ${axes} осям, расхождение ${Math.round(rms)} мм`;
+  const off = item.axes_rejected ?? [];
+  const tail = off.length > 0 ? `; на листе не там, где в модели: ${off.join(', ')}` : '';
+  return `по ${axes} осям, расхождение ${Math.round(rms)} мм${tail}`;
 };
 
 /** Что передаётся просмотрщику: растр листа и его углы на отметке этажа. */

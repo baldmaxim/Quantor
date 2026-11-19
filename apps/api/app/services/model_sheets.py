@@ -97,6 +97,8 @@ class SheetFit:
     used: tuple[str, ...]
     n_vertical: int
     n_horizontal: int
+    # подписи, общие с моделью, но стоящие на листе не там (отброшены при подгонке)
+    rejected: tuple[str, ...] = ()
 
     @property
     def matrix(self) -> tuple[float, float, float, float, float, float]:
@@ -130,6 +132,11 @@ def _solve3(m: list[list[float]], v: list[float]) -> tuple[float, float, float] 
                 for k in range(col, 4):
                     a[r][k] -= factor * a[col][k]
     return (a[0][3] / a[0][0], a[1][3] / a[1][1], a[2][3] / a[2][2])
+
+
+def _image(axis: SheetAxis, theta: float) -> float:
+    """Направление оси листа в модели при повороте θ: вертикаль листа → θ − 90°, горизонталь → θ."""
+    return theta - 90.0 if axis.orient == "vertical" else theta
 
 
 def _rows(
@@ -197,29 +204,26 @@ def fit_sheet(
         | None
     ) = None
     for theta in _candidate_angles(pairs):
-        kept = list(pairs)
-        for _ in range(3):
+        kept = [p for p in pairs if _angle_gap(_image(p[0], theta), p[1].angle) <= PARALLEL_DEG]
+        while len(kept) >= 3:
             rows = _rows(kept, theta)
-            if len(rows) < 3:
-                break
             x = _least_squares(rows)
             if x is None or x[0] <= 0:
                 break
             res = _residuals(rows, x)
-            used = [
-                p
-                for p in kept
-                if _angle_gap((theta - 90.0 if p[0].orient == "vertical" else theta), p[1].angle)
-                <= PARALLEL_DEG
-            ]
             worst = max(res)
-            if worst <= OUTLIER_MM:
+            median = sorted(res)[len(res) // 2]
+            if worst <= max(MAX_RESIDUAL_MM, 3 * median) and worst <= OUTLIER_MM:
                 rms = math.sqrt(sum(r * r for r in res) / len(res))
                 if best is None or (len(rows), -rms) > (best[0], -best[1]):
-                    best = (len(rows), rms, theta, x, used)
+                    best = (len(rows), rms, theta, x, kept)
                 break
-            drop = used[res.index(worst)]
-            kept = [p for p in kept if p is not drop]
+            drop = kept[res.index(worst)]
+            rest = [p for p in kept if p is not drop]
+            n_v = sum(1 for a, _ in rest if a.orient == "vertical")
+            if n_v < MIN_PER_DIRECTION or len(rest) - n_v < MIN_PER_DIRECTION:
+                break
+            kept = rest
     if best is None:
         return None, "подписи осей листа не складываются в одно положение на сетке модели"
     _, rms, theta, x, used = best
@@ -227,6 +231,10 @@ def fit_sheet(
     res = _residuals(rows, x)
     n_v = len({normalize_label(a.label) for a, _ in used if a.orient == "vertical"})
     n_h = len({normalize_label(a.label) for a, _ in used if a.orient == "horizontal"})
+    used_labels = {normalize_label(a.label) for a, _ in used}
+    rejected = tuple(
+        sorted({a.label for a, _ in pairs if normalize_label(a.label) not in used_labels})
+    )
     fit = SheetFit(
         rotation_deg=round(theta % 360.0, 4),
         scale=x[0],
@@ -236,6 +244,7 @@ def fit_sheet(
         used=tuple(sorted({a.label for a, _ in used})),
         n_vertical=n_v,
         n_horizontal=n_h,
+        rejected=rejected,
     )
     if n_v < MIN_PER_DIRECTION or n_h < MIN_PER_DIRECTION:
         return None, (
@@ -432,6 +441,38 @@ def match_sheets(
     return out[:MAX_CANDIDATES]
 
 
+def _ranges(values: Iterable[int]) -> str:
+    """4, 5, 6, 9 -> «4-6, 9»."""
+    items = sorted(set(values))
+    out: list[str] = []
+    i = 0
+    while i < len(items):
+        j = i
+        while j + 1 < len(items) and items[j + 1] == items[j] + 1:
+            j += 1
+        out.append(str(items[i]) if i == j else f"{items[i]}-{items[j]}")
+        i = j + 1
+    return ", ".join(out)
+
+
+def building_floors(sheets: Iterable[b3d.SheetRef], building_name: str | None) -> str:
+    """Этажи, на которые у здания есть посчитанные листы плана (по названию листа и паспорту)."""
+    wanted = building_number(building_name)
+    floors: set[int] = set()
+    for sheet in sheets:
+        if sheet.walls_key is None:
+            continue
+        number = building_number(sheet.passport_building)
+        if (wanted is None) != (number is None) or (wanted is not None and number != wanted):
+            continue
+        explicit = title_floors(sheet.stamp_title)
+        if explicit:
+            floors |= explicit
+        elif sheet.passport_floor_from is not None and sheet.passport_floor_to is not None:
+            floors |= set(range(sheet.passport_floor_from, sheet.passport_floor_to + 1))
+    return _ranges(floors)
+
+
 def _item(
     match: SheetMatch, fit: SheetFit | None, reason: str | None, frame_scale: float | None
 ) -> ModelSheetOverlayRead:
@@ -455,6 +496,7 @@ def _item(
         rms_mm=fit.rms_mm if fit is not None else None,
         max_mm=fit.max_mm if fit is not None else None,
         axes_used=list(fit.used) if fit is not None else [],
+        axes_rejected=list(fit.rejected) if fit is not None else [],
     )
 
 
@@ -505,8 +547,10 @@ async def storey_sheets(
         elevation_mm=storey.elevation_mm,
     )
     if not matches:
+        have = building_floors(sheets, getattr(storey, "building_name", None))
+        tail = f" У здания посчитаны листы этажей: {have}." if have else ""
         return empty.model_copy(
-            update={"message": "Листов плана этого этажа среди посчитанных листов CAD нет."}
+            update={"message": f"Листов плана этого этажа среди посчитанных листов CAD нет.{tail}"}
         )
     key = (
         version.id,

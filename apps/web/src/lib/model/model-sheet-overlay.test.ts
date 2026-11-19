@@ -73,6 +73,9 @@ describe('model-sheet-overlay', () => {
 
   it('подпись качества: по скольким осям и расхождение; не привязанный - причина', () => {
     expect(fitLabel(item({}))).toBe('по 4 осям, расхождение 12 мм');
+    expect(fitLabel(item({ axes_rejected: ['3/2'] }))).toBe(
+      'по 4 осям, расхождение 12 мм; на листе не там, где в модели: 3/2',
+    );
     expect(fitLabel(item({ status: 'unregistered', reason: 'совпала одна ось' }))).toBe(
       'совпала одна ось',
     );
