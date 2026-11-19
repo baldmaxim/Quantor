@@ -7,9 +7,9 @@ import { Suspense, use, useRef, useState, ViewTransition } from 'react';
 import { CadQueueCard } from '@/components/projects/CadQueueCard';
 import { DocumentPipelinePanel } from '@/components/projects/DocumentPipelinePanel';
 import { DocumentSections } from '@/components/projects/DocumentSections';
+import { ProjectSteps } from '@/components/projects/ProjectSteps';
 import { UploadFilesDialog } from '@/components/projects/UploadFilesDialog';
 import { TopBar } from '@/components/shell/TopBar';
-import { IconBim } from '@/components/ui/icons';
 import { Button, ButtonLink, EmptyState, ErrorState, Skeleton, StatusBadge } from '@/components/ui';
 import { projectStatus } from '@/lib/format';
 import {
@@ -20,10 +20,6 @@ import {
   type OpenState,
 } from '@/lib/openability';
 import { CAD_FEATURE } from '@/lib/cad/access';
-import { CONSISTENCY_FEATURE } from '@/lib/consistency/access';
-import { TENDER_EXCHANGE_FEATURE } from '@/lib/tender/access';
-import { MODEL_FEATURE } from '@/lib/model/model-access';
-import { TENDER_VERSIONS_FEATURE } from '@/lib/tender-versions';
 import { useFeatures, useProject, useProjectDocuments, useProjectRevisions } from '@/lib/queries';
 
 /**
@@ -101,54 +97,6 @@ const ProjectPage = ({ params }: IPageProps) => {
         status={status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : null}
         actions={
           <>
-            {features[CAD_FEATURE] === true && (
-              <ButtonLink
-                href={`/projects/${projectId}/building3d`}
-                variant="primary"
-                title="Открыть 3D-модель объекта"
-                aria-label="Открыть 3D-модель объекта"
-                transitionTypes={['nav-forward']}
-              >
-                <IconBim />
-                3D-модель объекта
-              </ButtonLink>
-            )}
-            {features[MODEL_FEATURE] === true && (
-              <ButtonLink href={`/projects/${projectId}/model`} transitionTypes={['nav-forward']}>
-                Модель здания
-              </ButtonLink>
-            )}
-            {features[TENDER_VERSIONS_FEATURE] === true && (
-              <ButtonLink
-                href={`/projects/${projectId}/versions`}
-                transitionTypes={['nav-forward']}
-              >
-                Версии тендера
-              </ButtonLink>
-            )}
-            {features[CONSISTENCY_FEATURE] === true && (
-              <ButtonLink href={`/projects/${projectId}/sheets`} transitionTypes={['nav-forward']}>
-                Листы комплекта
-              </ButtonLink>
-            )}
-            {features[CONSISTENCY_FEATURE] === true && (
-              <ButtonLink
-                href={`/projects/${projectId}/doc-questions`}
-                transitionTypes={['nav-forward']}
-              >
-                Вопросы к документации
-              </ButtonLink>
-            )}
-            {features[CONSISTENCY_FEATURE] === true && (
-              <ButtonLink href={`/projects/${projectId}/frame`} transitionTypes={['nav-forward']}>
-                Каркас здания
-              </ButtonLink>
-            )}
-            {features[TENDER_EXCHANGE_FEATURE] === true && (
-              <ButtonLink href={`/projects/${projectId}/calcs`} transitionTypes={['nav-forward']}>
-                Расчёты
-              </ButtonLink>
-            )}
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
             {target ? (
               <ButtonLink href={workspaceHref(projectId, target.revision.id)} variant="primary">
@@ -162,6 +110,9 @@ const ProjectPage = ({ params }: IPageProps) => {
           </>
         }
       />
+
+      {/* Разделы проекта - шагами по порядку, а не рядом кнопок в шапке. */}
+      <ProjectSteps projectId={projectId} current={['documents', 'cad']} />
 
       <main className="min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)] md:py-[var(--s-7)] lg:min-h-0 lg:overflow-hidden">
         {/* lg+: страница в высоту экрана, каждая колонка листается сама. */}

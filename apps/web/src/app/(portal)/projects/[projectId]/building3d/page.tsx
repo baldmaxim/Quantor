@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use } from 'react';
 
+import { ProjectNextStep } from '@/components/projects/ProjectSteps';
 import { TopBar } from '@/components/shell/TopBar';
 import { EmptyState, SkeletonRows } from '@/components/ui';
 import type { IBuildingViewerSelection } from '@/components/projects/building3d/BuildingViewer';
@@ -85,8 +86,9 @@ const Building3dPage = ({ params }: IPageProps) => {
         crumbs={[
           { label: 'Проекты', href: '/projects' },
           { label: project.data?.name ?? '…', href: `/projects/${projectId}` },
-          { label: '3D: общий вид объекта' },
+          { label: 'Здание — 3D по листам' },
         ]}
+        actions={<ProjectNextStep projectId={projectId} current="building" />}
       />
       {access === 'pending' ? (
         <main className={SHELL}>

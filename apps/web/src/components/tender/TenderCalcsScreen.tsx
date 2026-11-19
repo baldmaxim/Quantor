@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { FC } from 'react';
 
+import { ProjectNextStep } from '@/components/projects/ProjectSteps';
 import { TopBar } from '@/components/shell/TopBar';
 import { EmptyState, SegmentedControl, SkeletonRows, type ISegmentedOption } from '@/components/ui';
 import { useFeatures, useMeta, useProject } from '@/lib/queries';
@@ -87,6 +88,9 @@ export const TenderCalcsScreen: FC<IScreenProps> = ({ projectId }) => {
           { label: project.data?.name ?? '…', href: `/projects/${projectId}` },
           { label: 'Расчёты' },
         ]}
+        actions={
+          current === 'base' ? <ProjectNextStep projectId={projectId} current="base" /> : null
+        }
       />
       <main className={`${MAIN} md:py-[var(--s-7)]`}>
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-[var(--s-6)]">

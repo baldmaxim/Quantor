@@ -3,6 +3,7 @@
 import { use } from 'react';
 
 import { ModelScreen } from '@/components/projects/model/ModelScreen';
+import { ProjectNextStep } from '@/components/projects/ProjectSteps';
 import { TopBar } from '@/components/shell/TopBar';
 import { EmptyState, SkeletonRows } from '@/components/ui';
 import { modelAccess } from '@/lib/model/model-access';
@@ -41,6 +42,7 @@ const ModelPage = ({ params }: IPageProps) => {
           { label: project.data?.name ?? '…', href: `/projects/${projectId}` },
           { label: 'Модель здания' },
         ]}
+        actions={<ProjectNextStep projectId={projectId} current="model" />}
       />
       {access === 'pending' ? (
         <main className={SHELL}>

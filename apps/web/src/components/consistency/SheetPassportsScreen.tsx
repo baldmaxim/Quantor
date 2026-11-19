@@ -2,6 +2,7 @@
 
 import type { FC } from 'react';
 
+import { ProjectNextStep } from '@/components/projects/ProjectSteps';
 import { TopBar } from '@/components/shell/TopBar';
 import { EmptyState, SkeletonRows } from '@/components/ui';
 import { consistencyAccess } from '@/lib/consistency/access';
@@ -49,6 +50,7 @@ export const SheetPassportsScreen: FC<IScreenProps> = ({ projectId }) => {
           { label: project.data?.name ?? '…', href: `/projects/${projectId}` },
           { label: 'Листы комплекта' },
         ]}
+        actions={<ProjectNextStep projectId={projectId} current="sheets" />}
       />
       <main className={`${MAIN} md:py-[var(--s-7)]`}>
         <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-[var(--s-5)]">
