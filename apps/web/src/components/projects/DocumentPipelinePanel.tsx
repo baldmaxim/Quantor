@@ -6,6 +6,7 @@ import type { FC, ReactNode } from 'react';
 import { Button, ButtonLink, Skeleton, StatusBadge } from '@/components/ui';
 import { errorMessage } from '@/lib/errors';
 import { geometryStatus, revisionStatus } from '@/lib/format';
+import { jobTypeLabel } from '@/lib/jobs/job-labels';
 import {
   documentOpenState,
   isViewable,
@@ -119,7 +120,7 @@ export const DocumentPipelinePanel: FC<IDocumentPipelinePanelProps> = ({
         )}
 
         {importJob && (
-          <Section title="Импорт пакета">
+          <Section title={jobTypeLabel(importJob.job_type)}>
             <ImportJobCard job={importJob} />
           </Section>
         )}
