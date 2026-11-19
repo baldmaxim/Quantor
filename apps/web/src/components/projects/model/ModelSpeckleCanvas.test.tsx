@@ -17,6 +17,7 @@ const fakeViewer = (): ISpeckleModelViewer => ({
   setColorByCategory: vi.fn(),
   fit: vi.fn(),
   focusGroup: vi.fn(),
+  setSheetPlane: vi.fn(),
   dispose: vi.fn(),
 });
 

@@ -22,9 +22,11 @@ import {
 } from '@/lib/model/model-queries';
 import { disciplineLabel } from '@/lib/model/model-disciplines';
 import { defaultHouseDisciplines, type IModelPartInput } from '@/lib/model/model-scene';
+import type { ISheetPlaneInput } from '@/lib/model/model-sheet-overlay';
 import { MODEL_STATUS, newestVersion, pickVersion } from '@/lib/model/model-versions';
 
 import { ModelImportPanel } from './ModelImportPanel';
+import { ModelSheetPanel } from './ModelSheetPanel';
 import { ModelSpeckleCanvas } from './ModelSpeckleCanvas';
 import { ModelViewerCanvas } from './ModelViewerCanvas';
 
@@ -80,6 +82,8 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
   const [houseChoice, setHouseChoice] = useState<ReadonlySet<string> | null>(null);
   const [maxLevel, setMaxLevel] = useState<number | null>(null);
   const [storeyOffset, setStoreyOffset] = useState(0);
+  /** Чертёж выбранного этажа наложением (лист плана, привязанный по осям). */
+  const [sheetPlane, setSheetPlane] = useState<ISheetPlaneInput | null>(null);
   /** Этаж последнего выбранного элемента: из его файла берутся свойства. */
   const [pickedStorey, setPickedStorey] = useState<string | null>(null);
 
@@ -426,6 +430,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                 pending={updating}
                 fitSeq={fitSeq}
                 focus={house ? focus : null}
+                sheetPlane={sheetPlane}
                 onPick={(id, group) => {
                   setSelectedId(id);
                   if (house && group !== null) setPickedStorey(group);
@@ -447,6 +452,15 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
       </section>
 
       <aside className={`${SIDE} border-l border-border`} aria-label="Слои и свойства">
+        {!simpleViewer && storey !== null && (
+          <ModelSheetPanel
+            projectId={projectId}
+            versionId={data?.id ?? null}
+            storey={storey}
+            level={levelOf.get(storey.storey_key) ?? 0}
+            onPlane={setSheetPlane}
+          />
+        )}
         {(house ? allDisciplines : disciplines).length > 0 && (
           <fieldset className="flex flex-col gap-[var(--s-2)]">
             <legend className="mb-[var(--s-1)] text-xs text-muted">

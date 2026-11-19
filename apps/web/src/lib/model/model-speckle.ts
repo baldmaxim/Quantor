@@ -3,6 +3,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import type { IModelElement } from './model-elements';
 import type { IModelPartInput } from './model-scene';
+import type { ISheetPlaneInput } from './model-sheet-overlay';
+import { buildSheetMesh, disposeSheetMesh, setSheetOpacity } from './model-sheet-plane';
 
 /**
  * Просмотрщик Speckle (`@speckle/viewer`, Apache-2.0) для модели здания (ADR-0053).
@@ -196,6 +198,8 @@ export interface ISpeckleModelViewer {
   fit: () => void;
   /** Подлететь камерой к этажу (группе частей), ничего не скрывая. */
   focusGroup: (group: string) => void;
+  /** Чертёж этажа наложением: растр листа на отметке этажа; `null` - убрать. Тот же `key` - только прозрачность. */
+  setSheetPlane: (plane: ISheetPlaneInput | null) => void;
   dispose: () => void;
 }
 
@@ -322,6 +326,14 @@ export const createSpeckleModelViewer = async (
    * вписывает тот, кто дойдёт до конца, - иначе камера остаётся у стены (по умолчанию).
    */
   let needsFit = false;
+  /** Лист наложением: меш в сцене просмотрщика (слой PROPS - не выбирается и не вписывается). */
+  let sheet: { mesh: THREE.Mesh; key: string; level: number } | null = null;
+  const placeSheet = (): void => {
+    if (sheet === null) return;
+    sheet.mesh.position.z = sheet.level * offsetMeters;
+    sheet.mesh.visible = maxLevel === null || sheet.level <= maxLevel;
+    sheet.mesh.updateMatrixWorld(true);
+  };
 
   /** У холста нет размера (вкладка или панель скрыты): вписанная камера получила бы NaN и чёрный экран. */
   const canFit = (): boolean => host.clientWidth > 0 && host.clientHeight > 0;
@@ -502,10 +514,12 @@ export const createSpeckleModelViewer = async (
     },
     setMaxLevel: (level) => {
       maxLevel = level;
+      placeSheet();
       applyVisibility();
     },
     setStoreyOffset: (meters) => {
       offsetMeters = meters;
+      placeSheet();
       applyOffset();
     },
     select: (id) => {
@@ -526,9 +540,33 @@ export const createSpeckleModelViewer = async (
       const ids = groups.filter((item) => item.group === group).flatMap((item) => [...item.ids]);
       if (ids.length > 0) camera.setCameraView(ids, FIT_TRANSITION);
     },
+    setSheetPlane: (plane) => {
+      if (disposed) return;
+      if (plane !== null && sheet !== null && sheet.key === plane.key) {
+        setSheetOpacity(sheet.mesh, plane.opacity);
+        sheet.level = plane.level;
+        placeSheet();
+        viewer.requestRender();
+        return;
+      }
+      if (sheet !== null) {
+        disposeSheetMesh(sheet.mesh);
+        sheet = null;
+      }
+      if (plane !== null) {
+        const mesh = buildSheetMesh(plane, 'z');
+        mesh.layers.set(speckle.ObjectLayers.PROPS);
+        viewer.getRenderer().scene.add(mesh);
+        sheet = { mesh, key: plane.key, level: plane.level };
+        placeSheet();
+      }
+      viewer.requestRender();
+    },
     dispose: () => {
       disposed = true;
       generation += 1;
+      if (sheet !== null) disposeSheetMesh(sheet.mesh);
+      sheet = null;
       resize.disconnect();
       viewer.dispose();
     },

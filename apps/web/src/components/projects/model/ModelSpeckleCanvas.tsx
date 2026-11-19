@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FC } from 'react';
 
 import type { IModelElement } from '@/lib/model/model-elements';
 import type { IModelPartInput } from '@/lib/model/model-scene';
+import type { ISheetPlaneInput } from '@/lib/model/model-sheet-overlay';
 import { createSpeckleModelViewer, type ISpeckleModelViewer } from '@/lib/model/model-speckle';
 
 interface IModelSpeckleCanvasProps {
@@ -24,6 +25,8 @@ interface IModelSpeckleCanvasProps {
   readonly fitSeq: number;
   /** Подлёт камеры к этажу: новый объект - новая команда (в том числе к тому же этажу). */
   readonly focus?: { readonly group: string } | null;
+  /** Чертёж этажа наложением; `null` - без чертежа. */
+  readonly sheetPlane?: ISheetPlaneInput | null;
   readonly onPick: (id: string | null, group: string | null) => void;
   /** Просмотрщик не запустился (нет WebGL) или часть не разобрана. */
   readonly onError: (message: string) => void;
@@ -45,6 +48,7 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   pending = false,
   fitSeq,
   focus = null,
+  sheetPlane = null,
   onPick,
   onError,
 }) => {
@@ -134,6 +138,10 @@ export const ModelSpeckleCanvas: FC<IModelSpeckleCanvasProps> = ({
   useEffect(() => {
     if (focus !== null) view?.focusGroup(focus.group);
   }, [view, focus]);
+
+  useEffect(() => {
+    view?.setSheetPlane(sheetPlane);
+  }, [view, sheetPlane]);
 
   return (
     <div
