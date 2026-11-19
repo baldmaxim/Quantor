@@ -102,6 +102,46 @@ const PROCESSING_STATUS: Record<string, StatusView> = {
 export const revisionStatus = (status: string): StatusView =>
   PROCESSING_STATUS[status] ?? { label: status, tone: 'neutral' };
 
+export interface DocumentStatusView extends StatusView {
+  /** Что это значит и что делать дальше - во всплывающей подсказке у бейджа. */
+  readonly hint: string | null;
+}
+
+/**
+ * Состояние распознавания так, как его читает инженер в списке документов.
+ *
+ * Для PDF «не распознан» - норма: пакет распознавания (ADR-0037) не нужен ни листам, ни CAD,
+ * ни обмерам, поэтому жёлтая плашка на каждом PDF выглядела бедой. IFC не «без обработчика» -
+ * он строит модель на странице «Модель здания». RVT, NWD, NWC и книги Excel лежат на хранении.
+ */
+export const documentRecognitionStatus = (
+  documentKind: string,
+  processingStatus: string,
+): DocumentStatusView => {
+  if (documentKind === 'pdf' && processingStatus === 'unprocessed') {
+    return {
+      label: 'Без распознавания',
+      tone: 'neutral',
+      hint: 'Пакет распознавания не загружен, и он не нужен: листы, CAD и обмеры работают по PDF.',
+    };
+  }
+  if (documentKind === 'ifc' && processingStatus === 'processor_unavailable') {
+    return {
+      label: 'Для модели здания',
+      tone: 'neutral',
+      hint: 'Модель из IFC строится на странице «Модель здания» кнопкой «Построить модель из IFC».',
+    };
+  }
+  if (processingStatus === 'unprocessed' || processingStatus === 'processor_unavailable') {
+    return {
+      label: 'На хранении',
+      tone: 'neutral',
+      hint: 'Файл хранится в проекте; портал его не разбирает.',
+    };
+  }
+  return { ...revisionStatus(processingStatus), hint: null };
+};
+
 /**
  * Состояние подготовки листов.
  *

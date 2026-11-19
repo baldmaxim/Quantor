@@ -8,7 +8,7 @@
 
 const MESSAGES: Record<string, string> = {
   UNSUPPORTED_FILE_TYPE:
-    'Такой тип файла портал не принимает. Подходят ZIP-пакет распознавалки, PDF, книга Excel .xlsx, а также RVT, NWD, NWC и IFC на хранение.',
+    'Такой тип файла портал не принимает. Подходят PDF, IFC, книга Excel .xlsx, ZIP-пакет распознавалки, а также RVT, NWD, NWC на хранение.',
   MIME_MISMATCH: 'Содержимое файла не совпадает с расширением. Похоже, файл переименовали.',
   UPLOAD_TOO_LARGE: 'Файл больше допустимого размера.',
   EMPTY_FILE: 'Файл пуст.',

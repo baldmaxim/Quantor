@@ -5,7 +5,7 @@ import type { FC, ReactNode } from 'react';
 
 import { Button, ButtonLink, Skeleton, StatusBadge } from '@/components/ui';
 import { errorMessage } from '@/lib/errors';
-import { geometryStatus, revisionStatus } from '@/lib/format';
+import { documentRecognitionStatus, geometryStatus } from '@/lib/format';
 import { jobTypeLabel } from '@/lib/jobs/job-labels';
 import {
   documentOpenState,
@@ -53,7 +53,9 @@ export const DocumentPipelinePanel: FC<IDocumentPipelinePanelProps> = ({
   const state = revisions ? documentOpenState(document, revisions) : null;
   const viewable = isViewable(document);
 
-  const recognition = latest ? revisionStatus(latest.processing_status) : null;
+  const recognition = latest
+    ? documentRecognitionStatus(document.document_kind, latest.processing_status)
+    : null;
   const geometry = latest && viewable ? geometryStatus(latest.geometry_status) : null;
 
   return (
@@ -100,6 +102,7 @@ export const DocumentPipelinePanel: FC<IDocumentPipelinePanelProps> = ({
                   <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
                 )}
               </div>
+              {recognition?.hint && <p className="m-0 text-xs text-muted">{recognition.hint}</p>}
               {latest?.processing_error_code && (
                 <p className="text-xs text-danger">{errorMessage(latest.processing_error_code)}</p>
               )}

@@ -27,7 +27,7 @@ describe('приём файлов', () => {
   it('объясняет, какие типы принимаются', () => {
     renderZone([]);
 
-    expect(screen.getByText(/ZIP-пакет распознавалки, PDF/)).toBeInTheDocument();
+    expect(screen.getByText(/PDF — листы, CAD и обмеры · IFC — модель здания/)).toBeInTheDocument();
   });
 
   it('пакет распознавалки помечен как импортируемый', () => {

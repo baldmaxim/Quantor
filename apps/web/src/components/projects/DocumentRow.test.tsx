@@ -51,7 +51,9 @@ describe('строка документа', () => {
     );
     // Оба состояния рядом и не подменяют друг друга.
     expect(screen.getByText('Листы готовы')).toBeInTheDocument();
-    expect(screen.getByText('Не распознан')).toBeInTheDocument();
+    // PDF без пакета распознавания - норма: плашка нейтральная, без «Не распознан».
+    expect(screen.getByText('Без распознавания')).toBeInTheDocument();
+    expect(screen.queryByText('Не распознан')).not.toBeInTheDocument();
     expect(screen.getByText(/4 листа/)).toBeInTheDocument();
   });
 
@@ -127,7 +129,26 @@ describe('строка документа', () => {
     render(<DocumentRow projectId="p-1" document={pdf()} revisions={null} total={0} />);
 
     expect(screen.queryByRole('link', { name: /Открыть/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('Не распознан')).not.toBeInTheDocument();
+    expect(screen.queryByText('Без распознавания')).not.toBeInTheDocument();
+  });
+
+  it('IFC подсказывает, где из него строится модель', () => {
+    render(
+      <DocumentRow
+        projectId="p-1"
+        document={pdf({ document_kind: 'ifc', display_name: 'дом.ifc' })}
+        revisions={[
+          revision({
+            processing_status: 'processor_unavailable',
+            geometry_status: 'not_applicable',
+            sheet_count: 0,
+          }),
+        ]}
+        total={1}
+      />,
+    );
+    expect(screen.getByText('Для модели здания')).toBeInTheDocument();
+    expect(screen.queryByText('Обработчик не подключён')).not.toBeInTheDocument();
   });
 
   it('имя файла — кнопка выбора, растянутая на всю строку; ссылкой не является', () => {

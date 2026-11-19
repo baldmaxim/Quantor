@@ -116,7 +116,9 @@ export const FileDropzone = ({
       >
         <p className="text-sm">Перетащите файлы сюда</p>
         <p className="text-xs text-muted">
-          ZIP-пакет распознавалки, PDF, книга Excel .xlsx, а также RVT, NWD, NWC и IFC на хранение
+          PDF — листы, CAD и обмеры · IFC — модель здания
+          <br />
+          Ещё: книга Excel .xlsx, ZIP-пакет распознавалки, RVT, NWD, NWC — на хранение
         </p>
         <div className="flex flex-wrap justify-center gap-x-[var(--s-6)] gap-y-[var(--s-3)]">
           <button

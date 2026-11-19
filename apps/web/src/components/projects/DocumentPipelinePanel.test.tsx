@@ -122,7 +122,8 @@ describe('панель обработки документа', () => {
       screen.getByRole('link', { name: 'Открыть План 3 этажа.pdf в рабочей области' }),
     ).toHaveAttribute('href', '/projects/p-1/workspace?revision=rev-1');
     expect(screen.getByText('Листы готовы')).toBeInTheDocument();
-    expect(screen.getByText('Не распознан')).toBeInTheDocument();
+    expect(screen.getByText('Без распознавания')).toBeInTheDocument();
+    expect(screen.getByText(/листы, CAD и обмеры работают по PDF/)).toBeInTheDocument();
   });
 
   it('флаг CAD выключен: блока CAD нет и конвейер не запрашивается', () => {
@@ -227,9 +228,7 @@ describe('панель обработки документа', () => {
   });
 
   it('документ не открывается: «Открыть» недоступна', () => {
-    renderPanel(
-      panel({ revisions: [revision({ geometry_status: 'pending', sheet_count: 0 })] }),
-    );
+    renderPanel(panel({ revisions: [revision({ geometry_status: 'pending', sheet_count: 0 })] }));
 
     expect(screen.queryByRole('link', { name: /Открыть/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Открыть' })).toBeDisabled();
@@ -254,7 +253,9 @@ describe('панель обработки документа', () => {
     const name = await screen.findByText('К9 · С3 · 14 эт.');
     expect(name).toHaveAttribute('title', 'Корпус 9, секция 3, 14 этаж');
     expect(screen.getByText('Лист 82')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Открыть К9 · С3 · 14 эт. в CAD' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Открыть К9 · С3 · 14 эт. в CAD' }),
+    ).toBeInTheDocument();
   });
 
   it('лист: метка 3D DXF и ошибка шага показаны отдельно от дорожки', async () => {
@@ -286,7 +287,11 @@ describe('панель обработки документа', () => {
           page_index: 1,
           page_label: '2',
           calibrated: true,
-          convert: stage({ status: 'failed', error_code: 'CAD_ENGINE_FAILED', result_status: null }),
+          convert: stage({
+            status: 'failed',
+            error_code: 'CAD_ENGINE_FAILED',
+            result_status: null,
+          }),
           views: [],
         },
       ]),
@@ -337,9 +342,7 @@ describe('панель обработки документа', () => {
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
       expect(within(sheet).getByRole('list', { name: 'Шаги листа' })).toBeInTheDocument();
       // Не начатое преобразование: главная кнопка следующего шага и «Преобразовать в CAD» у шага.
-      expect(
-        within(sheet).getByRole('button', { name: 'Следующий шаг: CAD' }),
-      ).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Следующий шаг: CAD' })).toBeInTheDocument();
       expect(
         within(sheet).getByRole('button', { name: 'Преобразовать в CAD' }),
       ).toBeInTheDocument();
@@ -362,9 +365,7 @@ describe('панель обработки документа', () => {
 
       const sheet = (await screen.findByText('Лист 1')).closest('li') as HTMLElement;
       await user.click(within(sheet).getByRole('button', { expanded: false }));
-      expect(
-        within(sheet).getByRole('button', { name: 'Следующий шаг: CAD' }),
-      ).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Следующий шаг: CAD' })).toBeInTheDocument();
       expect(within(sheet).queryByRole('link', { name: 'Перейти: Калибровка' })).toBeNull();
       expect(within(sheet).getByRole('link', { name: 'Откалибровать вручную' })).toHaveAttribute(
         'href',
@@ -418,12 +419,13 @@ describe('панель обработки документа', () => {
       const links = within(sheet).getAllByRole('link', { name: 'Откалибровать вручную' });
       expect(links).toHaveLength(2);
       for (const link of links) {
-        expect(link).toHaveAttribute('href', '/projects/p-1/workspace?revision=rev-1&page=1&tab=cad');
+        expect(link).toHaveAttribute(
+          'href',
+          '/projects/p-1/workspace?revision=rev-1&page=1&tab=cad',
+        );
       }
       expect(within(sheet).queryByRole('button', { name: 'Повторить' })).toBeNull();
-      expect(
-        within(sheet).getAllByText(/Масштаб листа не подтверждён/).length,
-      ).toBeGreaterThan(0);
+      expect(within(sheet).getAllByText(/Масштаб листа не подтверждён/).length).toBeGreaterThan(0);
     });
 
     it('упавший шаг: «Повторить» вызывает повтор задания, обновляет конвейер', async () => {
@@ -482,7 +484,14 @@ describe('панель обработки документа', () => {
           last_seq: 1,
           finished: true,
           events: [
-            { seq: 1, attempt: 1, at: '2026-11-11T10:00:30Z', scope: 'document', status: 'error', detail: 'сбой движка' },
+            {
+              seq: 1,
+              attempt: 1,
+              at: '2026-11-11T10:00:30Z',
+              scope: 'document',
+              status: 'error',
+              detail: 'сбой движка',
+            },
           ],
         },
       });

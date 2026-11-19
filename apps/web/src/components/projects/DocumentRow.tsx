@@ -6,7 +6,13 @@ import type { FC } from 'react';
 import { ButtonLink, Skeleton, StatusBadge, cx } from '@/components/ui';
 import { IconBim, IconPdf, IconZip } from '@/components/ui/icons';
 import { errorMessage } from '@/lib/errors';
-import { countOf, documentKind, formatBytes, geometryStatus, revisionStatus } from '@/lib/format';
+import {
+  countOf,
+  documentKind,
+  documentRecognitionStatus,
+  formatBytes,
+  geometryStatus,
+} from '@/lib/format';
 import { SHEETS_FORMS } from '@/lib/format';
 import { documentOpenState, isViewable, latestOpenableRevision } from '@/lib/openability';
 
@@ -57,7 +63,9 @@ export const DocumentRow: FC<IDocumentRowProps> = ({
   const openable = revisions ? latestOpenableRevision(document, revisions) : null;
   const state = revisions ? documentOpenState(document, revisions) : null;
 
-  const recognition = latest ? revisionStatus(latest.processing_status) : null;
+  const recognition = latest
+    ? documentRecognitionStatus(document.document_kind, latest.processing_status)
+    : null;
   const geometry = latest && isViewable(document) ? geometryStatus(latest.geometry_status) : null;
   const pageCount = latest?.source_metadata?.['page_count'];
   const sheets = latest && latest.sheet_count > 0 ? latest.sheet_count : pageCount;
@@ -111,7 +119,9 @@ export const DocumentRow: FC<IDocumentRowProps> = ({
         {geometry && <StatusBadge tone={geometry.tone}>{geometry.label}</StatusBadge>}
 
         {recognition ? (
-          <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
+          <span title={recognition.hint ?? undefined}>
+            <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
+          </span>
         ) : (
           <Skeleton className="h-[16px] w-[90px]" />
         )}
