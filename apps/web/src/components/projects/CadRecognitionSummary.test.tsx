@@ -50,7 +50,9 @@ describe('CadRecognitionSummary', () => {
       }),
     });
     renderSummary();
-    expect(await screen.findByText('Распознавание: 4 из 8 листов · 50 %')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Конвейер CAD: готово 4 из 8 листов · 50 %'),
+    ).toBeInTheDocument();
     const labels = screen.getAllByRole('listitem').map((item) => item.textContent);
     expect(labels).toEqual(['Готово 4', 'Идёт 2', 'Не запускались 2']);
     expect(mocks.summary).toHaveBeenCalledWith(
@@ -82,7 +84,7 @@ describe('CadRecognitionSummary', () => {
       'aria-label',
       'готово 1, на проверку 2, идёт 0, ошибки 0, не запускались 1 из 4 листов',
     );
-    expect(screen.getByText(/Распознавание: 1 из 4 листов/)).toBeInTheDocument();
+    expect(screen.getByText(/Конвейер CAD: готово 1 из 4 листов/)).toBeInTheDocument();
   });
 
   it('нулевой проект: «Листов для CAD нет»', async () => {
@@ -99,6 +101,6 @@ describe('CadRecognitionSummary', () => {
     renderSummary();
     expect(await screen.findByText('Не удалось получить сводку распознавания')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Повторить' }));
-    expect(await screen.findByText('Распознавание: 0 из 1 листов · 0 %')).toBeInTheDocument();
+    expect(await screen.findByText('Конвейер CAD: готово 0 из 1 листа · 0 %')).toBeInTheDocument();
   });
 });
