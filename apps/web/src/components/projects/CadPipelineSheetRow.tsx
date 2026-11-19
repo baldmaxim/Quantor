@@ -109,8 +109,9 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
               open && 'rotate-90',
             )}
           />
-          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">
-            <span className="flex min-w-0 flex-col">
+          {/* Слева - этаж и лист, справа ровной колонкой - состояние: строки читаются сверху вниз. */}
+          <span className="flex min-w-0 flex-1 items-center gap-[var(--s-4)]">
+            <span className="flex min-w-0 flex-1 flex-col">
               <span
                 className="text-sm font-medium [overflow-wrap:anywhere]"
                 title={formatFloorTitleFull(sheet.floor_title) ?? undefined}
@@ -121,46 +122,44 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
                 <span className="text-xs text-muted [overflow-wrap:anywhere]">{subtitle}</span>
               )}
             </span>
-            {sheet.scale_source === 'auto' && (
-              <StatusBadge tone="neutral" dot={false}>
-                Масштаб: авто
+            <span className="flex max-w-[55%] flex-none flex-wrap items-center justify-end gap-[var(--s-2)]">
+              <StatusBadge tone={summary.tone} wrap>
+                {summary.label}
               </StatusBadge>
-            )}
-            <StatusBadge tone={summary.tone} wrap>
-              {summary.label}
-            </StatusBadge>
-            {updateBadge && (
-              <span title={updateBadge.hint}>
-                <StatusBadge tone={updateBadge.tone} wrap>
-                  {updateBadge.label}
-                </StatusBadge>
+              {updateBadge && (
+                <span title={updateBadge.hint}>
+                  <StatusBadge tone={updateBadge.tone} wrap>
+                    {updateBadge.label}
+                  </StatusBadge>
+                </span>
+              )}
+              {qualityBadge && (
+                <span title={qualityBadge.reasons.join('; ')}>
+                  <StatusBadge tone="warning" wrap>
+                    {qualityBadge.label}
+                  </StatusBadge>
+                </span>
+              )}
+              {stale.length > 0 && (
+                <span title={[staleHint, ...stale].join(' · ')}>
+                  <StatusBadge tone="neutral" wrap>
+                    устарел
+                  </StatusBadge>
+                </span>
+              )}
+              <span
+                className="font-mono text-xs text-muted"
+                title="Завершено основных шагов конвейера"
+              >
+                {`${progress.done} из ${progress.total}`}
               </span>
-            )}
-            {qualityBadge && (
-              <span title={qualityBadge.reasons.join('; ')}>
-                <StatusBadge tone="warning" wrap>
-                  {qualityBadge.label}
-                </StatusBadge>
-              </span>
-            )}
-            {stale.length > 0 && (
-              <span title={[staleHint, ...stale].join(' · ')}>
-                <StatusBadge tone="neutral" wrap>
-                  устарел
-                </StatusBadge>
-              </span>
-            )}
-            <span
-              className="font-mono text-xs text-muted"
-              title="Завершено основных шагов конвейера"
-            >
-              {`${progress.done} из ${progress.total}`}
             </span>
           </span>
         </button>
         <ButtonLink
           href={href}
           compact
+          variant="ghost"
           aria-label={`Открыть ${name} в CAD`}
           transitionTypes={['nav-forward']}
           className="flex-none"
@@ -173,12 +172,6 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
       <div onClick={toggle}>
         <PipelineStepper steps={steps} />
       </div>
-
-      {qualityBadge && (
-        <p className="m-0 text-xs text-warning [overflow-wrap:anywhere]">
-          {`На проверку: ${qualityBadge.reasons.join('; ')}`}
-        </p>
-      )}
 
       {(failed?.detail || floor3dBadge) && (
         <div className="flex flex-wrap items-center gap-x-[var(--s-4)] gap-y-[var(--s-2)]">

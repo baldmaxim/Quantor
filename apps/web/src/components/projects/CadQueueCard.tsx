@@ -25,9 +25,9 @@ export const CadQueueCard: FC<ICadQueueCardProps> = ({ projectId }) => {
   return (
     <section
       aria-label="Очередь CAD"
-      className="min-w-0 overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface xl:flex xl:max-h-full xl:flex-col"
+      className="min-w-0 overflow-hidden rounded-[var(--radius-md)] border border-border-strong bg-surface lg:flex lg:max-h-full lg:flex-col"
     >
-      <div className="flex shrink-0 items-center justify-between gap-[var(--s-4)] border-b border-border px-[var(--s-6)] py-[var(--s-5)]">
+      <div className="flex shrink-0 items-center justify-between gap-[var(--s-4)] border-b border-border px-[var(--s-6)] py-[var(--s-2)]">
         <h2 className="m-0 text-sm font-medium">Очередь CAD</h2>
         <Link
           href={`/queue?project=${projectId}`}
@@ -66,7 +66,7 @@ export const CadQueueCard: FC<ICadQueueCardProps> = ({ projectId }) => {
           ) : (
             <ul
               aria-label="Задания CAD проекта"
-              className="m-0 max-h-[60dvh] list-none overflow-y-auto overscroll-contain p-0 xl:max-h-none xl:min-h-0"
+              className="m-0 max-h-[60dvh] list-none overflow-y-auto overscroll-contain p-0 lg:max-h-none lg:min-h-0"
             >
               {data.items.map((item) => (
                 <CadQueueRow key={item.job_id} projectId={projectId} item={item} />

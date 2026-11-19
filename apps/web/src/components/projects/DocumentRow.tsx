@@ -71,74 +71,79 @@ export const DocumentRow: FC<IDocumentRowProps> = ({
   const sheets = latest && latest.sheet_count > 0 ? latest.sheet_count : pageCount;
 
   const href = openable ? `/projects/${projectId}/workspace?revision=${openable.id}` : null;
+  // Готовые листы - норма: плашка только когда листы готовятся или не подготовились.
+  const geometryNote = geometry && latest?.geometry_status !== 'ready' ? geometry : null;
+  const meta = [
+    documentKind(document.document_kind),
+    latest ? formatBytes(latest.source_size) : null,
+    typeof sheets === 'number' ? countOf(sheets, SHEETS_FORMS) : null,
+    total > 1 ? `ревизий: ${total}` : null,
+    packageCount > 0 ? `пакет распознавания${packageCount > 1 ? ` ×${packageCount}` : ''}` : null,
+  ].filter((part): part is string => part !== null);
 
   return (
     <div
       className={cx(
-        'relative grid min-h-[44px] grid-cols-[22px_1fr_auto] items-center gap-[var(--s-5)] border-b border-border py-[var(--s-4)] last:border-b-0',
+        'relative grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-x-[var(--s-4)] rounded-[var(--radius-sm)] px-[var(--s-3)] py-[var(--s-3)] transition-colors motion-reduce:transition-none',
         selected ? 'bg-accent-soft' : 'hover:bg-surface-muted',
       )}
     >
-      <Icon className="text-muted" />
+      <Icon className={cx('mt-[2px]', selected ? 'text-accent' : 'text-muted')} />
 
       <div className="min-w-0">
-        <p className="truncate text-sm">
-          <button
-            type="button"
-            aria-current={selected ? 'true' : undefined}
-            onClick={() => onSelect?.(document.id)}
-            className="max-w-full cursor-pointer truncate text-left [-webkit-tap-highlight-color:transparent] [touch-action:manipulation] focus-visible:outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-[var(--focus)]"
-          >
+        <button
+          type="button"
+          aria-current={selected ? 'true' : undefined}
+          title={document.display_name}
+          onClick={() => onSelect?.(document.id)}
+          className="block w-full cursor-pointer text-left text-sm leading-snug [-webkit-tap-highlight-color:transparent] [touch-action:manipulation] focus-visible:outline-none after:absolute after:inset-0 after:rounded-[var(--radius-sm)] after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-[var(--focus)]"
+        >
+          <span className={cx('line-clamp-2 [overflow-wrap:anywhere]', selected && 'font-medium')}>
             {document.display_name}
-          </button>
-        </p>
-        <p className="mono text-xs text-muted">
-          {documentKind(document.document_kind)}
-          {latest && ` · ${formatBytes(latest.source_size)}`}
-          {typeof sheets === 'number' && ` · ${countOf(sheets, SHEETS_FORMS)}`}
-          {total > 1 && ` · ревизий: ${total}`}
-          {packageCount > 0 &&
-            ` · пакет распознавания${packageCount > 1 ? ` ×${packageCount}` : ''}`}
-        </p>
+          </span>
+        </button>
+        <p className="m-0 mt-[2px] text-xs text-muted">{meta.join(' · ')}</p>
+
+        {(geometryNote || recognition || latest === null) && (
+          <div className="mt-[var(--s-2)] flex flex-wrap items-center gap-[var(--s-3)]">
+            {latest === null && <Skeleton className="h-[16px] w-[90px]" />}
+            {geometryNote && (
+              <StatusBadge tone={geometryNote.tone}>{geometryNote.label}</StatusBadge>
+            )}
+            {recognition && (
+              // Над растянутой кнопкой строки: иначе подсказка не всплывает.
+              <span title={recognition.hint ?? undefined} className="relative z-10">
+                <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
+              </span>
+            )}
+          </div>
+        )}
 
         {latest?.processing_error_code && (
-          <p className="mt-[var(--s-2)] text-xs text-danger">
+          <p className="m-0 mt-[var(--s-2)] text-xs text-danger">
             {errorMessage(latest.processing_error_code)}
           </p>
         )}
 
         {state?.kind === 'geometry_failed' && (
-          <p className="mt-[var(--s-2)] text-xs text-danger">
+          <p className="m-0 mt-[var(--s-2)] text-xs text-danger">
             Листы подготовить не удалось
             {state.errorCode ? `: ${errorMessage(state.errorCode)}` : '.'}
           </p>
         )}
       </div>
 
-      <div className="flex items-center gap-[var(--s-4)]">
-        {geometry && <StatusBadge tone={geometry.tone}>{geometry.label}</StatusBadge>}
-
-        {latest === null ? (
-          <Skeleton className="h-[16px] w-[90px]" />
-        ) : (
-          recognition && (
-            // Над растянутой кнопкой строки: иначе подсказка не всплывает.
-            <span title={recognition.hint ?? undefined} className="relative z-10">
-              <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
-            </span>
-          )
-        )}
-
-        {href && (
-          <ButtonLink
-            href={href}
-            aria-label={`Открыть ${document.display_name}`}
-            className="relative z-10 flex-none"
-          >
-            Открыть
-          </ButtonLink>
-        )}
-      </div>
+      {href && (
+        <ButtonLink
+          href={href}
+          compact
+          variant="ghost"
+          aria-label={`Открыть ${document.display_name}`}
+          className="relative z-10 flex-none"
+        >
+          Открыть
+        </ButtonLink>
+      )}
     </div>
   );
 };

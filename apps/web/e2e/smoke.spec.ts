@@ -322,7 +322,6 @@ test.describe('карточка проекта', () => {
 
     // Действие есть и у самой строки документа: документов в проекте бывает несколько.
     await expect(page.getByRole('link', { name: /Открыть План 3 этажа/ })).toBeVisible();
-    await expect(page.getByText('Листы готовы')).toBeVisible();
   });
 
   test('пока листы готовятся, кнопка неактивна и объясняет почему', async ({ page }) => {

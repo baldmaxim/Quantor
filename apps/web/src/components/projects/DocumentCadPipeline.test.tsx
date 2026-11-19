@@ -93,7 +93,7 @@ describe('конвейер CAD документа: массовый запуск
     mocks.sheets.mockResolvedValue({ data: { items: [], total: 0 } });
   });
 
-  it('листы по порядку страниц, название и бейдж «Масштаб: авто», сводка', async () => {
+  it('листы по порядку страниц, название и сводка; «Масштаб: авто» в строке не повторяется', async () => {
     respond([
       sheet(4, { title: 'План 5 этажа' }),
       sheet(1, { convert: stage(), scale_source: 'auto' }),
@@ -109,7 +109,8 @@ describe('конвейер CAD документа: массовый запуск
     expect(labels).toEqual(['Выбрать лист 1', 'Выбрать лист 2', 'Выбрать лист 5']);
     expect(screen.getByText('План 5 этажа')).toBeInTheDocument();
     const autoRow = checkbox('2').closest('li') as HTMLElement;
-    expect(within(autoRow).getByText('Масштаб: авто')).toBeInTheDocument();
+    // Авто-масштаб виден в шаге «Калибровка», отдельной плашкой строку не загромождает.
+    expect(within(autoRow).queryByText('Масштаб: авто')).not.toBeInTheDocument();
   });
 
   it('недоступные листы: чекбокс неактивен (готово, масштаб не подтверждён)', async () => {

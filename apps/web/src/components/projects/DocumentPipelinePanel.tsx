@@ -57,6 +57,21 @@ export const DocumentPipelinePanel: FC<IDocumentPipelinePanelProps> = ({
     ? documentRecognitionStatus(document.document_kind, latest.processing_status)
     : null;
   const geometry = latest && viewable ? geometryStatus(latest.geometry_status) : null;
+  const showCad = cadEnabled && viewable && openable !== null;
+  // Листы готовы, ошибок нет, распознавать нечего - норма: раздел «Подготовка» не занимает место
+  // над конвейером. Без конвейера он остаётся - иначе панель пуста.
+  const preparationNormal =
+    revisions !== null &&
+    (geometry === null || latest?.geometry_status === 'ready') &&
+    recognition === null &&
+    !latest?.processing_error_code &&
+    state?.kind !== 'geometry_failed';
+  // Последнее задание проекта - только пока идёт или если упало: готовое повторять незачем.
+  const showJob =
+    importJob !== null &&
+    (importJob.status === 'queued' ||
+      importJob.status === 'running' ||
+      importJob.status === 'failed');
 
   return (
     <section
@@ -91,37 +106,41 @@ export const DocumentPipelinePanel: FC<IDocumentPipelinePanelProps> = ({
       </header>
 
       <div className="flex min-h-0 flex-col gap-[var(--s-5)] overflow-y-auto overscroll-contain px-[var(--s-6)] py-[var(--s-5)]">
-        <Section title="Подготовка">
-          {revisions === null ? (
-            <Skeleton className="h-[20px] w-[180px]" />
-          ) : (
-            <div className="flex flex-col gap-[var(--s-3)]">
-              <div className="flex flex-wrap items-center gap-[var(--s-4)]">
-                {geometry && <StatusBadge tone={geometry.tone}>{geometry.label}</StatusBadge>}
-                {recognition && (
-                  <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
+        {!(preparationNormal && showCad) && (
+          <Section title="Подготовка">
+            {revisions === null ? (
+              <Skeleton className="h-[20px] w-[180px]" />
+            ) : (
+              <div className="flex flex-col gap-[var(--s-3)]">
+                <div className="flex flex-wrap items-center gap-[var(--s-4)]">
+                  {geometry && <StatusBadge tone={geometry.tone}>{geometry.label}</StatusBadge>}
+                  {recognition && (
+                    <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
+                  )}
+                </div>
+                {latest?.processing_error_code && (
+                  <p className="text-xs text-danger">
+                    {errorMessage(latest.processing_error_code)}
+                  </p>
+                )}
+                {state?.kind === 'geometry_failed' && (
+                  <p className="text-xs text-danger">
+                    Листы подготовить не удалось
+                    {state.errorCode ? `: ${errorMessage(state.errorCode)}` : '.'}
+                  </p>
                 )}
               </div>
-              {latest?.processing_error_code && (
-                <p className="text-xs text-danger">{errorMessage(latest.processing_error_code)}</p>
-              )}
-              {state?.kind === 'geometry_failed' && (
-                <p className="text-xs text-danger">
-                  Листы подготовить не удалось
-                  {state.errorCode ? `: ${errorMessage(state.errorCode)}` : '.'}
-                </p>
-              )}
-            </div>
-          )}
-        </Section>
+            )}
+          </Section>
+        )}
 
-        {cadEnabled && viewable && openable && (
+        {showCad && openable && (
           <Section title="CAD">
             <DocumentCadPipeline projectId={projectId} revisionId={openable.id} />
           </Section>
         )}
 
-        {importJob && (
+        {showJob && importJob && (
           <Section title={jobTypeLabel(importJob.job_type)}>
             <ImportJobCard job={importJob} />
           </Section>

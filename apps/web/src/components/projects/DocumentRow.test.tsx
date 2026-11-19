@@ -49,9 +49,8 @@ describe('строка документа', () => {
       'href',
       '/projects/p-1/workspace?revision=rev-1',
     );
-    // Оба состояния рядом и не подменяют друг друга.
-    expect(screen.getByText('Листы готовы')).toBeInTheDocument();
-    // PDF без пакета распознавания - норма: плашки распознавания нет вовсе.
+    // Готовые листы и PDF без пакета распознавания - норма: плашек нет, строка - имя и данные.
+    expect(screen.queryByText('Листы готовы')).not.toBeInTheDocument();
     expect(screen.queryByText('Не распознан')).not.toBeInTheDocument();
     expect(screen.queryByText('Без распознавания')).not.toBeInTheDocument();
     expect(screen.getByText(/4 листа/)).toBeInTheDocument();
