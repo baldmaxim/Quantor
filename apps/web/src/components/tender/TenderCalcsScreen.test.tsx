@@ -421,7 +421,7 @@ describe('раздел «База объекта»', () => {
   });
 });
 
-describe('раздел «Доступ для TENDER»', () => {
+describe('раздел «Доступ (токены)»', () => {
   it('токен показывается один раз после создания', async () => {
     const created: PersonalTokenCreated = {
       id: 't-1',

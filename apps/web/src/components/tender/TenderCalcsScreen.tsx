@@ -25,7 +25,7 @@ type TabId = 'calcs' | 'base' | 'tokens';
 const TABS: readonly ISegmentedOption<TabId>[] = [
   { value: 'calcs', label: 'Расчёты' },
   { value: 'base', label: 'База объекта' },
-  { value: 'tokens', label: 'Доступ для TENDER' },
+  { value: 'tokens', label: 'Доступ (токены)' },
 ];
 
 const MAIN = 'min-w-0 flex-1 px-[var(--s-5)] py-[var(--s-6)] md:px-[var(--s-7)]';
