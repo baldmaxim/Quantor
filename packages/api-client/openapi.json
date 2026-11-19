@@ -30026,6 +30026,201 @@
         "title": "ModelProviderRead",
         "type": "object"
       },
+      "ModelSheetOverlayList": {
+        "properties": {
+          "elevation_mm": {
+            "title": "Elevation Mm",
+            "type": "number"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelSheetOverlayRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "storey_key": {
+            "title": "Storey Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storey_key",
+          "elevation_mm",
+          "items"
+        ],
+        "title": "ModelSheetOverlayList",
+        "type": "object"
+      },
+      "ModelSheetOverlayRead": {
+        "description": "Вид листа плана на отметке этажа модели и его привязка к сетке осей модели.\n\n`matrix` - подобие pt страницы (от левого верхнего угла, как кадр вида) → мм системы здания\nмодели: `x = a·x_pt + b·y_pt + c`, `y = d·x_pt + e·y_pt + f`, `[a, b, c, d, e, f]`.\nНет привязки -\n`None` и причина в `reason`.",
+        "properties": {
+          "axes_used": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Axes Used",
+            "type": "array"
+          },
+          "base_z_mm": {
+            "title": "Base Z Mm",
+            "type": "integer"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "frame_scale_mm_per_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame Scale Mm Per Pt"
+          },
+          "group_label": {
+            "title": "Group Label",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "matrix": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 6,
+                "minItems": 6,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matrix"
+          },
+          "max_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mm"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "rms_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rms Mm"
+          },
+          "rotation_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotation Deg"
+          },
+          "scale_mm_per_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Mm Per Pt"
+          },
+          "status": {
+            "enum": [
+              "registered",
+              "unregistered"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision_id",
+          "document_id",
+          "job_id",
+          "page_index",
+          "view",
+          "label",
+          "group_label",
+          "base_z_mm",
+          "status"
+        ],
+        "title": "ModelSheetOverlayRead",
+        "type": "object"
+      },
       "ModelSpecRead": {
         "description": "Одна модель у поставщика.",
         "properties": {
@@ -50739,6 +50934,68 @@
           }
         },
         "summary": "Элементы этажа: отбор по категории, дисциплине и подстроке имени",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/versions/{version_id}/storeys/{storey_key}/sheets": {
+      "get": {
+        "operationId": "read_storey_sheets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "storey_key",
+            "required": true,
+            "schema": {
+              "title": "Storey Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSheetOverlayList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Листы планов на отметке этажа и их привязка к сетке осей модели (чертёж наложением)",
         "tags": [
           "building-models"
         ]

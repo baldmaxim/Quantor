@@ -15128,6 +15128,116 @@ export type ModelProviderRead = {
 };
 
 /**
+ * ModelSheetOverlayList
+ */
+export type ModelSheetOverlayList = {
+    /**
+     * Elevation Mm
+     */
+    elevation_mm: number;
+    /**
+     * Items
+     */
+    items: Array<ModelSheetOverlayRead>;
+    /**
+     * Message
+     */
+    message?: string | null;
+    /**
+     * Storey Key
+     */
+    storey_key: string;
+};
+
+/**
+ * ModelSheetOverlayRead
+ *
+ * Вид листа плана на отметке этажа модели и его привязка к сетке осей модели.
+ *
+ * `matrix` - подобие pt страницы (от левого верхнего угла, как кадр вида) → мм системы здания
+ * модели: `x = a·x_pt + b·y_pt + c`, `y = d·x_pt + e·y_pt + f`, `[a, b, c, d, e, f]`.
+ * Нет привязки -
+ * `None` и причина в `reason`.
+ */
+export type ModelSheetOverlayRead = {
+    /**
+     * Axes Used
+     */
+    axes_used?: Array<string>;
+    /**
+     * Base Z Mm
+     */
+    base_z_mm: number;
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Frame Scale Mm Per Pt
+     */
+    frame_scale_mm_per_pt?: number | null;
+    /**
+     * Group Label
+     */
+    group_label: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Matrix
+     */
+    matrix?: [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number
+    ] | null;
+    /**
+     * Max Mm
+     */
+    max_mm?: number | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Rms Mm
+     */
+    rms_mm?: number | null;
+    /**
+     * Rotation Deg
+     */
+    rotation_deg?: number | null;
+    /**
+     * Scale Mm Per Pt
+     */
+    scale_mm_per_pt?: number | null;
+    /**
+     * Status
+     */
+    status: 'registered' | 'unregistered';
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
  * ModelSpecRead
  *
  * Одна модель у поставщика.
@@ -26898,6 +27008,44 @@ export type ListModelElementsResponses = {
 };
 
 export type ListModelElementsResponse = ListModelElementsResponses[keyof ListModelElementsResponses];
+
+export type ReadStoreySheetsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Storey Key
+         */
+        storey_key: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/storeys/{storey_key}/sheets';
+};
+
+export type ReadStoreySheetsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadStoreySheetsError = ReadStoreySheetsErrors[keyof ReadStoreySheetsErrors];
+
+export type ReadStoreySheetsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelSheetOverlayList;
+};
+
+export type ReadStoreySheetsResponse = ReadStoreySheetsResponses[keyof ReadStoreySheetsResponses];
 
 export type GetPlanAlignmentsData = {
     body?: never;
