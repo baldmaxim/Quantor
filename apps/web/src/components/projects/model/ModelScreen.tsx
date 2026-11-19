@@ -4,7 +4,7 @@ import type { ModelPartRead } from '@quantor/api-client';
 import { useMemo, useState, type FC } from 'react';
 
 import { Button, EmptyState, ErrorState, SkeletonRows, StatusBadge } from '@/components/ui';
-import { extractCode } from '@/lib/errors';
+import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 import {
   elementTitle,
   formatElevation,
@@ -18,6 +18,7 @@ import {
   useStoreyElements,
   useStoreyGeometry,
 } from '@/lib/model/model-queries';
+import { disciplineLabel } from '@/lib/model/model-disciplines';
 import { defaultHouseDisciplines, type IModelPartInput } from '@/lib/model/model-scene';
 import { MODEL_STATUS, newestVersion, pickVersion } from '@/lib/model/model-versions';
 
@@ -249,11 +250,16 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
         {data && status && (
           <div className="flex flex-col gap-[var(--s-2)] text-xs text-muted">
             <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-            <span>
+            <span title={data.generator ? `Выгрузчик: ${data.generator}` : undefined}>
               Этажей: {String(data.counts?.storeys ?? storeys.length)} · элементов:{' '}
               {String(data.counts?.elements ?? '—')}
             </span>
-            {data.generator && <span>Выгрузчик: {data.generator}</span>}
+            {data.status === 'candidate' && (
+              <span>
+                Кандидат: проверьте модель и утвердите. Утверждённая версия - проверенная человеком;
+                прежняя утверждённая станет заменённой.
+              </span>
+            )}
             {data.status === 'candidate' && (
               <Button
                 variant="primary"
@@ -266,7 +272,8 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
             )}
             {approve.isError && (
               <span role="alert" className="text-[var(--danger)]">
-                Не удалось утвердить: {extractCode(approve.error) ?? 'ошибка'}
+                Не удалось утвердить:{' '}
+                {errorMessage(extractCode(approve.error), extractMessage(approve.error))}
               </span>
             )}
           </div>
@@ -443,7 +450,7 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
                     });
                   }}
                 />
-                {code}
+                <span title={code}>{disciplineLabel(code)}</span>
               </label>
             ))}
           </fieldset>

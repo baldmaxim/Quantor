@@ -52,13 +52,38 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
   onOpenSheet,
 }) => {
   if (floor === null) {
-    return <p className="p-[var(--s-4)] text-sm text-muted">Нажмите на этаж</p>;
+    // Пока этаж не выбран - что значат пометки списка и что с ними делать.
+    return (
+      <div className="flex flex-col gap-[var(--s-3)] p-[var(--s-4)] text-sm text-muted">
+        <p className="m-0">Нажмите на этаж</p>
+        <ul className="m-0 flex list-disc flex-col gap-[var(--s-2)] pl-[var(--s-5)] text-xs">
+          <li>
+            «по осям …» — этаж совмещён с эталонным по общим осям; цвет точки — качество совмещения.
+          </li>
+          <li>
+            «не совмещён по осям» — общих осей с эталоном не нашлось, этаж стоит условно: откройте
+            его лист и проверьте оси.
+          </li>
+          <li>
+            «отметка не определена» — этажа нет в 3D: проверьте этаж и отметку в паспорте листа
+            («Листы комплекта»).
+          </li>
+          <li>
+            «не поставлен на объект» у корпуса — место корпуса условное: «Привязать вручную» под
+            названием корпуса (корпус «Весь объект»).
+          </li>
+        </ul>
+      </div>
+    );
   }
   const note = alignmentNote(floor, groupSheetCount);
   const typical = floor.typical_of ?? null;
   const heightUnknown = floor.floor_height_source === 'derived_stack' ? BY_STACK : NOT_DEFINED;
   const counts = countWalls(floor.walls);
-  const place = [floor.corps ? `корпус ${floor.corps}` : null, floor.section ? `секция ${floor.section}` : null]
+  const place = [
+    floor.corps ? `корпус ${floor.corps}` : null,
+    floor.section ? `секция ${floor.section}` : null,
+  ]
     .filter((part): part is string => part !== null)
     .join(', ');
 
@@ -69,37 +94,55 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
         {place !== '' && <p className="text-xs text-muted">{place}</p>}
         {typical !== null && (
           <p className="text-xs text-muted [overflow-wrap:anywhere]">
-            Этаж показан по типовому листу «{typical}»: геометрия листа на отметке этого этажа. В объёмы листа
-            этаж не входит.
+            Этаж показан по типовому листу «{typical}»: геометрия листа на отметке этого этажа. В
+            объёмы листа этаж не входит.
           </p>
         )}
       </div>
       <dl className="divide-y divide-border">
-        <Row label="Отметка" value={floor.elevation_known ? formatElevation(floor.base_z_mm) : 'не определена'} />
+        <Row
+          label="Отметка"
+          value={floor.elevation_known ? formatElevation(floor.base_z_mm) : 'не определена'}
+        />
         <Row
           label="Высота этажа"
-          value={floor.floor_height_known ? meters(floor.floor_height_mm) : `${heightUnknown} (${meters(floor.floor_height_mm)})`}
+          value={
+            floor.floor_height_known
+              ? meters(floor.floor_height_mm)
+              : `${heightUnknown} (${meters(floor.floor_height_mm)})`
+          }
         />
         <Row
           label="Толщина плиты"
           value={
-            floor.slab_thickness_known ? meters(floor.slab_thickness_mm) : `${NOT_DEFINED} (${meters(floor.slab_thickness_mm)})`
+            floor.slab_thickness_known
+              ? meters(floor.slab_thickness_mm)
+              : `${NOT_DEFINED} (${meters(floor.slab_thickness_mm)})`
           }
         />
         {note && <Row label="Совмещение" value={note.text} />}
-        {floor.alignment === 'axes' && <Row label="Качество совмещения" value={alignmentQuality(floor)} />}
+        {floor.alignment === 'axes' && (
+          <Row label="Качество совмещения" value={alignmentQuality(floor)} />
+        )}
         {counts && (
           <>
             <Row label="Монолит, конструкций" value={String(counts.monolith)} />
             <Row label="Кладка, конструкций" value={String(counts.masonry)} />
-            {counts.partition > 0 && <Row label="Перегородки ГКЛ, конструкций" value={String(counts.partition)} />}
+            {counts.partition > 0 && (
+              <Row label="Перегородки ГКЛ, конструкций" value={String(counts.partition)} />
+            )}
             <Row label="Окна" value={windowsSummary(floor.windows)} />
           </>
         )}
       </dl>
       <div className="flex flex-wrap gap-[var(--s-3)]">
         {!detail && (
-          <Button variant="primary" className="min-h-[44px]" disabled={view.params === null} onClick={onOpenDetail}>
+          <Button
+            variant="primary"
+            className="min-h-[44px]"
+            disabled={view.params === null}
+            onClick={onOpenDetail}
+          >
             Этаж подробно
           </Button>
         )}

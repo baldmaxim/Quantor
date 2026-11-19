@@ -59,10 +59,7 @@ export const ModelImportPanel: FC<IModelImportPanelProps> = ({ projectId }) => {
       {view !== null && current !== null && (
         <p role="status" className="flex flex-wrap items-center gap-[var(--s-2)]">
           <StatusBadge tone={view.tone}>{view.label}</StatusBadge>
-          <span>
-            IFC: {current.inputs}
-            {current.generator_version ? ` · ${current.generator_version}` : ''}
-          </span>
+          <span title={current.generator_version ?? undefined}>Файлов IFC: {current.inputs}</span>
         </p>
       )}
       {status === 'failed' && current?.error_message && (
