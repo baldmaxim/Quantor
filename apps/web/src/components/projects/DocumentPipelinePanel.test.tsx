@@ -122,8 +122,7 @@ describe('панель обработки документа', () => {
       screen.getByRole('link', { name: 'Открыть План 3 этажа.pdf в рабочей области' }),
     ).toHaveAttribute('href', '/projects/p-1/workspace?revision=rev-1');
     expect(screen.getByText('Листы готовы')).toBeInTheDocument();
-    expect(screen.getByText('Без распознавания')).toBeInTheDocument();
-    expect(screen.getByText(/листы, CAD и обмеры работают по PDF/)).toBeInTheDocument();
+    expect(screen.queryByText('Не распознан')).not.toBeInTheDocument();
   });
 
   it('флаг CAD выключен: блока CAD нет и конвейер не запрашивается', () => {

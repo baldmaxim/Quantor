@@ -51,9 +51,9 @@ describe('строка документа', () => {
     );
     // Оба состояния рядом и не подменяют друг друга.
     expect(screen.getByText('Листы готовы')).toBeInTheDocument();
-    // PDF без пакета распознавания - норма: плашка нейтральная, без «Не распознан».
-    expect(screen.getByText('Без распознавания')).toBeInTheDocument();
+    // PDF без пакета распознавания - норма: плашки распознавания нет вовсе.
     expect(screen.queryByText('Не распознан')).not.toBeInTheDocument();
+    expect(screen.queryByText('Без распознавания')).not.toBeInTheDocument();
     expect(screen.getByText(/4 листа/)).toBeInTheDocument();
   });
 

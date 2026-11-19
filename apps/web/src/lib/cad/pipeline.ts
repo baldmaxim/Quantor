@@ -399,14 +399,14 @@ export const sheetStaleTexts = (sheet: CadPipelineSheetRead): readonly string[] 
 ];
 
 /**
- * Устаревший лист одной строкой для инженера: какие шаги посчитаны прежней версией движка и что
- * сделать. Версии движка («было …, стало …») - в подсказке, см. `sheetStaleTexts`.
+ * Подсказка метки «устарел»: какие шаги посчитаны старой версией движка и что нажать. Версии
+ * движка («было …, стало …») - строками ниже, см. `sheetStaleTexts`.
  */
 export const sheetStaleHint = (sheet: CadPipelineSheetRead): string | null => {
   const stages = [...new Set((sheet.stale ?? []).map((item) => STALE_STAGE_LABELS[item.stage]))];
   return stages.length === 0
     ? null
-    : `Посчитан прежней версией движка (${stages.join(', ')}): пересчитайте — кнопка «Пересчитать устаревшие» над списком листов.`;
+    : `Посчитан старой версией движка (${stages.join(', ')}) — «Пересчитать устаревшие»`;
 };
 
 export const isSheetStale = (sheet: CadPipelineSheetRead): boolean =>

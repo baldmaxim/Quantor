@@ -113,11 +113,6 @@ export const CadRecognitionSummary: FC<ICadRecognitionSummaryProps> = ({ project
           </li>
         ))}
       </ul>
-      {data.sheets_failed > 0 && (
-        <p className="m-0 mt-[var(--s-3)] text-xs text-muted">
-          Причина ошибки и что делать — в строке листа на панели «Обработка» (выберите документ).
-        </p>
-      )}
     </div>
   );
 };

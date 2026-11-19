@@ -118,13 +118,15 @@ export const DocumentRow: FC<IDocumentRowProps> = ({
       <div className="flex items-center gap-[var(--s-4)]">
         {geometry && <StatusBadge tone={geometry.tone}>{geometry.label}</StatusBadge>}
 
-        {recognition ? (
-          // Над растянутой кнопкой строки: иначе подсказка не всплывает.
-          <span title={recognition.hint ?? undefined} className="relative z-10">
-            <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
-          </span>
-        ) : (
+        {latest === null ? (
           <Skeleton className="h-[16px] w-[90px]" />
+        ) : (
+          recognition && (
+            // Над растянутой кнопкой строки: иначе подсказка не всплывает.
+            <span title={recognition.hint ?? undefined} className="relative z-10">
+              <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
+            </span>
+          )
         )}
 
         {href && (

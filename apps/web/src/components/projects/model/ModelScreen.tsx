@@ -255,14 +255,9 @@ export const ModelScreen: FC<IModelScreenProps> = ({ projectId }) => {
               {String(data.counts?.elements ?? '—')}
             </span>
             {data.status === 'candidate' && (
-              <span>
-                Кандидат: проверьте модель и утвердите. Утверждённая версия - проверенная человеком;
-                прежняя утверждённая станет заменённой.
-              </span>
-            )}
-            {data.status === 'candidate' && (
               <Button
                 variant="primary"
+                title="Отметить версию проверенной; прежняя утверждённая станет заменённой"
                 // Пока открывается новая версия, на экране ещё прежняя: утверждать нечего.
                 disabled={approve.isPending || detail.isPlaceholderData}
                 onClick={() => approve.mutate({ versionId: data.id })}

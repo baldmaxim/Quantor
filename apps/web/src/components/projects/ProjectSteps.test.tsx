@@ -24,7 +24,9 @@ describe('путь проекта', () => {
     render(<ProjectSteps projectId="p1" current={['documents', 'cad']} />);
     const nav = screen.getByRole('navigation', { name: 'Путь проекта' });
     const links = within(nav).getAllByRole('link');
-    expect(links[0]).toHaveTextContent('1Документызагрузите PDF и IFC');
+    // На экране - номер и название; что сделать - во всплывающей подсказке.
+    expect(links[0]).toHaveTextContent(/^1Документы$/);
+    expect(links[0]).toHaveAttribute('title', 'загрузите PDF и IFC');
     expect(within(nav).getByRole('link', { name: /Здание/ })).toHaveAttribute(
       'href',
       '/projects/p1/building3d',

@@ -132,7 +132,7 @@ export const BaseTab: FC<ITabProps> = ({ projectId }) => {
         <EmptyState
           compact
           title="Выпусков базы пока нет"
-          description="База собирается из этажей «Здания»: у этажа должны быть посчитаны конструкции (шаг «CAD по листам»). В окне «Выпустить базу» готовые этажи отмечены сами; выпуск не меняется, его можно только отозвать."
+          description="Нужны этажи «Здания» с посчитанными конструкциями."
           action={
             <ButtonLink href={`/projects/${projectId}/building3d`}>Открыть «Здание»</ButtonLink>
           }

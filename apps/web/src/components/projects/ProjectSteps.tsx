@@ -13,9 +13,9 @@ import {
 import { useFeatures } from '@/lib/queries';
 
 /**
- * Полоса «Путь проекта» под шапкой карточки проекта: шаги по порядку с номером и одной строкой
- * «что сделать», ниже - разделы вне основного пути. Заменяет ряд из восьми кнопок в шапке.
- * Шаги переносятся строками: ни полоса, ни страница вбок не листаются.
+ * Полоса «Путь проекта» под шапкой карточки проекта: шаги по порядку с номером, справа - разделы
+ * вне основного пути. Заменяет ряд из восьми кнопок в шапке. Что сделать на шаге - во всплывающей
+ * подсказке, без лишнего текста на экране. Узкий экран - перенос строк, а не прокрутка вбок.
  */
 
 export interface IProjectStepsProps {
@@ -32,55 +32,51 @@ export const ProjectSteps: FC<IProjectStepsProps> = ({ projectId, current = [] }
   return (
     <nav
       aria-label="Путь проекта"
-      className="flex-none border-b border-border bg-surface px-[var(--s-5)] md:px-[var(--s-6)]"
+      className="flex flex-none flex-wrap items-center gap-x-[var(--s-6)] gap-y-[var(--s-2)] border-b border-border bg-surface px-[var(--s-5)] py-[var(--s-2)] md:px-[var(--s-6)]"
     >
-      {/* Шаги переносятся на вторую строку, а не уезжают вбок: все видны на любой ширине. */}
-      <ol className="m-0 flex list-none flex-wrap gap-[var(--s-2)] p-0 py-[var(--s-3)]">
+      <ol className="m-0 flex list-none flex-wrap items-center gap-[var(--s-1)] p-0">
         {steps.map((step, index) => {
           const here = current.includes(step.key);
           return (
-            <li key={step.key} className="flex flex-none items-center gap-[var(--s-2)]">
+            <li key={step.key} className="flex items-center gap-[var(--s-1)]">
               {index > 0 && (
-                <span aria-hidden="true" className="text-muted opacity-60">
-                  →
+                <span aria-hidden="true" className="text-xs text-muted opacity-50">
+                  ›
                 </span>
               )}
               <Link
                 href={step.href}
+                title={step.hint}
                 aria-current={here ? 'step' : undefined}
                 className={cx(
-                  'flex min-h-[44px] items-center gap-[var(--s-3)] rounded-[var(--radius-sm)] border px-[var(--s-4)] py-[var(--s-2)] transition-colors motion-reduce:transition-none',
+                  'flex min-h-[32px] items-center gap-[var(--s-3)] rounded-full px-[var(--s-4)] text-sm whitespace-nowrap transition-colors motion-reduce:transition-none max-md:min-h-[44px]',
                   here
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-transparent hover:bg-surface-muted',
+                    ? 'bg-accent-soft font-medium text-accent'
+                    : 'text-text hover:bg-surface-muted',
                 )}
               >
                 <span
                   aria-hidden="true"
                   className={cx(
-                    'flex size-[20px] flex-none items-center justify-center rounded-full border text-micro font-semibold',
-                    here ? 'border-accent text-accent' : 'border-border-strong text-muted',
+                    'flex size-[18px] flex-none items-center justify-center rounded-full text-micro font-semibold',
+                    here ? 'bg-accent text-surface' : 'bg-surface-muted text-muted',
                   )}
                 >
                   {index + 1}
                 </span>
-                <span className="flex flex-col leading-tight">
-                  <span className="text-sm font-medium whitespace-nowrap">{step.title}</span>
-                  <span className="text-xs whitespace-nowrap text-muted">{step.hint}</span>
-                </span>
+                {step.title}
               </Link>
             </li>
           );
         })}
       </ol>
       {extras.length > 0 && (
-        <p className="m-0 flex flex-wrap items-center gap-x-[var(--s-5)] gap-y-[var(--s-1)] pb-[var(--s-3)] text-xs text-muted">
-          <span>Ещё:</span>
+        <p className="m-0 ml-auto flex flex-wrap items-center gap-x-[var(--s-5)] text-xs">
           {extras.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-accent underline-offset-4 hover:underline"
+              className="text-muted underline-offset-4 hover:text-text hover:underline"
             >
               {link.label}
             </Link>

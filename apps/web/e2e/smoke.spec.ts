@@ -115,7 +115,7 @@ test.describe('оболочка портала', () => {
     await page.goto('/projects?create=1');
     const dialog = page.getByRole('dialog');
 
-    await expect(dialog.getByText(/PDF — листы, CAD и обмеры · IFC — модель здания/)).toBeVisible();
+    await expect(dialog.getByText(/PDF, IFC, Excel \.xlsx/)).toBeVisible();
     await dialog.getByRole('textbox').first().fill('Проверочный проект');
     await expect(dialog.getByRole('button', { name: 'Создать проект' })).toBeEnabled();
   });
@@ -323,7 +323,6 @@ test.describe('карточка проекта', () => {
     // Действие есть и у самой строки документа: документов в проекте бывает несколько.
     await expect(page.getByRole('link', { name: /Открыть План 3 этажа/ })).toBeVisible();
     await expect(page.getByText('Листы готовы')).toBeVisible();
-    await expect(page.getByText('Без распознавания').first()).toBeVisible();
   });
 
   test('пока листы готовятся, кнопка неактивна и объясняет почему', async ({ page }) => {

@@ -144,7 +144,7 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
               </span>
             )}
             {stale.length > 0 && (
-              <span title={stale.join('; ')}>
+              <span title={[staleHint, ...stale].join(' · ')}>
                 <StatusBadge tone="neutral" wrap>
                   устарел
                 </StatusBadge>
@@ -174,17 +174,10 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
         <PipelineStepper steps={steps} />
       </div>
 
-      {(qualityBadge || stale.length > 0) && (
-        <div className="flex flex-col gap-[var(--s-1)] text-xs [overflow-wrap:anywhere]">
-          {qualityBadge && (
-            <p className="m-0 text-warning">{`На проверку: ${qualityBadge.reasons.join('; ')}`}</p>
-          )}
-          {staleHint && (
-            <p className="m-0 text-muted" title={stale.join('; ')}>
-              {staleHint}
-            </p>
-          )}
-        </div>
+      {qualityBadge && (
+        <p className="m-0 text-xs text-warning [overflow-wrap:anywhere]">
+          {`На проверку: ${qualityBadge.reasons.join('; ')}`}
+        </p>
       )}
 
       {(failed?.detail || floor3dBadge) && (

@@ -117,17 +117,14 @@ describe('состояния ревизии и типы документов', (
   });
 
   it('в списке документов: PDF без пакета - норма, IFC - для модели, Excel - для ВОР, BIM - на хранении', () => {
-    expect(documentRecognitionStatus('pdf', 'unprocessed')).toMatchObject({
-      label: 'Без распознавания',
-      tone: 'neutral',
-    });
-    expect(documentRecognitionStatus('ifc', 'processor_unavailable').label).toBe(
+    expect(documentRecognitionStatus('pdf', 'unprocessed')).toBeNull();
+    expect(documentRecognitionStatus('ifc', 'processor_unavailable')?.label).toBe(
       'Для модели здания',
     );
-    expect(documentRecognitionStatus('other', 'unprocessed').hint).toMatch(/ВОР Заказчика/);
-    expect(documentRecognitionStatus('revit', 'processor_unavailable').label).toBe('На хранении');
+    expect(documentRecognitionStatus('other', 'unprocessed')?.hint).toMatch(/ВОР Заказчика/);
+    expect(documentRecognitionStatus('revit', 'processor_unavailable')?.label).toBe('На хранении');
     expect(documentRecognitionStatus('pdf', 'ready')).toMatchObject({ label: 'Готов', hint: null });
-    expect(documentRecognitionStatus('pdf', 'failed').tone).toBe('danger');
+    expect(documentRecognitionStatus('pdf', 'failed')?.tone).toBe('danger');
   });
 
   it('неизвестное состояние отдаётся как есть, а не прячется', () => {

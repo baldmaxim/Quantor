@@ -111,40 +111,35 @@ export interface DocumentStatusView extends StatusView {
  * Состояние распознавания так, как его читает инженер в списке документов.
  *
  * Для PDF «не распознан» - норма: пакет распознавания (ADR-0037) не нужен ни листам, ни CAD,
- * ни обмерам, поэтому жёлтая плашка на каждом PDF выглядела бедой. IFC не «без обработчика» -
- * он строит модель на странице «Модель здания». Книга Excel хранится как есть (ВОР Заказчика
- * берётся из неё для сверки конструкций), RVT, NWD и NWC лежат на хранении.
+ * ни обмерам, поэтому плашки нет вовсе (`null`) - жёлтая на каждом PDF выглядела бедой. IFC не
+ * «без обработчика» - он строит модель на странице «Модель здания». Книга Excel хранится как есть
+ * (ВОР Заказчика берётся из неё для сверки конструкций), RVT, NWD и NWC лежат на хранении.
+ * Пояснение - только во всплывающей подсказке.
  */
 export const documentRecognitionStatus = (
   documentKind: string,
   processingStatus: string,
-): DocumentStatusView => {
-  if (documentKind === 'pdf' && processingStatus === 'unprocessed') {
-    return {
-      label: 'Без распознавания',
-      tone: 'neutral',
-      hint: 'Пакет распознавания не загружен, и он не нужен: листы, CAD и обмеры работают по PDF.',
-    };
-  }
+): DocumentStatusView | null => {
+  if (documentKind === 'pdf' && processingStatus === 'unprocessed') return null;
   if (documentKind === 'ifc' && processingStatus === 'processor_unavailable') {
     return {
       label: 'Для модели здания',
       tone: 'neutral',
-      hint: 'Модель из IFC строится на странице «Модель здания» кнопкой «Построить модель из IFC».',
+      hint: 'Модель строится на странице «Модель здания»',
     };
   }
   if (documentKind === 'other' && processingStatus === 'unprocessed') {
     return {
       label: 'Хранится',
       tone: 'neutral',
-      hint: 'Книга хранится как есть; ВОР Заказчика из неё сверяется с конструкциями во вкладке CAD рабочей области.',
+      hint: 'ВОР Заказчика для сверки конструкций',
     };
   }
   if (processingStatus === 'unprocessed' || processingStatus === 'processor_unavailable') {
     return {
       label: 'На хранении',
       tone: 'neutral',
-      hint: 'Файл хранится в проекте; портал его не разбирает.',
+      hint: 'Портал файл не разбирает',
     };
   }
   return { ...revisionStatus(processingStatus), hint: null };

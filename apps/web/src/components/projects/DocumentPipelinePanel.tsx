@@ -102,7 +102,6 @@ export const DocumentPipelinePanel: FC<IDocumentPipelinePanelProps> = ({
                   <StatusBadge tone={recognition.tone}>{recognition.label}</StatusBadge>
                 )}
               </div>
-              {recognition?.hint && <p className="m-0 text-xs text-muted">{recognition.hint}</p>}
               {latest?.processing_error_code && (
                 <p className="text-xs text-danger">{errorMessage(latest.processing_error_code)}</p>
               )}

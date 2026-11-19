@@ -75,16 +75,7 @@ export const TokensTab: FC = () => {
       <div className="flex flex-wrap items-center gap-[var(--s-4)]">
         <div className="flex min-w-0 flex-1 basis-[280px] flex-col gap-[var(--s-3)]">
           <p className="m-0 max-w-[70ch] text-sm text-muted">
-            Личный токен пускает программу на портал от вашего имени. Для чего он бывает нужен:
-          </p>
-          <ul className="m-0 max-w-[70ch] list-disc pl-[var(--s-6)] text-sm text-muted">
-            <li>навыку TENDER — загружать расчёты и читать базу объекта;</li>
-            <li>агенту или скрипту — загружать документы и IFC, строить модель;</li>
-            <li>ИИ-ассистенту (Claude и другие) — подключиться к порталу по MCP.</li>
-          </ul>
-          <p className="m-0 max-w-[70ch] text-sm text-muted">
-            Что токену можно, выбирается при создании («Для чего токен»). Токен показывается один
-            раз: сохраните его в файл. Расчёты TENDER загружаются так:
+            Доступ к порталу для TENDER, скриптов и ИИ-ассистентов (MCP). Загрузка расчётов TENDER:
           </p>
           <code className="mono block max-w-full overflow-x-auto rounded-[var(--radius-sm)] bg-surface-muted px-[var(--s-4)] py-[var(--s-3)] text-xs">
             python3 calc_push.py --portal {portalOrigin()} --token-file …

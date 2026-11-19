@@ -534,7 +534,7 @@ describe('отказы этапов словами этого этапа', () =>
       'zones',
     );
     expect(zones?.state).toBe('failed');
-    expect(zones?.detail).toMatch(/^Авторазметка не нашла квартир на плане/);
+    expect(zones?.detail).toBe('Квартиры на плане не найдены (нет марок помещений).');
     expect(zones?.detail).not.toMatch(/Трассы/);
   });
 
@@ -543,7 +543,7 @@ describe('отказы этапов словами этого этапа', () =>
       sheet({ views: [view({ walls, zones: zonesFailed('CAD_INPUT_INVALID') })] }),
       'zones',
     );
-    expect(zones?.detail).toMatch(/^Авторазметка не смогла связать CAD с PDF листа/);
+    expect(zones?.detail).toMatch(/^CAD не совпал с PDF листа/);
   });
 
   it('у преобразования тот же код значит своё: «PDF не подходит»', () => {
@@ -579,7 +579,7 @@ describe('устаревший лист словами', () => {
     });
     const hint = sheetStaleHint(s);
     expect(hint).toBe(
-      'Посчитан прежней версией движка (CAD, Конструкции): пересчитайте — кнопка «Пересчитать устаревшие» над списком листов.',
+      'Посчитан старой версией движка (CAD, Конструкции) — «Пересчитать устаревшие»',
     );
     expect(hint).not.toMatch(/f80883e8ef80/);
     expect(sheetStaleHint(sheet())).toBeNull();

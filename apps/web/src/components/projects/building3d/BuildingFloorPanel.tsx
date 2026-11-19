@@ -52,29 +52,7 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
   onOpenSheet,
 }) => {
   if (floor === null) {
-    // Пока этаж не выбран - что значат пометки списка и что с ними делать.
-    return (
-      <div className="flex flex-col gap-[var(--s-3)] p-[var(--s-4)] text-sm text-muted">
-        <p className="m-0">Нажмите на этаж</p>
-        <ul className="m-0 flex list-disc flex-col gap-[var(--s-2)] pl-[var(--s-5)] text-xs">
-          <li>
-            «по осям …» — этаж совмещён с эталонным по общим осям; цвет точки — качество совмещения.
-          </li>
-          <li>
-            «не совмещён по осям» — общих осей с эталоном не нашлось, этаж стоит условно: откройте
-            его лист и проверьте оси.
-          </li>
-          <li>
-            «отметка не определена» — этажа нет в 3D: проверьте этаж и отметку в паспорте листа
-            («Листы комплекта»).
-          </li>
-          <li>
-            «не поставлен на объект» у корпуса — место корпуса условное: «Привязать вручную» под
-            названием корпуса (корпус «Весь объект»).
-          </li>
-        </ul>
-      </div>
-    );
+    return <p className="p-[var(--s-4)] text-sm text-muted">Нажмите на этаж</p>;
   }
   const note = alignmentNote(floor, groupSheetCount);
   const typical = floor.typical_of ?? null;
