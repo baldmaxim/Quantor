@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import pytest
 
 from app.services.model_sheets import (
     ModelAxis,
     SheetAxis,
+    building_number,
     fit_sheet,
+    match_sheets,
     model_axes,
     normalize_label,
     sheet_axes,
+    storey_floor,
+    title_floors,
 )
 
 MM_PER_PT = 100 * 25.4 / 72  # 1:100
@@ -197,3 +202,80 @@ def test_parsers_skip_bad_items() -> None:
     }
     assert [a.tag for a in model_axes(grids)] == ["1"]
     assert sheet_axes(None) == [] and model_axes([]) == []
+
+
+def _sheet(title, building, elevation, floors=(None, None), walls="k", page=1):
+    return SimpleNamespace(
+        walls_key=walls,
+        scale_key="s",
+        checks_key="c",
+        passport_building=building,
+        passport_elevation_mm=elevation,
+        passport_floor_from=floors[0],
+        passport_floor_to=floors[1],
+        stamp_title=title,
+        page_index=page,
+        view=1,
+    )
+
+
+def test_title_floors() -> None:
+    assert title_floors("Корпус 5. План 5, 9, 13, 16 этажей") == {5, 9, 13, 16}
+    assert title_floors("Корпус 1. План 5-12 этажей") == set(range(5, 13))
+    assert title_floors("План -2 этажа") == {-2}
+    assert title_floors("Корпус 5. План 25, 27 этажей") == {25, 27}
+    assert title_floors("Корпус 7. План техпространства на отм. +105,200") == set()
+    assert title_floors(None) == set()
+
+
+def test_storey_and_building_numbers() -> None:
+    assert storey_floor("17 этаж") == 17
+    assert storey_floor("-2 этаж") == -2
+    assert storey_floor("Кровля +54.000") is None
+    assert building_number("Корпус 5") == "5"
+    assert building_number("Корп. 12") == "12"
+    assert building_number("Подземная часть") is None
+    assert building_number(None) is None
+
+
+def test_storey_matches_its_own_building_and_floor() -> None:
+    own = _sheet("Корпус 5. План 17 этажа", "5", 65000, page=95)
+    other = _sheet("Корпус 3. План 17 этажа", "3", 65600, page=72)
+    typical = _sheet("Корпус 5. План 5, 9, 13, 16 этажей", "5", 21900, (5, 16), page=90)
+    no_walls = _sheet("Корпус 5. План 17 этажа", "5", 65000, walls=None, page=94)
+    found = match_sheets(
+        [other, typical, no_walls, own],
+        building_name="Корпус 5",
+        storey_name="17 этаж",
+        elevation_mm=65850,
+    )
+    assert [(m.sheet.page_index, m.rank) for m in found] == [(95, 0)]
+
+
+def test_typical_floor_from_passport_range_without_title_floors() -> None:
+    sheet = _sheet("Корпус 1. План типовых этажей", "1", 21900, (5, 12), page=38)
+    found = match_sheets(
+        [sheet], building_name="Корпус 1", storey_name="7 этаж", elevation_mm=29100
+    )
+    assert [m.rank for m in found] == [1]
+
+
+def test_technical_floor_by_elevation() -> None:
+    tech = _sheet("Корпус 5. План техпространства на отм. +110,700", "5", 110700, page=105)
+    floor = _sheet("Корпус 5. План 28 этажа", "5", 106350, page=104)
+    found = match_sheets(
+        [floor, tech],
+        building_name="Корпус 5",
+        storey_name="Техпространство +110.700",
+        elevation_mm=110700,
+    )
+    assert [m.sheet.page_index for m in found] == [105]
+
+
+def test_stylobate_takes_sheets_without_building_number() -> None:
+    stylobate = _sheet("Стилобат. План 2 этажа. М 1:200", None, 7200, page=9)
+    tower = _sheet("Корпус 1. План 2 этажа", "1", 7200, page=12)
+    found = match_sheets(
+        [tower, stylobate], building_name="Стилобат", storey_name="2 этаж", elevation_mm=7200
+    )
+    assert [m.sheet.page_index for m in found] == [9]

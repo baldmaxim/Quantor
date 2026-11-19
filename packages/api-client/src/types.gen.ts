@@ -15167,7 +15167,7 @@ export type ModelSheetOverlayRead = {
     /**
      * Base Z Mm
      */
-    base_z_mm: number;
+    base_z_mm?: number | null;
     /**
      * Document Id
      */

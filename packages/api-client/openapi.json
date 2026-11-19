@@ -30075,8 +30075,15 @@
             "type": "array"
           },
           "base_z_mm": {
-            "title": "Base Z Mm",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Z Mm"
           },
           "document_id": {
             "anyOf": [
@@ -30215,7 +30222,6 @@
           "view",
           "label",
           "group_label",
-          "base_z_mm",
           "status"
         ],
         "title": "ModelSheetOverlayRead",

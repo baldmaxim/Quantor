@@ -19,9 +19,11 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import re
+import time
 import uuid
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Final
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +32,6 @@ from app.contracts.model_sheets import ModelSheetOverlayList, ModelSheetOverlayR
 from app.core.logging import get_logger
 from app.models import BuildingModelVersion, ModelStorey
 from app.services import cad_building3d as b3d
-from app.services import cad_building3d_assembly
 from app.storage.base import ObjectNotFoundError, ObjectStorage
 from app.storage.keys import model_part_key
 
@@ -38,9 +39,6 @@ log = get_logger(__name__)
 
 GRIDS_PATH: Final = "grids.json"
 MAX_GRIDS_BYTES: Final = 8 * 1024 * 1024
-# Отметка листа (верх плиты по паспорту) и отметка этажа модели расходятся на пирог пола и
-# округление: дальше этого - другой этаж.
-LEVEL_TOLERANCE_MM: Final = 600.0
 # Оси листа и модели параллельны после поворота с этой точностью.
 PARALLEL_DEG: Final = 1.0
 MIN_PER_DIRECTION: Final = 2
@@ -294,13 +292,6 @@ def model_axes(raw_grids: Any) -> list[ModelAxis]:
     return out
 
 
-@dataclass(slots=True)
-class _Candidate:
-    floor: Any
-    sheet: b3d.SheetRef
-    labels: list[str] = field(default_factory=list)
-
-
 def _overlaps(fit: SheetFit, model: Sequence[ModelAxis], bbox: Sequence[float] | None) -> bool:
     """Оси, по которым привязан лист, лежат в габарите этажа модели (с запасом 5 м)."""
     if not bbox or len(bbox) != 4:
@@ -342,18 +333,119 @@ async def load_model_axes(
     return model_axes(raw)
 
 
+_DIGITS: Final = re.compile(r"\d+")
+_STOREY_FLOOR: Final = re.compile(r"^\s*(-?\d+)\s*этаж", re.IGNORECASE)
+_TITLE_FLOORS: Final = re.compile(r"План\w*\s+((?:-?\d+\s*(?:[,–-]|и)?\s*)+)\s*этаж", re.IGNORECASE)
+_RANGE: Final = re.compile(r"^(-?\d+)\s*[–-]\s*(-?\d+)$")
+# Этаж без номера (техэтаж, кровля, фундамент): лист по отметке паспорта не дальше этого.
+ELEVATION_MATCH_MM: Final = 1500.0
+# Сколько листов этажа читать и подгонять: остальные - хуже по совпадению.
+MAX_CANDIDATES: Final = 8
+CACHE_SECONDS: Final = 600.0
+CACHE_LIMIT: Final = 512
+_cache: dict[tuple[Any, ...], tuple[float, ModelSheetOverlayList]] = {}
+
+
+def building_number(name: str | None) -> str | None:
+    """Номер корпуса из подписи здания («Корпус 5», «5», «Корп. 5»); без номера - None."""
+    if not name:
+        return None
+    found = _DIGITS.search(name)
+    return found.group(0) if found else None
+
+
+def storey_floor(name: str) -> int | None:
+    """Номер этажа из имени этажа модели («17 этаж», «-2 этаж»); техэтаж, кровля - None."""
+    found = _STOREY_FLOOR.match(name)
+    return int(found.group(1)) if found else None
+
+
+def title_floors(title: str | None) -> set[int]:
+    """Этажи из названия листа: «План 5, 9, 13, 16 этажей», «План 5-12 этажей», «План -2 этажа»."""
+    found = _TITLE_FLOORS.search(title or "")
+    if found is None:
+        return set()
+    out: set[int] = set()
+    for part in re.split(r",|\bи\b", found.group(1)):
+        item = part.strip()
+        span = _RANGE.match(item)
+        if span is not None:
+            a, b = int(span.group(1)), int(span.group(2))
+            if 0 < b - a <= 60:
+                out.update(range(a, b + 1))
+        elif re.fullmatch(r"-?\d+", item):
+            out.add(int(item))
+    return out
+
+
+@dataclass(frozen=True, slots=True)
+class SheetMatch:
+    """Лист-кандидат этажа: `rank` 0 - номер этажа в названии листа, 1 - в диапазоне этажей
+    паспорта, 2 - по отметке паспорта (этаж без номера или лист без этажей)."""
+
+    sheet: b3d.SheetRef
+    rank: int
+    distance_mm: float
+
+
+def match_sheets(
+    sheets: Iterable[b3d.SheetRef],
+    *,
+    building_name: str | None,
+    storey_name: str,
+    elevation_mm: float,
+) -> list[SheetMatch]:
+    """Листы плана того же здания, на которых есть этот этаж (по номеру, иначе по отметке)."""
+    wanted_building = building_number(building_name)
+    floor = storey_floor(storey_name)
+    out: list[SheetMatch] = []
+    for sheet in sheets:
+        if sheet.walls_key is None:
+            continue
+        sheet_building = building_number(sheet.passport_building)
+        if wanted_building is not None and sheet_building not in (None, wanted_building):
+            continue
+        if wanted_building is None and sheet_building is not None:
+            continue  # стилобат, подземная часть: листы без номера корпуса
+        distance = (
+            abs(sheet.passport_elevation_mm - elevation_mm)
+            if sheet.passport_elevation_mm is not None
+            else math.inf
+        )
+        explicit = title_floors(sheet.stamp_title)
+        if floor is not None and floor in explicit:
+            rank = 0
+        elif (
+            floor is not None
+            and not explicit
+            and sheet.passport_floor_from is not None
+            and sheet.passport_floor_to is not None
+            and sheet.passport_floor_from <= floor <= sheet.passport_floor_to
+        ):
+            rank = 1
+        elif distance <= ELEVATION_MATCH_MM and not (floor is not None and explicit):
+            rank = 2
+        else:
+            continue
+        out.append(SheetMatch(sheet, rank, distance))
+    out.sort(key=lambda m: (m.rank, m.distance_mm, m.sheet.page_index, m.sheet.view))
+    return out[:MAX_CANDIDATES]
+
+
 def _item(
-    floor: Any, fit: SheetFit | None, reason: str | None, frame_scale: float | None
+    match: SheetMatch, fit: SheetFit | None, reason: str | None, frame_scale: float | None
 ) -> ModelSheetOverlayRead:
+    sheet = match.sheet
+    number = building_number(sheet.passport_building)
     return ModelSheetOverlayRead(
-        revision_id=floor.revision_id,
-        document_id=floor.document_id,
-        job_id=floor.job_id,
-        page_index=floor.page_index,
-        view=floor.view,
-        label=floor.label,
-        group_label=floor.group_label,
-        base_z_mm=floor.base_z_mm,
+        revision_id=sheet.revision_id,
+        document_id=sheet.document_id,
+        job_id=sheet.job_id,
+        page_index=sheet.page_index,
+        view=sheet.view,
+        label=sheet.stamp_title or sheet.label,
+        group_label=f"Корп. {number}" if number else "Корпус не указан",
+        base_z_mm=sheet.passport_elevation_mm,
         status="registered" if fit is not None else "unregistered",
         reason=reason,
         matrix=list(fit.matrix) if fit is not None else None,
@@ -366,6 +458,20 @@ def _item(
     )
 
 
+def _cached(key: tuple[Any, ...]) -> ModelSheetOverlayList | None:
+    hit = _cache.get(key)
+    if hit is None or time.monotonic() - hit[0] > CACHE_SECONDS:
+        return None
+    return hit[1]
+
+
+def _remember(key: tuple[Any, ...], value: ModelSheetOverlayList) -> None:
+    if len(_cache) >= CACHE_LIMIT:
+        for old in sorted(_cache, key=lambda k: _cache[k][0])[: CACHE_LIMIT // 4]:
+            _cache.pop(old, None)
+    _cache[key] = (time.monotonic(), value)
+
+
 async def storey_sheets(
     session: AsyncSession,
     storage: ObjectStorage,
@@ -375,67 +481,71 @@ async def storey_sheets(
     version: BuildingModelVersion,
     storey: ModelStorey,
 ) -> ModelSheetOverlayList:
-    """Листы планов на отметке этажа модели и их привязка к сетке осей версии."""
+    """Листы планов этажа модели (то же здание, тот же этаж) и их привязка к сетке осей версии.
+
+    Листы - из базы (паспорт листа: корпус, этажи, отметка), без сборки «Здания»; читаются
+    и подгоняются только кандидаты этажа. Итог помнится в процессе 10 минут: ключ - версия,
+    этаж и файлы кандидатов (новый расчёт листа - новый ключ).
+    """
+    empty = ModelSheetOverlayList(
+        storey_key=storey.storey_key, elevation_mm=storey.elevation_mm, items=[]
+    )
     axes = await load_model_axes(storage, version)
     if not axes:
-        return ModelSheetOverlayList(
-            storey_key=storey.storey_key,
-            elevation_mm=storey.elevation_mm,
-            items=[],
-            message="В версии модели нет сетки осей: чертёж привязать не к чему.",
+        return empty.model_copy(
+            update={"message": "В версии модели нет сетки осей: чертёж привязать не к чему."}
         )
-    building = await cad_building3d_assembly.build_building3d(
-        session, storage, workspace_id=workspace_id, project_id=project_id, include_walls=False
-    )
     sheets, _warnings, _slab = await b3d.collect_sheets(
         session, workspace_id=workspace_id, project_id=project_id
     )
-    by_address = {(s.job_id, s.page_index, s.view): s for s in sheets}
-    seen: set[tuple[uuid.UUID, int, int]] = set()
-    candidates: list[_Candidate] = []
-    unknown = 0
-    for floor in building.floors:
-        address = (floor.job_id, floor.page_index, floor.view)
-        if address in seen or address not in by_address:
-            continue
-        if not floor.elevation_known:
-            unknown += 1
-            continue
-        if abs(floor.base_z_mm - storey.elevation_mm) > LEVEL_TOLERANCE_MM:
-            continue
-        seen.add(address)
-        candidates.append(_Candidate(floor, by_address[address]))
+    matches = match_sheets(
+        sheets,
+        building_name=getattr(storey, "building_name", None),
+        storey_name=storey.name,
+        elevation_mm=storey.elevation_mm,
+    )
+    if not matches:
+        return empty.model_copy(
+            update={"message": "Листов плана этого этажа среди посчитанных листов CAD нет."}
+        )
+    key = (
+        version.id,
+        storey.storey_key,
+        tuple((m.sheet.walls_key, m.sheet.scale_key, m.sheet.checks_key) for m in matches),
+    )
+    cached = _cached(key)
+    if cached is not None:
+        return cached
     gate = asyncio.Semaphore(b3d.READ_CONCURRENCY)
 
-    async def register(candidate: _Candidate) -> ModelSheetOverlayRead | None:
-        raw, problem = await b3d._read_walls(storage, candidate.sheet, gate)
+    async def register(match: SheetMatch) -> tuple[SheetMatch, ModelSheetOverlayRead] | None:
+        raw, problem = await b3d._read_walls(storage, match.sheet, gate)
         if raw is None:
-            return _item(
-                candidate.floor,
-                None,
-                problem.message if problem else "конструкции вида не читаются",
-                None,
-            )
-        frame, _cacheable = await b3d._read_frame(storage, candidate.sheet, gate)
+            why = problem.message if problem else "конструкции вида не читаются"
+            return match, _item(match, None, why, None)
+        frame, _cacheable = await b3d._read_frame(storage, match.sheet, gate)
         frame_scale = frame.mm_per_pdf_point if frame.confirmed else None
         fit, reason = fit_sheet(sheet_axes(raw), axes, frame_scale)
         if fit is not None and not _overlaps(fit, axes, storey.bbox_mm):
-            return None  # лист другого корпуса на той же отметке
+            return None  # оси листа - другого здания
         if fit is None and not _pairs(sheet_axes(raw), axes):
             return None  # оси листа к этой модели не относятся
-        return _item(candidate.floor, fit, reason, frame_scale)
+        return match, _item(match, fit, reason, frame_scale)
 
-    results = await asyncio.gather(*(register(c) for c in candidates))
-    items = [r for r in results if r is not None]
-    items.sort(key=lambda r: (r.status != "registered", r.rms_mm or 0.0, r.label))
-    message = None
-    if not items:
-        message = "На отметке этажа нет листов плана с осями этой модели."
-        if unknown:
-            message += f" У {unknown} листов отметка не определена."
-    return ModelSheetOverlayList(
+    gathered = await asyncio.gather(*(register(m) for m in matches))
+    results = [r for r in gathered if r is not None]
+    registered = [r for r in results if r[1].status == "registered"]
+    best_rank = min((m.rank for m, _ in (registered or results)), default=0)
+    # лучшие по совпадению этажа; не привязанные - только того же уровня совпадения
+    items = sorted((i for m, i in registered if m.rank == best_rank), key=lambda i: i.rms_mm or 0.0)
+    items += [i for m, i in results if i.status != "registered" and m.rank == best_rank]
+    message = None if items else "Листы этажа есть, но их оси не относятся к сетке этой модели."
+    out = ModelSheetOverlayList(
         storey_key=storey.storey_key, elevation_mm=storey.elevation_mm, items=items, message=message
     )
+    _remember(key, out)
+    log.info("model_sheets", storey=storey.storey_key, candidates=len(matches), **summarize(items))
+    return out
 
 
 def summarize(items: Iterable[ModelSheetOverlayRead]) -> dict[str, int]:

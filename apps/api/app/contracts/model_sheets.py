@@ -24,7 +24,8 @@ class ModelSheetOverlayRead(BaseModel):
     view: int
     label: str
     group_label: str
-    base_z_mm: int
+    # Отметка листа по паспорту, мм; нет в паспорте - `None`.
+    base_z_mm: int | None = None
     status: Literal["registered", "unregistered"]
     reason: str | None = None
     matrix: list[float] | None = Field(default=None, min_length=6, max_length=6)
