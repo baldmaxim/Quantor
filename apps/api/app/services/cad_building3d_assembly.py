@@ -49,8 +49,8 @@ from app.domain import JobStatus, JobType
 from app.models import Job, SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_building3d as b3d
-from app.services import cad_building3d_windows as b3d_windows
 from app.services import (
+    cad_building3d_grid,
     cad_facade_windows,
     cad_project_levels,
     cad_site_cores,
@@ -58,6 +58,7 @@ from app.services import (
     cad_views,
     sheet_passports,
 )
+from app.services import cad_building3d_windows as b3d_windows
 from app.services.cad_floor_title import floors_text, format_floor_title
 from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
@@ -427,7 +428,7 @@ def apply_project_levels(
             own = _own_floor(floors, corps, floor, levels)
             if own is not None:
                 level = levels[(corps, own)]
-                target, why = level.z_mm, f"по схеме КР ({level.ref})"
+                target, why = level.z_mm, f"по {level.source} ({level.ref})"
         if target is not None and (
             not floor.elevation_known or abs(floor.base_z_mm - target) > PROJECT_LEVEL_TOLERANCE_MM
         ):
@@ -523,8 +524,16 @@ class Stack:
     summaries: tuple[int, ...] = ()
 
 
-def build_stack(built: Sequence[b3d.BuiltFloor], pins: Sequence[SitePin] = ()) -> Stack:
-    """Здание из этажей листов: совмещение, дубли, сведение групп, постановка, типовые, высоты."""
+def build_stack(
+    built: Sequence[b3d.BuiltFloor],
+    pins: Sequence[SitePin] = (),
+    grid_version: int | None = None,
+) -> Stack:
+    """Здание из этажей листов: совмещение, дубли, сведение групп, постановка, типовые, высоты.
+
+    `grid_version` - номер утверждённой версии модели, к сетке осей которой подогнаны этажи
+    (`BuiltFloor.grid`): не вставшие на объект здания ставятся по ней (`cad_building3d_grid`).
+    """
     items = list(built)
     kept = list(range(len(items)))
     aligned = b3d.align_floors(items)
@@ -556,6 +565,8 @@ def build_stack(built: Sequence[b3d.BuiltFloor], pins: Sequence[SitePin] = ()) -
         aligned = b3d.align_floors(items)
     site = b3d.place_site_report(items, aligned, pins)
     placements = site.placements
+    if grid_version is not None:
+        placements = cad_building3d_grid.place_by_grid(items, aligned, placements, grid_version)
     lost = unplaced_summaries(placements)
     summaries: tuple[int, ...] = ()
     if lost:
@@ -901,8 +912,14 @@ async def build_building3d(
         )
     )
     # Отметки этажей по паспортам (заголовок листа, схемы КР) - до окон: окна ставятся от базы.
+    # Утверждённая модель здания добавляет отметки этажей, которых в КР нет, и сетку осей.
+    reference = await cad_building3d_grid.load_model_reference(
+        session, storage, workspace_id=workspace_id, project_id=project_id
+    )
     project_levels = await cad_project_levels.load_project_levels(session, project_id=project_id)
-    loaded = apply_project_levels(sheets, loaded, project_levels)
+    loaded = apply_project_levels(
+        sheets, loaded, cad_building3d_grid.merged_levels(project_levels, reference)
+    )
     window_results: list[b3d_windows.FloorWindows | None] = []
     views_failed = False
     if include_walls:
@@ -927,13 +944,17 @@ async def build_building3d(
                 item.cores,
                 item.typical,
                 (sheet.passport_building, sheet.passport_section),
+                None
+                if reference is None
+                else cad_building3d_grid.floor_fit(item.axes, reference.axes),
             )
         )
         sources.append((sheet, item.warnings))
         built_windows.append(window_results[position] if window_results else None)
     # Совмещение, дубли и постановка по ядрам - чистый расчёт на тысячах точек: в потоке.
     pins = await cad_site_pins.active_site_pins(session, project_id=project_id)
-    stack = await asyncio.to_thread(build_stack, built, pins)
+    grid_version = reference.number if reference is not None and reference.axes else None
+    stack = await asyncio.to_thread(build_stack, built, pins, grid_version)
     for index, floor in zip(stack.kept, stack.real, strict=True):
         derived = floor.floor_height_source == "derived_stack"
         warnings.extend(

@@ -35,7 +35,7 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -69,6 +69,9 @@ from app.services.cad_floor_title import floors_text, format_floor_title
 from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
+
+if TYPE_CHECKING:
+    from app.services.cad_building3d_grid import GridFit
 
 MAX_OUTLINE_POINTS: Final = 200
 # Контуры конструкций (`walls=true`): предел числа на этаж и точек в кольце.
@@ -882,6 +885,8 @@ class BuiltFloor:
     typical: TypicalPlan | None = None
     # Корпус и секция паспорта листа: подсказка при сведении групп одного корпуса.
     hint: tuple[str | None, str | None] = (None, None)
+    # Вид этажа → сетка осей утверждённой модели (`cad_building3d_grid`); модели нет - `None`.
+    grid: GridFit | None = None
 
 
 def _agreed(diffs: dict[str, float]) -> tuple[list[str], int]:

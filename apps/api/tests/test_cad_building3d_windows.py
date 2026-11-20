@@ -20,9 +20,9 @@ from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
 from app.contracts.cad_floor3d import WallsFloorExtras
 from app.services import cad_building3d as b3d
 from app.services import cad_building3d_assembly as assembly
+from app.services import cad_building3d_grid, cad_project_levels, cad_site_pins
 from app.services import cad_building3d_windows as windows
 from app.services import cad_facade_windows as fw
-from app.services import cad_project_levels, cad_site_pins
 from app.services.cad_constructions import ProjectSlab
 from tests.conftest import FakeObjectStorage
 from tests.test_cad_facade_windows import FACADE_OK, view
@@ -293,6 +293,7 @@ def _serve(monkeypatch: pytest.MonkeyPatch, sheets: list[b3d.SheetRef], loads: l
     monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
     monkeypatch.setattr(cad_site_pins, "active_site_pins", no_pins)
     monkeypatch.setattr(cad_project_levels, "load_project_levels", no_levels)
+    monkeypatch.setattr(cad_building3d_grid, "load_model_reference", _no_model)
     monkeypatch.setattr(fw, "load_views", load_views)
 
 
@@ -498,3 +499,8 @@ async def test_views_read_failure_empties_windows_of_the_building_but_not_the_an
     assert len(body.floors) == 1 and body.floors[0].windows == []
     assert body.floors[0].walls is not None
     assert _codes(body).count(windows.CODE_VIEWS_FAILED) == 1
+
+
+async def _no_model(*_args: object, **_kwargs: object) -> None:
+    """Утверждённой модели здания нет: сборка как без IFC."""
+    return None

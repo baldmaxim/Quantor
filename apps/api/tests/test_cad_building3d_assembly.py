@@ -16,7 +16,7 @@ from app.domain import JobStatus, JobType
 from app.models import Job
 from app.services import cad_building3d as b3d
 from app.services import cad_building3d_assembly as assembly
-from app.services import cad_project_levels, cad_site_pins
+from app.services import cad_building3d_grid, cad_project_levels, cad_site_pins
 from tests.conftest import FakeObjectStorage
 from tests.test_cad_building3d import axes_block, built, sheet, with_cores
 from tests.test_cad_floor3d import BASE, heights, raw_document, raw_extras
@@ -510,6 +510,7 @@ async def test_response_lists_service_sheets_and_follows_the_stack_height(
     # Ручные привязки корпусов (ADR-0052) читаются из базы: в этом тесте базы нет.
     monkeypatch.setattr(cad_site_pins, "active_site_pins", _no_pins)
     monkeypatch.setattr(cad_project_levels, "load_project_levels", _no_levels)
+    monkeypatch.setattr(cad_building3d_grid, "load_model_reference", _no_model)
     body = await assembly.build_building3d(
         cast(AsyncSession, object()), storage, workspace_id=uuid.uuid4(), project_id=uuid.uuid4()
     )
@@ -571,6 +572,7 @@ async def test_response_lists_unplaced_summary_sheet_as_service_sheet(
     monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
     monkeypatch.setattr(cad_site_pins, "active_site_pins", _no_pins)
     monkeypatch.setattr(cad_project_levels, "load_project_levels", _no_levels)
+    monkeypatch.setattr(cad_building3d_grid, "load_model_reference", _no_model)
     body = await assembly.build_building3d(
         cast(AsyncSession, object()), storage, workspace_id=uuid.uuid4(), project_id=uuid.uuid4()
     )
@@ -638,3 +640,8 @@ def test_review_placement_gets_its_own_warning_and_sure_placement_does_not() -> 
             "Корп. 1: на проверку: посадка по согласию этажей, 2 из 3 этажей",
         )
     ]
+
+
+async def _no_model(*_args: object, **_kwargs: object) -> None:
+    """Утверждённой модели здания нет: сборка как без IFC."""
+    return None
