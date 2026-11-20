@@ -181,7 +181,7 @@ def floor_fit(axes: b3d.FloorAxes, model: Sequence[model_sheets.ModelAxis]) -> G
     Оси вида подаются в `fit_sheet` как «лист» с осью Y вниз (горизонтальные - с минусом) и
     масштабом 1: подобие лист → модель тогда - поворот и сдвиг вида без отражения.
     """
-    if not model or not axes.usable:
+    if not model or not (axes.usable or axes.oblique):
         return None
     sheet = [
         model_sheets.SheetAxis(label, "vertical", float(x)) for label, x in axes.vertical.items()
@@ -189,6 +189,13 @@ def floor_fit(axes: b3d.FloorAxes, model: Sequence[model_sheets.ModelAxis]) -> G
         model_sheets.SheetAxis(label, "horizontal", -float(y))
         for label, y in axes.horizontal.items()
     ]
+    for oblique in axes.oblique:
+        # ось под углом (корпус повёрнут на плане): точка и направление в мм DXF (Y вверх)
+        # переводятся в «лист» с осью Y вниз
+        dx, dy = oblique.direction
+        angle = math.degrees(math.atan2(-dy, dx)) % 180.0
+        point = (float(oblique.point_mm[0]), -float(oblique.point_mm[1]))
+        sheet.append(model_sheets.SheetAxis(oblique.label, "oblique", 0.0, angle, point))
     fit, _reason = model_sheets.fit_sheet(sheet, model, frame_scale=SCALE_FRAME)
     if fit is None:
         return None
@@ -258,9 +265,28 @@ def place_by_grid(
     version_number: int,
 ) -> dict[str, b3d.GroupPlacement]:
     """Здания, не вставшие на объект, - по сетке осей модели; остальные постановки не трогаются."""
+    return place_and_align_by_grid(items, aligned, placements, version_number)[0]
+
+
+def place_and_align_by_grid(
+    items: Sequence[b3d.BuiltFloor],
+    aligned: Sequence[CadBuilding3dFloorRead],
+    placements: dict[str, b3d.GroupPlacement],
+    version_number: int,
+) -> tuple[dict[str, b3d.GroupPlacement], list[CadBuilding3dFloorRead]]:
+    """Постановка по сетке (`place_by_grid`) и этажи, не совмещённые в своей группе.
+
+    Этаж поставленной группы, не совмещённый с эталоном группы по осям (`alignment = none`: общих
+    осей нет, оси одного направления, корпус повёрнут на листе), но подогнанный к сетке модели,
+    ставится по сетке: его положение в системе группы = постановка группы⁻¹ ∘ модель→объект ∘
+    подгонка этажа.
+    Этаж стилобата («Корпус не указан») без совмещения и без подгонки не остаётся в центре основы
+    площадки, а выносится своей группой без постановки - место его неизвестно.
+    """
+    floors = list(aligned)
     fits = [item.grid for item in items]
     if not any(fit is not None for fit in fits):
-        return placements
+        return placements, floors
     samples: list[_Transform] = []
     probes: list[Point] = []
     for fit, floor in zip(fits, aligned, strict=True):
@@ -270,13 +296,14 @@ def place_by_grid(
         samples.append(_model_to_site(fit, _view_to_site(floor, placement)))
         probes.append(fit.apply(0.0, 0.0))
     if len(samples) < GRID_MIN_FLOORS:
-        return placements
+        return placements, floors
     probe = (statistics.median(p[0] for p in probes), statistics.median(p[1] for p in probes))
     agreed = _consensus(samples, probe, GRID_AGREE_DEG, GRID_AGREE_MM)
     if agreed is None or agreed[1] < max(GRID_MIN_FLOORS, (len(samples) + 1) // 2):
         log.info("cad_building3d_grid.no_consensus", floors=len(samples))
-        return placements
+        return placements, floors
     model_to_site = agreed[0]
+    floors = _align_unaligned(items, floors, placements, model_to_site, version_number)
     by_group: dict[str, list[tuple[GridFit, CadBuilding3dFloorRead]]] = {}
     for fit, floor in zip(fits, aligned, strict=True):
         current = placements.get(floor.group_key)
@@ -311,4 +338,53 @@ def place_by_grid(
             None,
             round(transform.rotation_deg % 360.0, 6),
         )
-    return result
+    return result, floors
+
+
+def _align_unaligned(
+    items: Sequence[b3d.BuiltFloor],
+    floors: list[CadBuilding3dFloorRead],
+    placements: dict[str, b3d.GroupPlacement],
+    model_to_site: _Transform,
+    version_number: int,
+) -> list[CadBuilding3dFloorRead]:
+    out = list(floors)
+    for i, (item, floor) in enumerate(zip(items, floors, strict=True)):
+        if floor.alignment != "none":
+            continue
+        placement = placements.get(floor.group_key)
+        if placement is None or placement.placement == "none":
+            continue
+        fit = item.grid
+        if fit is None:
+            if floor.group_key == "none" and placement.placement == "reference":
+                out[i] = floor.model_copy(
+                    update={
+                        "group_key": f"none-free-{floor.page_index}-{floor.view}",
+                        "group_label": f"Корпус не указан · {floor.label}",
+                        "alignment_message": (floor.alignment_message or "")
+                        + "; по сетке осей модели не подогнан - место на объекте неизвестно",
+                    }
+                )
+            continue
+        # вид -> объект по сетке; вид -> группа = постановка⁻¹ ∘ (вид -> объект)
+        site_rotation = model_to_site.rotation_deg + fit.rotation_deg
+        site_origin = model_to_site.apply(fit.apply(0.0, 0.0))
+        p_rot = placement.rotation_deg
+        local = _rotate(
+            (site_origin[0] - placement.offset_mm[0], site_origin[1] - placement.offset_mm[1]),
+            -p_rot,
+        )
+        target_rotation = site_rotation - p_rot
+        delta = target_rotation - floor.rotation_deg
+        rx, ry = _rotate(floor.offset_mm, delta)
+        moved = b3d._rotated(floor, delta, local[0] - rx, local[1] - ry)
+        out[i] = moved.model_copy(
+            update={
+                "alignment": "axes",
+                "alignment_axes": sorted(fit.used),
+                "alignment_message": f"по сетке осей модели здания (версия {version_number}), "
+                f"СКО {fit.rms_mm:.0f} мм",
+            }
+        )
+    return out

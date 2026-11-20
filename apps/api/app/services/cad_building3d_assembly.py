@@ -628,7 +628,9 @@ def build_stack(
     site = b3d.place_site_report(items, aligned, pins)
     placements = site.placements
     if grid_version is not None:
-        placements = cad_building3d_grid.place_by_grid(items, aligned, placements, grid_version)
+        placements, aligned = cad_building3d_grid.place_and_align_by_grid(
+            items, aligned, placements, grid_version
+        )
     lost = unplaced_summaries(placements)
     summaries: tuple[int, ...] = ()
     if lost:

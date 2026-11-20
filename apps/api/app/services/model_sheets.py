@@ -59,11 +59,18 @@ def normalize_label(text: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class SheetAxis:
-    """Ось вида листа: подпись, направление на листе и положение (pt страницы, Y вниз)."""
+    """Ось вида листа: подпись, направление на листе и положение (pt страницы, Y вниз).
+
+    Ось под углом к листу (`oblique`, корпус повёрнут на плане): направление - `angle_deg`
+    (линия на странице, x вправо, y вниз, 0…180), точка на оси - `point_pt`; `pos_pt` тогда не
+    используется.
+    """
 
     label: str
-    orient: str  # vertical (x = pos) | horizontal (y = pos)
+    orient: str  # vertical (x = pos) | horizontal (y = pos) | oblique (angle_deg, point_pt)
     pos_pt: float
+    angle_deg: float | None = None
+    point_pt: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,8 +142,13 @@ def _solve3(m: list[list[float]], v: list[float]) -> tuple[float, float, float] 
 
 
 def _image(axis: SheetAxis, theta: float) -> float:
-    """Направление оси листа в модели при повороте θ: вертикаль листа → θ − 90°, горизонталь → θ."""
-    return theta - 90.0 if axis.orient == "vertical" else theta
+    """Направление оси листа в модели при повороте θ: вертикаль листа → θ − 90°, горизонталь → θ,
+    ось под углом a (y страницы вниз) → θ − a."""
+    if axis.orient == "vertical":
+        return theta - 90.0
+    if axis.orient == "oblique":
+        return theta - (axis.angle_deg or 0.0)
+    return theta
 
 
 def _rows(
@@ -147,12 +159,16 @@ def _rows(
     rows = []
     for axis, model in pairs:
         # образ направления оси листа: вертикаль (0, 1) → R·(0, −1), горизонталь (1, 0) → R·(1, 0)
-        image = theta - 90.0 if axis.orient == "vertical" else theta
-        if _angle_gap(image, model.angle) > PARALLEL_DEG:
+        if _angle_gap(_image(axis, theta), model.angle) > PARALLEL_DEG:
             continue
         nx, ny = model.normal
         if axis.orient == "vertical":  # точка (pos, 0) → s·pos·(c, s) + t
             k = axis.pos_pt * (nx * c + ny * s)
+        elif axis.orient == "oblique":  # точка (x, y) → s·(c·x + s·y, s·x − c·y) + t
+            if axis.point_pt is None:
+                continue
+            px, py = axis.point_pt
+            k = nx * (c * px + s * py) + ny * (s * px - c * py)
         else:  # точка (0, pos) → s·pos·(s, −c) + t
             k = axis.pos_pt * (nx * s - ny * c)
         rows.append(([k, nx, ny], nx * model.p0[0] + ny * model.p0[1]))
@@ -183,13 +199,39 @@ def _pairs(
 def _candidate_angles(pairs: Sequence[tuple[SheetAxis, ModelAxis]]) -> list[float]:
     raw = []
     for axis, model in pairs:
-        base = model.angle + (90.0 if axis.orient == "vertical" else 0.0)
+        if axis.orient == "vertical":
+            base = model.angle + 90.0
+        elif axis.orient == "oblique":
+            base = model.angle + (axis.angle_deg or 0.0)
+        else:
+            base = model.angle
         raw += [base % 360.0, (base + 180.0) % 360.0]
     out: list[float] = []
     for angle in sorted(raw):
         if not out or abs(angle - out[-1]) > 0.2:
             out.append(angle)
     return out
+
+
+def _direction_key(axis: SheetAxis) -> str:
+    """Направление оси на листе: вертикаль, горизонталь или семья осей под углом (до градуса)."""
+    if axis.orient == "oblique":
+        return f"oblique:{round((axis.angle_deg or 0.0) % 180.0) % 180}"
+    return axis.orient
+
+
+def _direction_counts(pairs: Sequence[tuple[SheetAxis, ModelAxis]]) -> dict[str, int]:
+    """Сколько разных подписей в каждом направлении листа."""
+    labels: dict[str, set[str]] = {}
+    for axis, _model in pairs:
+        labels.setdefault(_direction_key(axis), set()).add(normalize_label(axis.label))
+    return {key: len(value) for key, value in labels.items()}
+
+
+def _enough_directions(pairs: Sequence[tuple[SheetAxis, ModelAxis]]) -> bool:
+    """Подгонке нужны не меньше двух подписей минимум в двух направлениях листа."""
+    counts = sorted(_direction_counts(pairs).values(), reverse=True)
+    return len(counts) >= 2 and counts[1] >= MIN_PER_DIRECTION
 
 
 def fit_sheet(
@@ -220,8 +262,7 @@ def fit_sheet(
                 break
             drop = kept[res.index(worst)]
             rest = [p for p in kept if p is not drop]
-            n_v = sum(1 for a, _ in rest if a.orient == "vertical")
-            if n_v < MIN_PER_DIRECTION or len(rest) - n_v < MIN_PER_DIRECTION:
+            if not _enough_directions(rest):
                 break
             kept = rest
     if best is None:
@@ -232,6 +273,7 @@ def fit_sheet(
     n_v = len({normalize_label(a.label) for a, _ in used if a.orient == "vertical"})
     n_h = len({normalize_label(a.label) for a, _ in used if a.orient == "horizontal"})
     used_labels = {normalize_label(a.label) for a, _ in used}
+    counts = sorted(_direction_counts(used).values(), reverse=True)
     rejected = tuple(
         sorted({a.label for a, _ in pairs if normalize_label(a.label) not in used_labels})
     )
@@ -246,9 +288,10 @@ def fit_sheet(
         n_horizontal=n_h,
         rejected=rejected,
     )
-    if n_v < MIN_PER_DIRECTION or n_h < MIN_PER_DIRECTION:
+    if len(counts) < 2 or counts[1] < MIN_PER_DIRECTION:
+        first, second = ([*counts, 0, 0])[:2]
         return None, (
-            f"совпало осей: {n_v} одного направления и {n_h} другого; нужно не меньше "
+            f"совпало осей: {first} одного направления и {second} другого; нужно не меньше "
             f"{MIN_PER_DIRECTION} каждого"
         )
     if fit.rms_mm > MAX_RMS_MM or fit.max_mm > MAX_RESIDUAL_MM:
@@ -282,6 +325,18 @@ def sheet_axes(raw_walls: Any) -> list[SheetAxis]:
             and math.isfinite(pos)
         ):
             out.append(SheetAxis(label.strip(), str(orient), float(pos)))
+        elif isinstance(label, str) and label.strip() and orient == "oblique":
+            angle, point = item.get("angle_deg"), item.get("point_pt")
+            if (
+                isinstance(angle, int | float)
+                and not isinstance(angle, bool)
+                and math.isfinite(angle)
+                and isinstance(point, list)
+                and len(point) == 2
+                and all(isinstance(v, int | float) and math.isfinite(v) for v in point)
+            ):
+                point_pt = (float(point[0]), float(point[1]))
+                out.append(SheetAxis(label.strip(), "oblique", 0.0, float(angle) % 180.0, point_pt))
     return out
 
 

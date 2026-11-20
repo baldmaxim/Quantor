@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import math
 import uuid
 from types import SimpleNamespace
 
@@ -151,3 +152,59 @@ def test_model_levels_by_corps_and_floor() -> None:
     assert merged[("12", -1)].z_mm == -3300
     assert grid.merged_levels(kr, None) is kr
     assert cad_project_levels.ProjectLevel(1, "x").source == "схеме КР"
+
+
+def test_floor_fit_takes_oblique_axes() -> None:
+    """Корпус повёрнут на плане (стилобат ЖД4): вертикалей и горизонталей нет, оси под углом."""
+    model = _model()
+    # вид = модель корпуса 1, повёрнутая на 7° вокруг начала и сдвинутая; оси вида - под углом
+    th = math.radians(7.0)
+    c, s = math.cos(th), math.sin(th)
+
+    def to_view(p: tuple[float, float]) -> tuple[float, float]:
+        x, y = p[0] - 500.0, p[1] - 700.0
+        return (c * x + s * y, -s * x + c * y)
+
+    oblique = []
+    for m in model:
+        if not m.tag.startswith("1/"):
+            continue
+        a, b = to_view(m.p0), to_view(m.p1)
+        length = math.dist(a, b)
+        oblique.append(b3d.ObliqueAxis(m.tag, a, ((b[0] - a[0]) / length, (b[1] - a[1]) / length)))
+    axes = b3d.FloorAxes({}, {}, "найдены только оси под углом", tuple(oblique))
+    fit = grid.floor_fit(axes, model)
+    assert fit is not None
+    assert fit.rotation_deg % 360 == pytest.approx(7.0, abs=1e-3)
+    back = fit.apply(*to_view((1500.0, 2700.0)))
+    assert back == pytest.approx((1500.0, 2700.0), abs=1.0)
+
+
+def test_unaligned_floor_of_a_placed_group_is_put_by_the_grid() -> None:
+    items = [_floor("1", i, K1_VIEW_V, K1_VIEW_H) for i in range(3)]
+    aligned = b3d.align_floors(items)
+    key = aligned[0].group_key
+    reference = b3d.GroupPlacement("reference", (0.0, 0.0), (), None, None)
+    placements = {key: reference}
+    right = aligned[2]
+    wrong = b3d._shifted(right, 5000.0, -3000.0).model_copy(update={"alignment": "none"})
+    floors = [aligned[0], aligned[1], wrong]
+    out_placements, out = grid.place_and_align_by_grid(items, floors, placements, 8)
+    assert out_placements[key] is reference
+    assert out[2].alignment == "axes"
+    assert "версия 8" in (out[2].alignment_message or "")
+    assert out[2].offset_mm == pytest.approx(right.offset_mm, abs=1.0)
+    assert out[0] is aligned[0]
+
+
+def test_unaligned_stylobate_floor_without_fit_gets_its_own_group() -> None:
+    items = [_floor("1", i, K1_VIEW_V, K1_VIEW_H) for i in range(3)]
+    stray = dataclasses.replace(built(corps=None, section=None, order=3), grid=None)
+    items.append(stray)
+    aligned = [f.model_copy(update={"group_key": "none"}) for f in b3d.align_floors(items)]
+    aligned[3] = aligned[3].model_copy(update={"alignment": "none"})
+    placements = {"none": b3d.GroupPlacement("reference", (0.0, 0.0), (), None, None)}
+    _placements, out = grid.place_and_align_by_grid(items, aligned, placements, 8)
+    assert out[3].group_key.startswith("none-free-")
+    assert out[3].group_label.startswith("Корпус не указан · ")
+    assert all(f.group_key == "none" for f in out[:3])
