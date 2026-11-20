@@ -61,6 +61,10 @@ class Permission(StrEnum):
     TAKEOFF_READ = "takeoff.read"
     TAKEOFF_EDIT = "takeoff.edit"
     TAKEOFF_VERIFY = "takeoff.verify"
+    # Калибровка масштаба листа по подписанному на чертеже размеру - вход разбора листа (CAD) и
+    # обмера. Отдельно от `takeoff.edit`: агенту с областью `upload` она нужна, чтобы лист, у
+    # которого движок не подтвердил масштаб сам, прошёл CAD; вносить и менять обмер агенту нельзя.
+    SCALE_CALIBRATE = "scale.calibrate"
 
     # Расчётный контур (ADR-0030). `verify` отдельно от `edit` по той же причине, что у
     # обмера: подтвердить факт или решить конфликт источников — ответственность за число,
@@ -113,6 +117,7 @@ _ENGINEER: Final[frozenset[Permission]] = _REVIEWER | {
     Permission.PROJECT_UPDATE,
     Permission.DOCUMENT_UPLOAD,
     Permission.TAKEOFF_EDIT,
+    Permission.SCALE_CALIBRATE,
     Permission.CALC_EDIT,
     Permission.TENDER_CALC_UPLOAD,
 }
@@ -187,9 +192,10 @@ READ_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
 
 # Область `upload`: чтение и загрузка документов (новые ревизии, IFC), а с ней всё, что на портале
 # закрыто тем же правом: построение модели здания из IFC, задания разбора чертежей. Как у человека с
-# этой ролью, но без создания проектов, расчёта, выпуска базы и токенов.
+# этой ролью, но без создания проектов, расчёта, выпуска базы и токенов. Калибровка масштаба листа -
+# тоже вход разбора чертежа (лист без подтверждённого масштаба иначе не проходит CAD); обмер - нет.
 UPLOAD_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = READ_TOKEN_PERMISSIONS | frozenset(
-    {Permission.DOCUMENT_UPLOAD}
+    {Permission.DOCUMENT_UPLOAD, Permission.SCALE_CALIBRATE}
 )
 
 

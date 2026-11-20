@@ -331,6 +331,9 @@ async def test_scopes_union_within_the_owner_role() -> None:
     assert Permission.DOCUMENT_UPLOAD not in read and Permission.TENDER_CALC_UPLOAD not in read
     upload = permissions_for_scopes(Role.ENGINEER, ["upload"])
     assert Permission.DOCUMENT_UPLOAD in upload and Permission.TENDER_CALC_UPLOAD not in upload
+    # калибровка масштаба листа - да (вход CAD), обмер - нет
+    assert Permission.SCALE_CALIBRATE in upload and Permission.TAKEOFF_EDIT not in upload
+    assert Permission.SCALE_CALIBRATE not in read
     read_tender = permissions_for_scopes(Role.ENGINEER, ["read", "tender"])
     assert Permission.TENDER_CALC_UPLOAD in read_tender
     assert permissions_for_scopes(Role.ENGINEER, ["admin"]) == frozenset()

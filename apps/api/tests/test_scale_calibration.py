@@ -16,6 +16,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.permissions import Permission, permissions_for
 from app.domain import (
     DocumentKind,
     GeometryStatus,
@@ -483,6 +484,8 @@ class TestApiAndPermissions:
 
         assert created.status_code == 403
         assert listed.status_code == 200
+        assert Permission.SCALE_CALIBRATE not in permissions_for(Role.VIEWER)
+        assert Permission.SCALE_CALIBRATE in permissions_for(Role.ENGINEER)
 
     async def test_reviewer_verifies_but_does_not_create(
         self,
