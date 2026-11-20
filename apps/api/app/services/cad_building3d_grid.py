@@ -341,6 +341,27 @@ def place_and_align_by_grid(
     return result, floors
 
 
+def split_unaligned_unnamed(
+    items: Sequence[b3d.BuiltFloor], floors: Sequence[CadBuilding3dFloorRead]
+) -> list[CadBuilding3dFloorRead]:
+    """Этаж «Корпус не указан» (основа площадки), не совмещённый с эталоном и не подогнанный к сетке
+    модели, - своей группой: в центре основы ему не место, а ручная привязка листа (ADR-0052)
+    группе из одного этажа применяется. Вызывается до постановки зданий на объект."""
+    out = list(floors)
+    for i, (item, floor) in enumerate(zip(items, floors, strict=True)):
+        if floor.group_key != "none" or floor.alignment != "none" or item.grid is not None:
+            continue
+        out[i] = floor.model_copy(
+            update={
+                "group_key": f"none-free-{floor.page_index}-{floor.view}",
+                "group_label": f"Корпус не указан · {floor.label}",
+                "alignment_message": (floor.alignment_message or "")
+                + "; по сетке осей модели не подогнан - место на объекте неизвестно",
+            }
+        )
+    return out
+
+
 def _align_unaligned(
     items: Sequence[b3d.BuiltFloor],
     floors: list[CadBuilding3dFloorRead],
@@ -357,15 +378,6 @@ def _align_unaligned(
             continue
         fit = item.grid
         if fit is None:
-            if floor.group_key == "none" and placement.placement == "reference":
-                out[i] = floor.model_copy(
-                    update={
-                        "group_key": f"none-free-{floor.page_index}-{floor.view}",
-                        "group_label": f"Корпус не указан · {floor.label}",
-                        "alignment_message": (floor.alignment_message or "")
-                        + "; по сетке осей модели не подогнан - место на объекте неизвестно",
-                    }
-                )
             continue
         # вид -> объект по сетке; вид -> группа = постановка⁻¹ ∘ (вид -> объект)
         site_rotation = model_to_site.rotation_deg + fit.rotation_deg

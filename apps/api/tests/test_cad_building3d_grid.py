@@ -204,7 +204,9 @@ def test_unaligned_stylobate_floor_without_fit_gets_its_own_group() -> None:
     aligned = [f.model_copy(update={"group_key": "none"}) for f in b3d.align_floors(items)]
     aligned[3] = aligned[3].model_copy(update={"alignment": "none"})
     placements = {"none": b3d.GroupPlacement("reference", (0.0, 0.0), (), None, None)}
-    _placements, out = grid.place_and_align_by_grid(items, aligned, placements, 8)
+    out = grid.split_unaligned_unnamed(items, aligned)
+    _placements, out2 = grid.place_and_align_by_grid(items, aligned, placements, 8)
+    assert out2[3].group_key == "none"  # постановка по сетке этаж без подгонки не трогает
     assert out[3].group_key.startswith("none-free-")
     assert out[3].group_label.startswith("Корпус не указан · ")
     assert all(f.group_key == "none" for f in out[:3])

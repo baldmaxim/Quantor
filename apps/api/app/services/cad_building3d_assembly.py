@@ -625,6 +625,8 @@ def build_stack(
     if superseded or merged:
         aligned = b3d.align_floors(items)
     aligned, fragments = drop_fragments(aligned)
+    if grid_version is not None:
+        aligned = cad_building3d_grid.split_unaligned_unnamed(items, aligned)
     site = b3d.place_site_report(items, aligned, pins)
     placements = site.placements
     if grid_version is not None:
