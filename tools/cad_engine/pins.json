@@ -3,15 +3,15 @@
   "runner_version": "0.1.0",
   "engine": {
     "name": "quantor-cad-legacy-ar",
-    "version": "2026.11.18+f0c7f14eb2cb",
-    "archive_name": "Quantor_CAD_source_2026.11.18_f0c7f14eb2cb.zip",
+    "version": "2026.11.20+d2f465661bb9",
+    "archive_name": "Quantor_CAD_source_2026.11.20_d2f465661bb9.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "5217107e19c85ef360691687ed3d6bc24b9e6f06",
-    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.18_f0c7f14eb2cb.zip",
-    "archive_sha256": "8e2e049e15f6444819d10e60a02090b07d1f023a571474a4048d1319a438c0d5",
-    "manifest_sha256": "32ccc6f6ae4fee4b80f688d67adb94994b4416680a6a6413bcbcfe42527ed380",
-    "source_snapshot_sha256": "f0c7f14eb2cba779f8524f76e1df2097034e1e3a94542468511d1a34e0a84e42",
-    "archive_entries": 251,
+    "repo_ref": "c91c3779d919e73b617e38bae8c3bc503ac02415",
+    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.20_d2f465661bb9.zip",
+    "archive_sha256": "b3e3b5297715017bfbb63444969d30a5f26fc4181803173a8d3a06acda308f76",
+    "manifest_sha256": "384f42fbfa044e49e6dcef6f914e902fcac86001fa4af15f462159bb2ad00708",
+    "source_snapshot_sha256": "d2f465661bb9b4fdcbc2d260340decb6fcc6d0416952b757d3127027c2d8e48d",
+    "archive_entries": 255,
     "max_unpacked_bytes": 4194304,
     "worker": "АР_Обработка/90_Пайплайн/pdf_job_monitor/worker.py",
     "intake": "АР_Обработка/90_Пайплайн/pdf_job_monitor"
@@ -36,10 +36,10 @@
       "params_canonical_sha256": "e2768297dea49c84496e7dd188775c98df18f358feee7221f9761009e6626d6d"
     },
     "cad_walls": {
-      "generator_version": "cad_walls.v1.24",
+      "generator_version": "cad_walls.v1.25",
       "params_path": "generators/cad_walls/params/v1.json",
-      "params_sha256": "127dae270f8a53e02b74f295466588c1f6a401b0d408208b14b15e47fe2e00df",
-      "params_canonical_sha256": "82b3778559414514813eca4b7d6b7f10cda89715d85a00f2af08656c1ea954ad",
+      "params_sha256": "7255ddfae68ac14abf854f2153fc429a131659744aabea9ec8e81857cf9ea53a",
+      "params_canonical_sha256": "0cee2b3152b6ea8239d5455cba2a24c5138abf6c4c8785c456ea58b80bf4684b",
       "floor3d_dxf_version": "cad_floor3d_dxf.v2"
     },
     "cad_eom": {

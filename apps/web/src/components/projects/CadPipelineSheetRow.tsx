@@ -159,7 +159,7 @@ export const CadPipelineSheetRow: FC<ICadPipelineSheetRowProps> = ({
         <ButtonLink
           href={href}
           compact
-          variant="ghost"
+          variant="primary"
           aria-label={`Открыть ${name} в CAD`}
           transitionTypes={['nav-forward']}
           className="flex-none"

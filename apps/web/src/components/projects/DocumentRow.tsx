@@ -137,7 +137,7 @@ export const DocumentRow: FC<IDocumentRowProps> = ({
         <ButtonLink
           href={href}
           compact
-          variant="ghost"
+          variant="primary"
           aria-label={`Открыть ${document.display_name}`}
           className="relative z-10 flex-none"
         >

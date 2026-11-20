@@ -25,6 +25,7 @@ import contextlib
 import dataclasses
 import math
 import re
+import statistics
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -76,6 +77,11 @@ MERGE_MIN_AXES: Final = 8
 MERGE_MIN_SHARE: Final = 0.8
 # Марка с номером секции («3.1», «1/2.4», «12-14.Г») одна на весь объект.
 MERGE_PREFIXED_LABEL: Final = re.compile(r"\d{1,2}(?:[/\-]\d{1,2})?[.\-]")
+# Фрагмент плана рядом с планом этажа на листе корпуса («Фрагмент плана 6-14 этажей», объект 346):
+# стены целиком дальше этого от пятна корпуса (медиана габаритов его этажей) - не этаж.
+FRAGMENT_MARGIN_MM: Final = 8000
+# Отбрасывается только меньшинство стен этажа: большее - не фрагмент, а сдвинутый этаж.
+FRAGMENT_MAX_SHARE: Final = 0.4
 # Высота этажа по стопке: разность отметок до следующего этажа здания в этих пределах, мм.
 STACK_HEIGHT_MIN_MM: Final = 2000
 STACK_HEIGHT_MAX_MM: Final = 6000
@@ -522,6 +528,61 @@ class Stack:
     # Ручные привязки корпусов к площадке (ADR-0052), которые не применены, с причиной.
     ignored_pins: tuple[b3d.PinIgnored, ...] = ()
     summaries: tuple[int, ...] = ()
+    # Этажи, у которых отброшен фрагмент плана вне пятна корпуса: подпись этажа и число стен.
+    fragments: tuple[tuple[str, int], ...] = ()
+
+
+def _box_of(shell: Sequence[Sequence[int]]) -> tuple[float, float, float, float]:
+    xs = [p[0] for p in shell]
+    ys = [p[1] for p in shell]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def drop_fragments(
+    floors: Sequence[CadBuilding3dFloorRead],
+) -> tuple[list[CadBuilding3dFloorRead], list[tuple[str, int]]]:
+    """Стены этажа корпуса целиком вне пятна корпуса - фрагмент плана на том же листе, не этаж.
+
+    Пятно - медиана габаритов этажей группы (в системе группы, до постановки) с запасом
+    `FRAGMENT_MARGIN_MM`: фрагменты есть на немногих листах и медиану не сдвигают, выходы на
+    кровлю и террасы лежат внутри. Только группы корпусов (ключ «k…»), этажи со стенами, и только
+    если отброшенных стен меньше `FRAGMENT_MAX_SHARE` - иначе сдвинут весь этаж, и это не фрагмент.
+    """
+    by_group: dict[str, list[int]] = {}
+    for i, floor in enumerate(floors):
+        if floor.group_key.startswith("k") and floor.walls and floor.bbox:
+            by_group.setdefault(floor.group_key, []).append(i)
+    out = list(floors)
+    notes: list[tuple[str, int]] = []
+    for members in by_group.values():
+        if len(members) < 3:
+            continue
+        boxes = [floors[i].bbox for i in members if floors[i].bbox is not None]
+        median = [statistics.median(b[k] for b in boxes if b is not None) for k in range(4)]
+        x0, y0 = median[0] - FRAGMENT_MARGIN_MM, median[1] - FRAGMENT_MARGIN_MM
+        x1, y1 = median[2] + FRAGMENT_MARGIN_MM, median[3] + FRAGMENT_MARGIN_MM
+        for i in members:
+            floor = floors[i]
+            walls = floor.walls or []
+            kept = []
+            for wall in walls:
+                bx0, by0, bx1, by1 = _box_of(wall.shell)
+                if bx1 < x0 or bx0 > x1 or by1 < y0 or by0 > y1:
+                    continue
+                kept.append(wall)
+            dropped = len(walls) - len(kept)
+            if not dropped or not kept or dropped > FRAGMENT_MAX_SHARE * len(walls):
+                continue
+            boxes_kept = [_box_of(w.shell) for w in kept]
+            bbox = [
+                min(b[0] for b in boxes_kept),
+                min(b[1] for b in boxes_kept),
+                max(b[2] for b in boxes_kept),
+                max(b[3] for b in boxes_kept),
+            ]
+            out[i] = floor.model_copy(update={"walls": kept, "bbox": bbox})
+            notes.append((floor.label, dropped))
+    return out, notes
 
 
 def build_stack(
@@ -563,6 +624,7 @@ def build_stack(
         items = renamed
     if superseded or merged:
         aligned = b3d.align_floors(items)
+    aligned, fragments = drop_fragments(aligned)
     site = b3d.place_site_report(items, aligned, pins)
     placements = site.placements
     if grid_version is not None:
@@ -602,6 +664,7 @@ def build_stack(
         superseded,
         site.ignored,
         summaries,
+        tuple(fragments),
     )
 
 
@@ -999,6 +1062,14 @@ async def build_building3d(
             )
         )
     warnings.extend(review_warnings(stack.groups))
+    warnings.extend(
+        CadBuilding3dWarningRead(
+            code="floor_fragment_dropped",
+            message=f"{label}: {count} стен вне пятна корпуса (фрагмент плана на том же листе) - "
+            "в 3D не показаны.",
+        )
+        for label, count in stack.fragments
+    )
     warnings.extend(
         CadBuilding3dWarningRead(
             code="site_pin_ignored",
