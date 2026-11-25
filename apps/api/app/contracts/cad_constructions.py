@@ -243,6 +243,21 @@ class WallsSlabBasis(BaseModel):
     basis: str | None = None
 
 
+class CadHintResultRead(BaseModel):
+    """Итог одной подсказки по замечанию (cad_walls v1.26, `hints_applied`)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    type: str
+    status: str = Field(
+        description="applied - применена; no_candidate - кандидата нет; unsupported"
+    )
+    added_ids: list[str] = []
+    removed_ids: list[str] = []
+    reason: str | None = None
+
+
 class WallsDocument(BaseModel):
     """walls.json целиком (схема `quantor.cad_walls.v1`)."""
 
@@ -262,6 +277,8 @@ class WallsDocument(BaseModel):
     checks: WallsChecks
     # Плита листа (cad_walls v1.7): здесь читается только основа контура; нет плиты - `None`.
     slab: WallsSlabBasis | None = None
+    # Итоги подсказок по замечаниям (cad_walls v1.26); нет, если скрипт запускали без `--hints`.
+    hints_applied: list[CadHintResultRead] | None = None
 
 
 # --------------------------------------------------------------------------- данные человека
@@ -653,6 +670,8 @@ class CadConstructionsRead(CadConstructionsTotalsRead):
     constructions: list[CadConstructionRead]
     openings: list[CadOpeningRead]
     warnings: list[CadWallsWarningRead]
+    # Итоги подсказок последнего перестроения по замечаниям; `None` - перестроения не было.
+    hints_applied: list[CadHintResultRead] | None = None
 
 
 class CadWallsJobRead(BaseModel):

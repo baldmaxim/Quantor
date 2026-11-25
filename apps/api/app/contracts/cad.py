@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.contracts.cad_convert_hints import CadHintAppliedRead
 from app.contracts.cad_mep import (
     CadJobType,
     CadMepAttemptRead,
@@ -558,6 +559,8 @@ class CadChecksRead(BaseModel):
     region_approved: bool | None
     all_source_fills_valid: bool | None
     quantity_release_allowed: bool
+    # Отчёт движка по рамкам подсказок; None - преобразование шло без подсказок.
+    hints_applied: list[CadHintAppliedRead] | None = None
 
 
 class CadViewDiagnosticsRead(CadViewMepRead):

@@ -4,6 +4,10 @@ import type { DocumentRevisionRead } from '@quantor/api-client';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useRef, useState, ViewTransition } from 'react';
 
+import { ProjectAiStages } from '@/components/projects/ai-pipeline/ProjectAiStages';
+import { AttentionButton } from '@/components/projects/attention/AttentionButton';
+import { AttentionDialog } from '@/components/projects/attention/AttentionDialog';
+import { useAttentionQueue } from '@/components/projects/attention/useAttentionQueue';
 import { CadQueueCard } from '@/components/projects/CadQueueCard';
 import { DocumentPipelinePanel } from '@/components/projects/DocumentPipelinePanel';
 import { DocumentSections } from '@/components/projects/DocumentSections';
@@ -49,6 +53,7 @@ const ProjectPage = ({ params }: IPageProps) => {
   const project = useProject(projectId);
   const documents = useProjectDocuments(projectId);
   const features = useFeatures();
+  const attention = useAttentionQueue(projectId);
 
   const items = documents.data?.items ?? [];
   const revisions = useProjectRevisions(
@@ -97,6 +102,10 @@ const ProjectPage = ({ params }: IPageProps) => {
         status={status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : null}
         actions={
           <>
+            <AttentionButton
+              count={attention.items.length}
+              onClick={() => attention.setOpen(true)}
+            />
             <Button onClick={() => setUploading(true)}>Загрузить файл</Button>
             {target ? (
               <ButtonLink href={workspaceHref(projectId, target.revision.id)} variant="primary">
@@ -171,6 +180,7 @@ const ProjectPage = ({ params }: IPageProps) => {
             ref={panelRef}
             className="min-w-0 scroll-mt-[var(--s-6)] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:h-full lg:min-h-0 lg:flex-col"
           >
+            {features[CAD_FEATURE] === true && <ProjectAiStages projectId={projectId} />}
             {selected ? (
               <DocumentPipelinePanel
                 key={selected.id}
@@ -204,6 +214,14 @@ const ProjectPage = ({ params }: IPageProps) => {
           )}
         </div>
       </main>
+
+      <AttentionDialog
+        projectId={projectId}
+        open={attention.open}
+        items={attention.items}
+        onClose={() => attention.setOpen(false)}
+        onSnooze={attention.snooze}
+      />
 
       <UploadFilesDialog
         projectId={projectId}

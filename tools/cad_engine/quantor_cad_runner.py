@@ -283,6 +283,54 @@ def _check_style_profile_shape(raw: Any) -> None:
                           "style_profile: объект схемы cad_engine.style_profile.v1")
 
 
+CONVERT_HINTS_SCHEMA = "quantor.cad_convert_hints.v1"
+CONVERT_HINT_TYPES = ("missing_wall", "missing_door")
+MAX_CONVERT_HINTS = 100
+MAX_CONVERT_HINT_ID = 64
+
+
+def _is_finite_number(value: Any) -> bool:
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def _check_convert_hints_shape(raw: Any) -> None:
+    """convert_hints (необязательно): подсказки замечаний; смысл рамок проверяет движок."""
+    if raw is None:
+        return
+
+    def bad(text: str) -> RunnerError:
+        return RunnerError(EXIT_PARAMS, "params_invalid", f"convert_hints: {text}")
+
+    if not isinstance(raw, dict) or raw.get("schema") != CONVERT_HINTS_SCHEMA:
+        raise bad("объект схемы quantor.cad_convert_hints.v1")
+    if set(raw) - {"schema", "page", "hints"}:
+        raise bad("лишние поля")
+    if type(raw.get("page")) is not int or raw["page"] < 1:
+        raise bad("page - номер страницы PDF с 1")
+    hints = raw.get("hints")
+    if not isinstance(hints, list) or not 1 <= len(hints) <= MAX_CONVERT_HINTS:
+        raise bad(f"hints - список из 1..{MAX_CONVERT_HINTS} рамок")
+    seen: set[str] = set()
+    for item in hints:
+        if not isinstance(item, dict) or set(item) - {"id", "type", "bbox_pt", "comment"}:
+            raise bad("рамка - объект с полями id, type, bbox_pt, comment")
+        ident = item.get("id")
+        if (not isinstance(ident, str) or not 0 < len(ident) <= MAX_CONVERT_HINT_ID
+                or ident in seen):
+            raise bad("id - непустая уникальная строка до 64 символов")
+        seen.add(ident)
+        if item.get("type") not in CONVERT_HINT_TYPES:
+            raise bad("type - missing_wall или missing_door")
+        if not isinstance(item.get("comment", ""), str):
+            raise bad("comment - строка")
+        bbox = item.get("bbox_pt")
+        if (not isinstance(bbox, list) or len(bbox) != 4
+                or not all(_is_finite_number(v) for v in bbox)):
+            raise bad("bbox_pt - четыре конечных числа")
+        if not (bbox[0] < bbox[2] and bbox[1] < bbox[3]):
+            raise bad("bbox_pt: x0<x1 и y0<y1")
+
+
 def parse_params(raw: bytes) -> dict[str, Any]:
     """Схема quantor.cad_engine.params.v2: лист и масштаб задаёт человек.
 
@@ -295,7 +343,7 @@ def parse_params(raw: bytes) -> dict[str, Any]:
     if not isinstance(params, dict):
         raise RunnerError(EXIT_PARAMS, "params_invalid", "params.json не объект")
     allowed = {"schema", "mode", "pages", "page_selection", "scales", "finishes", "schedules",
-               "limits", "style_profile"}
+               "limits", "style_profile", "convert_hints"}
     if set(params) - allowed or params.get("schema") != PARAMS_SCHEMA:
         raise RunnerError(EXIT_PARAMS, "params_invalid", "неизвестная схема или поле параметров")
     if params.get("mode") != "architecture":
@@ -310,6 +358,10 @@ def parse_params(raw: bytes) -> dict[str, Any]:
         raise RunnerError(EXIT_PARAMS, "params_invalid", "pages: непустой список индексов с 0")
     scales = _parse_scales(params.get("scales"), pages)
     _check_style_profile_shape(params.get("style_profile"))
+    _check_convert_hints_shape(params.get("convert_hints"))
+    hints = params.get("convert_hints")
+    if hints is not None and hints["page"] - 1 not in pages:
+        raise RunnerError(EXIT_PARAMS, "params_invalid", "convert_hints: страница не входит в pages")
     limits = dict(DEFAULT_LIMITS)
     given = params.get("limits", {})
     if not isinstance(given, dict) or set(given) - set(LIMIT_KEYS):
@@ -339,6 +391,8 @@ def job_document(pages: list[int], params: dict[str, Any]) -> dict[str, Any]:
                            "operator_pages": True, "operator_scales": operator_scales_for_job(params)}
     if params.get("style_profile") is not None:
         job["operator_style_profile"] = params["style_profile"]
+    if params.get("convert_hints") is not None:
+        job["operator_convert_hints"] = params["convert_hints"]
     return job
 
 

@@ -501,6 +501,7 @@ async def read_cad_constructions(
         constructions=result.constructions,
         openings=result.openings,
         warnings=warnings,
+        hints_applied=document.hints_applied,
     )
 
 
@@ -697,6 +698,41 @@ async def recompute_cad_walls(
     sheet = await _sheet(session, context, project_id, job_id, page_index, view)
     job = await cad_walls.schedule_recompute(
         session, storage, parent=sheet.parent, page_index=page_index, view=view, settings=settings
+    )
+    response = CadWallsJobRead(
+        job_id=job.id,
+        parent_job_id=sheet.parent.id,
+        page_index=page_index,
+        view=view,
+        status=job.status,
+        attempt=job.attempt,
+        created_at=job.created_at,
+    )
+    await session.commit()
+    return response
+
+
+@router.post(
+    "/walls/rebuild-by-remarks",
+    response_model=CadWallsJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Перестроить конструкции вида по открытым замечаниям: поставить задание cad_walls",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def rebuild_cad_walls_by_remarks(
+    project_id: uuid.UUID,
+    job_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    session: SessionDep,
+    context: AuthDep,
+    settings: SettingsDep,
+    storage: StorageDep,
+) -> CadWallsJobRead:
+    sheet = await _sheet(session, context, project_id, job_id, page_index, view)
+    walls = await _load_walls(session, storage, sheet)
+    job = await cad_walls.schedule_rebuild_by_remarks(
+        session, storage, walls_job=walls.job, settings=settings
     )
     response = CadWallsJobRead(
         job_id=job.id,

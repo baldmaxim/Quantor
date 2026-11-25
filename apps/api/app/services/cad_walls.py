@@ -9,7 +9,9 @@ cad-worker подпроцессом. Версия скрипта и sha256 па�
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -21,11 +23,12 @@ from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, not_found
-from app.models import Job
+from app.models import CadRemark, Job
 from app.models.sheet_passport import SheetPassport
 from app.services import cad as cad_service
-from app.services import cad_pins, cad_requeue, cad_walls_zones
+from app.services import cad_pins, cad_remarks, cad_requeue, cad_walls_zones
 from app.services import jobs as jobs_service
+from app.services.cad_walls_version import parse_walls_version
 from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectStorage
 
@@ -74,6 +77,53 @@ def load_params(settings: Settings) -> WallsParams:
     )
 
 
+REBUILD_REMARK_TYPES: Final = ("missing_wall", "false_wall", "missing_door")
+# Первая версия cad_walls, принимающая `--hints`.
+HINTS_MIN_VERSION: Final = (1, 26, 0)
+
+
+def _hints_of(payload: dict[str, Any]) -> list[dict[str, object]] | None:
+    raw = payload.get("hints")
+    if not isinstance(raw, list) or not raw:
+        return None
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def hints_sha256(hints: Sequence[dict[str, object]] | None) -> str:
+    """sha256 канонического JSON подсказок; нет подсказок - пустая строка."""
+    if not hints:
+        return ""
+    raw = json.dumps(list(hints), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def hints_from_remarks(remarks: Sequence[CadRemark]) -> list[dict[str, object]]:
+    """Открытые замечания подходящих типов -> подсказки: id = ключ замечания, рамка в pt PDF."""
+    rows = sorted(
+        (r for r in remarks if r.status == "open" and r.type in REBUILD_REMARK_TYPES),
+        key=lambda r: r.remark_key,
+    )
+    return [
+        {
+            "id": r.remark_key,
+            "type": r.type,
+            "bbox_pt": [r.bbox_x0, r.bbox_y0, r.bbox_x1, r.bbox_y1],
+            "construction_ids": [],
+            "comment": r.comment,
+        }
+        for r in rows
+    ]
+
+
+def ensure_hints_supported(generator_version: str) -> None:
+    """Скрипт закреплён версией ниже v1.26 или версия не читается - перестроить нельзя."""
+    parsed = parse_walls_version(generator_version)
+    if parsed is None or parsed < HINTS_MIN_VERSION:
+        raise DomainError(
+            ErrorCode.CAD_ENGINE_UNAVAILABLE, "Движок не поддерживает перестроение по замечаниям"
+        )
+
+
 def idempotency_key(
     parent_id: uuid.UUID,
     *,
@@ -84,22 +134,25 @@ def idempotency_key(
     generator_version: str,
     sequence: int,
     zones_sha256: str = "",
+    hints_sha256: str = "",
 ) -> str:
-    """Тот же вид, параметры, зоны и версия скрипта — то же задание; пересчёт — следующий номер."""
-    digest = hashlib.sha256(
-        "|".join(
-            (
-                str(parent_id),
-                str(parent_attempt),
-                str(page_index),
-                str(view),
-                params_sha256,
-                generator_version,
-                zones_sha256,
-                str(sequence),
-            )
-        ).encode()
-    ).hexdigest()
+    """Тот же вид, параметры, зоны и версия скрипта — то же задание; пересчёт — следующий номер.
+
+    Подсказки по замечаниям входят в ключ только когда они есть: без них ключ прежний.
+    """
+    parts = [
+        str(parent_id),
+        str(parent_attempt),
+        str(page_index),
+        str(view),
+        params_sha256,
+        generator_version,
+        zones_sha256,
+        str(sequence),
+    ]
+    if hints_sha256:
+        parts.append(hints_sha256)
+    digest = hashlib.sha256("|".join(parts).encode()).hexdigest()
     return f"cadwalls:{digest[:48]}"
 
 
@@ -145,6 +198,7 @@ def _walls_payload(
     dxf_sha256: str,
     params: WallsParams,
     zones: cad_walls_zones.ZonesInput,
+    hints: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "revision_id": parent.payload["revision_id"],
@@ -170,6 +224,9 @@ def _walls_payload(
     if zones.frame is not None:
         # кадр вида: знаки отметок плана -> участки плиты (`--frame`, cad_walls v1.15)
         payload["view_frame"] = list(zones.frame)
+    if hints:
+        # замечания проверяющего (`--hints`, v1.26): рамки в pt PDF, в мм их переводит исполнитель
+        payload["hints"] = hints
     return payload
 
 
@@ -183,6 +240,7 @@ async def _enqueue(
     params: WallsParams,
     sequence: int,
     zones: cad_walls_zones.ZonesInput = cad_walls_zones.NO_ZONES,
+    hints: list[dict[str, object]] | None = None,
 ) -> Job:
     attempt = cad_service.result_of(parent).get("attempt")
     return await jobs_service.enqueue(
@@ -199,6 +257,7 @@ async def _enqueue(
             generator_version=params.generator_version,
             sequence=sequence,
             zones_sha256=zones.sha256,
+            hints_sha256=hints_sha256(hints),
         ),
         payload=_walls_payload(
             parent,
@@ -207,6 +266,7 @@ async def _enqueue(
             dxf_sha256=str(dxf["sha256"]),
             params=params,
             zones=zones,
+            hints=hints,
         ),
     )
 
@@ -225,6 +285,7 @@ _INPUT_KEYS: Final = (
     "zones_warning",
     "view_zone",
     "view_frame",
+    "hints",
 )
 
 
@@ -265,6 +326,7 @@ async def requeue_with_current_params(
             generator_version=params.generator_version,
             sequence=len(existing),
             zones_sha256=str(payload.get("zones_sha256") or ""),
+            hints_sha256=hints_sha256(_hints_of(payload)),
         ),
         payload=payload,
     )
@@ -407,6 +469,66 @@ async def schedule_after_auto_zones(
     )
 
 
+async def _schedule(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    *,
+    parent: Job,
+    page_index: int,
+    view: int,
+    settings: Settings,
+    rebuild_by_remarks: bool,
+) -> Job:
+    if parent.job_type is not JobType.CAD_PDF_CONVERT:
+        raise not_found("Задание")
+    await session.refresh(parent, with_for_update=True)
+    if parent.status is not JobStatus.SUCCEEDED or not cad_service.current_result(parent):
+        raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
+    dxf = view_has_dxf(parent, page_index, view)
+    if dxf is None:
+        raise not_found("Вид")
+    params = load_params(settings)
+    hints: list[dict[str, object]] | None = None
+    if rebuild_by_remarks:
+        ensure_hints_supported(params.generator_version)
+        attempt = cad_service.result_of(parent).get("attempt")
+        remarks = await cad_remarks.list_remarks(
+            session,
+            job=parent,
+            attempt=attempt if type(attempt) is int else 0,
+            page_index=page_index,
+            view=view,
+        )
+        hints = hints_from_remarks(remarks)
+        if not hints:
+            raise DomainError(
+                ErrorCode.VALIDATION_FAILED,
+                "Нет открытых замечаний вида типов «Нет стены», «Лишняя стена», «Нет двери»",
+            )
+    existing = await walls_jobs_of_view(session, parent=parent, page_index=page_index, view=view)
+    if any(job.status in _ACTIVE for job in existing):
+        raise DomainError(ErrorCode.CAD_WALLS_BUSY)
+    zones = await cad_walls_zones.prepare(
+        session, storage, parent=parent, page_index=page_index, view=view
+    )
+    if hints and zones.frame is None:
+        raise DomainError(
+            ErrorCode.VALIDATION_FAILED,
+            "Кадр вида не подтверждён: рамки замечаний нельзя перевести в миллиметры",
+        )
+    return await _enqueue(
+        session,
+        parent=parent,
+        page_index=page_index,
+        view=view,
+        dxf=dxf,
+        params=params,
+        sequence=len(existing),
+        zones=zones,
+        hints=hints,
+    )
+
+
 async def schedule_recompute(
     session: AsyncSession,
     storage: ObjectStorage,
@@ -423,27 +545,45 @@ async def schedule_recompute(
     Нельзя, пока задание этого вида в очереди или выполняется (409 `CAD_WALLS_BUSY`). Строка
     родителя берётся под блокировкой: два одновременных нажатия не ставят задание дважды.
     """
-    if parent.job_type is not JobType.CAD_PDF_CONVERT:
-        raise not_found("Задание")
-    await session.refresh(parent, with_for_update=True)
-    if parent.status is not JobStatus.SUCCEEDED or not cad_service.current_result(parent):
-        raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
-    dxf = view_has_dxf(parent, page_index, view)
-    if dxf is None:
-        raise not_found("Вид")
-    existing = await walls_jobs_of_view(session, parent=parent, page_index=page_index, view=view)
-    if any(job.status in _ACTIVE for job in existing):
-        raise DomainError(ErrorCode.CAD_WALLS_BUSY)
-    zones = await cad_walls_zones.prepare(
-        session, storage, parent=parent, page_index=page_index, view=view
-    )
-    return await _enqueue(
+    return await _schedule(
         session,
+        storage,
         parent=parent,
         page_index=page_index,
         view=view,
-        dxf=dxf,
-        params=load_params(settings),
-        sequence=len(existing),
-        zones=zones,
+        settings=settings,
+        rebuild_by_remarks=False,
+    )
+
+
+async def schedule_rebuild_by_remarks(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    *,
+    walls_job: Job,
+    settings: Settings,
+) -> Job:
+    """Перестроение конструкций вида по открытым замечаниям проверяющего (cad_walls v1.26).
+
+    Вид и попытка берутся из задания `cad_walls`: родитель — `parent_job_id`, замечания — его
+    `parent_attempt`, страница и вид. Замечания не меняются и не закрываются. Те же блокировки и
+    отказы, что у пересчёта; нет подходящих замечаний или версия скрипта старше v1.26 - отказ.
+    """
+    payload = walls_job.payload
+    page_index, view = payload.get("page_index"), payload.get("view")
+    try:
+        parent_id = uuid.UUID(str(payload.get("parent_job_id")))
+    except ValueError as error:
+        raise not_found("Задание") from error
+    parent = await session.get(Job, parent_id)
+    if parent is None or type(page_index) is not int or type(view) is not int:
+        raise not_found("Задание")
+    return await _schedule(
+        session,
+        storage,
+        parent=parent,
+        page_index=page_index,
+        view=view,
+        settings=settings,
+        rebuild_by_remarks=True,
     )

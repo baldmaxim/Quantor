@@ -267,6 +267,200 @@ export type AiFinding = {
 };
 
 /**
+ * AiPromptCreate
+ */
+export type AiPromptCreate = {
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Role
+     */
+    role: 'corrector' | 'verifier';
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
+ * AiPromptRead
+ */
+export type AiPromptRead = {
+    /**
+     * Activated At
+     */
+    activated_at: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Role
+     */
+    role: 'corrector' | 'verifier';
+    /**
+     * Status
+     */
+    status: 'draft' | 'active' | 'archived';
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Text Bytes
+     */
+    text_bytes: number;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * AiPromptStats
+ */
+export type AiPromptStats = {
+    /**
+     * Rows
+     */
+    rows: Array<AiPromptStatsRow>;
+};
+
+/**
+ * AiPromptStatsRow
+ *
+ * Итоги прогонов одной версии. Прогоны без версии (до версионирования) не учитываются.
+ */
+export type AiPromptStatsRow = {
+    /**
+     * Cost Avg Usd
+     */
+    cost_avg_usd: number | null;
+    /**
+     * Cost Sum Usd
+     */
+    cost_sum_usd: number | null;
+    /**
+     * Duration Avg Ms
+     */
+    duration_avg_ms: number | null;
+    /**
+     * Findings By Type
+     */
+    findings_by_type: {
+        [key: string]: number;
+    };
+    /**
+     * Findings Total
+     */
+    findings_total: number;
+    /**
+     * Prompt Id
+     */
+    prompt_id: string;
+    /**
+     * Remarks Deleted
+     */
+    remarks_deleted: number;
+    /**
+     * Remarks Open
+     */
+    remarks_open: number;
+    /**
+     * Remarks Resolved
+     */
+    remarks_resolved: number;
+    /**
+     * Role
+     */
+    role: 'corrector' | 'verifier';
+    /**
+     * Runs Failed
+     */
+    runs_failed: number;
+    /**
+     * Runs Succeeded
+     */
+    runs_succeeded: number;
+    /**
+     * Runs Total
+     */
+    runs_total: number;
+    /**
+     * Status
+     */
+    status: 'draft' | 'active' | 'archived';
+    /**
+     * Verdicts
+     */
+    verdicts: {
+        [key: string]: number;
+    };
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * AiPromptSummary
+ *
+ * Версия без текста: список не тащит до 64 КиБ на строку.
+ */
+export type AiPromptSummary = {
+    /**
+     * Activated At
+     */
+    activated_at: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Role
+     */
+    role: 'corrector' | 'verifier';
+    /**
+     * Status
+     */
+    status: 'draft' | 'active' | 'archived';
+    /**
+     * Text Bytes
+     */
+    text_bytes: number;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
  * AiPropSuggestion
  *
  * Предложение правки свойств конструкции: только хранится и показывается, не применяется.
@@ -396,6 +590,14 @@ export type AiReviewResult = {
      */
     prompt_sha256: string;
     /**
+     * Prompt Version
+     */
+    prompt_version?: number | null;
+    /**
+     * Prompt Version Id
+     */
+    prompt_version_id?: string | null;
+    /**
      * Remark Keys
      */
     remark_keys: Array<string>;
@@ -463,6 +665,146 @@ export type AiReviewState = {
 };
 
 /**
+ * AiRunResult
+ */
+export type AiRunResult = {
+    /**
+     * Queued
+     */
+    queued: number;
+    /**
+     * Skipped
+     */
+    skipped: Array<AiRunSkip>;
+};
+
+/**
+ * AiRunSkip
+ */
+export type AiRunSkip = {
+    /**
+     * Document Name
+     */
+    document_name: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * View
+     */
+    view: number | null;
+};
+
+/**
+ * AiSheetStage1
+ */
+export type AiSheetStage1 = {
+    /**
+     * Error Message
+     */
+    error_message?: string | null;
+    /**
+     * State
+     */
+    state: 'not_started' | 'running' | 'ok' | 'attention' | 'failed';
+};
+
+/**
+ * AiSheetStage2
+ */
+export type AiSheetStage2 = {
+    /**
+     * Error Message
+     */
+    error_message?: string | null;
+    /**
+     * Exhausted
+     */
+    exhausted: boolean;
+    /**
+     * Last Findings
+     */
+    last_findings?: number | null;
+    /**
+     * Last Verdict
+     */
+    last_verdict?: 'ready_for_human_review' | 'needs_correction' | 'insufficient_evidence' | null;
+    /**
+     * Rounds Done
+     */
+    rounds_done: number;
+    /**
+     * Rounds Max
+     */
+    rounds_max: number;
+    /**
+     * Running
+     */
+    running?: boolean;
+    /**
+     * State
+     */
+    state: 'not_started' | 'running' | 'ok' | 'attention' | 'failed';
+    /**
+     * Verdict Stale
+     */
+    verdict_stale?: boolean;
+};
+
+/**
+ * AiSheetStage3
+ */
+export type AiSheetStage3 = {
+    /**
+     * Claude Running
+     */
+    claude_running?: boolean;
+    /**
+     * Claude Verdict
+     */
+    claude_verdict?: 'ready_for_human_review' | 'needs_correction' | 'insufficient_evidence' | null;
+    /**
+     * Codex Available
+     */
+    codex_available?: boolean;
+    /**
+     * Codex Running
+     */
+    codex_running?: boolean;
+    /**
+     * Codex Verdict
+     */
+    codex_verdict?: 'ready_for_human_review' | 'needs_correction' | 'insufficient_evidence' | null;
+    /**
+     * Error Message
+     */
+    error_message?: string | null;
+    /**
+     * State
+     */
+    state: 'not_started' | 'running' | 'ok' | 'attention' | 'failed';
+};
+
+/**
+ * AiSheetStage4
+ */
+export type AiSheetStage4 = {
+    /**
+     * Approved
+     */
+    approved: boolean;
+    /**
+     * Open Remarks
+     */
+    open_remarks: number;
+};
+
+/**
  * AiSourceCopy
  */
 export type AiSourceCopy = {
@@ -474,6 +816,54 @@ export type AiSourceCopy = {
      * Sha256
      */
     sha256: string;
+};
+
+/**
+ * AiStageSummary
+ *
+ * Сводка этапа по проекту: `total` - листов (видов), которые могут пройти этап.
+ */
+export type AiStageSummary = {
+    /**
+     * Cost Usd
+     */
+    cost_usd?: number | null;
+    /**
+     * Done
+     */
+    done: number;
+    /**
+     * Duration Ms
+     */
+    duration_ms?: number | null;
+    /**
+     * Failed
+     */
+    failed: number;
+    /**
+     * Needs Human
+     */
+    needs_human: number;
+    /**
+     * Running
+     */
+    running: number;
+    /**
+     * Stage
+     */
+    stage: number;
+    /**
+     * Status
+     */
+    status: 'not_started' | 'running' | 'done' | 'attention';
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Total
+     */
+    total: number;
 };
 
 /**
@@ -1445,6 +1835,10 @@ export type CadChecksRead = {
      */
     gate_block_inserts: number | null;
     /**
+     * Hints Applied
+     */
+    hints_applied?: Array<CadHintAppliedRead> | null;
+    /**
      * Layers
      */
     layers: {
@@ -1859,6 +2253,10 @@ export type CadConstructionsRead = {
      */
     generator: string;
     heights: CadHeightsRead;
+    /**
+     * Hints Applied
+     */
+    hints_applied?: Array<CadHintResultRead> | null;
     /**
      * Job Id
      */
@@ -3365,6 +3763,68 @@ export type CadHeightsRead = {
     wall_height_source: 'observed' | 'derived' | 'assumption' | 'manual' | null;
     window_head: CadLevelValueRead;
     window_sill: CadLevelValueRead;
+};
+
+/**
+ * CadHintAppliedRead
+ *
+ * Строка отчёта движка `hints_applied` по одной рамке (из checks.json вида).
+ */
+export type CadHintAppliedRead = {
+    /**
+     * Added
+     */
+    added?: number | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Type
+     */
+    type: string;
+};
+
+/**
+ * CadHintResultRead
+ *
+ * Итог одной подсказки по замечанию (cad_walls v1.26, `hints_applied`).
+ */
+export type CadHintResultRead = {
+    /**
+     * Added Ids
+     */
+    added_ids?: Array<string>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Removed Ids
+     */
+    removed_ids?: Array<string>;
+    /**
+     * Status
+     *
+     * applied - применена; no_candidate - кандидата нет; unsupported
+     */
+    status: string;
+    /**
+     * Type
+     */
+    type: string;
 };
 
 /**
@@ -16714,6 +17174,18 @@ export type PersonalTokenRead = {
 };
 
 /**
+ * PipelineAutoState
+ *
+ * Включён ли автопайплайн для проекта: от этого зависит окно прямых вопросов человеку.
+ */
+export type PipelineAutoState = {
+    /**
+     * Enabled
+     */
+    enabled: boolean;
+};
+
+/**
  * PlanAlignmentBulkOut
  */
 export type PlanAlignmentBulkOut = {
@@ -17005,6 +17477,86 @@ export type ProfileRef = {
  * ProfileStatus
  */
 export type ProfileStatus = 'synthetic' | 'draft' | 'approved';
+
+/**
+ * ProjectAiPipelineRead
+ */
+export type ProjectAiPipelineRead = {
+    /**
+     * Active
+     */
+    active: boolean;
+    /**
+     * Available
+     */
+    available: boolean;
+    /**
+     * Codex Available
+     */
+    codex_available: boolean;
+    /**
+     * Max Iterations
+     */
+    max_iterations: number;
+    /**
+     * Server Time
+     */
+    server_time: string;
+    /**
+     * Sheets
+     */
+    sheets: Array<ProjectAiSheetRow>;
+    /**
+     * Stages
+     */
+    stages: Array<AiStageSummary>;
+};
+
+/**
+ * ProjectAiSheetRow
+ */
+export type ProjectAiSheetRow = {
+    /**
+     * Convert Job Id
+     */
+    convert_job_id: string | null;
+    /**
+     * Document Name
+     */
+    document_name: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Review Available
+     */
+    review_available: boolean;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Sheet Position
+     */
+    sheet_position: number;
+    /**
+     * Sheet Title
+     */
+    sheet_title: string | null;
+    stage1: AiSheetStage1;
+    stage2?: AiSheetStage2 | null;
+    stage3?: AiSheetStage3 | null;
+    stage4?: AiSheetStage4 | null;
+    /**
+     * View
+     */
+    view: number | null;
+    /**
+     * Walls Job Id
+     */
+    walls_job_id: string | null;
+};
 
 /**
  * ProjectCreate
@@ -20746,6 +21298,203 @@ export type Vertex = {
 };
 
 /**
+ * VorFillExportRead
+ *
+ * Выгруженный файл: копия формы Заказчика с колонками Quantor.
+ */
+export type VorFillExportRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Download Url
+     */
+    download_url: string;
+    /**
+     * File Name
+     */
+    file_name: string;
+    /**
+     * Size
+     */
+    size: number;
+};
+
+/**
+ * VorFillItemRead
+ *
+ * Позиция ВОР, связанная с объектами Quantor, и сравнение количеств.
+ */
+export type VorFillItemRead = {
+    /**
+     * Customer Quantity
+     */
+    customer_quantity: number | null;
+    /**
+     * Difference
+     */
+    difference: number | null;
+    /**
+     * Difference Percent
+     */
+    difference_percent: number | null;
+    /**
+     * Group Keys
+     */
+    group_keys: Array<string>;
+    item: CadVorItemRead;
+    /**
+     * Missing Group Keys
+     */
+    missing_group_keys: Array<string>;
+    /**
+     * Quantor Quantity
+     */
+    quantor_quantity: number | null;
+    /**
+     * Sources
+     */
+    sources: Array<string>;
+    /**
+     * Status
+     */
+    status: 'match' | 'differs' | 'no_quantor' | 'unit_mismatch' | 'no_customer';
+    /**
+     * Unit
+     */
+    unit: 'm3' | 'm2' | 'm' | 'pcs' | null;
+};
+
+/**
+ * VorFillRead
+ */
+export type VorFillRead = {
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Has Vor
+     */
+    has_vor: boolean;
+    /**
+     * Items
+     */
+    items: Array<VorFillItemRead>;
+    /**
+     * Objects
+     */
+    objects: Array<VorObjectRead>;
+    /**
+     * Skipped Sheets
+     */
+    skipped_sheets: Array<string>;
+    /**
+     * Unavailable
+     */
+    unavailable: Array<VorKindUnavailableRead>;
+    /**
+     * Unlinked
+     */
+    unlinked: Array<VorObjectRead>;
+    /**
+     * Warnings
+     */
+    warnings: Array<string>;
+};
+
+/**
+ * VorKindUnavailableRead
+ *
+ * Почему объектов вида нет (или не по всем листам).
+ */
+export type VorKindUnavailableRead = {
+    /**
+     * Kind
+     */
+    kind: 'construction' | 'door' | 'finish';
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
+ * VorObjectRead
+ *
+ * Объект сверки Quantor: группа конструкций, тип двери или слой отделки МОП.
+ */
+export type VorObjectRead = {
+    /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Incomplete
+     */
+    incomplete: boolean;
+    /**
+     * Kind
+     */
+    kind: 'construction' | 'door' | 'finish';
+    /**
+     * Quantities
+     */
+    quantities: Array<VorQuantityRead>;
+    /**
+     * Sources
+     */
+    sources: Array<VorObjectSourceRead>;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * VorObjectSourceRead
+ *
+ * Откуда количество: лист (вид), его задание и примечание (типовые этажи листа).
+ */
+export type VorObjectSourceRead = {
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * VorQuantityRead
+ */
+export type VorQuantityRead = {
+    /**
+     * Unit
+     */
+    unit: 'm3' | 'm2' | 'm' | 'pcs';
+    /**
+     * Value
+     */
+    value: number;
+};
+
+/**
  * WallsHintEvidence
  *
  * Строка условных обозначений, по которой подобран материал.
@@ -20871,6 +21620,141 @@ export type RegisterRequestWritable = {
      */
     password: string;
 };
+
+export type ListAiPromptsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Role
+         *
+         * Роль: corrector или verifier
+         */
+        role?: 'corrector' | 'verifier' | null;
+    };
+    url: '/api/v1/admin/ai-prompts';
+};
+
+export type ListAiPromptsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListAiPromptsError = ListAiPromptsErrors[keyof ListAiPromptsErrors];
+
+export type ListAiPromptsResponses = {
+    /**
+     * Response List Ai Prompts
+     *
+     * Successful Response
+     */
+    200: Array<AiPromptSummary>;
+};
+
+export type ListAiPromptsResponse = ListAiPromptsResponses[keyof ListAiPromptsResponses];
+
+export type CreateAiPromptData = {
+    body: AiPromptCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ai-prompts';
+};
+
+export type CreateAiPromptErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateAiPromptError = CreateAiPromptErrors[keyof CreateAiPromptErrors];
+
+export type CreateAiPromptResponses = {
+    /**
+     * Successful Response
+     */
+    201: AiPromptRead;
+};
+
+export type CreateAiPromptResponse = CreateAiPromptResponses[keyof CreateAiPromptResponses];
+
+export type AiPromptStatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ai-prompts/stats';
+};
+
+export type AiPromptStatsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AiPromptStats;
+};
+
+export type AiPromptStatsResponse = AiPromptStatsResponses[keyof AiPromptStatsResponses];
+
+export type GetAiPromptData = {
+    body?: never;
+    path: {
+        /**
+         * Prompt Id
+         */
+        prompt_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/ai-prompts/{prompt_id}';
+};
+
+export type GetAiPromptErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetAiPromptError = GetAiPromptErrors[keyof GetAiPromptErrors];
+
+export type GetAiPromptResponses = {
+    /**
+     * Successful Response
+     */
+    200: AiPromptRead;
+};
+
+export type GetAiPromptResponse = GetAiPromptResponses[keyof GetAiPromptResponses];
+
+export type ActivateAiPromptData = {
+    body?: never;
+    path: {
+        /**
+         * Prompt Id
+         */
+        prompt_id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/ai-prompts/{prompt_id}/activate';
+};
+
+export type ActivateAiPromptErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ActivateAiPromptError = ActivateAiPromptErrors[keyof ActivateAiPromptErrors];
+
+export type ActivateAiPromptResponses = {
+    /**
+     * Successful Response
+     */
+    200: AiPromptRead;
+};
+
+export type ActivateAiPromptResponse = ActivateAiPromptResponses[keyof ActivateAiPromptResponses];
 
 export type ListAuditEventsData = {
     body?: never;
@@ -24700,6 +25584,70 @@ export type UpdateProjectResponses = {
 
 export type UpdateProjectResponse = UpdateProjectResponses[keyof UpdateProjectResponses];
 
+export type ReadProjectAiPipelineData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/ai-pipeline';
+};
+
+export type ReadProjectAiPipelineErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadProjectAiPipelineError = ReadProjectAiPipelineErrors[keyof ReadProjectAiPipelineErrors];
+
+export type ReadProjectAiPipelineResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectAiPipelineRead;
+};
+
+export type ReadProjectAiPipelineResponse = ReadProjectAiPipelineResponses[keyof ReadProjectAiPipelineResponses];
+
+export type RunProjectAiStageData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Stage
+         */
+        stage: 'review' | 'verify';
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/ai-pipeline/stages/{stage}/run';
+};
+
+export type RunProjectAiStageErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RunProjectAiStageError = RunProjectAiStageErrors[keyof RunProjectAiStageErrors];
+
+export type RunProjectAiStageResponses = {
+    /**
+     * Successful Response
+     */
+    202: AiRunResult;
+};
+
+export type RunProjectAiStageResponse = RunProjectAiStageResponses[keyof RunProjectAiStageResponses];
+
 export type ReadCadBuilding3dData = {
     body?: never;
     path: {
@@ -26487,6 +27435,48 @@ export type RecomputeCadWallsResponses = {
 
 export type RecomputeCadWallsResponse = RecomputeCadWallsResponses[keyof RecomputeCadWallsResponses];
 
+export type RebuildCadWallsByRemarksData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/walls/rebuild-by-remarks';
+};
+
+export type RebuildCadWallsByRemarksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RebuildCadWallsByRemarksError = RebuildCadWallsByRemarksErrors[keyof RebuildCadWallsByRemarksErrors];
+
+export type RebuildCadWallsByRemarksResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadWallsJobRead;
+};
+
+export type RebuildCadWallsByRemarksResponse = RebuildCadWallsByRemarksResponses[keyof RebuildCadWallsByRemarksResponses];
+
 export type ApplyCadWindowLevelsToSectionData = {
     body?: never;
     path: {
@@ -27700,6 +28690,36 @@ export type ReadStoreySheetsResponses = {
 
 export type ReadStoreySheetsResponse = ReadStoreySheetsResponses[keyof ReadStoreySheetsResponses];
 
+export type ReadPipelineAutoData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/pipeline-auto';
+};
+
+export type ReadPipelineAutoErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadPipelineAutoError = ReadPipelineAutoErrors[keyof ReadPipelineAutoErrors];
+
+export type ReadPipelineAutoResponses = {
+    /**
+     * Successful Response
+     */
+    200: PipelineAutoState;
+};
+
+export type ReadPipelineAutoResponse = ReadPipelineAutoResponses[keyof ReadPipelineAutoResponses];
+
 export type GetPlanAlignmentsData = {
     body?: never;
     path: {
@@ -28696,6 +29716,52 @@ export type ReadCadPreviewResponses = {
 };
 
 export type ReadCadPreviewResponse = ReadCadPreviewResponses[keyof ReadCadPreviewResponses];
+
+export type ReconvertCadViewByRemarksData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Revision Id
+         */
+        revision_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+        /**
+         * Page Index
+         */
+        page_index: number;
+        /**
+         * View
+         */
+        view: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/reconvert-by-remarks';
+};
+
+export type ReconvertCadViewByRemarksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReconvertCadViewByRemarksError = ReconvertCadViewByRemarksErrors[keyof ReconvertCadViewByRemarksErrors];
+
+export type ReconvertCadViewByRemarksResponses = {
+    /**
+     * Successful Response
+     */
+    202: CadJobRead;
+};
+
+export type ReconvertCadViewByRemarksResponse = ReconvertCadViewByRemarksResponses[keyof ReconvertCadViewByRemarksResponses];
 
 export type ListSheetPassportsData = {
     body?: never;
@@ -30018,6 +31084,98 @@ export type UploadFileResponses = {
 };
 
 export type UploadFileResponse = UploadFileResponses[keyof UploadFileResponses];
+
+export type ReadVorFillData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/vor/fill';
+};
+
+export type ReadVorFillErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadVorFillError = ReadVorFillErrors[keyof ReadVorFillErrors];
+
+export type ReadVorFillResponses = {
+    /**
+     * Successful Response
+     */
+    200: VorFillRead;
+};
+
+export type ReadVorFillResponse = ReadVorFillResponses[keyof ReadVorFillResponses];
+
+export type ExportVorFillData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/vor/fill/export';
+};
+
+export type ExportVorFillErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ExportVorFillError = ExportVorFillErrors[keyof ExportVorFillErrors];
+
+export type ExportVorFillResponses = {
+    /**
+     * Successful Response
+     */
+    200: VorFillExportRead;
+};
+
+export type ExportVorFillResponse = ExportVorFillResponses[keyof ExportVorFillResponses];
+
+export type DownloadVorFillData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Stamp
+         */
+        stamp: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/vor/fill/files/{stamp}';
+};
+
+export type DownloadVorFillErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadVorFillError = DownloadVorFillErrors[keyof DownloadVorFillErrors];
+
+export type DownloadVorFillResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type ReadRevisionData = {
     body?: never;

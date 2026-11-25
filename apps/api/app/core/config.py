@@ -162,6 +162,8 @@ class Settings(BaseSettings):
     # ИИ-проверка вида (`cad_ai_review`): JSON пилота `AiLoopPilot`; SSH - `cad_review_ssh_config`.
     cad_ai_loop: str = ""
     cad_ai_timeout_seconds: int = Field(default=900, ge=60, le=3600)
+    # Автопайплайн (S0-A): JSON пилота `PipelineAutoPilot`; пусто или невалидно - выключен.
+    pipeline_auto: str = ""
     # ЭОМ и СС этажа (`cad_eom`): как `cad_mep` — скрипт и параметры из каталога генераторов.
     cad_eom_runner: str = ""
     cad_eom_params: str = ""

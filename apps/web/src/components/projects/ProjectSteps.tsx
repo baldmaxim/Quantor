@@ -76,7 +76,7 @@ export const ProjectSteps: FC<IProjectStepsProps> = ({ projectId, current = [] }
             <Link
               key={link.href}
               href={link.href}
-              className="text-muted underline-offset-4 hover:text-text hover:underline"
+              className="text-muted underline-offset-4 hover:text-text hover:underline max-md:inline-flex max-md:min-h-[44px] max-md:items-center"
             >
               {link.label}
             </Link>

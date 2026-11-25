@@ -325,6 +325,8 @@ export const useWorkspaceCad = ({
         : remarkBindingOf(params, diagnostics),
     [routeSelected, routes.params, routes.diagnostics, params, diagnostics],
   );
+  // Конструкции всегда относятся к виду листа, даже когда выбраны трассы.
+  const wallsBinding = useMemo(() => remarkBindingOf(params, diagnostics), [params, diagnostics]);
   const remarks = useWorkspaceCadRemarks({ binding, pageSize, camera, viewportSize, active });
 
   // Открытые замечания показанного вида; пока список не прочитан - `null`, и решения заблокированы.
@@ -381,6 +383,7 @@ export const useWorkspaceCad = ({
       styleState.capture !== null,
     hiddenCategories: visibility.hiddenCategories,
     hiddenLayerNames: visibility.hiddenLayerNames,
+    remarkBinding: wallsBinding,
   });
   // Выбрана конструкция - подложка DXF приглушается, чтобы чужие линии не читались как выделение.
   const dimmed = constructionsState.selection.selectedIds.size > 0;

@@ -49,8 +49,8 @@ from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode, http_error, not_found
 from app.models import CadRemark, DocumentRevision, Job, Project
 from app.services import cad as cad_service
+from app.services import cad_convert_hints, cad_preview_cache, cad_progress, cad_remarks, cad_views
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_preview_cache, cad_progress, cad_remarks, cad_views
 from app.services import jobs as jobs_service
 from app.services import projects as projects_service
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
@@ -164,6 +164,32 @@ async def create_cad_job(
     )
     await session.commit()
     return await job_read(session, job)
+
+
+@router.post(
+    "/{job_id}/views/{page_index}/{view}/reconvert-by-remarks",
+    response_model=CadJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Повторить преобразование страницы с подсказками из открытых замечаний вида (QA)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def reconvert_cad_view_by_remarks(
+    project_id: uuid.UUID,
+    revision_id: uuid.UUID,
+    job_id: uuid.UUID,
+    page_index: int,
+    view: int,
+    session: SessionDep,
+    context: AuthDep,
+    settings: SettingsDep,
+) -> CadJobRead:
+    job = await _job(session, context, project_id, revision_id, job_id)
+    _succeeded_view(job, page_index, view)
+    new_job = await cad_convert_hints.schedule_reconvert_by_remarks(
+        session, job, page_index, view, settings
+    )
+    await session.commit()
+    return await job_read(session, new_job)
 
 
 @router.get(

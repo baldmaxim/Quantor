@@ -27,6 +27,7 @@ from app.models import Job
 from app.services import jobs
 
 DXF = "d" * 64
+PROMPT_ID = uuid.uuid4()
 
 
 def _pilot(**fields: Any) -> AiLoopPilot:
@@ -62,8 +63,10 @@ def _walls(pilot: AiLoopPilot, *, foreign: bool = False) -> Job:
     )
 
 
-def _review(status: JobStatus) -> Job:
-    return Job(id=uuid.uuid4(), status=status, job_type=JobType.CAD_AI_REVIEW, payload={})
+def _review(status: JobStatus, role: str = "corrector") -> Job:
+    return Job(
+        id=uuid.uuid4(), status=status, job_type=JobType.CAD_AI_REVIEW, payload={"role": role}
+    )
 
 
 def _stub_reviews(monkeypatch: pytest.MonkeyPatch, rows: list[Job]) -> AsyncMock:
@@ -226,8 +229,12 @@ async def test_iteration_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     assert queue.call_args.kwargs["idempotency_key"].endswith(":2")
     queue = _stub_reviews(monkeypatch, done)
     with pytest.raises(DomainError, match="лимит кругов"):
-        await enqueue_for_walls(AsyncMock(), _walls(pilot), _settings(pilot), "verifier")
+        await enqueue_for_walls(AsyncMock(), _walls(pilot), _settings(pilot), "corrector")
     queue.assert_not_awaited()
+    # У проверщика свой лимит: исчерпанные круги правщика верификацию не закрывают.
+    queue = _stub_reviews(monkeypatch, done)
+    await enqueue_for_walls(AsyncMock(), _walls(pilot), _settings(pilot), "verifier")
+    assert queue.call_args.kwargs["idempotency_key"].endswith(":1")
 
 
 # ------------------------------------------------------------------ замечания
@@ -314,6 +321,8 @@ async def _run_execute(
         "walls_sha256": "f" * 64,
         "dxf_sha256": DXF,
         "sources": {"vor": "/pilot/vor.md"},
+        "prompt_version_id": str(PROMPT_ID),
+        "prompt_version": 3,
     }
 
     async def prepare(*args: Any) -> dict[str, Any]:
@@ -350,6 +359,7 @@ async def test_execute_stores_report_and_writes_remarks(monkeypatch: pytest.Monk
     assert stored["report"]["verdict"] == "needs_correction"
     assert stored["usage"]["cost_usd"] == 0.5 and stored["role"] == "verifier"
     assert len(stored["remark_keys"]) == 1 and stored["prompt_sha256"] == "b" * 64
+    assert stored["prompt_version_id"] == str(PROMPT_ID) and stored["prompt_version"] == 3
     rows = write.call_args.args[2]
     assert [key for key, _ in rows] == stored["remark_keys"]
     assert rows[0][1].bbox_pt == (44.0, 94.0, 100.0, 100.0)

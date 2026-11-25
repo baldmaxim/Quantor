@@ -503,6 +503,364 @@
         "title": "AiFinding",
         "type": "object"
       },
+      "AiPromptCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "role": {
+            "enum": [
+              "corrector",
+              "verifier"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ],
+        "title": "AiPromptCreate",
+        "type": "object"
+      },
+      "AiPromptRead": {
+        "properties": {
+          "activated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "role": {
+            "enum": [
+              "corrector",
+              "verifier"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "active",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "text_bytes": {
+            "title": "Text Bytes",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "version",
+          "status",
+          "note",
+          "created_by",
+          "created_at",
+          "activated_at",
+          "text_bytes",
+          "text"
+        ],
+        "title": "AiPromptRead",
+        "type": "object"
+      },
+      "AiPromptStats": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AiPromptStatsRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "title": "AiPromptStats",
+        "type": "object"
+      },
+      "AiPromptStatsRow": {
+        "description": "Итоги прогонов одной версии. Прогоны без версии (до версионирования) не учитываются.",
+        "properties": {
+          "cost_avg_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Avg Usd"
+          },
+          "cost_sum_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Sum Usd"
+          },
+          "duration_avg_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Avg Ms"
+          },
+          "findings_by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Findings By Type",
+            "type": "object"
+          },
+          "findings_total": {
+            "title": "Findings Total",
+            "type": "integer"
+          },
+          "prompt_id": {
+            "format": "uuid",
+            "title": "Prompt Id",
+            "type": "string"
+          },
+          "remarks_deleted": {
+            "title": "Remarks Deleted",
+            "type": "integer"
+          },
+          "remarks_open": {
+            "title": "Remarks Open",
+            "type": "integer"
+          },
+          "remarks_resolved": {
+            "title": "Remarks Resolved",
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "corrector",
+              "verifier"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "runs_failed": {
+            "title": "Runs Failed",
+            "type": "integer"
+          },
+          "runs_succeeded": {
+            "title": "Runs Succeeded",
+            "type": "integer"
+          },
+          "runs_total": {
+            "title": "Runs Total",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "active",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verdicts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Verdicts",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prompt_id",
+          "role",
+          "version",
+          "status",
+          "runs_total",
+          "runs_succeeded",
+          "runs_failed",
+          "cost_avg_usd",
+          "cost_sum_usd",
+          "duration_avg_ms",
+          "verdicts",
+          "findings_total",
+          "findings_by_type",
+          "remarks_open",
+          "remarks_resolved",
+          "remarks_deleted"
+        ],
+        "title": "AiPromptStatsRow",
+        "type": "object"
+      },
+      "AiPromptSummary": {
+        "description": "Версия без текста: список не тащит до 64 КиБ на строку.",
+        "properties": {
+          "activated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "role": {
+            "enum": [
+              "corrector",
+              "verifier"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "active",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text_bytes": {
+            "title": "Text Bytes",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "version",
+          "status",
+          "note",
+          "created_by",
+          "created_at",
+          "activated_at",
+          "text_bytes"
+        ],
+        "title": "AiPromptSummary",
+        "type": "object"
+      },
       "AiPropSuggestion": {
         "additionalProperties": false,
         "description": "Предложение правки свойств конструкции: только хранится и показывается, не применяется.",
@@ -730,6 +1088,29 @@
             "title": "Prompt Sha256",
             "type": "string"
           },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          },
+          "prompt_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version Id"
+          },
           "remark_keys": {
             "items": {
               "type": "string"
@@ -852,6 +1233,272 @@
         "title": "AiReviewState",
         "type": "object"
       },
+      "AiRunResult": {
+        "properties": {
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/AiRunSkip"
+            },
+            "title": "Skipped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "queued",
+          "skipped"
+        ],
+        "title": "AiRunResult",
+        "type": "object"
+      },
+      "AiRunSkip": {
+        "properties": {
+          "document_name": {
+            "title": "Document Name",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
+          }
+        },
+        "required": [
+          "page_index",
+          "view",
+          "document_name",
+          "reason"
+        ],
+        "title": "AiRunSkip",
+        "type": "object"
+      },
+      "AiSheetStage1": {
+        "properties": {
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "state": {
+            "enum": [
+              "not_started",
+              "running",
+              "ok",
+              "attention",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "AiSheetStage1",
+        "type": "object"
+      },
+      "AiSheetStage2": {
+        "properties": {
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "exhausted": {
+            "title": "Exhausted",
+            "type": "boolean"
+          },
+          "last_findings": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Findings"
+          },
+          "last_verdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ready_for_human_review",
+                  "needs_correction",
+                  "insufficient_evidence"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Verdict"
+          },
+          "rounds_done": {
+            "title": "Rounds Done",
+            "type": "integer"
+          },
+          "rounds_max": {
+            "title": "Rounds Max",
+            "type": "integer"
+          },
+          "running": {
+            "default": false,
+            "title": "Running",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "not_started",
+              "running",
+              "ok",
+              "attention",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "verdict_stale": {
+            "default": false,
+            "title": "Verdict Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "state",
+          "rounds_done",
+          "rounds_max",
+          "exhausted"
+        ],
+        "title": "AiSheetStage2",
+        "type": "object"
+      },
+      "AiSheetStage3": {
+        "properties": {
+          "claude_running": {
+            "default": false,
+            "title": "Claude Running",
+            "type": "boolean"
+          },
+          "claude_verdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ready_for_human_review",
+                  "needs_correction",
+                  "insufficient_evidence"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claude Verdict"
+          },
+          "codex_available": {
+            "default": false,
+            "title": "Codex Available",
+            "type": "boolean"
+          },
+          "codex_running": {
+            "default": false,
+            "title": "Codex Running",
+            "type": "boolean"
+          },
+          "codex_verdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ready_for_human_review",
+                  "needs_correction",
+                  "insufficient_evidence"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codex Verdict"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "state": {
+            "enum": [
+              "not_started",
+              "running",
+              "ok",
+              "attention",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "AiSheetStage3",
+        "type": "object"
+      },
+      "AiSheetStage4": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "open_remarks": {
+            "title": "Open Remarks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "open_remarks",
+          "approved"
+        ],
+        "title": "AiSheetStage4",
+        "type": "object"
+      },
       "AiSourceCopy": {
         "properties": {
           "filename": {
@@ -868,6 +1515,83 @@
           "sha256"
         ],
         "title": "AiSourceCopy",
+        "type": "object"
+      },
+      "AiStageSummary": {
+        "description": "Сводка этапа по проекту: `total` - листов (видов), которые могут пройти этап.",
+        "properties": {
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "needs_human": {
+            "title": "Needs Human",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "not_started",
+              "running",
+              "done",
+              "attention"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "title",
+          "total",
+          "done",
+          "running",
+          "failed",
+          "needs_human",
+          "status"
+        ],
+        "title": "AiStageSummary",
         "type": "object"
       },
       "AiUsage": {
@@ -2775,6 +3499,20 @@
             ],
             "title": "Gate Block Inserts"
           },
+          "hints_applied": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CadHintAppliedRead"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hints Applied"
+          },
           "layers": {
             "additionalProperties": {
               "type": "integer"
@@ -3722,6 +4460,20 @@
           },
           "heights": {
             "$ref": "#/components/schemas/CadHeightsRead"
+          },
+          "hints_applied": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CadHintResultRead"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hints Applied"
           },
           "job_id": {
             "format": "uuid",
@@ -6961,6 +7713,104 @@
           "message"
         ],
         "title": "CadHeightsRead",
+        "type": "object"
+      },
+      "CadHintAppliedRead": {
+        "description": "Строка отчёта движка `hints_applied` по одной рамке (из checks.json вида).",
+        "properties": {
+          "added": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status"
+        ],
+        "title": "CadHintAppliedRead",
+        "type": "object"
+      },
+      "CadHintResultRead": {
+        "description": "Итог одной подсказки по замечанию (cad_walls v1.26, `hints_applied`).",
+        "properties": {
+          "added_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Added Ids",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "removed_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Removed Ids",
+            "type": "array"
+          },
+          "status": {
+            "description": "applied - применена; no_candidate - кандидата нет; unsupported",
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status"
+        ],
+        "title": "CadHintResultRead",
         "type": "object"
       },
       "CadJobListRead": {
@@ -32909,6 +33759,21 @@
         "title": "PersonalTokenRead",
         "type": "object"
       },
+      "PipelineAutoState": {
+        "additionalProperties": false,
+        "description": "Включён ли автопайплайн для проекта: от этого зависит окно прямых вопросов человеку.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "PipelineAutoState",
+        "type": "object"
+      },
       "PlanAlignmentBulkOut": {
         "properties": {
           "updated": {
@@ -33549,6 +34414,174 @@
         ],
         "title": "ProfileStatus",
         "type": "string"
+      },
+      "ProjectAiPipelineRead": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "codex_available": {
+            "title": "Codex Available",
+            "type": "boolean"
+          },
+          "max_iterations": {
+            "title": "Max Iterations",
+            "type": "integer"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "sheets": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectAiSheetRow"
+            },
+            "title": "Sheets",
+            "type": "array"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/AiStageSummary"
+            },
+            "title": "Stages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "server_time",
+          "available",
+          "max_iterations",
+          "codex_available",
+          "active",
+          "stages",
+          "sheets"
+        ],
+        "title": "ProjectAiPipelineRead",
+        "type": "object"
+      },
+      "ProjectAiSheetRow": {
+        "properties": {
+          "convert_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Convert Job Id"
+          },
+          "document_name": {
+            "title": "Document Name",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "review_available": {
+            "title": "Review Available",
+            "type": "boolean"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "sheet_position": {
+            "title": "Sheet Position",
+            "type": "integer"
+          },
+          "sheet_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Title"
+          },
+          "stage1": {
+            "$ref": "#/components/schemas/AiSheetStage1"
+          },
+          "stage2": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiSheetStage2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stage3": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiSheetStage3"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stage4": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiSheetStage4"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
+          },
+          "walls_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walls Job Id"
+          }
+        },
+        "required": [
+          "document_name",
+          "revision_id",
+          "page_index",
+          "sheet_position",
+          "sheet_title",
+          "convert_job_id",
+          "view",
+          "walls_job_id",
+          "review_available",
+          "stage1"
+        ],
+        "title": "ProjectAiSheetRow",
+        "type": "object"
       },
       "ProjectCreate": {
         "properties": {
@@ -40583,6 +41616,365 @@
         "title": "Vertex",
         "type": "object"
       },
+      "VorFillExportRead": {
+        "description": "Выгруженный файл: копия формы Заказчика с колонками Quantor.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file_name",
+          "size",
+          "created_at",
+          "download_url"
+        ],
+        "title": "VorFillExportRead",
+        "type": "object"
+      },
+      "VorFillItemRead": {
+        "description": "Позиция ВОР, связанная с объектами Quantor, и сравнение количеств.",
+        "properties": {
+          "customer_quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Quantity"
+          },
+          "difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference"
+          },
+          "difference_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Percent"
+          },
+          "group_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Group Keys",
+            "type": "array"
+          },
+          "item": {
+            "$ref": "#/components/schemas/CadVorItemRead"
+          },
+          "missing_group_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Group Keys",
+            "type": "array"
+          },
+          "quantor_quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantor Quantity"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "match",
+              "differs",
+              "no_quantor",
+              "unit_mismatch",
+              "no_customer"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "m3",
+                  "m2",
+                  "m",
+                  "pcs"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "item",
+          "status",
+          "customer_quantity",
+          "unit",
+          "quantor_quantity",
+          "difference",
+          "difference_percent",
+          "group_keys",
+          "missing_group_keys",
+          "sources"
+        ],
+        "title": "VorFillItemRead",
+        "type": "object"
+      },
+      "VorFillRead": {
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "has_vor": {
+            "title": "Has Vor",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VorFillItemRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "objects": {
+            "items": {
+              "$ref": "#/components/schemas/VorObjectRead"
+            },
+            "title": "Objects",
+            "type": "array"
+          },
+          "skipped_sheets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skipped Sheets",
+            "type": "array"
+          },
+          "unavailable": {
+            "items": {
+              "$ref": "#/components/schemas/VorKindUnavailableRead"
+            },
+            "title": "Unavailable",
+            "type": "array"
+          },
+          "unlinked": {
+            "items": {
+              "$ref": "#/components/schemas/VorObjectRead"
+            },
+            "title": "Unlinked",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document_id",
+          "has_vor",
+          "items",
+          "unlinked",
+          "objects",
+          "unavailable",
+          "warnings",
+          "skipped_sheets"
+        ],
+        "title": "VorFillRead",
+        "type": "object"
+      },
+      "VorKindUnavailableRead": {
+        "description": "Почему объектов вида нет (или не по всем листам).",
+        "properties": {
+          "kind": {
+            "enum": [
+              "construction",
+              "door",
+              "finish"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reason"
+        ],
+        "title": "VorKindUnavailableRead",
+        "type": "object"
+      },
+      "VorObjectRead": {
+        "description": "Объект сверки Quantor: группа конструкций, тип двери или слой отделки МОП.",
+        "properties": {
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "incomplete": {
+            "title": "Incomplete",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "construction",
+              "door",
+              "finish"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "quantities": {
+            "items": {
+              "$ref": "#/components/schemas/VorQuantityRead"
+            },
+            "title": "Quantities",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/VorObjectSourceRead"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_key",
+          "kind",
+          "title",
+          "quantities",
+          "incomplete",
+          "sources"
+        ],
+        "title": "VorObjectRead",
+        "type": "object"
+      },
+      "VorObjectSourceRead": {
+        "description": "Откуда количество: лист (вид), его задание и примечание (типовые этажи листа).",
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "job_id",
+          "page_index",
+          "view",
+          "note"
+        ],
+        "title": "VorObjectSourceRead",
+        "type": "object"
+      },
+      "VorQuantityRead": {
+        "properties": {
+          "unit": {
+            "enum": [
+              "m3",
+              "m2",
+              "m",
+              "pcs"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "unit",
+          "value"
+        ],
+        "title": "VorQuantityRead",
+        "type": "object"
+      },
       "WallsHintEvidence": {
         "description": "Строка условных обозначений, по которой подобран материал.",
         "properties": {
@@ -40724,6 +42116,211 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/ai-prompts": {
+      "get": {
+        "operationId": "list_ai_prompts",
+        "parameters": [
+          {
+            "description": "Роль: corrector или verifier",
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "corrector",
+                    "verifier"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Роль: corrector или verifier",
+              "title": "Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiPromptSummary"
+                  },
+                  "title": "Response List Ai Prompts",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версии промтов ИИ",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "create_ai_prompt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPromptCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPromptRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Новая версия промта (черновик)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ai-prompts/stats": {
+      "get": {
+        "operationId": "ai_prompt_stats",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPromptStats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Статистика прогонов по версиям",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ai-prompts/{prompt_id}": {
+      "get": {
+        "operationId": "get_ai_prompt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "prompt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Prompt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPromptRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версия промта с текстом",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ai-prompts/{prompt_id}/activate": {
+      "post": {
+        "operationId": "activate_ai_prompt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "prompt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Prompt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPromptRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Сделать версию активной",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/audit": {
       "get": {
         "description": "Страница журнала.\n\nПагинация обязательна: журнал растёт всё время работы установки, и выборка «всё»\nздесь означает выборку, которая однажды не вернётся.\n\nАдминистратор платформы видит всю установку; остальные — только своё пространство.",
@@ -47057,6 +48654,105 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/ai-pipeline": {
+      "get": {
+        "operationId": "read_project_ai_pipeline",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAiPipelineRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Этапы ИИ-проверки проекта: сводка и листы",
+        "tags": [
+          "cad-ai-pipeline"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/ai-pipeline/stages/{stage}/run": {
+      "post": {
+        "operationId": "run_project_ai_stage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage",
+            "required": true,
+            "schema": {
+              "enum": [
+                "review",
+                "verify"
+              ],
+              "title": "Stage",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRunResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить этап проверки Claude по всем подходящим видам проекта",
+        "tags": [
+          "cad-ai-pipeline"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/cad/building3d": {
       "get": {
         "operationId": "read_cad_building3d",
@@ -48802,7 +50498,7 @@
             "name": "group_key",
             "required": true,
             "schema": {
-              "pattern": "^(?:masonry|monolith_wall|monolith_pylon|monolith_column|floor_slab)\\|\\d{1,4}(?:\\.\\d{1,3})?\\|[a-z_]{0,40}(?:\\|lintel)?$",
+              "pattern": "^(?:(?:masonry|monolith_wall|monolith_pylon|monolith_column|frame_partition|floor_slab)\\|\\d{1,4}(?:\\.\\d{1,3})?\\|[a-z_]{0,40}(?:\\|lintel)?|door\\|[0-9a-f]{0,10}\\|\\d{1,5}x(?:\\d{1,5}|n)|finish\\|(?:floor|walls|ceiling)\\|[0-9a-f]{10})$",
               "title": "Group Key",
               "type": "string"
             }
@@ -48870,7 +50566,7 @@
             "name": "group_key",
             "required": true,
             "schema": {
-              "pattern": "^(?:masonry|monolith_wall|monolith_pylon|monolith_column|floor_slab)\\|\\d{1,4}(?:\\.\\d{1,3})?\\|[a-z_]{0,40}(?:\\|lintel)?$",
+              "pattern": "^(?:(?:masonry|monolith_wall|monolith_pylon|monolith_column|frame_partition|floor_slab)\\|\\d{1,4}(?:\\.\\d{1,3})?\\|[a-z_]{0,40}(?:\\|lintel)?|door\\|[0-9a-f]{0,10}\\|\\d{1,5}x(?:\\d{1,5}|n)|finish\\|(?:floor|walls|ceiling)\\|[0-9a-f]{10})$",
               "title": "Group Key",
               "type": "string"
             }
@@ -50122,6 +51818,77 @@
           }
         },
         "summary": "Пересчитать конструкции вида: поставить задание cad_walls",
+        "tags": [
+          "cad-constructions"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/{job_id}/views/{page_index}/{view}/walls/rebuild-by-remarks": {
+      "post": {
+        "operationId": "rebuild_cad_walls_by_remarks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadWallsJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Перестроить конструкции вида по открытым замечаниям: поставить задание cad_walls",
         "tags": [
           "cad-constructions"
         ]
@@ -52147,6 +53914,49 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/pipeline-auto": {
+      "get": {
+        "operationId": "read_pipeline_auto",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineAutoState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Включён ли автопайплайн для проекта",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/plan-alignments": {
       "get": {
         "operationId": "get_plan_alignments",
@@ -53955,6 +55765,87 @@
           }
         },
         "summary": "Геометрия выпущенного DXF вида для просмотра поверх PDF (QA)",
+        "tags": [
+          "cad-qa"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}/views/{page_index}/{view}/reconvert-by-remarks": {
+      "post": {
+        "operationId": "reconvert_cad_view_by_remarks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Revision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_index",
+            "required": true,
+            "schema": {
+              "title": "Page Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadJobRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Повторить преобразование страницы с подсказками из открытых замечаний вида (QA)",
         "tags": [
           "cad-qa"
         ]
@@ -56133,6 +58024,143 @@
         "summary": "Загрузить файл в проект",
         "tags": [
           "uploads"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/vor/fill": {
+      "get": {
+        "description": "Количества Quantor - только от движка; количества Заказчика не подставляются никуда.",
+        "operationId": "read_vor_fill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VorFillRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Заполнение ВОР: количества Заказчика и Quantor по связанным позициям",
+        "tags": [
+          "cad-vor",
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/vor/fill/export": {
+      "post": {
+        "description": "Оригинал в хранилище `cad-vor/...` не меняется; копия кладётся в `vor-fill/...`.",
+        "operationId": "export_vor_fill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VorFillExportRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Выгрузить копию ВОР Заказчика с колонками Quantor и блоком «Нет в ВОР»",
+        "tags": [
+          "cad-vor",
+          "cad-vor"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/vor/fill/files/{stamp}": {
+      "get": {
+        "operationId": "download_vor_fill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stamp",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{8}T\\d{6}Z$",
+              "title": "Stamp",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Скачать выгруженный заполненный ВОР (XLSX)",
+        "tags": [
+          "cad-vor",
+          "cad-vor"
         ]
       }
     },

@@ -1,5 +1,6 @@
 """Модели SQLAlchemy. Импортируются пакетом, чтобы Alembic видел все таблицы."""
 
+from app.models.ai_prompt import AiPromptVersion
 from app.models.api_token import ApiToken
 from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
@@ -56,6 +57,7 @@ from app.models.tender_version import TenderVersion, TenderVersionDocument
 from app.models.worker import Worker
 
 __all__ = [
+    "AiPromptVersion",
     "ApiToken",
     "AuditEvent",
     "AuthSession",

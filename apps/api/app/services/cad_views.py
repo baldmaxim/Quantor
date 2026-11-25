@@ -19,6 +19,7 @@ from app.contracts.cad import (
     CadScaleControlRead,
     CadScaleRead,
 )
+from app.contracts.cad_convert_hints import CadHintAppliedRead
 from app.services import cad as cad_service
 from app.storage.base import ObjectStorage
 
@@ -273,6 +274,29 @@ def frame_from(scale: CadScaleRead | None, cad_checks: Any) -> CadFrameRead:
     )
 
 
+def _hints_applied(raw: Any) -> list[CadHintAppliedRead] | None:
+    if not isinstance(raw, list):
+        return None
+    rows: list[CadHintAppliedRead] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        ident, kind, status = item.get("id"), item.get("type"), item.get("status")
+        if not (isinstance(ident, str) and isinstance(kind, str) and isinstance(status, str)):
+            continue
+        reason = item.get("reason")
+        rows.append(
+            CadHintAppliedRead(
+                id=ident,
+                type=kind,
+                status=status,
+                added=_int(item.get("added")),
+                reason=reason if isinstance(reason, str) else None,
+            )
+        )
+    return rows
+
+
 def checks_from(cad_checks: Any, checks: Any) -> CadChecksRead | None:
     if not isinstance(cad_checks, dict) and not isinstance(checks, dict):
         return None
@@ -298,4 +322,5 @@ def checks_from(cad_checks: Any, checks: Any) -> CadChecksRead | None:
         # Выпуск количеств в QA-контуре закрыт; true из отчёта всё равно показывается как есть.
         quantity_release_allowed=cad.get("quantity_release_allowed") is True
         or view.get("quantity_release_allowed") is True,
+        hints_applied=_hints_applied(view.get("hints_applied")),
     )

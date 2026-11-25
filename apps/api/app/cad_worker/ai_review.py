@@ -30,7 +30,7 @@ from app.contracts.cad_ai_review import (
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode
-from app.models import DocumentRevision, Job
+from app.models import AiPromptVersion, DocumentRevision, Job
 from app.services import cad, cad_remarks, jobs
 from app.services.cad_walls import WALLS_JSON
 from app.storage.base import ObjectStorage
@@ -99,7 +99,8 @@ async def enqueue_for_walls(
     existing = await reviews_of(session, walls)
     if existing and existing[0].status in (JobStatus.QUEUED, JobStatus.RUNNING):
         return existing[0]
-    iteration = len(existing) + 1
+    # Лимит кругов у каждой роли свой: исчерпанные круги правщика не закрывают верификацию.
+    iteration = sum(1 for row in existing if row.payload.get("role") == role) + 1
     if iteration > pilot.max_iterations:
         raise DomainError(ErrorCode.CAD_RESULT_NOT_READY, "Исчерпан лимит кругов ИИ-проверки")
     parent_id, parent_attempt = (
@@ -259,8 +260,27 @@ async def _prepare(
         result["walls_sha256"],
         root / "walls.json",
     )
+    prompt = await session.scalar(
+        select(AiPromptVersion).where(
+            AiPromptVersion.role == payload["role"], AiPromptVersion.status == "active"
+        )
+    )
+    if prompt is None:
+        raise CadError(
+            ErrorCode.CAD_INPUT_INVALID,
+            f"Нет активного промта роли «{_ROLE_LABEL.get(payload['role'], payload['role'])}»",
+        )
+    # Версия остаётся в задании и у упавшего прогона: статистика по версиям считает и ошибки.
+    prompt_ref: dict[str, Any] = {
+        "prompt_version_id": str(prompt.id),
+        "prompt_version": prompt.version,
+    }
+    job.payload = {**job.payload, **prompt_ref}
+    # Текст дословно, без перекодирования: по этим байтам считается prompt_sha256.
+    (root / "prompt.txt").write_bytes(prompt.text.encode())
     manifest = {
         **payload,
+        **prompt_ref,
         "schema": "quantor.cad_ai_review.v1",
         "input_sha256": revision.source_sha256,
         "walls_sha256": result["walls_sha256"],
@@ -355,6 +375,8 @@ async def execute_ai_review(
                 input_sha256=manifest["input_sha256"],
                 walls_sha256=manifest["walls_sha256"],
                 dxf_sha256=manifest["dxf_sha256"],
+                prompt_version_id=manifest["prompt_version_id"],
+                prompt_version=manifest["prompt_version"],
                 prompt_sha256=response["prompt_sha256"],
                 bundle_sha256=response["bundle_sha256"],
                 sources=response["sources"],

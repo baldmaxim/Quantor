@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/cad/queries', () => ({
+  useCadRemarksList: () => ({ data: undefined }),
   useCadJobs: (...args: unknown[]) => {
     mocks.jobs(...args);
     return { isPending: false, isError: false, data: mocks.jobsData.current, refetch: vi.fn() };
@@ -79,6 +80,7 @@ vi.mock('@/lib/cad/constructions-queries', async (importOriginal) => ({
     refetch: vi.fn(),
   }),
   useRecomputeCadWalls: () => ({ mutate: vi.fn(), isPending: false }),
+  useRebuildCadWallsByRemarks: () => ({ mutate: vi.fn(), isPending: false }),
   useSaveConstructionProps: () => ({ mutate: vi.fn(), isPending: false }),
   useBulkConstructionProps: () => ({ mutate: vi.fn(), isPending: false }),
   useSaveSheetLevels: () => ({ mutate: vi.fn(), isPending: false }),

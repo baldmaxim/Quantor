@@ -4,7 +4,7 @@
 новая группа процессов, пределы времени и памяти) по CLI-контракту:
 
     <python> -I run_walls.py --dxf --params --out --pdf --page [--zones] [--view-zone=X0,Y0,X1,Y1]
-    [--frame=OX,OY,K] [--control]
+    [--frame=OX,OY,K] [--control] [--hints]
 
 PDF ревизии и номер страницы нужны только разбору отметок этажа (как у генератора трасс); не
 определились — скрипт пишет в `heights` статус `missing`, и это не отказ. Зоны помещений листа
@@ -84,6 +84,7 @@ def _argv(
     view_zone: tuple[float, float, float, float] | None = None,
     control: Path | None = None,
     frame: tuple[float, float, float] | None = None,
+    hints: Path | None = None,
 ) -> list[str]:
     python, runner = settings.cad_engine_python.strip(), cad_walls_service.runner_path(settings)
     if not python or runner is None or not (Path(python).is_file() and runner.is_file()):
@@ -113,6 +114,8 @@ def _argv(
         argv += [f"--frame={round(ox, 4)},{round(oy, 4)},{round(k, 6)}"]
     if control is not None:
         argv += ["--control", str(control)]
+    if hints is not None:
+        argv += ["--hints", str(hints)]
     return argv
 
 
@@ -140,6 +143,68 @@ def _view_frame_of(payload: dict[str, Any]) -> tuple[float, float, float] | None
     if not all(math.isfinite(v) for v in (ox, oy, k)) or k <= 0:
         return None
     return (ox, oy, k)
+
+
+HINTS_SCHEMA = "quantor.cad_walls_hints.v1"
+
+
+def bbox_pt_to_view_mm(
+    bbox_pt: tuple[float, float, float, float], frame: tuple[float, float, float]
+) -> tuple[float, float, float, float]:
+    """Рамка замечания (пт PDF от левого верхнего угла) -> мм DXF вида (X вправо, Y вверх).
+
+    Обратное к кадру движка `pt = origin + (x_mm, -y_mm) / k`: `x_mm = (x_pt - ox) * k`,
+    `y_mm = (oy - y_pt) * k`. Ось Y переворачивается, поэтому нижний край в мм берётся от
+    нижнего (большего) края в пт; порядок углов нормализуется: x0 < x1, y0 < y1.
+    """
+    ox, oy, k = frame
+    x0_pt, y0_pt, x1_pt, y1_pt = bbox_pt
+    xa, xb = (x0_pt - ox) * k, (x1_pt - ox) * k
+    ya, yb = (oy - y0_pt) * k, (oy - y1_pt) * k
+    return (min(xa, xb), min(ya, yb), max(xa, xb), max(ya, yb))
+
+
+def _hints_document(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Файл подсказок для `--hints` из задания; нет `hints` - `None`.
+
+    Подсказки есть, а кадр вида или рамка негодны - отказ, а не молчаливый обычный пересчёт.
+    """
+    if "hints" not in payload:
+        return None
+    raw = payload["hints"]
+    frame = _view_frame_of(payload)
+    if not isinstance(raw, list) or frame is None:
+        raise CadError(
+            ErrorCode.CAD_PARAMS_INVALID, "подсказки задания конструкций заполнены неверно"
+        )
+    items: list[dict[str, Any]] = []
+    for row in raw:
+        bbox = row.get("bbox_pt") if isinstance(row, dict) else None
+        if (
+            not isinstance(row, dict)
+            or not isinstance(bbox, list)
+            or len(bbox) != 4
+            or not all(isinstance(v, int | float) and not isinstance(v, bool) for v in bbox)
+            or not all(math.isfinite(v) for v in bbox)
+            or not isinstance(row.get("id"), str)
+            or not isinstance(row.get("type"), str)
+        ):
+            raise CadError(ErrorCode.CAD_PARAMS_INVALID, "подсказка задания заполнена неверно")
+        x0, y0, x1, y1 = bbox_pt_to_view_mm((bbox[0], bbox[1], bbox[2], bbox[3]), frame)
+        items.append(
+            {
+                "id": row["id"],
+                "type": row["type"],
+                "bbox_mm": [round(x0, 2), round(y0, 2), round(x1, 2), round(y1, 2)],
+                "construction_ids": [
+                    v for v in row.get("construction_ids", []) if isinstance(v, str)
+                ],
+                "comment": row.get("comment") if isinstance(row.get("comment"), str) else "",
+            }
+        )
+    if not items:
+        return None
+    return {"schema": HINTS_SCHEMA, "hints": items}
 
 
 async def _download_zones(
@@ -325,6 +390,12 @@ async def execute_cad_walls(
             zones_file = attempt_dir / "in" / "zones.json"
             await _download_zones(storage, revision.id, zones_sha, zones_size, zones_file)
 
+        hints_file: Path | None = None
+        hints_document = _hints_document(job.payload)
+        if hints_document is not None:
+            hints_file = attempt_dir / "in" / "hints.json"
+            hints_file.write_text(json.dumps(hints_document, ensure_ascii=False), encoding="utf-8")
+
         out = attempt_dir / "out"
         walls_file = out / source.folder / cad_walls_service.WALLS_JSON
         walls_file.parent.mkdir(parents=True, mode=0o700)
@@ -348,6 +419,7 @@ async def execute_cad_walls(
                 view_zone=_view_zone_of(job.payload),
                 control=control_file,
                 frame=_view_frame_of(job.payload),
+                hints=hints_file,
             ),
             limit_seconds=float(settings.cad_total_timeout_seconds),
             poll_interval=settings.worker_heartbeat_interval_seconds,

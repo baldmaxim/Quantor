@@ -36,7 +36,7 @@ from app.domain import GeometryStatus, JobStatus, ProcessingStatus
 from app.errors import DomainError, ErrorCode
 from app.models import DocumentRevision, Job, Project
 from app.services import documents as documents_service
-from app.services import geometry
+from app.services import geometry, pipeline_auto
 from app.services import jobs as jobs_service
 from app.services.legacy import importer
 from app.storage import get_object_storage
@@ -166,7 +166,7 @@ async def execute_legacy_import(
         already_imported=result.already_imported,
         attached_to_existing=result.attached_to_existing,
     )
-    return await jobs_service.succeed(
+    done = await jobs_service.succeed(
         session,
         job=job,
         payload={
@@ -179,6 +179,9 @@ async def execute_legacy_import(
             "attached_by": result.attached_by,
         },
     )
+    # Автопайплайн пилотных проектов: сбой постановки импорт не рушит.
+    await pipeline_auto.after_revision_ready(session, done, settings)
+    return done
 
 
 async def _mark_failed(
@@ -271,7 +274,7 @@ async def execute_pdf_geometry_extract(
         sheets_enriched=result.sheets_enriched,
         parser=f"{result.parser_name} {result.parser_version}",
     )
-    return await jobs_service.succeed(
+    done = await jobs_service.succeed(
         session,
         job=job,
         payload={
@@ -283,6 +286,9 @@ async def execute_pdf_geometry_extract(
             "parser_version": result.parser_version,
         },
     )
+    # Автопайплайн пилотных проектов: сбой постановки извлечение геометрии не рушит.
+    await pipeline_auto.after_revision_ready(session, done, settings)
+    return done
 
 
 async def _mark_geometry_failed(

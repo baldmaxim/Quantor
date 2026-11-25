@@ -3,15 +3,15 @@
   "runner_version": "0.1.0",
   "engine": {
     "name": "quantor-cad-legacy-ar",
-    "version": "2026.11.20+d2f465661bb9",
-    "archive_name": "Quantor_CAD_source_2026.11.20_d2f465661bb9.zip",
+    "version": "2026.11.25+261db5038745",
+    "archive_name": "Quantor_CAD_source_2026.11.25_261db5038745.zip",
     "repo": "baldmaxim/CAD_engine",
-    "repo_ref": "c91c3779d919e73b617e38bae8c3bc503ac02415",
-    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.20_d2f465661bb9.zip",
-    "archive_sha256": "b3e3b5297715017bfbb63444969d30a5f26fc4181803173a8d3a06acda308f76",
-    "manifest_sha256": "384f42fbfa044e49e6dcef6f914e902fcac86001fa4af15f462159bb2ad00708",
-    "source_snapshot_sha256": "d2f465661bb9b4fdcbc2d260340decb6fcc6d0416952b757d3127027c2d8e48d",
-    "archive_entries": 255,
+    "repo_ref": "0a8c155bcf0cf02ec6e8e2f2510643bbae6b0b12",
+    "archive_path": "engine/dist/Quantor_CAD_source_2026.11.25_261db5038745.zip",
+    "archive_sha256": "034c164958dc3cd8ea397c7b17f198457544e51c84f8f4965fd1723672682610",
+    "manifest_sha256": "85f2497619d9ae31682edce47b6cf9742a6c9eb5e196cc19f187b8095031bb75",
+    "source_snapshot_sha256": "261db503874546f72de8c672ecb8a24cc9d04941fe9dca42e981bc9349a2ffa4",
+    "archive_entries": 253,
     "max_unpacked_bytes": 4194304,
     "worker": "АР_Обработка/90_Пайплайн/pdf_job_monitor/worker.py",
     "intake": "АР_Обработка/90_Пайплайн/pdf_job_monitor"
@@ -36,7 +36,7 @@
       "params_canonical_sha256": "e2768297dea49c84496e7dd188775c98df18f358feee7221f9761009e6626d6d"
     },
     "cad_walls": {
-      "generator_version": "cad_walls.v1.25",
+      "generator_version": "cad_walls.v1.26",
       "params_path": "generators/cad_walls/params/v1.json",
       "params_sha256": "7255ddfae68ac14abf854f2153fc429a131659744aabea9ec8e81857cf9ea53a",
       "params_canonical_sha256": "0cee2b3152b6ea8239d5455cba2a24c5138abf6c4c8785c456ea58b80bf4684b",

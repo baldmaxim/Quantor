@@ -66,6 +66,10 @@ describe('путь проекта', () => {
       'Каркас здания',
       'Версии тендера',
       'Расчёты',
+      'ВОР',
+    ]);
+    expect(projectExtraLinks('p1', { 'cad.export': true })).toEqual([
+      { label: 'ВОР', href: '/projects/p1/vor' },
     ]);
     expect(projectExtraLinks('p1', {})).toEqual([]);
   });

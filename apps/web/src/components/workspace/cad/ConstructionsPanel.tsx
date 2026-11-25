@@ -6,6 +6,7 @@ import { Button, Skeleton } from '@/components/ui';
 import { CadAiReviewPanel } from './CadAiReviewPanel';
 import { CadOutlineReviewPanel } from './CadOutlineReviewPanel';
 
+import { ConstructionsHintsResult } from './ConstructionsHintsResult';
 import { ConstructionsLevels } from './ConstructionsLevels';
 import { ConstructionsTotals } from './ConstructionsTotals';
 import { ConstructionsVor } from './ConstructionsVor';
@@ -32,6 +33,7 @@ export const ConstructionsPanel: FC<IWorkspaceCadConstructions> = ({
   onSelectGroup,
   vor,
   showOutlineReview,
+  rebuild,
 }) => {
   if (status === 'loading') {
     return (
@@ -108,7 +110,19 @@ export const ConstructionsPanel: FC<IWorkspaceCadConstructions> = ({
         {recomputeFailed}
         {failure}
         {action('Пересчитать', 'default')}
+        {rebuild && (
+          <Button
+            disabled={calculating || rebuild.pending || rebuild.count === 0}
+            className="self-start max-md:h-[44px] max-md:w-full"
+            onClick={rebuild.onRebuild}
+          >
+            {`Перестроить по замечаниям (${rebuild.count})`}
+          </Button>
+        )}
       </div>
+      {data.hints_applied && data.hints_applied.length > 0 && (
+        <ConstructionsHintsResult hints={data.hints_applied} />
+      )}
       {showOutlineReview && <CadOutlineReviewPanel wallsJobId={data.walls_job_id} />}
       {showOutlineReview && <CadAiReviewPanel wallsJobId={data.walls_job_id} />}
       <ConstructionsLevels

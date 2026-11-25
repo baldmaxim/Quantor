@@ -47,6 +47,7 @@ from app.models import (
     SheetPassport,
 )
 from app.services import jobs as jobs_service
+from app.services import pipeline_auto
 from app.services.calc.adapters.recognized import Stamp, parse_stamp
 from app.services.consistency.page_texts import (
     PAGE_TEXT_FORMAT,
@@ -485,6 +486,8 @@ async def execute_sheet_passport_extract(
             "versions": dictionary_versions(),
         },
     )
+    # Автопайплайн пилотных проектов: ответы на вопросы и CAD листов-планов; сбой не рушит разбор.
+    await pipeline_auto.after_passports(session, result, settings)
     await session.commit()
     return result
 

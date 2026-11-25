@@ -11,10 +11,12 @@ from app.api.v1.deps import (
     LimitDep,
     OffsetDep,
     SessionDep,
+    SettingsDep,
     WorkspaceDep,
     require,
 )
 from app.auth.permissions import Permission
+from app.contracts.pipeline_auto import PipelineAutoState
 from app.errors import not_found
 from app.schemas import (
     DocumentRead,
@@ -29,6 +31,7 @@ from app.schemas import (
 )
 from app.services import documents as documents_service
 from app.services import jobs as jobs_service
+from app.services import pipeline_auto
 from app.services import projects as projects_service
 from app.services.projects import ProjectSort
 
@@ -105,6 +108,26 @@ async def read_project(
         raise not_found("Проект")
 
     return _summary(row)
+
+
+@router.get(
+    "/{project_id}/pipeline-auto",
+    response_model=PipelineAutoState,
+    summary="Включён ли автопайплайн для проекта",
+    dependencies=[require(Permission.PROJECT_READ)],
+)
+async def read_pipeline_auto(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    workspace: WorkspaceDep,
+    settings: SettingsDep,
+) -> PipelineAutoState:
+    project = await projects_service.get_project(
+        session, workspace_id=workspace.tenant, project_id=project_id
+    )
+    if project is None:
+        raise not_found("Проект")
+    return PipelineAutoState(enabled=pipeline_auto.enabled_for(project.id, settings))
 
 
 @router.patch(

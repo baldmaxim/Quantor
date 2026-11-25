@@ -181,6 +181,17 @@ export interface IWorkspaceCadConstructions {
   readonly onSelectGroup: (key: string, ids: readonly string[]) => void;
   /** Сверка с ВОР Заказчика; нет - блок не показывается. */
   readonly vor?: IWorkspaceCadVor | null;
+  /** Перестроение по замечаниям; нет - кнопки нет. */
+  readonly rebuild?: IWorkspaceCadRebuild | null;
+}
+
+/** Перестроение вида по открытым замечаниям: счётчик подходящих замечаний и запуск. */
+export interface IWorkspaceCadRebuild {
+  /** Открытых замечаний типов «нет стены», «ложная стена», «нет двери». */
+  readonly count: number;
+  /** Запуск идёт: кнопка заблокирована. */
+  readonly pending: boolean;
+  readonly onRebuild: () => void;
 }
 
 /** Карточка выбранной конструкции у курсора. */

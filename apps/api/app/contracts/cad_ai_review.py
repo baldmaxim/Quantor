@@ -148,6 +148,9 @@ class AiReviewResult(BaseModel):
     input_sha256: str
     walls_sha256: str
     dxf_sha256: str
+    # Версия промта из `ai_prompt_versions`; у результатов до версионирования их нет.
+    prompt_version_id: UUID | None = None
+    prompt_version: int | None = None
     prompt_sha256: str
     bundle_sha256: str
     sources: dict[str, AiSourceCopy]

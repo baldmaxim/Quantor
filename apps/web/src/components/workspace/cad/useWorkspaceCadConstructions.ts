@@ -17,6 +17,7 @@ import {
   latestWallsStatus,
   useBulkConstructionProps,
   useCadConstructions,
+  useRebuildCadWallsByRemarks,
   useRecomputeCadWalls,
   useSaveConstructionProps,
   useSaveSheetLevels,
@@ -31,6 +32,8 @@ import {
   withoutHiddenCategories,
   type CadLayerCategory,
 } from '@/lib/cad/layer-categories';
+import { useCadRemarksList } from '@/lib/cad/queries';
+import { countRebuildRemarks, type IRemarkBinding } from '@/lib/cad/remarks';
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
@@ -44,6 +47,17 @@ import type {
 import { useWorkspaceCadVor } from './useWorkspaceCadVor';
 
 const NO_IDS: ReadonlySet<string> = new Set<string>();
+// Запрос замечаний выключен без привязки; ключу всё равно нужна привязка.
+const NO_BINDING: IRemarkBinding = {
+  projectId: '',
+  revisionId: '',
+  jobId: '',
+  attempt: 0,
+  pageIndex: 0,
+  legacyPdfPage: 0,
+  view: 0,
+  dxfSha256: null,
+};
 
 interface IInput {
   /** Родитель вида (задание, лист, вид); `null` - вида нет, запросов нет. */
@@ -61,6 +75,8 @@ interface IInput {
   hiddenCategories?: ReadonlySet<CadLayerCategory>;
   /** Имена скрытых слоёв DXF: конструкция скрыта, когда скрыты все её слои-источники. */
   hiddenLayerNames?: ReadonlySet<string>;
+  /** Привязка замечаний показанного вида: по ней считаются замечания для перестроения. */
+  remarkBinding?: IRemarkBinding | null;
 }
 
 export interface IWorkspaceCadConstructionsState {
@@ -102,6 +118,7 @@ export const useWorkspaceCadConstructions = ({
   blocked,
   hiddenCategories,
   hiddenLayerNames,
+  remarkBinding = null,
 }: IInput): IWorkspaceCadConstructionsState => {
   const theme = useTheme();
   const colors = useMemo(() => {
@@ -140,6 +157,9 @@ export const useWorkspaceCadConstructions = ({
   const vor = useWorkspaceCadVor({ params, enabled: enabled && data !== null, stamp: query.dataUpdatedAt });
 
   const recompute = useRecomputeCadWalls(params);
+  const rebuild = useRebuildCadWallsByRemarks(params);
+  const remarksList = useCadRemarksList(remarkBinding ?? NO_BINDING, enabled && remarkBinding !== null);
+  const rebuildCount = countRebuildRemarks(remarksList.data ?? []);
   const saveProps = useSaveConstructionProps(params);
   const bulkProps = useBulkConstructionProps(params);
   const saveLevels = useSaveSheetLevels(params);
@@ -257,6 +277,7 @@ export const useWorkspaceCadConstructions = ({
   // Свежее задание: при готовом результате - из ответа, без него - из отказа 404.
   const calculating =
     recompute.isPending ||
+    rebuild.isPending ||
     isWallsActive(notReady ? status : latestWallsStatus(data ?? undefined));
 
   const side: IWorkspaceCadConstructions | null = enabled
@@ -287,6 +308,22 @@ export const useWorkspaceCadConstructions = ({
               }
             },
           });
+        },
+        rebuild: {
+          count: rebuildCount,
+          pending: rebuild.isPending,
+          onRebuild: () => {
+            setActionError(null);
+            rebuild.mutate(undefined, {
+              onError: (error) => {
+                if (extractCode(error) === WALLS_BUSY) {
+                  setActionError('Конструкции уже считаются. Результат появится здесь сам.');
+                } else {
+                  setActionError(cadErrorText(error));
+                }
+              },
+            });
+          },
         },
         levelsSaving: saveLevels.isPending,
         onSaveLevels: (levels: CadSheetLevelsWrite) => {

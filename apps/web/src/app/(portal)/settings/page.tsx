@@ -1,10 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { ViewTransition } from 'react';
 
 import { TopBar } from '@/components/shell/TopBar';
 import { Button, Field, StatusBadge } from '@/components/ui';
+import { QUEUE_ACCESS_PERMISSION } from '@/lib/jobs/permissions';
 import { useMeta } from '@/lib/queries';
+import { useHasPermission } from '@/lib/session';
 import { toggleTheme, useTheme } from '@/lib/theme';
 
 /**
@@ -16,6 +19,7 @@ import { toggleTheme, useTheme } from '@/lib/theme';
 const SettingsPage = () => {
   const meta = useMeta();
   const theme = useTheme();
+  const isAdmin = useHasPermission(QUEUE_ACCESS_PERMISSION);
 
   return (
     <>
@@ -35,6 +39,18 @@ const SettingsPage = () => {
               </Button>
             </div>
           </section>
+
+          {isAdmin && (
+            <section className="rounded-[var(--radius-md)] border border-border-strong bg-surface p-[var(--s-5)] md:p-[var(--s-6)]">
+              <h2 className="mb-[var(--s-4)] text-sm font-medium">Администрирование</h2>
+              <Link
+                href="/ai-prompts"
+                className="press inline-flex min-h-[44px] items-center text-sm text-accent"
+              >
+                Промты ИИ и статистика
+              </Link>
+            </section>
+          )}
 
           <section className="rounded-[var(--radius-md)] border border-border-strong bg-surface p-[var(--s-5)] md:p-[var(--s-6)]">
             <h2 className="mb-[var(--s-4)] text-sm font-medium">Подключение</h2>

@@ -5,6 +5,7 @@ import {
   putCadConstructionProps,
   putCadSheetLevels,
   readCadConstructions,
+  rebuildCadWallsByRemarks,
   recomputeCadWalls,
   type CadConstructionProps,
   type CadConstructionRead,
@@ -129,6 +130,23 @@ export const useRecomputeCadWalls = (
       void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
       invalidateSheet3d(client, params);
       // Пересчёт ставит задание cad_walls: этапы конвейера листа меняются.
+      void client.invalidateQueries({ queryKey: cadPipelineKey(params.projectId, params.revisionId) });
+    },
+  });
+};
+
+/** Перестроение конструкций вида по открытым замечаниям (cad_walls v1.26): то же задание walls. */
+export const useRebuildCadWallsByRemarks = (
+  params: ICadViewParams | null,
+): UseMutationResult<CadWallsJobRead, unknown, void> => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await rebuildCadWallsByRemarks({ throwOnError: true, path: pathOf(need(params)) })),
+    onSettled: () => {
+      if (!params) return;
+      void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
+      invalidateSheet3d(client, params);
       void client.invalidateQueries({ queryKey: cadPipelineKey(params.projectId, params.revisionId) });
     },
   });

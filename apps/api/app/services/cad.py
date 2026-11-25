@@ -22,6 +22,7 @@ from typing import Any, Final
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contracts.cad_convert_hints import CadConvertHints
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode
@@ -30,8 +31,8 @@ from app.services import cad_style_profiles
 from app.services import jobs as jobs_service
 
 # Закрепление движка: архив сверяется и здесь (передаётся runner'у), и в tools/cad_engine/pins.json.
-ENGINE_VERSION: Final = "2026.11.20+d2f465661bb9"
-ENGINE_ARCHIVE_SHA256: Final = "b3e3b5297715017bfbb63444969d30a5f26fc4181803173a8d3a06acda308f76"
+ENGINE_VERSION: Final = "2026.11.25+261db5038745"
+ENGINE_ARCHIVE_SHA256: Final = "034c164958dc3cd8ea397c7b17f198457544e51c84f8f4965fd1723672682610"
 PARAMS_SCHEMA: Final = "quantor.cad_engine.params.v2"
 PAGE_SELECTION: Final = "operator"
 MAX_PAGES: Final = 50
@@ -276,6 +277,7 @@ async def schedule_convert(
     pages: list[int],
     settings: Settings,
     auto_scale: bool = False,
+    convert_hints: CadConvertHints | None = None,
 ) -> Job:
     if not is_pdf(revision):
         raise DomainError(ErrorCode.CAD_INPUT_INVALID, "Источник ревизии не PDF")
@@ -290,6 +292,28 @@ async def schedule_convert(
     if profile is not None:
         params["style_profile"] = profile.current.style
         style_ref = {"version": profile.current.version, "sha256": profile.current.sha256}
+    if convert_hints is not None:
+        params["convert_hints"] = convert_hints.to_params()
+    return await enqueue_convert(
+        session,
+        project=project,
+        revision=revision,
+        params=params,
+        style_ref=style_ref,
+        settings=settings,
+    )
+
+
+async def enqueue_convert(
+    session: AsyncSession,
+    *,
+    project: Project,
+    revision: DocumentRevision,
+    params: dict[str, Any],
+    style_ref: dict[str, Any] | None,
+    settings: Settings,
+) -> Job:
+    """Ставит преобразование с готовыми параметрами; ключ идемпотентности - от всех параметров."""
     job = await jobs_service.enqueue(
         session,
         job_type=JobType.CAD_PDF_CONVERT,

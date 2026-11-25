@@ -367,3 +367,16 @@ export const importSummary = (result: {
 /** Счётчик «открыто N / всего M». */
 export const remarksCounter = (remarks: readonly IRemark[]): string =>
   `открыто ${remarks.filter((remark) => remark.status === 'open').length} / всего ${remarks.length}`;
+
+/** Типы замечаний, по которым генератор конструкций умеет перестраивать вид (cad_walls v1.26). */
+export const REBUILD_REMARK_TYPES: readonly RemarkType[] = [
+  'missing_wall',
+  'false_wall',
+  'missing_door',
+];
+
+/** Сколько открытых замечаний подходит для перестроения по замечаниям. */
+export const countRebuildRemarks = (
+  remarks: readonly { readonly type: RemarkType; readonly status: RemarkStatus }[],
+): number =>
+  remarks.filter((r) => r.status === 'open' && REBUILD_REMARK_TYPES.includes(r.type)).length;

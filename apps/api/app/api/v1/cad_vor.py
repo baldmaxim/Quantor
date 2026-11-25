@@ -20,6 +20,7 @@ from typing import IO, Annotated, Final
 from fastapi import APIRouter, Depends, File, Path, Query, Response, UploadFile, status
 
 from app.api.v1.cad_constructions import _load_walls, _sheet, _totals
+from app.api.v1.cad_vor_fill import router as fill_router
 from app.api.v1.deps import AuthDep, SessionDep, StorageDep, require, require_feature
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
@@ -40,6 +41,7 @@ from app.models import Project
 from app.services import cad_vor as vor_service
 from app.services import documents as documents_service
 from app.services import projects as projects_service
+from app.services import vor_fill
 from app.services.cad_vor_import import MAX_FILE_BYTES, VorParseError, parse_workbook
 from app.services.uploads import CHUNK_SIZE, ZIP_MAGIC, limit_stream
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
@@ -48,6 +50,8 @@ from app.storage.keys import display_filename, extension_of
 XLSX_CONTENT_TYPE: Final = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 router = APIRouter(tags=["cad-vor"], dependencies=[require_feature("cad.export")])
+# Заполнение ВОР (ADR-0055 п. 7): тот же флаг и тот же `qa_router`.
+router.include_router(fill_router)
 
 GroupKeyPath = Annotated[str, Path(pattern=GROUP_KEY_PATTERN)]
 GroupKeyQuery = Annotated[str, Query(pattern=GROUP_KEY_PATTERN)]
@@ -248,8 +252,9 @@ async def suggest_cad_vor_items(
 ) -> list[CadVorSuggestionRead]:
     """Детерминированное ранжирование без моделей: связь ставит человек."""
     project = await _project(session, context, project_id)
-    parts = vor_service.parse_group_key(group_key)
-    if parts is None:
+    fill_key = vor_fill.is_fill_key(group_key)
+    parts = None if fill_key else vor_service.parse_group_key(group_key)
+    if parts is None and not fill_key:
         raise DomainError(ErrorCode.VALIDATION_FAILED, "Ключ группы вне формата")
     document = (
         await vor_service.current_document(session, project_id=project.id)
@@ -260,6 +265,8 @@ async def suggest_cad_vor_items(
         if document_id is not None:
             raise not_found("Документ ВОР")
         return []
+    if parts is None:
+        return await vor_fill.suggest(session, document_id=document.id, key=group_key)
     return await vor_service.suggest(session, document_id=document.id, parts=parts)
 
 

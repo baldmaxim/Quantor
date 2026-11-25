@@ -120,5 +120,6 @@ export const projectExtraLinks = (projectId: string, features: Features): IProje
       ? { label: 'Версии тендера', href: `${base}/versions` }
       : null,
     on(features, TENDER_EXCHANGE_FEATURE) ? { label: 'Расчёты', href: `${base}/calcs` } : null,
+    on(features, CAD_FEATURE) ? { label: 'ВОР', href: `${base}/vor` } : null,
   ].filter((link): link is IProjectLink => link !== null);
 };

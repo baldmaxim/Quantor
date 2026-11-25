@@ -860,3 +860,57 @@ def test_run_style_script_without_the_script_in_the_archive_is_an_integrity_fail
             tmp_path, tmp_path / "a.pdf", tmp_path / "s.json", tmp_path / "o", None, tmp_path / "l"
         )
     assert error.value.exit_code == runner.EXIT_INTEGRITY
+
+
+def _convert_hints(**patch: Any) -> dict[str, Any]:
+    hints: dict[str, Any] = {
+        "schema": "quantor.cad_convert_hints.v1",
+        "page": 1,
+        "hints": [
+            {"id": "r1", "type": "missing_wall", "bbox_pt": [10, 20, 30, 40], "comment": "стена"}
+        ],
+    }
+    hints.update(patch)
+    return hints
+
+
+def test_convert_hints_go_to_job_json_as_is(runner: ModuleType) -> None:
+    hints = _convert_hints()
+    params = runner.parse_params(_params(convert_hints=hints))
+    assert runner.job_document([1, 3], params)["operator_convert_hints"] == hints
+    plain = runner.parse_params(_params())
+    assert "operator_convert_hints" not in runner.job_document([1, 3], plain)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        [],
+        _convert_hints(schema="other"),
+        _convert_hints(page=0),
+        _convert_hints(page=True),
+        _convert_hints(page=2),
+        _convert_hints(hints=[]),
+        _convert_hints(extra=1),
+        _convert_hints(hints=[{"id": "a", "type": "false_wall", "bbox_pt": [0, 0, 1, 1]}]),
+        _convert_hints(hints=[{"id": "a", "type": "missing_door", "bbox_pt": [1, 0, 0, 1]}]),
+        _convert_hints(hints=[{"id": "a", "type": "missing_door", "bbox_pt": [0, 0, 1]}]),
+        _convert_hints(hints=[{"id": "a" * 65, "type": "missing_door", "bbox_pt": [0, 0, 1, 1]}]),
+        _convert_hints(
+            hints=[
+                {"id": "a", "type": "missing_door", "bbox_pt": [0, 0, 1, 1]},
+                {"id": "a", "type": "missing_door", "bbox_pt": [0, 0, 1, 1]},
+            ]
+        ),
+        _convert_hints(
+            hints=[
+                {"id": str(n), "type": "missing_door", "bbox_pt": [0, 0, 1, 1]} for n in range(101)
+            ]
+        ),
+    ],
+)
+def test_parse_params_rejects_bad_convert_hints(runner: ModuleType, bad: Any) -> None:
+    with pytest.raises(runner.RunnerError) as error:
+        runner.parse_params(_params(convert_hints=bad))
+    assert error.value.exit_code == runner.EXIT_PARAMS
+    assert error.value.code == "params_invalid"

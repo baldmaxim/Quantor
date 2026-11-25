@@ -24,6 +24,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.api.v1 import (
+    ai_prompts,
     api_tokens,
     auth,
     calc,
@@ -39,6 +40,7 @@ from app.api.v1 import (
     mep,
     meta,
     oauth,
+    project_ai_pipeline,
     projects,
     scale,
     takeoff,
@@ -60,6 +62,8 @@ api_v1_router.include_router(oauth.public_router)
 # --- всё остальное только после опознания ---
 protected_router = APIRouter(dependencies=[Depends(require_authenticated)])
 protected_router.include_router(projects.router)
+protected_router.include_router(project_ai_pipeline.router)
+protected_router.include_router(ai_prompts.router)
 protected_router.include_router(mcp.router)
 protected_router.include_router(oauth.router)
 protected_router.include_router(uploads.router)
