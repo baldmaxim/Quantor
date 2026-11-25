@@ -22,7 +22,10 @@ COPY apps/web/package.json apps/web/package.json
 COPY apps/admin/package.json apps/admin/package.json
 COPY packages/api-client/package.json packages/api-client/package.json
 COPY packages/ui/package.json packages/ui/package.json
-RUN pnpm install --frozen-lockfile --filter "@quantor/${APP}..."
+# Хранилище pnpm - в кэше сборки (не в слое): при смене lockfile скачивается только разница.
+ENV npm_config_store_dir=/pnpm-store
+RUN --mount=type=cache,id=quantor-pnpm-store,target=/pnpm-store \
+    pnpm install --frozen-lockfile --filter "@quantor/${APP}..."
 
 COPY packages ./packages
 COPY apps/${APP} ./apps/${APP}
@@ -36,7 +39,10 @@ ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
     NEXT_PUBLIC_ADMIN_URL=${NEXT_PUBLIC_ADMIN_URL} \
     NEXT_PUBLIC_BUILD_VERSION=${NEXT_PUBLIC_BUILD_VERSION} \
     QUANTOR_STANDALONE=1
-RUN pnpm --filter "@quantor/${APP}" build \
+# Кэш Next (.next/cache) - в кэше сборки, свой на каждое приложение: пересборка после правки одного
+# файла берёт готовые модули и не компилирует всё заново. Сам .next/cache в образ не попадает.
+RUN --mount=type=cache,id=quantor-next-cache-${APP},target=/repo/apps/${APP}/.next/cache \
+    pnpm --filter "@quantor/${APP}" build \
     && mkdir -p apps/${APP}/public
 
 FROM node:22-slim AS runtime

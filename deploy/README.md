@@ -143,6 +143,27 @@ venv; PyMuPDF и Shapely есть только в нём). Команда `pytho
 - Проверка: `./compose.sh logs --tail 50 cad-worker` — первая строка JSON с версией движка; ошибка
   `CAD_ENGINE_UNAVAILABLE` — архив или окружение не прошли проверку.
 
+## Сборка образов: слои и кэш
+
+Один и тот же набор Dockerfile собирают `publish.yml` (GHCR) и `deploy/ship-local.sh` (локально, без
+реестра). Порядок слоёв — от редко меняющегося к часто меняющемуся, чтобы правка кода не пересобирала всё:
+
+- `Dockerfile.api`: стадия `api-requirements` (список пакетов из `pyproject`) → `api-deps` (интерпретатор,
+  пакеты, пользователь; кэш pip в BuildKit-кэше) → `api` (только код, `pins.json`, `docker-compose.yml`).
+- `Dockerfile.cad-worker`: `cad-env` (venv движка и модели по lock-файлам) → `cad-base` (пакеты API без кода,
+  SSH-клиент, venv) → итоговая стадия: runner, генераторы и архив движка, **код API последним слоем**.
+- `Dockerfile.next`: манифесты → `pnpm install` (хранилище pnpm в кэше) → код → `next build` (`.next/cache` в
+  кэше, свой на web и admin).
+- `ship-local.sh` собирает основы отдельно и тегирует хешем входов: `quantor-api-deps:<хеш>` (Dockerfile.api,
+  `pyproject`, образ python) и `quantor-cad-base:<хеш>` (Dockerfile.cad-worker, оба lock-файла, слои api-deps).
+  Образ с таким тегом уже есть - основа не пересобирается. Это локальные теги; на сервер идут слои внутри
+  образов выпуска, прежние основы удаляются при уборке.
+- publish.yml передаёт только `API_IMAGE` и `ENGINE_ARCHIVE_SHA256`: `API_DEPS_IMAGE` и `CAD_BASE_IMAGE` по
+  умолчанию указывают на образ API и стадию `cad-base`, поэтому сборка работает и без локальных основ (цена -
+  повтор кода API лишним слоем в cad-worker, около 7 МБ).
+- Кэши pip, pnpm и Next живут в кэше BuildKit (`docker builder prune` их стирает; при нехватке диска сборка
+  станет медленнее, но не сломается).
+
 ## Проверка после выкладки
 
 ```bash

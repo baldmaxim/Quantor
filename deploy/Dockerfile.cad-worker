@@ -4,6 +4,8 @@
 # Тот же код `apps/api` (образ quantor-api того же коммита) плюс отдельный интерпретатор движка
 # с закреплёнными пакетами. PyMuPDF (AGPL-3.0), Shapely/GEOS и Pillow живут только здесь и
 # только в закрытом пакете GHCR (ADR-0036 п. 3); в образ quantor-api они не попадают.
+# Код API кладётся ПОСЛЕДНИМ слоем: всё тяжёлое (SSH-клиент, venv движка и модели, архив и генераторы)
+# лежит ниже и не пересобирается и не передаётся при каждой правке кода.
 #
 #   # <CAD_engine> - чистый checkout коммита pins.engine.repo_ref приватного репозитория движка
 #   cp <CAD_engine>/<pins.engine.archive_path> deploy/cad-engine/engine.zip
@@ -18,6 +20,13 @@
 ARG API_IMAGE
 # База образа API (deploy/Dockerfile.api): venv ссылаются на её интерпретатор /usr/local/bin/python3.12.
 ARG PYTHON_IMAGE=python:3.12-slim
+# Основа cad-worker: пакеты API без кода. По умолчанию - сам образ API (как раньше: publish.yml
+# передаёт только API_IMAGE); deploy/ship-local.sh передаёт образ стадии api-deps того же Dockerfile.api,
+# тогда правка кода API не пересобирает SSH-клиент, venv и архив движка.
+ARG API_DEPS_IMAGE=${API_IMAGE}
+# Основа итоговой стадии: по умолчанию стадия cad-base ниже; ship-local передаёт готовый образ
+# `quantor-cad-base:<хеш>` (SSH-клиент и venv), собранный отдельно и повторно используемый.
+ARG CAD_BASE_IMAGE=cad-base
 
 # Пакеты движка и модели здания — отдельной стадией, не от образа API. Они зависят только от
 # lock-файлов, поэтому между выпусками берутся из кэша сборки и слой с ними совпадает байт в байт:
@@ -29,16 +38,18 @@ ENV CAD_ENGINE_HOME=/opt/cad-engine \
 
 # Пакеты движка — в своём venv (Python 3.12), версии и хеши из lock-файла.
 COPY tools/cad_engine/requirements.linux-cp312.lock.txt /tmp/cad-requirements.txt
-RUN python -m venv ${CAD_ENGINE_HOME}/venv \
-    && ${CAD_ENGINE_HOME}/venv/bin/pip install --no-cache-dir --disable-pip-version-check \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m venv ${CAD_ENGINE_HOME}/venv \
+    && ${CAD_ENGINE_HOME}/venv/bin/pip install --disable-pip-version-check \
         --require-hashes --only-binary :all: -r /tmp/cad-requirements.txt \
     && rm /tmp/cad-requirements.txt
 
 # Модель здания из IFC (`cad_model`): ifcopenshell и trimesh - в отдельном venv со своим lock-файлом
 # (tools/cad_model/), чтобы закреплённые пакеты движка и результаты остальных генераторов не менялись.
 COPY tools/cad_model/requirements.linux-cp312.lock.txt /tmp/cad-model-requirements.txt
-RUN python -m venv ${CAD_MODEL_HOME}/venv \
-    && ${CAD_MODEL_HOME}/venv/bin/pip install --no-cache-dir --disable-pip-version-check \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m venv ${CAD_MODEL_HOME}/venv \
+    && ${CAD_MODEL_HOME}/venv/bin/pip install --disable-pip-version-check \
         --require-hashes --only-binary :all: -r /tmp/cad-model-requirements.txt \
     && rm /tmp/cad-model-requirements.txt
 
@@ -46,9 +57,9 @@ RUN python -m venv ${CAD_MODEL_HOME}/venv \
 # слоем, и образ снова вёз бы их при каждом выпуске.
 RUN chmod -R a=rX ${CAD_ENGINE_HOME}/venv ${CAD_MODEL_HOME}/venv
 
-FROM ${API_IMAGE}
-
-ARG ENGINE_ARCHIVE_SHA256
+# Основа: пакеты API (без кода) + SSH-клиент + venv. Меняется только вместе с lock-файлами, Dockerfile
+# и пакетами API; код API, архив и генераторы движка сюда не входят.
+FROM ${API_DEPS_IMAGE} AS cad-base
 
 USER root
 
@@ -60,10 +71,21 @@ RUN apt-get update \
 ENV CAD_ENGINE_HOME=/opt/cad-engine \
     CAD_MODEL_HOME=/opt/cad-model
 
-# --link: слой собирается отдельно от образа API и не зависит от него, поэтому при новом коде API
-# берётся из кэша тем же блобом (без --link копия получала бы новые метки времени папок и новый хеш).
+# --link: слой собирается отдельно от нижних и не зависит от них (одно содержимое - один блоб).
 COPY --link --from=cad-env /opt/cad-engine/venv ${CAD_ENGINE_HOME}/venv
 COPY --link --from=cad-env /opt/cad-model/venv ${CAD_MODEL_HOME}/venv
+
+# Код API того же коммита: берётся в самом конце, чтобы его правка задевала только верхний слой.
+FROM ${API_IMAGE} AS api-code
+
+FROM ${CAD_BASE_IMAGE} AS cad-worker
+
+ARG ENGINE_ARCHIVE_SHA256
+
+USER root
+
+ENV CAD_ENGINE_HOME=/opt/cad-engine \
+    CAD_MODEL_HOME=/opt/cad-model
 
 # Runner и pins лежат рядом: runner читает pins.json из своего каталога.
 COPY tools/cad_engine/quantor_cad_runner.py tools/cad_engine/pins.json ${CAD_ENGINE_HOME}/runner/
@@ -96,6 +118,10 @@ RUN chmod a=rX ${CAD_ENGINE_HOME} ${CAD_MODEL_HOME} \
     && mkdir -p /var/tmp/quantor-cad \
     && chown quantor:quantor /var/tmp/quantor-cad \
     && chmod 700 /var/tmp/quantor-cad
+
+# Код API (/app: app, alembic, pins, deploy) - последним слоем. При сборке поверх самого образа API
+# (publish.yml, без API_DEPS_IMAGE) это повтор тех же файлов поверх них.
+COPY --link --from=api-code /app/ /app/
 
 ENV CAD_ENGINE_PYTHON=${CAD_ENGINE_HOME}/venv/bin/python \
     CAD_ENGINE_RUNNER=${CAD_ENGINE_HOME}/runner/quantor_cad_runner.py \

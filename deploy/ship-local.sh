@@ -10,6 +10,11 @@
 # настройки cad-worker (compose.pilot.ui.yml, если он есть на сервере) и уборка старых образов: здесь
 # остаются этот и прошлый выпуск, на сервере - последние QUANTOR_KEEP_RELEASES (5) для отката.
 #
+# Статичные основы (пакеты API: `quantor-api-deps:<хеш>`; SSH-клиент и venv движка CAD: `quantor-cad-base:<хеш>`)
+# собираются отдельно и только если образа с таким хешем входов ещё нет; образы api и cad-worker строятся
+# поверх них, поэтому обычная правка кода пересобирает лишь верхние слои. Основы - локальные теги, в GHCR
+# и на сервер как отдельные образы не уходят (их слои едут внутри api и cad-worker).
+#
 #   deploy/ship-local.sh [<git-ref>]      # по умолчанию origin/main
 #   deploy/ship-local.sh --build-only [<git-ref>]
 #
@@ -100,6 +105,32 @@ NEXT_ARGS_ID="$(printf '%s\n' "$PUBLIC_ORIGIN" "$ADMIN_ORIGIN" | sha256sum | cut
 
 build() { echo "→ образ $1"; docker build -q -f "$WT/$2" "${@:3}" -t "$REG/$1:$SHA" "$WT" >/dev/null; }
 
+# Статичные основы. Хеш считается по файлам выписки $WT (не по рабочей копии, где бывают чужие правки):
+# Dockerfile целиком, манифесты и lock-файлы, образ python. Образ с таким тегом есть - берём его.
+# Основа cad-base хешируется по слоям образа api-deps (ID образа не годится: в нём время сборки), а не по
+# его тегу: она меняется, только если реально поменялись пакеты API.
+PYTHON_IMAGE="${QUANTOR_PYTHON_IMAGE:-python:3.12-slim}"
+PYTHON_ID="$(docker image inspect -f '{{.Id}}' "$PYTHON_IMAGE" 2>/dev/null || echo "$PYTHON_IMAGE")"
+base_hash() { { echo "$1"; shift; cat "$@"; } | sha256sum | cut -c1-12; }
+API_DEPS="quantor-api-deps:$(base_hash "$PYTHON_ID" "$WT/deploy/Dockerfile.api" "$WT/apps/api/pyproject.toml")"
+if docker image inspect "$API_DEPS" >/dev/null 2>&1; then
+  echo "→ основа $API_DEPS: есть"
+else
+  echo "→ основа $API_DEPS: сборка (пакеты API)"
+  docker build -q -f "$WT/deploy/Dockerfile.api" --target api-deps -t "$API_DEPS" "$WT" >/dev/null
+fi
+CAD_BASE="quantor-cad-base:$(base_hash "$(docker image inspect -f '{{json .RootFS.Layers}}' "$API_DEPS")" \
+  "$WT/deploy/Dockerfile.cad-worker" "$WT/tools/cad_engine/requirements.linux-cp312.lock.txt" \
+  "$WT/tools/cad_model/requirements.linux-cp312.lock.txt")"
+if docker image inspect "$CAD_BASE" >/dev/null 2>&1; then
+  echo "→ основа $CAD_BASE: есть"
+else
+  echo "→ основа $CAD_BASE: сборка (SSH-клиент, venv движка и модели)"
+  docker build -q -f "$WT/deploy/Dockerfile.cad-worker" --target cad-base \
+    --build-arg "API_IMAGE=$REG/quantor-api:$SHA" --build-arg "API_DEPS_IMAGE=$API_DEPS" \
+    -t "$CAD_BASE" "$WT" >/dev/null
+fi
+
 # Страницы без изменений: всё, что копирует deploy/Dockerfile.next, с выпуска PREV то же, адреса те же,
 # прежний образ есть здесь. Тогда новый тег на прежний образ; версия сборки в нём - PREV (код тот же).
 reuse_next() {
@@ -114,7 +145,7 @@ reuse_next() {
   docker tag "$old" "$REG/quantor-$app:$SHA"
 }
 
-build quantor-api deploy/Dockerfile.api --build-arg APP= "${next_args[@]}"
+build quantor-api deploy/Dockerfile.api --build-arg APP= --build-arg "API_DEPS_IMAGE=$API_DEPS" "${next_args[@]}"
 for app in web admin; do
   if reuse_next "$app"; then
     echo "→ образ quantor-$app: без изменений с ${PREV:0:7}, тег на прежний образ"
@@ -124,7 +155,8 @@ for app in web admin; do
   fi
 done
 build quantor-cad-worker deploy/Dockerfile.cad-worker \
-  --build-arg "API_IMAGE=$REG/quantor-api:$SHA" --build-arg "ENGINE_ARCHIVE_SHA256=$ARCHIVE_SHA"
+  --build-arg "API_IMAGE=$REG/quantor-api:$SHA" --build-arg "CAD_BASE_IMAGE=$CAD_BASE" \
+  --build-arg "ENGINE_ARCHIVE_SHA256=$ARCHIVE_SHA"
 [ "$BUILD_ONLY" = 1 ] && { echo "собрано: ${SHA}"; exit 0; }
 
 images=("$REG/quantor-api:$SHA" "$REG/quantor-web:$SHA" "$REG/quantor-admin:$SHA" "$REG/quantor-cad-worker:$SHA")
@@ -149,8 +181,8 @@ ssh -o LogLevel=ERROR "$SSH_HOST" "set -e; cd $REMOTE_DIR; \
 # api (пилоты проверок обводки и ИИ-петли, ADR-0055, нужны обоим: api решает доступность, cad-worker исполняет).
 if [ "${QUANTOR_PILOT_OVERLAY:-1}" = 1 ]; then
   remote "cd $REMOTE_DIR; if [ -f compose.pilot.ui.yml ]; then \
-    ./compose.sh -f docker-compose.yml -f compose.pilot.ui.yml up -d --no-deps cad-worker api >/dev/null \
-    && echo '→ пилотные настройки cad-worker и api возвращены'; fi"
+    ./compose.sh -f docker-compose.yml -f compose.pilot.ui.yml up -d --no-deps cad-worker api worker >/dev/null \
+    && echo '→ пилотные настройки cad-worker, api и worker возвращены'; fi"
 fi
 
 # Уборка. Здесь - образы выпусков Quantor, кроме этого и прошлого (прошлый - для тега без пересборки
@@ -160,6 +192,9 @@ echo "→ уборка старых образов"
 docker images --format '{{.Repository}}:{{.Tag}}' \
   | grep -E "^$REG/quantor-(api|web|admin|cad-worker):[0-9a-f]{40}\$" \
   | grep -v -e ":$SHA\$" -e ":${PREV:-none}\$" | xargs -r docker rmi >/dev/null 2>&1 || true
+# Основы прежних хешей (пакеты или Dockerfile менялись) больше не нужны: слои уже внутри выпусков.
+docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^quantor-(api-deps|cad-base):' \
+  | grep -v -e "^$API_DEPS\$" -e "^$CAD_BASE\$" | xargs -r docker rmi >/dev/null 2>&1 || true
 docker builder prune -f --filter until=168h >/dev/null 2>&1 || true
 ssh -o LogLevel=ERROR "$SSH_HOST" "REG=$REG KEEP=$KEEP_RELEASES CUR=$SHA bash -s" <<'REMOTE' || true
 keep="$CUR $(cat /opt/portals/quantor/RELEASE 2>/dev/null) $(docker images "$REG/quantor-api" \
