@@ -81,6 +81,11 @@ class Permission(StrEnum):
     TENDER_BASE_RELEASE = "tender.base.release"
     TENDER_CALC_WITHDRAW = "tender.calc.withdraw"
 
+    # Пакетный импорт тендерной документации: создать объект по тендеру TenderHUB, если его ещё
+    # нет. Отдельно от `project.create`: токену дашборда создание объекта нужно только здесь и
+    # только по подтверждённому TenderHUB тендеру, а не произвольно.
+    TENDER_IMPORT_CREATE_PROJECT = "tender_import.create_project"
+
 
 # Читатель: видит проекты и документы своего пространства, не меняет ничего.
 _VIEWER: Final[frozenset[Permission]] = frozenset(
@@ -114,6 +119,7 @@ _REVIEWER: Final[frozenset[Permission]] = _VIEWER | {
 # уносит с собой ревизии и распознанные области, и это решение уровня администратора.
 _ENGINEER: Final[frozenset[Permission]] = _REVIEWER | {
     Permission.PROJECT_CREATE,
+    Permission.TENDER_IMPORT_CREATE_PROJECT,
     Permission.PROJECT_UPDATE,
     Permission.DOCUMENT_UPLOAD,
     Permission.TAKEOFF_EDIT,
@@ -196,6 +202,12 @@ READ_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
 # тоже вход разбора чертежа (лист без подтверждённого масштаба иначе не проходит CAD); обмер - нет.
 UPLOAD_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = READ_TOKEN_PERMISSIONS | frozenset(
     {Permission.DOCUMENT_UPLOAD, Permission.SCALE_CALIBRATE}
+)
+
+# Область `tender_import`: объект по тендеру TenderHUB может быть создан при пакетном импорте.
+# Сама по себе загрузку не даёт: токену дашборда нужны `upload` и `tender_import`.
+TENDER_IMPORT_TOKEN_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
+    {Permission.WORKSPACE_READ, Permission.TENDER_IMPORT_CREATE_PROJECT}
 )
 
 

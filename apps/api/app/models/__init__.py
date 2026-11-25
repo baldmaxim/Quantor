@@ -51,6 +51,7 @@ from app.models.sheet_passport import SheetPassport
 from app.models.sheet_register import SheetRegister
 from app.models.takeoff import Measurement, TakeoffItem
 from app.models.tender_exchange import TenderBaseRelease, TenderCalc, TenderCalcVersion
+from app.models.tender_import import TenderImport, TenderImportItem
 from app.models.tender_version import TenderVersion, TenderVersionDocument
 from app.models.worker import Worker
 
@@ -120,6 +121,8 @@ __all__ = [
     "TenderBaseRelease",
     "TenderCalc",
     "TenderCalcVersion",
+    "TenderImport",
+    "TenderImportItem",
     "TenderVersion",
     "TenderVersionDocument",
     "UserIdentity",

@@ -43,6 +43,7 @@ from app.api.v1 import (
     scale,
     takeoff,
     tender_exchange,
+    tender_imports,
     tender_versions,
     uploads,
 )
@@ -81,6 +82,8 @@ protected_router.include_router(tender_versions.router)
 # Обмен расчётами с TENDER и персональные токены: закрыты флагом tender.exchange (ADR-0051).
 protected_router.include_router(tender_exchange.router)
 protected_router.include_router(api_tokens.router)
+# Пакетный импорт тендерной документации: перечень и статус; файлы - обычная загрузка в проект.
+protected_router.include_router(tender_imports.router)
 
 api_v1_router.include_router(protected_router)
 

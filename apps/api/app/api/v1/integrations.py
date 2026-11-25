@@ -17,9 +17,10 @@ from app.api.v1.deps import SessionDep, TenderHubDep, WorkspaceDep, require
 from app.auth.permissions import Permission
 from app.domain import ProjectSource
 from app.errors import DomainError, ErrorCode
-from app.integrations.tenderhub import TenderBrief
 from app.schemas import ProjectRead, TenderBriefRead, TenderImport
 from app.services import projects as projects_service
+from app.services import tender_imports as tender_imports_service
+from app.services.projects import project_name
 
 router = APIRouter(prefix="/integrations/tenderhub", tags=["integrations"])
 
@@ -104,6 +105,18 @@ async def import_tender(
 
     tender = await client.get_tender(payload.tender_id)
 
+    # Та же блокировка, что у пакетного импорта: проверки ниже и создание идут под ней.
+    await tender_imports_service.lock_tender(
+        session, workspace_id=workspace.tenant, key=tender.tender_number or payload.tender_id
+    )
+    if await projects_service.find_by_external_id(
+        session,
+        workspace_id=workspace.tenant,
+        source=ProjectSource.TENDERHUB,
+        external_id=payload.tender_id,
+    ):
+        raise DomainError(ErrorCode.TENDERHUB_ALREADY_LINKED)
+
     # Один номер тендера — один проект (ADR-0035). Другая версия того же номера добавляется
     # версией в существующий проект; интерфейс ведёт туда по `issue.project_id`.
     if tender.tender_number:
@@ -128,14 +141,3 @@ async def import_tender(
     )
     await session.commit()
     return ProjectRead.model_validate(project)
-
-
-def project_name(tender: TenderBrief) -> str:
-    """Имя проекта по тендеру.
-
-    Номер впереди: инженеры ищут тендер по номеру, а названия у соседних тендеров
-    часто отличаются одним словом в конце. Если названия нет — остаётся номер.
-    """
-    parts = [part for part in (tender.tender_number, tender.title.strip()) if part]
-    name = " · ".join(parts) or f"Тендер {tender.id}"
-    return name[:200]

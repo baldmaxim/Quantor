@@ -341,6 +341,18 @@ async def test_scopes_union_within_the_owner_role() -> None:
     assert everything <= permissions_for(Role.ENGINEER)
     assert Permission.PROJECT_CREATE not in everything
     assert Permission.TENDER_BASE_RELEASE not in everything
+    # область tender_import: создание объекта по тендеру, но сама по себе загрузку не даёт
+    importing = permissions_for_scopes(Role.ENGINEER, ["tender_import"])
+    assert Permission.TENDER_IMPORT_CREATE_PROJECT in importing
+    assert (
+        Permission.DOCUMENT_UPLOAD not in importing and Permission.PROJECT_CREATE not in importing
+    )
+    assert Permission.TENDER_IMPORT_CREATE_PROJECT not in permissions_for_scopes(
+        Role.ENGINEER, ["upload"]
+    )
+    assert Permission.TENDER_IMPORT_CREATE_PROJECT not in permissions_for_scopes(
+        Role.VIEWER, ["tender_import"]
+    )
 
 
 async def test_token_scopes_are_stored_in_order_and_unknown_is_refused(

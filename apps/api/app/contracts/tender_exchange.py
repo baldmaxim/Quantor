@@ -739,7 +739,7 @@ class TenderBuildingLayersRead(BaseModel):
 
 # Имена типов без слов «api token»: контракт и клиент их не содержат (тест 9 матрицы
 # безопасности), смысл тот же - персональный токен пользователя.
-TokenScope = Literal["read", "tender", "upload"]
+TokenScope = Literal["read", "tender", "upload", "tender_import"]
 
 
 def _tender_scope() -> list[TokenScope]:
@@ -752,8 +752,9 @@ class PersonalTokenCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     expires_in_days: int | None = Field(default=None, ge=1, le=365)
     # Для чего токен: `read` - только чтение (агенты), `tender` - обмен расчётами TENDER, `upload` -
-    # загрузка документов и модели здания. Права - объединение областей в пределах роли владельца.
-    scopes: list[TokenScope] = Field(default_factory=_tender_scope, min_length=1, max_length=3)
+    # загрузка документов и модели здания, `tender_import` - создание объекта по тендеру при
+    # пакетном импорте (вместе с `upload`). Права - объединение областей в пределах роли владельца.
+    scopes: list[TokenScope] = Field(default_factory=_tender_scope, min_length=1, max_length=4)
 
 
 class PersonalTokenRead(BaseModel):

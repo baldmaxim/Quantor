@@ -235,8 +235,13 @@ async def receive_upload(
     chunks: AsyncIterator[bytes],
     max_size: int,
     document: Document | None = None,
+    expected_sha256: str | None = None,
+    expected_size: int | None = None,
 ) -> UploadOutcome:
     """Принимает файл: проверка, потоковая запись в хранилище, записи в базе.
+
+    `expected_sha256` и `expected_size` - заявленные клиентом значения (пакетный импорт): сверка
+    идёт сразу после записи в хранилище и до поиска дубля и создания записей.
 
     Идентификатор ревизии выбирается заранее, чтобы файл сразу лёг по своему окончательному
     ключу. Если после загрузки выяснится, что такой файл уже есть, объект удаляется,
@@ -259,6 +264,18 @@ async def receive_upload(
     if stored.size == 0:
         await storage.delete(key)
         raise DomainError(ErrorCode.EMPTY_FILE, "Файл пуст")
+
+    if (expected_sha256 is not None and stored.sha256 != expected_sha256) or (
+        expected_size is not None and stored.size != expected_size
+    ):
+        await storage.delete(key)
+        raise DomainError(
+            ErrorCode.TENDER_IMPORT_HASH_MISMATCH,
+            f"Загруженный файл не совпадает с заявленным в перечне: "
+            f"размер {stored.size} вместо {expected_size}, "
+            f"SHA-256 {stored.sha256[:12]}… вместо "
+            f"{(expected_sha256 or '')[:12]}…",
+        )
 
     existing = await find_project_revision_by_hash(
         session, project_id=project.id, source_sha256=stored.sha256

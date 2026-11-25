@@ -457,6 +457,45 @@ describe('раздел «Доступ (токены)»', () => {
     );
   });
 
+  it('область импорта по тендеру уходит в порядке сервера', async () => {
+    vi.mocked(client.createPersonalToken).mockImplementation(() =>
+      ok({
+        id: 't-2',
+        name: 'Дашборд',
+        prefix: 'qtr_cd',
+        token: 'qtr_dash-секрет',
+        active: true,
+        created_at: '2026-11-25T10:00:00Z',
+        expires_at: null,
+        last_used_at: null,
+        revoked_at: null,
+        scopes: ['upload', 'tender_import'],
+      }),
+    );
+    mountWith(<TokensTab />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Создать токен' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: 'Название токена' }),
+      'Дашборд',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('checkbox', { name: /Создание объекта по тендеру/ }),
+    );
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Загрузка документов/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
+    await within(dialog).findByDisplayValue('qtr_dash-секрет');
+    expect(client.createPersonalToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          name: 'Дашборд',
+          expires_in_days: 90,
+          scopes: ['tender', 'upload', 'tender_import'],
+        },
+      }),
+    );
+  });
+
   it('список токенов и отзыв', async () => {
     vi.mocked(client.listPersonalTokens).mockImplementation(() =>
       ok([

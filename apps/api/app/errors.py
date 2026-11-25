@@ -240,6 +240,15 @@ class ErrorCode(StrEnum):
     # Построение и показ трасс ВИС движка закрыты флагом `cad.mep_engine`.
     CAD_MEP_ENGINE_DISABLED = "CAD_MEP_ENGINE_DISABLED"
 
+    # Пакетный импорт тендерной документации.
+    TENDER_IMPORT_NOT_FOUND = "TENDER_IMPORT_NOT_FOUND"
+    TENDER_IMPORT_ITEM_NOT_FOUND = "TENDER_IMPORT_ITEM_NOT_FOUND"
+    TENDER_IMPORT_HASH_MISMATCH = "TENDER_IMPORT_HASH_MISMATCH"
+    TENDER_IMPORT_ITEM_DONE = "TENDER_IMPORT_ITEM_DONE"
+    TENDER_IMPORT_CREATE_FORBIDDEN = "TENDER_IMPORT_CREATE_FORBIDDEN"
+    TENDER_IMPORT_OCR_CONFLICT = "TENDER_IMPORT_OCR_CONFLICT"
+    TENDER_IMPORT_PDF_MISMATCH = "TENDER_IMPORT_PDF_MISMATCH"
+
 
 MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.NOT_FOUND: "Объект не найден",
@@ -441,6 +450,19 @@ MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAD_MEP_ENGINE_DISABLED: (
         "Трассы ВИС движка отключены: расчёты систем приходят из TENDER"
     ),
+    ErrorCode.TENDER_IMPORT_NOT_FOUND: "Пакетный импорт не найден",
+    ErrorCode.TENDER_IMPORT_ITEM_NOT_FOUND: "В пакетном импорте нет такой позиции",
+    ErrorCode.TENDER_IMPORT_HASH_MISMATCH: (
+        "Загруженный файл не совпадает с заявленным в перечне пакетного импорта"
+    ),
+    ErrorCode.TENDER_IMPORT_ITEM_DONE: "Позиция пакетного импорта уже обработана",
+    ErrorCode.TENDER_IMPORT_CREATE_FORBIDDEN: (
+        "Объекта по тендеру нет, а создавать его токену не разрешено: нужна область tender_import"
+    ),
+    ErrorCode.TENDER_IMPORT_OCR_CONFLICT: (
+        "Этот PDF уже распознан другим результатом: прежние данные оставлены как есть"
+    ),
+    ErrorCode.TENDER_IMPORT_PDF_MISMATCH: "PDF в загруженном архиве не совпадает с заявленным",
 }
 
 # HTTP-статус зависит от кода: клиенту важно отличать свою ошибку от отказа инфраструктуры.
@@ -611,6 +633,13 @@ STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.TENDER_FIT_TOO_LARGE: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.TENDER_PROJECT_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.CAD_MEP_ENGINE_DISABLED: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDER_IMPORT_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.TENDER_IMPORT_ITEM_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.TENDER_IMPORT_HASH_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.TENDER_IMPORT_ITEM_DONE: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDER_IMPORT_CREATE_FORBIDDEN: status.HTTP_403_FORBIDDEN,
+    ErrorCode.TENDER_IMPORT_OCR_CONFLICT: status.HTTP_409_CONFLICT,
+    ErrorCode.TENDER_IMPORT_PDF_MISMATCH: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
 

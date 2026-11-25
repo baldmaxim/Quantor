@@ -34,7 +34,9 @@ INSTRUCTIONS = (
     "дисциплины новой ревизией документа того же имени, затем сборка модели (4-9 минут, следить - "
     "job_status или model_status). Отправляй только облегчённые IFC (через MCP - до 3 МБ). "
     "Новый выпуск "
-    "базы делает только человек. Проект можно называть точным названием или id."
+    "базы делает только человек. Проект можно называть точным названием или id. "
+    "Пакетный импорт тендерной документации: start_tender_import присылает перечень ZIP с хешами "
+    "(файлы через MCP не передаются), tender_import_status показывает, что принято."
 )
 UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -397,6 +399,59 @@ async def job_status(caller: Caller, args: dict[str, Any]) -> ToolResult:
     )
 
 
+TENDER_IMPORT_ITEM_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "key": {"type": "string", "description": "ключ позиции в перечне, 1-200 знаков"},
+        "filename": {"type": "string", "description": "имя ZIP без пути, оканчивается на .zip"},
+        "size": {"type": "integer", "description": "размер ZIP, байт"},
+        "sha256": {"type": "string", "description": "SHA-256 ZIP (проверка передачи)"},
+        "pdf_sha256": {"type": "string", "description": "SHA-256 PDF внутри ZIP"},
+        "blocks_sha256": {"type": "string", "description": "SHA-256 blocks.json внутри ZIP"},
+    },
+    "required": ["key", "filename", "size", "sha256", "pdf_sha256", "blocks_sha256"],
+    "additionalProperties": False,
+}
+
+
+def _import_text(data: dict[str, Any]) -> str:
+    summary = data.get("summary") or {}
+    return (
+        f"Импорт {data.get('import_id')}: объект «{data.get('project_name')}» "
+        f"({data.get('matched_by')}), {data.get('project_url')}. "
+        f"Позиций {summary.get('total')}: ждут загрузки {summary.get('pending')}, "
+        f"принято {summary.get('received')}, импортировано {summary.get('imported')}, "
+        f"ошибок {summary.get('failed')}, конфликтов {summary.get('conflict')}. "
+        + ("Импорт завершён." if data.get("complete") else "Импорт не завершён.")
+    )
+
+
+async def start_tender_import(caller: Caller, args: dict[str, Any]) -> ToolResult:
+    tenderhub_id = str(args.get("tenderhub_id") or "").strip()
+    project = str(args.get("project") or "").strip()
+    if bool(tenderhub_id) == bool(project):
+        raise ToolInputError("Укажите ровно одно из полей: tenderhub_id или project")
+    items = args.get("items")
+    if not isinstance(items, list) or not items:
+        raise ToolInputError("items: непустой массив позиций перечня")
+    body: dict[str, Any] = {"items": items}
+    if tenderhub_id:
+        body["tenderhub_id"] = tenderhub_id
+    else:
+        project_id, _ = await resolve_project(caller, project)
+        body["project_id"] = project_id
+    data = await caller.post("/api/v1/tender-imports", body)
+    return ToolResult(_import_text(data), data)
+
+
+async def tender_import_status(caller: Caller, args: dict[str, Any]) -> ToolResult:
+    import_id = str(args.get("import_id", "")).strip()
+    if not UUID_RE.match(import_id):
+        raise ToolInputError("import_id: id пакетного импорта (uuid)")
+    data = await caller.get(f"/api/v1/tender-imports/{import_id}")
+    return ToolResult(_import_text(data), data)
+
+
 TOOLS: dict[str, Tool] = {
     t.name: t
     for t in (
@@ -478,6 +533,37 @@ TOOLS: dict[str, Tool] = {
             ["project"],
             build_model,
             read_only=False,
+        ),
+        Tool(
+            "start_tender_import",
+            "Пакетный импорт тендера",
+            "Начать пакетный импорт тендерной документации: перечень ZIP-пакетов распознавалки "
+            "(PDF + blocks.json) с хешами. Объект - по tenderhub_id (создаётся, если токену "
+            "разрешено: области upload и tender_import) или по project. Возвращает, что уже "
+            "есть и что догрузить; сами файлы через MCP не передаются.",
+            {
+                "tenderhub_id": {"type": "string", "description": "id тендера в TenderHUB"},
+                "project": PROJECT_ARG,
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "items": TENDER_IMPORT_ITEM_SCHEMA,
+                    "description": "перечень позиций (ZIP-пакетов)",
+                },
+            },
+            ["items"],
+            start_tender_import,
+            read_only=False,
+        ),
+        Tool(
+            "tender_import_status",
+            "Состояние пакетного импорта",
+            "Состояние позиций пакетного импорта по id импорта: ждут загрузки, приняты, "
+            "импортированы, ошибки, конфликты распознавания.",
+            {"import_id": {"type": "string", "description": "id пакетного импорта"}},
+            ["import_id"],
+            tender_import_status,
         ),
         Tool(
             "job_status",

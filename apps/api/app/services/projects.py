@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.domain import JobType, ProjectSource, ProjectStatus
+from app.integrations.tenderhub import TenderBrief
 from app.models import Document, DocumentRevision, Job, Project, Sheet
 
 # Задания конвейера загрузки и импорта документов. Только они задают статус проекта
@@ -295,3 +296,14 @@ async def list_projects(
         )
         for project, documents, sheets, last_job in result.all()
     ]
+
+
+def project_name(tender: TenderBrief) -> str:
+    """Имя проекта по тендеру.
+
+    Номер впереди: инженеры ищут тендер по номеру, а названия у соседних тендеров
+    часто отличаются одним словом в конце. Если названия нет — остаётся номер.
+    """
+    parts = [part for part in (tender.tender_number, tender.title.strip()) if part]
+    name = " · ".join(parts) or f"Тендер {tender.id}"
+    return name[:200]

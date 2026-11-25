@@ -1,6 +1,6 @@
 /** Области личного токена: для чего он выдан (права - в пределах роли владельца). */
 
-export type TokenScope = 'read' | 'tender' | 'upload';
+export type TokenScope = 'read' | 'tender' | 'upload' | 'tender_import';
 
 export const TOKEN_SCOPES: readonly {
   readonly value: TokenScope;
@@ -8,19 +8,24 @@ export const TOKEN_SCOPES: readonly {
   readonly hint: string;
 }[] = [
   {
-    value: 'tender',
-    label: 'Расчёты TENDER',
-    hint: 'читать выпуски базы, загружать и читать расчёты',
-  },
-  {
     value: 'read',
     label: 'Только чтение (агенты)',
     hint: 'проекты, документы, разбор, модель, задания и исполнители, база и координационный файл',
   },
   {
+    value: 'tender',
+    label: 'Расчёты TENDER',
+    hint: 'читать выпуски базы, загружать и читать расчёты',
+  },
+  {
     value: 'upload',
     label: 'Загрузка документов и модели',
     hint: 'новые ревизии и IFC, построение и утверждение модели, правки и задания разбора — всё, что закрыто правом загрузки',
+  },
+  {
+    value: 'tender_import',
+    label: 'Создание объекта по тендеру (импорт из дашборда)',
+    hint: 'Дашборд «Тендеры» создаёт объект Quantor по тендеру TenderHUB, если его ещё нет. Без области «Загрузка» не работает',
   },
 ];
 

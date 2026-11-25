@@ -957,6 +957,31 @@
             "description": "Файл проекта",
             "title": "File",
             "type": "string"
+          },
+          "tender_import_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Пакетный импорт: к какому импорту относится файл",
+            "title": "Tender Import Id"
+          },
+          "tender_import_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Пакетный импорт: ключ позиции перечня",
+            "title": "Tender Import Item"
           }
         },
         "required": [
@@ -32131,11 +32156,12 @@
               "enum": [
                 "read",
                 "tender",
-                "upload"
+                "upload",
+                "tender_import"
               ],
               "type": "string"
             },
-            "maxItems": 3,
+            "maxItems": 4,
             "minItems": 1,
             "title": "Scopes",
             "type": "array"
@@ -38327,6 +38353,416 @@
           "tender_id"
         ],
         "title": "TenderImport",
+        "type": "object"
+      },
+      "TenderImportItemIn": {
+        "additionalProperties": false,
+        "description": "Позиция перечня: один ZIP распознавалки (PDF + blocks.json) и его хеши.",
+        "properties": {
+          "blocks_sha256": {
+            "description": "SHA-256 blocks.json внутри ZIP",
+            "title": "Blocks Sha256",
+            "type": "string"
+          },
+          "filename": {
+            "description": "Имя .zip без пути",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "key": {
+            "description": "Ключ позиции в перечне",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "pdf_sha256": {
+            "description": "SHA-256 PDF внутри ZIP",
+            "title": "Pdf Sha256",
+            "type": "string"
+          },
+          "sha256": {
+            "description": "SHA-256 ZIP: проверка передачи",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size": {
+            "description": "Размер ZIP, байт",
+            "minimum": 1.0,
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "filename",
+          "size",
+          "sha256",
+          "pdf_sha256",
+          "blocks_sha256"
+        ],
+        "title": "TenderImportItemIn",
+        "type": "object"
+      },
+      "TenderImportItemRead": {
+        "properties": {
+          "blocks_sha256": {
+            "title": "Blocks Sha256",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Status"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "package_revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Revision Id"
+          },
+          "pdf_revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Revision Id"
+          },
+          "pdf_sha256": {
+            "title": "Pdf Sha256",
+            "type": "string"
+          },
+          "received_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Received At"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "received",
+              "imported",
+              "failed",
+              "conflict"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "filename",
+          "size",
+          "sha256",
+          "pdf_sha256",
+          "blocks_sha256",
+          "state",
+          "job_id",
+          "job_status",
+          "package_revision_id",
+          "document_id",
+          "pdf_revision_id",
+          "error_code",
+          "error_message",
+          "received_at"
+        ],
+        "title": "TenderImportItemRead",
+        "type": "object"
+      },
+      "TenderImportRead": {
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "import_id": {
+            "format": "uuid",
+            "title": "Import Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TenderImportItemRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "matched_by": {
+            "enum": [
+              "project_id",
+              "tenderhub_id",
+              "tender_number",
+              "created"
+            ],
+            "title": "Matched By",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "project_name": {
+            "title": "Project Name",
+            "type": "string"
+          },
+          "project_url": {
+            "title": "Project Url",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/TenderImportSummary"
+          },
+          "tenderhub_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenderhub Id"
+          },
+          "to_upload": {
+            "items": {
+              "type": "string"
+            },
+            "title": "To Upload",
+            "type": "array"
+          },
+          "upload": {
+            "$ref": "#/components/schemas/TenderImportUpload"
+          }
+        },
+        "required": [
+          "import_id",
+          "project_id",
+          "project_name",
+          "project_url",
+          "tenderhub_id",
+          "matched_by",
+          "created",
+          "complete",
+          "summary",
+          "to_upload",
+          "upload",
+          "items"
+        ],
+        "title": "TenderImportRead",
+        "type": "object"
+      },
+      "TenderImportStart": {
+        "additionalProperties": false,
+        "description": "Запуск пакетного импорта: объект (по id или по тендеру TenderHUB) и перечень позиций.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TenderImportItemIn"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "tenderhub_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenderhub Id"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "TenderImportStart",
+        "type": "object"
+      },
+      "TenderImportSummary": {
+        "properties": {
+          "conflict": {
+            "title": "Conflict",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "received": {
+            "title": "Received",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "pending",
+          "received",
+          "imported",
+          "failed",
+          "conflict"
+        ],
+        "title": "TenderImportSummary",
+        "type": "object"
+      },
+      "TenderImportUpload": {
+        "description": "Как догружать файлы: обычный приём файлов с двумя дополнительными полями формы.",
+        "properties": {
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "object"
+          },
+          "file_field": {
+            "title": "File Field",
+            "type": "string"
+          },
+          "item_field": {
+            "title": "Item Field",
+            "type": "string"
+          },
+          "method": {
+            "const": "POST",
+            "title": "Method",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "path",
+          "file_field",
+          "fields",
+          "item_field"
+        ],
+        "title": "TenderImportUpload",
         "type": "object"
       },
       "TenderQuantityDiffRead": {
@@ -55010,7 +55446,7 @@
     },
     "/api/v1/projects/{project_id}/uploads": {
       "post": {
-        "description": "Принимает файл, кладёт его в хранилище и заводит документ с ревизией.\n\nРаспознавание здесь не выполняется: для ZIP-пакета создаётся задание импорта в состоянии\n«в очереди», для остальных типов ревизия сохраняется с честным статусом обработки.",
+        "description": "Принимает файл, кладёт его в хранилище и заводит документ с ревизией.\n\nРаспознавание здесь не выполняется: для ZIP-пакета создаётся задание импорта в состоянии\n«в очереди», для остальных типов ревизия сохраняется с честным статусом обработки.\n\nС полями `tender_import_id` и `tender_import_item` файл привязывается к позиции пакетного\nимпорта: заявленные хеш и размер сверяются, повтор уже принятой позиции возвращает прежний\nрезультат (200), а не создаёт вторую ревизию.",
         "operationId": "upload_file",
         "parameters": [
           {
@@ -56012,6 +56448,101 @@
         "summary": "Архивировать строку обмера",
         "tags": [
           "takeoff"
+        ]
+      }
+    },
+    "/api/v1/tender-imports": {
+      "post": {
+        "description": "Находит или создаёт объект и запись комплекта; 201 - импорт создан, 200 - найден прежний.",
+        "operationId": "start_tender_import",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenderImportStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderImportRead"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderImportRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить пакетный импорт тендерной документации",
+        "tags": [
+          "tender-imports"
+        ]
+      }
+    },
+    "/api/v1/tender-imports/{import_id}": {
+      "get": {
+        "operationId": "read_tender_import",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderImportRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Состояние пакетного импорта",
+        "tags": [
+          "tender-imports"
         ]
       }
     },

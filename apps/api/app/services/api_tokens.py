@@ -1,9 +1,9 @@
 """Персональные API-токены `qtk_…` (ADR-0051): выпуск, список, отзыв, опознание.
 
 Токен — `qtk_` и 40 знаков `secrets.token_urlsafe`; в базе только sha256 и первые 12 знаков для
-показа. Токен привязан к пространству и областям (`scopes`: `read`, `tender`, `upload`;
-права токена - права роли владельца, суженные объединением прав его областей). Отзыв и
-истечение действуют сразу: токен проверяется по базе при каждом запросе, кэша у него нет.
+показа. Токен привязан к пространству и областям (`scopes`: `read`, `tender`, `upload`,
+`tender_import`; права токена - права роли владельца, суженные объединением прав его областей).
+Отзыв и истечение действуют сразу: токен проверяется по базе при каждом запросе, кэша у него нет.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.permissions import (
     API_TOKEN_PERMISSIONS,
     READ_TOKEN_PERMISSIONS,
+    TENDER_IMPORT_TOKEN_PERMISSIONS,
     UPLOAD_TOKEN_PERMISSIONS,
     Permission,
     permissions_for,
@@ -34,11 +35,14 @@ SCOPE_TENDER: Final = "tender"
 # API для агентов: только чтение и загрузка документов/модели.
 SCOPE_READ: Final = "read"
 SCOPE_UPLOAD: Final = "upload"
-SCOPES: Final = (SCOPE_READ, SCOPE_TENDER, SCOPE_UPLOAD)
+# Создание объекта по тендеру TenderHUB при пакетном импорте (с `upload` - для дашборда).
+SCOPE_TENDER_IMPORT: Final = "tender_import"
+SCOPES: Final = (SCOPE_READ, SCOPE_TENDER, SCOPE_UPLOAD, SCOPE_TENDER_IMPORT)
 SCOPE_PERMISSIONS: Final[dict[str, frozenset[Permission]]] = {
     SCOPE_READ: READ_TOKEN_PERMISSIONS,
     SCOPE_TENDER: API_TOKEN_PERMISSIONS,
     SCOPE_UPLOAD: UPLOAD_TOKEN_PERMISSIONS,
+    SCOPE_TENDER_IMPORT: TENDER_IMPORT_TOKEN_PERMISSIONS,
 }
 # 30 байт дают ровно 40 знаков urlsafe-base64 без добивки.
 _TOKEN_BYTES: Final = 30

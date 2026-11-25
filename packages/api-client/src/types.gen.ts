@@ -494,6 +494,18 @@ export type BodyUploadFile = {
      * Файл проекта
      */
     file: Blob | File;
+    /**
+     * Tender Import Id
+     *
+     * Пакетный импорт: к какому импорту относится файл
+     */
+    tender_import_id?: string | null;
+    /**
+     * Tender Import Item
+     *
+     * Пакетный импорт: ключ позиции перечня
+     */
+    tender_import_item?: string | null;
 };
 
 /**
@@ -16303,7 +16315,7 @@ export type PersonalTokenCreate = {
     /**
      * Scopes
      */
-    scopes?: Array<'read' | 'tender' | 'upload'>;
+    scopes?: Array<'read' | 'tender' | 'upload' | 'tender_import'>;
 };
 
 /**
@@ -19505,6 +19517,244 @@ export type TenderImport = {
      * Tender Id
      */
     tender_id: string;
+};
+
+/**
+ * TenderImportItemIn
+ *
+ * Позиция перечня: один ZIP распознавалки (PDF + blocks.json) и его хеши.
+ */
+export type TenderImportItemIn = {
+    /**
+     * Blocks Sha256
+     *
+     * SHA-256 blocks.json внутри ZIP
+     */
+    blocks_sha256: string;
+    /**
+     * Filename
+     *
+     * Имя .zip без пути
+     */
+    filename: string;
+    /**
+     * Key
+     *
+     * Ключ позиции в перечне
+     */
+    key: string;
+    /**
+     * Pdf Sha256
+     *
+     * SHA-256 PDF внутри ZIP
+     */
+    pdf_sha256: string;
+    /**
+     * Sha256
+     *
+     * SHA-256 ZIP: проверка передачи
+     */
+    sha256: string;
+    /**
+     * Size
+     *
+     * Размер ZIP, байт
+     */
+    size: number;
+};
+
+/**
+ * TenderImportItemRead
+ */
+export type TenderImportItemRead = {
+    /**
+     * Blocks Sha256
+     */
+    blocks_sha256: string;
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Job Id
+     */
+    job_id: string | null;
+    /**
+     * Job Status
+     */
+    job_status: string | null;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Package Revision Id
+     */
+    package_revision_id: string | null;
+    /**
+     * Pdf Revision Id
+     */
+    pdf_revision_id: string | null;
+    /**
+     * Pdf Sha256
+     */
+    pdf_sha256: string;
+    /**
+     * Received At
+     */
+    received_at: string | null;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * State
+     */
+    state: 'pending' | 'received' | 'imported' | 'failed' | 'conflict';
+};
+
+/**
+ * TenderImportRead
+ */
+export type TenderImportRead = {
+    /**
+     * Complete
+     */
+    complete: boolean;
+    /**
+     * Created
+     */
+    created: boolean;
+    /**
+     * Import Id
+     */
+    import_id: string;
+    /**
+     * Items
+     */
+    items: Array<TenderImportItemRead>;
+    /**
+     * Matched By
+     */
+    matched_by: 'project_id' | 'tenderhub_id' | 'tender_number' | 'created';
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Project Name
+     */
+    project_name: string;
+    /**
+     * Project Url
+     */
+    project_url: string;
+    summary: TenderImportSummary;
+    /**
+     * Tenderhub Id
+     */
+    tenderhub_id: string | null;
+    /**
+     * To Upload
+     */
+    to_upload: Array<string>;
+    upload: TenderImportUpload;
+};
+
+/**
+ * TenderImportStart
+ *
+ * Запуск пакетного импорта: объект (по id или по тендеру TenderHUB) и перечень позиций.
+ */
+export type TenderImportStart = {
+    /**
+     * Items
+     */
+    items: Array<TenderImportItemIn>;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
+    /**
+     * Tenderhub Id
+     */
+    tenderhub_id?: string | null;
+};
+
+/**
+ * TenderImportSummary
+ */
+export type TenderImportSummary = {
+    /**
+     * Conflict
+     */
+    conflict: number;
+    /**
+     * Failed
+     */
+    failed: number;
+    /**
+     * Imported
+     */
+    imported: number;
+    /**
+     * Pending
+     */
+    pending: number;
+    /**
+     * Received
+     */
+    received: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * TenderImportUpload
+ *
+ * Как догружать файлы: обычный приём файлов с двумя дополнительными полями формы.
+ */
+export type TenderImportUpload = {
+    /**
+     * Fields
+     */
+    fields: {
+        [key: string]: string;
+    };
+    /**
+     * File Field
+     */
+    file_field: string;
+    /**
+     * Item Field
+     */
+    item_field: string;
+    /**
+     * Method
+     */
+    method: 'POST';
+    /**
+     * Path
+     */
+    path: string;
 };
 
 /**
@@ -30002,6 +30252,65 @@ export type ArchiveTakeoffItemResponses = {
 };
 
 export type ArchiveTakeoffItemResponse = ArchiveTakeoffItemResponses[keyof ArchiveTakeoffItemResponses];
+
+export type StartTenderImportData = {
+    body: TenderImportStart;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tender-imports';
+};
+
+export type StartTenderImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartTenderImportError = StartTenderImportErrors[keyof StartTenderImportErrors];
+
+export type StartTenderImportResponses = {
+    /**
+     * OK
+     */
+    200: TenderImportRead;
+    /**
+     * Successful Response
+     */
+    201: TenderImportRead;
+};
+
+export type StartTenderImportResponse = StartTenderImportResponses[keyof StartTenderImportResponses];
+
+export type ReadTenderImportData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/v1/tender-imports/{import_id}';
+};
+
+export type ReadTenderImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadTenderImportError = ReadTenderImportErrors[keyof ReadTenderImportErrors];
+
+export type ReadTenderImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenderImportRead;
+};
+
+export type ReadTenderImportResponse = ReadTenderImportResponses[keyof ReadTenderImportResponses];
 
 export type LivenessData = {
     body?: never;
