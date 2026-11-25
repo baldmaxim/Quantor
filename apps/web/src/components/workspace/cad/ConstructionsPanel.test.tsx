@@ -28,8 +28,24 @@ const pylon = construction({
 const DATA = constructionsRead({
   constructions: [base, construction({ id: 'b' }), check, noHeight, pylon],
   totals: [
-    { kind: 'masonry', thickness_mm: 120, material: null, count: 2, length_m: 10, wall_area_m2: 27, volume_m3: 3.24 },
-    { kind: 'monolith_pylon', thickness_mm: 300, material: 'monolith_concrete', count: 1, length_m: 1, wall_area_m2: 2.7, volume_m3: 0.81 },
+    {
+      kind: 'masonry',
+      thickness_mm: 120,
+      material: null,
+      count: 2,
+      length_m: 10,
+      wall_area_m2: 27,
+      volume_m3: 3.24,
+    },
+    {
+      kind: 'monolith_pylon',
+      thickness_mm: 300,
+      material: 'monolith_concrete',
+      count: 1,
+      length_m: 1,
+      wall_area_m2: 2.7,
+      volume_m3: 0.81,
+    },
   ],
   summary: {
     total_count: 5,
@@ -58,7 +74,11 @@ const props = (patch: Partial<IWorkspaceCadConstructions> = {}): IWorkspaceCadCo
 
 describe('ConstructionsPanel: нет результата', () => {
   it('404: текст по статусу и кнопка «Посчитать конструкции»', () => {
-    const p = props({ status: 'not-ready', data: null, notReadyText: 'Конструкции этого листа ещё не считались.' });
+    const p = props({
+      status: 'not-ready',
+      data: null,
+      notReadyText: 'Конструкции этого листа ещё не считались.',
+    });
     render(<ConstructionsPanel {...p} />);
     expect(screen.getByText('Конструкции этого листа ещё не считались.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Посчитать конструкции' }));
@@ -68,7 +88,12 @@ describe('ConstructionsPanel: нет результата', () => {
   it('расчёт идёт: статус вместо подсказки, кнопка недоступна', () => {
     render(
       <ConstructionsPanel
-        {...props({ status: 'not-ready', data: null, notReadyText: 'старый текст', calculating: true })}
+        {...props({
+          status: 'not-ready',
+          data: null,
+          notReadyText: 'старый текст',
+          calculating: true,
+        })}
       />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('Конструкции считаются');
@@ -90,12 +115,16 @@ describe('ConstructionsPanel: нет результата', () => {
   });
 
   it('загрузка - скелетон, отказ чтения - текст и «Повторить»', () => {
-    const { unmount } = render(<ConstructionsPanel {...props({ status: 'loading', data: null })} />);
+    const { unmount } = render(
+      <ConstructionsPanel {...props({ status: 'loading', data: null })} />,
+    );
     expect(screen.getByRole('status', { name: 'Загрузка конструкций' })).toBeInTheDocument();
     unmount();
     const p = props({ status: 'error', data: null, loadError: 'нет связи' });
     render(<ConstructionsPanel {...p} />);
-    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось загрузить конструкции. нет связи');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Не удалось загрузить конструкции. нет связи',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
     expect(p.onReload).toHaveBeenCalled();
   });
@@ -106,15 +135,11 @@ describe('ConstructionsPanel: свод', () => {
     render(<ConstructionsPanel {...props()} />);
     const table = screen.getByRole('table');
     const rows = within(table).getAllByRole('row');
-    expect(within(rows[1] as HTMLElement).getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
-      'Кладка',
-      '120',
-      'не задан',
-      '2',
-      '10',
-      '27',
-      '3,24',
-    ]);
+    expect(
+      within(rows[1] as HTMLElement)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Кладка', '120', 'не задан', '2', '10', '27', '3,24']);
     expect(within(rows[2] as HTMLElement).getByText('Монолитный железобетон')).toBeInTheDocument();
     expect(within(table).getByText('Итого кладка').closest('tr')).toHaveTextContent('3,24');
     expect(within(table).getByText('Итого монолит').closest('tr')).toHaveTextContent('0,81');
@@ -167,8 +192,43 @@ describe('ConstructionsPanel: свод', () => {
   });
 
   it('пересчёт идёт снова: отказ прежнего не показывается', () => {
-    render(<ConstructionsPanel {...props({ calculating: true, recomputeFailure: 'скрипт упал' })} />);
+    render(
+      <ConstructionsPanel {...props({ calculating: true, recomputeFailure: 'скрипт упал' })} />,
+    );
     expect(screen.queryByTestId('constructions-recompute-failed')).toBeNull();
+  });
+
+  it('кнопки по замечаниям: активны при count > 0, вызывают обработчик и показывают статус reconvert', () => {
+    const onRebuild = vi.fn();
+    const onReconvert = vi.fn();
+    const { rerender } = render(
+      <ConstructionsPanel
+        {...props({
+          rebuild: { count: 0, pending: false, onRebuild },
+          reconvert: { count: 0, pending: false, queued: false, onReconvert },
+        })}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Перестроить по замечаниям (0)' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Повторить PDF→DXF по замечаниям (0)' }),
+    ).toBeDisabled();
+
+    rerender(
+      <ConstructionsPanel
+        {...props({
+          rebuild: { count: 3, pending: false, onRebuild },
+          reconvert: { count: 2, pending: false, queued: true, onReconvert },
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Перестроить по замечаниям (3)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить PDF→DXF по замечаниям (2)' }));
+    expect(onRebuild).toHaveBeenCalledTimes(1);
+    expect(onReconvert).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Повторное преобразование с подсказками поставлено в очередь.',
+    );
   });
 });
 
@@ -266,4 +326,3 @@ describe('ConstructionsPanel: ВОР Заказчика', () => {
     expect(totals.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
-

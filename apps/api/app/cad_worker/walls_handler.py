@@ -62,6 +62,9 @@ from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavaila
 log = get_logger(__name__)
 
 RESULT_READY = "walls_ready"
+_RENDER_CLI = Path(__file__).with_name("view_render_cli.py")
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+_RENDER_TIMEOUT_SECONDS = 60.0
 
 
 class _Input:
@@ -300,6 +303,104 @@ def _verified_output(
     return [{"name": name, "sha256": _sha256(path), "size": path.stat().st_size}], document
 
 
+def _render_argv(
+    settings: Settings,
+    job: Job,
+    *,
+    pdf: Path,
+    walls_file: Path,
+    source: _Input,
+) -> list[str] | None:
+    frame = _view_frame_of(job.payload)
+    python = settings.cad_engine_python.strip()
+    if frame is None or not python or not Path(python).is_file():
+        return None
+    ox, oy, k = frame
+    argv = [
+        python,
+        "-I",
+        str(_RENDER_CLI),
+        "--pdf",
+        str(pdf),
+        "--walls",
+        str(walls_file),
+        "--out-dir",
+        str(walls_file.parent),
+        "--page",
+        str(source.page_index),
+        "--ox",
+        str(ox),
+        "--oy",
+        str(oy),
+        "--k",
+        str(k),
+    ]
+    zone = _view_zone_of(job.payload)
+    if zone is not None:
+        argv += ["--view-zone", ",".join(str(v) for v in zone)]
+    return argv
+
+
+def _collect_rendered_images(
+    job_id: uuid.UUID, walls_dir: Path, folder: str
+) -> list[dict[str, Any]]:
+    rendered: list[dict[str, Any]] = []
+    for filename, is_png in (("plan.png", True), ("overlay.png", True), ("render.json", False)):
+        path = walls_dir / filename
+        if not path.is_file() or path.is_symlink():
+            log.warning("cad_walls_render_missing", job_id=str(job_id), file=filename)
+            return []
+        size = path.stat().st_size
+        limit = (
+            cad_service.MAX_PNG_ARTIFACT_BYTES if is_png else cad_service.MAX_JSON_ARTIFACT_BYTES
+        )
+        if size <= 0 or size > limit:
+            log.warning("cad_walls_render_oversized", job_id=str(job_id), file=filename, size=size)
+            return []
+        if is_png and path.read_bytes()[: len(_PNG_MAGIC)] != _PNG_MAGIC:
+            log.warning("cad_walls_render_invalid_png", job_id=str(job_id), file=filename)
+            return []
+        rendered.append({"name": f"{folder}/{filename}", "sha256": _sha256(path), "size": size})
+    return rendered
+
+
+async def _render_view_images(
+    session: AsyncSession,
+    job: Job,
+    owner: str | None,
+    attempt: int,
+    settings: Settings,
+    *,
+    pdf: Path,
+    walls_file: Path,
+    source: _Input,
+) -> list[dict[str, Any]] | None:
+    """Рендер `plan.png`, `overlay.png`, `render.json` в подпроцессе движка; сбой не роняет walls.
+
+    Возвращает `None`, только если во время рендера потеряна аренда задания.
+    """
+    argv = _render_argv(settings, job, pdf=pdf, walls_file=walls_file, source=source)
+    if argv is None:
+        return []
+    outcome = await _run_while_owned(
+        session,
+        job,
+        owner,
+        attempt,
+        argv,
+        limit_seconds=_RENDER_TIMEOUT_SECONDS,
+        poll_interval=settings.worker_heartbeat_interval_seconds,
+        memory_limit_mb=settings.cad_max_memory_mb,
+    )
+    if outcome is None:
+        return None
+    code, _ = outcome
+    if code != 0:
+        log.warning("cad_walls_render_skipped", job_id=str(job.id), exit_code=code)
+        return []
+    return _collect_rendered_images(job.id, walls_file.parent, source.folder)
+
+
 async def execute_cad_walls(
     session: AsyncSession, job: Job, storage: ObjectStorage, settings: Settings
 ) -> Job:
@@ -441,7 +542,13 @@ async def execute_cad_walls(
                 job,
                 owner,
                 attempt,
-                [settings.cad_engine_python, "-I", znaki_corner_door.__file__, str(walls_file), str(dxf)],
+                [
+                    settings.cad_engine_python,
+                    "-I",
+                    znaki_corner_door.__file__,
+                    str(walls_file),
+                    str(dxf),
+                ],
                 limit_seconds=30,
                 poll_interval=settings.worker_heartbeat_interval_seconds,
                 memory_limit_mb=settings.cad_max_memory_mb,
@@ -453,6 +560,20 @@ async def execute_cad_walls(
                     ErrorCode.CAD_ENGINE_FAILED, "Не подтверждены откосы двери на листе 32"
                 )
             files, document = _verified_output(out, source, job, params, dxf_sha256)
+        rendered = await _render_view_images(
+            session,
+            job,
+            owner,
+            attempt,
+            settings,
+            pdf=pdf,
+            walls_file=walls_file,
+            source=source,
+        )
+        if rendered is None:
+            log.warning("cad_lease_lost", job_id=str(job.id))
+            return job
+        files = [*files, *rendered]
         if not await _still_owned(session, job, owner, attempt):
             log.warning("cad_lease_lost", job_id=str(job.id))
             return job

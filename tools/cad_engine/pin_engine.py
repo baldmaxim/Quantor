@@ -19,6 +19,7 @@ import json
 import re
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -129,9 +130,8 @@ def generators_section(engine: Path, current: dict[str, Any]) -> dict[str, Any]:
     return section
 
 
-def verify_archive(engine: Path, pins: dict[str, Any]) -> None:
-    info = pins["engine"]
-    archive = engine / info["archive_path"]
+def verify_archive_bundle(archive: Path, info: dict[str, Any]) -> None:
+    """Сверяет SHA256 архива, число записей, MANIFEST.json и SHA каждого файла внутри zip."""
     try:
         actual = sha256_file(archive)
     except OSError as error:
@@ -142,6 +142,54 @@ def verify_archive(engine: Path, pins: dict[str, Any]) -> None:
             f"(pins {info['archive_sha256'][:12]}..., checkout {actual[:12]}...). "
             "Обновите поля engine.archive_* вручную по engine/dist/<имя>.json."
         )
+    try:
+        with zipfile.ZipFile(archive) as bundle:
+            infos = bundle.infolist()
+            if len(infos) != info["archive_entries"]:
+                raise PinError(
+                    f"archive_entries в pins ({info['archive_entries']}) не совпало "
+                    f"с архивом ({len(infos)})"
+                )
+            unpacked = sum(item.file_size for item in infos)
+            if unpacked > info["max_unpacked_bytes"]:
+                raise PinError(
+                    f"размер архива ({unpacked}) больше max_unpacked_bytes "
+                    f"({info['max_unpacked_bytes']})"
+                )
+            manifest_bytes = bundle.read("MANIFEST.json")
+            manifest_sha = sha256_bytes(manifest_bytes)
+            if manifest_sha != info["manifest_sha256"]:
+                raise PinError(
+                    f"manifest_sha256 не совпал с MANIFEST.json "
+                    f"(pins {info['manifest_sha256'][:12]}..., архив {manifest_sha[:12]}...)"
+                )
+            manifest = json.loads(manifest_bytes)
+            if manifest.get("version") != info["version"]:
+                raise PinError(
+                    f"engine.version в pins ({info['version']!r}) не совпала "
+                    f"с MANIFEST.json ({manifest.get('version')!r})"
+                )
+            if manifest.get("source_snapshot_sha256") != info["source_snapshot_sha256"]:
+                raise PinError(
+                    f"engine.source_snapshot_sha256 в pins "
+                    f"({str(info['source_snapshot_sha256'])[:12]}...) не совпал "
+                    f"с MANIFEST.json ({str(manifest.get('source_snapshot_sha256'))[:12]}...)"
+                )
+            expected = {row["file"]: row["sha256"] for row in manifest["files"]}
+            names = {item.filename for item in infos} - {"MANIFEST.json"}
+            if names != set(expected):
+                raise PinError("состав файлов архива не совпал с MANIFEST.json")
+            for name, digest in expected.items():
+                if sha256_bytes(bundle.read(name)) != digest:
+                    raise PinError(f"sha256 файла {name} не совпал с MANIFEST.json")
+    except (zipfile.BadZipFile, KeyError, TypeError, ValueError, OSError) as error:
+        raise PinError(f"некорректный архив или MANIFEST.json в {archive}: {error}") from error
+
+
+def verify_archive(engine: Path, pins: dict[str, Any]) -> None:
+    info = pins["engine"]
+    archive = engine / info["archive_path"]
+    verify_archive_bundle(archive, info)
 
 
 def differences(old: dict[str, Any], new: dict[str, Any], prefix: str = "") -> list[str]:

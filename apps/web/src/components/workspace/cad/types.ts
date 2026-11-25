@@ -183,6 +183,8 @@ export interface IWorkspaceCadConstructions {
   readonly vor?: IWorkspaceCadVor | null;
   /** Перестроение по замечаниям; нет - кнопки нет. */
   readonly rebuild?: IWorkspaceCadRebuild | null;
+  /** Повторное преобразование PDF→DXF с подсказками из замечаний; нет - кнопки нет. */
+  readonly reconvert?: IWorkspaceCadReconvert | null;
 }
 
 /** Перестроение вида по открытым замечаниям: счётчик подходящих замечаний и запуск. */
@@ -192,6 +194,17 @@ export interface IWorkspaceCadRebuild {
   /** Запуск идёт: кнопка заблокирована. */
   readonly pending: boolean;
   readonly onRebuild: () => void;
+}
+
+/** Повторное преобразование PDF→DXF страницы с подсказками из открытых замечаний. */
+export interface IWorkspaceCadReconvert {
+  /** Открытых замечаний типов «нет стены», «нет двери». */
+  readonly count: number;
+  /** Запуск идёт: кнопка заблокирована. */
+  readonly pending: boolean;
+  /** Новое задание преобразования поставлено в очередь. */
+  readonly queued: boolean;
+  readonly onReconvert: () => void;
 }
 
 /** Карточка выбранной конструкции у курсора. */

@@ -380,3 +380,12 @@ export const countRebuildRemarks = (
   remarks: readonly { readonly type: RemarkType; readonly status: RemarkStatus }[],
 ): number =>
   remarks.filter((r) => r.status === 'open' && REBUILD_REMARK_TYPES.includes(r.type)).length;
+
+/** Типы замечаний, которые движок PDF→DXF принимает как `operator_convert_hints`. */
+export const RECONVERT_REMARK_TYPES: readonly RemarkType[] = ['missing_wall', 'missing_door'];
+
+/** Сколько открытых замечаний подходит для повторного преобразования PDF→DXF. */
+export const countReconvertRemarks = (
+  remarks: readonly { readonly type: RemarkType; readonly status: RemarkStatus }[],
+): number =>
+  remarks.filter((r) => r.status === 'open' && RECONVERT_REMARK_TYPES.includes(r.type)).length;

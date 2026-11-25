@@ -34,10 +34,15 @@ export const ConstructionsPanel: FC<IWorkspaceCadConstructions> = ({
   vor,
   showOutlineReview,
   rebuild,
+  reconvert,
 }) => {
   if (status === 'loading') {
     return (
-      <div role="status" aria-label="Загрузка конструкций" className="flex flex-col gap-[var(--s-3)]">
+      <div
+        role="status"
+        aria-label="Загрузка конструкций"
+        className="flex flex-col gap-[var(--s-3)]"
+      >
         <Skeleton className="h-[20px] w-[60%]" />
         <Skeleton className="h-[16px] w-[80%]" />
       </div>
@@ -68,9 +73,7 @@ export const ConstructionsPanel: FC<IWorkspaceCadConstructions> = ({
 
   const calculatingNote = calculating && (
     <p role="status" className="text-xs text-muted">
-      {data === null
-        ? 'Конструкции считаются. Результат появится здесь сам.'
-        : 'Пересчёт идёт…'}
+      {data === null ? 'Конструкции считаются. Результат появится здесь сам.' : 'Пересчёт идёт…'}
     </p>
   );
   // Показан прежний результат, а свежий пересчёт упал: об этом сказано заметно.
@@ -118,6 +121,20 @@ export const ConstructionsPanel: FC<IWorkspaceCadConstructions> = ({
           >
             {`Перестроить по замечаниям (${rebuild.count})`}
           </Button>
+        )}
+        {reconvert && (
+          <Button
+            disabled={calculating || reconvert.pending || reconvert.count === 0}
+            className="self-start max-md:h-[44px] max-md:w-full"
+            onClick={reconvert.onReconvert}
+          >
+            {`Повторить PDF→DXF по замечаниям (${reconvert.count})`}
+          </Button>
+        )}
+        {reconvert?.queued && (
+          <p role="status" className="text-xs text-muted">
+            Повторное преобразование с подсказками поставлено в очередь.
+          </p>
         )}
       </div>
       {data.hints_applied && data.hints_applied.length > 0 && (

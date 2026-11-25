@@ -90,10 +90,27 @@ python3 quantor_agent.py --json coordination --project <id>                  # �
 | `start_tender_import`  | пакетный импорт: перечень ZIP с хешами; объект — `tenderhub_id` (создаётся при `tender_import`) или `project` | `upload` (+ `tender_import` для создания объекта) |
 | `tender_import_status` | состояние позиций пакетного импорта по `import_id`                                           | `read`         |
 | `job_status`         | состояние задания                                                                             | `read`         |
+| `get_cad_pipeline`   | листы и виды CAD проекта (или конкретной ревизии): `convert_job_id`, `walls_job_id`, статусы и замечания | `read` (`cad.export`) |
+| `get_cad_view`       | результаты построения чертежа вида: группы конструкций, высоты, предупреждения, `hints_applied`, диагностика и замечания | `read` (`cad.export`) |
+| `get_cad_view_images` | снимки `plan.png` (исходный чертёж) и `overlay.png` (наложение обводки `walls.json`) с `render.json` в формате MCP `image/png` | `read` (`cad.export`) |
+| `get_cad_artifact`   | чтение текстового/JSON-артефакта CAD (`scale.json`, `cad_checks.json`, `walls.json`, DXF до 1 МБ) | `read` (`cad.export`) |
+| `add_cad_remark`     | запись замечания агента (Gemini, Claude, Codex и др.) с рамкой `bbox_pt` или `bbox_px` на виде чертежа | `upload` (`cad.export`) |
+| `rebuild_cad_view`   | запуск перестроения конструкций (`rebuild_walls`) или повторного PDF→DXF (`reconvert_pdf`) по открытым замечаниям | `upload` (`cad.export`) |
 
 Вход — личный токен в заголовке `Authorization: Bearer qtk_…` или вход чата по OAuth (ниже); cookie портала
 MCP не принимает. Права — как у токена или разрешения: роль владельца и выбранные области. Проект в
 инструментах — id или точное название.
+
+#### Работа с результатами построения чертежей из Gemini, Claude или Codex через MCP
+
+Любой подключённый MCP-клиент (Gemini / Antigravity, Claude, ChatGPT, Codex) может визуально
+проверять обводку и прокручивать петлю замечаний напрямую, без передачи ключей моделей на сервер
+Quantor:
+
+1. `get_cad_pipeline(project)` — получить перечень планов и их `(revision_id, convert_job_id, page_index, view)`.
+2. `get_cad_view(project, job_id, page_index, view, revision_id=…)` и `get_cad_view_images(…)` — забрать итоги конструкций, замечания и сами картинки `plan.png` + `overlay.png` (генерируются в `cad-worker` при расчёте `cad_walls`).
+3. `add_cad_remark(…, bbox_px=[x0, y0, x1, y1], reviewer="Gemini (MCP)")` — записать найденные расхождения прямо в пикселях снимка (сервер сам переведёт их в `bbox_pt` по `render.json`).
+4. `rebuild_cad_view(…, mode="rebuild_walls" | "reconvert_pdf")` + `job_status(job_id)` → снова `get_cad_view_images(…)` для проверки результата круга. Одобрение вида остаётся за человеком.
 
 ### Веб-чаты: Claude и ChatGPT (вход по OAuth, ADR-0054)
 

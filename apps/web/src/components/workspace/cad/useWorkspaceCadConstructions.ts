@@ -19,13 +19,17 @@ import {
   useCadConstructions,
   useRebuildCadWallsByRemarks,
   useRecomputeCadWalls,
+  useReconvertCadViewByRemarks,
   useSaveConstructionProps,
   useSaveSheetLevels,
   WALLS_BUSY,
   WALLS_NOT_READY,
   wallsJobStatus,
 } from '@/lib/cad/constructions-queries';
-import { readConstructionColors, type IConstructionPaintData } from '@/lib/cad/constructions-painter';
+import {
+  readConstructionColors,
+  type IConstructionPaintData,
+} from '@/lib/cad/constructions-painter';
 import type { ICadFrame } from '@/lib/cad/frame';
 import {
   monolithPaintedByShapes,
@@ -33,17 +37,14 @@ import {
   type CadLayerCategory,
 } from '@/lib/cad/layer-categories';
 import { useCadRemarksList } from '@/lib/cad/queries';
-import { countRebuildRemarks, type IRemarkBinding } from '@/lib/cad/remarks';
+import { countRebuildRemarks, countReconvertRemarks, type IRemarkBinding } from '@/lib/cad/remarks';
 import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import type { ICadViewParams } from '@/lib/cad/view-queries';
 import { extractCode } from '@/lib/errors';
 import { useTheme } from '@/lib/theme';
 import type { Camera } from '@/lib/viewer/camera';
 
-import type {
-  IWorkspaceCadConstructionPicker,
-  IWorkspaceCadConstructions,
-} from './types';
+import type { IWorkspaceCadConstructionPicker, IWorkspaceCadConstructions } from './types';
 import { useWorkspaceCadVor } from './useWorkspaceCadVor';
 
 const NO_IDS: ReadonlySet<string> = new Set<string>();
@@ -136,6 +137,7 @@ export const useWorkspaceCadConstructions = ({
   const [anchor, setAnchor] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [actionError, setActionError] = useState<string | null>(null);
   const [popoverError, setPopoverError] = useState<string | null>(null);
+  const [reconvertQueued, setReconvertQueued] = useState(false);
 
   // Выбор принадлежит виду: на другом они означали бы другое место.
   const scope = params ? `${params.jobId}:${params.pageIndex}:${params.view}` : null;
@@ -148,18 +150,28 @@ export const useWorkspaceCadConstructions = ({
     setChosenId(null);
     setActionError(null);
     setPopoverError(null);
+    setReconvertQueued(false);
   }
 
   const enabled = load && params !== null;
   const query = useCadConstructions(params, enabled);
   const data = query.data ?? null;
 
-  const vor = useWorkspaceCadVor({ params, enabled: enabled && data !== null, stamp: query.dataUpdatedAt });
+  const vor = useWorkspaceCadVor({
+    params,
+    enabled: enabled && data !== null,
+    stamp: query.dataUpdatedAt,
+  });
 
   const recompute = useRecomputeCadWalls(params);
   const rebuild = useRebuildCadWallsByRemarks(params);
-  const remarksList = useCadRemarksList(remarkBinding ?? NO_BINDING, enabled && remarkBinding !== null);
+  const reconvert = useReconvertCadViewByRemarks(params);
+  const remarksList = useCadRemarksList(
+    remarkBinding ?? NO_BINDING,
+    enabled && remarkBinding !== null,
+  );
   const rebuildCount = countRebuildRemarks(remarksList.data ?? []);
+  const reconvertCount = countReconvertRemarks(remarksList.data ?? []);
   const saveProps = useSaveConstructionProps(params);
   const bulkProps = useBulkConstructionProps(params);
   const saveLevels = useSaveSheetLevels(params);
@@ -182,7 +194,10 @@ export const useWorkspaceCadConstructions = ({
   }, [selected, shapes]);
 
   // Включена ровно одна монолитная строка - монолит рисует сам слой конструкций, а не DXF.
-  const alwaysCategories = useMemo(() => monolithPaintedByShapes(hiddenCategories), [hiddenCategories]);
+  const alwaysCategories = useMemo(
+    () => monolithPaintedByShapes(hiddenCategories),
+    [hiddenCategories],
+  );
 
   const paintData = useMemo<IConstructionPaintData | null>(
     () =>
@@ -231,7 +246,10 @@ export const useWorkspaceCadConstructions = ({
           onClose: closePopover,
           onSave: (props: CadConstructionProps) => {
             setPopoverError(null);
-            saveProps.mutate({ key: construction.id, props }, { onError: failure(setPopoverError) });
+            saveProps.mutate(
+              { key: construction.id, props },
+              { onError: failure(setPopoverError) },
+            );
           },
           onBulk: (patch: CadConstructionProps) => {
             setPopoverError(null);
@@ -283,13 +301,7 @@ export const useWorkspaceCadConstructions = ({
   const side: IWorkspaceCadConstructions | null = enabled
     ? {
         showOutlineReview: true,
-        status: data
-          ? 'ready'
-          : notReady
-            ? 'not-ready'
-            : query.isError
-              ? 'error'
-              : 'loading',
+        status: data ? 'ready' : notReady ? 'not-ready' : query.isError ? 'error' : 'loading',
         data,
         notReadyText: notReady ? notReadyText(status) : null,
         loadError: query.isError && !notReady ? cadErrorText(query.error) : null,
@@ -322,6 +334,19 @@ export const useWorkspaceCadConstructions = ({
                   setActionError(cadErrorText(error));
                 }
               },
+            });
+          },
+        },
+        reconvert: {
+          count: reconvertCount,
+          pending: reconvert.isPending,
+          queued: reconvertQueued,
+          onReconvert: () => {
+            setActionError(null);
+            setReconvertQueued(false);
+            reconvert.mutate(undefined, {
+              onSuccess: () => setReconvertQueued(true),
+              onError: (error) => setActionError(cadErrorText(error)),
             });
           },
         },

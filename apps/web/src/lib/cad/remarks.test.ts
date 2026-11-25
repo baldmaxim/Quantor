@@ -270,3 +270,18 @@ describe('импорт на сервер', () => {
     expect(result.ok && result.remarks.map((item) => item.id)).toEqual(['id-1']);
   });
 });
+
+describe('countRebuildRemarks и countReconvertRemarks', () => {
+  it('считают только открытые замечания подходящих типов', async () => {
+    const { countRebuildRemarks, countReconvertRemarks } = await import('./remarks');
+    const items = [
+      { type: 'missing_wall' as const, status: 'open' as const },
+      { type: 'false_wall' as const, status: 'open' as const },
+      { type: 'missing_door' as const, status: 'open' as const },
+      { type: 'missing_wall' as const, status: 'resolved' as const },
+      { type: 'wrong_class' as const, status: 'open' as const },
+    ];
+    expect(countRebuildRemarks(items)).toBe(3);
+    expect(countReconvertRemarks(items)).toBe(2);
+  });
+});

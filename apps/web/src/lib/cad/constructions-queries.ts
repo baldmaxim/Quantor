@@ -7,11 +7,13 @@ import {
   readCadConstructions,
   rebuildCadWallsByRemarks,
   recomputeCadWalls,
+  reconvertCadViewByRemarks,
   type CadConstructionProps,
   type CadConstructionRead,
   type CadConstructionsBulkRead,
   type CadConstructionsRead,
   type CadConstructionsTotalsRead,
+  type CadJobRead,
   type CadSheetLevelsWrite,
   type CadWallsJobRead,
 } from '@quantor/api-client';
@@ -30,6 +32,7 @@ import { unwrap } from '@/lib/queries';
 
 import { building3dKeys } from './building3d-queries';
 import { cadPipelineKey } from './pipeline-queries';
+import { cadKeys } from './queries';
 import type { ICadViewParams } from './view-queries';
 
 /**
@@ -46,7 +49,14 @@ export const WALLS_POLL_MS = 5000;
 
 export const constructionKeys = {
   view: (params: ICadViewParams) =>
-    ['cad-constructions', params.projectId, params.revisionId, params.jobId, params.pageIndex, params.view] as const,
+    [
+      'cad-constructions',
+      params.projectId,
+      params.revisionId,
+      params.jobId,
+      params.pageIndex,
+      params.view,
+    ] as const,
 };
 
 /**
@@ -56,7 +66,14 @@ export const constructionKeys = {
  */
 export const invalidateSheet3d = (client: QueryClient, params: ICadViewParams): void => {
   void client.invalidateQueries({
-    queryKey: ['cad-floor3d', params.projectId, params.revisionId, params.jobId, params.pageIndex, params.view],
+    queryKey: [
+      'cad-floor3d',
+      params.projectId,
+      params.revisionId,
+      params.jobId,
+      params.pageIndex,
+      params.view,
+    ],
   });
   void client.invalidateQueries({ queryKey: building3dKeys.project(params.projectId) });
 };
@@ -76,8 +93,8 @@ const pathOf = (params: ICadViewParams) => ({
 /** Статус последнего задания расчёта из отказа 404 `CAD_WALLS_NOT_READY` (`detail.issue.job_status`). */
 export const wallsJobStatus = (error: unknown): string | null => {
   const read = (value: unknown): string | null => {
-    const status = (value as { detail?: { issue?: { job_status?: unknown } } } | null)?.detail?.issue
-      ?.job_status;
+    const status = (value as { detail?: { issue?: { job_status?: unknown } } } | null)?.detail
+      ?.issue?.job_status;
     return typeof status === 'string' ? status : null;
   };
   return read(error) ?? read((error as { error?: unknown } | null)?.error);
@@ -95,7 +112,11 @@ export const latestWallsStatus = (data: CadConstructionsRead | undefined): strin
 export const latestWallsFailure = (data: CadConstructionsRead | null): string | null => {
   const job = data?.latest_walls_job;
   if (!job || job.status !== 'failed') return null;
-  return job.error_message ?? (job.error_code !== null ? cadCodeText(job.error_code) : null) ?? 'причина не указана';
+  return (
+    job.error_message ??
+    (job.error_code !== null ? cadCodeText(job.error_code) : null) ??
+    'причина не указана'
+  );
 };
 
 export const useCadConstructions = (
@@ -130,7 +151,9 @@ export const useRecomputeCadWalls = (
       void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
       invalidateSheet3d(client, params);
       // Пересчёт ставит задание cad_walls: этапы конвейера листа меняются.
-      void client.invalidateQueries({ queryKey: cadPipelineKey(params.projectId, params.revisionId) });
+      void client.invalidateQueries({
+        queryKey: cadPipelineKey(params.projectId, params.revisionId),
+      });
     },
   });
 };
@@ -147,7 +170,43 @@ export const useRebuildCadWallsByRemarks = (
       if (!params) return;
       void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
       invalidateSheet3d(client, params);
-      void client.invalidateQueries({ queryKey: cadPipelineKey(params.projectId, params.revisionId) });
+      void client.invalidateQueries({
+        queryKey: cadPipelineKey(params.projectId, params.revisionId),
+      });
+    },
+  });
+};
+
+/** Повторное преобразование PDF→DXF страницы с подсказками из открытых замечаний вида. */
+export const useReconvertCadViewByRemarks = (
+  params: ICadViewParams | null,
+): UseMutationResult<CadJobRead, unknown, void> => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const target = need(params);
+      return unwrap(
+        await reconvertCadViewByRemarks({
+          throwOnError: true,
+          path: {
+            project_id: target.projectId,
+            revision_id: target.revisionId,
+            job_id: target.jobId,
+            page_index: target.pageIndex,
+            view: target.view,
+          },
+        }),
+      );
+    },
+    onSettled: () => {
+      if (!params) return;
+      void client.invalidateQueries({
+        queryKey: cadKeys.jobs(params.projectId, params.revisionId),
+      });
+      void client.invalidateQueries({
+        queryKey: cadPipelineKey(params.projectId, params.revisionId),
+      });
+      void client.invalidateQueries({ queryKey: constructionKeys.view(params) });
     },
   });
 };

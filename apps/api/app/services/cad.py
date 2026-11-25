@@ -54,8 +54,11 @@ ROUTE_ARTIFACT_NAME: Final = re.compile(
     r"^(?:report\.json|manifest\.json|"
     r"views/p\d{3}_v\d{2}/(?:mep_routes\.dxf|candidate\.json|preview\.json|routes3d\.json))$"
 )
-# Артефакт задания конструкций (`cad_walls`, ADR-0038): один файл в каталоге вида.
-WALLS_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/walls\.json$")
+# Артефакты задания конструкций (`cad_walls`, ADR-0038): `walls.json` и необязательные снимки
+# вида (`plan.png`, `overlay.png`, `render.json`) для визуальной проверки через MCP/ИИ.
+WALLS_ARTIFACT_NAME: Final = re.compile(
+    r"^views/p\d{3}_v\d{2}/(?:walls\.json|plan\.png|overlay\.png|render\.json)$"
+)
 # Артефакт задания 3D DXF этажа (`cad_floor3d_dxf`, ADR-0039): один файл в каталоге вида.
 FLOOR3D_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/floor3d\.dxf$")
 # Артефакт задания автоматической разметки зон (`cad_zones`): один файл в каталоге вида.
@@ -70,12 +73,18 @@ EOM_ARTIFACT_NAME: Final = re.compile(
     r"views/p\d{3}_v\d{2}/(?:eom_routes\.dxf|eom_candidate\.json|eom_routes3d\.json|"
     r"eom_preview\.json))$"
 )
-CONTENT_TYPES: Final = {".dxf": "application/dxf", ".json": "application/json"}
+CONTENT_TYPES: Final = {
+    ".dxf": "application/dxf",
+    ".json": "application/json",
+    ".png": "image/png",
+}
+MAX_PNG_ARTIFACT_BYTES: Final = 16 * 1024 * 1024
 # Типы заданий контура CAD: у обоих один и тот же вид доступа (пространство, проект, ревизия).
 CAD_JOB_TYPES: Final = (JobType.CAD_PDF_CONVERT, JobType.CAD_MEP_ROUTE)
-# Задания, чьи файлы отдаёт скачивание артефактов: к ним добавлено задание 3D DXF этажа. В список
-# и историю заданий ревизии оно не входит (у него нет страниц и видов результата).
-CAD_ARTIFACT_JOB_TYPES: Final = (*CAD_JOB_TYPES, JobType.CAD_FLOOR3D_DXF)
+# Задания, чьи файлы отдаёт скачивание артефактов: добавлены 3D DXF этажа и `cad_walls`
+# (`walls.json`, `plan.png`, `overlay.png`, `render.json`). В список и историю заданий ревизии
+# они не входят.
+CAD_ARTIFACT_JOB_TYPES: Final = (*CAD_JOB_TYPES, JobType.CAD_FLOOR3D_DXF, JobType.CAD_WALLS)
 
 
 @dataclass(frozen=True, slots=True)
