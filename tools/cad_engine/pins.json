@@ -10,7 +10,7 @@
     "archive_path": "engine/dist/Quantor_CAD_source_2026.11.25_a34437736054.zip",
     "archive_sha256": "ae7f06dd7bf4d6b3550c296b7bd57976f03c91a7a5c7cd0503e69230b74eba19",
     "manifest_sha256": "ce1ba2f29bea10280b32d49e8ddf6d0d78bb41caf8e2ecd7cf8381cf3e845723",
-    "source_snapshot_sha256": "a3443773605446f72de8c672ecb8a24cc9d04941fe9dca42e981bc9349a2ffa4",
+    "source_snapshot_sha256": "a34437736054d90171af98be95b31c23c44cb28153104c27373c2adae6ea72b6",
     "archive_entries": 253,
     "max_unpacked_bytes": 4194304,
     "worker": "АР_Обработка/90_Пайплайн/pdf_job_monitor/worker.py",
