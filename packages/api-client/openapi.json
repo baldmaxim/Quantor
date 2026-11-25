@@ -426,6 +426,549 @@
         "title": "AdminWorkspaceRead",
         "type": "object"
       },
+      "AiFinding": {
+        "additionalProperties": false,
+        "properties": {
+          "bbox_px": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Bbox Px",
+            "type": "array"
+          },
+          "construction_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Construction Ids",
+            "type": "array"
+          },
+          "evidence": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "observation": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Observation",
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "blocking",
+              "major",
+              "minor"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "suggested_fix": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Suggested Fix",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "missing_wall",
+              "false_wall",
+              "missing_door",
+              "door_geometry",
+              "missing_gate",
+              "missing_glazing",
+              "monolith",
+              "room_boundary",
+              "wrong_class",
+              "route",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "priority",
+          "bbox_px",
+          "construction_ids",
+          "observation",
+          "evidence",
+          "suggested_fix"
+        ],
+        "title": "AiFinding",
+        "type": "object"
+      },
+      "AiPropSuggestion": {
+        "additionalProperties": false,
+        "description": "Предложение правки свойств конструкции: только хранится и показывается, не применяется.",
+        "properties": {
+          "construction_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Construction Id",
+            "type": "string"
+          },
+          "count_openings": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count Openings"
+          },
+          "evidence": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "height_mm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 20000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Mm"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "thickness_mm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 2000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thickness Mm"
+          }
+        },
+        "required": [
+          "construction_id",
+          "evidence"
+        ],
+        "title": "AiPropSuggestion",
+        "type": "object"
+      },
+      "AiRender": {
+        "properties": {
+          "clip": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Clip",
+            "type": "array"
+          },
+          "zoom": {
+            "exclusiveMinimum": 0.0,
+            "title": "Zoom",
+            "type": "number"
+          }
+        },
+        "required": [
+          "clip",
+          "zoom"
+        ],
+        "title": "AiRender",
+        "type": "object"
+      },
+      "AiReviewRead": {
+        "properties": {
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiReviewResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "error_message"
+        ],
+        "title": "AiReviewRead",
+        "type": "object"
+      },
+      "AiReviewReport": {
+        "additionalProperties": false,
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/AiFinding"
+            },
+            "maxItems": 40,
+            "title": "Findings",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "props": {
+            "items": {
+              "$ref": "#/components/schemas/AiPropSuggestion"
+            },
+            "maxItems": 60,
+            "title": "Props",
+            "type": "array"
+          },
+          "verdict": {
+            "enum": [
+              "ready_for_human_review",
+              "needs_correction",
+              "insufficient_evidence"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          },
+          "vor_check": {
+            "items": {
+              "$ref": "#/components/schemas/AiVorCheck"
+            },
+            "maxItems": 80,
+            "title": "Vor Check",
+            "type": "array"
+          }
+        },
+        "required": [
+          "verdict",
+          "findings",
+          "props",
+          "vor_check",
+          "limitations"
+        ],
+        "title": "AiReviewReport",
+        "type": "object"
+      },
+      "AiReviewResult": {
+        "properties": {
+          "bundle_sha256": {
+            "title": "Bundle Sha256",
+            "type": "string"
+          },
+          "cad_job_id": {
+            "format": "uuid",
+            "title": "Cad Job Id",
+            "type": "string"
+          },
+          "dxf_sha256": {
+            "title": "Dxf Sha256",
+            "type": "string"
+          },
+          "input_sha256": {
+            "title": "Input Sha256",
+            "type": "string"
+          },
+          "iteration": {
+            "title": "Iteration",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "prompt_sha256": {
+            "title": "Prompt Sha256",
+            "type": "string"
+          },
+          "remark_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Remark Keys",
+            "type": "array"
+          },
+          "render": {
+            "$ref": "#/components/schemas/AiRender"
+          },
+          "report": {
+            "$ref": "#/components/schemas/AiReviewReport"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "corrector",
+              "verifier"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AiSourceCopy"
+            },
+            "title": "Sources",
+            "type": "object"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/AiUsage"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "walls_attempt": {
+            "title": "Walls Attempt",
+            "type": "integer"
+          },
+          "walls_job_id": {
+            "format": "uuid",
+            "title": "Walls Job Id",
+            "type": "string"
+          },
+          "walls_sha256": {
+            "title": "Walls Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "walls_job_id",
+          "walls_attempt",
+          "cad_job_id",
+          "revision_id",
+          "page_index",
+          "view",
+          "role",
+          "iteration",
+          "model",
+          "input_sha256",
+          "walls_sha256",
+          "dxf_sha256",
+          "prompt_sha256",
+          "bundle_sha256",
+          "sources",
+          "usage",
+          "render",
+          "remark_keys",
+          "report"
+        ],
+        "title": "AiReviewResult",
+        "type": "object"
+      },
+      "AiReviewStart": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "corrector",
+              "verifier"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "AiReviewStart",
+        "type": "object"
+      },
+      "AiReviewState": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "max_iterations": {
+            "title": "Max Iterations",
+            "type": "integer"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/AiReviewRead"
+            },
+            "title": "Reviews",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "max_iterations",
+          "reviews"
+        ],
+        "title": "AiReviewState",
+        "type": "object"
+      },
+      "AiSourceCopy": {
+        "properties": {
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "sha256"
+        ],
+        "title": "AiSourceCopy",
+        "type": "object"
+      },
+      "AiUsage": {
+        "properties": {
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          }
+        },
+        "title": "AiUsage",
+        "type": "object"
+      },
+      "AiVorCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "construction_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Construction Ids",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 1000,
+            "title": "Note",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "found",
+              "absent_on_view",
+              "not_applicable",
+              "unclear"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "vor_ref": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Vor Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vor_ref",
+          "name",
+          "status",
+          "construction_ids",
+          "note"
+        ],
+        "title": "AiVorCheck",
+        "type": "object"
+      },
       "AlignParamsOut": {
         "description": "Параметры правила совмещения действующей версии.",
         "properties": {
@@ -28369,6 +28912,7 @@
           "cad_mep_route",
           "cad_walls",
           "cad_outline_review",
+          "cad_ai_review",
           "cad_floor3d_dxf",
           "cad_zones",
           "cad_sections",
@@ -45559,6 +46103,100 @@
           }
         },
         "summary": "Состояние задания",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/cad-ai-review": {
+      "get": {
+        "operationId": "read_cad_ai_reviews",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiReviewState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "ИИ-проверки вида по заданию конструкций",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "operationId": "start_cad_ai_review",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiReviewStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiReviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить ИИ-проверку вида по заданию конструкций",
         "tags": [
           "jobs"
         ]

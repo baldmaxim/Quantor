@@ -228,6 +228,303 @@ export type AdminWorkspaceRead = {
 };
 
 /**
+ * AiFinding
+ */
+export type AiFinding = {
+    /**
+     * Bbox Px
+     */
+    bbox_px: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Construction Ids
+     */
+    construction_ids: Array<string>;
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Observation
+     */
+    observation: string;
+    /**
+     * Priority
+     */
+    priority: 'blocking' | 'major' | 'minor';
+    /**
+     * Suggested Fix
+     */
+    suggested_fix: string;
+    /**
+     * Type
+     */
+    type: 'missing_wall' | 'false_wall' | 'missing_door' | 'door_geometry' | 'missing_gate' | 'missing_glazing' | 'monolith' | 'room_boundary' | 'wrong_class' | 'route' | 'other';
+};
+
+/**
+ * AiPropSuggestion
+ *
+ * Предложение правки свойств конструкции: только хранится и показывается, не применяется.
+ */
+export type AiPropSuggestion = {
+    /**
+     * Construction Id
+     */
+    construction_id: string;
+    /**
+     * Count Openings
+     */
+    count_openings?: boolean | null;
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Height Mm
+     */
+    height_mm?: number | null;
+    /**
+     * Material
+     */
+    material?: string | null;
+    /**
+     * Thickness Mm
+     */
+    thickness_mm?: number | null;
+};
+
+/**
+ * AiRender
+ */
+export type AiRender = {
+    /**
+     * Clip
+     */
+    clip: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Zoom
+     */
+    zoom: number;
+};
+
+/**
+ * AiReviewRead
+ */
+export type AiReviewRead = {
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    result?: AiReviewResult | null;
+    status: JobStatus;
+};
+
+/**
+ * AiReviewReport
+ */
+export type AiReviewReport = {
+    /**
+     * Findings
+     */
+    findings: Array<AiFinding>;
+    /**
+     * Limitations
+     */
+    limitations: Array<string>;
+    /**
+     * Props
+     */
+    props: Array<AiPropSuggestion>;
+    /**
+     * Verdict
+     */
+    verdict: 'ready_for_human_review' | 'needs_correction' | 'insufficient_evidence';
+    /**
+     * Vor Check
+     */
+    vor_check: Array<AiVorCheck>;
+};
+
+/**
+ * AiReviewResult
+ */
+export type AiReviewResult = {
+    /**
+     * Bundle Sha256
+     */
+    bundle_sha256: string;
+    /**
+     * Cad Job Id
+     */
+    cad_job_id: string;
+    /**
+     * Dxf Sha256
+     */
+    dxf_sha256: string;
+    /**
+     * Input Sha256
+     */
+    input_sha256: string;
+    /**
+     * Iteration
+     */
+    iteration: number;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Prompt Sha256
+     */
+    prompt_sha256: string;
+    /**
+     * Remark Keys
+     */
+    remark_keys: Array<string>;
+    render: AiRender;
+    report: AiReviewReport;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Role
+     */
+    role: 'corrector' | 'verifier';
+    /**
+     * Sources
+     */
+    sources: {
+        [key: string]: AiSourceCopy;
+    };
+    usage: AiUsage;
+    /**
+     * View
+     */
+    view: number;
+    /**
+     * Walls Attempt
+     */
+    walls_attempt: number;
+    /**
+     * Walls Job Id
+     */
+    walls_job_id: string;
+    /**
+     * Walls Sha256
+     */
+    walls_sha256: string;
+};
+
+/**
+ * AiReviewStart
+ */
+export type AiReviewStart = {
+    /**
+     * Role
+     */
+    role: 'corrector' | 'verifier';
+};
+
+/**
+ * AiReviewState
+ */
+export type AiReviewState = {
+    /**
+     * Available
+     */
+    available: boolean;
+    /**
+     * Max Iterations
+     */
+    max_iterations: number;
+    /**
+     * Reviews
+     */
+    reviews: Array<AiReviewRead>;
+};
+
+/**
+ * AiSourceCopy
+ */
+export type AiSourceCopy = {
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+};
+
+/**
+ * AiUsage
+ */
+export type AiUsage = {
+    /**
+     * Cost Usd
+     */
+    cost_usd?: number | null;
+    /**
+     * Duration Ms
+     */
+    duration_ms?: number | null;
+    /**
+     * Input Tokens
+     */
+    input_tokens?: number | null;
+    /**
+     * Output Tokens
+     */
+    output_tokens?: number | null;
+};
+
+/**
+ * AiVorCheck
+ */
+export type AiVorCheck = {
+    /**
+     * Construction Ids
+     */
+    construction_ids: Array<string>;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Note
+     */
+    note: string;
+    /**
+     * Status
+     */
+    status: 'found' | 'absent_on_view' | 'not_applicable' | 'unclear';
+    /**
+     * Vor Ref
+     */
+    vor_ref: string;
+};
+
+/**
  * AlignParamsOut
  *
  * Параметры правила совмещения действующей версии.
@@ -14244,7 +14541,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'model_ifc_import' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_ai_review' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'model_ifc_import' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
 
 /**
  * LengthUnit
@@ -23828,6 +24125,66 @@ export type ReadJobResponses = {
 };
 
 export type ReadJobResponse = ReadJobResponses[keyof ReadJobResponses];
+
+export type ReadCadAiReviewsData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/jobs/{job_id}/cad-ai-review';
+};
+
+export type ReadCadAiReviewsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadAiReviewsError = ReadCadAiReviewsErrors[keyof ReadCadAiReviewsErrors];
+
+export type ReadCadAiReviewsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AiReviewState;
+};
+
+export type ReadCadAiReviewsResponse = ReadCadAiReviewsResponses[keyof ReadCadAiReviewsResponses];
+
+export type StartCadAiReviewData = {
+    body: AiReviewStart;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/v1/jobs/{job_id}/cad-ai-review';
+};
+
+export type StartCadAiReviewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartCadAiReviewError = StartCadAiReviewErrors[keyof StartCadAiReviewErrors];
+
+export type StartCadAiReviewResponses = {
+    /**
+     * Successful Response
+     */
+    202: AiReviewRead;
+};
+
+export type StartCadAiReviewResponse = StartCadAiReviewResponses[keyof StartCadAiReviewResponses];
 
 export type ReadCadOutlineReviewsData = {
     body?: never;

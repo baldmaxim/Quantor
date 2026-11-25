@@ -18,7 +18,9 @@ from app.api.v1.deps import (
     require_feature,
 )
 from app.auth.permissions import Permission
+from app.cad_worker import ai_review
 from app.cad_worker.outline_review import enqueue_for_walls, review_available, reviews_of
+from app.contracts.cad_ai_review import AiReviewRead, AiReviewStart, AiReviewState
 from app.contracts.cad_outline_review import OutlineReviewRead, OutlineReviewState, SourceRole
 from app.domain import JobType
 from app.errors import not_found
@@ -89,6 +91,53 @@ async def start_cad_outline_review(
     review = await enqueue_for_walls(session, walls, settings)
     await session.commit()
     return _review_read(review)
+
+
+def _ai_review_read(job: Job) -> AiReviewRead:
+    return AiReviewRead(
+        job_id=job.id,
+        status=job.status,
+        error_message=job.error_message,
+        result=job.payload.get("ai_review"),
+    )
+
+
+@router.get(
+    "/{job_id}/cad-ai-review",
+    response_model=AiReviewState,
+    summary="ИИ-проверки вида по заданию конструкций",
+    dependencies=[require(Permission.JOBS_READ), require_feature("cad.export")],
+)
+async def read_cad_ai_reviews(
+    job_id: uuid.UUID, session: SessionDep, workspace: WorkspaceDep, settings: SettingsDep
+) -> AiReviewState:
+    walls = await _walls_of(session, workspace, job_id)
+    pilot = ai_review.pilot_for(walls, settings)
+    return AiReviewState(
+        available=ai_review.review_available(walls, settings),
+        max_iterations=pilot.max_iterations if pilot else 0,
+        reviews=[_ai_review_read(job) for job in await ai_review.reviews_of(session, walls)],
+    )
+
+
+@router.post(
+    "/{job_id}/cad-ai-review",
+    response_model=AiReviewRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Запустить ИИ-проверку вида по заданию конструкций",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD), require_feature("cad.export")],
+)
+async def start_cad_ai_review(
+    job_id: uuid.UUID,
+    body: AiReviewStart,
+    session: SessionDep,
+    workspace: WorkspaceDep,
+    settings: SettingsDep,
+) -> AiReviewRead:
+    walls = await _walls_of(session, workspace, job_id)
+    review = await ai_review.enqueue_for_walls(session, walls, settings, body.role)
+    await session.commit()
+    return _ai_review_read(review)
 
 
 @router.get(

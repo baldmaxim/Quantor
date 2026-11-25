@@ -159,6 +159,9 @@ class Settings(BaseSettings):
     cad_review_pilot: str = ""
     cad_review_ssh_config: str = ""
     cad_review_timeout_seconds: int = Field(default=480, ge=30, le=1800)
+    # ИИ-проверка вида (`cad_ai_review`): JSON пилота `AiLoopPilot`; SSH - `cad_review_ssh_config`.
+    cad_ai_loop: str = ""
+    cad_ai_timeout_seconds: int = Field(default=900, ge=60, le=3600)
     # ЭОМ и СС этажа (`cad_eom`): как `cad_mep` — скрипт и параметры из каталога генераторов.
     cad_eom_runner: str = ""
     cad_eom_params: str = ""

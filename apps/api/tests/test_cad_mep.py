@@ -314,6 +314,7 @@ def test_new_routes_are_in_openapi_and_job_type_is_registered() -> None:
         JobType.CAD_SECTIONS,
         JobType.CAD_FACADES,
         JobType.CAD_OUTLINE_REVIEW,
+        JobType.CAD_AI_REVIEW,
         JobType.CAD_EOM_ROUTE,
         JobType.CAD_STYLE_PREVIEW,
         JobType.MODEL_IFC_IMPORT,

@@ -11,6 +11,7 @@ export const JOB_TYPE_LABELS: Readonly<Record<JobType, string>> = {
   cad_mep_route: 'CAD: трассы',
   cad_walls: 'CAD: конструкции',
   cad_outline_review: 'CAD: проверка обводки',
+  cad_ai_review: 'CAD: ИИ-проверка вида',
   cad_floor3d_dxf: 'CAD: 3D DXF',
   cad_zones: 'CAD: зоны',
   cad_sections: 'CAD: разрезы',

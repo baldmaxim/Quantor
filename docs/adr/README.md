@@ -56,3 +56,4 @@ ADR не переписываются задним числом. Если реш
 | [0052](0052-ruchnaya-privyazka-korpusa-k-ploshchadke.md)                      | Ручная привязка корпуса к площадке по двум парам точек                                       | принято                |
 | [0053](0053-model-zdaniya-iz-ifc-i-podlozhka-chertezha.md)                    | Модель здания из IFC и подложка чертежа на ней: пакет QMP, приём по частям, привязка по осям | черновик               |
 | [0054](0054-vhod-ii-chatov-v-mcp-po-oauth.md)                                 | Вход ИИ-чатов (Claude, ChatGPT) в MCP портала по OAuth 2.1                                   | принято                |
+| [0055](0055-ii-petlya-obvodki-i-zapolnenie-vor.md)                            | ИИ-петля обводки и автозаполнение ВОР Заказчика в пилоте CAD                                 | черновик               |

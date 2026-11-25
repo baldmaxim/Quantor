@@ -204,6 +204,7 @@ def test_main_worker_never_claims_cad_and_cad_worker_claims_only_cad() -> None:
             JobType.CAD_MEP_ROUTE.value,
             JobType.CAD_WALLS.value,
             JobType.CAD_OUTLINE_REVIEW.value,
+            JobType.CAD_AI_REVIEW.value,
             JobType.CAD_FLOOR3D_DXF.value,
             JobType.CAD_ZONES.value,
             JobType.CAD_SECTIONS.value,
