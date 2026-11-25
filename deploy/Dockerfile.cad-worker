@@ -52,6 +52,11 @@ ARG ENGINE_ARCHIVE_SHA256
 
 USER root
 
+# SSH-клиент: проверки обводки Codex и ИИ-петли (ADR-0055) ходят на kg_claude по SSH.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV CAD_ENGINE_HOME=/opt/cad-engine \
     CAD_MODEL_HOME=/opt/cad-model
 
