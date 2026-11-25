@@ -15,16 +15,27 @@ from pathlib import PurePosixPath
 from typing import Annotated, Final
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 
 from app.api.v1.cad_constructions import _load_walls, _sheet, _totals
 from app.api.v1.deps import AuthDep, SessionDep, SettingsDep, StorageDep, require
 from app.auth.permissions import Permission
+from app.cad_worker import ai_vor_map
+from app.contracts.ai_vor_map import (
+    AiVorMapObjectRead,
+    AiVorMapObjectRef,
+    AiVorMapRead,
+    AiVorMapResult,
+    AiVorMapSuggestionRead,
+    AiVorMapUnmatchedRead,
+)
 from app.contracts.cad_vor import CadVorSheetColumnsRead
-from app.contracts.vor_fill import VorFillExportRead, VorFillRead
+from app.contracts.vor_fill import VorFillExportRead, VorFillRead, VorObjectKind, VorObjectRead
+from app.domain import JobStatus
 from app.errors import DomainError, ErrorCode, not_found
-from app.models import CadVorDocument, Project
+from app.models import CadVorDocument, CadVorItem, Job, Project
 from app.services import (
     cad_building3d,
     cad_finish_templates,
@@ -311,3 +322,151 @@ async def download_vor_fill(
         media_type=XLSX_CONTENT_TYPE,
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"},
     )
+
+
+# --------------------------------------------------------------------------- ИИ-сопоставление
+
+
+def _object_kind(key: str) -> VorObjectKind:
+    if key.startswith("door|"):
+        return "door"
+    return "finish" if key.startswith("finish|") else "construction"
+
+
+async def _project_objects(
+    session: SessionDep,
+    storage: StorageDep,
+    settings: SettingsDep,
+    context: AuthDep,
+    project: Project,
+) -> list[VorObjectRead]:
+    """Объекты проекта тем же расчётом, что у `GET /vor/fill`."""
+    collected = await _collect(session, storage, settings, context, project)
+    return vor_fill.build_objects(collected.sheets, collected.finishes)
+
+
+@router.post(
+    "/projects/{project_id}/vor/ai-map",
+    response_model=AiVorMapRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Предложить сопоставление позиций ВОР с объектами Quantor (Claude)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def start_vor_ai_map(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    context: AuthDep,
+    storage: StorageDep,
+    settings: SettingsDep,
+) -> AiVorMapRead:
+    """Количества модели не даются: в пакет идут описания позиций и объектов. Связи - вручную."""
+    project = await _project(session, context, project_id)
+    if ai_vor_map.pilot_for_project(project.id, settings) is None:
+        raise DomainError(
+            ErrorCode.CAD_RESULT_NOT_READY, "ИИ-сопоставление недоступно для этого проекта"
+        )
+    last = await ai_vor_map.latest_job(session, project.id)
+    if last is None or last.status not in (JobStatus.QUEUED, JobStatus.RUNNING):
+        objects = await _project_objects(session, storage, settings, context, project)
+        document = await vor_service.current_document(session, project_id=project.id)
+        await ai_vor_map.enqueue_for_project(
+            session,
+            workspace_id=context.tenant,
+            project_id=project.id,
+            settings=settings,
+            document=document,
+            objects=objects,
+        )
+        await session.commit()
+    return await _ai_map_read(session, settings, project)
+
+
+def _object_ref(raw: object, key: str) -> AiVorMapObjectRef:
+    title = key
+    if isinstance(raw, dict):
+        title = str(raw.get("description") or key)
+    return AiVorMapObjectRef(group_key=key, kind=_object_kind(key), title=title)
+
+
+async def _ai_map_read(
+    session: SessionDep, settings: SettingsDep, project: Project
+) -> AiVorMapRead:
+    document = await vor_service.current_document(session, project_id=project.id)
+    available = ai_vor_map.pilot_for_project(project.id, settings) is not None and (
+        document is not None
+    )
+    job: Job | None = await ai_vor_map.latest_job(session, project.id)
+    empty = AiVorMapRead(
+        available=available,
+        job_id=None,
+        status=None,
+        error_message=None,
+        stale=False,
+        model=None,
+        prompt_version=None,
+        suggestions=[],
+        unmatched=[],
+        limitations=[],
+    )
+    if job is None:
+        return empty
+    empty.job_id, empty.status, empty.error_message = job.id, job.status, job.error_message
+    raw_result = job.payload.get("ai_vor_map")
+    if job.status is not JobStatus.SUCCEEDED or raw_result is None:
+        return empty
+    result = AiVorMapResult.model_validate(raw_result)
+    empty.model, empty.prompt_version = result.model, result.prompt_version
+    empty.limitations = [*result.report.limitations, *result.dropped]
+    if document is None or document.id != result.document_id:
+        empty.stale = True
+        return empty
+    snapshot = {
+        str(row["group_key"]): row
+        for row in job.payload.get("objects", [])
+        if isinstance(row, dict)
+    }
+    links = await vor_service.load_links(session, project_id=project.id)
+    linked = {(link.item.id, link.group_key) for link in links}
+    item_ids = [uuid.UUID(match.vor_item_id) for match in result.report.matches]
+    rows = await session.scalars(
+        select(CadVorItem).where(CadVorItem.document_id == document.id, CadVorItem.id.in_(item_ids))
+    )
+    items = {item.id: item for item in rows}
+    for match in result.report.matches:
+        item = items.get(uuid.UUID(match.vor_item_id))
+        if item is None:
+            continue
+        empty.suggestions.append(
+            AiVorMapSuggestionRead(
+                item=vor_service.item_read(item),
+                objects=[
+                    AiVorMapObjectRead(
+                        **_object_ref(snapshot.get(key), key).model_dump(),
+                        linked=(item.id, key) in linked,
+                    )
+                    for key in match.group_keys
+                ],
+                confidence=match.confidence,
+                rationale=match.rationale,
+            )
+        )
+    empty.unmatched = [
+        AiVorMapUnmatchedRead(
+            object=_object_ref(snapshot.get(row.group_key), row.group_key), reason=row.reason
+        )
+        for row in result.report.unmatched_objects
+    ]
+    return empty
+
+
+@router.get(
+    "/projects/{project_id}/vor/ai-map",
+    response_model=AiVorMapRead,
+    summary="Последнее ИИ-сопоставление ВОР: статус и предложения связей",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_vor_ai_map(
+    project_id: uuid.UUID, session: SessionDep, context: AuthDep, settings: SettingsDep
+) -> AiVorMapRead:
+    project = await _project(session, context, project_id)
+    return await _ai_map_read(session, settings, project)

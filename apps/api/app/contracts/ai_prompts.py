@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.contracts.cad_ai_review import AiRole
+from app.contracts.cad_ai_review import AiPromptRole
 from app.models.ai_prompt import AI_PROMPT_MAX_BYTES, AI_PROMPT_MAX_NOTE
 
 AiPromptStatus = Literal["draft", "active", "archived"]
@@ -15,7 +15,7 @@ AiPromptStatus = Literal["draft", "active", "archived"]
 class AiPromptCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    role: AiRole
+    role: AiPromptRole
     text: str = Field(min_length=1)
     note: str | None = Field(default=None, max_length=AI_PROMPT_MAX_NOTE)
 
@@ -33,7 +33,7 @@ class AiPromptSummary(BaseModel):
     """Версия без текста: список не тащит до 64 КиБ на строку."""
 
     id: UUID
-    role: AiRole
+    role: AiPromptRole
     version: int
     status: AiPromptStatus
     note: str | None
@@ -51,7 +51,7 @@ class AiPromptStatsRow(BaseModel):
     """Итоги прогонов одной версии. Прогоны без версии (до версионирования) не учитываются."""
 
     prompt_id: UUID
-    role: AiRole
+    role: AiPromptRole
     version: int
     status: AiPromptStatus
     runs_total: int

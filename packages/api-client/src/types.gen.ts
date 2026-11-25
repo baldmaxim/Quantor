@@ -277,7 +277,7 @@ export type AiPromptCreate = {
     /**
      * Role
      */
-    role: 'corrector' | 'verifier';
+    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style';
     /**
      * Text
      */
@@ -311,7 +311,7 @@ export type AiPromptRead = {
     /**
      * Role
      */
-    role: 'corrector' | 'verifier';
+    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style';
     /**
      * Status
      */
@@ -387,7 +387,7 @@ export type AiPromptStatsRow = {
     /**
      * Role
      */
-    role: 'corrector' | 'verifier';
+    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style';
     /**
      * Runs Failed
      */
@@ -445,7 +445,7 @@ export type AiPromptSummary = {
     /**
      * Role
      */
-    role: 'corrector' | 'verifier';
+    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style';
     /**
      * Status
      */
@@ -805,6 +805,32 @@ export type AiSheetStage4 = {
 };
 
 /**
+ * AiSheetStyle
+ *
+ * Оформление вида (роль Claude «оформление»): классы подписей штриховки и их применение.
+ *
+ * Только счётчики: найденные классы и регионы, которые взял движок. Площади и объёмы - не здесь.
+ */
+export type AiSheetStyle = {
+    /**
+     * Classes Found
+     */
+    classes_found?: number | null;
+    /**
+     * Error Message
+     */
+    error_message?: string | null;
+    /**
+     * Regions Applied
+     */
+    regions_applied?: number | null;
+    /**
+     * State
+     */
+    state: 'not_started' | 'running' | 'ok' | 'attention' | 'failed';
+};
+
+/**
  * AiSourceCopy
  */
 export type AiSourceCopy = {
@@ -912,6 +938,123 @@ export type AiVorCheck = {
      * Vor Ref
      */
     vor_ref: string;
+};
+
+/**
+ * AiVorMapObjectRead
+ */
+export type AiVorMapObjectRead = {
+    /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Kind
+     */
+    kind: 'construction' | 'door' | 'finish';
+    /**
+     * Linked
+     */
+    linked: boolean;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * AiVorMapObjectRef
+ *
+ * Объект Quantor в пакете: название и вид, без количеств.
+ */
+export type AiVorMapObjectRef = {
+    /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Kind
+     */
+    kind: 'construction' | 'door' | 'finish';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * AiVorMapRead
+ *
+ * Последнее задание сопоставления проекта и его предложения.
+ */
+export type AiVorMapRead = {
+    /**
+     * Available
+     */
+    available: boolean;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Job Id
+     */
+    job_id: string | null;
+    /**
+     * Limitations
+     */
+    limitations: Array<string>;
+    /**
+     * Model
+     */
+    model: string | null;
+    /**
+     * Prompt Version
+     */
+    prompt_version: number | null;
+    /**
+     * Stale
+     */
+    stale: boolean;
+    status: JobStatus | null;
+    /**
+     * Suggestions
+     */
+    suggestions: Array<AiVorMapSuggestionRead>;
+    /**
+     * Unmatched
+     */
+    unmatched: Array<AiVorMapUnmatchedRead>;
+};
+
+/**
+ * AiVorMapSuggestionRead
+ */
+export type AiVorMapSuggestionRead = {
+    /**
+     * Confidence
+     */
+    confidence: 'high' | 'medium' | 'low';
+    item: CadVorItemRead;
+    /**
+     * Objects
+     */
+    objects: Array<AiVorMapObjectRead>;
+    /**
+     * Rationale
+     */
+    rationale: string;
+};
+
+/**
+ * AiVorMapUnmatchedRead
+ */
+export type AiVorMapUnmatchedRead = {
+    object: AiVorMapObjectRef;
+    /**
+     * Reason
+     */
+    reason: string;
 };
 
 /**
@@ -3776,6 +3919,14 @@ export type CadHintAppliedRead = {
      */
     added?: number | null;
     /**
+     * Area Mm2
+     */
+    area_mm2?: number | null;
+    /**
+     * Class Name
+     */
+    class_name?: string | null;
+    /**
      * Id
      */
     id: string;
@@ -3783,6 +3934,10 @@ export type CadHintAppliedRead = {
      * Reason
      */
     reason?: string | null;
+    /**
+     * Signature Id
+     */
+    signature_id?: string | null;
     /**
      * Status
      */
@@ -15001,7 +15156,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_ai_review' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'model_ifc_import' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_ai_review' | 'cad_ai_vor_map' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'model_ifc_import' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
 
 /**
  * LengthUnit
@@ -17548,6 +17703,7 @@ export type ProjectAiSheetRow = {
     stage2?: AiSheetStage2 | null;
     stage3?: AiSheetStage3 | null;
     stage4?: AiSheetStage4 | null;
+    style?: AiSheetStyle | null;
     /**
      * View
      */
@@ -21628,9 +21784,9 @@ export type ListAiPromptsData = {
         /**
          * Role
          *
-         * Роль: corrector или verifier
+         * Роль: corrector, verifier, vor_mapper или style
          */
-        role?: 'corrector' | 'verifier' | null;
+        role?: 'corrector' | 'verifier' | 'vor_mapper' | 'style' | null;
     };
     url: '/api/v1/admin/ai-prompts';
 };
@@ -31084,6 +31240,66 @@ export type UploadFileResponses = {
 };
 
 export type UploadFileResponse = UploadFileResponses[keyof UploadFileResponses];
+
+export type ReadVorAiMapData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/vor/ai-map';
+};
+
+export type ReadVorAiMapErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadVorAiMapError = ReadVorAiMapErrors[keyof ReadVorAiMapErrors];
+
+export type ReadVorAiMapResponses = {
+    /**
+     * Successful Response
+     */
+    200: AiVorMapRead;
+};
+
+export type ReadVorAiMapResponse = ReadVorAiMapResponses[keyof ReadVorAiMapResponses];
+
+export type StartVorAiMapData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/vor/ai-map';
+};
+
+export type StartVorAiMapErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartVorAiMapError = StartVorAiMapErrors[keyof StartVorAiMapErrors];
+
+export type StartVorAiMapResponses = {
+    /**
+     * Successful Response
+     */
+    202: AiVorMapRead;
+};
+
+export type StartVorAiMapResponse = StartVorAiMapResponses[keyof StartVorAiMapResponses];
 
 export type ReadVorFillData = {
     body?: never;

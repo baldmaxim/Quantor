@@ -12,6 +12,11 @@ from app.domain import JobStatus
 
 AiRole = Literal["corrector", "verifier"]
 AI_ROLES = ("corrector", "verifier")
+# Роли версий промтов: две роли проверки вида и сопоставление ВОР. Старт проверки вида - `AiRole`.
+AiPromptRole = Literal["corrector", "verifier", "vor_mapper", "style"]
+# Роль задания `cad_ai_review`: `style` - оформление (классы подписей штриховки, до конструкций);
+# ручной старт и результат проверки вида (`AiReviewStart`, `AiReviewResult`) берут только `AiRole`.
+AiJobRole = Literal["corrector", "verifier", "style"]
 Priority = Literal["blocking", "major", "minor"]
 
 _SOURCE_KEY = re.compile(r"^[a-z_]{2,32}$")

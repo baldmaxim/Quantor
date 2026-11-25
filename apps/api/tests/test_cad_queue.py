@@ -63,6 +63,7 @@ def test_queue_types_match_the_cad_worker() -> None:
     assert set(QUEUE_JOB_TYPES) == set(HANDLERS) - {
         JobType.CAD_OUTLINE_REVIEW,
         JobType.CAD_AI_REVIEW,
+        JobType.CAD_AI_VOR_MAP,
     }
 
 

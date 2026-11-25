@@ -521,7 +521,9 @@
           "role": {
             "enum": [
               "corrector",
-              "verifier"
+              "verifier",
+              "vor_mapper",
+              "style"
             ],
             "title": "Role",
             "type": "string"
@@ -589,7 +591,9 @@
           "role": {
             "enum": [
               "corrector",
-              "verifier"
+              "verifier",
+              "vor_mapper",
+              "style"
             ],
             "title": "Role",
             "type": "string"
@@ -714,7 +718,9 @@
           "role": {
             "enum": [
               "corrector",
-              "verifier"
+              "verifier",
+              "vor_mapper",
+              "style"
             ],
             "title": "Role",
             "type": "string"
@@ -824,7 +830,9 @@
           "role": {
             "enum": [
               "corrector",
-              "verifier"
+              "verifier",
+              "vor_mapper",
+              "style"
             ],
             "title": "Role",
             "type": "string"
@@ -1499,6 +1507,60 @@
         "title": "AiSheetStage4",
         "type": "object"
       },
+      "AiSheetStyle": {
+        "description": "Оформление вида (роль Claude «оформление»): классы подписей штриховки и их применение.\n\nТолько счётчики: найденные классы и регионы, которые взял движок. Площади и объёмы - не здесь.",
+        "properties": {
+          "classes_found": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classes Found"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "regions_applied": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regions Applied"
+          },
+          "state": {
+            "enum": [
+              "not_started",
+              "running",
+              "ok",
+              "attention",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "AiSheetStyle",
+        "type": "object"
+      },
       "AiSourceCopy": {
         "properties": {
           "filename": {
@@ -1691,6 +1753,223 @@
           "note"
         ],
         "title": "AiVorCheck",
+        "type": "object"
+      },
+      "AiVorMapObjectRead": {
+        "properties": {
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "construction",
+              "door",
+              "finish"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "linked": {
+            "title": "Linked",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_key",
+          "kind",
+          "title",
+          "linked"
+        ],
+        "title": "AiVorMapObjectRead",
+        "type": "object"
+      },
+      "AiVorMapObjectRef": {
+        "description": "Объект Quantor в пакете: название и вид, без количеств.",
+        "properties": {
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "construction",
+              "door",
+              "finish"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_key",
+          "kind",
+          "title"
+        ],
+        "title": "AiVorMapObjectRef",
+        "type": "object"
+      },
+      "AiVorMapRead": {
+        "description": "Последнее задание сопоставления проекта и его предложения.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/AiVorMapSuggestionRead"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "unmatched": {
+            "items": {
+              "$ref": "#/components/schemas/AiVorMapUnmatchedRead"
+            },
+            "title": "Unmatched",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "job_id",
+          "status",
+          "error_message",
+          "stale",
+          "model",
+          "prompt_version",
+          "suggestions",
+          "unmatched",
+          "limitations"
+        ],
+        "title": "AiVorMapRead",
+        "type": "object"
+      },
+      "AiVorMapSuggestionRead": {
+        "properties": {
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "item": {
+            "$ref": "#/components/schemas/CadVorItemRead"
+          },
+          "objects": {
+            "items": {
+              "$ref": "#/components/schemas/AiVorMapObjectRead"
+            },
+            "title": "Objects",
+            "type": "array"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item",
+          "objects",
+          "confidence",
+          "rationale"
+        ],
+        "title": "AiVorMapSuggestionRead",
+        "type": "object"
+      },
+      "AiVorMapUnmatchedRead": {
+        "properties": {
+          "object": {
+            "$ref": "#/components/schemas/AiVorMapObjectRef"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "object",
+          "reason"
+        ],
+        "title": "AiVorMapUnmatchedRead",
         "type": "object"
       },
       "AlignParamsOut": {
@@ -7729,6 +8008,28 @@
             ],
             "title": "Added"
           },
+          "area_mm2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Mm2"
+          },
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -7743,6 +8044,17 @@
               }
             ],
             "title": "Reason"
+          },
+          "signature_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Id"
           },
           "status": {
             "title": "Status",
@@ -29763,6 +30075,7 @@
           "cad_walls",
           "cad_outline_review",
           "cad_ai_review",
+          "cad_ai_vor_map",
           "cad_floor3d_dxf",
           "cad_zones",
           "cad_sections",
@@ -34538,6 +34851,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AiSheetStage4"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "style": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiSheetStyle"
               },
               {
                 "type": "null"
@@ -42121,7 +42444,7 @@
         "operationId": "list_ai_prompts",
         "parameters": [
           {
-            "description": "Роль: corrector или verifier",
+            "description": "Роль: corrector, verifier, vor_mapper или style",
             "in": "query",
             "name": "role",
             "required": false,
@@ -42130,7 +42453,9 @@
                 {
                   "enum": [
                     "corrector",
-                    "verifier"
+                    "verifier",
+                    "vor_mapper",
+                    "style"
                   ],
                   "type": "string"
                 },
@@ -42138,7 +42463,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Роль: corrector или verifier",
+              "description": "Роль: corrector, verifier, vor_mapper или style",
               "title": "Role"
             }
           }
@@ -58024,6 +58349,93 @@
         "summary": "Загрузить файл в проект",
         "tags": [
           "uploads"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/vor/ai-map": {
+      "get": {
+        "operationId": "read_vor_ai_map",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiVorMapRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Последнее ИИ-сопоставление ВОР: статус и предложения связей",
+        "tags": [
+          "cad-vor",
+          "cad-vor"
+        ]
+      },
+      "post": {
+        "description": "Количества модели не даются: в пакет идут описания позиций и объектов. Связи - вручную.",
+        "operationId": "start_vor_ai_map",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiVorMapRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Предложить сопоставление позиций ВОР с объектами Quantor (Claude)",
+        "tags": [
+          "cad-vor",
+          "cad-vor"
         ]
       }
     },

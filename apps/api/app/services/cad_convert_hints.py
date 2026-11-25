@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from copy import deepcopy
 from typing import Any, Final
 
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contracts.cad_convert_hints import (
@@ -20,6 +21,7 @@ from app.contracts.cad_convert_hints import (
     MAX_HINT_ID_LENGTH,
     CadConvertHint,
     CadConvertHints,
+    CadHatchClass,
 )
 from app.core.config import Settings
 from app.domain import JobType
@@ -67,6 +69,19 @@ def hints_from_remarks(remarks: Sequence[CadRemark], page: int) -> CadConvertHin
     return CadConvertHints(page=page, hints=hints)
 
 
+def hatch_classes_of(job: Job) -> list[CadHatchClass]:
+    """Классы подписей штриховки, с которыми выполнено преобразование; нет или битые - пусто."""
+    params = job.payload.get("params")
+    hints = params.get("convert_hints") if isinstance(params, dict) else None
+    raw = hints.get("hatch_classes") if isinstance(hints, dict) else None
+    if not isinstance(raw, list):
+        return []
+    try:
+        return [CadHatchClass.model_validate(item) for item in raw]
+    except ValidationError:
+        return []
+
+
 def _source_params(job: Job, page_index: int) -> dict[str, Any]:
     """Параметры исходного задания для одной страницы: те же масштаб, профиль и лимиты."""
     raw = job.payload.get("params")
@@ -83,31 +98,27 @@ def _source_params(job: Job, page_index: int) -> dict[str, Any]:
     return params
 
 
-async def schedule_reconvert_by_remarks(
-    session: AsyncSession,
+def reconvert_params(
     convert_job: Job,
     page_index: int,
-    view: int,
-    settings: Settings,
-) -> Job:
-    """Новое преобразование той же ревизии и страницы с подсказками из открытых замечаний вида."""
+    *,
+    hints: Sequence[CadConvertHint],
+    hatch_classes: Sequence[CadHatchClass],
+) -> dict[str, Any]:
+    """Параметры повторного преобразования страницы: копия исходных с новыми подсказками."""
     if convert_job.job_type is not JobType.CAD_PDF_CONVERT:
         raise DomainError(ErrorCode.CAD_PARAMS_INVALID, "Задание не является преобразованием PDF")
-    result = cad_service.current_result(convert_job)
-    attempt = result.get("attempt")
-    if type(attempt) is not int:
-        raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
-    remarks = await cad_remarks.list_remarks(
-        session, job=convert_job, attempt=attempt, page_index=page_index, view=view
-    )
-    hints = hints_from_remarks(remarks, page_index + 1)
-    if hints is None:
-        raise DomainError(
-            ErrorCode.CAD_PARAMS_INVALID,
-            "У вида нет открытых замечаний «нет стены» или «нет двери» с ненулевой рамкой",
-        )
     params = _source_params(convert_job, page_index)
-    params["convert_hints"] = hints.to_params()
+    params["convert_hints"] = CadConvertHints(
+        page=page_index + 1, hints=list(hints), hatch_classes=list(hatch_classes)
+    ).to_params()
+    return params
+
+
+async def enqueue_reconvert(
+    session: AsyncSession, convert_job: Job, params: dict[str, Any], settings: Settings
+) -> Job:
+    """Ставит преобразование с готовыми параметрами; ключ идемпотентности - от параметров."""
     project = await session.get(Project, convert_job.project_id)
     revision = await session.get(
         DocumentRevision, uuid.UUID(str(convert_job.payload.get("revision_id")))
@@ -123,3 +134,36 @@ async def schedule_reconvert_by_remarks(
         style_ref=style if isinstance(style, dict) else None,
         settings=settings,
     )
+
+
+async def schedule_reconvert_by_remarks(
+    session: AsyncSession,
+    convert_job: Job,
+    page_index: int,
+    view: int,
+    settings: Settings,
+) -> Job:
+    """Новое преобразование той же ревизии и страницы с подсказками из открытых замечаний вида.
+
+    Классы подписей штриховки текущего преобразования сохраняются: иначе оформление, найденное
+    ранее, пропало бы при перестроении по замечаниям.
+    """
+    if convert_job.job_type is not JobType.CAD_PDF_CONVERT:
+        raise DomainError(ErrorCode.CAD_PARAMS_INVALID, "Задание не является преобразованием PDF")
+    result = cad_service.current_result(convert_job)
+    attempt = result.get("attempt")
+    if type(attempt) is not int:
+        raise DomainError(ErrorCode.CAD_RESULT_NOT_READY)
+    remarks = await cad_remarks.list_remarks(
+        session, job=convert_job, attempt=attempt, page_index=page_index, view=view
+    )
+    hints = hints_from_remarks(remarks, page_index + 1)
+    if hints is None:
+        raise DomainError(
+            ErrorCode.CAD_PARAMS_INVALID,
+            "У вида нет открытых замечаний «нет стены» или «нет двери» с ненулевой рамкой",
+        )
+    params = reconvert_params(
+        convert_job, page_index, hints=hints.hints, hatch_classes=hatch_classes_of(convert_job)
+    )
+    return await enqueue_reconvert(session, convert_job, params, settings)

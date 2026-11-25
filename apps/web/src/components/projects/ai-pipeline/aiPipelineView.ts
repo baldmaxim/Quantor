@@ -1,5 +1,6 @@
 import type {
   AiSheetStage2,
+  AiSheetStyle,
   AiStageSummary,
   ProjectAiPipelineRead,
   ProjectAiSheetRow,
@@ -72,10 +73,32 @@ const stage2Detail = (stage: AiSheetStage2): string => {
   return parts.join(' · ');
 };
 
+/** Оформление вида (роль Claude «оформление»): классы подписей штриховки и применённые регионы. */
+export const styleDetail = (style: AiSheetStyle | null | undefined): string | null => {
+  if (!style) return null;
+  if (style.state === 'running') return 'Оформление: идёт';
+  if (style.state === 'failed') {
+    return style.error_message
+      ? `Оформление: ошибка · ${style.error_message}`
+      : 'Оформление: ошибка';
+  }
+  if (style.classes_found === null || style.classes_found === undefined) {
+    return 'Оформление: ждёт запуска';
+  }
+  const parts = [`классов ${style.classes_found}`];
+  if (style.regions_applied !== null && style.regions_applied !== undefined) {
+    parts.push(`применено регионов ${style.regions_applied}`);
+  }
+  return `Оформление: ${parts.join(', ')}`;
+};
+
 /** Представление строки листа на этапе `stage`; `null` - лист в этап не входит. */
 export const rowView = (row: ProjectAiSheetRow, stage: number): IRowView | null => {
   if (stage === 1) {
-    return { badge: STATE_BADGES[row.stage1.state], detail: row.stage1.error_message ?? null };
+    return {
+      badge: STATE_BADGES[row.stage1.state],
+      detail: row.stage1.error_message ?? styleDetail(row.style),
+    };
   }
   if (stage === 2) {
     const s = row.stage2;

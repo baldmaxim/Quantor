@@ -398,3 +398,110 @@ async def test_run_verify_needs_a_ready_corrector_verdict(
         )
     )
     assert len(created) == 1
+
+
+async def test_sheet_row_shows_style_classes_and_applied_regions(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    workspace_id: uuid.UUID,
+) -> None:
+    async with build_api(make_context(), settings=clean_settings(environment="test")) as probe:
+        plan = await _plan(db_session, fake_storage, probe, workspace_id, 3)
+    async with build_api(make_context(), settings=_settings(plan.project_id)) as api:
+        # Стр. 0: оформление дало 2 класса, движок взял 5 + 3 региона. Стр. 1: оформление идёт.
+        # Стр. 2: оформление упало. Страница без заданий оформления - без поля.
+        style = {
+            "cad_job_id": str(plan.convert[0].id),
+            "cad_attempt": 1,
+            "revision_id": str(plan.revision_id),
+            "page_index": 0,
+            "view": 0,
+            "model": "claude-test",
+            "input_sha256": "a" * 64,
+            "signatures_sha256": "b" * 64,
+            "prompt_sha256": "c" * 64,
+            "bundle_sha256": "d" * 64,
+            "usage": {},
+            "sources": {},
+            "classes": [
+                {
+                    "signature_id": f"s{n}",
+                    "class_name": "monolith",
+                    "confidence": "high",
+                    "evidence": "легенда",
+                    "color": [0.1, 0.1, 0.1],
+                    "pen_pt": 0.3,
+                    "angle_deg": 45.0,
+                    "pitch_pt": 3.0 + n,
+                }
+                for n in range(2)
+            ],
+            "dropped": [],
+            "limitations": [],
+        }
+        for page, status in (
+            (0, JobStatus.SUCCEEDED),
+            (1, JobStatus.RUNNING),
+            (2, JobStatus.FAILED),
+        ):
+            payload: dict[str, Any] = {
+                "role": "style",
+                "revision_id": str(plan.revision_id),
+                "page_index": page,
+                "view": 0,
+            }
+            if status is JobStatus.SUCCEEDED:
+                payload["ai_style"] = style
+            add_job(
+                db_session,
+                workspace_id=workspace_id,
+                project_id=uuid.UUID(plan.project_id),
+                status=status,
+                minutes=1,
+                job_type=JobType.CAD_AI_REVIEW,
+                payload=payload,
+                attempt=1,
+                error_message="Claude не ответил" if status is JobStatus.FAILED else None,
+            )
+        plan.convert[0].payload = {
+            **plan.convert[0].payload,
+            "cad_result": {
+                **plan.convert[0].payload["cad_result"],
+                "hatch_applied": [
+                    {
+                        "page_index": 0,
+                        "view": 0,
+                        "classes": [{"added": 5, "status": "applied"}, {"added": 3}],
+                    }
+                ],
+            },
+        }
+        await db_session.commit()
+        body = (await api.get(_url(plan.project_id))).json()
+    rows = sorted(body["sheets"], key=lambda row: row["page_index"])
+    assert rows[0]["style"] == {
+        "state": "ok",
+        "classes_found": 2,
+        "regions_applied": 8,
+        "error_message": None,
+    }
+    assert rows[1]["style"]["state"] == "running" and rows[1]["style"]["classes_found"] is None
+    assert rows[2]["style"]["state"] == "failed"
+    assert rows[2]["style"]["error_message"] == "Claude не ответил"
+    assert body["active"] is True
+    # Нумерация этапов прежняя: оформление - поле вида, а не пятый этап.
+    assert [item["stage"] for item in body["stages"]] == [1, 2, 3, 4]
+
+
+async def test_sheet_without_style_jobs_has_no_style_field(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    workspace_id: uuid.UUID,
+) -> None:
+    async with build_api(make_context(), settings=clean_settings(environment="test")) as probe:
+        plan = await _plan(db_session, fake_storage, probe, workspace_id, 1)
+    async with build_api(make_context(), settings=_settings(plan.project_id)) as api:
+        body = (await api.get(_url(plan.project_id))).json()
+    assert body["sheets"][0]["style"] is None

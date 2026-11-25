@@ -13,6 +13,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import resource
 import shutil
 import signal
@@ -31,8 +32,8 @@ from app.core.logging import get_logger
 from app.domain import JobStatus
 from app.errors import MESSAGES, ErrorCode
 from app.models import DocumentRevision, Job
+from app.services import ai_loop, cad_progress, cad_walls, cad_zones_auto
 from app.services import cad as cad_service
-from app.services import cad_progress, cad_walls, cad_zones_auto
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
@@ -257,6 +258,46 @@ def _auto_pages(params: dict[str, Any]) -> list[int]:
     )
 
 
+_VIEW_CHECKS = re.compile(r"^views/p(\d{3})_v(\d{2})/checks\.json$")
+
+
+def _hatch_applied(out: Path) -> list[dict[str, Any]]:
+    """Отчёт движка по классам подписей штриховки (`hints_applied`, тип `hatch_class`) по видам.
+
+    Читается из локальных файлов попытки при публикации: сводка этапа «Оформление» в проекте
+    не ходит за `checks.json` в хранилище. Только числа регионов и площади движка.
+    """
+    found: list[dict[str, Any]] = []
+    for path in sorted(out.glob("views/p*_v*/checks.json")):
+        match = _VIEW_CHECKS.fullmatch(path.relative_to(out).as_posix())
+        if match is None or path.is_symlink():
+            continue
+        try:
+            checks = json.loads(path.read_bytes())
+        except (OSError, ValueError):
+            continue
+        rows = checks.get("hints_applied") if isinstance(checks, dict) else None
+        classes = [
+            {
+                "signature_id": row.get("signature_id"),
+                "class_name": row.get("class"),
+                "status": row.get("status"),
+                "added": row.get("added") if type(row.get("added")) is int else 0,
+            }
+            for row in (rows if isinstance(rows, list) else [])
+            if isinstance(row, dict) and row.get("type") == "hatch_class"
+        ]
+        if classes:
+            found.append(
+                {
+                    "page_index": int(match.group(1)) - 1,
+                    "view": int(match.group(2)),
+                    "classes": classes,
+                }
+            )
+    return found
+
+
 def _unconfirmed_auto_pages(params: dict[str, Any], report: dict[str, Any]) -> list[int]:
     """Автостраницы, у которых ни один вид не получил масштаб по размерным цепочкам.
 
@@ -469,6 +510,7 @@ async def execute_cad_pdf_convert(
         if code != 0:
             raise _failure_from_report(out, code)
         report, files = _verified_outputs(out, revision, str(job.payload["params_sha256"]))
+        hatch_applied = _hatch_applied(out)
         unconfirmed = _unconfirmed_auto_pages(params, report)
         if unconfirmed:
             raise CadError(
@@ -513,6 +555,7 @@ async def execute_cad_pdf_convert(
         "dxf_count": sum(1 for row in artifacts if row["name"].endswith(".dxf")),
         "pages": _page_summary(report),
         "artifacts": artifacts,
+        "hatch_applied": hatch_applied,
     }
     log.info("cad_convert_finished", job_id=str(job.id), result=report["status"])
     job.payload = cad_progress.finish_attempt(
@@ -527,6 +570,8 @@ async def execute_cad_pdf_convert(
     await cad_walls.enqueue_after_convert(session, storage, done, settings)
     # Зоны квартир: только для листов без разметки человека; сбой постановки конвертацию не рушит.
     await cad_zones_auto.enqueue_after_convert(session, done, settings)
+    # Петля ИИ пилота: оформление первого прогона плана и перенос замечаний перестроения.
+    await ai_loop.after_convert(session, done, settings)
     return done
 
 

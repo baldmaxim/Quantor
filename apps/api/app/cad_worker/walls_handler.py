@@ -51,9 +51,9 @@ from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.errors import ErrorCode
 from app.models import DocumentRevision, Job
+from app.services import ai_loop, cad_progress, cad_quality, cad_walls_zones
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_progress, cad_quality, cad_walls_zones
 from app.services import cad_requeue as requeue
 from app.services import cad_walls as cad_walls_service
 from app.services import jobs as jobs_service
@@ -632,4 +632,6 @@ async def execute_cad_walls(
         job.payload, attempt, cad_progress.now(), outcome="succeeded", result_status=RESULT_READY
     )
     done = await jobs_service.succeed(session, job=job, payload={"cad_result": result})
+    # Автоход петли ИИ пилота: правщик по готовым конструкциям вида (в той же транзакции).
+    await ai_loop.after_walls(session, done, settings)
     return done

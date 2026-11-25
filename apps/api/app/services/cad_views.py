@@ -274,6 +274,12 @@ def frame_from(scale: CadScaleRead | None, cad_checks: Any) -> CadFrameRead:
     )
 
 
+def _finite_float(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        return None
+    return float(value)
+
+
 def _hints_applied(raw: Any) -> list[CadHintAppliedRead] | None:
     if not isinstance(raw, list):
         return None
@@ -284,7 +290,8 @@ def _hints_applied(raw: Any) -> list[CadHintAppliedRead] | None:
         ident, kind, status = item.get("id"), item.get("type"), item.get("status")
         if not (isinstance(ident, str) and isinstance(kind, str) and isinstance(status, str)):
             continue
-        reason = item.get("reason")
+        reason, class_name = item.get("reason"), item.get("class")
+        signature_id, area = item.get("signature_id"), item.get("area_mm2")
         rows.append(
             CadHintAppliedRead(
                 id=ident,
@@ -292,6 +299,9 @@ def _hints_applied(raw: Any) -> list[CadHintAppliedRead] | None:
                 status=status,
                 added=_int(item.get("added")),
                 reason=reason if isinstance(reason, str) else None,
+                class_name=class_name if isinstance(class_name, str) else None,
+                signature_id=signature_id if isinstance(signature_id, str) else None,
+                area_mm2=_finite_float(area),
             )
         )
     return rows

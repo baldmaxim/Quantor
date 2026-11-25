@@ -16,7 +16,7 @@ from app.contracts.ai_prompts import (
     AiPromptStats,
     AiPromptSummary,
 )
-from app.contracts.cad_ai_review import AiRole
+from app.contracts.cad_ai_review import AiPromptRole
 from app.models import AiPromptVersion
 from app.services import ai_prompts as service
 
@@ -50,7 +50,9 @@ def _read(row: AiPromptVersion) -> AiPromptRead:
 @router.get("", response_model=list[AiPromptSummary], summary="Версии промтов ИИ")
 async def list_ai_prompts(
     session: SessionDep,
-    role: Annotated[AiRole | None, Query(description="Роль: corrector или verifier")] = None,
+    role: Annotated[
+        AiPromptRole | None, Query(description="Роль: corrector, verifier, vor_mapper или style")
+    ] = None,
 ) -> list[AiPromptSummary]:
     return [_summary(row) for row in await service.list_versions(session, role)]
 

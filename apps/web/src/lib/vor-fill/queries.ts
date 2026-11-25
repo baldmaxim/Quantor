@@ -2,13 +2,17 @@
 
 import {
   exportVorFill,
+  readVorAiMap,
   readVorFill,
+  startVorAiMap,
+  type AiVorMapRead,
   type VorFillExportRead,
   type VorFillRead,
 } from '@quantor/api-client';
 import {
   useMutation,
   useQuery,
+  useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
@@ -48,5 +52,38 @@ export const useExportVorFill = (
   return useMutation({
     mutationFn: async () =>
       unwrap(await exportVorFill({ throwOnError: true, path: { project_id: projectId } })),
+  });
+};
+
+export const vorAiMapKey = (projectId: string) => [...vorKeys.all(projectId), 'ai-map'] as const;
+
+const AI_MAP_POLL_MS = 5_000;
+
+/** ИИ-сопоставление: последнее задание проекта; пока оно идёт, состояние читается раз в 5 с. */
+export const useVorAiMap = (
+  projectId: string,
+  enabled: boolean,
+): UseQueryResult<AiVorMapRead, unknown> =>
+  useQuery({
+    queryKey: vorAiMapKey(projectId),
+    enabled,
+    queryFn: async () =>
+      unwrap(await readVorAiMap({ throwOnError: true, path: { project_id: projectId } })),
+    refetchInterval: (query) =>
+      query.state.data?.status === 'queued' || query.state.data?.status === 'running'
+        ? AI_MAP_POLL_MS
+        : false,
+    retry: retryNetworkOnly,
+  });
+
+/** Запуск сопоставления (пилот, `cad.export`); идущее задание не дублируется на сервере. */
+export const useStartVorAiMap = (
+  projectId: string,
+): UseMutationResult<AiVorMapRead, unknown, void> => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await startVorAiMap({ throwOnError: true, path: { project_id: projectId } })),
+    onSettled: () => void client.invalidateQueries({ queryKey: vorAiMapKey(projectId) }),
   });
 };

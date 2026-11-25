@@ -13,6 +13,7 @@ import { useFeatures, useMeta, useProject } from '@/lib/queries';
 import { OBJECT_KIND_LABELS } from '@/lib/vor-fill/format';
 import { useExportVorFill, useVorFill } from '@/lib/vor-fill/queries';
 
+import { VorFillAiMap } from './VorFillAiMap';
 import { VorFillLinkDialog } from './VorFillLinkDialog';
 import { VorFillObjects } from './VorFillObjects';
 import { VorFillTable } from './VorFillTable';
@@ -142,6 +143,8 @@ export const VorFillScreen: FC<IScreenProps> = ({ projectId }) => {
                   ))}
                 </ul>
               )}
+
+              {data.has_vor && <VorFillAiMap projectId={projectId} />}
 
               <section aria-label="Позиции ВОР" className="flex flex-col gap-[var(--s-3)]">
                 <h2 className={HEADING}>Позиции ВОР</h2>

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cad_worker import ai_review, outline_review
 from app.contracts.cad_ai_review import AiLoopPilot, AiReviewResult, AiRole
+from app.contracts.cad_ai_style import AiStyleResult
 from app.contracts.cad_outline_review import OutlineReviewResult
 from app.contracts.cad_pipeline import CadPipelineSheetRead, CadPipelineViewRead
 from app.contracts.project_ai_pipeline import (
@@ -34,6 +35,7 @@ from app.contracts.project_ai_pipeline import (
     AiSheetStage2,
     AiSheetStage3,
     AiSheetStage4,
+    AiSheetStyle,
     AiStageState,
     AiStageStatus,
     AiStageSummary,
@@ -47,6 +49,7 @@ from app.errors import DomainError
 from app.models import CadRemark, DocumentRevision, Job, Project, Sheet
 from app.services import cad as cad_service
 from app.services import cad_pipeline, sheet_passports
+from app.services.ai_loop import STYLE_ROLE
 
 _ACTIVE = (JobStatus.QUEUED, JobStatus.RUNNING)
 _TITLES = {
@@ -120,6 +123,16 @@ def _ai_result(job: Job) -> AiReviewResult | None:
         return None
 
 
+def _style_result(job: Job) -> AiStyleResult | None:
+    raw = job.payload.get("ai_style")
+    if job.status is not JobStatus.SUCCEEDED or not isinstance(raw, dict):
+        return None
+    try:
+        return AiStyleResult.model_validate(raw)
+    except ValidationError:
+        return None
+
+
 def _codex_result(job: Job) -> OutlineReviewResult | None:
     raw = job.payload.get("outline_review")
     if job.status is not JobStatus.SUCCEEDED or not isinstance(raw, dict):
@@ -136,6 +149,44 @@ def _job_state(job: Job | None) -> AiStageState:
     if job.status in _ACTIVE:
         return "running"
     return "ok" if job.status is JobStatus.SUCCEEDED else "failed"
+
+
+_StyleKey = tuple[uuid.UUID, int, int]
+
+
+def _style_of(
+    jobs: list[Job] | None, convert_job: Job | None, page_index: int, view: int
+) -> AiSheetStyle | None:
+    """Оформление вида: последнее задание роли `style`, регионы - из итога преобразования."""
+    if not jobs:
+        return None
+    last = jobs[0]
+    result: AiStyleResult | None = None
+    for job in jobs:
+        result = _style_result(job)
+        if result is not None:
+            break
+    applied: int | None = None
+    raw = cad_service.result_of(convert_job).get("hatch_applied") if convert_job else None
+    for entry in raw if isinstance(raw, list) else []:
+        if (
+            isinstance(entry, dict)
+            and entry.get("page_index") == page_index
+            and entry.get("view") == view
+            and isinstance(entry.get("classes"), list)
+        ):
+            applied = sum(
+                row["added"]
+                for row in entry["classes"]
+                if isinstance(row, dict) and type(row.get("added")) is int
+            )
+    failed = _failed(last)
+    return AiSheetStyle(
+        state=_job_state(last),
+        classes_found=len(result.classes) if result is not None else None,
+        regions_applied=applied,
+        error_message=last.error_message if failed else None,
+    )
 
 
 def _stage1(
@@ -342,6 +393,24 @@ async def _collect(
             bucket = reviews[str(job.payload.get("walls_job_id"))]
             (bucket.claude if job.job_type is JobType.CAD_AI_REVIEW else bucket.codex).append(job)
 
+    # Оформление (роль `style`) по виду всей цепочки преобразований: новые первыми.
+    styles: dict[_StyleKey, list[Job]] = defaultdict(list)
+    style_rows = await session.scalars(
+        select(Job).where(
+            Job.project_id == project.id,
+            Job.job_type == JobType.CAD_AI_REVIEW,
+            Job.payload["role"].astext == STYLE_ROLE,
+        )
+    )
+    for job in _newest_first(list(style_rows)):
+        page, view_no = job.payload.get("page_index"), job.payload.get("view")
+        try:
+            style_revision = uuid.UUID(str(job.payload.get("revision_id")))
+        except ValueError:
+            continue
+        if type(page) is int and type(view_no) is int:
+            styles[(style_revision, page, view_no)].append(job)
+
     open_remarks: dict[tuple[uuid.UUID, int, int, int], int] = {}
     remark_rows = await session.execute(
         select(
@@ -375,6 +444,7 @@ async def _collect(
                         position,
                         jobs,
                         reviews,
+                        styles,
                         open_remarks,
                         pilot,
                         settings,
@@ -391,6 +461,7 @@ def _build_row(
     position: int,
     jobs: dict[uuid.UUID, Job],
     reviews: dict[str, _Reviews],
+    styles: dict[_StyleKey, list[Job]],
     open_remarks: dict[tuple[uuid.UUID, int, int, int], int],
     pilot: AiLoopPilot | None,
     settings: Settings,
@@ -421,6 +492,10 @@ def _build_row(
         reviews=reviews.get(str(walls.id), _Reviews()) if walls is not None else _Reviews(),
     )
     state.running = row.stage1.state == "running"
+    if view is not None:
+        style_jobs = styles.get((revision.id, sheet.page_index, view.view))
+        row.style = _style_of(style_jobs, convert_job, sheet.page_index, view.view)
+        state.running = state.running or (row.style is not None and row.style.state == "running")
     if walls is None or not walls_ok or view is None:
         return state
     if row.review_available and pilot is not None:

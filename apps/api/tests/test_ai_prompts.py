@@ -354,9 +354,21 @@ async def test_migration_seeds_old_cli_prompts_as_active_version_one(
         ).all()
     assert [(row.role, row.version, row.status, row.created_by) for row in rows] == [
         ("corrector", 1, "active", None),
+        ("style", 1, "active", None),
         ("verifier", 1, "active", None),
+        ("vor_mapper", 1, "active", None),
     ]
-    assert {row.role: hashlib.sha256(row.text.encode()).hexdigest() for row in rows} == OLD_SHA
+    assert {
+        row.role: hashlib.sha256(row.text.encode()).hexdigest()
+        for row in rows
+        if row.role in OLD_SHA
+    } == OLD_SHA
+    mapper = next(row.text for row in rows if row.role == "vor_mapper")
+    assert mapper.startswith("Ты сопоставляешь позиции ведомости объёмов работ (ВОР) Заказчика")
+    assert "vor_items.json" in mapper and "objects.json" in mapper and "unmatched_objects" in mapper
+    style = next(row.text for row in rows if row.role == "style")
+    assert style.startswith("Ты определяешь, как проектировщик оформил материалы стен на плане")
+    assert "hatch_signatures.json" in style and style.endswith("Верни один JSON по схеме.\n")
 
 
 __all__ = ["migrated_engine"]

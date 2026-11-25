@@ -31,7 +31,7 @@ from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode
 from app.models import AiPromptVersion, DocumentRevision, Job
-from app.services import cad, cad_remarks, jobs
+from app.services import ai_loop, cad, cad_remarks, jobs
 from app.services.cad_walls import WALLS_JSON
 from app.storage.base import ObjectStorage
 
@@ -89,9 +89,18 @@ async def reviews_of(session: AsyncSession, walls: Job) -> list[Job]:
 
 
 async def enqueue_for_walls(
-    session: AsyncSession, walls: Job, settings: Settings, role: AiRole
+    session: AsyncSession,
+    walls: Job,
+    settings: Settings,
+    role: AiRole,
+    iteration: int | None = None,
 ) -> Job:
-    """Ручной запуск проверки; идущую проверку не дублирует, число кругов ограничено."""
+    """Запуск проверки; идущую проверку не дублирует, число кругов ограничено.
+
+    Ручной запуск считает круги роли по этому заданию конструкций. Автоход петли
+    (`services/ai_loop`) передаёт номер круга сам: он считает круги по виду всей цепочки
+    преобразований листа, а у перестроенного задания конструкций счёт начинался бы заново.
+    """
     pilot = pilot_for(walls, settings)
     position = _view_of(walls)
     if pilot is None or position is None or not review_available(walls, settings):
@@ -100,7 +109,8 @@ async def enqueue_for_walls(
     if existing and existing[0].status in (JobStatus.QUEUED, JobStatus.RUNNING):
         return existing[0]
     # Лимит кругов у каждой роли свой: исчерпанные круги правщика не закрывают верификацию.
-    iteration = sum(1 for row in existing if row.payload.get("role") == role) + 1
+    if iteration is None:
+        iteration = sum(1 for row in existing if row.payload.get("role") == role) + 1
     if iteration > pilot.max_iterations:
         raise DomainError(ErrorCode.CAD_RESULT_NOT_READY, "Исчерпан лимит кругов ИИ-проверки")
     parent_id, parent_attempt = (
@@ -300,6 +310,11 @@ async def _prepare(
 async def execute_ai_review(
     session: AsyncSession, job: Job, storage: ObjectStorage, settings: Settings
 ) -> Job:
+    if job.payload.get("role") == ai_loop.STYLE_ROLE:
+        # Роль «оформление»: свои пакет, схема и CLI (нет конструкций вида, есть подписи).
+        from app.cad_worker.ai_style import execute_ai_style  # цикл модулей
+
+        return await execute_ai_style(session, job, storage, settings)
     owner, attempt = job.worker_id, job.attempt
     await jobs.start(session, job=job, stage="cad_ai_review")
     await session.commit()
@@ -401,9 +416,12 @@ async def execute_ai_review(
         except CadError as error:
             failure = error
         else:
-            return await jobs.succeed(
+            done = await jobs.succeed(
                 session, job=job, payload={"ai_review": result.model_dump(mode="json")}
             )
+            # Автоход петли пилота: в той же транзакции; сбой постановки правщика не роняет.
+            await ai_loop.after_review(session, storage, done, settings)
+            return done
     if await _still_owned(session, job, owner, attempt, lock=True):
         return await jobs.fail(
             session, job=job, error_code=failure.code.value, error_message=failure.message

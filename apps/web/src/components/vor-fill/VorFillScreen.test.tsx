@@ -20,6 +20,7 @@ vi.mock('@/lib/queries', async (importOriginal) => ({
 vi.mock('@quantor/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof client>()),
   readVorFill: vi.fn(),
+  readVorAiMap: vi.fn(),
   exportVorFill: vi.fn(),
   listCadVorLinks: vi.fn(),
   suggestCadVorItems: vi.fn(),
@@ -99,6 +100,20 @@ beforeEach(() => {
   vi.mocked(queries.useMeta).mockReturnValue({ isSuccess: true } as never);
   vi.mocked(queries.useFeatures).mockReturnValue({ 'cad.export': true });
   vi.mocked(queries.useProject).mockReturnValue({ data: { name: 'Объект' } } as never);
+  vi.mocked(client.readVorAiMap).mockReturnValue(
+    ok({
+      available: false,
+      job_id: null,
+      status: null,
+      error_message: null,
+      stale: false,
+      model: null,
+      prompt_version: null,
+      suggestions: [],
+      unmatched: [],
+      limitations: [],
+    }),
+  );
   vi.mocked(client.listCadVorLinks).mockReturnValue(ok([]));
   vi.mocked(client.suggestCadVorItems).mockReturnValue(ok([]));
   vi.mocked(client.listCadVorItems).mockReturnValue(ok({ total: 0, items: [] }));

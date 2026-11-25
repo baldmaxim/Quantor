@@ -31,8 +31,8 @@ from app.services import cad_style_profiles
 from app.services import jobs as jobs_service
 
 # Закрепление движка: архив сверяется и здесь (передаётся runner'у), и в tools/cad_engine/pins.json.
-ENGINE_VERSION: Final = "2026.11.25+a34437736054"
-ENGINE_ARCHIVE_SHA256: Final = "ae7f06dd7bf4d6b3550c296b7bd57976f03c91a7a5c7cd0503e69230b74eba19"
+ENGINE_VERSION: Final = "2026.11.25+28365f4e1936"
+ENGINE_ARCHIVE_SHA256: Final = "aa3bd45d222e09fe5e4174069e2389b61d2068c527b4ceb510130899cffa3905"
 PARAMS_SCHEMA: Final = "quantor.cad_engine.params.v2"
 PAGE_SELECTION: Final = "operator"
 MAX_PAGES: Final = 50
@@ -46,7 +46,8 @@ RESULT_STATUSES: Final = frozenset({RESULT_WITH_CAD, RESULT_NO_CAD})
 ARTIFACT_NAME: Final = re.compile(
     r"^(?:report\.json|manifest\.json|"
     r"views/p\d{3}_v\d{2}/"
-    r"(?:plan_candidates\.dxf|scale\.json|cad_checks\.json|checks\.json|preview\.json))$"
+    r"(?:plan_candidates\.dxf|scale\.json|cad_checks\.json|checks\.json|preview\.json|"
+    r"hatch_signatures\.json))$"
 )
 # Артефакты задания трасс механики (`cad_mep_route`, ADR-0036 п. 8): отчёт и манифест как у
 # движка, плюс DXF трасс, кандидат и 3D-трассы (`routes3d.json`, ADR-0041) — в каталоге вида.

@@ -73,6 +73,9 @@ DEFAULT_LIMITS = {"max_pages": 50, "total_timeout_s": 900, "max_memory_mb": 3072
 PUBLISHED = {"Масштаб.json": "scale.json", "План_кандидаты.dxf": "plan_candidates.dxf",
              "Контроль_CAD.json": "cad_checks.json"}
 CHECKS_FILE, CHECKS_NAME = "Контроль.json", "checks.json"
+# Статистика оформления вида (движок 2026.11.25, п. 41): подписи штриховок и заливок страницы.
+HATCH_SIGNATURES_FILE = "hatch_signatures.json"
+MAX_HATCH_SIGNATURES_BYTES = 1024 * 1024
 FORBIDDEN_ACTIVE = ("native_cad_read_during_recognition", "pilot_geometry_read_during_recognition",
                     "finish_detector_called", "quantity_release_allowed")
 VIEW_DIR = re.compile(r"^PDF_(\d{3})_Вид_(\d{2})/(.+)$")
@@ -287,10 +290,38 @@ CONVERT_HINTS_SCHEMA = "quantor.cad_convert_hints.v1"
 CONVERT_HINT_TYPES = ("missing_wall", "missing_door")
 MAX_CONVERT_HINTS = 100
 MAX_CONVERT_HINT_ID = 64
+MAX_HATCH_CLASSES = 20
+HATCH_CLASS_VALUES = ("monolith", "masonry", "ignore")
+HATCH_CLASS_FIELDS = {"signature_id", "color", "pen_pt", "angle_deg", "pitch_pt", "class"}
 
 
 def _is_finite_number(value: Any) -> bool:
     return type(value) in (int, float) and math.isfinite(value)
+
+
+def _check_hatch_classes_shape(classes: Any, bad: Any) -> None:
+    """hatch_classes: 1..20 классов подписей штриховки; смысл подписей проверяет движок."""
+    if not isinstance(classes, list) or not 1 <= len(classes) <= MAX_HATCH_CLASSES:
+        raise bad(f"hatch_classes - список из 1..{MAX_HATCH_CLASSES} классов")
+    for item in classes:
+        if not isinstance(item, dict) or set(item) - HATCH_CLASS_FIELDS:
+            raise bad("класс подписи - объект с полями signature_id, color, pen_pt, angle_deg, "
+                      "pitch_pt, class")
+        color = item.get("color")
+        if (not isinstance(color, list) or len(color) != 3
+                or not all(_is_finite_number(v) and 0 <= v <= 1 for v in color)):
+            raise bad("color - три числа 0..1")
+        if not (_is_finite_number(item.get("pen_pt")) and item["pen_pt"] > 0):
+            raise bad("pen_pt - число больше 0")
+        if not (_is_finite_number(item.get("angle_deg")) and 0 <= item["angle_deg"] < 180):
+            raise bad("angle_deg - число 0..<180")
+        if not (_is_finite_number(item.get("pitch_pt")) and item["pitch_pt"] > 0):
+            raise bad("pitch_pt - число больше 0")
+        if item.get("class") not in HATCH_CLASS_VALUES:
+            raise bad("class - monolith, masonry или ignore")
+        ident = item.get("signature_id")
+        if ident is not None and (not isinstance(ident, str) or not 0 < len(ident) <= 100):
+            raise bad("signature_id - строка до 100 символов")
 
 
 def _check_convert_hints_shape(raw: Any) -> None:
@@ -303,13 +334,17 @@ def _check_convert_hints_shape(raw: Any) -> None:
 
     if not isinstance(raw, dict) or raw.get("schema") != CONVERT_HINTS_SCHEMA:
         raise bad("объект схемы quantor.cad_convert_hints.v1")
-    if set(raw) - {"schema", "page", "hints"}:
+    if set(raw) - {"schema", "page", "hints", "hatch_classes"}:
         raise bad("лишние поля")
     if type(raw.get("page")) is not int or raw["page"] < 1:
         raise bad("page - номер страницы PDF с 1")
-    hints = raw.get("hints")
-    if not isinstance(hints, list) or not 1 <= len(hints) <= MAX_CONVERT_HINTS:
-        raise bad(f"hints - список из 1..{MAX_CONVERT_HINTS} рамок")
+    classes = raw.get("hatch_classes")
+    if classes is not None:
+        _check_hatch_classes_shape(classes, bad)
+    # Без классов рамки обязательны; при непустых классах список рамок может быть пустым или отсутствовать.
+    hints = raw.get("hints", [] if classes else None)
+    if not isinstance(hints, list) or not (0 if classes else 1) <= len(hints) <= MAX_CONVERT_HINTS:
+        raise bad(f"hints - список из {0 if classes else 1}..{MAX_CONVERT_HINTS} рамок")
     seen: set[str] = set()
     for item in hints:
         if not isinstance(item, dict) or set(item) - {"id", "type", "bbox_pt", "comment"}:
@@ -802,6 +837,14 @@ def collect(attempt: Path, out: Path, inventory: dict[str, Any], exit_code: int,
                 scale_file = out / folder_rel / "scale.json"
                 scale = json.loads(scale_file.read_bytes()) if scale_file.is_file() else {}
                 scale = scale if isinstance(scale, dict) else {}
+                legacy = attempt / f"PDF_{page_entry['legacy_pdf_page']:03d}_Вид_{view['view']:02d}"
+                # Статистика оформления нужна и виду без DXF (отказ по масштабу): копия до `continue`.
+                signatures_src = legacy / HATCH_SIGNATURES_FILE
+                if (signatures_src.is_file() and not signatures_src.is_symlink()
+                        and signatures_src.stat().st_size <= MAX_HATCH_SIGNATURES_BYTES):
+                    (out / folder_rel).mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(signatures_src, out / folder_rel / HATCH_SIGNATURES_FILE)
+                    view["files"].append(f"{folder_rel}/{HATCH_SIGNATURES_FILE}")
                 view["scale_status"] = scale["status"] if isinstance(scale.get("status"), str) else None
                 view["scale_source"] = scale["source"] if isinstance(scale.get("source"), str) else None
                 deviation = scale.get("deviation")
@@ -828,7 +871,6 @@ def collect(attempt: Path, out: Path, inventory: dict[str, Any], exit_code: int,
                         or (view["scale_status"] == SCALE_CHAINS_PASSED
                             and view["scale_source"] == SCALE_SOURCE_CHAINS)):
                     raise RunnerError(EXIT_ENGINE, "gate_violation", "DXF без подтверждённого масштаба")
-                legacy = attempt / f"PDF_{page_entry['legacy_pdf_page']:03d}_Вид_{view['view']:02d}"
                 checks_src = legacy / CHECKS_FILE
                 if not checks_src.is_file():
                     raise RunnerError(EXIT_ENGINE, "gate_violation", "нет Контроль.json у DXF")

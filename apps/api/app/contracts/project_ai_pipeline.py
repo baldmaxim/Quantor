@@ -40,6 +40,20 @@ class AiSheetStage1(BaseModel):
     error_message: str | None = None
 
 
+class AiSheetStyle(BaseModel):
+    """Оформление вида (роль Claude «оформление»): классы подписей штриховки и их применение.
+
+    Только счётчики: найденные классы и регионы, которые взял движок. Площади и объёмы - не здесь.
+    """
+
+    state: AiStageState
+    # Классов подписей, оставшихся после проверки ответа; `None` - ответа ещё нет.
+    classes_found: int | None = None
+    # Регионов страницы, взятых движком по классам в последнем преобразовании; `None` - нет отчёта.
+    regions_applied: int | None = None
+    error_message: str | None = None
+
+
 class AiSheetStage2(BaseModel):
     state: AiStageState
     rounds_done: int
@@ -82,6 +96,8 @@ class ProjectAiSheetRow(BaseModel):
     # Для вида есть успешные конструкции и проект - пилот ИИ-проверки.
     review_available: bool
     stage1: AiSheetStage1
+    # Оформление перед проверкой Claude; `None` - у вида его нет (не пилот или не план).
+    style: AiSheetStyle | None = None
     stage2: AiSheetStage2 | None = None
     stage3: AiSheetStage3 | None = None
     stage4: AiSheetStage4 | None = None

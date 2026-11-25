@@ -914,3 +914,81 @@ def test_parse_params_rejects_bad_convert_hints(runner: ModuleType, bad: Any) ->
         runner.parse_params(_params(convert_hints=bad))
     assert error.value.exit_code == runner.EXIT_PARAMS
     assert error.value.code == "params_invalid"
+
+
+def _hatch_class(**patch: Any) -> dict[str, Any]:
+    item: dict[str, Any] = {
+        "signature_id": "ae2b34038041",
+        "color": [0.145, 0.0, 0.29],
+        "pen_pt": 0.28,
+        "angle_deg": 135.0,
+        "pitch_pt": 4.5,
+        "class": "monolith",
+    }
+    item.update(patch)
+    return item
+
+
+def test_hatch_classes_allow_empty_or_missing_hints(runner: ModuleType) -> None:
+    classes = [_hatch_class()]
+    only_classes = {
+        "schema": "quantor.cad_convert_hints.v1",
+        "page": 1,
+        "hatch_classes": classes,
+    }
+    params = runner.parse_params(_params(convert_hints=only_classes))
+    assert runner.job_document([1, 3], params)["operator_convert_hints"] == only_classes
+    with_empty = _convert_hints(hints=[], hatch_classes=classes)
+    runner.parse_params(_params(convert_hints=with_empty))
+    with_both = _convert_hints(hatch_classes=classes)
+    runner.parse_params(_params(convert_hints=with_both))
+
+
+@pytest.mark.parametrize(
+    "bad_classes",
+    [
+        [],
+        "x",
+        [_hatch_class(**{"class": "wall"})],
+        [_hatch_class(color=[0, 0])],
+        [_hatch_class(color=[0, 0, 2])],
+        [_hatch_class(pen_pt=0)],
+        [_hatch_class(angle_deg=180)],
+        [_hatch_class(pitch_pt=-1)],
+        [_hatch_class(signature_id="")],
+        [{**_hatch_class(), "extra": 1}],
+        [_hatch_class() for _ in range(21)],
+    ],
+)
+def test_parse_params_rejects_bad_hatch_classes(runner: ModuleType, bad_classes: Any) -> None:
+    hints = _convert_hints(hints=[], hatch_classes=bad_classes)
+    with pytest.raises(runner.RunnerError) as error:
+        runner.parse_params(_params(convert_hints=hints))
+    assert error.value.exit_code == runner.EXIT_PARAMS
+
+
+def test_collect_copies_hatch_signatures_for_view(stubbed: ModuleType, tmp_path: Path) -> None:
+    attempt, out, inventory = _attempt(tmp_path, {"status": "passed", "source": "dimension_chains"})
+    document = '{"schema":"quantor.cad_hatch_signatures.v1","signatures":[]}'
+    (attempt / "PDF_001_Вид_01" / "hatch_signatures.json").write_text(document, encoding="utf-8")
+    _, _, pages = stubbed.collect(attempt, out, inventory, 0, "")
+    [view] = pages[0]["views"]
+    assert (out / "views/p001_v01/hatch_signatures.json").read_text(encoding="utf-8") == document
+    assert "views/p001_v01/hatch_signatures.json" in view["files"]
+
+
+def test_collect_copies_hatch_signatures_even_without_dxf(
+    stubbed: ModuleType, tmp_path: Path
+) -> None:
+    attempt, out, inventory = _attempt(tmp_path, {"status": "failed"}, dxf=False)
+    (attempt / "PDF_001_Вид_01" / "hatch_signatures.json").write_text("{}", encoding="utf-8")
+    _, _, pages = stubbed.collect(attempt, out, inventory, 0, "")
+    assert (out / "views/p001_v01/hatch_signatures.json").is_file()
+    assert "views/p001_v01/hatch_signatures.json" in pages[0]["views"][0]["files"]
+
+
+def test_collect_without_hatch_signatures_adds_nothing(stubbed: ModuleType, tmp_path: Path) -> None:
+    scale = {"status": "passed", "source": "dimension_chains"}
+    _, _, pages, out = _collect(stubbed, tmp_path, scale)
+    assert not (out / "views/p001_v01/hatch_signatures.json").exists()
+    assert not any("hatch_signatures" in name for name in pages[0]["views"][0]["files"])
