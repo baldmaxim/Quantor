@@ -20,6 +20,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.main import create_app
 from app.models import Job, Workspace
@@ -201,6 +202,12 @@ def test_retry_state_explains_every_refusal() -> None:
     ):
         allowed, reason = cad_service.retry_state(job(status, code))
         assert allowed is False and reason, (status, code)
+
+
+def test_cad_max_memory_default_is_6144_mb() -> None:
+    # Предел адресного пространства конвертации: 3072 не хватало крупным листам (`std::bad_alloc`).
+    # Читаем описание поля, а не `Settings()`: окружение разработчика (.env) значение не меняет.
+    assert Settings.model_fields["cad_max_memory_mb"].default == 6144
 
 
 def test_refresh_limits_updates_limits_and_sha_only() -> None:

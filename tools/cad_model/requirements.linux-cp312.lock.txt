@@ -1,0 +1,22 @@
+# Пакеты генератора cad_model (модель здания из IFC) для образа cad-worker: Python 3.12, Linux x86_64.
+# Отдельное окружение: venv движка (tools/cad_engine/requirements.linux-cp312.lock.txt) не меняется.
+# Версии - те, на которых генератор проверен (numpy 2.4.2, shapely 2.1.2, trimesh 5.2.1, ifcopenshell 0.8.5);
+# хеши колёс с PyPI. Установка: pip install --require-hashes --only-binary :all: -r <файл>.
+ifcopenshell==0.8.5 \
+    --hash=sha256:dd154b121815e25bc4890f030bf2bdd8d99b059448e0d1205ac81388a3d321f4
+trimesh==5.2.1 \
+    --hash=sha256:ba4b5dbdf030bbffbb6337d9c67595435a8d1f224f23eb6500e9662f42a3c5df
+numpy==2.4.2 \
+    --hash=sha256:9e35d3e0144137d9fdae62912e869136164534d64a169f86438bc9561b6ad49f
+shapely==2.1.2 \
+    --hash=sha256:1e7d4d7ad262a48bb44277ca12c7c78cb1b0f56b32c10734ec9a1d30c0b0c54b
+isodate==0.7.2 \
+    --hash=sha256:28009937d8031054830160fce6d409ed342816b543597cece116d966c6d99e15
+lark==1.3.1 \
+    --hash=sha256:c629b661023a014c37da873b4ff58a817398d12635d3bbb2c5a03be7fe5d1e12
+typing_extensions==4.15.0 \
+    --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548
+python-dateutil==2.9.0.post0 \
+    --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+six==1.17.0 \
+    --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274

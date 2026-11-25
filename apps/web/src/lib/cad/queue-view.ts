@@ -2,8 +2,9 @@ import type { CadQueueItemRead, JobType } from '@quantor/api-client';
 
 import type { BadgeTone } from '@/components/ui';
 import { countOf } from '@/lib/format';
+import { jobTypeLabel } from '@/lib/jobs/job-labels';
 
-import { cadCodeText } from './errors';
+import { cadStageCodeText } from './errors';
 import { PIPELINE_STEP_LABELS, type PipelineStepKey } from './pipeline';
 
 /** Показ очереди CAD без UI: метки заданий, статусы, место в очереди, страницы. */
@@ -30,7 +31,8 @@ export const queueJobLabel = (jobType: JobType): string => {
   if (jobType === 'cad_facades') return 'Фасады';
   if (jobType === 'cad_style_preview') return 'Профиль оформления';
   const key = STEP_OF_JOB[jobType];
-  return key === undefined ? jobType : PIPELINE_STEP_LABELS[key];
+  // Не шаг конвейера листа (модель из IFC, паспорта листов…) - общая подпись задания, не код.
+  return key === undefined ? jobTypeLabel(jobType) : PIPELINE_STEP_LABELS[key];
 };
 
 const CLOCK = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -74,7 +76,9 @@ export const queueStatusView = (item: CadQueueItemRead): IQueueStatusView => {
 
 /** Текст ошибки задания по коду; кода нет или статус не «ошибка» - `null`. */
 export const queueErrorText = (item: CadQueueItemRead): string | null =>
-  item.status === 'failed' && item.error_code !== null ? cadCodeText(item.error_code) : null;
+  item.status === 'failed' && item.error_code !== null
+    ? cadStageCodeText(item.job_type, item.error_code)
+    : null;
 
 const PAGES_LISTED_MAX = 5;
 

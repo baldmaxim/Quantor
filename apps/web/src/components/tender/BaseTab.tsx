@@ -5,6 +5,7 @@ import { useState, type FC } from 'react';
 
 import {
   Button,
+  ButtonLink,
   EmptyState,
   ErrorState,
   SkeletonRows,
@@ -128,7 +129,14 @@ export const BaseTab: FC<ITabProps> = ({ projectId }) => {
         />
       )}
       {releases.data && releases.data.length === 0 && (
-        <EmptyState compact title="Выпусков базы пока нет" />
+        <EmptyState
+          compact
+          title="Выпусков базы пока нет"
+          description="Нужны этажи «Здания» с посчитанными конструкциями."
+          action={
+            <ButtonLink href={`/projects/${projectId}/building3d`}>Открыть «Здание»</ButtonLink>
+          }
+        />
       )}
       {releases.data && releases.data.length > 0 && (
         <div className="rounded-[var(--radius-md)] border border-border-strong bg-surface">

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type MockInstance } from 'vitest';
 
 const api = vi.hoisted(() => ({
   create: vi.fn(),
@@ -23,7 +23,39 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 );
 
+type InvalidateSpy = MockInstance<QueryClient['invalidateQueries']>;
+
 describe('facades-queries', () => {
+  const clientWith = (): { client: QueryClient; spy: InvalidateSpy; wrap: typeof wrapper } => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const wrap = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    return { client, spy, wrap };
+  };
+  const keysOf = (spy: InvalidateSpy): unknown[] =>
+    spy.mock.calls.map((call) => call[0]?.queryKey);
+
+  it('после запуска и решения перечитываются 3D этажа и 3D здания проекта', async () => {
+    api.create.mockResolvedValue({ data: { job_id: 'j' } });
+    api.decide.mockResolvedValue({ data: { views: [] } });
+    const started = clientWith();
+    const start = renderHook(() => useStartCadFacades('p1', 'r1'), { wrapper: started.wrap });
+    await act(async () => {
+      await start.result.current.mutateAsync();
+    });
+    expect(keysOf(started.spy)).toContainEqual(['cad-floor3d', 'p1']);
+    expect(keysOf(started.spy)).toContainEqual(['cad-building3d', 'p1']);
+    const decided = clientWith();
+    const decide = renderHook(() => useDecideCadFacadeViews('p1', 'r1'), { wrapper: decided.wrap });
+    await act(async () => {
+      await decide.result.current.mutateAsync({ viewIds: ['a'], decision: 'accept' });
+    });
+    expect(keysOf(decided.spy)).toContainEqual(['cad-floor3d', 'p1']);
+    expect(keysOf(decided.spy)).toContainEqual(['cad-building3d', 'p1']);
+  });
+
   it('запуск: POST jobs с revision_id и page_indexes null', async () => {
     api.create.mockResolvedValue({ data: { job_id: 'j' } });
     const { result } = renderHook(() => useStartCadFacades('p1', 'r1'), { wrapper });

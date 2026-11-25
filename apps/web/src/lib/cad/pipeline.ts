@@ -6,7 +6,7 @@ import type {
   CadPipelineViewRead,
 } from '@quantor/api-client';
 
-import { cadCodeText } from './errors';
+import { cadStageCodeText } from './errors';
 
 /**
  * Состояние конвейера листа CAD для показа (без UI): шаги, их состояния и одна строка итога.
@@ -17,13 +17,7 @@ import { cadCodeText } from './errors';
  */
 
 export type PipelineStepKey =
-  | 'calibration'
-  | 'convert'
-  | 'walls'
-  | 'zones'
-  | 'approval'
-  | 'routes'
-  | 'floor3d';
+  'calibration' | 'convert' | 'walls' | 'zones' | 'approval' | 'routes' | 'floor3d';
 
 /**
  * `blocked` - предыдущий шаг не выполнен; `skipped` - шаг не нужен (преобразование не выпустило
@@ -31,14 +25,7 @@ export type PipelineStepKey =
  * `queued` - задание поставлено, но исполнитель CAD ещё занят другим.
  */
 export type PipelineStepState =
-  | 'todo'
-  | 'queued'
-  | 'running'
-  | 'done'
-  | 'review'
-  | 'failed'
-  | 'skipped'
-  | 'blocked';
+  'todo' | 'queued' | 'running' | 'done' | 'review' | 'failed' | 'skipped' | 'blocked';
 
 export interface IPipelineStep {
   readonly key: PipelineStepKey;
@@ -116,7 +103,7 @@ const stageState = (stage: CadPipelineStageRead | null): PipelineStepState => {
 };
 
 const failureText = (stage: CadPipelineStageRead): string => {
-  if (stage.error_code) return cadCodeText(stage.error_code);
+  if (stage.error_code) return cadStageCodeText(stage.job_type, stage.error_code);
   return stage.status === 'cancelled' ? 'Отменено' : 'Итог: отказ';
 };
 
@@ -173,9 +160,27 @@ const zonesStep = (view: CadPipelineViewRead): IPipelineStep => {
   return make('zones', 'done', `${view.zones_count} ${zonesWord(view.zones_count)}`);
 };
 
+/**
+ * Авторазметка зон не нашла решения на этом листе: квартир нет (нет марок помещений) или CAD не
+ * совместился с PDF. Повтор с теми же входами даст то же; зоны размечает человек, а одобрению вида
+ * и трассам они не нужны (сервер одобряет вид без зон, трассы зон не читают).
+ */
+const ZONES_NOT_FOUND_CODES: ReadonlySet<string> = new Set([
+  'CAD_MEP_NOT_BUILT',
+  'CAD_INPUT_INVALID',
+]);
+
+export const isZonesNotFound = (stage: CadPipelineStageRead | null): boolean =>
+  stage !== null &&
+  stage.job_type === 'cad_zones' &&
+  stageState(stage) === 'failed' &&
+  ZONES_NOT_FOUND_CODES.has(stage.error_code ?? '');
+
 const approvalStep = (view: CadPipelineViewRead, walls: IPipelineStep, zones: IPipelineStep) => {
   if (view.approved) return make('approval', 'done');
-  const ready = walls.state === 'done' && zones.state === 'done';
+  // Зоны, которые авторазметка не нашла, одобрение не держат: иначе лист застревает без выхода.
+  const zonesReady = zones.state === 'done' || isZonesNotFound(view.zones);
+  const ready = walls.state === 'done' && zonesReady;
   return make('approval', ready ? 'review' : 'blocked', ready ? 'нужно решение человека' : null);
 };
 
@@ -296,7 +301,9 @@ export const MAIN_STEP_KEYS = [
 export const MAIN_STEP_TOTAL = MAIN_STEP_KEYS.length;
 
 const mainSteps = (sheet: CadPipelineSheetRead): IPipelineStep[] =>
-  sheetSteps(sheet).filter((step) => (MAIN_STEP_KEYS as readonly PipelineStepKey[]).includes(step.key));
+  sheetSteps(sheet).filter((step) =>
+    (MAIN_STEP_KEYS as readonly PipelineStepKey[]).includes(step.key),
+  );
 
 /** Сколько из шести основных шагов закончено (готово или не требуется). */
 export const sheetProgress = (sheet: CadPipelineSheetRead): { done: number; total: 6 } => ({
@@ -325,7 +332,8 @@ export const sheetSummary = (sheet: CadPipelineSheetRead): IPipelineSummary => {
 
   const running = steps.find((step) => step.state === 'running');
   if (running) {
-    const percent = running.detail !== null && running.detail.endsWith('%') ? ` · ${running.detail}` : '';
+    const percent =
+      running.detail !== null && running.detail.endsWith('%') ? ` · ${running.detail}` : '';
     return { tone: 'accent', label: `Идёт: ${running.label}${percent}` };
   }
 
@@ -389,6 +397,17 @@ export const staleText = (item: CadPipelineStaleRead): string =>
 export const sheetStaleTexts = (sheet: CadPipelineSheetRead): readonly string[] => [
   ...new Set((sheet.stale ?? []).map(staleText)),
 ];
+
+/**
+ * Подсказка метки «устарел»: какие шаги посчитаны старой версией движка и что нажать. Версии
+ * движка («было …, стало …») - строками ниже, см. `sheetStaleTexts`.
+ */
+export const sheetStaleHint = (sheet: CadPipelineSheetRead): string | null => {
+  const stages = [...new Set((sheet.stale ?? []).map((item) => STALE_STAGE_LABELS[item.stage]))];
+  return stages.length === 0
+    ? null
+    : `Посчитан старой версией движка (${stages.join(', ')}) — «Пересчитать устаревшие»`;
+};
 
 export const isSheetStale = (sheet: CadPipelineSheetRead): boolean =>
   (sheet.stale ?? []).length > 0;

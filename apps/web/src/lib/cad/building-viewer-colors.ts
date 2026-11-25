@@ -6,6 +6,8 @@ export interface IBuildingViewerColors {
   readonly slab: string;
   readonly masonry: string;
   readonly monolith: string;
+  /** Стекло окна: тот же токен, что в 3D этажа. */
+  readonly glass: string;
 }
 
 const FALLBACK_COLOR = 'gray';
@@ -19,6 +21,7 @@ export const readBuildingViewerColors = (): IBuildingViewerColors => {
       slab: FALLBACK_COLOR,
       masonry: FALLBACK_COLOR,
       monolith: FALLBACK_COLOR,
+      glass: FALLBACK_COLOR,
     };
   }
   const style = getComputedStyle(document.documentElement);
@@ -29,5 +32,6 @@ export const readBuildingViewerColors = (): IBuildingViewerColors => {
     slab: token('--border-strong'),
     masonry: token('--cad-construction-masonry'),
     monolith: token('--cad-construction-monolith'),
+    glass: token('--cad-layer-9'),
   };
 };

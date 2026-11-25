@@ -38,6 +38,10 @@ const segmentsOf = (data: CadProjectSummaryRead): readonly ISegment[] => {
   ];
 };
 
+/** «из 1 листа», «из 21 листа», но «из 11 листов», «из 346 листов». */
+const sheetsOf = (count: number): string =>
+  count % 10 === 1 && count % 100 !== 11 ? 'листа' : 'листов';
+
 const WRAPPER = 'shrink-0 border-b border-border px-[var(--s-6)] py-[var(--s-4)]';
 
 export const CadRecognitionSummary: FC<ICadRecognitionSummaryProps> = ({ projectId }) => {
@@ -83,7 +87,8 @@ export const CadRecognitionSummary: FC<ICadRecognitionSummaryProps> = ({ project
   return (
     <div data-testid="cad-recognition-summary" className={WRAPPER}>
       <p className="m-0 text-xs font-medium text-text">
-        Распознавание: {data.sheets_done} из {data.sheets_total} листов · {percent} %
+        Конвейер CAD: готово {data.sheets_done} из {data.sheets_total} {sheetsOf(data.sheets_total)}{' '}
+        · {percent} %
       </p>
       <div
         role="img"

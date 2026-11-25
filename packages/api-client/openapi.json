@@ -1682,6 +1682,20 @@
               }
             ],
             "title": "Walls"
+          },
+          "windows": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CadBuilding3dWindowRead"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Windows"
           }
         },
         "required": [
@@ -1981,7 +1995,8 @@
           "reason": {
             "enum": [
               "not_plan",
-              "superseded"
+              "superseded",
+              "summary_unplaced"
             ],
             "title": "Reason",
             "type": "string"
@@ -2074,6 +2089,65 @@
           "message"
         ],
         "title": "CadBuilding3dWarningRead",
+        "type": "object"
+      },
+      "CadBuilding3dWindowRead": {
+        "description": "Окно этажа с высотой по виду фасада или ручному вводу листа (ADR-0048 п. 6).\n\nКонтур проёма - открытое кольцо в целых мм, не более 16 точек, уже преобразованное как этаж\n(`rotation_deg`, `offset_mm`). Все z - абсолютные мм от +-0,000: подоконная часть - от\n`sill_z_bottom_mm` (верх плиты) до `glass_z_bottom_mm`, стекло - от `glass_z_bottom_mm` до\n`glass_z_top_mm`, перемычка - от `glass_z_top_mm` до `lintel_z_top_mm` (верх стены этажа).\nВерх окна не ниже верха стены - перемычки нет: `lintel_z_top_mm = glass_z_top_mm`; нет\nподоконной части - `sill_z_bottom_mm = glass_z_bottom_mm`. `accepted = false` - вид фасада\nне принят человеком: окно показывается как кандидат.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "glass_z_bottom_mm": {
+            "title": "Glass Z Bottom Mm",
+            "type": "integer"
+          },
+          "glass_z_top_mm": {
+            "title": "Glass Z Top Mm",
+            "type": "integer"
+          },
+          "lintel_z_top_mm": {
+            "title": "Lintel Z Top Mm",
+            "type": "integer"
+          },
+          "opening_id": {
+            "title": "Opening Id",
+            "type": "string"
+          },
+          "shell": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "title": "Shell",
+            "type": "array"
+          },
+          "sill_z_bottom_mm": {
+            "title": "Sill Z Bottom Mm",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "facade",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "opening_id",
+          "shell",
+          "sill_z_bottom_mm",
+          "glass_z_bottom_mm",
+          "glass_z_top_mm",
+          "lintel_z_top_mm",
+          "accepted",
+          "source"
+        ],
+        "title": "CadBuilding3dWindowRead",
         "type": "object"
       },
       "CadChecksRead": {
@@ -10660,47 +10734,6 @@
         "title": "CadStageRead",
         "type": "object"
       },
-      "CadStyleHatchSignature": {
-        "additionalProperties": false,
-        "description": "Подпись штриховки монолита: цвет RGB (0..1), перо, угол и шаг в pt.",
-        "properties": {
-          "angle_deg": {
-            "exclusiveMaximum": 180.0,
-            "minimum": 0.0,
-            "title": "Angle Deg",
-            "type": "number"
-          },
-          "color": {
-            "items": {
-              "maximum": 1.0,
-              "minimum": 0.0,
-              "type": "number"
-            },
-            "maxItems": 3,
-            "minItems": 3,
-            "title": "Color",
-            "type": "array"
-          },
-          "pen": {
-            "exclusiveMinimum": 0.0,
-            "title": "Pen",
-            "type": "number"
-          },
-          "pitch_pt": {
-            "exclusiveMinimum": 0.0,
-            "title": "Pitch Pt",
-            "type": "number"
-          }
-        },
-        "required": [
-          "color",
-          "pen",
-          "angle_deg",
-          "pitch_pt"
-        ],
-        "title": "CadStyleHatchSignature",
-        "type": "object"
-      },
       "CadStyleManualSource": {
         "additionalProperties": false,
         "description": "Профиль введён вручную: полей снятия по образцам нет (лишнее поле - 422).",
@@ -10997,14 +11030,6 @@
             },
             "maxItems": 16,
             "title": "Concrete Hatch Gray",
-            "type": "array"
-          },
-          "concrete_hatch_signatures": {
-            "items": {
-              "$ref": "#/components/schemas/CadStyleHatchSignature"
-            },
-            "maxItems": 8,
-            "title": "Concrete Hatch Signatures",
             "type": "array"
           },
           "door_grid_tolerance": {
@@ -28325,6 +28350,7 @@
           "cad_facades",
           "cad_style_preview",
           "cad_eom_route",
+          "model_ifc_import",
           "sheet_passport_extract",
           "doc_questions_search",
           "sheet_register_extract",
@@ -29493,6 +29519,373 @@
         "title": "MetaResponse",
         "type": "object"
       },
+      "ModelApprove": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "title": "ModelApprove",
+        "type": "object"
+      },
+      "ModelElementRead": {
+        "properties": {
+          "bbox_mm": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox Mm"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "discipline": {
+            "title": "Discipline",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "ifc_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ifc Class"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "part": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part"
+          },
+          "props": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Props",
+            "type": "object"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "discipline"
+        ],
+        "title": "ModelElementRead",
+        "type": "object"
+      },
+      "ModelElementsPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelElementRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "limit",
+          "items"
+        ],
+        "title": "ModelElementsPage",
+        "type": "object"
+      },
+      "ModelImportCreate": {
+        "additionalProperties": false,
+        "description": "Постановка импорта: выбранные ревизии IFC; пусто - последние ревизии всех IFC проекта.",
+        "properties": {
+          "revision_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 40,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Ids"
+          }
+        },
+        "title": "ModelImportCreate",
+        "type": "object"
+      },
+      "ModelImportRead": {
+        "description": "Состояние задания «Модель из IFC»; `version_id` - версия модели, когда задание готово.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "generator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator Version"
+          },
+          "inputs": {
+            "title": "Inputs",
+            "type": "integer"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "stage",
+          "progress",
+          "error_code",
+          "error_message",
+          "generator_version",
+          "inputs",
+          "version_id",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "ModelImportRead",
+        "type": "object"
+      },
+      "ModelIssueRead": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "where": {
+            "title": "Where",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "where",
+          "message"
+        ],
+        "title": "ModelIssueRead",
+        "type": "object"
+      },
+      "ModelPartRead": {
+        "properties": {
+          "discipline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discipline"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "storey_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storey Key"
+          }
+        },
+        "required": [
+          "path",
+          "kind",
+          "size_bytes",
+          "sha256"
+        ],
+        "title": "ModelPartRead",
+        "type": "object"
+      },
       "ModelProviderProbeRead": {
         "description": "Результат явной проверки связи. Задержка появляется только здесь и только по кнопке.",
         "properties": {
@@ -29633,6 +30026,215 @@
         "title": "ModelProviderRead",
         "type": "object"
       },
+      "ModelSheetOverlayList": {
+        "properties": {
+          "elevation_mm": {
+            "title": "Elevation Mm",
+            "type": "number"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelSheetOverlayRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "storey_key": {
+            "title": "Storey Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storey_key",
+          "elevation_mm",
+          "items"
+        ],
+        "title": "ModelSheetOverlayList",
+        "type": "object"
+      },
+      "ModelSheetOverlayRead": {
+        "description": "Вид листа плана на отметке этажа модели и его привязка к сетке осей модели.\n\n`matrix` - подобие pt страницы (от левого верхнего угла, как кадр вида) → мм системы здания\nмодели: `x = a·x_pt + b·y_pt + c`, `y = d·x_pt + e·y_pt + f`, `[a, b, c, d, e, f]`.\nНет привязки -\n`None` и причина в `reason`.",
+        "properties": {
+          "axes_rejected": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Axes Rejected",
+            "type": "array"
+          },
+          "axes_used": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Axes Used",
+            "type": "array"
+          },
+          "base_z_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Z Mm"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "frame_scale_mm_per_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame Scale Mm Per Pt"
+          },
+          "group_label": {
+            "title": "Group Label",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "matrix": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 6,
+                "minItems": 6,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matrix"
+          },
+          "max_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mm"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "rms_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rms Mm"
+          },
+          "rotation_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotation Deg"
+          },
+          "scale_mm_per_pt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Mm Per Pt"
+          },
+          "status": {
+            "enum": [
+              "registered",
+              "unregistered"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision_id",
+          "document_id",
+          "job_id",
+          "page_index",
+          "view",
+          "label",
+          "group_label",
+          "status"
+        ],
+        "title": "ModelSheetOverlayRead",
+        "type": "object"
+      },
       "ModelSpecRead": {
         "description": "Одна модель у поставщика.",
         "properties": {
@@ -29664,6 +30266,480 @@
         ],
         "title": "ModelSpecRead",
         "type": "object"
+      },
+      "ModelStoreyRead": {
+        "properties": {
+          "bbox_mm": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox Mm"
+          },
+          "building_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Key"
+          },
+          "building_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Name"
+          },
+          "element_count": {
+            "default": 0,
+            "title": "Element Count",
+            "type": "integer"
+          },
+          "elevation_mm": {
+            "title": "Elevation Mm",
+            "type": "number"
+          },
+          "height_mm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Mm"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "storey_key": {
+            "title": "Storey Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storey_key",
+          "name",
+          "elevation_mm"
+        ],
+        "title": "ModelStoreyRead",
+        "type": "object"
+      },
+      "ModelVersionDetail": {
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "counts": {
+            "additionalProperties": true,
+            "title": "Counts",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "generator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/ModelPartRead"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ModelVersionStatus"
+          },
+          "storeys": {
+            "items": {
+              "$ref": "#/components/schemas/ModelStoreyRead"
+            },
+            "title": "Storeys",
+            "type": "array"
+          },
+          "tender_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tender Version Id"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/ModelIssueRead"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "number",
+          "status",
+          "source_kind",
+          "manifest_sha256",
+          "created_at"
+        ],
+        "title": "ModelVersionDetail",
+        "type": "object"
+      },
+      "ModelVersionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelVersionRead"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ModelVersionList",
+        "type": "object"
+      },
+      "ModelVersionRead": {
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "counts": {
+            "additionalProperties": true,
+            "title": "Counts",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "generator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ModelVersionStatus"
+          },
+          "tender_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tender Version Id"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/ModelIssueRead"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "number",
+          "status",
+          "source_kind",
+          "manifest_sha256",
+          "created_at"
+        ],
+        "title": "ModelVersionRead",
+        "type": "object"
+      },
+      "ModelVersionStarted": {
+        "description": "Ответ на начало выгрузки: что ещё надо загрузить (повторная выгрузка возобновляется).",
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "counts": {
+            "additionalProperties": true,
+            "title": "Counts",
+            "type": "object"
+          },
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "generator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "missing_parts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Parts",
+            "type": "array"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ModelVersionStatus"
+          },
+          "tender_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tender Version Id"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/ModelIssueRead"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "number",
+          "status",
+          "source_kind",
+          "manifest_sha256",
+          "created_at",
+          "created"
+        ],
+        "title": "ModelVersionStarted",
+        "type": "object"
+      },
+      "ModelVersionStatus": {
+        "description": "Версия модели здания (ADR-0053): загрузка, кандидат, утверждена, заменена.",
+        "enum": [
+          "uploading",
+          "candidate",
+          "approved",
+          "superseded"
+        ],
+        "title": "ModelVersionStatus",
+        "type": "string"
       },
       "NetworkGraphRef": {
         "additionalProperties": false,
@@ -30010,6 +31086,111 @@
           "source"
         ],
         "title": "NotInProjectAnswerIn",
+        "type": "object"
+      },
+      "OAuthAuthorizeDecision": {
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "required": [
+          "params",
+          "approve"
+        ],
+        "title": "OAuthAuthorizeDecision",
+        "type": "object"
+      },
+      "OAuthAuthorizeInfo": {
+        "description": "Что показать человеку перед «Разрешить», либо куда сразу вернуть чат с ошибкой.",
+        "properties": {
+          "already_connected": {
+            "default": false,
+            "title": "Already Connected",
+            "type": "boolean"
+          },
+          "client_name": {
+            "default": "",
+            "title": "Client Name",
+            "type": "string"
+          },
+          "error_redirect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Redirect"
+          },
+          "local_app": {
+            "default": false,
+            "title": "Local App",
+            "type": "boolean"
+          },
+          "redirect_host": {
+            "default": "",
+            "title": "Redirect Host",
+            "type": "string"
+          },
+          "scope_titles": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Scope Titles",
+            "type": "object"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "workspace_name": {
+            "default": "",
+            "title": "Workspace Name",
+            "type": "string"
+          }
+        },
+        "title": "OAuthAuthorizeInfo",
+        "type": "object"
+      },
+      "OAuthAuthorizeRedirect": {
+        "properties": {
+          "redirect_to": {
+            "title": "Redirect To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "redirect_to"
+        ],
+        "title": "OAuthAuthorizeRedirect",
         "type": "object"
       },
       "OriginalPrediction": {
@@ -30944,6 +32125,20 @@
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "enum": [
+                "read",
+                "tender",
+                "upload"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array"
           }
         },
         "required": [
@@ -30958,6 +32153,17 @@
           "active": {
             "title": "Active",
             "type": "boolean"
+          },
+          "client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Name"
           },
           "created_at": {
             "format": "date-time",
@@ -31045,6 +32251,17 @@
           "active": {
             "title": "Active",
             "type": "boolean"
+          },
+          "client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Name"
           },
           "created_at": {
             "format": "date-time",
@@ -44051,6 +45268,25 @@
         ]
       }
     },
+    "/api/v1/mcp": {
+      "post": {
+        "operationId": "mcp_endpoint",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "MCP-сервер для ИИ-агентов (JSON-RPC 2.0): личный токен или вход чата по OAuth",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
     "/api/v1/me/api-tokens": {
       "get": {
         "operationId": "list_personal_tokens",
@@ -44326,6 +45562,206 @@
         "summary": "Версии и возможности API",
         "tags": [
           "meta"
+        ]
+      }
+    },
+    "/api/v1/oauth/authorize": {
+      "get": {
+        "operationId": "oauth_authorize_check",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "client_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Client Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "redirect_uri",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Redirect Uri"
+            }
+          },
+          {
+            "in": "query",
+            "name": "response_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Response Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_challenge",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code Challenge"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_challenge_method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code Challenge Method"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthAuthorizeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запрос ИИ-чата на доступ: что показать на странице согласия",
+        "tags": [
+          "oauth"
+        ]
+      },
+      "post": {
+        "operationId": "oauth_authorize_decide",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthAuthorizeDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthAuthorizeRedirect"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Решение человека: разрешить ИИ-чату доступ или отказать",
+        "tags": [
+          "oauth"
         ]
       }
     },
@@ -48892,6 +50328,751 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/model/imports": {
+      "post": {
+        "operationId": "start_model_import",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelImportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelImportRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Построить модель из загруженных IFC проекта (задание генератора cad_model)",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/imports/latest": {
+      "get": {
+        "operationId": "read_latest_model_import",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelImportRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Новейшее задание импорта модели проекта: ход, отказ, версия",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/versions": {
+      "get": {
+        "operationId": "list_model_versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версии модели проекта, новые первыми",
+        "tags": [
+          "building-models"
+        ]
+      },
+      "post": {
+        "operationId": "start_model_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tender_version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tender Version Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "comment",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Comment"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersionStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Начать выгрузку модели: принять манифест пакета QMP (повтор возобновляет)",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/versions/{version_id}": {
+      "delete": {
+        "operationId": "delete_model_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Отменить выгрузку, не доведённую до фиксации",
+        "tags": [
+          "building-models"
+        ]
+      },
+      "get": {
+        "operationId": "read_model_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Версия модели с этажами и предупреждениями проверки",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/versions/{version_id}/approve": {
+      "post": {
+        "operationId": "approve_model_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelApprove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Утвердить кандидата: прежняя утверждённая версия становится заменённой",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/versions/{version_id}/commit": {
+      "post": {
+        "operationId": "commit_model_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Зафиксировать выгрузку: проверить пакет целиком, версия становится кандидатом",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/versions/{version_id}/parts/{path}": {
+      "get": {
+        "operationId": "read_model_part",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Часть пакета (GLB, элементы, разрезы): неизменяема, кэшируется по sha256",
+        "tags": [
+          "building-models"
+        ]
+      },
+      "put": {
+        "operationId": "put_model_part",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelPartRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Принять часть пакета: размер и sha256 сверяются с манифестом",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/versions/{version_id}/storeys/{storey_key}/elements": {
+      "get": {
+        "operationId": "list_model_elements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "storey_key",
+            "required": true,
+            "schema": {
+              "title": "Storey Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "discipline",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Discipline"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelElementsPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Элементы этажа: отбор по категории, дисциплине и подстроке имени",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/model/versions/{version_id}/storeys/{storey_key}/sheets": {
+      "get": {
+        "operationId": "read_storey_sheets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "storey_key",
+            "required": true,
+            "schema": {
+              "title": "Storey Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSheetOverlayList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Листы планов на отметке этажа и их привязка к сетке осей модели (чертёж наложением)",
+        "tags": [
+          "building-models"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/plan-alignments": {
       "get": {
         "operationId": "get_plan_alignments",
@@ -51966,6 +54147,56 @@
           }
         },
         "summary": "Виды проекта, которые можно включить в выпуск базы (этажи «Здания»)",
+        "tags": [
+          "tender-exchange"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/tender/base/coordination.{fmt}": {
+      "get": {
+        "description": "Для агентов: один запрос вместо «список выпусков -> ZIP -> распаковка». Номер выпуска - в\nзаголовке `X-Quantor-Base-Release`; отозванные выпуски пропускаются.",
+        "operationId": "read_latest_coordination",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fmt",
+            "required": true,
+            "schema": {
+              "enum": [
+                "json",
+                "ifc"
+              ],
+              "title": "Fmt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Координационный файл (сетка осей и этажи) последнего действующего выпуска базы",
         "tags": [
           "tender-exchange"
         ]

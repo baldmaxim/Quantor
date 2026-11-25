@@ -42,6 +42,27 @@ const CAD_MESSAGES: Readonly<Record<string, string>> = {
   CAD_RECOMPUTE_SAME_PARAMS: 'Те же отметка, высота и версия генератора: результат не изменится.',
 };
 
+/**
+ * Коды, которые у задания этапа значат своё: сервер отдаёт один и тот же код разным заданиям
+ * (выход CLI 2 - «вход не подошёл», 3 - «решения нет»). У авторазметки зон «решения нет» - это
+ * «квартиры на плане не найдены», а не «трассы не построены»; «вход не подошёл» - привязка
+ * PDF к DXF не прошла проверку либо лист пересчитали после постановки задания, а не «PDF не
+ * подходит». Записаны только значения, проверенные на ответах сервера (объект 346).
+ */
+const STAGE_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  cad_zones: {
+    CAD_MEP_NOT_BUILT: 'Квартиры на плане не найдены (нет марок помещений).',
+    CAD_INPUT_INVALID: 'CAD не совпал с PDF листа: повторите разметку или разметьте вручную.',
+  },
+};
+
+/**
+ * Текст кода с учётом задания этапа (`job_type`): сначала значение кода у этого этапа, затем
+ * общий текст кода.
+ */
+export const cadStageCodeText = (jobType: string | null | undefined, code: string): string =>
+  (jobType ? STAGE_MESSAGES[jobType]?.[code] : undefined) ?? cadCodeText(code);
+
 /** Текст отказа API для показа: код CAD, затем общий словарь, затем сообщение сервера. */
 export const cadErrorText = (error: unknown): string => {
   const code = extractCode(error);

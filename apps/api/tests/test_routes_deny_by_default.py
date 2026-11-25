@@ -90,7 +90,12 @@ async def test_operation_denies_anonymous_request(method: str, path: str) -> Non
         "Новая операция должна попасть либо под запрет по умолчанию, либо в список PUBLIC "
         "с объяснением, почему она публична."
     )
-    assert response.headers.get("WWW-Authenticate") == "Bearer"
+    challenge = response.headers.get("WWW-Authenticate")
+    if path == "/api/v1/mcp":
+        # Отказ MCP ведёт чат к метаданным ресурса: с них начинается вход по OAuth (ADR-0054).
+        assert challenge is not None and challenge.startswith("Bearer resource_metadata=")
+    else:
+        assert challenge == "Bearer"
 
 
 def test_every_protected_operation_declares_a_permission() -> None:
@@ -122,6 +127,11 @@ def test_every_protected_operation_declares_a_permission() -> None:
         "register",
         "login_with_password",
         "change_password",
+        # Вход ИИ-чатов по OAuth (ADR-0054): их зовёт сервер чата без сеанса портала.
+        "oauth_authorization_server_metadata",
+        "oauth_protected_resource_metadata",
+        "oauth_register_client",
+        "oauth_token",
     }
     missing: list[str] = []
     for route in walk(app.routes):

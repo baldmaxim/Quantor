@@ -54,7 +54,7 @@ async def list_sheet_calibrations(
     response_model=ScaleCalibrationRead,
     status_code=status.HTTP_201_CREATED,
     summary="Задать масштаб по известному размеру",
-    dependencies=[require(Permission.TAKEOFF_EDIT)],
+    dependencies=[require(Permission.SCALE_CALIBRATE)],
 )
 async def create_sheet_calibration(
     sheet_id: uuid.UUID,

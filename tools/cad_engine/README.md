@@ -46,14 +46,21 @@ API отвечает 409 `CAD_CALIBRATION_REQUIRED`.
 ## Генераторы CAD (`cad_mep`, `cad_walls`)
 
 Код генераторов трасс, зон, конструкций и 3D DXF в Quantor не хранится: он лежит в репозитории
-движка (`generators/cad_mep`, `generators/cad_walls`) и берётся по пину. В `pins.json` раздел
-`generators` фиксирует версии генераторов (`cad_mep.vN`, `cad_walls.vN.M`, `cad_floor3d_dxf.vN`)
+движка (`generators/cad_mep`, `generators/cad_walls`, `generators/cad_eom` — ЭОМ и СС этажа,
+ADR-0047, `generators/cad_facades` — виды фасадов, ADR-0048) и берётся по пину. В `pins.json` раздел
+`generators` фиксирует версии генераторов (`cad_mep.vN`, `cad_walls.vN.M`, `cad_floor3d_dxf.vN`,
+`cad_eom.vN.M`, `cad_facades.vN.M`, `cad_model.vN`)
 и sha256 файлов параметров: `params_sha256` — байты файла (по нему CI сверяет файл движка),
 `params_canonical_sha256` — канонический JSON (так считают API и генератор, он идёт в ключи заданий).
 API читает из pins только это (`CAD_ENGINE_PINS`, по умолчанию `tools/cad_engine/pins.json`);
 исполнитель берёт скрипты из `CAD_GENERATORS_ROOT` (в образе `/opt/cad-engine/generators`) и при
-`CAD_MEP_PARAMS` / `CAD_WALLS_PARAMS` сверяет параметры с пином. Нет `CAD_GENERATORS_ROOT` и явных
-`CAD_MEP_RUNNER` / `CAD_WALLS_RUNNER` — генератор не настроен, задание отказывает.
+`CAD_MEP_PARAMS` / `CAD_WALLS_PARAMS` / `CAD_EOM_PARAMS` / `CAD_FACADES_PARAMS` / `CAD_MODEL_PARAMS` сверяет параметры с пином. Нет `CAD_GENERATORS_ROOT` и явных
+`CAD_MEP_RUNNER` / `CAD_WALLS_RUNNER` / `CAD_EOM_RUNNER` / `CAD_FACADES_RUNNER` / `CAD_MODEL_RUNNER` — генератор не настроен, задание отказывает.
+
+`cad_model` (модель здания из IFC, ADR-0053) запускается не интерпретатором движка, а своим
+(`CAD_MODEL_PYTHON`, в образе `/opt/cad-model/venv`): ifcopenshell и trimesh стоят отдельно, по lock-файлу
+`tools/cad_model/requirements.linux-cp312.lock.txt`; закреплённые пакеты движка не меняются. Память процесса —
+`CAD_MODEL_MAX_MEMORY_MB`.
 
 ### Обновление пина
 

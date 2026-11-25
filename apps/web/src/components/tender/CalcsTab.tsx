@@ -69,7 +69,7 @@ export const CalcsTab: FC<ITabProps> = ({ projectId, calcId, versionId, onNaviga
     return (
       <EmptyState
         title="Расчётов пока нет"
-        description="Расчёт появится после загрузки пакета из TENDER (навык quantor-obmen). Токен для загрузки выпускается в разделе «Доступ для TENDER»."
+        description="Расчёт появится после загрузки пакета из TENDER (навык quantor-obmen). Токен для загрузки выпускается в разделе «Доступ (токены)»."
         action={<Button onClick={() => onNavigate({ tab: 'tokens' })}>Выпустить токен</Button>}
       />
     );

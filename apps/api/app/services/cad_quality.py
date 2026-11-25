@@ -66,7 +66,10 @@ def walls_reasons(document: WallsDocument) -> list[QualityReason]:
         )
     total = math.fsum(item.area_plan_mm2 for item in document.constructions)
     unsure = math.fsum(
-        item.area_plan_mm2 for item in document.constructions if item.thickness_status == "check"
+        item.area_plan_mm2
+        for item in document.constructions
+        # cad_walls v1.17: монолит без номинала с габаритом сечения считается по площади
+        if item.thickness_status == "check" and item.section_mm is None
     )
     if total > 0 and unsure / total > WALLS_CHECK_AREA_SHARE_MAX + _EPSILON:
         reasons.append(

@@ -4,7 +4,7 @@ import type { CadPipelineStageRead } from '@quantor/api-client';
 import { useState, type FC, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
-import { cadCodeText, cadErrorText } from '@/lib/cad/errors';
+import { cadErrorText, cadStageCodeText } from '@/lib/cad/errors';
 import { formatTime } from '@/lib/cad/format';
 import { useCadStageJob } from '@/lib/cad/pipeline-queries';
 import { useCadEvents, useCadJob } from '@/lib/cad/queries';
@@ -71,9 +71,13 @@ export const CadPipelineStageErrorDetails: FC<ICadPipelineStageErrorDetailsProps
       )}
       <dl className="m-0 flex flex-col gap-[var(--s-2)]">
         <Row label="Код ошибки">
-          {code ? <span className="font-mono">{code}</span> : <span className="text-muted">нет</span>}
+          {code ? (
+            <span className="font-mono">{code}</span>
+          ) : (
+            <span className="text-muted">нет</span>
+          )}
         </Row>
-        {code && <Row label="Что значит">{cadCodeText(code)}</Row>}
+        {code && <Row label="Что значит">{cadStageCodeText(stage.job_type, code)}</Row>}
         {message && <Row label="Сообщение сервера">{message}</Row>}
         {stageName && <Row label="Стадия">{stageName}</Row>}
         {finishedAt && <Row label="Завершено">{formatTime(finishedAt)}</Row>}

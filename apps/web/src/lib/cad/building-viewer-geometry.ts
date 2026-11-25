@@ -19,6 +19,10 @@ import {
  * (не ниже 100 мм); все стены одного материала сливаются в одну геометрию. Стена с верхом по знаку
  * отметки (парапет кровли, `top_mm`) поднимается до него.
  *
+ * Окна этажа (ADR-0048 п. 6) - те же высоты, что в 3D этажа: подоконная часть от верха плиты до низа
+ * стекла, стекло, перемычка до верха стены; контуры уже в системе объекта. Окна без высоты сервер не
+ * присылает: проём остаётся щелью.
+ *
  * Этаж с участками уровней (`levels`: кровля со скатами и нишами, ступенчатый первый этаж) - плита из
  * участков, каждый своей толщины плиты под своим верхом, с отверстиями.
  */
@@ -35,6 +39,20 @@ export interface IViewerWall {
   readonly top?: number;
 }
 
+/** Окно этажа: контур проёма в плане и четыре отметки по высоте, м, от общего центра. */
+export interface IViewerWindow {
+  readonly id: string;
+  readonly shell: readonly Point2[];
+  /** Низ подоконной части (верх плиты); равен `glassBottom`, если подоконной части нет. */
+  readonly sillBottom: number;
+  readonly glassBottom: number;
+  readonly glassTop: number;
+  /** Верх перемычки (верх стены); равен `glassTop`, если перемычки нет. */
+  readonly lintelTop: number;
+  /** Высота принята человеком (принятый вид фасада или ручной ввод); иначе - кандидат, бледнее. */
+  readonly accepted: boolean;
+}
+
 /** Участок плиты на своей отметке; контуры, м, от общего центра; верх плиты, м, по высоте. */
 export interface IViewerLevel {
   readonly shell: readonly Point2[];
@@ -44,6 +62,8 @@ export interface IViewerLevel {
 
 export interface IViewerFloorSpec extends IBuildingFloorSpec {
   readonly walls: readonly IViewerWall[];
+  /** Окна этажа с высотой; пусто - окон нет или контуры не запрошены. */
+  readonly windows: readonly IViewerWindow[];
   /** Участки уровней плиты; пусто - одна плита по `shell`. */
   readonly levels: readonly IViewerLevel[];
   /** Верх стен, м, от общего центра по высоте (низ стен = верх плиты). */
@@ -168,6 +188,22 @@ export const buildViewerPlan = (floors: readonly CadBuilding3dFloorRead[]): IVie
         top === null || top === undefined ? { id: wall.id, material, shell } : { id: wall.id, material, shell, top: height(top) },
       );
     }
+    const windows: IViewerWindow[] = [];
+    for (const window of spec.floor.windows ?? []) {
+      const outline = cleanOutline(window.shell);
+      if (outline === null) continue;
+      const shell = outline.map(toPlan);
+      if (polygonAreaM2(shell) < MIN_AREA_M2) continue;
+      windows.push({
+        id: window.opening_id,
+        shell,
+        sillBottom: height(window.sill_z_bottom_mm),
+        glassBottom: height(window.glass_z_bottom_mm),
+        glassTop: height(window.glass_z_top_mm),
+        lintelTop: height(window.lintel_z_top_mm),
+        accepted: window.accepted,
+      });
+    }
     const levels: IViewerLevel[] = [];
     for (const zone of spec.floor.levels ?? []) {
       const outline = cleanOutline(zone.shell);
@@ -178,7 +214,7 @@ export const buildViewerPlan = (floors: readonly CadBuilding3dFloorRead[]): IVie
         .map((ring) => ring.map(toPlan));
       levels.push({ shell: outline.map(toPlan), holes, top: height(zone.top_mm) });
     }
-    return { ...spec, walls, levels, wallTop: spec.slabTop + wallHeightMm(spec.floor) / MM_IN_M };
+    return { ...spec, walls, windows, levels, wallTop: spec.slabTop + wallHeightMm(spec.floor) / MM_IN_M };
   });
   return { floors: specs, size: base.size, zCenterMm: base.center.z, labels: [] };
 };
@@ -369,29 +405,36 @@ export const extrudeShell = (shell: readonly Point2[], yBottom: number, yTop: nu
  * строить - `null`.
  */
 export const mergeWalls = (
-  walls: readonly { readonly id: string; readonly shell: readonly Point2[]; readonly top?: number }[],
+  walls: readonly {
+    readonly id: string;
+    readonly shell: readonly Point2[];
+    readonly top?: number;
+    /** Свой низ призмы (окно: подоконная часть, стекло, перемычка); нет - `yBottom`. */
+    readonly bottom?: number;
+  }[],
   yBottom: number,
   yTop: number,
 ): IMergedWalls | null => {
-  const prisms: { id: string; prism: IPrism; top: number }[] = [];
+  const prisms: { id: string; prism: IPrism; top: number; bottom: number }[] = [];
   const ranges: IWallRange[] = [];
   let triangles = 0;
   for (const wall of walls) {
     // Верх по знаку отметки (парапет) - свой; ниже низа стены - стена не строится.
     const top = wall.top ?? yTop;
-    if (!(top - yBottom > 0)) continue;
+    const bottom = wall.bottom ?? yBottom;
+    if (!(top - bottom > 0)) continue;
     const prism = preparePrism(wall.shell);
     if (prism === null) continue;
     const count = prismTriangles(prism);
     ranges.push({ id: wall.id, start: triangles, end: triangles + count });
     triangles += count;
-    prisms.push({ id: wall.id, prism, top });
+    prisms.push({ id: wall.id, prism, top, bottom });
   }
   if (prisms.length === 0) return null;
   const positions = new Float32Array(triangles * 9);
   const normals = new Float32Array(triangles * 9);
   let offset = 0;
-  for (const { prism, top } of prisms) offset = writePrism(prism, yBottom, top, positions, normals, offset);
+  for (const { prism, top, bottom } of prisms) offset = writePrism(prism, bottom, top, positions, normals, offset);
   return { geometry: geometryOf(positions, normals), ranges };
 };
 

@@ -1,0 +1,8 @@
+# Выгрузчик QMP v1 и привязка листа (Python 3.12+). Проверка пакета qmp_check.py зависимостей не требует.
+ifcopenshell==0.8.5
+trimesh==5.2.1
+numpy==2.4.2
+shapely==2.1.2
+PyMuPDF==1.27.2.3
+# тесты
+pytest==9.0.2

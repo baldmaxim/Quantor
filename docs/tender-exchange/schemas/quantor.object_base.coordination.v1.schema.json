@@ -1,0 +1,175 @@
+{
+  "$defs": {
+    "ObjectBaseCoordinationAxis": {
+      "additionalProperties": false,
+      "description": "Ось группы линией в мм системы здания: точка на оси и единичное направление.",
+      "properties": {
+        "direction": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Direction",
+          "type": "array"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "orient": {
+          "enum": [
+            "vertical",
+            "horizontal"
+          ],
+          "title": "Orient",
+          "type": "string"
+        },
+        "point_mm": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Point Mm",
+          "type": "array"
+        },
+        "spread_mm": {
+          "title": "Spread Mm",
+          "type": "integer"
+        },
+        "views": {
+          "title": "Views",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "label",
+        "orient",
+        "point_mm",
+        "direction",
+        "views",
+        "spread_mm"
+      ],
+      "title": "ObjectBaseCoordinationAxis",
+      "type": "object"
+    },
+    "ObjectBaseCoordinationGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "axes": {
+          "items": {
+            "$ref": "#/$defs/ObjectBaseCoordinationAxis"
+          },
+          "title": "Axes",
+          "type": "array"
+        },
+        "group_key": {
+          "title": "Group Key",
+          "type": "string"
+        },
+        "group_label": {
+          "title": "Group Label",
+          "type": "string"
+        },
+        "storeys": {
+          "items": {
+            "$ref": "#/$defs/ObjectBaseCoordinationStorey"
+          },
+          "title": "Storeys",
+          "type": "array"
+        }
+      },
+      "required": [
+        "group_key",
+        "group_label",
+        "axes",
+        "storeys"
+      ],
+      "title": "ObjectBaseCoordinationGroup",
+      "type": "object"
+    },
+    "ObjectBaseCoordinationStorey": {
+      "additionalProperties": false,
+      "properties": {
+        "base_z_mm": {
+          "title": "Base Z Mm",
+          "type": "integer"
+        },
+        "elevation_known": {
+          "default": true,
+          "title": "Elevation Known",
+          "type": "boolean"
+        },
+        "floor_height_mm": {
+          "title": "Floor Height Mm",
+          "type": "integer"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "view_keys": {
+          "items": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}:\\d{1,4}:\\d{1,3}$",
+            "type": "string"
+          },
+          "title": "View Keys",
+          "type": "array"
+        }
+      },
+      "required": [
+        "label",
+        "base_z_mm",
+        "floor_height_mm",
+        "view_keys"
+      ],
+      "title": "ObjectBaseCoordinationStorey",
+      "type": "object"
+    }
+  },
+  "$id": "quantor.object_base.coordination.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`coordination.json`: сетка осей и этажи по группам здания (корпус/секция), мм здания.",
+  "properties": {
+    "doubts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Doubts",
+      "type": "array"
+    },
+    "frame": {
+      "const": "building_mm",
+      "title": "Frame",
+      "type": "string"
+    },
+    "groups": {
+      "items": {
+        "$ref": "#/$defs/ObjectBaseCoordinationGroup"
+      },
+      "title": "Groups",
+      "type": "array"
+    },
+    "schema": {
+      "const": "quantor.object_base.coordination.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "units": {
+      "const": "mm",
+      "title": "Units",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "units",
+    "frame",
+    "groups",
+    "doubts"
+  ],
+  "title": "ObjectBaseCoordination",
+  "type": "object"
+}

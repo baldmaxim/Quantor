@@ -7,6 +7,7 @@ import { Button, Dialog, DialogActions } from '@/components/ui';
 import { ClearableInput } from '@/components/ui/ClearableInput';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 import { useCreatePersonalToken } from '@/lib/tender/queries';
+import { TOKEN_SCOPES, type TokenScope } from '@/lib/tender/token-scopes';
 
 /**
  * Окно создания токена в два шага: название и срок -> значение токена. Значение показывается один
@@ -32,16 +33,18 @@ export const TokenCreateDialog: FC<IDialogProps> = ({ open, onClose }) => {
   const create = useCreatePersonalToken();
   const [name, setName] = useState('');
   const [lifetime, setLifetime] = useState('90');
+  const [scopes, setScopes] = useState<ReadonlySet<TokenScope>>(new Set(['tender']));
   const [created, setCreated] = useState<PersonalTokenCreated | null>(null);
   const [copied, setCopied] = useState<'done' | 'failed' | null>(null);
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();
-    if (name.trim() === '') return;
+    if (name.trim() === '' || scopes.size === 0) return;
     create.mutate(
       {
         name: name.trim(),
         expires_in_days: lifetime === 'none' ? null : Number(lifetime),
+        scopes: TOKEN_SCOPES.map((scope) => scope.value).filter((value) => scopes.has(value)),
       },
       { onSuccess: setCreated },
     );
@@ -60,6 +63,7 @@ export const TokenCreateDialog: FC<IDialogProps> = ({ open, onClose }) => {
     create.reset();
     setName('');
     setLifetime('90');
+    setScopes(new Set(['tender']));
     setCreated(null);
     setCopied(null);
   };
@@ -72,11 +76,11 @@ export const TokenCreateDialog: FC<IDialogProps> = ({ open, onClose }) => {
       onClose={onClose}
       busy={busy}
       onExited={reset}
-      title={created ? 'Токен создан' : 'Новый токен для TENDER'}
+      title={created ? 'Токен создан' : 'Новый токен'}
       description={
         created
           ? 'Скопируйте токен сейчас: больше мы его не покажем.'
-          : 'Токен действует от вашего имени в этом пространстве и позволяет загружать расчёты.'
+          : 'Токен действует от вашего имени в этом пространстве. Что он может - выберите ниже, в пределах ваших прав.'
       }
       footer={
         created ? (
@@ -94,7 +98,7 @@ export const TokenCreateDialog: FC<IDialogProps> = ({ open, onClose }) => {
               variant="primary"
               type="submit"
               form="tender-token-form"
-              disabled={busy || name.trim() === ''}
+              disabled={busy || name.trim() === '' || scopes.size === 0}
             >
               {busy ? 'Создаём…' : 'Создать'}
             </Button>
@@ -157,6 +161,33 @@ export const TokenCreateDialog: FC<IDialogProps> = ({ open, onClose }) => {
               ))}
             </select>
           </label>
+          <fieldset className="m-0 flex flex-col gap-[var(--s-2)] border-0 p-0">
+            <legend className="mb-[var(--s-2)] text-sm">Для чего токен</legend>
+            {TOKEN_SCOPES.map((scope) => (
+              <label key={scope.value} className="flex items-start gap-[var(--s-2)] text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-[3px]"
+                  checked={scopes.has(scope.value)}
+                  onChange={(event) => {
+                    const next = new Set(scopes);
+                    if (event.target.checked) next.add(scope.value);
+                    else next.delete(scope.value);
+                    setScopes(next);
+                  }}
+                />
+                <span>
+                  {scope.label}
+                  <span className="block text-xs text-muted">{scope.hint}</span>
+                </span>
+              </label>
+            ))}
+            {scopes.size === 0 && (
+              <span role="status" className="text-xs text-danger">
+                Отметьте хотя бы одну область
+              </span>
+            )}
+          </fieldset>
           {create.isError && (
             <p role="alert" className="m-0 text-sm text-danger">
               {extractMessage(create.error) ?? errorMessage(extractCode(create.error))}

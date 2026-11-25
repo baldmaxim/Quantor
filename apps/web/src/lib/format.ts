@@ -102,6 +102,49 @@ const PROCESSING_STATUS: Record<string, StatusView> = {
 export const revisionStatus = (status: string): StatusView =>
   PROCESSING_STATUS[status] ?? { label: status, tone: 'neutral' };
 
+export interface DocumentStatusView extends StatusView {
+  /** Что это значит и что делать дальше - во всплывающей подсказке у бейджа. */
+  readonly hint: string | null;
+}
+
+/**
+ * Состояние распознавания так, как его читает инженер в списке документов.
+ *
+ * Для PDF «не распознан» - норма: пакет распознавания (ADR-0037) не нужен ни листам, ни CAD,
+ * ни обмерам, поэтому плашки нет вовсе (`null`) - жёлтая на каждом PDF выглядела бедой. IFC не
+ * «без обработчика» - он строит модель на странице «Модель здания». Книга Excel хранится как есть
+ * (ВОР Заказчика берётся из неё для сверки конструкций), RVT, NWD и NWC лежат на хранении.
+ * Пояснение - только во всплывающей подсказке.
+ */
+export const documentRecognitionStatus = (
+  documentKind: string,
+  processingStatus: string,
+): DocumentStatusView | null => {
+  if (documentKind === 'pdf' && processingStatus === 'unprocessed') return null;
+  if (documentKind === 'ifc' && processingStatus === 'processor_unavailable') {
+    return {
+      label: 'Для модели здания',
+      tone: 'neutral',
+      hint: 'Модель строится на странице «Модель здания»',
+    };
+  }
+  if (documentKind === 'other' && processingStatus === 'unprocessed') {
+    return {
+      label: 'Хранится',
+      tone: 'neutral',
+      hint: 'ВОР Заказчика для сверки конструкций',
+    };
+  }
+  if (processingStatus === 'unprocessed' || processingStatus === 'processor_unavailable') {
+    return {
+      label: 'На хранении',
+      tone: 'neutral',
+      hint: 'Портал файл не разбирает',
+    };
+  }
+  return { ...revisionStatus(processingStatus), hint: null };
+};
+
 /**
  * Состояние подготовки листов.
  *

@@ -23,6 +23,22 @@ const nextConfig: NextConfig = {
   // на разделы, которых на этом этапе ещё нет, и их адреса не являются валидными
   // маршрутами. Включить, когда появятся все разделы.
   typedRoutes: false,
+  // Вход ИИ-чатов по OAuth (ADR-0054): метаданные по адресам RFC 8414 и RFC 9728 отдаёт API,
+  // страница лишь пересылает их (`app/oauth/metadata`).
+  rewrites: async () => [
+    {
+      source: '/.well-known/oauth-authorization-server',
+      destination: '/oauth/metadata/authorization-server',
+    },
+    {
+      source: '/.well-known/oauth-protected-resource',
+      destination: '/oauth/metadata/protected-resource',
+    },
+    {
+      source: '/.well-known/oauth-protected-resource/:path*',
+      destination: '/oauth/metadata/protected-resource',
+    },
+  ],
 };
 
 export default nextConfig;

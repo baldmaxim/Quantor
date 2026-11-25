@@ -1,0 +1,22 @@
+[project]
+name = "quantor-model-package"
+version = "0.1.0"
+description = "Выгрузчик модели в пакет QMP v1 (docs/building-model/07-model-package-qmp-v1.md) и привязка листа PDF к осям модели"
+requires-python = ">=3.12"
+# Точные версии - requirements.txt. Проверка пакета (model_package/qmp_check.py) - только стандартная библиотека.
+dependencies = ["ifcopenshell", "trimesh", "numpy", "shapely", "PyMuPDF"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "S"]
+# Документация и комментарии на русском: кириллица не «неоднозначный символ».
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

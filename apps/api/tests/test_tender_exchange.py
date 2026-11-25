@@ -1016,12 +1016,23 @@ async def test_base_release_builds_a_checked_package(
         listed = (await api.get(_url(project_id, "base/releases"))).json()
         assert [r["number"] for r in listed] == [2, 1]
 
+        # Агенту - одним запросом: координационный файл последнего действующего выпуска (№ 2).
+        coord_json = await api.get(_url(project_id, "base/coordination.json"))
+        assert coord_json.status_code == 200, coord_json.text
+        assert coord_json.headers["x-quantor-base-release"] == "2"
+        assert coord_json.json()["schema"] == "quantor.object_base.coordination.v1"
+        coord_ifc = await api.get(_url(project_id, "base/coordination.ifc"))
+        assert coord_ifc.status_code == 200 and coord_ifc.text.startswith("ISO-10303-21;")
+        assert (await api.get(_url(project_id, "base/coordination.dwg"))).status_code == 422
+
     archive = zipfile.ZipFile(io.BytesIO(download.content))
     names = set(archive.namelist())
     folder = f"views/p0000-v1-{revision_id[:8]}"
     assert names == {
         "manifest.json",
         "building.json",
+        "coordination.json",
+        "coordination.ifc",
         f"{folder}/view.json",
         f"{folder}/axes.json",
         f"{folder}/zones.json",
@@ -1085,6 +1096,16 @@ async def test_base_release_builds_a_checked_package(
     building = json.loads(archive.read("building.json"))
     assert [f["view_key"] for f in building["floors"]] == [view_key]
     assert building["floors"][0]["base_z_mm"] == 47600
+
+    # Координационный файл: этаж выпуска на своей отметке, IFC - текст STEP со своими этажами.
+    coordination = json.loads(archive.read("coordination.json"))
+    assert coordination["schema"] == "quantor.object_base.coordination.v1"
+    (group,) = coordination["groups"]
+    assert [s["base_z_mm"] for s in group["storeys"]] == [47600]
+    assert group["storeys"][0]["view_keys"] == [view_key]
+    ifc = archive.read("coordination.ifc").decode("ascii")
+    assert ifc.startswith("ISO-10303-21;") and "FILE_SCHEMA(('IFC4'));" in ifc
+    assert ifc.count("IFCBUILDINGSTOREY(") == 1
 
     stored = (
         (await db_session.execute(select(TenderBaseRelease).order_by(TenderBaseRelease.number)))
@@ -1177,3 +1198,31 @@ def test_view_bbox_is_in_view_frame_not_building() -> None:
     # Поворот на 90°: вид [0,0]-[10,4] после R(90) = [-4,0]-[0,10], затем сдвиг (100, 200).
     assert _bbox_in_view([96, 200, 100, 210], (100, 200), 90.0) == [0, 0, 10, 4]
     assert _bbox_in_view(None, (0, 0), 0.0) is None
+
+
+def test_object_base_thickness_of_monolith_without_nominal_uses_measured_section() -> None:
+    """cad_walls v1.17: монолит без номинала с `section_mm` - округлённая измеренная толщина."""
+    from app.contracts.cad_constructions import CadConstructionProps as PropsContract
+    from app.contracts.cad_floor3d import WallsFloorExtras
+    from app.services import tender_base
+    from tests.test_cad_constructions_calc import document, section_item
+
+    with_section = section_item("col", measured=649.9)
+    no_section = section_item("pil", kind="monolith_pylon", measured=649.9)
+    del no_section["section_mm"]
+    nominal = section_item("wall", kind="monolith_wall", nominal=400.0, measured=649.9)
+    doc = document([with_section, no_section, nominal])
+    by_id = {c.id: c for c in doc.constructions}
+
+    assert tender_base._thickness(by_id["col"], None) == 650
+    assert tender_base._thickness(by_id["pil"], None) is None
+    assert tender_base._thickness(by_id["wall"], None) == 400
+    override = PropsContract(thickness_override_mm=300)
+    assert tender_base._thickness(by_id["col"], override) == 300
+
+    built = tender_base.build_constructions(doc, WallsFloorExtras(), {})
+    assert {c.id: c.thickness_mm for c in built.constructions} == {
+        "col": 650,
+        "pil": None,
+        "wall": 400,
+    }

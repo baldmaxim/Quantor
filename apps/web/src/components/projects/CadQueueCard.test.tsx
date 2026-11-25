@@ -70,7 +70,9 @@ describe('CadQueueCard', () => {
     });
     respond([]);
     renderCard();
-    expect(await screen.findByText('Распознавание: 3 из 4 листов · 75 %')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Конвейер CAD: готово 3 из 4 листов · 75 %'),
+    ).toBeInTheDocument();
     expect(mocks.summary).toHaveBeenCalledWith(
       expect.objectContaining({ path: { project_id: 'p-1' } }),
     );

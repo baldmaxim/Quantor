@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.cad_worker import walls_handler
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
-from app.models import Job
+from app.models import Job, SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_mep as cad_mep_service
 from app.services import cad_walls as cad_walls_service
@@ -487,3 +487,80 @@ async def test_auto_enqueue_without_confirmed_frame_has_no_view_zone(
         )
         assert "view_zone" not in job.payload
         assert walls_handler._view_zone_of(job.payload) is None
+
+
+async def _passport(
+    session: AsyncSession,
+    project_id: str,
+    revision_id: str,
+    *,
+    page_index: int,
+    kind: str,
+    status: str,
+) -> None:
+    session.add(
+        SheetPassport(
+            project_id=uuid.UUID(project_id),
+            revision_id=uuid.UUID(revision_id),
+            page_index=page_index,
+            file_name="Лист.pdf",
+            sheet_kind=kind,
+            status=status,
+        )
+    )
+    await session.commit()
+
+
+@pytest.mark.parametrize(
+    ("kind", "status", "queued"),
+    [
+        ("section", "confirmed", False),
+        ("facade", "confirmed", False),
+        ("section", "candidate", True),
+        ("facade", "candidate", True),
+        ("section", "rejected", True),
+        ("floor_plan", "confirmed", True),
+        ("floor_plan", "candidate", True),
+    ],
+)
+async def test_auto_enqueue_skips_confirmed_section_and_facade_sheets(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    settings: Settings,
+    kind: str,
+    status: str,
+    queued: bool,
+) -> None:
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        await _passport(db_session, project_id, revision_id, page_index=0, kind=kind, status=status)
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        jobs = await cad_walls_service.enqueue_after_convert(
+            db_session, fake_storage, parent, settings
+        )
+        await db_session.commit()
+        assert len(jobs) == int(queued)
+        assert len(await _walls_jobs(db_session)) == int(queued)
+
+
+async def test_auto_enqueue_ignores_not_plan_passport_of_another_page(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    settings: Settings,
+) -> None:
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, revision_id, job_id, _base = await _parent(api, db_session, fake_storage)
+        await _passport(
+            db_session, project_id, revision_id, page_index=1, kind="section", status="confirmed"
+        )
+        parent = await db_session.get(Job, uuid.UUID(job_id))
+        assert parent is not None
+        pages = await cad_walls_service._not_plan_pages(db_session, parent)
+        assert pages == {1}
+        (job,) = await cad_walls_service.enqueue_after_convert(
+            db_session, fake_storage, parent, settings
+        )
+        assert job.payload["page_index"] == 0

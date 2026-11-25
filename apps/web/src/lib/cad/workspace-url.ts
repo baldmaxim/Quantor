@@ -23,6 +23,11 @@ export interface IWorkspaceCadTarget {
   readonly position: number | null;
   readonly job: string | null;
   readonly view: number | null;
+  /**
+   * Раздел правой панели CAD, который открыть сразу (`zones`, `mep`…): кнопка «Одобрить вид»
+   * лежит в «Трассах», ручная разметка - в «Зонах». Нет - панель выберет сама.
+   */
+  readonly side?: string | null;
 }
 
 /** Ссылка в рабочую область на вкладку CAD. Без ревизии - только вкладка. */
@@ -37,6 +42,7 @@ export const workspaceCadHref = (projectId: string, target: IWorkspaceCadTarget)
     params.set('job', target.job);
     if (target.view !== null) params.set('view', String(target.view));
   }
+  if (target.side) params.set('side', target.side);
   return `/projects/${projectId}/workspace?${params.toString()}`;
 };
 

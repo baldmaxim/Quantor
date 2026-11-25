@@ -35,7 +35,7 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -50,19 +50,28 @@ from app.contracts.cad_building3d import (
     CadBuilding3dWallRead,
     CadBuilding3dWarningRead,
 )
-from app.contracts.cad_constructions import CadSheetFloorTitle, CadSheetLevelsRead, WallsDocument
-from app.contracts.cad_floor3d import WallsFloorExtras, WallsLevels
+from app.contracts.cad_constructions import (
+    CadSheetFloorTitle,
+    CadSheetLevelsRead,
+    WallsDocument,
+    WallsOpening,
+)
+from app.contracts.cad_floor3d import WallsFloorExtras, WallsLevels, WallsOpeningExtras
 from app.domain import JobStatus, JobType
 from app.models import Document, DocumentRevision, Job, Sheet, SheetPassport
 from app.services import cad as cad_service
 from app.services import cad_construction_store, cad_site_cores, cad_views, cad_walls
 from app.services import cad_site_pins_math as pins_math
 from app.services import documents as documents_service
-from app.services.cad_constructions import ProjectSlab, effective_levels
+from app.services.cad_constructions import EffectiveLevels, ProjectSlab, effective_levels
+from app.services.cad_facade_windows import SheetLevel
 from app.services.cad_floor_title import floors_text, format_floor_title
 from app.services.cad_site_pins_math import SitePin
 from app.services.consistency.dictionaries import SheetKind
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
+
+if TYPE_CHECKING:
+    from app.services.cad_building3d_grid import GridFit
 
 MAX_OUTLINE_POINTS: Final = 200
 # Контуры конструкций (`walls=true`): предел числа на этаж и точек в кольце.
@@ -117,6 +126,11 @@ SITE_MIN_AGREEMENT: Final = 0.75
 SITE_SAME_LEVEL_MM: Final = 300
 SITE_MAX_OVERLAP: Final = 0.3
 SITE_PREFIXED_LABEL: Final = re.compile(r"\d{1,2}[.\-]")
+# Марка «4/1» - корпус 4, ось 1 (объект 346): номер корпуса через дробь. Дробью же пишут
+# дополнительные оси («1/1» - первая после оси 1), поэтому номером корпуса дробь считается, только
+# если у здания этого корпуса такие марки - большинство его осей (`CORPS_MARKS_SHARE`).
+CORPS_FRACTION_LABEL: Final = re.compile(r"(\d{1,3})/")
+CORPS_MARKS_SHARE: Final = 0.6
 # Ядра для постановки по совпадению монолита: стены и пилоны (колонны паркинга периодичны).
 CORE_KINDS: Final = frozenset({"monolith_wall", "monolith_pylon"})
 # Нижних этажей скопления, пробуемых по одному, и наименьшее число колец ядер этажа.
@@ -284,6 +298,11 @@ class SheetRef:
     passport_kind: str | None = None
     passport_building: str | None = None
     passport_section: str | None = None
+    # Отметка из заголовка листа по паспорту (мм) и этажи листа «от - до» (номера этажей):
+    # отметка этажа и типовые этажи, когда движок не нашёл отметок в заголовке (объект 346).
+    passport_elevation_mm: int | None = None
+    passport_floor_from: int | None = None
+    passport_floor_to: int | None = None
     # Показан прежний прогон листа (у нового конструкций ещё нет): текст предупреждения.
     previous_run_note: str | None = None
 
@@ -636,15 +655,26 @@ def _natural_key(text: str) -> list[tuple[int, int, str]]:
 
 
 @dataclass(frozen=True, slots=True)
+class ObliqueAxis:
+    """Ось под углом к листу (cad_walls v1.19) в мм DXF: точка на оси и единичное направление."""
+
+    label: str
+    point_mm: tuple[float, float]
+    direction: tuple[float, float]
+
+
+@dataclass(frozen=True, slots=True)
 class FloorAxes:
     """Оси этажа в мм DXF: подпись -> координата (x у вертикальных, y у горизонтальных).
 
     `message` - почему оси непригодны для совмещения (нет блока, нет кадра, одно направление).
+    `oblique` - оси под углом к листу: в совмещение этажей не идут, только в координационный файл.
     """
 
     vertical: dict[str, float]
     horizontal: dict[str, float]
     message: str | None
+    oblique: tuple[ObliqueAxis, ...] = ()
 
     @property
     def usable(self) -> bool:
@@ -652,6 +682,15 @@ class FloorAxes:
 
 
 NO_AXES: Final = FloorAxes({}, {}, MESSAGE_AXES_OUTDATED)
+MESSAGE_AXES_FOREIGN: Final = (
+    "оси листа - чужих корпусов (схема расположения корпусов в углу листа, а не план): "
+    "не используются"
+)
+# Доля марок «N/X» чужих корпусов среди марок листа корпуса, с которой оси листа - не его плана.
+FOREIGN_MARKS_SHARE: Final = 0.6
+MESSAGE_AXES_OBLIQUE_ONLY: Final = (
+    "на листе только оси под углом к листу: для совмещения нужны вертикальные и горизонтальные"
+)
 
 
 def _axis_rows(raw: Any) -> list[tuple[str, str, float]]:
@@ -674,6 +713,51 @@ def _axis_rows(raw: Any) -> list[tuple[str, str, float]]:
     return rows
 
 
+def _finite(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _oblique_rows(raw: Any) -> list[tuple[str, float, tuple[float, float]]]:
+    """Оси под углом из блока `axes`: подпись, угол на листе (градусы), точка на оси (pt)."""
+    rows: list[tuple[str, float, tuple[float, float]]] = []
+    if not isinstance(raw, list):
+        return rows
+    for item in raw:
+        if not isinstance(item, dict) or item.get("orient") != "oblique":
+            continue
+        label, angle, point = item.get("label"), item.get("angle_deg"), item.get("point_pt")
+        if (
+            isinstance(label, str)
+            and label.strip()
+            and isinstance(angle, int | float)
+            and _finite(angle)
+            and isinstance(point, list)
+            and len(point) == 2
+            and all(_finite(v) for v in point)
+        ):
+            rows.append((label.strip(), float(angle), (float(point[0]), float(point[1]))))
+    return rows
+
+
+def _oblique_in_mm(
+    rows: list[tuple[str, float, tuple[float, float]]],
+    origin: tuple[float, float],
+    factor: float,
+) -> tuple[ObliqueAxis, ...]:
+    """Оси под углом в мм DXF: y листа вниз, y DXF вверх - направление (cos, -sin)."""
+    out: dict[str, ObliqueAxis] = {}
+    for label, angle, (px, py) in rows:
+        if label in out:
+            continue
+        a = math.radians(angle)
+        out[label] = ObliqueAxis(
+            label=label,
+            point_mm=((px - origin[0]) * factor, (origin[1] - py) * factor),
+            direction=(math.cos(a), -math.sin(a)),
+        )
+    return tuple(out.values())
+
+
 def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
     """Оси листа из walls.json в мм DXF по кадру вида.
 
@@ -684,7 +768,8 @@ def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
     if not isinstance(block, dict):
         return NO_AXES
     rows = _axis_rows(block.get("items"))
-    if not rows:
+    slanted = _oblique_rows(block.get("items"))
+    if not rows and not slanted:
         message = block.get("message")
         return FloorAxes(
             {}, {}, message if isinstance(message, str) and message else MESSAGE_AXES_EMPTY
@@ -692,6 +777,7 @@ def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
     origin, factor = frame.origin_pt, frame.mm_per_pdf_point
     if not frame.confirmed or origin is None or factor is None or factor <= 0:
         return FloorAxes({}, {}, frame.reason or MESSAGE_FRAME_MISSING)
+    oblique = _oblique_in_mm(slanted, (origin[0], origin[1]), factor)
     values: dict[tuple[str, str], list[float]] = {}
     for label, orient, pos in rows:
         mm = (pos - origin[0]) * factor if orient == "vertical" else (origin[1] - pos) * factor
@@ -703,12 +789,85 @@ def axes_in_mm(raw_walls: Any, frame: CadFrameRead) -> FloorAxes:
             continue
         (vertical if orient == "vertical" else horizontal)[label] = sum(mms) / len(mms)
     if vertical and horizontal:
-        return FloorAxes(vertical, horizontal, None)
+        return FloorAxes(vertical, horizontal, None, oblique)
     if not vertical and not horizontal:
-        return FloorAxes({}, {}, MESSAGE_AXES_EMPTY)
+        message = MESSAGE_AXES_OBLIQUE_ONLY if oblique else MESSAGE_AXES_EMPTY
+        return FloorAxes({}, {}, message, oblique)
     found = "вертикальные" if vertical else "горизонтальные"
     return FloorAxes(
-        vertical, horizontal, f"найдены только {found} оси: для совмещения нужны оба направления"
+        vertical,
+        horizontal,
+        f"найдены только {found} оси: для совмещения нужны оба направления",
+        oblique,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class WindowSource:
+    """Окна листа для высот по фасадам (ADR-0048 п. 6) в системе DXF листа до совмещения.
+
+    Лежит в кеше этажа рядом с этажом: виды фасадов меняются без смены ключа этажа, поэтому
+    высоты считаются на каждый запрос здания (`cad_building3d_windows`), а не кешируются.
+    `frame_problem` - кадр вида не подтверждён (причина); `axes` - оси плана в мм (пусты, если
+    кадра нет или осей на плане нет).
+    """
+
+    openings: tuple[WallsOpening, ...]
+    extras: tuple[WallsOpeningExtras, ...]
+    slab_shell: list[list[float]] | None
+    corps: str | None
+    section: str | None
+    level: SheetLevel
+    opening_floor_z_mm: int
+    manual_sill_mm: int | None
+    manual_head_mm: int | None
+    axes: FloorAxes
+    frame_problem: str | None
+
+    @property
+    def points(self) -> int:
+        """Вес в кеше этажа: число точек контуров проёмов, плиты листа и осей."""
+        return (
+            sum(len(item.lintel or ()) for item in self.extras)
+            + len(self.slab_shell or ())
+            + len(self.axes.vertical)
+            + len(self.axes.horizontal)
+        )
+
+
+def window_source(
+    document: WallsDocument,
+    extras: WallsFloorExtras,
+    raw: Any,
+    frame: CadFrameRead | None,
+    levels: EffectiveLevels,
+) -> WindowSource | None:
+    """Окна листа без `opening_height_mm`; нет таких окон - `None` (строить нечего)."""
+    windows = tuple(o for o in document.openings if o.kind == "window")
+    if not any(o.opening_height_mm is None for o in windows):
+        return None
+    ids = {o.id for o in windows}
+    title = document.heights.title
+    confirmed = frame is not None and frame.confirmed
+    frame_problem: str | None = None
+    if frame is not None and not frame.confirmed:
+        frame_problem = frame.reason or MESSAGE_FRAME_MISSING
+    return WindowSource(
+        openings=windows,
+        extras=tuple(item for item in extras.openings if item.id in ids),
+        slab_shell=None if extras.slab is None else extras.slab.shell,
+        corps=None if title is None else title.corps,
+        section=None if title is None else title.section,
+        level=SheetLevel(
+            floor_z_mm=levels.opening_floor_z_mm,
+            floor_height_mm=levels.floor_height.value_mm,
+            elevation_known=levels.elevation_mm is not None,
+        ),
+        opening_floor_z_mm=levels.opening_floor_z_mm,
+        manual_sill_mm=levels.window_sill.value_mm,
+        manual_head_mm=levels.window_head.value_mm,
+        axes=axes_in_mm(raw, frame) if frame is not None and confirmed else NO_AXES,
+        frame_problem=frame_problem,
     )
 
 
@@ -726,6 +885,8 @@ class BuiltFloor:
     typical: TypicalPlan | None = None
     # Корпус и секция паспорта листа: подсказка при сведении групп одного корпуса.
     hint: tuple[str | None, str | None] = (None, None)
+    # Вид этажа → сетка осей утверждённой модели (`cad_building3d_grid`); модели нет - `None`.
+    grid: GridFit | None = None
 
 
 def _agreed(diffs: dict[str, float]) -> tuple[list[str], int]:
@@ -860,6 +1021,14 @@ def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding
             for wall in floor.walls
         ]
     )
+    windows = (
+        floor.windows
+        if floor.windows is None or (ix == 0 and iy == 0)
+        else [
+            window.model_copy(update={"shell": [[x + ix, y + iy] for x, y in window.shell]})
+            for window in floor.windows
+        ]
+    )
     levels = (
         floor.levels
         if not floor.levels or (ix == 0 and iy == 0)
@@ -877,6 +1046,7 @@ def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding
     return floor.model_copy(
         update={
             "walls": walls,
+            "windows": windows,
             "levels": levels,
             "outline": [[x + dx, y + dy] for x, y in floor.outline],
             "bbox": None if box is None else [box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy],
@@ -1167,6 +1337,7 @@ class _GroupInfo:
     axes: FloorAxes
     # Этажи с известной отметкой: (низ плиты, верх объёма, отметка, bbox) в системе группы.
     levels: tuple[tuple[int, int, int, tuple[float, float, float, float]], ...]
+    corps: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1178,9 +1349,27 @@ class _SiteMatch:
     prefixed: bool
 
 
-def _is_prefixed(label: str) -> bool:
-    """Марка с номером секции («3.1», «2-А»): одна на весь объект, совпадение надёжно."""
-    return SITE_PREFIXED_LABEL.match(label) is not None
+def _is_prefixed(label: str, corps_marks: frozenset[str] = frozenset()) -> bool:
+    """Марка с номером секции («3.1», «2-А») или корпуса через дробь («4/1», если корпус в
+    `corps_marks`): одна на весь объект, совпадение надёжно."""
+    if SITE_PREFIXED_LABEL.match(label) is not None:
+        return True
+    found = CORPS_FRACTION_LABEL.match(label)
+    return found is not None and found.group(1) in corps_marks
+
+
+def _corps_marks(infos: dict[str, _GroupInfo]) -> frozenset[str]:
+    """Корпуса, у которых марки осей через дробь с номером корпуса («4/1») - большинство марок."""
+    out: set[str] = set()
+    for info in infos.values():
+        corps = (info.corps or "").strip()
+        labels = [*info.axes.vertical, *info.axes.horizontal]
+        if not corps.isdigit() or not labels:
+            continue
+        own = sum(1 for label in labels if label.startswith(f"{corps}/"))
+        if own >= CORPS_MARKS_SHARE * len(labels):
+            out.add(corps)
+    return frozenset(out)
 
 
 def _group_axes(
@@ -1208,7 +1397,9 @@ def _group_axes(
     return FloorAxes(vertical, horizontal, None)
 
 
-def _consensus(base: dict[str, float], other: dict[str, float]) -> tuple[float, list[str]] | None:
+def _consensus(
+    base: dict[str, float], other: dict[str, float], corps_marks: frozenset[str] = frozenset()
+) -> tuple[float, list[str]] | None:
     """Сдвиг по одному направлению по согласованным общим маркам; согласия нет - `None`.
 
     Марка с номером секции («15.1») одна на весь объект: случайного совпадения у неё нет, и
@@ -1224,24 +1415,26 @@ def _consensus(base: dict[str, float], other: dict[str, float]) -> tuple[float, 
     if found is None:
         return None
     agreed = found[1]
-    if not any(_is_prefixed(label) for label in agreed) and (
+    if not any(_is_prefixed(label, corps_marks) for label in agreed) and (
         len(agreed) < SITE_MIN_AGREEMENT * len(common)
     ):
         return None
     return found
 
 
-def _site_match(base: FloorAxes, other: FloorAxes) -> _SiteMatch | None:
+def _site_match(
+    base: FloorAxes, other: FloorAxes, corps_marks: frozenset[str] = frozenset()
+) -> _SiteMatch | None:
     """Совпадение осей двух зданий: нужны оба направления и не меньше `SITE_MIN_AXES` марок."""
-    along_x = _consensus(base.vertical, other.vertical)
-    along_y = _consensus(base.horizontal, other.horizontal)
+    along_x = _consensus(base.vertical, other.vertical, corps_marks)
+    along_y = _consensus(base.horizontal, other.horizontal, corps_marks)
     if along_x is None or along_y is None:
         return None
     labels = (*along_x[1], *along_y[1])
     if len(labels) < SITE_MIN_AXES:
         return None
     return _SiteMatch(
-        (along_x[0], along_y[0]), labels, any(_is_prefixed(label) for label in labels)
+        (along_x[0], along_y[0]), labels, any(_is_prefixed(label, corps_marks) for label in labels)
     )
 
 
@@ -1268,6 +1461,7 @@ def _group_infos(
             label=aligned[indexes[0]].group_label,
             axes=_group_axes([items[i] for i in indexes], [aligned[i] for i in indexes]),
             levels=levels,
+            corps=next((aligned[i].corps for i in indexes if aligned[i].corps), None),
         )
     return infos
 
@@ -1317,10 +1511,13 @@ def place_groups(
     # Здание без этажей с отметкой (план 1 этажа, техэтаж без отметки) - тоже связка: марки с
     # номером секции ставят его без проверки наложения.
     with_axes = [k for k in keys if infos[k].axes.usable]
+    corps_marks = _corps_marks(infos)
     matches: dict[tuple[str, str], _SiteMatch] = {}
     for base in with_axes:
         for other in with_axes:
-            if base != other and (match := _site_match(infos[base].axes, infos[other].axes)):
+            if base != other and (
+                match := _site_match(infos[base].axes, infos[other].axes, corps_marks)
+            ):
                 matches[(base, other)] = match
     result: dict[str, GroupPlacement] = {}
     rejected: dict[str, str] = {}
@@ -1636,10 +1833,13 @@ def _axis_links(
 ) -> dict[tuple[str, str], _SiteMatch]:
     """Совпадения осей всех пар зданий с осями в обоих направлениях: сдвиг из `other` в `base`."""
     with_axes = [k for k in infos if infos[k].axes.usable]
+    corps_marks = _corps_marks(infos)
     links: dict[tuple[str, str], _SiteMatch] = {}
     for base in with_axes:
         for other in with_axes:
-            if base != other and (match := _site_match(infos[base].axes, infos[other].axes)):
+            if base != other and (
+                match := _site_match(infos[base].axes, infos[other].axes, corps_marks)
+            ):
                 links[(base, other)] = match
     return links
 
@@ -2533,6 +2733,11 @@ def _rotated(
             for wall in floor.walls
         ]
     )
+    windows = (
+        None
+        if floor.windows is None
+        else [window.model_copy(update={"shell": ints(window.shell)}) for window in floor.windows]
+    )
     levels = [
         zone.model_copy(update={"shell": ints(zone.shell), "holes": [ints(h) for h in zone.holes]})
         for zone in floor.levels
@@ -2549,6 +2754,7 @@ def _rotated(
         update={
             "outline": outline,
             "walls": walls,
+            "windows": windows,
             "levels": levels,
             "bbox": bbox,
             "offset_mm": (round(ox, 3), round(oy, 3)),
@@ -2723,6 +2929,9 @@ async def collect_sheets(
                     SheetPassport.sheet_kind,
                     SheetPassport.building,
                     SheetPassport.section,
+                    SheetPassport.elevation_m,
+                    SheetPassport.level_from_ordinal,
+                    SheetPassport.level_to_ordinal,
                 ).where(
                     SheetPassport.project_id == project_id,
                     SheetPassport.revision_id.in_(list(revisions)),
@@ -2790,10 +2999,23 @@ async def collect_sheets(
                         passport_kind=None if passport is None else passport.sheet_kind,
                         passport_building=None if passport is None else _clean(passport.building),
                         passport_section=None if passport is None else _clean(passport.section),
+                        passport_elevation_mm=_passport_mm(passport),
+                        passport_floor_from=None
+                        if passport is None
+                        else passport.level_from_ordinal,
+                        passport_floor_to=None if passport is None else passport.level_to_ordinal,
                         previous_run_note=note,
                     )
                 )
     return sheets, [], project_slab
+
+
+def _passport_mm(passport: Any) -> int | None:
+    """Отметка из заголовка листа по паспорту, мм; нет паспорта или отметки - `None`."""
+    value = None if passport is None else passport.elevation_m
+    if not isinstance(value, int | float) or not math.isfinite(value):
+        return None
+    return round(value * 1000)
 
 
 def _walls_state(walls: Job | None) -> str:
@@ -2918,6 +3140,12 @@ class _SheetFloor:
     typical: TypicalPlan | None = None
     # Почему лист служебный (не план этажа): в стопку не идёт, но и не ошибка.
     service: str | None = None
+    # Окна листа без высоты в плане (только при `include_walls`); высоты - на каждый запрос.
+    windows: WindowSource | None = None
+    # Этажи заголовка плана (cad_walls) и есть ли в заголовке отметки: без отметок отметку этажа
+    # и типовые этажи даёт паспорт листа и схемы КР (`cad_project_levels`).
+    title_floors: tuple[str, ...] = ()
+    title_marked: bool = False
 
 
 # Ключ - всё, от чего зависит этаж листа: адрес и подпись листа, ключи артефактов (неизменны в
@@ -3050,15 +3278,54 @@ def _sheet_floor(
     # Оси сводного листа не связывают здания: планы секций на нём разложены не как на объекте.
     summary = is_summary_sheet(sheet.stamp_title)
     axes = NO_AXES if frame is None or summary else axes_in_mm(raw, frame)
+    corps_of_sheet = (title.corps if title is not None else None) or sheet.passport_building
+    if foreign_axes(axes, corps_of_sheet):
+        axes = FloorAxes({}, {}, MESSAGE_AXES_FOREIGN)
     cores = core_rings(document)
+    windows = (
+        window_source(
+            document,
+            extras,
+            raw,
+            frame,
+            effective_levels(document.heights, sheet.overrides, project_slab),
+        )
+        if include_walls
+        else None
+    )
     cost = (
         1
+        + (0 if windows is None else windows.points)
         + sum(len(ring) for ring in cores)
         + len(floor.outline)
         + sum(len(wall.shell) for wall in floor.walls or ())
         + sum(len(zone.shell) + sum(len(h) for h in zone.holes) for zone in floor.levels)
     )
-    return _SheetFloor(floor, tuple(floor_warnings), axes, cost, cores, typical)
+    return _SheetFloor(
+        floor,
+        tuple(floor_warnings),
+        axes,
+        cost,
+        cores,
+        typical,
+        windows=windows,
+        title_floors=tuple(title.floors) if title is not None else (),
+        title_marked=title is not None and bool(title.marks_mm),
+    )
+
+
+def foreign_axes(axes: FloorAxes, corps: str | None) -> bool:
+    """Оси листа корпуса - чужих корпусов: марки «N/X» с N не своего корпуса - большинство марок."""
+    own = (corps or "").strip()
+    labels = [*axes.vertical, *axes.horizontal]
+    if not own.isdigit() or not labels:
+        return False
+    foreign = 0
+    for label in labels:
+        found = CORPS_FRACTION_LABEL.match(label)
+        if found is not None and found.group(1) != own:
+            foreign += 1
+    return foreign >= FOREIGN_MARKS_SHARE * len(labels)
 
 
 def core_rings(document: WallsDocument) -> tuple[CoreRing, ...]:

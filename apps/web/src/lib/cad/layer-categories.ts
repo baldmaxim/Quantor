@@ -31,17 +31,20 @@ export const MONOLITH_CATEGORIES: readonly CadExtraCategory[] = ['monolith_verti
 
 const MONOLITH_LAYER = /^02_МОНОЛИТ/;
 const SERVICE_LAYER = /^(aux|qa)_/i;
+/** Каркасные перегородки C112: движок с 2026.11.10 пишет их в `AUX_C112_*` (прежде `07_C112_*`). */
+const FRAME_PARTITION_LAYER = /^(07|AUX)_[CС]112/;
 
 /** Слой монолита DXF (`02_МОНОЛИТ…`): в списке слоёв его нет, им управляют две монолитные строки. */
 export const isMonolithLayer = (name: string): boolean => MONOLITH_LAYER.test(name.trim().toUpperCase());
 
-/** Служебный слой движка (`AUX_…`, `QA_…`): не показывается в панели и не рисуется в плане. */
-export const isServiceLayer = (name: string): boolean => SERVICE_LAYER.test(name.trim());
+/** Служебный слой движка (`AUX_…`, `QA_…`): не показывается в панели и не рисуется в плане; кроме C112. */
+export const isServiceLayer = (name: string): boolean =>
+  SERVICE_LAYER.test(name.trim()) && !FRAME_PARTITION_LAYER.test(name.trim().toUpperCase());
 
 /** Префиксы имён слоёв (в верхнем регистре); для C112 принимается и латинская, и кириллическая «С». */
 const LAYER_PREFIXES: readonly { readonly pattern: RegExp; readonly category: CadLayerCategory }[] = [
   { pattern: /^01_КЛАДКА/, category: 'masonry' },
-  { pattern: /^07_[CС]112/, category: 'frame_partition' },
+  { pattern: FRAME_PARTITION_LAYER, category: 'frame_partition' },
   { pattern: /^03_ДВЕРИ/, category: 'door' },
 ];
 

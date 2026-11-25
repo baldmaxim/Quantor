@@ -35,6 +35,13 @@ const BY_STACK = 'не определена, показана по отметк�
 
 const meters = (mm: number): string => formatNumber(mm / 1000, 3, 'м');
 
+/** «Окна: принятые N, кандидаты M» (кандидат - вид фасада не принят); окон не запрошено - «—». */
+export const windowsSummary = (windows: CadBuilding3dFloorRead['windows']): string => {
+  if (windows === null || windows === undefined) return '—';
+  const candidates = windows.filter((window) => !window.accepted).length;
+  return `принятые ${windows.length - candidates}, кандидаты ${candidates}`;
+};
+
 /** Параметры выбранного этажа, число конструкций по видам и итоги листа (считает сервер). */
 export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
   floor,
@@ -51,7 +58,10 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
   const typical = floor.typical_of ?? null;
   const heightUnknown = floor.floor_height_source === 'derived_stack' ? BY_STACK : NOT_DEFINED;
   const counts = countWalls(floor.walls);
-  const place = [floor.corps ? `корпус ${floor.corps}` : null, floor.section ? `секция ${floor.section}` : null]
+  const place = [
+    floor.corps ? `корпус ${floor.corps}` : null,
+    floor.section ? `секция ${floor.section}` : null,
+  ]
     .filter((part): part is string => part !== null)
     .join(', ');
 
@@ -62,36 +72,55 @@ export const BuildingFloorPanel: FC<IBuildingFloorPanelProps> = ({
         {place !== '' && <p className="text-xs text-muted">{place}</p>}
         {typical !== null && (
           <p className="text-xs text-muted [overflow-wrap:anywhere]">
-            Этаж показан по типовому листу «{typical}»: геометрия листа на отметке этого этажа. В объёмы листа
-            этаж не входит.
+            Этаж показан по типовому листу «{typical}»: геометрия листа на отметке этого этажа. В
+            объёмы листа этаж не входит.
           </p>
         )}
       </div>
       <dl className="divide-y divide-border">
-        <Row label="Отметка" value={floor.elevation_known ? formatElevation(floor.base_z_mm) : 'не определена'} />
+        <Row
+          label="Отметка"
+          value={floor.elevation_known ? formatElevation(floor.base_z_mm) : 'не определена'}
+        />
         <Row
           label="Высота этажа"
-          value={floor.floor_height_known ? meters(floor.floor_height_mm) : `${heightUnknown} (${meters(floor.floor_height_mm)})`}
+          value={
+            floor.floor_height_known
+              ? meters(floor.floor_height_mm)
+              : `${heightUnknown} (${meters(floor.floor_height_mm)})`
+          }
         />
         <Row
           label="Толщина плиты"
           value={
-            floor.slab_thickness_known ? meters(floor.slab_thickness_mm) : `${NOT_DEFINED} (${meters(floor.slab_thickness_mm)})`
+            floor.slab_thickness_known
+              ? meters(floor.slab_thickness_mm)
+              : `${NOT_DEFINED} (${meters(floor.slab_thickness_mm)})`
           }
         />
         {note && <Row label="Совмещение" value={note.text} />}
-        {floor.alignment === 'axes' && <Row label="Качество совмещения" value={alignmentQuality(floor)} />}
+        {floor.alignment === 'axes' && (
+          <Row label="Качество совмещения" value={alignmentQuality(floor)} />
+        )}
         {counts && (
           <>
             <Row label="Монолит, конструкций" value={String(counts.monolith)} />
             <Row label="Кладка, конструкций" value={String(counts.masonry)} />
-            {counts.partition > 0 && <Row label="Перегородки ГКЛ, конструкций" value={String(counts.partition)} />}
+            {counts.partition > 0 && (
+              <Row label="Перегородки ГКЛ, конструкций" value={String(counts.partition)} />
+            )}
+            <Row label="Окна" value={windowsSummary(floor.windows)} />
           </>
         )}
       </dl>
       <div className="flex flex-wrap gap-[var(--s-3)]">
         {!detail && (
-          <Button variant="primary" className="min-h-[44px]" disabled={view.params === null} onClick={onOpenDetail}>
+          <Button
+            variant="primary"
+            className="min-h-[44px]"
+            disabled={view.params === null}
+            onClick={onOpenDetail}
+          >
             Этаж подробно
           </Button>
         )}

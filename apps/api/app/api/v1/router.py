@@ -10,7 +10,9 @@
 - `/auth/*` — вход и вопрос «я вошёл?». Отвечать на него отказом 401 значит не отличать
   «не вошёл» от «сеанс протух»;
 - `/meta` — версии и набор возможностей. Страница входа должна узнать состояние API
-  до того, как появится сеанс.
+  до того, как появится сеанс;
+- `/auth/oauth/*` — метаданные, регистрация и выдача доступа ИИ-чатам (ADR-0054): их зовёт
+  сервер чата, у которого сеанса портала нет и не будет.
 
 Права на конкретные операции объявлены в самих обработчиках (`dependencies=[require(...)]`).
 Тест `test_routes_deny_by_default` перебирает операции и не даёт появиться маршруту без
@@ -33,8 +35,10 @@ from app.api.v1 import (
     documents,
     integrations,
     jobs,
+    mcp,
     mep,
     meta,
+    oauth,
     projects,
     scale,
     takeoff,
@@ -50,10 +54,13 @@ api_v1_router = APIRouter(prefix="/api/v1")
 # --- публичное ---
 api_v1_router.include_router(auth.router)
 api_v1_router.include_router(meta.router)
+api_v1_router.include_router(oauth.public_router)
 
 # --- всё остальное только после опознания ---
 protected_router = APIRouter(dependencies=[Depends(require_authenticated)])
 protected_router.include_router(projects.router)
+protected_router.include_router(mcp.router)
+protected_router.include_router(oauth.router)
 protected_router.include_router(uploads.router)
 protected_router.include_router(documents.router)
 protected_router.include_router(scale.router)

@@ -856,6 +856,10 @@ export type CadBuilding3dFloorRead = {
      * Walls
      */
     walls?: Array<CadBuilding3dWallRead> | null;
+    /**
+     * Windows
+     */
+    windows?: Array<CadBuilding3dWindowRead> | null;
 };
 
 /**
@@ -1010,7 +1014,7 @@ export type CadBuilding3dServiceSheetRead = {
     /**
      * Reason
      */
-    reason: 'not_plan' | 'superseded';
+    reason: 'not_plan' | 'superseded' | 'summary_unplaced';
     /**
      * Revision Id
      */
@@ -1057,6 +1061,54 @@ export type CadBuilding3dWarningRead = {
      * Message
      */
     message: string;
+};
+
+/**
+ * CadBuilding3dWindowRead
+ *
+ * Окно этажа с высотой по виду фасада или ручному вводу листа (ADR-0048 п. 6).
+ *
+ * Контур проёма - открытое кольцо в целых мм, не более 16 точек, уже преобразованное как этаж
+ * (`rotation_deg`, `offset_mm`). Все z - абсолютные мм от +-0,000: подоконная часть - от
+ * `sill_z_bottom_mm` (верх плиты) до `glass_z_bottom_mm`, стекло - от `glass_z_bottom_mm` до
+ * `glass_z_top_mm`, перемычка - от `glass_z_top_mm` до `lintel_z_top_mm` (верх стены этажа).
+ * Верх окна не ниже верха стены - перемычки нет: `lintel_z_top_mm = glass_z_top_mm`; нет
+ * подоконной части - `sill_z_bottom_mm = glass_z_bottom_mm`. `accepted = false` - вид фасада
+ * не принят человеком: окно показывается как кандидат.
+ */
+export type CadBuilding3dWindowRead = {
+    /**
+     * Accepted
+     */
+    accepted: boolean;
+    /**
+     * Glass Z Bottom Mm
+     */
+    glass_z_bottom_mm: number;
+    /**
+     * Glass Z Top Mm
+     */
+    glass_z_top_mm: number;
+    /**
+     * Lintel Z Top Mm
+     */
+    lintel_z_top_mm: number;
+    /**
+     * Opening Id
+     */
+    opening_id: string;
+    /**
+     * Shell
+     */
+    shell: Array<Array<number>>;
+    /**
+     * Sill Z Bottom Mm
+     */
+    sill_z_bottom_mm: number;
+    /**
+     * Source
+     */
+    source: 'facade' | 'manual';
 };
 
 /**
@@ -5075,34 +5127,6 @@ export type CadStageRead = {
 };
 
 /**
- * CadStyleHatchSignature
- *
- * Подпись штриховки монолита: цвет RGB (0..1), перо, угол и шаг в pt.
- */
-export type CadStyleHatchSignature = {
-    /**
-     * Angle Deg
-     */
-    angle_deg: number;
-    /**
-     * Color
-     */
-    color: [
-        number,
-        number,
-        number
-    ];
-    /**
-     * Pen
-     */
-    pen: number;
-    /**
-     * Pitch Pt
-     */
-    pitch_pt: number;
-};
-
-/**
  * CadStyleManualSource
  *
  * Профиль введён вручную: полей снятия по образцам нет (лишнее поле - 422).
@@ -5256,10 +5280,6 @@ export type CadStyleProfileBody = {
      * Concrete Hatch Gray
      */
     concrete_hatch_gray: Array<number>;
-    /**
-     * Concrete Hatch Signatures
-     */
-    concrete_hatch_signatures?: Array<CadStyleHatchSignature>;
     /**
      * Door Grid Tolerance
      */
@@ -14212,7 +14232,7 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
  * Реальны legacy_import и pdf_geometry_extract. Остальные объявлены как контракт и
  * не исполняются.
  */
-export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
+export type JobType = 'legacy_import' | 'pdf_geometry_extract' | 'cad_pdf_convert' | 'cad_mep_route' | 'cad_walls' | 'cad_outline_review' | 'cad_floor3d_dxf' | 'cad_zones' | 'cad_sections' | 'cad_facades' | 'cad_style_preview' | 'cad_eom_route' | 'model_ifc_import' | 'sheet_passport_extract' | 'doc_questions_search' | 'sheet_register_extract' | 'plan_align';
 
 /**
  * LengthUnit
@@ -14834,6 +14854,191 @@ export type MetaResponse = {
 };
 
 /**
+ * ModelApprove
+ */
+export type ModelApprove = {
+    /**
+     * Comment
+     */
+    comment?: string | null;
+};
+
+/**
+ * ModelElementRead
+ */
+export type ModelElementRead = {
+    /**
+     * Bbox Mm
+     */
+    bbox_mm?: Array<number> | null;
+    /**
+     * Category
+     */
+    category: string;
+    /**
+     * Discipline
+     */
+    discipline: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Ifc Class
+     */
+    ifc_class?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Part
+     */
+    part?: string | null;
+    /**
+     * Props
+     */
+    props?: {
+        [key: string]: string | number | number | boolean | null;
+    };
+    /**
+     * Type
+     */
+    type?: string | null;
+};
+
+/**
+ * ModelElementsPage
+ */
+export type ModelElementsPage = {
+    /**
+     * Items
+     */
+    items: Array<ModelElementRead>;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * ModelImportCreate
+ *
+ * Постановка импорта: выбранные ревизии IFC; пусто - последние ревизии всех IFC проекта.
+ */
+export type ModelImportCreate = {
+    /**
+     * Revision Ids
+     */
+    revision_ids?: Array<string> | null;
+};
+
+/**
+ * ModelImportRead
+ *
+ * Состояние задания «Модель из IFC»; `version_id` - версия модели, когда задание готово.
+ */
+export type ModelImportRead = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error Code
+     */
+    error_code: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Generator Version
+     */
+    generator_version: string | null;
+    /**
+     * Inputs
+     */
+    inputs: number;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Progress
+     */
+    progress: number | null;
+    /**
+     * Stage
+     */
+    stage: string | null;
+    status: JobStatus;
+    /**
+     * Version Id
+     */
+    version_id: string | null;
+};
+
+/**
+ * ModelIssueRead
+ */
+export type ModelIssueRead = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Where
+     */
+    where: string;
+};
+
+/**
+ * ModelPartRead
+ */
+export type ModelPartRead = {
+    /**
+     * Discipline
+     */
+    discipline?: string | null;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Size Bytes
+     */
+    size_bytes: number;
+    /**
+     * Storey Key
+     */
+    storey_key?: string | null;
+};
+
+/**
  * ModelProviderProbeRead
  *
  * Результат явной проверки связи. Задержка появляется только здесь и только по кнопке.
@@ -14923,6 +15128,120 @@ export type ModelProviderRead = {
 };
 
 /**
+ * ModelSheetOverlayList
+ */
+export type ModelSheetOverlayList = {
+    /**
+     * Elevation Mm
+     */
+    elevation_mm: number;
+    /**
+     * Items
+     */
+    items: Array<ModelSheetOverlayRead>;
+    /**
+     * Message
+     */
+    message?: string | null;
+    /**
+     * Storey Key
+     */
+    storey_key: string;
+};
+
+/**
+ * ModelSheetOverlayRead
+ *
+ * Вид листа плана на отметке этажа модели и его привязка к сетке осей модели.
+ *
+ * `matrix` - подобие pt страницы (от левого верхнего угла, как кадр вида) → мм системы здания
+ * модели: `x = a·x_pt + b·y_pt + c`, `y = d·x_pt + e·y_pt + f`, `[a, b, c, d, e, f]`.
+ * Нет привязки -
+ * `None` и причина в `reason`.
+ */
+export type ModelSheetOverlayRead = {
+    /**
+     * Axes Rejected
+     */
+    axes_rejected?: Array<string>;
+    /**
+     * Axes Used
+     */
+    axes_used?: Array<string>;
+    /**
+     * Base Z Mm
+     */
+    base_z_mm?: number | null;
+    /**
+     * Document Id
+     */
+    document_id: string | null;
+    /**
+     * Frame Scale Mm Per Pt
+     */
+    frame_scale_mm_per_pt?: number | null;
+    /**
+     * Group Label
+     */
+    group_label: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Matrix
+     */
+    matrix?: [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number
+    ] | null;
+    /**
+     * Max Mm
+     */
+    max_mm?: number | null;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Rms Mm
+     */
+    rms_mm?: number | null;
+    /**
+     * Rotation Deg
+     */
+    rotation_deg?: number | null;
+    /**
+     * Scale Mm Per Pt
+     */
+    scale_mm_per_pt?: number | null;
+    /**
+     * Status
+     */
+    status: 'registered' | 'unregistered';
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
  * ModelSpecRead
  *
  * Одна модель у поставщика.
@@ -14945,6 +15264,262 @@ export type ModelSpecRead = {
      */
     model_id: string;
 };
+
+/**
+ * ModelStoreyRead
+ */
+export type ModelStoreyRead = {
+    /**
+     * Bbox Mm
+     */
+    bbox_mm?: Array<number> | null;
+    /**
+     * Building Key
+     */
+    building_key?: string | null;
+    /**
+     * Building Name
+     */
+    building_name?: string | null;
+    /**
+     * Element Count
+     */
+    element_count?: number;
+    /**
+     * Elevation Mm
+     */
+    elevation_mm: number;
+    /**
+     * Height Mm
+     */
+    height_mm?: number | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Storey Key
+     */
+    storey_key: string;
+};
+
+/**
+ * ModelVersionDetail
+ */
+export type ModelVersionDetail = {
+    /**
+     * Approved At
+     */
+    approved_at?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Committed At
+     */
+    committed_at?: string | null;
+    /**
+     * Counts
+     */
+    counts?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Generator
+     */
+    generator?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Parts
+     */
+    parts?: Array<ModelPartRead>;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Source Kind
+     */
+    source_kind: string;
+    status: ModelVersionStatus;
+    /**
+     * Storeys
+     */
+    storeys?: Array<ModelStoreyRead>;
+    /**
+     * Tender Version Id
+     */
+    tender_version_id?: string | null;
+    /**
+     * Warnings
+     */
+    warnings?: Array<ModelIssueRead>;
+};
+
+/**
+ * ModelVersionList
+ */
+export type ModelVersionList = {
+    /**
+     * Items
+     */
+    items: Array<ModelVersionRead>;
+};
+
+/**
+ * ModelVersionRead
+ */
+export type ModelVersionRead = {
+    /**
+     * Approved At
+     */
+    approved_at?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Committed At
+     */
+    committed_at?: string | null;
+    /**
+     * Counts
+     */
+    counts?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Generator
+     */
+    generator?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Source Kind
+     */
+    source_kind: string;
+    status: ModelVersionStatus;
+    /**
+     * Tender Version Id
+     */
+    tender_version_id?: string | null;
+    /**
+     * Warnings
+     */
+    warnings?: Array<ModelIssueRead>;
+};
+
+/**
+ * ModelVersionStarted
+ *
+ * Ответ на начало выгрузки: что ещё надо загрузить (повторная выгрузка возобновляется).
+ */
+export type ModelVersionStarted = {
+    /**
+     * Approved At
+     */
+    approved_at?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Committed At
+     */
+    committed_at?: string | null;
+    /**
+     * Counts
+     */
+    counts?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created
+     */
+    created: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Generator
+     */
+    generator?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Manifest Sha256
+     */
+    manifest_sha256: string;
+    /**
+     * Missing Parts
+     */
+    missing_parts?: Array<string>;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Source Kind
+     */
+    source_kind: string;
+    status: ModelVersionStatus;
+    /**
+     * Tender Version Id
+     */
+    tender_version_id?: string | null;
+    /**
+     * Warnings
+     */
+    warnings?: Array<ModelIssueRead>;
+};
+
+/**
+ * ModelVersionStatus
+ *
+ * Версия модели здания (ADR-0053): загрузка, кандидат, утверждена, заменена.
+ */
+export type ModelVersionStatus = 'uploading' | 'candidate' | 'approved' | 'superseded';
 
 /**
  * NetworkGraphRef
@@ -15103,6 +15678,78 @@ export type NotInProjectAnswerIn = {
      * Source
      */
     source: 'not_in_project';
+};
+
+/**
+ * OAuthAuthorizeDecision
+ */
+export type OAuthAuthorizeDecision = {
+    /**
+     * Approve
+     */
+    approve: boolean;
+    /**
+     * Params
+     */
+    params: {
+        [key: string]: string;
+    };
+    /**
+     * Scopes
+     */
+    scopes?: Array<string> | null;
+};
+
+/**
+ * OAuthAuthorizeInfo
+ *
+ * Что показать человеку перед «Разрешить», либо куда сразу вернуть чат с ошибкой.
+ */
+export type OAuthAuthorizeInfo = {
+    /**
+     * Already Connected
+     */
+    already_connected?: boolean;
+    /**
+     * Client Name
+     */
+    client_name?: string;
+    /**
+     * Error Redirect
+     */
+    error_redirect?: string | null;
+    /**
+     * Local App
+     */
+    local_app?: boolean;
+    /**
+     * Redirect Host
+     */
+    redirect_host?: string;
+    /**
+     * Scope Titles
+     */
+    scope_titles?: {
+        [key: string]: string;
+    };
+    /**
+     * Scopes
+     */
+    scopes?: Array<string>;
+    /**
+     * Workspace Name
+     */
+    workspace_name?: string;
+};
+
+/**
+ * OAuthAuthorizeRedirect
+ */
+export type OAuthAuthorizeRedirect = {
+    /**
+     * Redirect To
+     */
+    redirect_to: string;
 };
 
 /**
@@ -15653,6 +16300,10 @@ export type PersonalTokenCreate = {
      * Name
      */
     name: string;
+    /**
+     * Scopes
+     */
+    scopes?: Array<'read' | 'tender' | 'upload'>;
 };
 
 /**
@@ -15665,6 +16316,10 @@ export type PersonalTokenCreated = {
      * Active
      */
     active: boolean;
+    /**
+     * Client Name
+     */
+    client_name?: string | null;
     /**
      * Created At
      */
@@ -15711,6 +16366,10 @@ export type PersonalTokenRead = {
      * Active
      */
     active: boolean;
+    /**
+     * Client Name
+     */
+    client_name?: string | null;
     /**
      * Created At
      */
@@ -23012,6 +23671,20 @@ export type ReadCadOutlineSourceResponses = {
     200: unknown;
 };
 
+export type McpEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/mcp';
+};
+
+export type McpEndpointResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ListPersonalTokensData = {
     body?: never;
     path?: never;
@@ -23208,6 +23881,89 @@ export type ReadMetaResponses = {
 };
 
 export type ReadMetaResponse = ReadMetaResponses[keyof ReadMetaResponses];
+
+export type OauthAuthorizeCheckData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Client Id
+         */
+        client_id?: string | null;
+        /**
+         * Redirect Uri
+         */
+        redirect_uri?: string | null;
+        /**
+         * Response Type
+         */
+        response_type?: string | null;
+        /**
+         * State
+         */
+        state?: string | null;
+        /**
+         * Scope
+         */
+        scope?: string | null;
+        /**
+         * Code Challenge
+         */
+        code_challenge?: string | null;
+        /**
+         * Code Challenge Method
+         */
+        code_challenge_method?: string | null;
+        /**
+         * Resource
+         */
+        resource?: string | null;
+    };
+    url: '/api/v1/oauth/authorize';
+};
+
+export type OauthAuthorizeCheckErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OauthAuthorizeCheckError = OauthAuthorizeCheckErrors[keyof OauthAuthorizeCheckErrors];
+
+export type OauthAuthorizeCheckResponses = {
+    /**
+     * Successful Response
+     */
+    200: OAuthAuthorizeInfo;
+};
+
+export type OauthAuthorizeCheckResponse = OauthAuthorizeCheckResponses[keyof OauthAuthorizeCheckResponses];
+
+export type OauthAuthorizeDecideData = {
+    body: OAuthAuthorizeDecision;
+    path?: never;
+    query?: never;
+    url: '/api/v1/oauth/authorize';
+};
+
+export type OauthAuthorizeDecideErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OauthAuthorizeDecideError = OauthAuthorizeDecideErrors[keyof OauthAuthorizeDecideErrors];
+
+export type OauthAuthorizeDecideResponses = {
+    /**
+     * Successful Response
+     */
+    200: OAuthAuthorizeRedirect;
+};
+
+export type OauthAuthorizeDecideResponse = OauthAuthorizeDecideResponses[keyof OauthAuthorizeDecideResponses];
 
 export type ListProjectsData = {
     body?: never;
@@ -25901,6 +26657,442 @@ export type ListProjectJobsResponses = {
 
 export type ListProjectJobsResponse = ListProjectJobsResponses[keyof ListProjectJobsResponses];
 
+export type StartModelImportData = {
+    body: ModelImportCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/imports';
+};
+
+export type StartModelImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartModelImportError = StartModelImportErrors[keyof StartModelImportErrors];
+
+export type StartModelImportResponses = {
+    /**
+     * Successful Response
+     */
+    202: ModelImportRead;
+};
+
+export type StartModelImportResponse = StartModelImportResponses[keyof StartModelImportResponses];
+
+export type ReadLatestModelImportData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/imports/latest';
+};
+
+export type ReadLatestModelImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadLatestModelImportError = ReadLatestModelImportErrors[keyof ReadLatestModelImportErrors];
+
+export type ReadLatestModelImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelImportRead;
+};
+
+export type ReadLatestModelImportResponse = ReadLatestModelImportResponses[keyof ReadLatestModelImportResponses];
+
+export type ListModelVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions';
+};
+
+export type ListModelVersionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListModelVersionsError = ListModelVersionsErrors[keyof ListModelVersionsErrors];
+
+export type ListModelVersionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelVersionList;
+};
+
+export type ListModelVersionsResponse = ListModelVersionsResponses[keyof ListModelVersionsResponses];
+
+export type StartModelVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Tender Version Id
+         */
+        tender_version_id?: string | null;
+        /**
+         * Comment
+         */
+        comment?: string | null;
+    };
+    url: '/api/v1/projects/{project_id}/model/versions';
+};
+
+export type StartModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartModelVersionError = StartModelVersionErrors[keyof StartModelVersionErrors];
+
+export type StartModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    201: ModelVersionStarted;
+};
+
+export type StartModelVersionResponse = StartModelVersionResponses[keyof StartModelVersionResponses];
+
+export type DeleteModelVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}';
+};
+
+export type DeleteModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteModelVersionError = DeleteModelVersionErrors[keyof DeleteModelVersionErrors];
+
+export type DeleteModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteModelVersionResponse = DeleteModelVersionResponses[keyof DeleteModelVersionResponses];
+
+export type ReadModelVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}';
+};
+
+export type ReadModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadModelVersionError = ReadModelVersionErrors[keyof ReadModelVersionErrors];
+
+export type ReadModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelVersionDetail;
+};
+
+export type ReadModelVersionResponse = ReadModelVersionResponses[keyof ReadModelVersionResponses];
+
+export type ApproveModelVersionData = {
+    body: ModelApprove;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/approve';
+};
+
+export type ApproveModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ApproveModelVersionError = ApproveModelVersionErrors[keyof ApproveModelVersionErrors];
+
+export type ApproveModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelVersionDetail;
+};
+
+export type ApproveModelVersionResponse = ApproveModelVersionResponses[keyof ApproveModelVersionResponses];
+
+export type CommitModelVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/commit';
+};
+
+export type CommitModelVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommitModelVersionError = CommitModelVersionErrors[keyof CommitModelVersionErrors];
+
+export type CommitModelVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelVersionDetail;
+};
+
+export type CommitModelVersionResponse = CommitModelVersionResponses[keyof CommitModelVersionResponses];
+
+export type ReadModelPartData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Path
+         */
+        path: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/parts/{path}';
+};
+
+export type ReadModelPartErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadModelPartError = ReadModelPartErrors[keyof ReadModelPartErrors];
+
+export type ReadModelPartResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type PutModelPartData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Path
+         */
+        path: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/parts/{path}';
+};
+
+export type PutModelPartErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PutModelPartError = PutModelPartErrors[keyof PutModelPartErrors];
+
+export type PutModelPartResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelPartRead;
+};
+
+export type PutModelPartResponse = PutModelPartResponses[keyof PutModelPartResponses];
+
+export type ListModelElementsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Storey Key
+         */
+        storey_key: string;
+    };
+    query?: {
+        /**
+         * Category
+         */
+        category?: string | null;
+        /**
+         * Discipline
+         */
+        discipline?: string | null;
+        /**
+         * Q
+         */
+        q?: string | null;
+        /**
+         * Offset
+         */
+        offset?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/storeys/{storey_key}/elements';
+};
+
+export type ListModelElementsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListModelElementsError = ListModelElementsErrors[keyof ListModelElementsErrors];
+
+export type ListModelElementsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelElementsPage;
+};
+
+export type ListModelElementsResponse = ListModelElementsResponses[keyof ListModelElementsResponses];
+
+export type ReadStoreySheetsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Version Id
+         */
+        version_id: string;
+        /**
+         * Storey Key
+         */
+        storey_key: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/model/versions/{version_id}/storeys/{storey_key}/sheets';
+};
+
+export type ReadStoreySheetsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadStoreySheetsError = ReadStoreySheetsErrors[keyof ReadStoreySheetsErrors];
+
+export type ReadStoreySheetsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelSheetOverlayList;
+};
+
+export type ReadStoreySheetsResponse = ReadStoreySheetsResponses[keyof ReadStoreySheetsResponses];
+
 export type GetPlanAlignmentsData = {
     body?: never;
     path: {
@@ -27646,6 +28838,38 @@ export type ListTenderBaseCandidatesResponses = {
 };
 
 export type ListTenderBaseCandidatesResponse = ListTenderBaseCandidatesResponses[keyof ListTenderBaseCandidatesResponses];
+
+export type ReadLatestCoordinationData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Fmt
+         */
+        fmt: 'json' | 'ifc';
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/tender/base/coordination.{fmt}';
+};
+
+export type ReadLatestCoordinationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadLatestCoordinationError = ReadLatestCoordinationErrors[keyof ReadLatestCoordinationErrors];
+
+export type ReadLatestCoordinationResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type ListTenderBaseReleasesData = {
     body?: never;

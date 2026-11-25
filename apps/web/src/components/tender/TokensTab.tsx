@@ -8,6 +8,7 @@ import { env } from '@/lib/env';
 import { errorMessage, extractCode, extractMessage } from '@/lib/errors';
 import { formatWhen } from '@/lib/format';
 import { usePersonalTokens, useRevokePersonalToken } from '@/lib/tender/queries';
+import { scopesLabel } from '@/lib/tender/token-scopes';
 
 import { TokenCreateDialog } from './TokenCreateDialog';
 
@@ -33,10 +34,12 @@ const TokenRow: FC<{
   return (
     <tr className="border-b border-border last:border-b-0 max-md:flex max-md:flex-col max-md:px-[var(--s-5)] max-md:py-[var(--s-4)]">
       <td data-label="Название" className={cx(TD, '[overflow-wrap:anywhere]', dim)}>
-        {token.name}
+        <span>{token.name}</span>
+        <span className="block text-xs text-muted">{scopesLabel(token.scopes ?? [])}</span>
       </td>
       <td data-label="Префикс" className={cx(TD, 'mono text-xs')}>
-        {token.prefix}…
+        {/* Разрешение ИИ-чату по OAuth: значения qtk_ у него нет, чат входит сам. */}
+        {token.client_name ? 'вход чата' : `${token.prefix}…`}
       </td>
       <td data-label="Создан" className={cx(TD, 'text-muted')}>
         {formatWhen(token.created_at)}
@@ -72,8 +75,7 @@ export const TokensTab: FC = () => {
       <div className="flex flex-wrap items-center gap-[var(--s-4)]">
         <div className="flex min-w-0 flex-1 basis-[280px] flex-col gap-[var(--s-3)]">
           <p className="m-0 max-w-[70ch] text-sm text-muted">
-            Токен нужен навыку TENDER, чтобы загружать расчёты в этот проект. Сохраните его в файл и
-            передайте команде:
+            Доступ к порталу для TENDER, скриптов и ИИ-ассистентов (MCP). Загрузка расчётов TENDER:
           </p>
           <code className="mono block max-w-full overflow-x-auto rounded-[var(--radius-sm)] bg-surface-muted px-[var(--s-4)] py-[var(--s-3)] text-xs">
             python3 calc_push.py --portal {portalOrigin()} --token-file …

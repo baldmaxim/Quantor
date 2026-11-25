@@ -421,7 +421,7 @@ describe('раздел «База объекта»', () => {
   });
 });
 
-describe('раздел «Доступ для TENDER»', () => {
+describe('раздел «Доступ (токены)»', () => {
   it('токен показывается один раз после создания', async () => {
     const created: PersonalTokenCreated = {
       id: 't-1',
@@ -447,7 +447,9 @@ describe('раздел «Доступ для TENDER»', () => {
     expect(await within(dialog).findByDisplayValue('qtr_abcdef-секрет')).toBeInTheDocument();
     expect(within(dialog).getByRole('alert')).toBeInTheDocument();
     expect(client.createPersonalToken).toHaveBeenCalledWith(
-      expect.objectContaining({ body: { name: 'Ноутбук', expires_in_days: 90 } }),
+      expect.objectContaining({
+        body: { name: 'Ноутбук', expires_in_days: 90, scopes: ['tender'] },
+      }),
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Готово' }));
     await waitFor(() =>
@@ -462,6 +464,7 @@ describe('раздел «Доступ для TENDER»', () => {
           id: 't-1',
           name: 'Ноутбук',
           prefix: 'qtr_ab',
+          scopes: ['read', 'upload'],
           active: true,
           created_at: '2026-11-16T10:00:00Z',
           expires_at: null,
@@ -474,6 +477,9 @@ describe('раздел «Доступ для TENDER»', () => {
     mountWith(<TokensTab />);
     expect(await screen.findByText('Ноутбук')).toBeInTheDocument();
     expect(screen.getByText('не использовался')).toBeInTheDocument();
+    expect(
+      screen.getByText('Только чтение (агенты), Загрузка документов и модели'),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Отозвать' }));
     await waitFor(() =>
       expect(client.revokePersonalToken).toHaveBeenCalledWith(

@@ -9,19 +9,23 @@
 #   cp <CAD_engine>/<pins.engine.archive_path> deploy/cad-engine/engine.zip
 #   mkdir -p deploy/cad-engine/generators
 #   cp -r <CAD_engine>/generators/cad_mep <CAD_engine>/generators/cad_walls \
-#     <CAD_engine>/generators/cad_eom <CAD_engine>/generators/cad_facades deploy/cad-engine/generators/
+#     <CAD_engine>/generators/cad_eom <CAD_engine>/generators/cad_facades \
+#     <CAD_engine>/generators/cad_model deploy/cad-engine/generators/
 #   rm -rf deploy/cad-engine/generators/*/tests   # sha256 params сверяет publish.yml (jq по pins.json)
 #   docker buildx build -f deploy/Dockerfile.cad-worker \
 #     --build-arg API_IMAGE=ghcr.io/baldmaxim/quantor-api:<sha> \
 #     --build-arg ENGINE_ARCHIVE_SHA256=<pins.engine.archive_sha256> .
 ARG API_IMAGE
-FROM ${API_IMAGE}
+# База образа API (deploy/Dockerfile.api): venv ссылаются на её интерпретатор /usr/local/bin/python3.12.
+ARG PYTHON_IMAGE=python:3.12-slim
 
-ARG ENGINE_ARCHIVE_SHA256
+# Пакеты движка и модели здания — отдельной стадией, не от образа API. Они зависят только от
+# lock-файлов, поэтому между выпусками берутся из кэша сборки и слой с ними совпадает байт в байт:
+# правка кода API больше не переустанавливает их, и выкатка не передаёт их заново (ship-local.sh).
+FROM ${PYTHON_IMAGE} AS cad-env
 
-USER root
-
-ENV CAD_ENGINE_HOME=/opt/cad-engine
+ENV CAD_ENGINE_HOME=/opt/cad-engine \
+    CAD_MODEL_HOME=/opt/cad-model
 
 # Пакеты движка — в своём venv (Python 3.12), версии и хеши из lock-файла.
 COPY tools/cad_engine/requirements.linux-cp312.lock.txt /tmp/cad-requirements.txt
@@ -29,6 +33,32 @@ RUN python -m venv ${CAD_ENGINE_HOME}/venv \
     && ${CAD_ENGINE_HOME}/venv/bin/pip install --no-cache-dir --disable-pip-version-check \
         --require-hashes --only-binary :all: -r /tmp/cad-requirements.txt \
     && rm /tmp/cad-requirements.txt
+
+# Модель здания из IFC (`cad_model`): ifcopenshell и trimesh - в отдельном venv со своим lock-файлом
+# (tools/cad_model/), чтобы закреплённые пакеты движка и результаты остальных генераторов не менялись.
+COPY tools/cad_model/requirements.linux-cp312.lock.txt /tmp/cad-model-requirements.txt
+RUN python -m venv ${CAD_MODEL_HOME}/venv \
+    && ${CAD_MODEL_HOME}/venv/bin/pip install --no-cache-dir --disable-pip-version-check \
+        --require-hashes --only-binary :all: -r /tmp/cad-model-requirements.txt \
+    && rm /tmp/cad-model-requirements.txt
+
+# Только на чтение — здесь, а не в итоговой стадии: chmod там переписал бы все файлы venv новым
+# слоем, и образ снова вёз бы их при каждом выпуске.
+RUN chmod -R a=rX ${CAD_ENGINE_HOME}/venv ${CAD_MODEL_HOME}/venv
+
+FROM ${API_IMAGE}
+
+ARG ENGINE_ARCHIVE_SHA256
+
+USER root
+
+ENV CAD_ENGINE_HOME=/opt/cad-engine \
+    CAD_MODEL_HOME=/opt/cad-model
+
+# --link: слой собирается отдельно от образа API и не зависит от него, поэтому при новом коде API
+# берётся из кэша тем же блобом (без --link копия получала бы новые метки времени папок и новый хеш).
+COPY --link --from=cad-env /opt/cad-engine/venv ${CAD_ENGINE_HOME}/venv
+COPY --link --from=cad-env /opt/cad-model/venv ${CAD_MODEL_HOME}/venv
 
 # Runner и pins лежат рядом: runner читает pins.json из своего каталога.
 COPY tools/cad_engine/quantor_cad_runner.py tools/cad_engine/pins.json ${CAD_ENGINE_HOME}/runner/
@@ -45,6 +75,8 @@ COPY deploy/cad-engine/generators/cad_walls ${CAD_ENGINE_HOME}/generators/cad_wa
 COPY deploy/cad-engine/generators/cad_eom ${CAD_ENGINE_HOME}/generators/cad_eom
 # Виды фасадов АР (`cad_facades`, ADR-0048): самодостаточный генератор, читает векторы и текст PDF.
 COPY deploy/cad-engine/generators/cad_facades ${CAD_ENGINE_HOME}/generators/cad_facades
+# Модель здания из IFC (`cad_model`): запускается интерпретатором из CAD_MODEL_HOME, не движка.
+COPY deploy/cad-engine/generators/cad_model ${CAD_ENGINE_HOME}/generators/cad_model
 
 # Архив движка кладёт в контекст сборки publish.yml (checkout приватного репозитория по
 # закреплённому коммиту, deploy-key только на чтение); здесь — повторная сверка SHA256 с pins.json.
@@ -53,7 +85,9 @@ RUN test -n "${ENGINE_ARCHIVE_SHA256}" \
     && echo "${ENGINE_ARCHIVE_SHA256}  ${CAD_ENGINE_HOME}/engine.zip" | sha256sum -c -
 
 # Рабочие каталоги попыток: удаляются после каждого задания. Файлы движка — только на чтение.
-RUN chmod -R a=rX ${CAD_ENGINE_HOME} \
+RUN chmod a=rX ${CAD_ENGINE_HOME} ${CAD_MODEL_HOME} \
+    && chmod -R a=rX ${CAD_ENGINE_HOME}/runner ${CAD_ENGINE_HOME}/generators \
+        ${CAD_ENGINE_HOME}/engine.zip \
     && mkdir -p /var/tmp/quantor-cad \
     && chown quantor:quantor /var/tmp/quantor-cad \
     && chmod 700 /var/tmp/quantor-cad
@@ -70,6 +104,9 @@ ENV CAD_ENGINE_PYTHON=${CAD_ENGINE_HOME}/venv/bin/python \
     CAD_EOM_PARAMS=${CAD_ENGINE_HOME}/generators/cad_eom/params/v1.json \
     CAD_FACADES_RUNNER=${CAD_ENGINE_HOME}/generators/cad_facades/run_facades.py \
     CAD_FACADES_PARAMS=${CAD_ENGINE_HOME}/generators/cad_facades/params/v1.json \
+    CAD_MODEL_PYTHON=${CAD_MODEL_HOME}/venv/bin/python \
+    CAD_MODEL_RUNNER=${CAD_ENGINE_HOME}/generators/cad_model/run_model.py \
+    CAD_MODEL_PARAMS=${CAD_ENGINE_HOME}/generators/cad_model/params/v1.json \
     CAD_WORK_ROOT=/var/tmp/quantor-cad
 
 USER quantor

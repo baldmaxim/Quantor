@@ -26,8 +26,9 @@ CadBuilding3dPlacement = Literal["reference", "axes", "cores", "manual", "none"]
 # разность отметок до следующего этажа здания; `default` - типовая (соседа сверху нет).
 CadBuilding3dHeightSource = Literal["derived_stack", "default"]
 # Почему лист с конструкциями не вошёл в стопку этажей: `not_plan` - не план этажа или уровня
-# (разрез, таблица); `superseded` - дубль плана на той же отметке, оставлен лист большей площади.
-CadBuilding3dServiceReason = Literal["not_plan", "superseded"]
+# (разрез, таблица); `superseded` - дубль плана на той же отметке, оставлен лист большей площади;
+# `summary_unplaced` - сводный лист планов нескольких секций, не вставший на площадку.
+CadBuilding3dServiceReason = Literal["not_plan", "superseded", "summary_unplaced"]
 
 
 class CadBuilding3dWarningRead(BaseModel):
@@ -49,6 +50,28 @@ class CadBuilding3dWallRead(BaseModel):
     # Верх конструкции по знаку отметки на плане (парапет, cad_walls v1.15), мм от 0.000;
     # `None` - верх по высоте этажа.
     top_mm: int | None = None
+
+
+class CadBuilding3dWindowRead(BaseModel):
+    """Окно этажа с высотой по виду фасада или ручному вводу листа (ADR-0048 п. 6).
+
+    Контур проёма - открытое кольцо в целых мм, не более 16 точек, уже преобразованное как этаж
+    (`rotation_deg`, `offset_mm`). Все z - абсолютные мм от +-0,000: подоконная часть - от
+    `sill_z_bottom_mm` (верх плиты) до `glass_z_bottom_mm`, стекло - от `glass_z_bottom_mm` до
+    `glass_z_top_mm`, перемычка - от `glass_z_top_mm` до `lintel_z_top_mm` (верх стены этажа).
+    Верх окна не ниже верха стены - перемычки нет: `lintel_z_top_mm = glass_z_top_mm`; нет
+    подоконной части - `sill_z_bottom_mm = glass_z_bottom_mm`. `accepted = false` - вид фасада
+    не принят человеком: окно показывается как кандидат.
+    """
+
+    opening_id: str
+    shell: list[list[int]]
+    sill_z_bottom_mm: int
+    glass_z_bottom_mm: int
+    glass_z_top_mm: int
+    lintel_z_top_mm: int
+    accepted: bool
+    source: Literal["facade", "manual"]
 
 
 class CadBuilding3dLevelZoneRead(BaseModel):
@@ -137,6 +160,10 @@ class CadBuilding3dFloorRead(BaseModel):
     # этаж (`rotation_deg`, `offset_mm`). `None` - не запрошено (`walls=false`); при
     # `walls=true` - список (может быть пустым).
     walls: list[CadBuilding3dWallRead] | None = None
+    # Окна этажа с высотой (фасад или ручной ввод листа), уже преобразованные как этаж. `None` - не
+    # запрошено (`walls=false`); при `walls=true` - список (может быть пустым). Окна без высоты
+    # не выдаются.
+    windows: list[CadBuilding3dWindowRead] | None = None
 
 
 class CadBuilding3dGroupRead(BaseModel):

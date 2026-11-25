@@ -105,6 +105,11 @@ from app.services import (
     cad_walls,
     cad_zones,
 )
+from app.services.tender_base_coordination import (
+    CoordinationFloor,
+    build_coordination,
+    coordination_ifc,
+)
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 log = get_logger(__name__)
@@ -429,6 +434,9 @@ def _thickness(construction: WallsConstruction, props: CadConstructionProps | No
         return int(props.thickness_override_mm)
     if construction.thickness_nominal_mm is not None:
         return round(construction.thickness_nominal_mm)
+    if construction.section_mm is not None and construction.thickness_measured_mm > 0:
+        # cad_walls v1.17: монолит без номинала с габаритом сечения - толщина измеренная
+        return round(construction.thickness_measured_mm)
     return None
 
 
@@ -739,8 +747,11 @@ async def _write_view(
     source: ViewSource,
     *,
     include_dxf: bool,
-) -> str | None:
-    """Файлы одного вида в пакет. Возвращает версию генератора конструкций из walls.json."""
+) -> tuple[str | None, ObjectBaseAxes, tuple[cad_building3d.ObliqueAxis, ...]]:
+    """Файлы одного вида в пакет. Возвращает версию генератора конструкций, оси вида и оси под
+    углом к листу (в `axes.json` их нет: формат обмена с TENDER - только вертикальные и
+    горизонтальные; они идут только в координационный файл).
+    """
     floor, frame = source.floor, source.frame
     assert frame.origin_pt is not None and frame.mm_per_pdf_point is not None
     assert source.page_size_pt is not None
@@ -758,7 +769,8 @@ async def _write_view(
     )
     base = f"views/{source.dir}"
     await sink.add_bytes(f"{base}/view.json", _dump(build_view(source)))
-    await sink.add_bytes(f"{base}/axes.json", _dump(build_axes(raw, frame)))
+    axes = build_axes(raw, frame)
+    await sink.add_bytes(f"{base}/axes.json", _dump(axes))
     await sink.add_bytes(
         f"{base}/zones.json",
         _dump(
@@ -778,7 +790,7 @@ async def _write_view(
         await sink.add_bytes(f"{base}/risers.json", _dump(build_risers(risers)))
     if include_dxf and source.dxf_key is not None:
         await sink.add_stream(f"{base}/plan.dxf", storage.iter_stream(source.dxf_key))
-    return document.generator
+    return document.generator, axes, cad_building3d.axes_in_mm(raw, frame).oblique
 
 
 def _select(sources: Sequence[ViewSource], view_keys: Sequence[str] | None) -> list[ViewSource]:
@@ -852,11 +864,28 @@ async def create_release(
     with tempfile.TemporaryFile() as target:
         sink = _ZipSink(target)
         walls_generator: str | None = None
+        coordination_floors: list[CoordinationFloor] = []
         for source in chosen:
-            generator = await _write_view(
+            generator, view_axes, view_oblique = await _write_view(
                 session, storage, sink, source, include_dxf=body.include_dxf
             )
             walls_generator = walls_generator or generator
+            coordination_floors.append(
+                CoordinationFloor(
+                    view_key=source.key,
+                    label=source.floor.label,
+                    group_key=source.floor.group_key,
+                    group_label=source.floor.group_label,
+                    base_z_mm=source.floor.base_z_mm,
+                    floor_height_mm=source.floor.floor_height_mm,
+                    offset_mm=(source.floor.offset_mm[0], source.floor.offset_mm[1]),
+                    rotation_deg=source.floor.rotation_deg,
+                    alignment=source.floor.alignment,
+                    axes=view_axes.axes,
+                    oblique=[(o.label, o.point_mm, o.direction) for o in view_oblique],
+                    elevation_known=source.floor.elevation_known,
+                )
+            )
         building = ObjectBaseBuilding(
             schema_name="quantor.object_base.building.v1",
             floors=[
@@ -877,6 +906,15 @@ async def create_release(
             ],
         )
         await sink.add_bytes("building.json", _dump(building))
+        # Координационный файл: общая сетка осей и этажи - из тех же осей и размещения этажей.
+        coordination = build_coordination(coordination_floors)
+        await sink.add_bytes("coordination.json", _dump(coordination))
+        await sink.add_bytes(
+            "coordination.ifc",
+            coordination_ifc(
+                coordination, project_name=project.name, release_id=release_id, moment=released_at
+            ),
+        )
         manifest = ObjectBaseManifest(
             schema_name="quantor.object_base.v1",
             release=ObjectBaseRelease(
@@ -995,6 +1033,23 @@ def release_read(release: TenderBaseRelease, names: dict[uuid.UUID, str]) -> Ten
         revoked_at=release.revoked_at,
         revoked_by_name=names.get(release.revoked_by) if release.revoked_by else None,
     )
+
+
+async def read_package_member(storage: ObjectStorage, key: str, name: str) -> bytes | None:
+    """Один файл из ZIP выпуска: пакет качается из хранилища во временный файл, не в память."""
+    with tempfile.TemporaryFile() as handle:
+        async for chunk in storage.iter_stream(key):
+            await asyncio.to_thread(handle.write, chunk)
+
+        def pick() -> bytes | None:
+            handle.seek(0)
+            with zipfile.ZipFile(handle) as archive:
+                try:
+                    return archive.read(name)
+                except KeyError:
+                    return None
+
+        return await asyncio.to_thread(pick)
 
 
 async def list_releases(

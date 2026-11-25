@@ -24,7 +24,7 @@ from typing import Any
 
 PINS_PATH = Path(__file__).resolve().with_name("pins.json")
 GENERATORS_PATH = "generators"
-GENERATOR_NAMES = ("cad_mep", "cad_walls", "cad_eom", "cad_facades")
+GENERATOR_NAMES = ("cad_mep", "cad_walls", "cad_eom", "cad_facades", "cad_model")
 PARAMS_RELPATH = "params/v1.json"
 FLOOR3D_RELPATH = "floor3d_dxf.py"
 VERSION_LINE = re.compile(r'^GENERATOR_VERSION\s*(?::[^=]+)?=\s*"([A-Za-z0-9._-]{1,48})"', re.M)

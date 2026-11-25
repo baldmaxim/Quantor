@@ -255,6 +255,36 @@ def test_walls_reasons_cover_each_threshold() -> None:
     ]
 
 
+def test_check_construction_with_section_mm_is_not_counted_as_unsure_thickness() -> None:
+    # cad_walls v1.17: монолит без номинала с габаритом сечения считается по площади.
+    with_section = _walls()
+    with_section.constructions[1].kind = "monolith_column"
+    with_section.constructions[1].area_plan_mm2 = 60000.0
+    assert with_section.constructions[1].thickness_status == "check"
+    without_section = with_section.model_copy(deep=True)
+    with_section.constructions[1].section_mm = [100.0, 600.0]
+    assert _codes(with_section) == []
+    assert cad_quality.walls_quality(with_section) == {"status": "ok", "reasons": []}
+    assert _codes(without_section) == ["thickness_check_share"]
+
+
+def test_only_check_constructions_without_section_mm_make_up_the_unsure_share() -> None:
+    # Две «проверочные» на 60000 мм2 каждая: с габаритом сечения - вне доли, без него - внутри.
+    document = _walls()
+    for item in document.constructions:
+        item.thickness_status = "check"
+        item.thickness_nominal_mm = None
+    document.constructions[0].area_plan_mm2 = 60000.0
+    document.constructions[1].area_plan_mm2 = 60000.0
+    assert _codes(document) == ["thickness_check_share"]
+    document.constructions[0].section_mm = [100.0, 600.0]
+    # 60000 из 120000 = 50 % - остаётся вторая конструкция без габарита.
+    (reason,) = cad_quality.walls_reasons(document)
+    assert reason.code == "thickness_check_share" and "50,0 %" in reason.text
+    document.constructions[1].section_mm = [100.0, 600.0]
+    assert _codes(document) == []
+
+
 def test_walls_quality_is_read_from_the_job_result() -> None:
     block = cad_quality.walls_quality(_walls(constructions=[]))
     assert cad_quality.walls_result_quality({"result_status": "walls_ready", "quality": block}) == (

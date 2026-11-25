@@ -3,6 +3,7 @@
 from app.models.api_token import ApiToken
 from app.models.artifact import RecognitionArtifact
 from app.models.audit import AuditEvent
+from app.models.building_model import BuildingModelVersion, ModelPart, ModelStorey
 from app.models.cad_construction import CadConstructionProps, CadSheetLevels
 from app.models.cad_decision import CadDecision
 from app.models.cad_facade_view import CadFacadeView
@@ -39,6 +40,7 @@ from app.models.identity import (
     WorkspaceMembership,
 )
 from app.models.job import Job
+from app.models.oauth import OAuthClient, OAuthToken
 from app.models.page_geometry import PageGeometry
 from app.models.plan_alignment import PlanAlignment
 from app.models.project import Project
@@ -56,6 +58,7 @@ __all__ = [
     "ApiToken",
     "AuditEvent",
     "AuthSession",
+    "BuildingModelVersion",
     "CadConstructionProps",
     "CadDecision",
     "CadFacadeView",
@@ -98,6 +101,10 @@ __all__ = [
     "Job",
     "LocalCredential",
     "Measurement",
+    "ModelPart",
+    "ModelStorey",
+    "OAuthClient",
+    "OAuthToken",
     "PageGeometry",
     "PlanAlignment",
     "Project",

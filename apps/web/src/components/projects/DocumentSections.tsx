@@ -107,7 +107,7 @@ export const DocumentSections: FC<IDocumentSectionsProps> = ({
             </h3>
 
             {open && (
-              <div id={bodyId}>
+              <div id={bodyId} className="flex flex-col gap-px pb-[var(--s-3)]">
                 {group.entries.map(({ document, packages }) => {
                   const info = revisionsOf(document.id);
                   return (

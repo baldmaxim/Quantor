@@ -26,6 +26,7 @@ BASE_ZONES_SCHEMA: Final = "quantor.object_base.zones.v1"
 BASE_CONSTRUCTIONS_SCHEMA: Final = "quantor.object_base.constructions.v1"
 BASE_RISERS_SCHEMA: Final = "quantor.object_base.risers.v1"
 BASE_BUILDING_SCHEMA: Final = "quantor.object_base.building.v1"
+BASE_COORDINATION_SCHEMA: Final = "quantor.object_base.coordination.v1"
 
 CALC_SCHEMA: Final = "quantor.tender_calc.v1"
 CALC_VIEW_SCHEMA: Final = "quantor.tender_calc.view.v1"
@@ -273,6 +274,45 @@ class ObjectBaseBuilding(_Strict):
     floors: list[ObjectBaseBuildingFloor]
 
 
+class ObjectBaseCoordinationAxis(_Strict):
+    """Ось группы линией в мм системы здания: точка на оси и единичное направление."""
+
+    label: str
+    # Направление оси в системе здания: вертикальная (вдоль Y) или горизонтальная (вдоль X).
+    orient: Literal["vertical", "horizontal"]
+    point_mm: Point2
+    direction: Annotated[list[float], Field(min_length=2, max_length=2)]
+    # Сколько этажей её показали и насколько они разошлись поперёк оси (качество совмещения).
+    views: int
+    spread_mm: int
+
+
+class ObjectBaseCoordinationStorey(_Strict):
+    label: str
+    base_z_mm: int
+    floor_height_mm: int
+    # Отметка взята с листа; нет - этаж без отметки (base_z_mm = 0 условно), в IFC не входит.
+    elevation_known: bool = True
+    view_keys: list[ViewKey]
+
+
+class ObjectBaseCoordinationGroup(_Strict):
+    group_key: str
+    group_label: str
+    axes: list[ObjectBaseCoordinationAxis]
+    storeys: list[ObjectBaseCoordinationStorey]
+
+
+class ObjectBaseCoordination(_Strict):
+    """`coordination.json`: сетка осей и этажи по группам здания (корпус/секция), мм здания."""
+
+    schema_name: Literal["quantor.object_base.coordination.v1"] = Field(alias="schema")
+    units: Literal["mm"]
+    frame: Literal["building_mm"]
+    groups: list[ObjectBaseCoordinationGroup]
+    doubts: list[str]
+
+
 # ------------------------------------------------------------- расчёт: пакет TENDER → Quantor
 
 
@@ -445,6 +485,7 @@ PACKAGE_MODELS: Final[dict[str, type[BaseModel]]] = {
     BASE_CONSTRUCTIONS_SCHEMA: ObjectBaseConstructions,
     BASE_RISERS_SCHEMA: ObjectBaseRisers,
     BASE_BUILDING_SCHEMA: ObjectBaseBuilding,
+    BASE_COORDINATION_SCHEMA: ObjectBaseCoordination,
     CALC_SCHEMA: CalcManifest,
     CALC_VIEW_SCHEMA: CalcViewFile,
     CALC_QUANTITIES_SCHEMA: CalcQuantitiesFile,
@@ -698,11 +739,21 @@ class TenderBuildingLayersRead(BaseModel):
 
 # Имена типов без слов «api token»: контракт и клиент их не содержат (тест 9 матрицы
 # безопасности), смысл тот же - персональный токен пользователя.
+TokenScope = Literal["read", "tender", "upload"]
+
+
+def _tender_scope() -> list[TokenScope]:
+    return ["tender"]
+
+
 class PersonalTokenCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=100)
     expires_in_days: int | None = Field(default=None, ge=1, le=365)
+    # Для чего токен: `read` - только чтение (агенты), `tender` - обмен расчётами TENDER, `upload` -
+    # загрузка документов и модели здания. Права - объединение областей в пределах роли владельца.
+    scopes: list[TokenScope] = Field(default_factory=_tender_scope, min_length=1, max_length=3)
 
 
 class PersonalTokenRead(BaseModel):
@@ -715,6 +766,8 @@ class PersonalTokenRead(BaseModel):
     expires_at: datetime | None
     revoked_at: datetime | None
     active: bool
+    # Разрешение ИИ-чату по OAuth (ADR-0054): имя чата; у такой строки нет значения `qtk_`.
+    client_name: str | None = None
 
 
 class PersonalTokenCreated(PersonalTokenRead):

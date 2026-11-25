@@ -24,6 +24,7 @@ from app.errors import DomainError, ErrorCode, not_found
 from app.models import ApiToken
 from app.services import api_tokens as tokens_service
 from app.services import audit as audit_service
+from app.services import oauth as oauth_service
 
 router = APIRouter(
     prefix="/me/api-tokens",
@@ -41,7 +42,7 @@ def _session_only(context: AuthContext) -> None:
         )
 
 
-def _read(row: ApiToken) -> PersonalTokenRead:
+def _read(row: ApiToken, client_name: str | None = None) -> PersonalTokenRead:
     return PersonalTokenRead(
         id=row.id,
         name=row.name,
@@ -52,6 +53,7 @@ def _read(row: ApiToken) -> PersonalTokenRead:
         expires_at=row.expires_at,
         revoked_at=row.revoked_at,
         active=tokens_service.is_active(row),
+        client_name=client_name,
     )
 
 
@@ -66,7 +68,13 @@ async def list_personal_tokens(session: SessionDep, context: AuthDep) -> list[Pe
     rows = await tokens_service.list_for_user(
         session, user_id=context.principal.user_id, workspace_id=context.tenant
     )
-    return [_read(row) for row in rows]
+    # Разрешения ИИ-чатам по OAuth (ADR-0054) - в том же списке, с именем чата.
+    names = await oauth_service.client_names(
+        session, {row.oauth_client_id for row in rows if row.oauth_client_id is not None}
+    )
+    return [
+        _read(row, names.get(row.oauth_client_id) if row.oauth_client_id else None) for row in rows
+    ]
 
 
 @router.post(
@@ -86,6 +94,7 @@ async def create_personal_token(
         workspace_id=context.tenant,
         name=body.name,
         expires_in_days=body.expires_in_days,
+        scopes=body.scopes,
     )
     await audit_service.record(
         session,

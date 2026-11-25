@@ -139,7 +139,9 @@ class Settings(BaseSettings):
     # Пусто — системный каталог временных файлов + quantor-cad.
     cad_work_root: str = ""
     cad_total_timeout_seconds: int = Field(default=2700, ge=10, le=7200)
-    cad_max_memory_mb: int = Field(default=3072, ge=256, le=16384)
+    # Предел адресного пространства конвертации (RLIMIT_AS раннера). 3072 не хватало крупным листам
+    # (1 этаж корпуса с подземкой — `std::bad_alloc`); 6144 — как в compose и deploy/README.
+    cad_max_memory_mb: int = Field(default=6144, ge=256, le=16384)
     # Генераторы CAD (трассы и зоны `cad_mep`, конструкции `cad_walls`) живут в репозитории движка
     # и закреплены в `tools/cad_engine/pins.json` (раздел `generators`, ADR-0036 п. 8, ADR-0038).
     # API читает оттуда только версию генератора и sha256 параметров; пусто — pins.json в корне
@@ -163,6 +165,17 @@ class Settings(BaseSettings):
     # Фасады АР (`cad_facades`, ADR-0048): так же, скрипт и параметры из каталога генераторов.
     cad_facades_runner: str = ""
     cad_facades_params: str = ""
+    # Модель здания из IFC (`cad_model`): так же скрипт и параметры из каталога генераторов.
+    cad_model_runner: str = ""
+    cad_model_params: str = ""
+    # Свой интерпретатор: ifcopenshell и trimesh стоят отдельно от закреплённых пакетов движка
+    # (lock `tools/cad_model/`), окружение остальных генераторов не меняется. Пусто — как у движка.
+    cad_model_python: str = ""
+    # Разбор IFC тяжелее остальных заданий CAD: свой предел памяти (адресного пространства)
+    # процесса генератора. Пять облегчённых IFC Капельского (76 МБ, 21 тыс. элементов,
+    # 1,5 млн треугольников): пик 1,7 ГБ, проходят и при 3072. Выше памяти контейнера
+    # cad-worker (CAD_WORKER_MEM_LIMIT, 4g) поднимать бессмысленно.
+    cad_model_max_memory_mb: int = Field(default=3584, ge=256, le=16384)
 
     # --- вход в портал ---
     #
@@ -204,6 +217,17 @@ class Settings(BaseSettings):
     # запросы, а сюда уходит переадресация, и подставлять её из запроса нельзя.
     portal_base_url: str = "http://localhost:3000"
 
+    # Вход ИИ-чатов по OAuth (ADR-0054). Издатель - `portal_base_url`. Сюда чат может вернуть
+    # человека после разрешения: точный адрес или префикс, оканчивающийся на «/». Адреса этого
+    # компьютера (http://localhost, 127.0.0.1 - Claude Code и другие программы) - отдельным флагом.
+    oauth_redirect_uris: str = (
+        "https://claude.ai/api/mcp/auth_callback,"
+        "https://claude.com/api/mcp/auth_callback,"
+        "https://chatgpt.com/connector_platform_oauth_redirect,"
+        "https://chatgpt.com/connector/oauth/"
+    )
+    oauth_allow_loopback: bool = True
+
     # Аварийное переопределение настроек: `documents.content_url_ttl_seconds=900`.
     # Рычаг на случай, когда неудачное значение в базе положило портал и добраться до
     # админки уже нельзя. Поэтому старше базы и только для чтения из интерфейса.
@@ -221,6 +245,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.api_cors_origins.split(",") if origin.strip()]
+
+    @property
+    def oauth_redirect_allowlist(self) -> list[str]:
+        return [item.strip() for item in self.oauth_redirect_uris.split(",") if item.strip()]
 
     @property
     def tenderhub_enabled(self) -> bool:
