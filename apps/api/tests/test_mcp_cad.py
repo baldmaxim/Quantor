@@ -184,7 +184,16 @@ async def test_get_cad_view_combines_constructions_diagnostics_and_remarks() -> 
             assert request.url.params["attempt"] == "2"
             return httpx.Response(
                 200,
-                json=[{"id": "ai-1", "type": "missing_wall", "status": "open"}],
+                json=[
+                    {
+                        "id": "ai-1",
+                        "type": "missing_wall",
+                        "status": "open",
+                        "reviewer": "Инженер",
+                        "bbox_pt": [10.0, 20.0, 30.0, 40.0],
+                        "comment": "Пропущена стена шахты",
+                    }
+                ],
             )
         return httpx.Response(404, json={"detail": "not found"})
 
@@ -200,6 +209,9 @@ async def test_get_cad_view_combines_constructions_diagnostics_and_remarks() -> 
         },
     )
     assert compact["isError"] is False
+    text_out = compact["content"][0]["text"]
+    assert "ai-1 [missing_wall] (Инженер) bbox_pt=[10.0, 20.0, 30.0, 40.0]" in text_out
+    assert "Пропущена стена шахты" in text_out
     data = compact["structuredContent"]
     assert data["constructions"]["constructions_count"] == 2
     assert "constructions" not in data["constructions"]
@@ -571,3 +583,47 @@ def test_cad_walls_image_artifacts_are_allowed_in_cad_service() -> None:
     assert cad_service.content_type_for("views/p008_v01/plan.png") == "image/png"
     for suffix in ("walls.json", "plan.png", "overlay.png", "render.json"):
         assert cad_service.WALLS_ARTIFACT_NAME.fullmatch(f"views/p008_v01/{suffix}") is not None
+
+
+def test_convert_hints_merge_preserves_previous_and_supports_250_limit() -> None:
+    from app.contracts.cad_convert_hints import MAX_CONVERT_HINTS, CadConvertHint
+    from app.models import Job
+    from app.services.cad_convert_hints import merge_hints, previous_hints_of
+
+    assert MAX_CONVERT_HINTS == 250
+    prev_job = Job(
+        job_type=JobType.CAD_PDF_CONVERT,
+        payload={
+            "params": {
+                "convert_hints": {
+                    "schema": "quantor.cad_convert_hints.v1",
+                    "page": 8,
+                    "hints": [
+                        {
+                            "id": "old-1",
+                            "type": "missing_wall",
+                            "bbox_pt": [1.0, 2.0, 3.0, 4.0],
+                            "comment": "старая",
+                        },
+                        {
+                            "id": "shared",
+                            "type": "missing_wall",
+                            "bbox_pt": [5.0, 6.0, 7.0, 8.0],
+                            "comment": "до правки",
+                        },
+                    ],
+                }
+            }
+        },
+    )
+    prev = previous_hints_of(prev_job)
+    assert [h.id for h in prev] == ["old-1", "shared"]
+    cur = [
+        CadConvertHint(id="shared", type="missing_wall", bbox_pt=(5, 6, 9, 10), comment="после"),
+        CadConvertHint(id="new-1", type="missing_wall", bbox_pt=(10, 20, 30, 40), comment="новая"),
+    ]
+    merged = merge_hints(prev, cur)
+    assert [h.id for h in merged] == ["old-1", "shared", "new-1"]
+    assert merged[1].comment == "после"
+    trimmed = merge_hints(prev, cur, limit=2)
+    assert [h.id for h in trimmed] == ["shared", "new-1"]

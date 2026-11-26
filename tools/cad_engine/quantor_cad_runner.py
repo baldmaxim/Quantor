@@ -288,7 +288,7 @@ def _check_style_profile_shape(raw: Any) -> None:
 
 CONVERT_HINTS_SCHEMA = "quantor.cad_convert_hints.v1"
 CONVERT_HINT_TYPES = ("missing_wall", "missing_door")
-MAX_CONVERT_HINTS = 100
+MAX_CONVERT_HINTS = 250
 MAX_CONVERT_HINT_ID = 64
 MAX_HATCH_CLASSES = 20
 HATCH_CLASS_VALUES = ("monolith", "masonry", "ignore")

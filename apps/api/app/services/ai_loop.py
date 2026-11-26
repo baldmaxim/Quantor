@@ -607,10 +607,13 @@ async def _after_corrector(
     )
     hints = cad_convert_hints.hints_from_remarks(remarks, page_index + 1)
     if hints is not None:
+        merged_hints = cad_convert_hints.merge_hints(
+            cad_convert_hints.previous_hints_of(convert), hints.hints
+        )
         params = cad_convert_hints.reconvert_params(
             convert,
             page_index,
-            hints=hints.hints,
+            hints=merged_hints,
             hatch_classes=cad_convert_hints.hatch_classes_of(convert),
         )
         key = cad_service.idempotency_key(uuid.UUID(str(convert.payload["revision_id"])), params)

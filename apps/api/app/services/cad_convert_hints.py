@@ -82,6 +82,56 @@ def hatch_classes_of(job: Job) -> list[CadHatchClass]:
         return []
 
 
+def previous_hints_of(job: Job) -> list[CadConvertHint]:
+    """Рамки подсказок, с которыми выполнено преобразование; нет или битые - пусто."""
+    params = job.payload.get("params")
+    convert_hints = params.get("convert_hints") if isinstance(params, dict) else None
+    raw = convert_hints.get("hints") if isinstance(convert_hints, dict) else None
+    if not isinstance(raw, list):
+        return []
+    valid: list[CadConvertHint] = []
+    seen: set[str] = set()
+    for item in raw:
+        try:
+            parsed = CadConvertHint.model_validate(item)
+        except ValidationError:
+            continue
+        if parsed.id in seen:
+            continue
+        seen.add(parsed.id)
+        valid.append(parsed)
+    return valid
+
+
+def merge_hints(
+    previous: Sequence[CadConvertHint],
+    current: Sequence[CadConvertHint],
+    *,
+    limit: int = MAX_CONVERT_HINTS,
+) -> list[CadConvertHint]:
+    """Объединяет прежние рамки преобразования с новыми замечаниями без потери уже найденных стен.
+
+    При совпадении `id` побеждает новое замечание (обновляется на месте). Если суммарно рамок
+    больше `limit`, сохраняются последние `limit` записей, чтобы новые замечания не обрезались.
+    """
+    current_by_id = {hint.id: hint for hint in current}
+    merged: list[CadConvertHint] = []
+    seen: set[str] = set()
+    for hint in previous:
+        if hint.id in seen:
+            continue
+        merged.append(current_by_id.get(hint.id, hint))
+        seen.add(hint.id)
+    for hint in current:
+        if hint.id in seen:
+            continue
+        merged.append(hint)
+        seen.add(hint.id)
+    if len(merged) > limit:
+        return merged[-limit:]
+    return merged
+
+
 def _source_params(job: Job, page_index: int) -> dict[str, Any]:
     """Параметры исходного задания для одной страницы: те же масштаб, профиль и лимиты."""
     raw = job.payload.get("params")
@@ -163,7 +213,8 @@ async def schedule_reconvert_by_remarks(
             ErrorCode.CAD_PARAMS_INVALID,
             "У вида нет открытых замечаний «нет стены» или «нет двери» с ненулевой рамкой",
         )
+    merged = merge_hints(previous_hints_of(convert_job), hints.hints)
     params = reconvert_params(
-        convert_job, page_index, hints=hints.hints, hatch_classes=hatch_classes_of(convert_job)
+        convert_job, page_index, hints=merged, hatch_classes=hatch_classes_of(convert_job)
     )
     return await enqueue_reconvert(session, convert_job, params, settings)

@@ -186,6 +186,34 @@ async def test_reconvert_copies_params_adds_hints_and_is_idempotent(
         assert third.status_code == 202, third.text
         assert third.json()["job_id"] != new_id
 
+        # Следующий круг поверх уже переконвертированного задания сохраняет прежние рамки.
+        created_payload = dict(created.payload)
+        created_payload["cad_result"] = {
+            "attempt": 1,
+            "result_status": "succeeded",
+            "artifacts": [],
+            "pages": [{"index": 0, "views": [{"view": 1, "status": "succeeded"}]}],
+        }
+        await db_session.execute(
+            update(Job)
+            .where(Job.id == created.id)
+            .values(attempt=1, status=JobStatus.SUCCEEDED, payload=created_payload)
+        )
+        await db_session.commit()
+        next_key = str(uuid.uuid4())
+        await api.put(
+            f"{base}/{new_id}/remarks/{next_key}?{QUERY}",
+            json=_body(comment="вторая ручная рамка"),
+        )
+        chained = await api.post(f"{base}/{new_id}/views/0/1/reconvert-by-remarks")
+        assert chained.status_code == 202, chained.text
+        chained_job = await db_session.get(Job, uuid.UUID(chained.json()["job_id"]))
+        assert chained_job is not None
+        assert [h["id"] for h in chained_job.payload["params"]["convert_hints"]["hints"]] == [
+            key,
+            next_key,
+        ]
+
 
 async def test_reconvert_requires_ready_result(
     db_session: AsyncSession, build_api: Callable[..., AsyncClient], tmp_path: Path

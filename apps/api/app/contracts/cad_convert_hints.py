@@ -13,7 +13,7 @@ from typing import Annotated, Final, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, model_validator
 
 CONVERT_HINTS_SCHEMA: Final = "quantor.cad_convert_hints.v1"
-MAX_CONVERT_HINTS: Final = 100
+MAX_CONVERT_HINTS: Final = 250
 MAX_HINT_ID_LENGTH: Final = 64
 MAX_HINT_COMMENT_LENGTH: Final = 500
 MAX_HATCH_CLASSES: Final = 20

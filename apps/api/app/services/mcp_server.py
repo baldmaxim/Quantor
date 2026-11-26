@@ -726,8 +726,22 @@ async def get_cad_view(caller: Caller, args: dict[str, Any]) -> ToolResult:
         lines.append(f"Конструкции ещё не готовы: {constructions_error}.")
 
     if remarks is not None:
-        open_count = sum(1 for r in remarks if r.get("status") == "open")
-        lines.append(f"Замечания: открыто {open_count}, всего {len(remarks)}.")
+        open_remarks = [r for r in remarks if r.get("status") == "open"]
+        lines.append(f"Замечания: открыто {len(open_remarks)}, всего {len(remarks)}.")
+        for r in open_remarks[:60]:
+            box = r.get("bbox_pt")
+            box_str = (
+                "[" + ", ".join(f"{float(v):.1f}" for v in box) + "]"
+                if isinstance(box, list) and len(box) == 4
+                else "-"
+            )
+            who = str(r.get("reviewer") or "").strip() or "пользователь"
+            text_comment = " ".join(str(r.get("comment") or "").split())[:200]
+            lines.append(
+                f"  - {r.get('id')} [{r.get('type')}] ({who}) bbox_pt={box_str}: {text_comment}"
+            )
+        if len(open_remarks) > 60:
+            lines.append(f"  … и ещё {len(open_remarks) - 60} открытых замечаний.")
         payload["remarks"] = remarks
 
     return ToolResult("\n".join(lines), payload)
