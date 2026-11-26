@@ -662,7 +662,7 @@ async def get_cad_view(caller: Caller, args: dict[str, Any]) -> ToolResult:
     if raw_revision:
         diagnostics = await caller.get(
             f"/api/v1/projects/{project_id}/revisions/{raw_revision}/cad/{job_id}"
-            f"/views/{page_index}/{view}/diagnostics"
+            f"/views/{page_index}/{view}"
         )
         attempt = diagnostics.get("attempt") if isinstance(diagnostics, dict) else None
         if type(attempt) is int and attempt >= 1:
@@ -948,7 +948,7 @@ async def add_cad_remark(caller: Caller, args: dict[str, Any]) -> ToolResult:
     dxf_sha256: str | None = None
     diagnostics = await caller.get(
         f"/api/v1/projects/{project_id}/revisions/{revision_id}/cad/{job_id}"
-        f"/views/{page_index}/{view}/diagnostics"
+        f"/views/{page_index}/{view}"
     )
     if isinstance(diagnostics, dict):
         if attempt is None and type(diagnostics.get("attempt")) is int:

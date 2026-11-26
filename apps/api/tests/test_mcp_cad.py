@@ -165,8 +165,7 @@ async def test_get_cad_view_combines_constructions_diagnostics_and_remarks() -> 
                 },
             )
         if request.url.path == (
-            f"/api/v1/projects/{PROJECT_ID}/revisions/{REVISION_ID}/cad/{CONVERT_JOB_ID}"
-            "/views/7/1/diagnostics"
+            f"/api/v1/projects/{PROJECT_ID}/revisions/{REVISION_ID}/cad/{CONVERT_JOB_ID}/views/7/1"
         ):
             return httpx.Response(
                 200,
@@ -295,7 +294,9 @@ async def test_add_cad_remark_resolves_attempt_and_enforces_validation() -> None
     captured_body: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET" and request.url.path.endswith("/diagnostics"):
+        if request.method == "GET" and request.url.path == (
+            f"/api/v1/projects/{PROJECT_ID}/revisions/{REVISION_ID}/cad/{CONVERT_JOB_ID}/views/7/1"
+        ):
             return httpx.Response(200, json={"attempt": 3, "dxf": {"sha256": DXF_SHA}})
         if request.method == "PUT" and "/remarks/mcp-" in request.url.path:
             captured_body.update(json.loads(request.content))
@@ -519,7 +520,9 @@ async def test_add_cad_remark_converts_bbox_px_via_render_json() -> None:
                     "height_px": 800,
                 },
             )
-        if request.url.path.endswith("/diagnostics"):
+        if request.url.path == (
+            f"/api/v1/projects/{PROJECT_ID}/revisions/{REVISION_ID}/cad/{CONVERT_JOB_ID}/views/7/1"
+        ):
             return httpx.Response(200, json={"attempt": 1, "dxf": {"sha256": DXF_SHA}})
         if request.method == "PUT":
             captured.update(json.loads(request.content))
